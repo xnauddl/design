@@ -256,7 +256,6 @@
 
     .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
     .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
-    .wiz-done { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     /* ── 콜아웃(안내 노트) ── */
     .ux {
@@ -321,7 +320,6 @@
     .pstep.blocked .pstat { color: var(--muted); }
 
     /* ── 시스템화 마법사 스테퍼 ── */
-    #wizardSteps { margin-top: 8px; }
 
     /* ── 첫 실행 배너 — 카드가 아니라 한 줄(온보딩 흡수) ── */
     .banner {
@@ -630,6 +628,51 @@
     button.bv-switch[aria-checked="false"] .bv-track { background: var(--border-2); }
     button.bv-switch[aria-checked="false"] .bv-track::after { left: 2px; }
     button.bv-switch:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 6px; }
+    /* 트리 목록(IA v4 §2.7) — 머리 32 · 줄 30, 아래 구분선. 머리 = 접기 · 이름 · {n}개 · 스위치 */
+    .tree { display: flex; flex-direction: column; font-size: var(--fs); }
+    .tree:empty { display: none; }
+    .tr { display: flex; align-items: center; gap: 6px; min-height: 30px; padding-right: 2px; border-bottom: 1px solid var(--border); outline: none; }
+    .tr:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
+    .tr-head { min-height: 32px; gap: 4px; }
+    .tr-group { background: var(--surface-2); }
+    button.tr-car { width: 22px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--text-2); font-size: 10px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
+    button.tr-car:hover:not([aria-disabled="true"]) { background: none; color: var(--text); }
+    .tr-name { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tr-group .tr-name { font-size: 12.5px; }
+    .tr-name.muted { font-weight: 500; color: var(--text-2); }
+    .tr-cnt { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; margin-left: 4px; }
+    .tr .grow { flex: 1 1 auto; min-width: 4px; }
+    .tr-tag { font: 500 10px/16px var(--font); padding: 0 5px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); flex: 0 0 auto; white-space: nowrap; }
+    .tr-tag.warn { background: var(--warn-subtle, #fff4e5); color: var(--warn); }
+    .tr-sub { color: var(--text-2); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
+    .tr-note { font-size: 11px; color: var(--text-2); padding: 6px 2px 6px 24px; border-bottom: 1px solid var(--border); line-height: 1.45; }
+    .tr.off .bv-val, .tr.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    .tr.off .bv-arrow, .tr.off .bv-tw, .tr.off .tr-new { color: var(--text-2); }
+    .tr.off .tr-new { font-weight: 500; }
+    .tr.off .bv-sw { filter: grayscale(1); }
+    .tr .tr-old { color: var(--text-2); text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
+    .tr .tr-new { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+    .tr input.tr-edit { width: 130px; height: 22px; min-height: 22px; font: 500 11px var(--mono); padding: 0 6px; border: 1.5px solid var(--accent); border-radius: 4px; }
+    .tr .bv-var.dup { box-shadow: 0 0 0 1.5px var(--warn); }
+    button.bv-switch[aria-checked="mixed"] .bv-track { background: var(--accent); }
+    button.bv-switch[aria-checked="mixed"] .bv-track::after { left: 8px; width: 12px; height: 4px; top: 6px; border-radius: 2px; }
+    button.bv-switch[aria-disabled="true"] { opacity: .45; cursor: default; }
+    .make-free { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; font-size: 11px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
+    .make-free .grow { flex: 1 1 auto; }
+    .make-more { padding: 10px 2px 2px; font-size: 11px; color: var(--text-2); }
+    .make-foot { position: sticky; bottom: 24px; background: var(--bg, #fff); border-top: 1px solid var(--border); margin-top: 8px; padding: 6px 0 8px; z-index: 2; }
+    .make-opts { display: flex; align-items: center; gap: 2px; height: 26px; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
+    .make-opts .lab { color: var(--text-2); font-size: 11px; font-weight: 600; margin-right: 6px; }
+    .make-opts label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
+    .make-act { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 36px; }
+    .make-act .grow { flex: 1 1 auto; }
+    .make-count { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .make-prog { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; font-size: 11px; }
+    .make-prog .bar { height: 4px; display: block; }
+    .make-prog .bar-fill { display: block; height: 4px; }
+    .tr-skel { height: 10px; border-radius: 5px; background: var(--surface-2); display: inline-block; }
+    .tree-top { display: flex; align-items: center; gap: 6px; min-height: 28px; font-size: 11px; color: var(--text-2); padding: 2px 2px 4px; }
+    .tree-top .grow { flex: 1 1 auto; }
     /* 끈 카드 — 글자·칩을 회색으로(opacity 쓰지 않음) */
     .bv-card.off .bv-val, .bv-card.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
     .bv-card.off .bv-arrow, .bv-card.off .bv-tw, .bv-card.off .bv-place { color: var(--text-2); }
@@ -789,7 +832,6 @@
     .popover { position: fixed; z-index: 45; width: 240px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px; }
     .popover[hidden] { display: none; }
     .beta-badge { display: inline-block; font-size: 10px; font-weight: 600; line-height: 14px; background: var(--beta-subtle); color: var(--beta); border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
-    #wizardSlotMake .step { margin-bottom: 10px; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
     .back-link { display: inline-block; margin: 0 0 10px; padding: 4px 0; min-height: 24px; }
@@ -914,8 +956,8 @@
         </div>
       </div>
       <div class="bind-empty" id="bindEmpty" hidden></div>
-      <div class="bv-allrow" id="bindAllRow" hidden><button class="link link-btn" id="bindAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn" id="bindAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></div>
-      <div id="bindTree" class="bind-list" role="grid" data-i18n-aria-label="v4.bindListAria" aria-label="연결할 변수"></div>
+      <div class="tree-top" id="bindAllRow" hidden><span data-i18n="v4.bindTop">켠 곳만 연결해요</span><span class="grow"></span><span><button class="link link-btn" id="bindAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn" id="bindAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+      <div id="bindTree" class="tree" role="treegrid" data-i18n-aria-label="v4.bindListAria" aria-label="연결할 변수"></div>
       <div class="bind-badges" id="bindBadges" hidden>
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
         <div class="skip-row" id="bindSkips" hidden></div>
@@ -927,23 +969,17 @@
       </div>
     </div>
 
-    <div class="step" data-apply-step="rename">
-      <h2><span data-i18n="rename.title">이름 정리</span> <span class="muted" id="renameCount"></span></h2>
-      <div class="hint" data-i18n="rename.hint">역할에 맞는 레이어 이름으로 바꿔요. 최상위·인스턴스 이름은 그대로 둬요</div>
-      <div class="toolbar">
-        <button id="btnPreview" data-i18n="rename.preview">미리보기</button>
-        <button id="btnRename" class="primary" disabled data-i18n="rename.apply">이름 적용</button>
-      </div>
-      <div class="row tree-ctrls">
-        <label class="inline"><input type="checkbox" id="renameAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-        <!-- 보존 행(루트·인스턴스·잠긴 레이어…)을 목록에서 걷어낸다 — 바뀔 것만 보고 싶을 때. -->
-        <button id="btnRenameKeep" class="link" data-i18n="rename.hideKeep">잠금 제외</button>
-      </div>
-      <div id="diff" class="results"></div>
-      <!-- 「되돌리기 안전장치」 콜아웃 철거 — 와이어에 없고, 있으면 오히려 틀린 말을 한다.
-           한 번의 Ctrl/⌘Z로 되돌아가는 건 이 카드만이 아니라 commitUndo를 부르는 13개 동작
-           전부다. 이름 정리에만 붙여 두면 나머지는 안 그렇다는 뜻이 된다. -->
+    <!-- IA v4 §4.4 이름 정리(⑨) — 소속 트리(바꿀 줄 · 이름 그대로인 조상 머리) · 아래 고정 [k개 이름 바꾸기] -->
+    <div class="step bind-v4" data-apply-step="rename">
+      <div class="bind-empty" id="renameEmpty" hidden></div>
+      <div class="tree-top" id="renameTop" hidden><span data-i18n="rename.top">켠 이름만 바꿔요</span><span class="grow"></span><span><button class="link link-btn" id="renameAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn" id="renameAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+      <div id="renameTree" class="tree" role="treegrid" data-i18n-aria-label="rename.treeAria" aria-label="바꿀 이름"></div>
       <div class="status" id="renameStatus"></div>
+      <div class="sub-foot" id="renameFoot">
+        <span class="muted" style="font-size:11px" data-i18n="rename.footNote">레이어 이름만 바뀌어요 · ⌘Z로 되돌릴 수 있어요</span>
+        <span class="grow"></span>
+        <button id="btnRename" class="primary" type="button" data-i18n="rename.applyBtn">이름 바꾸기</button>
+      </div>
     </div>
 
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
@@ -981,9 +1017,33 @@
       <div class="status" id="structureStatus"></div>
     </div>
 
-   <!-- 만들기 하위 화면 — "← 돌아가기"로 변수 탭 첫 화면. -->
+   <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
+   <div class="step bind-v4" id="makeScreen" style="display:none">
+      <div class="status warn" id="makeWarn" hidden></div>
+      <div class="tree-top" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+      <div class="make-free" id="makeFree" hidden>🔒 <span data-i18n="make.freeBox">무료는 변수를 만들지 않아요 · 아래는 유료에서 만들 변수예요</span><span class="grow"></span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div>
+      <div class="bind-empty" id="makeEmpty" hidden></div>
+      <div id="makeTree" class="tree" role="treegrid" data-i18n-aria-label="make.treeAria" aria-label="만들 변수"></div>
+      <div class="tree" id="makeResults" hidden></div>
+      <div class="make-more" id="makeMore" hidden><span data-i18n="make.more">격자 정리 · 테마 · 타이포까지 고르려면</span> <button class="link link-btn" id="btnMakePick" type="button" data-i18n="make.pick">값을 직접 고르기 →</button></div>
+      <div class="make-foot" id="makeFoot">
+        <div class="make-opts" id="makeOpts">
+          <span class="lab" data-i18n="make.after">만든 뒤</span>
+          <label class="inline"><input type="checkbox" id="makeOptLink" checked /> <span data-i18n="make.optLink">바로 연결</span></label>
+          <label class="inline"><input type="checkbox" id="makeOptRename" /> <span data-i18n="make.optRename">이름 정리</span></label>
+          <label class="inline"><input type="checkbox" id="makeOptDark" /> <span data-i18n="make.optDark">다크 모드</span> <span class="tr-tag" id="makeDarkPaid" hidden data-i18n="common.paidTag">유료</span></label>
+        </div>
+        <div class="make-act">
+          <span class="muted make-count" id="makeCount"></span>
+          <span class="make-prog" id="makeProg" hidden><span class="make-prog-text" id="makeProgText"></span><span class="bar"><span class="bar-fill" id="makeProgFill"></span></span></span>
+          <span class="grow"></span>
+          <button id="btnMakeCancel" type="button" hidden data-i18n="common.cancel">취소</button>
+          <button id="btnMakeRun" class="primary" type="button" data-i18n="make.run">변수 만들기</button>
+        </div>
+      </div>
+   </div>
+   <!-- 값을 직접 고르기(IA v4 §4.3 [값을 직접 고르기 →]) — v3 만들기 4단계(색 · 토큰 · 테마 · 타이포). -->
    <div id="varMake" class="sub-screen" style="display:none">
-        <div id="wizardSlotMake"></div>
     <!-- 만들기 단계 레일 — 색 → 토큰 → 테마 → 타이포. 한 화면에 한 단계(카드는 data-make-step로 묶임). -->
     <div class="steps steps-4" id="makeRail" role="tablist" data-i18n-aria-label="rail.makeAria" aria-label="만들기 단계">
       <button class="step-chip" data-make-step="color"><span class="n" data-i18n="rail.color">색</span><span data-i18n="rail.colorSub">추출·변수</span></button>
@@ -999,7 +1059,7 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙어요.">뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 쓰임 이름은 Semantic으로 붙어요.">뽑거나 팔레트를 만든 뒤, 목록에서 Semantic을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
         <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
@@ -1032,7 +1092,7 @@
       </div>
       <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
-        <div class="hint" data-i18n="color.listHint">추출·정리된 색 · Global = hue · Semantic = 역할</div>
+        <div class="hint" data-i18n="color.listHint">추출·정리된 색 · Global = hue 이름 · Semantic = 쓰임 이름</div>
         <!-- 색 N:1 자동 병합 요약/되돌리기 줄은 걷었다(ui.ts 참고) — 이제 색은 이름만 정리하고 전부 변수가 된다. -->
         <!-- 모아 놓은 색 미리보기 한 줄(ui.ts가 채운다). -->
         <div id="paletteRow" class="palette-row"></div>
@@ -1071,8 +1131,8 @@
          DOM은 유지 — 카드가 숨김이라 이 textarea가 역할 맵의 단일 출처다
          (팔레트·색 편집표가 채우고, 자동 추천이 비었을 때만 채우고, 마법사가 읽는다). -->
     <div class="step" data-make-step="token" data-always-hidden style="display:none">
-      <h2><span data-i18n="semantic.title">시맨틱 매핑 (역할 → 토큰)</span> <span class="muted lock" id="semLock"></span></h2>
-      <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>역할 = Global변수이름</code></div>
+      <h2><span data-i18n="semantic.title">Semantic 매핑 (쓰임 이름 → Global)</span> <span class="muted lock" id="semLock"></span></h2>
+      <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>Semantic = Global변수이름</code></div>
       <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
@@ -1091,7 +1151,7 @@
         <button class="btn-next" data-next-make="type" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="row">
-        <label class="inline"><span data-i18n="dark.collection">역할 컬렉션</span>
+        <label class="inline"><span data-i18n="dark.collection">Semantic 컬렉션</span>
           <select id="darkCollection"></select>
         </label>
         <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
@@ -1110,11 +1170,11 @@
       <!-- 색 카드와 같은 이유로 제목 개수 없음 — 상태줄이 「신규 N · 등록됨 N · …」로 이미 말한다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="textStyle.title">텍스트 스타일</span> <span class="muted lock" id="tsLock"></span></h2>
-      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 화면 연결은 레이어 › 연결에서</div>
+      <div class="hint" data-i18n="textStyle.hint">스캔 후 이름을 다듬고 등록하세요. 켜 두면 등록하면서 선택한 글자에 바로 붙여요</div>
       <div class="toolbar">
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
-        <button id="btnTsAddRow" data-i18n="textStyle.addRow">행 추가</button>
         <span class="grow"></span>
+        <label class="inline" style="font-size:11.5px"><input type="checkbox" id="tsLinkNow" checked /> <span data-i18n="textStyle.linkNow">레이어에 바로 연결</span></label>
         <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
       </div>
       <!-- 「가로 행의 왼쪽 텍스트를 이름으로」 체크박스 폐기(결정 2026-08-06) — 스캔 전에 켜고 끄는
@@ -1127,38 +1187,6 @@
       <div class="status" id="tsStatus"></div>
     </div>
    </div>
-   <!-- 마법사 카드(요소 1개) — 시작 화면 또는 만들기 맨 위 중 보이는 곳에 붙는다(§4.3). -->
-    <!-- 시스템화 마법사 — 추출→생성→(시맨틱)→바인딩→정돈을 한 번에 -->
-    <div class="step" id="wizardCard">
-      <h2 data-i18n="wizardCard.title">한 번에 정리</h2>
-      <div class="hint" data-i18n="wizardCard.hint">선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요</div>
-      <div class="hint" id="wizNoSel" hidden data-i18n="wizardCard.noSel">레이어를 선택하면 실행할 수 있어요</div>
-      <div class="wiz-done" id="wizDone" hidden><b id="wizDoneText"></b> <button class="link link-btn" id="btnWizListView" type="button" data-i18n="start.viewList">변수 목록 보기</button></div>
-      <div class="row">
-        <label class="inline"><input id="wizOptSemantics" type="checkbox" checked /> <span data-i18n="wizardCard.optSemantics">역할 매핑</span> <span class="muted" id="wizSemanticLock"></span></label>
-        <label class="inline"><input id="wizOptDark" type="checkbox" /> <span data-i18n="wizardCard.optDark">다크</span> <span class="muted" id="wizDarkLock"></span></label>
-        <label class="inline"><input id="wizOptTextStyles" type="checkbox" /> <span data-i18n="wizardCard.optTextStyles">텍스트 스타일</span> <span class="muted" id="wizTextStylesLock"></span></label>
-        <!-- 연결(무료, 기본 켬) — "한 번에 정리는 연결까지"(IA v4 §4.3 B.1 ~ B.3 마법사) -->
-        <label class="inline"><input id="wizOptBind" type="checkbox" checked /> <span data-i18n="wizardCard.optBind">연결</span></label>
-        <!-- v1.0: 컴포넌트 등록은 마법사에서 뺀다(출시 범위 = 추출→생성→바인딩→리네임→내보내기).
-             리네임 직후 이름 기준 묶기가 섹션들을 한 세트로 합쳐 내용을 덮어쓴 사고(QA 파일). 적용 탭의 수동 등록만 남긴다. -->
-        <label class="inline" style="display:none"><input id="wizOptComponentize" type="checkbox" /> <span data-i18n="wizardCard.optComponentize">컴포넌트</span> <span class="muted" id="wizComponentLock"></span></label>
-      </div>
-      <div class="row">
-        <button id="btnWizardRun" class="primary" data-i18n="wizardCard.run">전체 실행</button>
-        <button id="btnWizardCancel" style="display:none" data-i18n="common.cancel">취소</button>
-      </div>
-      <!-- 실행 단계는 세로 목록이 아니라 미니 파이프 칩 — 진행 상태만 한눈에(사유는 칩 툴팁). -->
-      <div id="wizardSteps" class="pipe-mini"></div>
-      <!-- 범례(와이어 rev j) — 이 카드에는 닮은 말이 둘 있다: 위 체크박스의 「역할 매핑」과
-           파이프 칩의 「변수연결」. 둘 다 '변수에 뭔가 한다'로 읽혀 무엇을 켜야 하는지가
-           흐려진다. 한 줄로 갈라 주고, 여기서 안 도는 다크·텍스트 스타일의 자리도 함께 밝힌다. -->
-      <div class="hint" data-i18n="wizardCard.legend">역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기</div>
-      <div class="status" id="wizardSummary"></div>
-      <!-- 요약 끝 연결 안내(§4.3) — 마법사는 레이어에 변수를 붙이지 않는다. 누르면 레이어 › 연결 + 미리보기. -->
-      <button class="link link-btn" id="btnWizToBind" type="button" hidden data-i18n="wizard.toBind">선택 탭에서 확인하고 연결하기 →</button>
-    </div>
-
   </section>
 
   <section class="tab-section" id="tab-settings" role="region" data-i18n-aria-label="tab.settings" aria-label="설정" tabindex="-1">
@@ -1176,7 +1204,7 @@
       </div>
       <!-- 허용오차는 없앴다(§4.8) — 연결은 언제나 같은 값만. 격자는 만들기가 값을 맞추는 간격이다. -->
       <div class="row">
-        <label class="inline" data-i18n-title="settings.gridTip" title="여백 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
+        <label class="inline" data-i18n-title="settings.gridTip" title="여백 토큰을 값을 직접 고르기 › 토큰에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요."><span data-i18n="settings.grid">여백 격자</span> <input id="grid" type="number" value="8" min="1" max="64" step="1" />px</label>
       </div>
     </div>
 
@@ -1293,15 +1321,15 @@
     // 추출 / 토큰 생성
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
-    "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
+    "color.summary": "\uC0C9 {count}\uAC1C \xB7 Semantic \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
     "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
-    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
+    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 Semantic {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
     "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC5B4\uC694",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
     "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
     // 시맨틱 매핑
-    "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201CSemantic = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
     "semantic.result": "\uC2DC\uB9E8\uD2F1 {aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 {created} / \uAC31\uC2E0 {updated})",
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
@@ -1309,9 +1337,7 @@
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD574\uC694",
     // 리네임
-    "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uCCB4\uD06C \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019",
-    "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694.",
-    "rename.applied": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.",
+    "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
     // 컴포넌트 / 베리언트
     "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
     "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
@@ -1336,15 +1362,11 @@
     "component.reuseKept": " \xB7 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC6D0\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
-    "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
-    "wizard.result": "{state} \u2014 {summary}",
-    "wizard.stopped": "\uC911\uB2E8",
-    "wizard.completed": "\uC644\uB8CC",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
     "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
     "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
-    "dark.collection": "\uC5ED\uD560 \uCEEC\uB809\uC158",
+    "dark.collection": "Semantic \uCEEC\uB809\uC158",
     "dark.fromMode": "\uB77C\uC774\uD2B8",
     "dark.toMode": "\uB2E4\uD06C",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
@@ -1360,24 +1382,12 @@
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
     // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
-    "wizard.step.extract": "\uCD94\uCD9C",
-    "wizard.step.create": "\uD1A0\uD070",
-    "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
-    "wizard.step.dark": "\uB2E4\uD06C",
+    "wizard.step.create": "\uB9CC\uB4E4\uAE30",
+    "wizard.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "wizard.step.bind": "\uC5F0\uACB0",
-    "wizard.step.rename": "\uC774\uB984",
-    "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
-    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC774\uC5D0\uC694 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
-    "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
-    "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
+    "wizard.step.rename": "\uC774\uB984 \uC815\uB9AC",
     // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
-    "wizard.rolesFromTokens": "\uB9CC\uB4E4\uAE30\uC5D0\uC11C \uD568\uAED8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \uC5ED\uD560 {n}\uAC1C",
-    "wizard.rolesFromTokensTail": " \xB7 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5ED\uD560 {n}\uAC1C",
-    "wizard.skip.paid": "\uC720\uB8CC \uAE30\uB2A5",
-    "wizard.chip.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB6F0\uC5B4\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
-    "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
     "pipeline.stat.ready": "\uC900\uBE44",
@@ -1403,38 +1413,26 @@
     "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
-    "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
-    "wizard.seq.noExtract": "\uBF51\uC740 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
-    "wizard.seq.extractDone": "{count}\uAC1C \uD6C4\uBCF4",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
-    "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
     "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
     "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
     "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
     "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
     "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
+    "wizard.seq.textStylesLinked": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uC5F0\uACB0",
+    "wizard.seq.textStylesMissing": " \xB7 \uC54C\uB9BC {k}\uAC1C",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
-    "wizard.seq.bindRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "wizard.seq.bindRoles": " \xB7 \uC0C8 Semantic {k}\uAC1C",
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
-    "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
-    "wizard.sum.tokens": "\uD1A0\uD070 {n}",
-    "wizard.sum.dark": "\uB2E4\uD06C {n}",
-    "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
-    "wizard.sum.bound": "\uC5F0\uACB0 {n}\uACF3",
-    "wizard.sum.renamed": "\uC774\uB984 {n}",
-    "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
-    "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
     // 진행 안내 단계 라벨·안내
     "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
     "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
-    "pipeline.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "pipeline.step.semantics": "Semantic \uB9E4\uD551",
     "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
     "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
@@ -1582,6 +1580,12 @@
     "bind.needOn": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCF1C\uC138\uC694",
     // 빈 상태(목록 자리)
     // 배지 줄
+    // 트리 목록(IA v4 §2.7)
+    "tree.count": "{n}\uAC1C",
+    "tree.expand": "\uD3BC\uCE58\uAE30",
+    "tree.collapse": "\uC811\uAE30",
+    "tree.headAria": "{name} \uBAA8\uB450 \uCF1C\uACE0 \uB044\uAE30",
+    "v4.bindTop": "\uCF20 \uACF3\uB9CC \uC5F0\uACB0\uD574\uC694",
     "bind.allOn": "\uBAA8\uB450 \uCF1C\uAE30",
     "bind.allOff": "\uBAA8\uB450 \uB044\uAE30",
     // 변수 카드 "값 → 변수"
@@ -1593,23 +1597,11 @@
     "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
     "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
     "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
-    "tsSkip.boundVars": "\uAE00\uC790 \uC18D\uC131\uC5D0 \uBCC0\uC218 \uC788\uC74C",
     "tsSkip.mixed": "\uC11C\uC2DD\uC774 \uC11E\uC784",
     "tsSkip.instance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
-    "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
-    "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
-    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
-    "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
-    "wizard.toBind": "\uC120\uD0DD \uD0ED\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
-    "wizard.notLinked": " \xB7 \uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
-    "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
-    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
+    "wizard.toBind": "\uC5F0\uACB0\uD558\uAE30 \u2192",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.addTip": "\uCD94\uAC00",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
@@ -1638,7 +1630,7 @@
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
-    "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
+    "list.semanticsNote": "Semantic \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uB9CC\uB4E4 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
@@ -1699,6 +1691,7 @@
     "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
     "v4.rename": "\uC774\uB984 \uC815\uB9AC",
     "v4.back": "\uB3CC\uC544\uAC00\uAE30",
+    "v4.backHome": "\u2190 \uB3CC\uC544\uAC00\uAE30",
     "v4.subBind": "\uC5F0\uACB0",
     "v4.subComponents": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCA0\uD0C0",
     "v4.subMake": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30",
@@ -1713,6 +1706,72 @@
     // 선택 표시줄(§4.1)
     "sel.unnamed": "(\uC774\uB984 \uC5C6\uC74C)",
     "sel.noneHere": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    // 변수 만들기 화면(IA v4 §4.3)
+    "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
+    "make.subRight": "{name}\uC5D0\uC11C \uCC3E\uC740 \uAC12",
+    "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
+    "make.freeBox": "\uBB34\uB8CC\uB294 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694 \xB7 \uC544\uB798\uB294 \uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uBCC0\uC218\uC608\uC694",
+    "make.license": "\uB77C\uC774\uC120\uC2A4 \u2192",
+    "make.treeAria": "\uB9CC\uB4E4 \uBCC0\uC218",
+    "make.more": "\uACA9\uC790 \uC815\uB9AC \xB7 \uD14C\uB9C8 \xB7 \uD0C0\uC774\uD3EC\uAE4C\uC9C0 \uACE0\uB974\uB824\uBA74",
+    "make.pick": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30 \u2192",
+    "make.after": "\uB9CC\uB4E0 \uB4A4",
+    "make.optLink": "\uBC14\uB85C \uC5F0\uACB0",
+    "make.optRename": "\uC774\uB984 \uC815\uB9AC",
+    "make.optDark": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "common.paidTag": "\uC720\uB8CC",
+    "make.run": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
+    "make.runN": "\uBCC0\uC218 {g}\uAC1C \uB9CC\uB4E4\uAE30",
+    "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
+    "make.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "make.freeCount": "\uAE30\uC874 \uBCC0\uC218\uB85C \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694",
+    "make.freeNeedOpt": "\uBB34\uB8CC\uB85C\uB294 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD560 \uC218 \uC788\uC5B4\uC694",
+    "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "make.counting": "\uC138\uB294 \uC911\u2026",
+    "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
+    "make.countStyles": " \xB7 \uC2A4\uD0C0\uC77C {t}\uAC1C",
+    "make.layers": "\uB808\uC774\uC5B4 {n}",
+    "make.tagHas": "\uC788\uC74C",
+    "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
+    "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
+    "make.tagReuseTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uADF8\uAC83\uC744 \uC368\uC694",
+    "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
+    "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
+    "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
+    "make.semNote": "\uCF20 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 Semantic\uC744 \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694 \xB7 Global\uC744 \uB044\uBA74 \uADF8 Semantic\uB3C4 \uBE60\uC838\uC694",
+    "make.tsNote": "\uC774\uB984\uC744 \uB354\uBE14\uD074\uB9AD\uD558\uBA74 \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694 \xB7 \uC2A4\uD0C0\uC77C\uC5D0 \uC4F8 \uAE00\uC790 \uD06C\uAE30 \xB7 \uC904 \uB192\uC774 \xB7 \uC790\uAC04 \uBCC0\uC218\uB3C4 \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
+    "make.tsDup": "\uC2A4\uD0C0\uC77C \uC774\uB984\uC774 \uACB9\uCCD0\uC694",
+    "make.tsExists": "\uC774\uBBF8 \uC788\uB294 \uC2A4\uD0C0\uC77C \uC774\uB984\uC774\uC5D0\uC694",
+    "make.tsHasTip": "\uAC19\uC740 \uAC12\uC758 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 \uC774\uB984\uB9CC \uB9DE\uCDB0\uC694",
+    "make.tsEditAria": "\uC2A4\uD0C0\uC77C \uC774\uB984",
+    "make.zero": "\uC774 \uC120\uD0DD\uC5D0\uC11C \uCC3E\uC740 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "make.runLocked": "\uB9CC\uB4DC\uB294 \uB3D9\uC548\uC740 \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694",
+    "make.partialTitle": "\uC77C\uBD80 \uB2E8\uACC4\uAC00 \uB05D\uB098\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "make.partialKept": "\uB9CC\uB4E0 \uBCC0\uC218\uB294 \uB0A8\uC544 \uC788\uC5B4\uC694 \xB7 \uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCFC \uC218 \uC788\uC5B4\uC694",
+    "make.partialStatus": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \uC77C\uBD80 \uC2E4\uD328",
+    "make.stepOf": "{i}/{n}\uB2E8\uACC4",
+    "make.stepOff": "\uAED0\uC74C",
+    "make.run.create": "\uB9CC\uB4DC\uB294 \uC911\u2026",
+    "make.run.dark": "\uB2E4\uD06C \uBAA8\uB4DC \uB9CC\uB4DC\uB294 \uC911\u2026",
+    "make.run.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uD558\uB294 \uC911\u2026",
+    "make.run.bind": "\uC5F0\uACB0\uD558\uB294 \uC911\u2026",
+    "make.run.rename": "\uC774\uB984 \uBC14\uAFB8\uB294 \uC911\u2026",
+    "make.cancelled": "\uCDE8\uC18C\uD588\uC5B4\uC694",
+    "make.cancelledUpTo": "\uCDE8\uC18C\uD588\uC5B4\uC694 \xB7 {step}\uAE4C\uC9C0 \uB410\uC5B4\uC694",
+    "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
+    "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
+    "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
+    "make.done.stylesLinked": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C(\uAE00\uC790 {a}\uAC1C)",
+    "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
+    "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
+    "make.done.manual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {m}",
+    "make.done.free": "\uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "make.done.notLinked": "\uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
+    "common.view": "\uBCF4\uAE30",
+    "textStyle.linkNow": "\uB808\uC774\uC5B4\uC5D0 \uBC14\uB85C \uC5F0\uACB0",
+    "textStyle.linkNeedScan": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uACE0 \uC2A4\uCE94\uD558\uBA74 \uBC14\uB85C \uBD99\uC77C \uC218 \uC788\uC5B4\uC694",
+    "textStyle.linkedN": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uBD99\uC784",
+    "textStyle.linkSkipped": " \xB7 \uBABB \uBD99\uC778 \uAE00\uC790 {k}\uAC1C",
     "make.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC758 \uAC12\uC73C\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     // 공통 상태 줄(§4.1·§2.3)
     "status.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4\uC5D0\uC11C \uD480 \uC218 \uC788\uC5B4\uC694",
@@ -1724,7 +1783,7 @@
     // 작업 이름 — 최소화 중 실패 안내("{op} 실패 · [보기]")
     "op.extract": "\uCD94\uCD9C",
     "op.create": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30",
-    "op.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "op.semantics": "Semantic \uB9E4\uD551",
     "op.dark": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     "op.textScan": "\uD14D\uC2A4\uD2B8 \uC2A4\uCE94",
     "op.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
@@ -1758,23 +1817,14 @@
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB3FC\uC694",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
     "settings.grid": "\uC5EC\uBC31 \uACA9\uC790",
-    "settings.gridTip": "\uC5EC\uBC31 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
+    "settings.gridTip": "\uC5EC\uBC31 \uD1A0\uD070\uC744 \uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30 \u203A \uD1A0\uD070\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
     "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
     // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
     "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
     // 마법사 카드
-    "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
-    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uB808\uC774\uC5B4 \uC774\uB984\uC744 \uC815\uB9AC\uD574\uC694",
-    "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
-    "wizardCard.optDark": "\uB2E4\uD06C",
-    "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "wizardCard.optBind": "\uC5F0\uACB0",
-    "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC4F0\uC784 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30\uB85C \u2192",
@@ -1784,7 +1834,7 @@
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",
-    "color.listHint": "\uCD94\uCD9C\xB7\uC815\uB9AC\uB41C \uC0C9 \xB7 Global = hue \xB7 Semantic = \uC5ED\uD560",
+    "color.listHint": "\uCD94\uCD9C\xB7\uC815\uB9AC\uB41C \uC0C9 \xB7 Global = hue \uC774\uB984 \xB7 Semantic = \uC4F0\uC784 \uC774\uB984",
     "color.makeVars": "\uC0C9 \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "palette.brand2": "\uBCF4\uC870\uC0C9",
     "palette.harmony": "\uD558\uBAA8\uB2C8",
@@ -1800,8 +1850,8 @@
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
-    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
+    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C Semantic\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC4F0\uC784 \uC774\uB984\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
     "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB904\uC694. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
@@ -1814,14 +1864,13 @@
     "create.rowCheckTip": "\uC0DD\uC131 \uB300\uC0C1",
     "create.rowCountTip": "\uC774 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 {count}\uAC1C",
     // 시맨틱 매핑 카드
-    "semantic.title": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551 (\uC5ED\uD560 \u2192 \uD1A0\uD070)",
-    "semantic.formatLabel": "\uD615\uC2DD: <code>\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984</code>",
+    "semantic.title": "Semantic \uB9E4\uD551 (\uC4F0\uC784 \uC774\uB984 \u2192 Global)",
+    "semantic.formatLabel": "\uD615\uC2DD: <code>Semantic = Global\uBCC0\uC218\uC774\uB984</code>",
     "semantic.aliasBtn": "\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C",
+    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uCF1C \uB450\uBA74 \uB4F1\uB85D\uD558\uBA74\uC11C \uC120\uD0DD\uD55C \uAE00\uC790\uC5D0 \uBC14\uB85C \uBD99\uC5EC\uC694",
     "textStyle.scanBtn": "\uC2A4\uCE94",
-    "textStyle.addRow": "\uD589 \uCD94\uAC00",
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
@@ -1843,7 +1892,7 @@
     // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
     // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
     // 키 = `color/` 접두사를 뗀 역할 경로의 `/`→`-` (color/background/brand-bold → background-brand-bold).
-    "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
+    "role.none": "Semantic \uC5C6\uC74C",
     "role.background-default": "\uBA74",
     "role.background-subtle": "\uC605\uC740 \uBA74",
     "role.background-inverse": "\uBC18\uC804 \uBA74",
@@ -1871,19 +1920,17 @@
     "role.icon-subtle": "\uC605\uC740 \uC544\uC774\uCF58",
     "role.icon-brand": "\uC8FC\uC0C9 \uC544\uC774\uCF58",
     // 리네임
-    "rename.title": "\uC774\uB984 \uC815\uB9AC",
-    "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFD4\uC694. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
-    "rename.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "rename.apply": "\uC774\uB984 \uC801\uC6A9",
+    // 이름 정리 화면(IA v4 §4.4)
+    "rename.top": "\uCF20 \uC774\uB984\uB9CC \uBC14\uAFD4\uC694",
+    "rename.treeAria": "\uBC14\uAFC0 \uC774\uB984",
+    "rename.footNote": "\uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uBC14\uB00C\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694",
+    "rename.applyBtn": "\uC774\uB984 \uBC14\uAFB8\uAE30",
+    "rename.applyN": "{k}\uAC1C \uC774\uB984 \uBC14\uAFB8\uAE30",
+    "rename.switchAria": "{name}(\uC73C)\uB85C \uBC14\uAFB8\uAE30",
+    "rename.needOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "rename.doneStatus": "\uC774\uB984 {k}\uAC1C \uBC14\uAFC8 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "rename.subRight": "{name} \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
     // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
-    "rename.keep.root": "\uB8E8\uD2B8 \uBCF4\uC874",
-    "rename.keep.instance": "\uC778\uC2A4\uD134\uC2A4 \uBCF4\uC874",
-    "rename.keep.component": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCF4\uC874",
-    "rename.keep.text": "\uD14D\uC2A4\uD2B8 \uBCF4\uC874",
-    "rename.keep.locked": "\uC7A0\uAE34 \uB808\uC774\uC5B4",
-    "rename.keep.meta": "\uC7A0\uAE08",
-    "rename.hideKeep": "\uC7A0\uAE08 \uC81C\uC678",
-    "rename.showKeep": "\uC7A0\uAE08 \uD45C\uC2DC",
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
     "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
@@ -1938,14 +1985,13 @@
     // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
     // 새 역할(§2.12, §4.6)
     "bind.newRole": "N",
-    "bind.newRoleAria": "\uC0C8 \uC5ED\uD560",
+    "bind.newRoleAria": "\uC0C8 Semantic",
     "bind.newRoleTip": "{global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.waitOp": "{op} \uC791\uC5C5\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.skipSelected": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C \uC120\uD0DD",
     // 레이어 › 이름
-    "rename.count": "\uD6C4\uBCF4 {total}",
     // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
     "component.extraSkipped": " \xB7 \uAC74\uB108\uB700 {n}",
     "component.extraSingles": " \xB7 \uB2E8\uC77C {n}",
@@ -2037,7 +2083,7 @@
     "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
     // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
-    "create.sumRoles": " \xB7 \uC5ED\uD560 {n}\uAC1C",
+    "create.sumRoles": " \xB7 Semantic {n}\uAC1C",
     "create.tidySummary": "\uC5EC\uBC31 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
     "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
     "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
@@ -2077,7 +2123,7 @@
     "textStyle.scanLhPct": " \xB7 \uD589\uAC04% {n}",
     "textStyle.scanLsPct": " \xB7 \uC790\uAC04% {n}",
     "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
-    "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.",
+    "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
@@ -2420,6 +2466,9 @@
   }
 
   // src/lib/textStyles.ts
+  function tsSig(s) {
+    return `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+  }
   var STYLE_BY_WEIGHT = {
     100: "Thin",
     200: "ExtraLight",
@@ -2456,6 +2505,259 @@
       family,
       style: fontStyleForWeight(r.weight, false)
     }));
+  }
+
+  // src/lib/treeState.ts
+  function headState(rows) {
+    const free = rows.filter((r) => !r.locked);
+    if (!free.length) return null;
+    const on = free.filter((r) => r.on).length;
+    return on === free.length ? true : on === 0 ? false : "mixed";
+  }
+  function headToggleTarget(state2) {
+    return state2 === false;
+  }
+  function mergeSameNameTokens(tokens2) {
+    var _a, _b, _c;
+    const out = [];
+    const byName = /* @__PURE__ */ new Map();
+    for (const t2 of tokens2) {
+      const prev = byName.get(t2.name);
+      if (!prev) {
+        const copy = __spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {});
+        byName.set(t2.name, copy);
+        out.push(copy);
+        continue;
+      }
+      if (prev.category === "effectColor" || prev.category === "color") prev.category = "color";
+      for (const s of t2.sources) if (!prev.sources.includes(s)) prev.sources.push(s);
+      if ((_a = t2.uses) == null ? void 0 : _a.length) {
+        const uses = (_b = prev.uses) != null ? _b : prev.uses = [];
+        for (const u of t2.uses) {
+          const same = uses.find((x) => x.name === u.name && x.bg === u.bg);
+          if (same) same.count += u.count;
+          else uses.push(__spreadValues({}, u));
+        }
+      }
+      if (t2.count != null) prev.count = Math.max((_c = prev.count) != null ? _c : 0, t2.count);
+    }
+    return out;
+  }
+  function buildRenameTree(nodes) {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    const keep = /* @__PURE__ */ new Set();
+    for (const n of nodes) {
+      if (n.after === void 0) continue;
+      for (let cur = n; cur && !keep.has(cur.id); cur = cur.parentId ? byId.get(cur.parentId) : void 0) keep.add(cur.id);
+    }
+    const kept = nodes.filter((n) => keep.has(n.id));
+    if (!kept.length) return [];
+    const minDepth = Math.min(...kept.map((n) => n.depth));
+    const items = /* @__PURE__ */ new Map();
+    const roots = [];
+    for (const n of kept) {
+      const it = __spreadProps(__spreadValues({ id: n.id, kind: n.after !== void 0 ? "row" : "head", name: n.name }, n.after !== void 0 ? { after: n.after } : {}), { level: n.depth - minDepth, descendants: [], children: [] });
+      items.set(n.id, it);
+      const parent2 = n.parentId ? items.get(n.parentId) : void 0;
+      if (parent2) parent2.children.push(it);
+      else roots.push(it);
+    }
+    const fill = (it) => {
+      const ds = [];
+      for (const c of it.children) {
+        if (c.kind === "row") ds.push(c.id);
+        ds.push(...fill(c));
+      }
+      it.descendants = ds;
+      return ds;
+    };
+    roots.forEach(fill);
+    return roots;
+  }
+
+  // src/treeList.ts
+  var state = /* @__PURE__ */ new WeakMap();
+  function swEl(sw, locked) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "bv-switch";
+    b.setAttribute("role", "switch");
+    b.setAttribute("aria-checked", sw.state === null ? "false" : String(sw.state));
+    b.setAttribute("aria-label", sw.label);
+    b.tabIndex = -1;
+    const dis = locked || sw.disabled || sw.state === null;
+    if (dis) b.setAttribute("aria-disabled", "true");
+    const tr = document.createElement("span");
+    tr.className = "bv-track";
+    tr.setAttribute("aria-hidden", "true");
+    b.appendChild(tr);
+    b.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (b.getAttribute("aria-disabled") === "true") return;
+      sw.onToggle();
+    });
+    return b;
+  }
+  function renderTree(mount, items, opts) {
+    var _a, _b, _c;
+    const active = document.activeElement;
+    const hadFocus = !!active && mount.contains(active) && !active.matches("input, textarea");
+    const focusKey2 = hadFocus ? (_b = (_a = active.closest("[data-tkey]")) == null ? void 0 : _a.dataset.tkey) != null ? _b : null : (_c = mount.dataset.focusKey) != null ? _c : null;
+    mount.replaceChildren();
+    mount.setAttribute("role", "treegrid");
+    const flat = [];
+    const walk = (list, parentKey, level) => {
+      var _a2, _b2, _c2, _d;
+      for (const it of list) {
+        flat.push({ item: it, parentKey, level });
+        const row = document.createElement("div");
+        row.className = `tr ${it.head ? "tr-head" : "tr-row"}${it.group ? " tr-group" : ""}${it.off ? " off" : ""}${it.cls ? " " + it.cls : ""}`;
+        row.setAttribute("role", "row");
+        row.setAttribute("aria-level", String(level + 1));
+        row.dataset.tkey = it.key;
+        row.tabIndex = -1;
+        row.style.paddingLeft = `${it.indent}px`;
+        const hasKids = !!((_a2 = it.children) == null ? void 0 : _a2.length);
+        const open = hasKids && !opts.collapsed.has(it.key);
+        if (hasKids) row.setAttribute("aria-expanded", String(open));
+        if (hasKids || it.head) {
+          const car = document.createElement("button");
+          car.type = "button";
+          car.className = "tr-car";
+          car.tabIndex = -1;
+          car.textContent = open ? "\u25BC" : "\u25B6";
+          car.setAttribute("aria-label", open ? opts.collapseLabel : opts.expandLabel);
+          if (!hasKids) car.style.visibility = "hidden";
+          if (opts.locked) car.setAttribute("aria-disabled", "true");
+          car.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (opts.locked || !hasKids) return;
+            toggle(it.key);
+          });
+          row.appendChild(car);
+        }
+        if (it.head) {
+          const nm = document.createElement("span");
+          nm.className = `tr-name${it.muted ? " muted" : ""}`;
+          nm.textContent = (_b2 = it.name) != null ? _b2 : "";
+          const ct = document.createElement("span");
+          ct.className = "tr-cnt";
+          ct.textContent = (_c2 = it.countText) != null ? _c2 : "";
+          row.append(nm, ct);
+        } else row.append(...(_d = it.cells) != null ? _d : []);
+        const grow = document.createElement("span");
+        grow.className = "grow";
+        row.appendChild(grow);
+        if (it.right) row.append(...it.right);
+        if (it.sw) row.appendChild(swEl(it.sw, !!opts.locked));
+        if (it.aria) row.setAttribute("aria-label", it.aria);
+        mount.appendChild(row);
+        if (open) walk(it.children, it.key, level + 1);
+      }
+    };
+    const toggle = (key) => {
+      if (opts.collapsed.has(key)) opts.collapsed.delete(key);
+      else opts.collapsed.add(key);
+      mount.dataset.focusKey = key;
+      opts.rerender();
+      focusRow(mount, key);
+    };
+    walk(items, null, 0);
+    state.set(mount, { flat, opts });
+    const rows = Array.from(mount.querySelectorAll("[data-tkey]"));
+    const target = focusKey2 && rows.find((r) => r.dataset.tkey === focusKey2) || rows[0];
+    if (target) target.tabIndex = 0;
+    if (hadFocus && target) target.focus({ preventScroll: true });
+    if (!mount.dataset.treeKeys) {
+      mount.dataset.treeKeys = "1";
+      mount.addEventListener("keydown", (e) => onKey(mount, e));
+      mount.addEventListener("focusin", (e) => {
+        const r = e.target.closest("[data-tkey]");
+        if (!r) return;
+        mount.dataset.focusKey = r.dataset.tkey;
+        for (const x of Array.from(mount.querySelectorAll("[data-tkey]"))) x.tabIndex = x === r ? 0 : -1;
+      });
+    }
+  }
+  function focusRow(mount, key) {
+    const rows = Array.from(mount.querySelectorAll("[data-tkey]"));
+    const r = rows.find((x) => x.dataset.tkey === key);
+    if (!r) return;
+    rows.forEach((x) => x.tabIndex = x === r ? 0 : -1);
+    r.focus({ preventScroll: false });
+  }
+  function onKey(mount, e) {
+    var _a, _b;
+    const st = state.get(mount);
+    if (!st) return;
+    if (e.target.matches("input, textarea")) return;
+    const rows = Array.from(mount.querySelectorAll("[data-tkey]"));
+    const cur = e.target.closest("[data-tkey]");
+    if (!cur) return;
+    const i = rows.indexOf(cur);
+    const f = st.flat.find((x) => x.item.key === cur.dataset.tkey);
+    if (!f) return;
+    const it = f.item;
+    const hasKids = !!((_a = it.children) == null ? void 0 : _a.length);
+    const open = hasKids && !st.opts.collapsed.has(it.key);
+    const go = (j) => {
+      const tg = rows[Math.max(0, Math.min(rows.length - 1, j))];
+      if (tg) focusRow(mount, tg.dataset.tkey);
+    };
+    const toggleOpen = () => {
+      if (st.opts.locked) return;
+      if (open) st.opts.collapsed.add(it.key);
+      else st.opts.collapsed.delete(it.key);
+      mount.dataset.focusKey = it.key;
+      st.opts.rerender();
+      focusRow(mount, it.key);
+    };
+    switch (e.key) {
+      case "ArrowDown":
+        go(i + 1);
+        break;
+      case "ArrowUp":
+        go(i - 1);
+        break;
+      case "Home":
+        go(0);
+        break;
+      case "End":
+        go(rows.length - 1);
+        break;
+      case "ArrowRight":
+        if (!hasKids) return;
+        if (open) go(i + 1);
+        else toggleOpen();
+        break;
+      case "ArrowLeft":
+        if (hasKids && open) toggleOpen();
+        else if (f.parentKey) focusRow(mount, f.parentKey);
+        else return;
+        break;
+      case "Enter":
+        if (hasKids && (it.head || !it.onEdit)) toggleOpen();
+        else if (it.onEdit && !st.opts.locked) it.onEdit();
+        else return;
+        break;
+      case "F2":
+        if (!it.onEdit || st.opts.locked) return;
+        it.onEdit();
+        break;
+      case " ":
+      case "Spacebar": {
+        const sw = cur.querySelector(":scope > .bv-switch");
+        if (!sw || sw.getAttribute("aria-disabled") === "true") {
+          e.preventDefault();
+          return;
+        }
+        (_b = it.sw) == null ? void 0 : _b.onToggle();
+        break;
+      }
+      default:
+        return;
+    }
+    e.preventDefault();
   }
 
   // src/lib/entitlements.ts
@@ -3481,28 +3783,15 @@
   }
 
   // src/lib/wizard.ts
-  var WIZARD_STEPS = [
-    { id: "extract", write: false, optional: false },
-    { id: "create", write: true, optional: false, paid: true },
-    { id: "semantics", write: true, optional: true, paid: true },
-    // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
-    { id: "dark", write: true, optional: true, paid: true },
-    { id: "textStyles", write: true, optional: true, paid: true },
-    { id: "bind", write: true, optional: true },
-    // 무료 — 연결은 무료 기능이다
-    { id: "rename", write: true, optional: false },
-    { id: "componentize", write: true, optional: true, paid: true }
-  ];
-  function planWizard(options, ctx) {
-    return WIZARD_STEPS.map((step) => {
-      if (step.optional) {
-        const enabled = options[step.id];
-        if (!enabled) return { step, run: false, skipReason: "wizard.skip.optionOff" };
-        if (step.id === "semantics" && !ctx.hasSemanticMap) return { step, run: false, skipReason: "wizard.skip.noMapping" };
-      }
-      if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: "wizard.skip.paid" };
-      return { step, run: true };
-    });
+  var MAKE_STEP_ORDER = ["create", "dark", "textStyles", "bind", "rename"];
+  function planMake(i) {
+    const out = [];
+    if (i.isPaid && i.globalsOn > 0) out.push("create");
+    if (i.isPaid && i.dark) out.push("dark");
+    if (i.isPaid && i.stylesOn > 0) out.push("textStyles");
+    if (i.link) out.push("bind");
+    if (i.rename) out.push("rename");
+    return out;
   }
   function pickDarkTarget(vars) {
     const target = vars.find((v) => v.owned === "semantic" && v.modes.length >= 1);
@@ -3512,15 +3801,17 @@
     if (!from) return null;
     return __spreadValues({ collectionId: target.collectionId, fromModeId: from.modeId }, dark ? { toModeId: dark.modeId } : {});
   }
-  function summarize(totals) {
+  function makeDoneText(totals, opts) {
     const parts = [];
-    if (totals.created != null) parts.push(t("wizard.sum.tokens", { n: totals.created }));
-    if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t("wizard.sum.dark", { n: totals.darkFilled }));
-    if (totals.textStyles != null && totals.textStyles > 0) parts.push(t("wizard.sum.textStyles", { n: totals.textStyles }));
-    if (totals.bound != null) parts.push(t("wizard.sum.bound", { n: totals.bound }));
-    if (totals.renamed != null) parts.push(t("wizard.sum.renamed", { n: totals.renamed }));
-    if (totals.components != null && totals.components > 0) parts.push(t("wizard.sum.components", { n: totals.components }));
-    return parts.length ? parts.join(" \xB7 ") : t("wizard.sum.empty");
+    if (totals.created) parts.push(t("make.done.create", { g: totals.created.g, r: totals.created.r }));
+    if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
+    if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
+    if (totals.bound != null) parts.push(t("make.done.bind", { n: totals.bound }));
+    if (totals.renamed != null) parts.push(t("make.done.rename", { c: totals.renamed }));
+    if (totals.created && totals.created.m > 0) parts.push(t("make.done.manual", { m: totals.created.m }));
+    if (!opts.isPaid) parts.push(t("make.done.free"));
+    if (opts.linkOff) parts.push(t("make.done.notLinked"));
+    return parts.join(" \xB7 ");
   }
 
   // src/ui.ts
@@ -4258,18 +4549,19 @@
       });
     });
   }
-  $("btnScanText").addEventListener("click", () => send({ type: "SCAN_TEXT_STYLES" }));
+  var tsScanIds = null;
+  $("btnScanText").addEventListener("click", () => {
+    const ids = (baseline == null ? void 0 : baseline.ids.length) ? baseline.ids : curSel.ids.length ? curSel.ids : null;
+    tsScanIds = ids ? ids.slice() : null;
+    send(ids ? { type: "SCAN_TEXT_STYLES", nodeIds: ids } : { type: "SCAN_TEXT_STYLES" });
+    renderTsLink();
+  });
+  function renderTsLink() {
+    setLock($("tsLinkNow"), tsScanIds ? null : "prereq", t("textStyle.linkNeedScan"));
+  }
   $("btnTsRowLabels").addEventListener("click", () => {
     setStatus("tsStatus", t("textStyle.renaming"), "ok");
     send({ type: "NAME_TEXT_STYLES_BY_ROW" });
-  });
-  $("btnTsAddRow").addEventListener("click", () => {
-    var _a;
-    tsSpecs.push({ name: "", fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: "Regular" });
-    renderTextStyles();
-    const last = $("tsList").lastElementChild;
-    last == null ? void 0 : last.scrollIntoView({ block: "nearest" });
-    (_a = last == null ? void 0 : last.querySelector("input")) == null ? void 0 : _a.focus();
   });
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
@@ -4277,7 +4569,8 @@
       setStatus("tsStatus", t("textStyle.needSpecs"), "warn");
       return;
     }
-    send({ type: "CREATE_TEXT_STYLES", styles });
+    const link = $("tsLinkNow").checked && !!tsScanIds;
+    send(link ? { type: "CREATE_TEXT_STYLES", styles, applyTo: tsScanIds } : { type: "CREATE_TEXT_STYLES", styles });
   });
   var AUTO_SCAN_DELAY = 250;
   var bindReqSeq = 0;
@@ -4379,27 +4672,6 @@
     send({ type: "CANCEL" });
     setStatus("applyStatus", t("apply.cancelRequested"), "warn");
   });
-  $("btnPreview").addEventListener("click", () => {
-    send({ type: "RENAME", apply: false, maxDepth: readMaxDepth() });
-  });
-  $("btnRename").addEventListener("click", () => {
-    const items = renameNodes.filter((n) => n.after !== void 0 && renameChecked.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after, role: n.role }));
-    if (!items.length) return;
-    const roleOnly = renameNodes.filter((n) => n.after === void 0 && n.role).map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
-    send({ type: "RENAME_APPLY", items: [...items, ...roleOnly] });
-  });
-  $("renameAll").addEventListener("change", (e) => {
-    const on = e.target.checked;
-    renameChecked.clear();
-    if (on) {
-      for (const n of renameNodes) if (n.after !== void 0) renameChecked.add(n.id);
-    }
-    renderRenameTree();
-  });
-  $("btnRenameKeep").addEventListener("click", () => {
-    renameHideKeep = !renameHideKeep;
-    renderRenameTree();
-  });
   var wizardRunning = false;
   var PaidRequiredError = class extends Error {
   };
@@ -4433,235 +4705,6 @@
       send(msg);
     });
   }
-  function paidSkippedSteps(plan) {
-    return plan.filter((p) => !p.run && p.skipReason === "wizard.skip.paid");
-  }
-  function renderWizardSteps(plan) {
-    const box = $("wizardSteps");
-    box.innerHTML = "";
-    let n = 0;
-    for (const p of plan) {
-      const paidSkip = !p.run && p.skipReason === "wizard.skip.paid";
-      if (!p.run && !paidSkip) continue;
-      const chip = document.createElement("span");
-      chip.id = `wstep-${p.step.id}`;
-      const label = t("wizard.step." + p.step.id);
-      if (p.run) {
-        chip.textContent = `${++n} ${label}`;
-      } else {
-        chip.className = "skip";
-        chip.textContent = `${PAID_LOCK} ${label}`;
-        chip.title = t("wizard.chip.paid");
-      }
-      box.appendChild(chip);
-    }
-  }
-  var wizardFailed = false;
-  function setWizardStep(id, state, note) {
-    if (state === "fail" && note !== t("wizard.seq.stoppedPrev")) wizardFailed = true;
-    const chip = document.getElementById(`wstep-${id}`);
-    if (!chip) return;
-    chip.classList.remove("active", "done", "fail");
-    chip.classList.add(state);
-    chip.title = note;
-  }
-  async function runWizard() {
-    var _a, _b, _c, _d, _e, _f, _g;
-    if (wizardRunning) return;
-    if (lastSelCount <= 0) {
-      setStatus("wizardSummary", t("wizard.needSelect"), "warn");
-      return;
-    }
-    const base = Number($("base").value) || 16;
-    const maxDepth = readMaxDepth();
-    let semMap = textToSemanticMap($("semMap").value);
-    const options = {
-      semantics: $("wizOptSemantics").checked,
-      dark: $("wizOptDark").checked,
-      textStyles: $("wizOptTextStyles").checked,
-      bind: $("wizOptBind").checked,
-      // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
-      componentize: false
-    };
-    const ctx = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
-    const plan = planWizard(options, ctx);
-    const wizIds = (baseline != null ? baseline : curSel).ids.slice();
-    wizBindRan = false;
-    wizardRunning = true;
-    wizardFailed = false;
-    wizBeforeCount = localVarCount();
-    wizFrom = activeTab === "select" && selSub === "make" ? "make" : "start";
-    wizLatch = wizBeforeCount === 0 ? { from: wizFrom, before: 0, summarySeen: false, done: false } : null;
-    opWizardStart();
-    $("btnWizardRun").disabled = true;
-    $("btnWizardCancel").style.display = "";
-    setStatus("wizardSummary", t("common.running"), "");
-    renderWizardSteps(plan);
-    const totals = {};
-    let rolesFromTokens = 0;
-    let stopped = false;
-    let failNote = "";
-    wizCancelReq = false;
-    wizEnded = false;
-    renderWizToBind();
-    for (const p of plan) {
-      if (!p.run) continue;
-      if (wizCancelReq && !stopped) stopped = true;
-      if (stopped) {
-        setWizardStep(p.step.id, "fail", wizCancelReq ? t("wizard.seq.cancelSkipped") : t("wizard.seq.stoppedPrev"));
-        continue;
-      }
-      setWizardStep(p.step.id, "active", t("wizard.seq.running"));
-      try {
-        switch (p.step.id) {
-          case "extract": {
-            await wizardRequest({ type: "EXTRACT", nodeIds: wizIds }, ["EXTRACT_RESULT"]);
-            if (!tokens.length) {
-              setWizardStep("extract", "fail", t("wizard.seq.noExtract"));
-              stopped = true;
-              break;
-            }
-            colorRevealed = true;
-            previewRevealed = true;
-            renderColorTable();
-            renderTokens();
-            setSemMapText(colorAuthoritativeRoles(base));
-            semMap = textToSemanticMap($("semMap").value);
-            const sem = plan.find((x) => x.step.id === "semantics");
-            if (sem && !sem.run && sem.skipReason === "wizard.skip.noMapping" && Object.keys(semMap).length) {
-              sem.run = true;
-              sem.skipReason = void 0;
-              renderWizardSteps(plan);
-              setWizardStep("extract", "active", t("wizard.seq.running"));
-            }
-            setWizardStep("extract", "done", t("wizard.seq.extractDone", { count: tokens.length }));
-            break;
-          }
-          case "create": {
-            const r = await wizardRequest({ type: "CREATE_TOKENS", tokens, base }, ["CREATE_RESULT"]);
-            totals.created = r.created + r.updated;
-            rolesFromTokens = (_a = r.roles) != null ? _a : 0;
-            setWizardStep("create", "done", t("wizard.seq.createDone", { created: r.created, updated: r.updated }));
-            const sem = plan.find((x) => x.step.id === "semantics");
-            if (sem && !sem.run && sem.skipReason === "wizard.skip.noMapping" && rolesFromTokens > 0) {
-              setWizardStep("semantics", "done", t("wizard.rolesFromTokens", { n: rolesFromTokens }));
-            }
-            break;
-          }
-          case "semantics": {
-            const r = await wizardRequest({ type: "CREATE_SEMANTICS", map: semMap }, ["SEMANTICS_RESULT"]);
-            totals.semanticsAliased = r.aliased;
-            setWizardStep(
-              "semantics",
-              "done",
-              t("wizard.seq.semantics", { aliased: r.aliased }) + (r.missing.length ? t("wizard.seq.semanticsMissing", { n: r.missing.length }) : "") + (rolesFromTokens > 0 ? t("wizard.rolesFromTokensTail", { n: rolesFromTokens }) : "")
-            );
-            break;
-          }
-          case "dark": {
-            const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
-            const target = pickDarkTarget(vars.vars);
-            if (!target) {
-              setWizardStep("dark", "done", t("wizard.seq.darkNoTarget"));
-              break;
-            }
-            const r = await wizardRequest(
-              __spreadValues({ type: "GENERATE_DARK_MODE", collectionId: target.collectionId, fromModeId: target.fromModeId }, target.toModeId ? { toModeId: target.toModeId } : {}),
-              ["DARK_MODE_RESULT"]
-            );
-            if (r.error) {
-              setWizardStep("dark", "fail", r.error);
-              break;
-            }
-            totals.darkFilled = r.realiased;
-            if (!r.realiased) {
-              setWizardStep("dark", "fail", t("wizard.seq.darkNothing"));
-              break;
-            }
-            setWizardStep(
-              "dark",
-              "done",
-              t("wizard.seq.dark", { realiased: r.realiased }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + (r.skipped ? t("wizard.seq.darkSkip", { n: r.skipped }) : "")
-            );
-            break;
-          }
-          case "textStyles": {
-            const scan = await wizardRequest({ type: "SCAN_TEXT_STYLES" }, ["TEXT_STYLE_CANDIDATES"]);
-            if (!scan.styles.length) {
-              setWizardStep("textStyles", "done", t("wizard.seq.textStylesNone"));
-              break;
-            }
-            const r = await wizardRequest({ type: "CREATE_TEXT_STYLES", styles: scan.styles }, ["TEXT_STYLES_RESULT"]);
-            totals.textStyles = r.created + r.updated;
-            setWizardStep("textStyles", "done", t("wizard.seq.textStyles", { created: r.created, updated: r.updated }));
-            break;
-          }
-          case "bind": {
-            wizBindReq = ++bindReqSeq;
-            wizBindPending = true;
-            const r = await wizardRequest({ type: "APPLY", preview: false, nodeIds: wizIds, reqId: wizBindReq }, ["APPLY_RESULT"], wizBindReq).finally(() => {
-              wizBindPending = false;
-            });
-            totals.bound = r.bound;
-            wizBindRan = true;
-            const reasons = (_b = r.reasons) != null ? _b : {};
-            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_c = reasons["already-bound"]) != null ? _c : 0) > 0 && !((_d = reasons["no-match"]) != null ? _d : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
-            setWizardStep("bind", "done", r.bound ? t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") : t(zero));
-            break;
-          }
-          case "rename": {
-            const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth, nodeIds: wizIds }, ["RENAME_RESULT"]);
-            totals.renamed = r.changes.length;
-            setWizardStep("rename", "done", t("wizard.seq.renameDone", { count: r.changes.length }));
-            break;
-          }
-          case "componentize": {
-            const reg = await wizardRequest({ type: "REGISTER_COMPONENTS" }, ["COMPONENTS_RESULT"]);
-            totals.components = reg.registered;
-            setWizardStep("componentize", "done", t("wizard.seq.componentize", { registered: reg.registered, sets: reg.sets }));
-            break;
-          }
-        }
-      } catch (e) {
-        if (e instanceof PaidRequiredError) failNote = t("status.paid");
-        else {
-          const fe = explainError(e instanceof Error ? e.message : String(e));
-          failNote = `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}`;
-        }
-        setWizardStep(p.step.id, "fail", failNote);
-        stopped = true;
-      }
-    }
-    wizardRunning = false;
-    opWizardEnd(wizardFailed ? "fail" : stopped ? "cancel" : "ok");
-    if (wizLatch) wizLatch.done = true;
-    $("btnWizardRun").disabled = false;
-    setWizardRunLabel(!stopped);
-    $("btnWizardCancel").style.display = "none";
-    const paidSkipped = paidSkippedSteps(plan);
-    const paidNote = paidSkipped.length ? t("wizard.paidSkipped", { steps: paidSkipped.map((p) => t("wizard.step." + p.step.id)).join(" \xB7 ") }) : "";
-    if (!isPaid && !stopped && !wizardFailed) {
-      setStatus("wizardSummary", wizBindRan ? t("wizard.freeSumBound", { b: (_e = totals.bound) != null ? _e : 0, n: (_f = totals.renamed) != null ? _f : 0 }) : t("wizard.freeSum", { n: (_g = totals.renamed) != null ? _g : 0 }) + t("wizard.notLinked"), "ok");
-    } else setStatus(
-      "wizardSummary",
-      t("wizard.result", { state: stopped ? t("wizard.stopped") : t("wizard.completed"), summary: summarize(totals) }) + // 연결 단계를 껐으면 다 끝난 것처럼 읽히지 않게 적는다(v4 §4.3 링크 표).
-      (!wizBindRan ? t("wizard.notLinked") : "") + paidNote + (failNote ? ` \xB7 ${failNote}` : ""),
-      stopped || paidSkipped.length || wizardFailed ? "warn" : "ok"
-    );
-    wizCountPending = wizFrom === "make" && wizBeforeCount > 0;
-    wizEnded = true;
-    renderWizToBind();
-    renderVarScreen();
-  }
-  var wizCancelReq = false;
-  var wizEnded = false;
-  var wizBindRan = false;
-  function renderWizToBind() {
-    const b = $("btnWizToBind");
-    b.hidden = !wizEnded || wizardRunning || wizBindRan || prereqKnown && !hasBindable;
-    if (curSel) setLock(b, curSel.count ? null : "prereq", t("status.noSelection"));
-  }
-  var wizCountPending = false;
   var lastSelBound = 0;
   var lastSelRenamed = 0;
   function applySelectionDone() {
@@ -4669,21 +4712,7 @@
     hasBoundNodes = !fresh && lastSelBound > 0;
     hasRenamedNodes = !fresh && lastSelRenamed > 0;
     renderPipeline();
-    if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);
   }
-  function setWizardRunLabel(rerun) {
-    const b = $("btnWizardRun");
-    b.dataset.rerun = rerun ? "1" : "";
-    b.title = rerun && isPaid ? t("wizard.rerunHint") : "";
-    reapplyWaitTip(b);
-    renderWizardCopy();
-  }
-  $("btnWizardRun").addEventListener("click", () => void runWizard());
-  $("btnWizardCancel").addEventListener("click", () => {
-    wizCancelReq = true;
-    send({ type: "CANCEL" });
-  });
-  $("btnWizToBind").addEventListener("click", () => findUnbound());
   if (false) {
     $("devTierRow").style.display = "";
     $("tier").addEventListener("change", () => {
@@ -4780,24 +4809,6 @@
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     refreshDarkModes();
-    for (const [box, lock] of [
-      ["wizOptSemantics", "wizSemanticLock"],
-      ["wizOptDark", "wizDarkLock"],
-      ["wizOptTextStyles", "wizTextStylesLock"],
-      ["wizOptComponentize", "wizComponentLock"]
-    ]) {
-      $(lock).textContent = isPaid ? "" : PAID_LOCK;
-      const input = $(box);
-      if (!isPaid && !isLocked(input)) {
-        input.dataset.wasChecked = String(input.checked);
-        input.checked = false;
-      }
-      if (isPaid && isLocked(input) && input.dataset.wasChecked !== void 0) {
-        input.checked = input.dataset.wasChecked === "true";
-        delete input.dataset.wasChecked;
-      }
-      setLock(input, isPaid ? null : "paid");
-    }
     setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
     renderBindPrereq();
@@ -4826,7 +4837,7 @@
     if (text) text.textContent = ok ? "" : msg;
   }
   function goToCreate() {
-    showMake("token");
+    showPick("token");
     $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
     $("btnCreate").focus();
   }
@@ -4839,7 +4850,7 @@
     textStyles: { make: "type", btn: "btnScanText" },
     bind: { make: null, btn: "btnApplyConfirm" },
     // 선택 탭 첫 화면
-    rename: { make: null, btn: "btnPreview", apply: "rename" }
+    rename: { make: null, btn: "btnRename", apply: "rename" }
     // 적용 탭 · 이름 정리
   };
   function gotoStep(id) {
@@ -4855,7 +4866,7 @@
         return;
       }
     } else {
-      showMake(target.make);
+      showPick(target.make, "vars");
     }
     const b = $(target.btn);
     b.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -5082,6 +5093,7 @@
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
+    if (makeTakes(msg)) return;
     switch (msg.type) {
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
@@ -5280,13 +5292,7 @@
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
         if (msg.styles.length) {
-          const tsSig = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
-          const incoming = new Set(msg.styles.map(tsSig));
-          const manual = msg.labeled != null ? tsSpecs.filter((s) => {
-            var _a2;
-            return !((_a2 = s.nodeIds) == null ? void 0 : _a2.length) && !incoming.has(tsSig(s));
-          }) : [];
-          tsSpecs = [...msg.styles.map((x) => __spreadValues({}, x)), ...manual];
+          tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
             namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_g = msg.fallback) != null ? _g : 0 }) : "",
             warnings: msg.warnings
@@ -5294,6 +5300,8 @@
           renderTextStyles();
         } else {
           tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+          tsScanIds = null;
+          renderTsLink();
           tsScanNote = { namePart: "", warnings: [] };
           renderTextStyles();
           setStatus("tsStatus", t("textStyle.fallbackRamp"), "warn");
@@ -5303,7 +5311,7 @@
       case "TEXT_STYLES_RESULT":
         setStatus(
           "tsStatus",
-          t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
+          t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? t("textStyle.unlinked", { names: msg.missing.join(", ") }) : ""),
           msg.missing.length ? "warn" : "ok"
         );
@@ -5652,61 +5660,930 @@
     renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange, opts.readOnly));
   }
   var renameNodes = [];
-  var renameChecked = /* @__PURE__ */ new Set();
-  var renameHideContext = true;
-  var renameHideKeep = false;
-  function affectedRenameCount() {
-    return renameNodes.reduce((n, r) => n + (r.after !== void 0 ? 1 : 0), 0);
-  }
-  function renderRenameTree() {
-    const rows = renameNodes.map((n) => ({
-      id: n.id,
-      name: n.name,
-      type: n.type,
-      depth: n.depth,
-      parentId: n.parentId,
-      change: n.after,
-      keep: n.keep ? { reason: t(`rename.keep.${n.keep}`), meta: t("rename.keep.meta") } : void 0
-    }));
-    const keepBtn = $("btnRenameKeep");
-    keepBtn.style.display = rows.some((r) => r.keep) ? "" : "none";
-    keepBtn.textContent = t(renameHideKeep ? "rename.showKeep" : "rename.hideKeep");
-    renderSelectableTree($("diff"), rows, renameChecked, {
-      hideContext: renameHideContext,
-      hideKeep: renameHideKeep,
-      onChange: updateRenameApply
-    });
-    updateRenameApply();
-  }
-  function updateRenameApply() {
-    const total = affectedRenameCount();
-    const sel = renameChecked.size;
-    $("renameCount").textContent = total ? t("rename.count", { total }) : "";
-    $("btnRename").disabled = sel === 0;
-    const all = $("renameAll");
-    all.checked = total > 0 && sel === total;
-    all.indeterminate = sel > 0 && sel < total;
-    setStatus(
-      "renameStatus",
-      total === 0 ? t("rename.none") : t("rename.previewCount", { total, sel }),
-      ""
-    );
-  }
-  function renderRenameResult(msg) {
-    if (!msg.applied) {
-      renameNodes = msg.nodes;
-      renameChecked.clear();
-      for (const n of msg.nodes) if (n.after !== void 0) renameChecked.add(n.id);
-      renderRenameTree();
+  var renameOff = /* @__PURE__ */ new Set();
+  var renameCollapsed = /* @__PURE__ */ new Set();
+  var renameTreeFresh = true;
+  var renameReq = 0;
+  var renameApplyReq = 0;
+  var renameFor = null;
+  var renameReading = false;
+  var renameTimer = null;
+  var renameRows = () => renameNodes.filter((n) => n.after !== void 0);
+  var renameOnCount = () => renameRows().filter((n) => !renameOff.has(n.id)).length;
+  function readRename(user = false) {
+    if (renameTimer) {
+      clearTimeout(renameTimer);
+      renameTimer = null;
+    }
+    if (!baseline || isMini || activeTab !== "select" || selSub !== "rename") {
+      renderRenameScreen();
       return;
     }
-    renameNodes = [];
-    renameChecked.clear();
-    clearMount($("diff"));
-    $("renameCount").textContent = "";
-    $("btnRename").disabled = true;
-    setStatus("renameStatus", t("rename.applied", { count: msg.changes.length }), "ok");
+    if (!user && baseline.scanned > BIG_SELECTION) {
+      renameFor = null;
+      renameNodes = [];
+      renderRenameScreen();
+      return;
+    }
+    if (opBusy() || wizardRunning) return;
+    renameReq = ++bindReqSeq;
+    renameReading = true;
+    opSilent = !user;
+    send({ type: "RENAME", apply: false, maxDepth: readMaxDepth(), nodeIds: baseline.ids, reqId: renameReq });
+    opSilent = false;
+    renderRenameScreen();
   }
+  function scheduleRename() {
+    if (renameTimer) clearTimeout(renameTimer);
+    renameTimer = setTimeout(() => {
+      renameTimer = null;
+      readRename();
+    }, AUTO_SCAN_DELAY);
+  }
+  function renderRenameScreen() {
+    const empty = $("renameEmpty");
+    clearMount(empty);
+    let text = "";
+    let action = null;
+    if (!baseline) {
+      text = t("v4.noSel");
+      action = [t("v4.backHome"), subBack];
+    } else if (renameFor !== baseKey() && !renameReading && baseline.scanned > BIG_SELECTION) {
+      text = t("list.big");
+      action = [t("list.read"), () => readRename(true)];
+    } else if (renameReading && renameFor !== baseKey()) text = t("v4.reading");
+    else if (!renameRows().length) text = t("rename.none");
+    empty.hidden = !text;
+    if (text) {
+      const d = document.createElement("div");
+      d.className = "be-text";
+      d.textContent = text;
+      empty.appendChild(d);
+      if (action) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "link link-btn";
+        b.textContent = action[0];
+        b.addEventListener("click", action[1]);
+        empty.appendChild(b);
+      }
+    }
+    const show = !text;
+    $("renameTop").hidden = !show;
+    const roots = show ? buildRenameTree(renameNodes) : [];
+    const toItem = (it) => {
+      var _a, _b, _c;
+      const children = it.children.map(toItem);
+      if (it.kind === "head") {
+        const st = headState(it.descendants.map((id) => ({ on: !renameOff.has(id) })));
+        return {
+          key: it.id,
+          head: true,
+          muted: true,
+          name: it.name,
+          countText: t("tree.count", { n: it.descendants.length }),
+          indent: it.level * 16,
+          children,
+          sw: { state: st, label: t("tree.headAria", { name: it.name }), onToggle: () => {
+            const to = headToggleTarget(st);
+            for (const id of it.descendants) to ? renameOff.delete(id) : renameOff.add(id);
+            renderRenameScreen();
+          } }
+        };
+      }
+      const on = !renameOff.has(it.id);
+      const old = document.createElement("span");
+      old.className = "tr-old";
+      old.textContent = it.name;
+      old.title = it.name;
+      const nw = document.createElement("b");
+      nw.className = "tr-new";
+      nw.textContent = (_a = it.after) != null ? _a : "";
+      nw.title = (_b = it.after) != null ? _b : "";
+      const cells = [old, arrowEl(), nw];
+      return {
+        key: it.id,
+        indent: it.level * 16 + (children.length ? 0 : 22),
+        off: !on,
+        cells,
+        children,
+        sw: { state: on, label: t("rename.switchAria", { name: (_c = it.after) != null ? _c : "" }), onToggle: () => {
+          on ? renameOff.add(it.id) : renameOff.delete(it.id);
+          renderRenameScreen();
+        } }
+      };
+    };
+    const items = roots.map(toItem);
+    if (show && renameTreeFresh) {
+      renameTreeFresh = false;
+      renameCollapsed.clear();
+      const walk = (list) => {
+        var _a;
+        for (const it of list) {
+          if (it.head && ((_a = it.sw) == null ? void 0 : _a.state) === false) renameCollapsed.add(it.key);
+          if (it.children) walk(it.children);
+        }
+      };
+      walk(items);
+    }
+    renderTree($("renameTree"), items, { collapsed: renameCollapsed, rerender: renderRenameScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse") });
+    const k = show ? renameOnCount() : 0;
+    const btn = $("btnRename");
+    btn.textContent = show && renameRows().length ? t("rename.applyN", { k }) : t("rename.applyBtn");
+    setLock(btn, !show ? "prereq" : !k ? "prereq" : null, !baseline ? t("status.noSelection") : !show ? t("rename.none") : t("rename.needOn"));
+    if (activeTab === "select" && selSub === "rename") renderSubHead();
+    if (renameFocusPending && show) {
+      const row = $("renameTree").querySelector('[data-tkey][tabindex="0"]');
+      if (row) {
+        renameFocusPending = false;
+        row.focus({ preventScroll: true });
+      }
+    }
+  }
+  var renameFocusPending = false;
+  function renderRenameResult(msg) {
+    if (msg.reqId != null && msg.reqId === renameApplyReq && msg.applied) {
+      renameApplyReq = 0;
+      renameNodes = [];
+      renameFor = null;
+      if (activeTab === "select" && selSub === "rename") showSelSub("home");
+      showStatusLine(t("rename.doneStatus", { k: msg.changes.length }), { cls: "ok" });
+      return;
+    }
+    if (msg.reqId == null || msg.reqId !== renameReq || msg.applied) return;
+    renameReading = false;
+    const sameBase = renameFor === baseKey();
+    renameNodes = msg.nodes;
+    renameFor = baseKey();
+    const ids = new Set(renameRows().map((n) => n.id));
+    for (const id of Array.from(renameOff)) if (!ids.has(id)) renameOff.delete(id);
+    if (!sameBase) renameTreeFresh = true;
+    renderRenameScreen();
+  }
+  $("btnRename").addEventListener("click", () => {
+    if ($("btnRename").getAttribute("aria-disabled") === "true") return;
+    const items = renameRows().filter((n) => !renameOff.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after, role: n.role }));
+    if (!items.length) return;
+    const roleOnly = renameNodes.filter((n) => n.after === void 0 && n.role).map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+    renameApplyReq = ++bindReqSeq;
+    send({ type: "RENAME_APPLY", items: [...items, ...roleOnly], reqId: renameApplyReq });
+  });
+  $("renameAllOn").addEventListener("click", () => {
+    renameOff.clear();
+    renderRenameScreen();
+    $("renameAllOn").focus();
+  });
+  $("renameAllOff").addEventListener("click", () => {
+    for (const n of renameRows()) renameOff.add(n.id);
+    renderRenameScreen();
+    $("renameAllOff").focus();
+  });
+  var MAKE_KINDS = ["color", "gap", "radius", "size", "stroke", "opacity", "text"];
+  var MAKE_KIND_OF = {
+    color: "color",
+    effectColor: "color",
+    gap: "gap",
+    radius: "radius",
+    size: "size",
+    strokeWidth: "stroke",
+    opacity: "opacity",
+    fontSize: "text",
+    lineHeight: "text",
+    letterSpacing: "text",
+    fontFamily: "text"
+  };
+  var mkTokens = [];
+  var mkFor = null;
+  var mkExtractReq = 0;
+  var mkReading = false;
+  var mkOn = /* @__PURE__ */ new Map();
+  var mkCollapsed = /* @__PURE__ */ new Set();
+  var mkTreeFresh = true;
+  var mkStates = {};
+  var mkRoleRows = [];
+  var mkPreview = null;
+  var mkPreviewReq = 0;
+  var mkPreviewTimer = null;
+  var mkPreviewTagsOnly = false;
+  var mkTs = [];
+  var mkTsExisting = [];
+  var mkTsFor = null;
+  var mkScanReq = 0;
+  var mkTsReading = false;
+  var mkTsOff = /* @__PURE__ */ new Set();
+  var mkTsNames = /* @__PURE__ */ new Map();
+  var mkEditSig = null;
+  var mkTsPending = null;
+  var mkOwned = /* @__PURE__ */ new Set();
+  var mkReadTimer = null;
+  var mkFocusPending = false;
+  var mkRunning = false;
+  var mkCancelReq = false;
+  var mkProg = null;
+  var mkResults = null;
+  var mkResultsCreated = false;
+  var mkCancelNote = "";
+  var mkNextReq = () => {
+    const id = ++bindReqSeq;
+    mkOwned.add(id);
+    return id;
+  };
+  var mkKind = (tk) => MAKE_KIND_OF[tk.category];
+  var mkLocked = (tk) => {
+    var _a;
+    return ((_a = mkStates[tk.name]) == null ? void 0 : _a.state) === "manual";
+  };
+  var mkIsOn = (tk) => {
+    var _a;
+    return !mkLocked(tk) && ((_a = mkOn.get(tk.name)) != null ? _a : true);
+  };
+  var mkGlobalsOn = () => mkTokens.filter(mkIsOn);
+  var mkSendTokens = () => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
+  var mkTsName = (s) => {
+    var _a;
+    return (_a = mkTsNames.get(tsSig(s))) != null ? _a : s.name;
+  };
+  var mkTsOnList = () => isPaid ? mkTs.filter((s) => !mkTsOff.has(tsSig(s))) : [];
+  var mkReady = () => !!baseline && mkFor === baseKey() && !mkReading && (!isPaid || mkTsFor === baseKey() && !mkTsReading);
+  function mkTsConflict(s) {
+    if (mkTsOff.has(tsSig(s))) return null;
+    const name = mkTsName(s);
+    const sig = tsSig(s);
+    if (mkTsOnList().some((o) => o !== s && mkTsName(o) === name)) return "dup";
+    if (mkTsExisting.some((e) => e.name === name && e.sig !== sig)) return "exists";
+    return null;
+  }
+  function readMake(user = false) {
+    if (mkReadTimer) {
+      clearTimeout(mkReadTimer);
+      mkReadTimer = null;
+    }
+    if (!baseline || isMini || activeTab !== "select" || selSub !== "make" || mkRunning) {
+      renderMakeScreen();
+      return;
+    }
+    if (!user && baseline.scanned > BIG_SELECTION) {
+      renderMakeScreen();
+      return;
+    }
+    if (opBusy() || wizardRunning) return;
+    mkExtractReq = mkNextReq();
+    mkReading = true;
+    opSilent = true;
+    send({ type: "EXTRACT", nodeIds: baseline.ids, reqId: mkExtractReq });
+    if (isPaid) {
+      mkScanReq = mkNextReq();
+      mkTsReading = true;
+      send({ type: "SCAN_TEXT_STYLES", nodeIds: baseline.ids, reqId: mkScanReq });
+    }
+    opSilent = false;
+    renderMakeScreen();
+  }
+  function scheduleMake() {
+    if (mkReadTimer) clearTimeout(mkReadTimer);
+    mkReadTimer = setTimeout(() => {
+      mkReadTimer = null;
+      readMake();
+    }, AUTO_SCAN_DELAY);
+  }
+  function mkPreviewSoon() {
+    if (mkPreviewTimer) clearTimeout(mkPreviewTimer);
+    mkPreviewTimer = setTimeout(() => {
+      mkPreviewTimer = null;
+      mkSendPreview();
+    }, AUTO_SCAN_DELAY);
+  }
+  function mkSendPreview() {
+    const toks = mkSendTokens();
+    mkPreview = null;
+    if (!toks.length) {
+      mkRoleRows = [];
+      mkPreviewReq = 0;
+      renderMakeScreen();
+      return;
+    }
+    mkPreviewTagsOnly = !mkGlobalsOn().length;
+    if (mkPreviewTagsOnly) mkRoleRows = [];
+    mkPreviewReq = mkNextReq();
+    const base = Number($("base").value) || 16;
+    opSilent = true;
+    send({ type: "CREATE_TOKENS", tokens: toks, base, preview: true, reqId: mkPreviewReq });
+    opSilent = false;
+    renderMakeScreen();
+  }
+  function makeTakes(msg) {
+    const rid = msg.reqId;
+    if (rid == null || !mkOwned.has(rid)) return false;
+    if (msg.type === "EXTRACT_RESULT" && rid === mkExtractReq) onMakeExtract(msg);
+    else if (msg.type === "CREATE_RESULT" && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
+    else if (msg.type === "TEXT_STYLE_CANDIDATES" && rid === mkScanReq) onMakeScan(msg);
+    return true;
+  }
+  function onMakeExtract(msg) {
+    var _a;
+    mkReading = false;
+    const sameBase = mkFor === baseKey();
+    const raw = msg.tokens.map((x) => __spreadValues({}, x));
+    huefyTokenColors(raw);
+    const prevByKind = /* @__PURE__ */ new Map();
+    for (const tk of mkTokens) {
+      const k = mkKind(tk);
+      if (k) prevByKind.set(k, [...(_a = prevByKind.get(k)) != null ? _a : [], mkIsOn(tk)]);
+    }
+    mkTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
+    for (const tk of mkTokens) {
+      if (mkOn.has(tk.name)) continue;
+      const k = mkKind(tk);
+      const prev = prevByKind.get(k);
+      mkOn.set(tk.name, prev ? prev.some(Boolean) : k !== "text");
+    }
+    mkFor = baseKey();
+    if (!sameBase) mkTreeFresh = true;
+    renderMakeScreen();
+    mkSendPreview();
+  }
+  function onMakePreview(msg) {
+    var _a, _b, _c, _d, _e, _f;
+    const prev = mkStates;
+    mkStates = __spreadValues(__spreadValues({}, mkStates), (_a = msg.tokenStates) != null ? _a : {});
+    for (const [name, st] of Object.entries((_b = msg.tokenStates) != null ? _b : {})) if (((_c = prev[name]) == null ? void 0 : _c.state) === "manual" && st.state !== "manual") mkOn.set(name, true);
+    if (mkPreviewTagsOnly) {
+      mkPreview = null;
+      mkRoleRows = [];
+    } else {
+      mkPreview = { g: msg.created + msg.updated, r: (_d = msg.roles) != null ? _d : 0, m: (_e = msg.skippedManual) != null ? _e : 0 };
+      mkRoleRows = (_f = msg.roleRows) != null ? _f : [];
+    }
+    renderMakeScreen();
+  }
+  function onMakeScan(msg) {
+    var _a;
+    if (mkEditSig) {
+      mkTsPending = msg;
+      return;
+    }
+    mkTsReading = false;
+    mkTs = msg.styles;
+    mkTsExisting = (_a = msg.existing) != null ? _a : [];
+    const sigs = new Set(mkTs.map(tsSig));
+    for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
+    mkTsFor = baseKey();
+    renderMakeScreen();
+  }
+  function mkValueChip(tk) {
+    const v = typeof tk.value === "number" && tk.unit === "percent" ? `${tk.value}%` : String(tk.value);
+    return valueChip(v);
+  }
+  function mkTag(text, tip, warn = false) {
+    const s = document.createElement("span");
+    s.className = `tr-tag${warn ? " warn" : ""}`;
+    s.textContent = text;
+    s.title = tip;
+    return s;
+  }
+  function mkLayers(n) {
+    const s = document.createElement("span");
+    s.className = "bv-tw";
+    s.textContent = t("make.layers", { n: n != null ? n : 0 });
+    return s;
+  }
+  function makeTreeItems() {
+    var _a;
+    const ro = !isPaid || mkRunning;
+    const items = [];
+    const kindItems = [];
+    for (const k of MAKE_KINDS) {
+      const list = mkTokens.filter((tk) => mkKind(tk) === k);
+      if (!list.length) continue;
+      const rows = list.map((tk) => {
+        const st = mkStates[tk.name];
+        const locked = mkLocked(tk);
+        const on = mkIsOn(tk);
+        const name = (st == null ? void 0 : st.state) === "reuse" && st.varName ? st.varName : tk.name;
+        const cells = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value))];
+        if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
+        else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
+        else if ((st == null ? void 0 : st.state) === "manual") cells.push(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
+        return {
+          key: `g:${tk.name}`,
+          indent: 40,
+          off: !on && isPaid,
+          cells,
+          right: [mkLayers(tk.count)],
+          sw: ro && !isPaid ? null : { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
+            mkOn.set(tk.name, !on);
+            mkPreviewSoon();
+            renderMakeScreen();
+          } }
+        };
+      });
+      const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
+      kindItems.push({
+        key: `gk:${k}`,
+        head: true,
+        name: t(`v4.kind.${k}`),
+        countText: t("tree.count", { n: list.length }),
+        indent: 16,
+        children: rows,
+        sw: !isPaid ? null : { state: hs, label: t("tree.headAria", { name: t(`v4.kind.${k}`) }), onToggle: () => {
+          const to = headToggleTarget(hs);
+          for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to);
+          mkPreviewSoon();
+          renderMakeScreen();
+        } }
+      });
+    }
+    if (kindItems.length) {
+      const gs = headState(mkTokens.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
+      items.push({
+        key: "grp:global",
+        head: true,
+        group: true,
+        name: "Global",
+        countText: t("tree.count", { n: mkTokens.length }),
+        indent: 0,
+        children: kindItems,
+        sw: !isPaid ? null : { state: gs, label: t("tree.headAria", { name: "Global" }), onToggle: () => {
+          const to = headToggleTarget(gs);
+          for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, to);
+          mkPreviewSoon();
+          renderMakeScreen();
+        } }
+      });
+    }
+    if (mkGlobalsOn().length && (mkPreview == null || mkRoleRows.length)) {
+      const note = document.createElement("span");
+      note.className = "tr-sub";
+      note.style.whiteSpace = "normal";
+      note.textContent = t("make.semNote");
+      const semKids = [{ key: "sem:note", indent: 24, cells: [note], cls: "tr-noterow" }];
+      const byTok = new Map(mkTokens.map((tk) => [tk.name, tk]));
+      for (const k of MAKE_KINDS) {
+        const rows = mkRoleRows.filter((r) => {
+          const tk = byTok.get(r.token);
+          return tk && mkKind(tk) === k;
+        });
+        if (!rows.length) continue;
+        semKids.push({
+          key: `sk:${k}`,
+          head: true,
+          name: t(`v4.kind.${k}`),
+          countText: t("tree.count", { n: rows.length }),
+          indent: 16,
+          children: rows.map((r) => {
+            const tk = byTok.get(r.token);
+            const eq = document.createElement("span");
+            eq.className = "tr-sub";
+            eq.textContent = `= ${r.global}`;
+            return { key: `s:${r.name}`, indent: 40, cells: [varChip(r.name, String(tk.value)), eq] };
+          })
+        });
+      }
+      items.push({ key: "grp:semantic", head: true, group: true, name: "Semantic", countText: mkPreview == null ? t("make.counting") : t("tree.count", { n: mkRoleRows.length }), indent: 0, children: mkPreview == null ? [] : semKids });
+    }
+    if (isPaid && (mkTs.length || mkTsReading && mkTsFor !== baseKey())) {
+      const note = document.createElement("span");
+      note.className = "tr-sub";
+      note.style.whiteSpace = "normal";
+      note.textContent = t("make.tsNote");
+      const kids = [{ key: "ts:note", indent: 24, cells: [note], cls: "tr-noterow" }];
+      for (const s of mkTs) {
+        const sig = tsSig(s);
+        const on = !mkTsOff.has(sig);
+        const aa = document.createElement("span");
+        aa.className = "ts-aa";
+        aa.setAttribute("aria-hidden", "true");
+        aa.textContent = "Aa";
+        const cells = [aa];
+        if (mkEditSig === sig) cells.push(mkEditInput(s));
+        else {
+          const chip = varChip(mkTsName(s), "Aa");
+          (_a = chip.querySelector(".bv-mark")) == null ? void 0 : _a.remove();
+          const c = mkTsConflict(s);
+          if (c) {
+            chip.classList.add("dup");
+            chip.title = t(c === "dup" ? "make.tsDup" : "make.tsExists");
+          }
+          chip.addEventListener("dblclick", () => {
+            if (!mkRunning) mkStartEdit(sig);
+          });
+          cells.push(chip);
+        }
+        const sub = document.createElement("span");
+        sub.className = "tr-sub";
+        sub.textContent = tsSummary(s);
+        cells.push(sub);
+        if (s.boundStyleId) cells.push(mkTag(t("make.tagHas"), t("make.tsHasTip")));
+        kids.push({
+          key: `t:${sig}`,
+          indent: 24,
+          off: !on,
+          cells,
+          right: [mkLayers(s.count)],
+          onEdit: () => mkStartEdit(sig),
+          sw: { state: on, label: t("make.rowAria", { name: mkTsName(s) }), onToggle: () => {
+            on ? mkTsOff.add(sig) : mkTsOff.delete(sig);
+            renderMakeScreen();
+          } }
+        });
+      }
+      const hs = headState(mkTs.map((s) => ({ on: !mkTsOff.has(tsSig(s)) })));
+      items.push({
+        key: "grp:ts",
+        head: true,
+        group: true,
+        name: t("v4.kind.textStyle"),
+        countText: mkTsFor === baseKey() ? t("tree.count", { n: mkTs.length }) : t("make.counting"),
+        indent: 0,
+        children: mkTsFor === baseKey() ? kids : [],
+        sw: mkTs.length ? { state: hs, label: t("tree.headAria", { name: t("v4.kind.textStyle") }), onToggle: () => {
+          const to = headToggleTarget(hs);
+          for (const s of mkTs) to ? mkTsOff.delete(tsSig(s)) : mkTsOff.add(tsSig(s));
+          renderMakeScreen();
+        } } : null
+      });
+    }
+    return items;
+  }
+  function mkEditInput(s) {
+    const sig = tsSig(s);
+    const inp = document.createElement("input");
+    inp.className = "tr-edit";
+    inp.value = mkTsName(s);
+    inp.setAttribute("aria-label", t("make.tsEditAria"));
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      const v = inp.value.trim();
+      if (save && v) {
+        if (v === s.name) mkTsNames.delete(sig);
+        else mkTsNames.set(sig, v);
+      }
+      mkEditSig = null;
+      if (mkTsPending) {
+        const p = mkTsPending;
+        mkTsPending = null;
+        onMakeScan(p);
+      } else renderMakeScreen();
+      focusRow($("makeTree"), `t:${sig}`);
+    };
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(true);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        finish(false);
+      }
+    });
+    inp.addEventListener("blur", () => finish(true));
+    requestAnimationFrame(() => {
+      inp.focus();
+      inp.select();
+    });
+    return inp;
+  }
+  function mkStartEdit(sig) {
+    if (mkRunning) return;
+    mkEditSig = sig;
+    renderMakeScreen();
+  }
+  function mkCommitEdit() {
+    const inp = $("makeTree").querySelector("input.tr-edit");
+    if (inp) inp.blur();
+  }
+  function renderMakeScreen() {
+    var _a;
+    if (!curSel) return;
+    const tree = $("makeTree");
+    const empty = $("makeEmpty");
+    clearMount(empty);
+    const showResults = !!mkResults;
+    $("makeResults").hidden = !showResults;
+    $("makeWarn").hidden = !mkCancelNote || showResults;
+    $("makeWarn").textContent = mkCancelNote;
+    let emptyText = "";
+    let emptyAction = null;
+    let skeleton = false;
+    if (!showResults) {
+      if (!baseline && !mkRunning) {
+        emptyText = t("v4.noSel");
+        emptyAction = [t("v4.backHome"), subBack];
+      } else if (!mkRunning && mkFor !== baseKey() && !mkReading && baseline && baseline.scanned > BIG_SELECTION) {
+        emptyText = t("list.big");
+        emptyAction = [t("list.read"), () => readMake(true)];
+      } else if (!mkRunning && (mkFor !== baseKey() || mkReading)) skeleton = true;
+      else if (!mkTokens.length && !mkTs.length) emptyText = t("make.zero");
+    }
+    empty.hidden = !emptyText;
+    if (emptyText) {
+      const d = document.createElement("div");
+      d.className = "be-text";
+      d.textContent = emptyText;
+      empty.appendChild(d);
+      if (emptyAction) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "link link-btn";
+        b.textContent = emptyAction[0];
+        b.addEventListener("click", emptyAction[1]);
+        empty.appendChild(b);
+      }
+    }
+    const showTree = !showResults && !emptyText && !skeleton;
+    $("makeTop").hidden = showResults || !showTree && !skeleton || !isPaid && !skeleton;
+    $("makeFree").hidden = isPaid || !showTree;
+    $("makeTopText").textContent = skeleton ? t("v4.reading") : t("make.top");
+    $("makeTopRight").hidden = skeleton;
+    $("makeAllOn").hidden = mkRunning;
+    $("makeAllOff").hidden = mkRunning;
+    $("makeAllSep").hidden = mkRunning;
+    if (mkRunning) $("makeTopRight").hidden = false;
+    (_a = $("makeTopRight").querySelector(".make-lockmsg")) == null ? void 0 : _a.remove();
+    if (mkRunning) {
+      const m = document.createElement("span");
+      m.className = "make-lockmsg";
+      m.textContent = t("make.runLocked");
+      $("makeTopRight").appendChild(m);
+    }
+    if (skeleton) {
+      tree.replaceChildren();
+      for (const w of [[30, 120], [40, 90], [34, 60], [28, 40]]) {
+        const r = document.createElement("div");
+        r.className = "tr tr-head";
+        r.innerHTML = `<span style="width:22px"></span><span class="tr-skel" style="width:${w[0]}px"></span><span class="tr-skel" style="width:${w[1]}px;margin-left:12px"></span><span class="grow"></span><span class="tr-skel" style="width:28px;height:16px;border-radius:8px"></span>`;
+        tree.appendChild(r);
+      }
+    } else if (showTree) {
+      const items = makeTreeItems();
+      if (mkTreeFresh) {
+        mkTreeFresh = false;
+        mkCollapsed.clear();
+        mkCollapsed.add("grp:semantic");
+        const walk = (list) => {
+          var _a2;
+          for (const it of list) {
+            if (it.head && ((_a2 = it.sw) == null ? void 0 : _a2.state) === false) mkCollapsed.add(it.key);
+            if (it.children) walk(it.children);
+          }
+        };
+        walk(items);
+        for (const k of MAKE_KINDS) mkCollapsed.add(`sk:${k}`);
+        if (!isPaid) {
+          for (const tk of mkTokens) if (mkKind(tk) === "text") mkCollapsed.add("gk:text");
+        }
+      }
+      const collapsed = mkRunning ? new Set(items.map((i) => i.key)) : mkCollapsed;
+      renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse"), locked: mkRunning });
+      tipTruncatedNames(tree);
+    } else tree.replaceChildren();
+    if (showResults) renderMakeResults();
+    $("makeMore").hidden = showResults || !!(emptyText && emptyText !== t("make.zero")) || skeleton;
+    setLock($("btnMakePick"), mkRunning ? "prereq" : null, t("make.runLocked"));
+    renderMakeFoot(showResults);
+    if (activeTab === "select" && selSub === "make") renderSubHead();
+    if (mkFocusPending && activeTab === "select" && selSub === "make") {
+      const target = showTree ? tree.querySelector('[data-tkey][tabindex="0"]') : emptyAction ? empty.querySelector("button") : skeleton ? $("makeOptLink") : null;
+      if (target) {
+        mkFocusPending = showTree || !!emptyAction ? false : mkFocusPending;
+        target.focus({ preventScroll: true });
+        if (showTree) mkFocusPending = false;
+      }
+    }
+  }
+  function renderMakeResults() {
+    const box = $("makeResults");
+    box.replaceChildren();
+    const top = document.createElement("div");
+    top.className = "tree-top";
+    top.innerHTML = `<b style="color:var(--text)">${escapeHtml(t("make.partialTitle"))}</b>`;
+    box.appendChild(top);
+    for (const r of mkResults != null ? mkResults : []) {
+      const row = document.createElement("div");
+      row.className = "tr tr-head";
+      const mark = document.createElement("span");
+      mark.className = "tr-car";
+      mark.style.color = r.mark === "ok" ? "var(--ok)" : r.mark === "warn" ? "var(--warn)" : "var(--text-2)";
+      mark.textContent = r.mark === "ok" ? "\u2713" : r.mark === "warn" ? "\u26A0" : "\u2014";
+      const nm = document.createElement("span");
+      nm.className = `tr-name${r.mark === "off" ? " muted" : ""}`;
+      nm.textContent = t(`wizard.step.${r.id}`);
+      const tx = document.createElement("span");
+      tx.className = "tr-cnt";
+      if (r.mark === "warn") tx.style.color = "var(--warn)";
+      tx.textContent = r.text;
+      row.append(mark, nm, tx);
+      box.appendChild(row);
+    }
+    if (mkResultsCreated) {
+      const n = document.createElement("div");
+      n.className = "make-more";
+      n.textContent = t("make.partialKept");
+      box.appendChild(n);
+    }
+  }
+  function renderMakeFoot(showResults) {
+    var _a;
+    const run = $("btnMakeRun");
+    const opts = $("makeOpts");
+    opts.hidden = showResults;
+    const dark = $("makeOptDark");
+    $("makeDarkPaid").hidden = isPaid;
+    if (!isPaid) dark.checked = false;
+    for (const id of ["makeOptLink", "makeOptRename", "makeOptDark"]) setLock($(id), mkRunning ? "prereq" : id === "makeOptDark" && !isPaid ? "paid" : null, t("make.runLocked"));
+    $("btnMakeCancel").hidden = !mkRunning;
+    $("makeProg").hidden = !mkRunning;
+    $("makeCount").hidden = mkRunning;
+    run.hidden = mkRunning;
+    if (showResults) {
+      run.textContent = t("common.close");
+      setLock(run, null);
+      $("makeCount").textContent = "";
+      return;
+    }
+    if (mkRunning && mkProg) {
+      const { steps, i, done } = mkProg;
+      const cur = steps[i];
+      $("makeProgText").innerHTML = `${escapeHtml(cur ? t(`make.run.${cur}`) : "")} <span class="muted">${escapeHtml(t("make.stepOf", { i: i + 1, n: steps.length }))}${done.length ? " \xB7 " + escapeHtml(done.map((d) => `${t(`wizard.step.${d}`)} \u2713`).join(" ")) : ""}</span>`;
+      $("makeProgFill").style.width = `${Math.round(done.length / Math.max(1, steps.length) * 100)}%`;
+      return;
+    }
+    const link = $("makeOptLink").checked;
+    const ren = $("makeOptRename").checked;
+    if (!isPaid) {
+      run.textContent = t("make.runFree");
+      $("makeCount").textContent = t("make.freeCount");
+      setLock(run, !baseline ? "prereq" : !link && !ren ? "prereq" : null, !baseline ? t("status.noSelection") : t("make.freeNeedOpt"));
+      return;
+    }
+    const gOn = mkGlobalsOn().length;
+    const tsOn = mkTsOnList().length;
+    const tsTail = tsOn ? t("make.countStyles", { t: tsOn }) : "";
+    let count = "";
+    if (gOn) count = mkPreview ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
+    $("makeCount").textContent = count ? count + tsTail : tsTail.replace(/^ · /, "");
+    $("makeCount").title = (_a = $("makeCount").textContent) != null ? _a : "";
+    run.textContent = gOn ? mkPreview ? t("make.runN", { g: mkPreview.g }) : t("make.run") : tsOn ? t("make.runStyles", { t: tsOn }) : t("make.run");
+    const conflict = mkTsOnList().map(mkTsConflict).find(Boolean);
+    const reason = !baseline ? t("status.noSelection") : !mkReady() ? t("v4.reading") : !gOn && !tsOn ? t("make.needOn") : conflict === "dup" ? t("make.tsDup") : conflict === "exists" ? t("make.tsExists") : "";
+    setLock(run, reason ? "prereq" : null, reason);
+  }
+  async function runMake() {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (mkRunning || wizardRunning) return;
+    mkCommitEdit();
+    renderMakeScreen();
+    if ($("btnMakeRun").getAttribute("aria-disabled") === "true") return;
+    if (mkResults) {
+      mkResults = null;
+      showSelSub("home");
+      return;
+    }
+    const link = $("makeOptLink").checked;
+    const steps = planMake({ isPaid, globalsOn: mkGlobalsOn().length, stylesOn: mkTsOnList().length, link, rename: $("makeOptRename").checked, dark: isPaid && $("makeOptDark").checked });
+    if (!steps.length || !baseline) return;
+    const ids = baseline.ids.slice();
+    const toks = mkSendTokens();
+    const styles = mkTsOnList().map((s) => __spreadProps(__spreadValues({}, s), { name: mkTsName(s) }));
+    const base = Number($("base").value) || 16;
+    mkRunning = true;
+    mkCancelReq = false;
+    mkCancelNote = "";
+    mkResults = null;
+    mkProg = { steps, i: 0, done: [] };
+    wizardRunning = true;
+    opWizardStart();
+    renderMakeScreen();
+    const totals = {};
+    const results = [];
+    let stay = false;
+    let stopped = false;
+    for (let i = 0; i < steps.length; i++) {
+      const id = steps[i];
+      if (mkCancelReq) {
+        stopped = true;
+        break;
+      }
+      mkProg = { steps, i, done: mkProg.done };
+      renderMakeScreen();
+      try {
+        if (id === "create") {
+          const rid = mkNextReq();
+          const r = await wizardRequest({ type: "CREATE_TOKENS", tokens: toks, base, reqId: rid }, ["CREATE_RESULT"], rid);
+          totals.created = { g: r.created + r.updated, r: (_a = r.roles) != null ? _a : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
+          results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
+        } else if (id === "dark") {
+          const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
+          const target = pickDarkTarget(vars.vars);
+          if (!target) results.push({ id, mark: "ok", text: t("wizard.seq.darkNoTarget") });
+          else {
+            const r = await wizardRequest(__spreadValues({ type: "GENERATE_DARK_MODE", collectionId: target.collectionId, fromModeId: target.fromModeId }, target.toModeId ? { toModeId: target.toModeId } : {}), ["DARK_MODE_RESULT"]);
+            if (r.error) {
+              results.push({ id, mark: "warn", text: r.error });
+              stay = true;
+            } else if (!r.realiased) {
+              results.push({ id, mark: "warn", text: t("wizard.seq.darkNothing") });
+              stay = true;
+            } else {
+              totals.darkFilled = r.realiased;
+              results.push({ id, mark: "ok", text: t("wizard.seq.dark", { realiased: r.realiased }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + (r.skipped ? t("wizard.seq.darkSkip", { n: r.skipped }) : "") });
+            }
+          }
+        } else if (id === "textStyles") {
+          const rid = mkNextReq();
+          const r = await wizardRequest(__spreadValues({ type: "CREATE_TEXT_STYLES", styles, reqId: rid }, link ? { applyTo: ids } : {}), ["TEXT_STYLES_RESULT"], rid);
+          totals.styles = { s: r.created + r.updated, a: (_c = r.applied) != null ? _c : 0 };
+          results.push({ id, mark: "ok", text: t("wizard.seq.textStyles", { created: r.created, updated: r.updated }) + (r.applied ? t("wizard.seq.textStylesLinked", { a: r.applied }) : "") + (r.missing.length ? t("wizard.seq.textStylesMissing", { k: r.missing.length }) : "") });
+        } else if (id === "bind") {
+          wizBindReq = ++bindReqSeq;
+          wizBindPending = true;
+          const r = await wizardRequest({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true }, ["APPLY_RESULT"], wizBindReq).finally(() => {
+            wizBindPending = false;
+          });
+          totals.bound = r.bound;
+          const reasons = (_d = r.reasons) != null ? _d : {};
+          if (r.bound) results.push({ id, mark: "ok", text: t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") });
+          else {
+            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_e = reasons["already-bound"]) != null ? _e : 0) > 0 && !((_f = reasons["no-match"]) != null ? _f : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+            results.push({ id, mark: "warn", text: t(zero) });
+            stay = true;
+          }
+        } else if (id === "rename") {
+          const rid = mkNextReq();
+          const r = await wizardRequest({ type: "RENAME", apply: true, maxDepth: readMaxDepth(), nodeIds: ids, reqId: rid }, ["RENAME_RESULT"], rid);
+          totals.renamed = r.changes.length;
+          results.push({ id, mark: "ok", text: t("wizard.seq.renameDone", { count: r.changes.length }) });
+        }
+        mkProg = { steps, i, done: [...mkProg.done, id] };
+      } catch (e) {
+        const fe = e instanceof PaidRequiredError ? { message: t("status.paid"), action: "" } : explainError(e instanceof Error ? e.message : String(e));
+        results.push({ id, mark: "warn", text: `${fe.message}${fe.action ? ` \u2014 ${fe.action}` : ""}` });
+        stay = true;
+        stopped = true;
+        for (const rest of steps.slice(i + 1)) results.push({ id: rest, mark: "off", text: t("wizard.seq.stoppedPrev") });
+        break;
+      }
+    }
+    const finishedSteps = (_g = mkProg == null ? void 0 : mkProg.done) != null ? _g : [];
+    mkRunning = false;
+    mkProg = null;
+    wizardRunning = false;
+    opWizardEnd(stay ? "fail" : stopped ? "cancel" : "ok");
+    if (stopped && !stay) {
+      const last = finishedSteps[finishedSteps.length - 1];
+      mkCancelNote = last ? t("make.cancelledUpTo", { step: t(`wizard.step.${last}`) }) + (totals.created ? ` (${t("make.done.create", { g: totals.created.g, r: totals.created.r })}${totals.styles ? " \xB7 " + t("make.done.styles", { s: totals.styles.s }) : ""})` : "") : t("make.cancelled");
+      renderMakeScreen();
+      return;
+    }
+    if (stay) {
+      for (const sid of MAKE_STEP_ORDER) if (!steps.includes(sid) && (isPaid || sid === "bind" || sid === "rename")) results.push({ id: sid, mark: "off", text: t("make.stepOff") });
+      results.sort((a, b) => MAKE_STEP_ORDER.indexOf(a.id) - MAKE_STEP_ORDER.indexOf(b.id));
+      mkResults = results;
+      mkResultsCreated = !!totals.created;
+      if (!(activeTab === "select" && selSub === "make")) showStatusLine(t("make.partialStatus"), { cls: "warn", action: { label: t("common.view"), run: () => {
+        showTab("select");
+        showSelSub("make");
+      } } });
+      renderMakeScreen();
+      if (activeTab === "select" && selSub === "make") $("btnMakeRun").focus();
+      return;
+    }
+    const linkOff = !link;
+    if (selSub === "make") showSelSub("home");
+    showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues({ cls: "ok" }, linkOff ? { action: { label: t("wizard.toBind"), run: () => {
+      showTab("select");
+      showSelSub("bind");
+    } } } : {}));
+  }
+  $("btnMakeRun").addEventListener("click", () => void runMake());
+  $("btnMakeCancel").addEventListener("click", () => {
+    mkCancelReq = true;
+    send({ type: "CANCEL" });
+  });
+  $("btnMakePick").addEventListener("click", (e) => {
+    if (e.currentTarget.getAttribute("aria-disabled") === "true") return;
+    showPick(void 0, "make");
+  });
+  $("makeLicense").addEventListener("click", () => {
+    showTab("settings");
+  });
+  $("makeAllOn").addEventListener("click", () => {
+    for (const tk of mkTokens) mkOn.set(tk.name, true);
+    mkTsOff.clear();
+    mkPreviewSoon();
+    renderMakeScreen();
+    $("makeAllOn").focus();
+  });
+  $("makeAllOff").addEventListener("click", () => {
+    for (const tk of mkTokens) mkOn.set(tk.name, false);
+    for (const s of mkTs) mkTsOff.add(tsSig(s));
+    mkPreviewSoon();
+    renderMakeScreen();
+    $("makeAllOff").focus();
+  });
+  for (const id of ["makeOptLink", "makeOptRename", "makeOptDark"]) $(id).addEventListener("change", () => renderMakeScreen());
   var bindCandidates = [];
   var bindChecked = /* @__PURE__ */ new Set();
   var candKey = placeKey;
@@ -5719,7 +6596,6 @@
   var bindSkipReasons = {};
   var bindPreviewSel = null;
   var bindLeftSince = false;
-  var bindForeignSel = false;
   var bindHereSel = false;
   var bindLayerSelectPending = false;
   var bindPreviewMini = false;
@@ -5836,45 +6712,6 @@
       }
     });
   }
-  function switchEl(on, label, onToggle) {
-    const sw = document.createElement("button");
-    sw.type = "button";
-    sw.className = "bv-switch";
-    sw.setAttribute("role", "switch");
-    sw.setAttribute("aria-checked", String(on));
-    sw.setAttribute("aria-label", label);
-    sw.tabIndex = -1;
-    const track = document.createElement("span");
-    track.className = "bv-track";
-    track.setAttribute("aria-hidden", "true");
-    sw.appendChild(track);
-    sw.addEventListener("click", onToggle);
-    return sw;
-  }
-  function bindRowEl(key, left, n, on, label, onToggle) {
-    const row = document.createElement("div");
-    row.className = "bv-card";
-    row.classList.toggle("off", !on);
-    row.dataset.var = key;
-    row.setAttribute("role", "row");
-    const head = document.createElement("div");
-    head.className = "bv-head";
-    const grow = document.createElement("span");
-    grow.className = "grow";
-    const cnt = document.createElement("span");
-    cnt.className = "bv-tw";
-    cnt.textContent = t("bind.count", { k: n });
-    head.append(...left, grow, cnt, switchEl(on, label, onToggle));
-    row.appendChild(head);
-    return row;
-  }
-  function kindHeadEl(label, n) {
-    const h = document.createElement("div");
-    h.className = "bv-kind";
-    h.setAttribute("role", "presentation");
-    h.textContent = t("v4.kindPlaces", { kind: label, n });
-    return h;
-  }
   function renderBindEmpty() {
     const box = $("bindEmpty");
     clearMount(box);
@@ -5884,7 +6721,7 @@
     else if (!bindPreviewed) text = bindFinding || bindFindFailed ? "" : t("v4.reading");
     else if (!hasBindPreview() || bindTsOnly() && !bindTsRows.length) {
       text = t("v4.nothingToLink");
-      if (bindCardCounts().k > 0) action = [t("v4.makeArrow"), () => showMake("color")];
+      if (bindCardCounts().k > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
     }
     box.hidden = !text;
     if (!text) return;
@@ -5913,30 +6750,56 @@
     $("bindSkips").hidden = !(show && bindSkipsOpen);
   }
   function renderBindTree() {
-    var _a, _b;
+    var _a;
     const tree = $("bindTree");
-    const hadFocus = tree.contains(document.activeElement) ? (_b = (_a = document.activeElement.closest("[data-var]")) == null ? void 0 : _a.dataset.var) != null ? _b : null : null;
-    clearMount(tree);
     const rows = bindTsOnly() ? [] : bindRows();
     const showList = bindPreviewed && !bindLinking && (rows.length > 0 || bindTsRows.length > 0);
     $("bindAllRow").hidden = !showList;
+    const items = [];
     if (showList) {
       for (const kind of [...SEL_KINDS, "other"]) {
         const list = rows.filter((g) => g.kind === kind);
         if (!list.length) continue;
-        tree.appendChild(kindHeadEl(t(`v4.kind.${kind}`), list.reduce((a, g) => a + g.count, 0)));
-        for (const g of list) {
+        const children = list.map((g) => {
           const on = rowOn(g);
-          tree.appendChild(bindRowEl(g.rowKey, [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)], g.count, on, t("bind.switchAria", { name: g.variableName }), () => {
-            for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
+          const cnt = document.createElement("span");
+          cnt.className = "bv-tw";
+          cnt.textContent = t("bind.count", { k: g.count });
+          return {
+            key: g.rowKey,
+            indent: 24,
+            off: !on,
+            cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)],
+            right: [cnt],
+            sw: { state: on, label: t("bind.switchAria", { name: g.variableName }), onToggle: () => {
+              for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
+              renderBindTree();
+            } }
+          };
+        });
+        const st = headState(list.map((g) => ({ on: rowOn(g) })));
+        items.push({
+          key: `kind:${kind}`,
+          head: true,
+          name: t(`v4.kind.${kind}`),
+          countText: t("tree.count", { n: list.length }),
+          indent: 0,
+          children,
+          sw: { state: st, label: t("tree.headAria", { name: t(`v4.kind.${kind}`) }), onToggle: () => {
+            const to = headToggleTarget(st);
+            for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k);
             renderBindTree();
-            focusBindRow(g.rowKey);
-          }));
-        }
+          } }
+        });
       }
       if (bindTsRows.length) {
-        tree.appendChild(kindHeadEl(t("v4.kind.textStyle"), bindTsRows.reduce((a, r) => a + r.nodeIds.length, 0)));
-        for (const r of bindTsRows) {
+        const tsToggle = (r, on) => {
+          on ? bindTsOff.delete(r.styleId) : bindTsOff.add(r.styleId);
+          if (!on) {
+            for (const c of bindCandidates) if (fieldKind(c.field) === "text" && r.nodeIds.includes(c.nodeId)) bindChecked.add(candKey(c));
+          }
+        };
+        const children = bindTsRows.map((r) => {
           const on = !bindTsOff.has(r.styleId);
           const aa = document.createElement("span");
           aa.className = "ts-aa";
@@ -5945,48 +6808,42 @@
           const nm = document.createElement("span");
           nm.className = "bv-chip bv-var";
           nm.innerHTML = `<span class="bv-name">${escapeHtml(r.name)}</span>`;
-          tree.appendChild(bindRowEl(`ts:${r.styleId}`, [aa, arrowEl(), nm], r.nodeIds.length, on, t("bind.switchAria", { name: r.name }), () => {
-            on ? bindTsOff.add(r.styleId) : bindTsOff.delete(r.styleId);
-            if (on) {
-              for (const c of bindCandidates) if (fieldKind(c.field) === "text" && r.nodeIds.includes(c.nodeId)) bindChecked.add(candKey(c));
-            }
+          const cnt = document.createElement("span");
+          cnt.className = "bv-tw";
+          cnt.textContent = t("bind.count", { k: r.nodeIds.length });
+          return { key: `ts:${r.styleId}`, indent: 24, off: !on, cells: [aa, arrowEl(), nm], right: [cnt], sw: { state: on, label: t("bind.switchAria", { name: r.name }), onToggle: () => {
+            tsToggle(r, !on);
             renderBindTree();
-            focusBindRow(`ts:${r.styleId}`);
-          }));
-        }
+          } } };
+        });
+        const st = headState(bindTsRows.map((r) => ({ on: !bindTsOff.has(r.styleId) })));
+        items.push({
+          key: "kind:textStyle",
+          head: true,
+          name: t("v4.kind.textStyle"),
+          countText: t("tree.count", { n: bindTsRows.length }),
+          indent: 0,
+          children,
+          sw: { state: st, label: t("tree.headAria", { name: t("v4.kind.textStyle") }), onToggle: () => {
+            const to = headToggleTarget(st);
+            for (const r of bindTsRows) tsToggle(r, to);
+            renderBindTree();
+          } }
+        });
+      }
+      if (bindTreeFresh) {
+        bindTreeFresh = false;
+        bindCollapsed.clear();
+        for (const it of items) if (((_a = it.sw) == null ? void 0 : _a.state) === false) bindCollapsed.add(it.key);
       }
     }
-    const switches = Array.from(tree.querySelectorAll(".bv-switch"));
-    const target = hadFocus && tree.querySelector(`[data-var="${CSS.escape(hadFocus)}"] .bv-switch`) || switches[0];
-    if (target) target.tabIndex = 0;
+    renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse") });
     tipTruncatedNames(tree);
     renderBindChrome();
     bindFocusFirst();
   }
-  function focusBindRow(key) {
-    const sw = $("bindTree").querySelector(`[data-var="${CSS.escape(key)}"] .bv-switch`);
-    if (!sw) return;
-    $("bindTree").querySelectorAll(".bv-switch").forEach((x) => x.tabIndex = -1);
-    sw.tabIndex = 0;
-    sw.focus();
-  }
-  $("bindTree").addEventListener("keydown", (e) => {
-    const sws = Array.from($("bindTree").querySelectorAll(".bv-switch"));
-    const i = sws.indexOf(document.activeElement);
-    if (i < 0) return;
-    const go = (j) => {
-      const tg = sws[Math.max(0, Math.min(sws.length - 1, j))];
-      sws.forEach((x) => x.tabIndex = -1);
-      tg.tabIndex = 0;
-      tg.focus();
-    };
-    if (e.key === "ArrowDown") go(i + 1);
-    else if (e.key === "ArrowUp") go(i - 1);
-    else if (e.key === "Home") go(0);
-    else if (e.key === "End") go(sws.length - 1);
-    else return;
-    e.preventDefault();
-  });
+  var bindCollapsed = /* @__PURE__ */ new Set();
+  var bindTreeFresh = true;
   function renderBindChrome() {
     if (!curSel) return;
     renderBindEmpty();
@@ -6026,7 +6883,6 @@
   }
   function clearBindPreview() {
     bindPreviewSel = null;
-    bindForeignSel = false;
     bindHereSel = false;
     bindPreviewed = false;
     bindCandidates = [];
@@ -6124,10 +6980,6 @@
     if (compCandidates.length === 0) {
       if (lastSelCount === 0) renderEmptyState($("compTree"), t("sel.noneHere"), "");
       else clearMount($("compTree"));
-    }
-    if (renameNodes.length === 0) {
-      if (lastSelCount === 0) renderEmptyState($("diff"), t("sel.noneHere"), "");
-      else clearMount($("diff"));
     }
     renderMakeNoSel();
   }
@@ -6581,12 +7433,12 @@ ${opts.tip}` : text;
     showApplyStep(step);
   };
   var OPS = {
-    EXTRACT: { results: ["EXTRACT_RESULT"], label: "op.extract", go: () => showMake("color"), write: false },
-    CREATE_TOKENS: { results: ["CREATE_RESULT"], label: "op.create", go: () => showMake("token"), write: true },
-    CREATE_SEMANTICS: { results: ["SEMANTICS_RESULT"], label: "op.semantics", go: () => showMake("token"), write: true },
-    GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showMake("theme"), write: true },
-    SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showMake("type"), write: false },
-    CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showMake("type"), write: true },
+    EXTRACT: { results: ["EXTRACT_RESULT"], label: "op.extract", go: () => showPick("color"), write: false },
+    CREATE_TOKENS: { results: ["CREATE_RESULT"], label: "op.create", go: () => showPick("token"), write: true },
+    CREATE_SEMANTICS: { results: ["SEMANTICS_RESULT"], label: "op.semantics", go: () => showPick("token"), write: true },
+    GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showPick("theme"), write: true },
+    SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showPick("type"), write: false },
+    CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showPick("type"), write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
     APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
     // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
@@ -6631,8 +7483,8 @@ ${opts.tip}` : text;
     // GENERATE_MISSING_VARIANTS
     "btnComponentize",
     // COMPONENTIZE_SIMILAR
-    "btnWizardRun"
-    // 마법사 [전체 실행]
+    "btnMakeRun"
+    // 만들기 화면 실행(§4.3)
   ];
   var WAIT_CARD_IDS = ["btnApplyConfirm"];
   function otherWriteOp() {
@@ -6738,7 +7590,7 @@ ${opts.tip}` : text;
     opWizard = false;
     opProg = null;
     renderWaitLocks();
-    if (result !== "cancel") opFinished(result === "ok", { results: [], label: "op.wizard", go: () => showMake(), write: true });
+    if (result !== "cancel") opFinished(result === "ok", { results: [], label: "op.wizard", go: () => showMakeScreen(), write: true });
     else if (isMini) renderMiniMark();
     readScreen("work");
     reentry.release();
@@ -6752,7 +7604,8 @@ ${opts.tip}` : text;
     }
     if (why === "work" && activeTab !== "variables") send({ type: "GET_VAR_TABLE" });
     if (activeTab === "select") {
-      if (selSub === "make") send({ type: "GET_VARIABLES" });
+      if (selSub === "rename" && (why !== "enter" || renameFor !== baseKey() && !renameReading)) readRename();
+      if (selSub === "make" && !mkResults && (why === "work" || why === "reentry" || why === "enter" && mkFor !== baseKey() && !mkReading)) readMake();
       const bindReturn = why !== "work" && selSub === "bind";
       readSelData(why, !bindReturn);
       readLayerLibUse();
@@ -6801,6 +7654,7 @@ ${opts.tip}` : text;
   }
   window.addEventListener("resize", syncStickyOffsets);
   updateGates();
+  renderTsLink();
   renderPipeline();
   renderTokens();
   refreshTreeEmptyStates();
@@ -6853,12 +7707,12 @@ ${opts.tip}` : text;
     selSub = sub;
     $("selHome").style.display = sub === "home" ? "" : "none";
     $("subHead").hidden = sub === "home";
-    $("varMake").style.display = sub === "make" ? "" : "none";
+    $("varMake").style.display = sub === "pick" ? "" : "none";
+    $("makeScreen").style.display = sub === "make" ? "" : "none";
     if (sub === "bind" || sub === "rename" || sub === "structure") showStep("apply", sub);
     else for (const el of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el.style.display = "none";
-    if (sub === "make") showMakeStep(curMakeStep);
+    if (sub === "pick") showMakeStep(curMakeStep);
     renderSubHead();
-    placeWizard();
     syncStickyOffsets();
     if (changed && activeTab === "select") {
       const y = (_b = screenScroll.get(screenKey())) != null ? _b : 0;
@@ -6866,15 +7720,34 @@ ${opts.tip}` : text;
       readScreen("enter");
     }
     renderSelHome();
-    if (changed && sub === "bind") bindFocusPending = true;
+    if (changed && sub === "bind") {
+      bindFocusPending = true;
+      bindTreeFresh = true;
+      $("bindTree").dataset.focusKey = "";
+      if (bindPreviewed) renderBindTree();
+    }
+    if (changed && sub === "make") {
+      mkFocusPending = true;
+      mkTreeFresh = true;
+      mkCancelNote = "";
+      if (!mkRunning && !mkResults) readMake();
+      else renderMakeScreen();
+    }
+    if (changed && sub === "rename") {
+      renameFocusPending = true;
+      renameTreeFresh = true;
+      renameFor = null;
+      renameNodes = [];
+      readRename();
+    }
     bindFocusFirst();
   }
   function bindFocusFirst() {
     if (!bindFocusPending || activeTab !== "select" || selSub !== "bind") return;
-    const sw = $("bindTree").querySelector('.bv-switch[tabindex="0"]');
-    if (!sw) return;
+    const row = $("bindTree").querySelector('[data-tkey][tabindex="0"]');
+    if (!row) return;
     bindFocusPending = false;
-    sw.focus({ preventScroll: true });
+    row.focus({ preventScroll: true });
   }
   function bindHeadRight() {
     if (!bindPreviewed) return "";
@@ -6883,12 +7756,25 @@ ${opts.tip}` : text;
     return c.n ? t("v4.findN", { n: c.n }) : "";
   }
   function renderSubHead() {
-    const titles = { bind: "v4.subBind", rename: "v4.rename", structure: "v4.subComponents", make: "v4.subMake" };
+    const titles = { bind: "v4.subBind", rename: "v4.rename", structure: "v4.subComponents", make: "make.title", pick: "v4.subMake" };
     if (selSub === "home") return;
     $("subTitle").textContent = selSub === "bind" ? baseLabel() : t(titles[selSub]);
-    $("subRight").textContent = selSub === "make" || selSub === "rename" ? baseLabel() : selSub === "bind" ? bindHeadRight() : "";
+    $("subRight").textContent = selSub === "make" ? baseline ? t("make.subRight", { name: baseLabel() }) : "" : selSub === "pick" ? "" : selSub === "rename" ? renameFor === baseKey() ? t("rename.subRight", { name: baseLabel(), n: renameRows().length }) : baseLabel() : selSub === "bind" ? bindHeadRight() : "";
   }
   function subBack() {
+    var _a;
+    if (selSub === "pick") {
+      if (pickFrom === "make" && ((_a = baseline != null ? baseline : curSel) == null ? void 0 : _a.count)) {
+        showSelSub("make");
+        $("btnMakePick").focus();
+        return;
+      }
+      showSelSub("home");
+      if (pickFrom === "vars") {
+        showTab("variables");
+        return;
+      }
+    }
     showSelSub("home");
     const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $("selCards").querySelector("button");
     (target != null ? target : $("btnGoRename")).focus();
@@ -6899,7 +7785,7 @@ ${opts.tip}` : text;
     const el = (_a = e.target) == null ? void 0 : _a.closest("[data-go-sub]");
     if (!el) return;
     const sub = el.dataset.goSub;
-    if (!["home", "bind", "rename", "structure", "make"].includes(sub)) return;
+    if (!["home", "bind", "rename", "structure", "make", "pick"].includes(sub)) return;
     showTab("select");
     showSelSub(sub, el);
   });
@@ -6924,11 +7810,22 @@ ${opts.tip}` : text;
       subBack();
     }
   });
-  function showMake(step) {
+  var pickFrom = "make";
+  function showPick(step, from = "vars") {
     const opener = document.activeElement;
+    pickFrom = from;
     showTab("select");
-    showSelSub("make", opener);
+    showSelSub("pick", opener);
     if (step) showMakeStep(step);
+  }
+  function showMakeScreen(opener) {
+    var _a;
+    if (!((_a = baseline != null ? baseline : curSel) == null ? void 0 : _a.count)) {
+      showStatusLine(t("status.noSelection"), { cls: "warn" });
+      return;
+    }
+    showTab("select");
+    showSelSub("make", opener != null ? opener : document.activeElement);
   }
   TABS.forEach((tb, i) => {
     const btn = $(`tabbtn-${tb}`);
@@ -6950,9 +7847,9 @@ ${opts.tip}` : text;
     if (!curSel.count) return;
     showSelSub("structure", e.currentTarget);
   });
-  $("btnVarEmptyMake").addEventListener("click", () => {
+  $("btnVarEmptyMake").addEventListener("click", (e) => {
     if (!curSel.count) return;
-    showMake("color");
+    showMakeScreen(e.currentTarget);
   });
   function showStep(attr, step) {
     var _a;
@@ -7291,7 +8188,6 @@ ${opts.tip}` : text;
     closeMenu();
     closeModal();
     closeReadiness();
-    if (wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
   }
   function onSelectionForList(m) {
     var _a, _b;
@@ -7316,6 +8212,14 @@ ${opts.tip}` : text;
     vmUsageReq = 0;
     vmUsageInFlight = false;
     if (!b && activeTab === "select" && selSub === "bind" && !bindLinking) showSelSub("home");
+    if (activeTab === "select" && selSub === "rename") {
+      if (b && b.scanned <= BIG_SELECTION) scheduleRename();
+      else renderRenameScreen();
+    }
+    if (activeTab === "select" && selSub === "make" && !mkRunning) {
+      if (b && b.scanned <= BIG_SELECTION) scheduleMake();
+      else renderMakeScreen();
+    }
     if (!b) {
       usageMap = null;
       libVars = [];
@@ -7398,11 +8302,6 @@ ${opts.tip}` : text;
     vmTableSig = sig;
     vmCols = msg.collections;
     vmVars = msg.vars;
-    if (wizCountPending) {
-      wizCountPending = false;
-      const n = vmVars.length - wizBeforeCount;
-      if (n > 0) showStatusLine(t("wizard.madeStatus", { n }), { cls: "ok" });
-    }
     if (vmOpen || first) renderVarScreen();
     if (edRebase) edOnVarTable(msg);
     runAfterTable();
@@ -9287,9 +10186,9 @@ ${opts.tip}` : text;
     const limit = manualLimitReason();
     openMenu(r.left, r.bottom + 2, [
       { label: t("list.addNew"), disabled: !!limit, note: limit != null ? limit : void 0, onSelect: () => openNewVar(btn), focusElsewhere: true },
-      { label: t("list.addFromSel"), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => showMake("color"), focusElsewhere: true },
-      { label: t("list.addDark"), onSelect: () => showMake("theme"), focusElsewhere: true },
-      { label: t("list.addTextStyles"), onSelect: () => showMake("type"), focusElsewhere: true }
+      { label: t("list.addFromSel"), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => showMakeScreen(), focusElsewhere: true },
+      { label: t("list.addDark"), onSelect: () => showPick("theme", "vars"), focusElsewhere: true },
+      { label: t("list.addTextStyles"), onSelect: () => showPick("type", "vars"), focusElsewhere: true }
     ], btn);
   }
   function setAllGroups(open) {
@@ -9299,22 +10198,6 @@ ${opts.tip}` : text;
       else grpCollapsed.add(g.key);
     }
     renderVarList();
-  }
-  function findUnbound() {
-    if (!curSel.count) {
-      showStatusLine(t("status.noSelection"), { cls: "warn" });
-      return;
-    }
-    const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, (baseline != null ? baseline : curSel).ids) && !bindForeignSel;
-    bindLeftSince = false;
-    showTab("select");
-    showApplyStep("bind");
-    if (sameResult || bindBusy()) return;
-    if (prereqKnown && !hasBindable) {
-      renderBindPrereq();
-      return;
-    }
-    runBindPreview();
   }
   $("btnAddVar").addEventListener("click", openAddMenu);
   $("btnVarMore").addEventListener("click", openMoreMenu);
@@ -9333,39 +10216,6 @@ ${opts.tip}` : text;
     modeName = $("modeSelect").value || null;
     renderVarList();
   });
-  var wizLatch = null;
-  var wizBeforeCount = 0;
-  var wizFrom = "start";
-  function placeWizard() {
-    const card = $("wizardCard");
-    const inMake = true;
-    const slot = $("wizardSlotMake");
-    if (card.parentElement !== slot) {
-      slot.appendChild(card);
-      if (inMake) card.classList.toggle("collapsed", !wizardRunning && !wizHasSummary());
-      else card.classList.remove("collapsed");
-    }
-    if (wizardRunning) card.classList.remove("collapsed");
-    const visible = activeTab === "select" && selSub === "make" && !isMini;
-    if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;
-    renderWizardCopy();
-  }
-  var wizHasSummary = () => !!$("wizardSummary").textContent;
-  function renderWizardCopy() {
-    const hint = $("wizardCard").querySelector('[data-i18n="wizardCard.hint"]');
-    if (hint) hint.textContent = t(isPaid ? "wizardCard.hintPaid" : "wizardCard.hintFree");
-    const btn = $("btnWizardRun");
-    if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === "1" ? "wizard.rerun" : "wizardCard.run") : t("wizardCard.runFree");
-    if (!wizardRunning) setLock(btn, curSel.count ? null : "prereq", t("status.noSelection"));
-    $("wizNoSel").hidden = wizardRunning || !!curSel.count;
-    renderWizToBind();
-    const done = $("wizDone");
-    const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
-    if (made > 0) {
-      $("wizDoneText").textContent = t("start.made", { n: made });
-      done.hidden = false;
-    } else done.hidden = true;
-  }
   function readinessDone() {
     return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === "done").length;
   }
@@ -9419,12 +10269,6 @@ ${opts.tip}` : text;
     if (pop.contains(tgt) || (readinessReturn == null ? void 0 : readinessReturn.contains(tgt))) return;
     closeReadiness();
   }, true);
-  $("btnWizListView").addEventListener("click", () => {
-    var _a;
-    wizLatch = null;
-    showTab("variables");
-    (_a = $("varTree").querySelector("[data-key]")) == null ? void 0 : _a.focus();
-  });
   function renderBindPrereq() {
     if (!curSel) return;
     renderBindChrome();
@@ -9456,7 +10300,6 @@ ${opts.tip}` : text;
   window.addEventListener("blur", () => {
     if (hasBindPreview()) bindLeftSince = true;
   });
-  var bindBusy = () => bindFinding || bindLinking !== 0;
   var selFindFor = null;
   var selFindInFlight = false;
   var selFindDeferred = false;
@@ -9616,8 +10459,7 @@ ${opts.tip}` : text;
         if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== "other").map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
         else if (!findReady) subs.push(t("v4.reading"));
         const actions = [selBtn(t("v4.makeArrow"), (b) => {
-          showMake("color");
-          subOpener = b;
+          showMakeScreen(b);
         }, true)];
         const allSubs = [...subs];
         tsOnlyExtra(allSubs, actions);
@@ -9649,8 +10491,7 @@ ${opts.tip}` : text;
   function renderFindCard(put, counts) {
     if (prereqKnown && !hasBindable) {
       const b = selBtn(t("v4.makeArrow"), (el) => {
-        showMake("color");
-        subOpener = el;
+        showMakeScreen(el);
       });
       b.dataset.k = "make";
       const subs = [t("bind.noTier")];
@@ -9691,16 +10532,14 @@ ${opts.tip}` : text;
       if (k > 0) {
         sub.append(" \xB7 " + t("v4.noVarPlaces", { k }) + " ");
         const mk = selLink(t("v4.makeArrow"), (el) => {
-          showMake("color");
-          subOpener = el;
+          showMakeScreen(el);
         });
         mk.dataset.k = "make";
         sub.appendChild(mk);
       }
     } else {
       const mk = selBtn(t("v4.makeArrow"), (el) => {
-        showMake("color");
-        subOpener = el;
+        showMakeScreen(el);
       }, true);
       mk.dataset.k = "make";
       actions.push(mk);
@@ -9851,7 +10690,6 @@ ${opts.tip}` : text;
   }
   activeTab = "variables";
   showTab("select");
-  placeWizard();
 })();
 
 </script>

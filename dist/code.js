@@ -39,15 +39,15 @@
     // 추출 / 토큰 생성
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
-    "color.summary": "\uC0C9 {count}\uAC1C \xB7 \uC5ED\uD560 \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
+    "color.summary": "\uC0C9 {count}\uAC1C \xB7 Semantic \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
     "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
-    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 \uC5ED\uD560 {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
+    "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 Semantic {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
     "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC5B4\uC694",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
     "color.extractEmpty": "\uACE0\uB97C \uAC12\uC744 \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0C9\xB7\uC5EC\uBC31\xB7\uD06C\uAE30\uAC00 \uC788\uB294 \uD504\uB808\uC784\uC774\uB098 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694.",
     "create.baseChanged": "base {base}px\uB85C \uB2E4\uC2DC \uACC4\uC0B0 \uC911\u2026",
     // 시맨틱 매핑
-    "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201C\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
+    "semantic.formatHint": "\uB9E4\uD551\uC744 \uD55C \uC904\uC5D0 \u201CSemantic = Global\uBCC0\uC218\uC774\uB984\u201D \uD615\uC2DD\uC73C\uB85C \uC785\uB825\uD558\uC138\uC694.",
     "semantic.result": "\uC2DC\uB9E8\uD2F1 {aliased}\uAC1C \uBCC4\uCE6D (\uC0DD\uC131 {created} / \uAC31\uC2E0 {updated})",
     "semantic.missing": " \xB7 \uB204\uB77D: {names}",
     // 바인딩(적용)
@@ -55,9 +55,7 @@
     // 연결 목록의 속성 이름 — API 필드명 대신 디자인 말(원래 이름은 툴팁으로).
     "bind.layerSelectTip": "\uB204\uB974\uBA74 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uC774 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD574\uC694",
     // 리네임
-    "rename.previewCount": "{total}\uAC1C \uBCC0\uACBD \uC608\uC815 \xB7 {sel}\uAC1C \uCCB4\uD06C \u2014 \u2018\uC774\uB984 \uC801\uC6A9\u2019",
-    "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694.",
-    "rename.applied": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9 \uC644\uB8CC.",
+    "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
     // 컴포넌트 / 베리언트
     "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
     "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
@@ -82,15 +80,11 @@
     "component.reuseKept": " \xB7 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC6D0\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
-    "wizard.needSelect": "\uBA3C\uC800 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694 \u2014 \uC120\uD0DD\uC5D0\uC11C \uAC12\uC744 \uBF51\uC544\uC694",
-    "wizard.result": "{state} \u2014 {summary}",
-    "wizard.stopped": "\uC911\uB2E8",
-    "wizard.completed": "\uC644\uB8CC",
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
     "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
     "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
-    "dark.collection": "\uC5ED\uD560 \uCEEC\uB809\uC158",
+    "dark.collection": "Semantic \uCEEC\uB809\uC158",
     "dark.fromMode": "\uB77C\uC774\uD2B8",
     "dark.toMode": "\uB2E4\uD06C",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
@@ -106,24 +100,12 @@
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
     // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
-    "wizard.step.extract": "\uCD94\uCD9C",
-    "wizard.step.create": "\uD1A0\uD070",
-    "wizard.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
-    "wizard.step.dark": "\uB2E4\uD06C",
+    "wizard.step.create": "\uB9CC\uB4E4\uAE30",
+    "wizard.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "wizard.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
     "wizard.step.bind": "\uC5F0\uACB0",
-    "wizard.step.rename": "\uC774\uB984",
-    "wizard.step.componentize": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "wizard.rerun": "\uB2E4\uC2DC \uC2E4\uD589",
-    "wizard.rerunHint": "\uC774\uBBF8 \uC815\uB9AC\uD55C \uC120\uD0DD\uC774\uC5D0\uC694 \u2014 \uB2E4\uC2DC \uC2E4\uD589\uD558\uBA74 \uBCC0\uC218\uB294 \uAC31\uC2E0\uB418\uACE0 \uC774\uB984\uC740 \uADF8\uB300\uB85C\uC608\uC694.",
-    "wizard.skip.optionOff": "\uC635\uC158 \uAEBC\uC9D0",
-    "wizard.skip.noMapping": "\uB9E4\uD551 \uC5C6\uC74C",
+    "wizard.step.rename": "\uC774\uB984 \uC815\uB9AC",
     // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
-    "wizard.rolesFromTokens": "\uB9CC\uB4E4\uAE30\uC5D0\uC11C \uD568\uAED8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \uC5ED\uD560 {n}\uAC1C",
-    "wizard.rolesFromTokensTail": " \xB7 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC5ED\uD560 {n}\uAC1C",
-    "wizard.skip.paid": "\uC720\uB8CC \uAE30\uB2A5",
-    "wizard.chip.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uC774\uBC88 \uC2E4\uD589\uC5D0\uC11C\uB294 \uAC74\uB108\uB6F0\uC5B4\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4",
-    "wizard.paidSkipped": " \xB7 \uC720\uB8CC \uAE30\uB2A5\uC774\uB77C \uAC74\uB108\uB700: {steps} \u2014 \uC0C8 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     // 진행 안내(파이프라인) 단계 상태
     "pipeline.stat.done": "\uC644\uB8CC",
     "pipeline.stat.ready": "\uC900\uBE44",
@@ -149,38 +131,26 @@
     "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
-    "wizard.seq.running": "\uC9C4\uD589 \uC911\u2026",
-    "wizard.seq.noExtract": "\uBF51\uC740 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uC0C9\xB7\uD3F0\uD2B8\xB7\uAC04\uACA9\uC774 \uC788\uB294 \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
-    "wizard.seq.extractDone": "{count}\uAC1C \uD6C4\uBCF4",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.semantics": "\uBCC4\uCE6D {aliased}",
-    "wizard.seq.semanticsMissing": " \xB7 \uB204\uB77D {n}",
     "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
     "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
     "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
     "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
     "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.textStylesNone": "\uC120\uD0DD\uC5D0 \uD14D\uC2A4\uD2B8\uAC00 \uC5C6\uC5B4 \uAC74\uB108\uB700",
+    "wizard.seq.textStylesLinked": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uC5F0\uACB0",
+    "wizard.seq.textStylesMissing": " \xB7 \uC54C\uB9BC {k}\uAC1C",
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
-    "wizard.seq.bindRoles": " \xB7 \uC0C8 \uC5ED\uD560 {k}\uAC1C",
+    "wizard.seq.bindRoles": " \xB7 \uC0C8 Semantic {k}\uAC1C",
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
-    "wizard.seq.componentize": "\uB4F1\uB85D {registered} \xB7 \uC138\uD2B8 {sets}",
     // 마법사 완료 요약(summarize, wizard.ts)
-    "wizard.sum.tokens": "\uD1A0\uD070 {n}",
-    "wizard.sum.dark": "\uB2E4\uD06C {n}",
-    "wizard.sum.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}",
-    "wizard.sum.bound": "\uC5F0\uACB0 {n}\uACF3",
-    "wizard.sum.renamed": "\uC774\uB984 {n}",
-    "wizard.sum.components": "\uCEF4\uD3EC\uB10C\uD2B8 {n}",
-    "wizard.sum.empty": "\uB05D\uB0B8 \uC791\uC5C5\uC774 \uC5C6\uC5B4\uC694",
     // 진행 안내 단계 라벨·안내
     "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
     "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
-    "pipeline.step.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "pipeline.step.semantics": "Semantic \uB9E4\uD551",
     "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
     "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
     "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
@@ -328,6 +298,12 @@
     "bind.needOn": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uCF1C\uC138\uC694",
     // 빈 상태(목록 자리)
     // 배지 줄
+    // 트리 목록(IA v4 §2.7)
+    "tree.count": "{n}\uAC1C",
+    "tree.expand": "\uD3BC\uCE58\uAE30",
+    "tree.collapse": "\uC811\uAE30",
+    "tree.headAria": "{name} \uBAA8\uB450 \uCF1C\uACE0 \uB044\uAE30",
+    "v4.bindTop": "\uCF20 \uACF3\uB9CC \uC5F0\uACB0\uD574\uC694",
     "bind.allOn": "\uBAA8\uB450 \uCF1C\uAE30",
     "bind.allOff": "\uBAA8\uB450 \uB044\uAE30",
     // 변수 카드 "값 → 변수"
@@ -339,23 +315,11 @@
     "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
     "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
     "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
-    "tsSkip.boundVars": "\uAE00\uC790 \uC18D\uC131\uC5D0 \uBCC0\uC218 \uC788\uC74C",
     "tsSkip.mixed": "\uC11C\uC2DD\uC774 \uC11E\uC784",
     "tsSkip.instance": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD",
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
-    "start.made": "\uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
-    "start.viewList": "\uBCC0\uC218 \uBAA9\uB85D \uBCF4\uAE30",
-    "wizardCard.hintPaid": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uB808\uC774\uC5B4 \uC5F0\uACB0\uC740 \uB05D\uB09C \uB4A4 \uD655\uC778\uD558\uACE0 \uD574\uC694",
-    "wizardCard.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uC2E4\uD589\uD560 \uC218 \uC788\uC5B4\uC694",
-    "wizard.toBind": "\uC120\uD0DD \uD0ED\uC5D0\uC11C \uD655\uC778\uD558\uACE0 \uC5F0\uACB0\uD558\uAE30 \u2192",
-    "wizard.notLinked": " \xB7 \uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
-    "wizard.seq.cancelSkipped": "\uCDE8\uC18C\uB85C \uAC74\uB108\uB700",
-    "wizardCard.hintFree": "\uBB34\uB8CC \uBC84\uC804\uC5D0\uC11C\uB294 \uAE30\uC874 \uBCC0\uC218 \uC5F0\uACB0\uACFC \uB808\uC774\uC5B4 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694. \uBCC0\uC218 \uB9CC\uB4E4\uAE30\uB294 \uC720\uB8CC\uC608\uC694",
-    "wizardCard.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "wizard.freeSum": "\uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.freeSumBound": "\uC5F0\uACB0 {b}\uACF3 \xB7 \uB808\uC774\uC5B4 \uC774\uB984 {n}\uAC1C \uC815\uB9AC \xB7 \uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
-    "wizard.madeStatus": "\uBCC0\uC218 {n}\uAC1C \uC0DD\uC131",
+    "wizard.toBind": "\uC5F0\uACB0\uD558\uAE30 \u2192",
     "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.addTip": "\uCD94\uAC00",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
@@ -384,7 +348,7 @@
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
-    "list.semanticsNote": "\uC5ED\uD560 \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uC801\uC6A9\uD560 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
+    "list.semanticsNote": "Semantic \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uB9CC\uB4E4 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
@@ -445,6 +409,7 @@
     "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
     "v4.rename": "\uC774\uB984 \uC815\uB9AC",
     "v4.back": "\uB3CC\uC544\uAC00\uAE30",
+    "v4.backHome": "\u2190 \uB3CC\uC544\uAC00\uAE30",
     "v4.subBind": "\uC5F0\uACB0",
     "v4.subComponents": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCA0\uD0C0",
     "v4.subMake": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30",
@@ -459,6 +424,72 @@
     // 선택 표시줄(§4.1)
     "sel.unnamed": "(\uC774\uB984 \uC5C6\uC74C)",
     "sel.noneHere": "\uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uCE94\uBC84\uC2A4\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
+    // 변수 만들기 화면(IA v4 §4.3)
+    "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
+    "make.subRight": "{name}\uC5D0\uC11C \uCC3E\uC740 \uAC12",
+    "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
+    "make.freeBox": "\uBB34\uB8CC\uB294 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694 \xB7 \uC544\uB798\uB294 \uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uBCC0\uC218\uC608\uC694",
+    "make.license": "\uB77C\uC774\uC120\uC2A4 \u2192",
+    "make.treeAria": "\uB9CC\uB4E4 \uBCC0\uC218",
+    "make.more": "\uACA9\uC790 \uC815\uB9AC \xB7 \uD14C\uB9C8 \xB7 \uD0C0\uC774\uD3EC\uAE4C\uC9C0 \uACE0\uB974\uB824\uBA74",
+    "make.pick": "\uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30 \u2192",
+    "make.after": "\uB9CC\uB4E0 \uB4A4",
+    "make.optLink": "\uBC14\uB85C \uC5F0\uACB0",
+    "make.optRename": "\uC774\uB984 \uC815\uB9AC",
+    "make.optDark": "\uB2E4\uD06C \uBAA8\uB4DC",
+    "common.paidTag": "\uC720\uB8CC",
+    "make.run": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
+    "make.runN": "\uBCC0\uC218 {g}\uAC1C \uB9CC\uB4E4\uAE30",
+    "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
+    "make.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
+    "make.freeCount": "\uAE30\uC874 \uBCC0\uC218\uB85C \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694",
+    "make.freeNeedOpt": "\uBB34\uB8CC\uB85C\uB294 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD560 \uC218 \uC788\uC5B4\uC694",
+    "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "make.counting": "\uC138\uB294 \uC911\u2026",
+    "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
+    "make.countStyles": " \xB7 \uC2A4\uD0C0\uC77C {t}\uAC1C",
+    "make.layers": "\uB808\uC774\uC5B4 {n}",
+    "make.tagHas": "\uC788\uC74C",
+    "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
+    "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
+    "make.tagReuseTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uADF8\uAC83\uC744 \uC368\uC694",
+    "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
+    "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
+    "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
+    "make.semNote": "\uCF20 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 Semantic\uC744 \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694 \xB7 Global\uC744 \uB044\uBA74 \uADF8 Semantic\uB3C4 \uBE60\uC838\uC694",
+    "make.tsNote": "\uC774\uB984\uC744 \uB354\uBE14\uD074\uB9AD\uD558\uBA74 \uACE0\uCE60 \uC218 \uC788\uC5B4\uC694 \xB7 \uC2A4\uD0C0\uC77C\uC5D0 \uC4F8 \uAE00\uC790 \uD06C\uAE30 \xB7 \uC904 \uB192\uC774 \xB7 \uC790\uAC04 \uBCC0\uC218\uB3C4 \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
+    "make.tsDup": "\uC2A4\uD0C0\uC77C \uC774\uB984\uC774 \uACB9\uCCD0\uC694",
+    "make.tsExists": "\uC774\uBBF8 \uC788\uB294 \uC2A4\uD0C0\uC77C \uC774\uB984\uC774\uC5D0\uC694",
+    "make.tsHasTip": "\uAC19\uC740 \uAC12\uC758 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 \uC774\uB984\uB9CC \uB9DE\uCDB0\uC694",
+    "make.tsEditAria": "\uC2A4\uD0C0\uC77C \uC774\uB984",
+    "make.zero": "\uC774 \uC120\uD0DD\uC5D0\uC11C \uCC3E\uC740 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "make.runLocked": "\uB9CC\uB4DC\uB294 \uB3D9\uC548\uC740 \uBC14\uAFC0 \uC218 \uC5C6\uC5B4\uC694",
+    "make.partialTitle": "\uC77C\uBD80 \uB2E8\uACC4\uAC00 \uB05D\uB098\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "make.partialKept": "\uB9CC\uB4E0 \uBCC0\uC218\uB294 \uB0A8\uC544 \uC788\uC5B4\uC694 \xB7 \uBCC0\uC218 \uD0ED\uC5D0\uC11C \uBCFC \uC218 \uC788\uC5B4\uC694",
+    "make.partialStatus": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \uC77C\uBD80 \uC2E4\uD328",
+    "make.stepOf": "{i}/{n}\uB2E8\uACC4",
+    "make.stepOff": "\uAED0\uC74C",
+    "make.run.create": "\uB9CC\uB4DC\uB294 \uC911\u2026",
+    "make.run.dark": "\uB2E4\uD06C \uBAA8\uB4DC \uB9CC\uB4DC\uB294 \uC911\u2026",
+    "make.run.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D\uD558\uB294 \uC911\u2026",
+    "make.run.bind": "\uC5F0\uACB0\uD558\uB294 \uC911\u2026",
+    "make.run.rename": "\uC774\uB984 \uBC14\uAFB8\uB294 \uC911\u2026",
+    "make.cancelled": "\uCDE8\uC18C\uD588\uC5B4\uC694",
+    "make.cancelledUpTo": "\uCDE8\uC18C\uD588\uC5B4\uC694 \xB7 {step}\uAE4C\uC9C0 \uB410\uC5B4\uC694",
+    "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
+    "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
+    "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
+    "make.done.stylesLinked": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C(\uAE00\uC790 {a}\uAC1C)",
+    "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
+    "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
+    "make.done.manual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {m}",
+    "make.done.free": "\uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "make.done.notLinked": "\uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
+    "common.view": "\uBCF4\uAE30",
+    "textStyle.linkNow": "\uB808\uC774\uC5B4\uC5D0 \uBC14\uB85C \uC5F0\uACB0",
+    "textStyle.linkNeedScan": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uACE0 \uC2A4\uCE94\uD558\uBA74 \uBC14\uB85C \uBD99\uC77C \uC218 \uC788\uC5B4\uC694",
+    "textStyle.linkedN": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uBD99\uC784",
+    "textStyle.linkSkipped": " \xB7 \uBABB \uBD99\uC778 \uAE00\uC790 {k}\uAC1C",
     "make.noSel": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uBA74 \uADF8 \uC548\uC758 \uAC12\uC73C\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     // 공통 상태 줄(§4.1·§2.3)
     "status.paid": "\uC720\uB8CC \uAE30\uB2A5\uC774\uC5D0\uC694 \xB7 \uC124\uC815 \u203A \uB77C\uC774\uC120\uC2A4\uC5D0\uC11C \uD480 \uC218 \uC788\uC5B4\uC694",
@@ -470,7 +501,7 @@
     // 작업 이름 — 최소화 중 실패 안내("{op} 실패 · [보기]")
     "op.extract": "\uCD94\uCD9C",
     "op.create": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30",
-    "op.semantics": "\uC5ED\uD560 \uB9E4\uD551",
+    "op.semantics": "Semantic \uB9E4\uD551",
     "op.dark": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     "op.textScan": "\uD14D\uC2A4\uD2B8 \uC2A4\uCE94",
     "op.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uB4F1\uB85D",
@@ -504,23 +535,14 @@
     "ts.letterSpacing": "\uC790\uAC04(px) \xB7 \uC74C\uC218\uB3C4 \uB3FC\uC694",
     "ts.weight": "\uAD75\uAE30 \u2014 Regular \xB7 Medium \xB7 SemiBold \xB7 Bold \uCC98\uB7FC Figma\uAC00 \uC4F0\uB294 \uC774\uB984",
     "settings.grid": "\uC5EC\uBC31 \uACA9\uC790",
-    "settings.gridTip": "\uC5EC\uBC31 \uD1A0\uD070\uC744 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
+    "settings.gridTip": "\uC5EC\uBC31 \uD1A0\uD070\uC744 \uAC12\uC744 \uC9C1\uC811 \uACE0\uB974\uAE30 \u203A \uD1A0\uD070\uC5D0\uC11C \uC774 \uACA9\uC790\uB85C \uBAA8\uC544\uC694. \uC608: 8\uC774\uBA74 13\xB715\uAC00 16\uC73C\uB85C. \uC62E\uAE34 \uAC12\uC758 \uBCC0\uC218\uB294 \uC6D0\uB798 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694.",
     // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
     "create.snapNoBind": " \xB7 \uACA9\uC790\uB85C \uC62E\uAE34 {k}\uAC1C \uAC12\uC740 \uC6D0\uB798 \uB808\uC774\uC5B4\uC640 \uB2EC\uB77C \uC5F0\uACB0\uB418\uC9C0 \uC54A\uC544\uC694",
     // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
     "create.tidyUndo": "\uB418\uB3CC\uB9AC\uAE30",
     // 마법사 카드
-    "wizardCard.title": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
-    "wizardCard.hint": "\uC120\uD0DD\uD55C \uD504\uB808\uC784\uC758 \uC0C9\xB7\uAC04\uACA9\uC744 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uACE0 \uB808\uC774\uC5B4 \uC774\uB984\uC744 \uC815\uB9AC\uD574\uC694",
-    "wizardCard.optSemantics": "\uC5ED\uD560 \uB9E4\uD551",
-    "wizardCard.optDark": "\uB2E4\uD06C",
-    "wizardCard.optTextStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "wizardCard.optBind": "\uC5F0\uACB0",
-    "wizardCard.optComponentize": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "wizardCard.run": "\uC804\uCCB4 \uC2E4\uD589",
     // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
     // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-    "wizardCard.legend": "\uC5ED\uD560 \uB9E4\uD551=\uC4F0\uC784 \uC5ED\uD560 \xB7 \uB2E4\uD06C=\uB77C\uC774\uD2B8\uC5D0\uC11C \uC5B4\uB450\uC6B4 \uAC12 \uCC44\uC6B0\uAE30",
     // 공통(정적 라벨)
     "common.selectAll": "\uC804\uCCB4",
     "prereq.gotoCreate": "\uD1A0\uD070 \uB9CC\uB4E4\uAE30\uB85C \u2192",
@@ -530,7 +552,7 @@
     // 브랜드 팔레트
     "color.title": "\uC0C9",
     "color.scope": "\uBCC0\uC218\uD654",
-    "color.listHint": "\uCD94\uCD9C\xB7\uC815\uB9AC\uB41C \uC0C9 \xB7 Global = hue \xB7 Semantic = \uC5ED\uD560",
+    "color.listHint": "\uCD94\uCD9C\xB7\uC815\uB9AC\uB41C \uC0C9 \xB7 Global = hue \uC774\uB984 \xB7 Semantic = \uC4F0\uC784 \uC774\uB984",
     "color.makeVars": "\uC0C9 \uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "palette.brand2": "\uBCF4\uC870\uC0C9",
     "palette.harmony": "\uD558\uBAA8\uB2C8",
@@ -546,8 +568,8 @@
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C \uC5ED\uD560\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
-    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC5ED\uD560\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
+    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C Semantic\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC4F0\uC784 \uC774\uB984\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
     "create.scopeHint": "\uC5EC\uBC31\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8\xB7\uD6A8\uACFC\uB9CC \uB2E4\uB904\uC694. \uC0C9\uC740 \uC774\uC804 \uB2E8\uACC4\uC5D0\uC11C \uC774\uBBF8 \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
@@ -560,14 +582,13 @@
     "create.rowCheckTip": "\uC0DD\uC131 \uB300\uC0C1",
     "create.rowCountTip": "\uC774 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4 {count}\uAC1C",
     // 시맨틱 매핑 카드
-    "semantic.title": "\uC2DC\uB9E8\uD2F1 \uB9E4\uD551 (\uC5ED\uD560 \u2192 \uD1A0\uD070)",
-    "semantic.formatLabel": "\uD615\uC2DD: <code>\uC5ED\uD560 = Global\uBCC0\uC218\uC774\uB984</code>",
+    "semantic.title": "Semantic \uB9E4\uD551 (\uC4F0\uC784 \uC774\uB984 \u2192 Global)",
+    "semantic.formatLabel": "\uD615\uC2DD: <code>Semantic = Global\uBCC0\uC218\uC774\uB984</code>",
     "semantic.aliasBtn": "\uC2DC\uB9E8\uD2F1 \uBCC4\uCE6D \uC0DD\uC131",
     // 텍스트 스타일
     "textStyle.title": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uD654\uBA74 \uC5F0\uACB0\uC740 \uB808\uC774\uC5B4 \u203A \uC5F0\uACB0\uC5D0\uC11C",
+    "textStyle.hint": "\uC2A4\uCE94 \uD6C4 \uC774\uB984\uC744 \uB2E4\uB4EC\uACE0 \uB4F1\uB85D\uD558\uC138\uC694. \uCF1C \uB450\uBA74 \uB4F1\uB85D\uD558\uBA74\uC11C \uC120\uD0DD\uD55C \uAE00\uC790\uC5D0 \uBC14\uB85C \uBD99\uC5EC\uC694",
     "textStyle.scanBtn": "\uC2A4\uCE94",
-    "textStyle.addRow": "\uD589 \uCD94\uAC00",
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
@@ -589,7 +610,7 @@
     // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
     // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
     // 키 = `color/` 접두사를 뗀 역할 경로의 `/`→`-` (color/background/brand-bold → background-brand-bold).
-    "role.none": "\uC5ED\uD560 \uC5C6\uC74C",
+    "role.none": "Semantic \uC5C6\uC74C",
     "role.background-default": "\uBA74",
     "role.background-subtle": "\uC605\uC740 \uBA74",
     "role.background-inverse": "\uBC18\uC804 \uBA74",
@@ -617,19 +638,17 @@
     "role.icon-subtle": "\uC605\uC740 \uC544\uC774\uCF58",
     "role.icon-brand": "\uC8FC\uC0C9 \uC544\uC774\uCF58",
     // 리네임
-    "rename.title": "\uC774\uB984 \uC815\uB9AC",
-    "rename.hint": "\uC5ED\uD560\uC5D0 \uB9DE\uB294 \uB808\uC774\uC5B4 \uC774\uB984\uC73C\uB85C \uBC14\uAFD4\uC694. \uCD5C\uC0C1\uC704\xB7\uC778\uC2A4\uD134\uC2A4 \uC774\uB984\uC740 \uADF8\uB300\uB85C \uB46C\uC694",
-    "rename.preview": "\uBBF8\uB9AC\uBCF4\uAE30",
-    "rename.apply": "\uC774\uB984 \uC801\uC6A9",
+    // 이름 정리 화면(IA v4 §4.4)
+    "rename.top": "\uCF20 \uC774\uB984\uB9CC \uBC14\uAFD4\uC694",
+    "rename.treeAria": "\uBC14\uAFC0 \uC774\uB984",
+    "rename.footNote": "\uB808\uC774\uC5B4 \uC774\uB984\uB9CC \uBC14\uB00C\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694",
+    "rename.applyBtn": "\uC774\uB984 \uBC14\uAFB8\uAE30",
+    "rename.applyN": "{k}\uAC1C \uC774\uB984 \uBC14\uAFB8\uAE30",
+    "rename.switchAria": "{name}(\uC73C)\uB85C \uBC14\uAFB8\uAE30",
+    "rename.needOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "rename.doneStatus": "\uC774\uB984 {k}\uAC1C \uBC14\uAFC8 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "rename.subRight": "{name} \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
     // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
-    "rename.keep.root": "\uB8E8\uD2B8 \uBCF4\uC874",
-    "rename.keep.instance": "\uC778\uC2A4\uD134\uC2A4 \uBCF4\uC874",
-    "rename.keep.component": "\uCEF4\uD3EC\uB10C\uD2B8 \uBCF4\uC874",
-    "rename.keep.text": "\uD14D\uC2A4\uD2B8 \uBCF4\uC874",
-    "rename.keep.locked": "\uC7A0\uAE34 \uB808\uC774\uC5B4",
-    "rename.keep.meta": "\uC7A0\uAE08",
-    "rename.hideKeep": "\uC7A0\uAE08 \uC81C\uC678",
-    "rename.showKeep": "\uC7A0\uAE08 \uD45C\uC2DC",
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
     "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
@@ -684,14 +703,13 @@
     // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
     // 새 역할(§2.12, §4.6)
     "bind.newRole": "N",
-    "bind.newRoleAria": "\uC0C8 \uC5ED\uD560",
+    "bind.newRoleAria": "\uC0C8 Semantic",
     "bind.newRoleTip": "{global}\uC744 \uAC00\uB9AC\uCF1C\uC694",
     "bind.linkingOf": "\uC5F0\uACB0 \uC911\u2026 {done} / {total}",
     "bind.waitLink": "\uC5F0\uACB0\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.waitOp": "{op} \uC791\uC5C5\uC774 \uB05D\uB098\uBA74 \uB2E4\uC2DC \uD574 \uC8FC\uC138\uC694",
     "bind.skipSelected": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C \uC120\uD0DD",
     // 레이어 › 이름
-    "rename.count": "\uD6C4\uBCF4 {total}",
     // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
     "component.extraSkipped": " \xB7 \uAC74\uB108\uB700 {n}",
     "component.extraSingles": " \xB7 \uB2E8\uC77C {n}",
@@ -783,7 +801,7 @@
     "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
     // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
-    "create.sumRoles": " \xB7 \uC5ED\uD560 {n}\uAC1C",
+    "create.sumRoles": " \xB7 Semantic {n}\uAC1C",
     "create.tidySummary": "\uC5EC\uBC31 {before} \u2192 {after}\uAC1C ({grid}px \uACA9\uC790\uB85C {n}\uAC1C \uC774\uB3D9{mergedPart}){gapPart}",
     "create.tidyUndone": "\uACA9\uC790 \uC815\uB9AC\uB97C \uB418\uB3CC\uB838\uC5B4\uC694 \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB2E4\uC2DC \uB204\uB974\uBA74 \uB610 \uC815\uB9AC\uD574\uC694",
     "create.onceOff": "1\xD7 \uD1A0\uD070 {n}\uAC1C \uD574\uC81C",
@@ -823,7 +841,7 @@
     "textStyle.scanLhPct": " \xB7 \uD589\uAC04% {n}",
     "textStyle.scanLsPct": " \xB7 \uC790\uAC04% {n}",
     "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
-    "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uD558\uAC70\uB098 \u2018\uD589 \uCD94\uAC00\u2019\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC815\uC758\uD558\uC138\uC694.",
+    "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
@@ -2059,7 +2077,11 @@
     const reuse = await pickReusable(tokens, base);
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set() };
+    const states = /* @__PURE__ */ new Map();
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), tokenStates: states };
+    const setState = (name, st) => {
+      if (!states.has(name)) states.set(name, st);
+    };
     const seen = /* @__PURE__ */ new Set();
     const tally = (colId, name, kind) => {
       const k = vkey(colId, name);
@@ -2080,6 +2102,7 @@
       const r = reuse.get(t2.name);
       if (r) {
         summary.globalOf.set(t2.name, r.id);
+        setState(t2.name, { state: "reuse", varName: r.name });
         continue;
       }
       const mine = manualByName.get(t2.name);
@@ -2087,19 +2110,22 @@
         const type = resolvedTypeForToken(t2);
         if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gCol.defaultModeId], literalOf(t2, type, base), type)) {
           summary.globalOf.set(t2.name, mine.id);
+          setState(t2.name, { state: "reuse", varName: mine.name });
         } else if (!summary.skippedManualNames.has(t2.name)) {
           summary.globalOf.delete(t2.name);
           summary.skippedManualNames.add(t2.name);
           summary.skippedManual++;
+          states.set(t2.name, { state: "manual" });
         }
         continue;
       }
+      setState(t2.name, { state: existing.has(vkey(gId, t2.name)) ? "update" : "new" });
       tally(gId, t2.name, "globals");
     }
     return summary;
   }
-  async function createUsageRoles(tokens, preview = false, globalOf) {
-    var _a, _b, _c, _d, _e, _f, _g;
+  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const withUses = tokens.filter((t2) => {
       var _a2;
       return (_a2 = t2.uses) == null ? void 0 : _a2.length;
@@ -2174,7 +2200,15 @@
       if (existing.has(name) || toMake.has(name)) continue;
       toMake.set(name, r.token);
     }
-    if (preview) return toMake.size;
+    if (preview) {
+      if (rowsOut) {
+        for (const [name, t2] of toMake) {
+          const id = globalOf == null ? void 0 : globalOf.get(t2.name);
+          rowsOut.push({ name, global: id && ((_f = byId.get(id)) == null ? void 0 : _f.name) || t2.name, token: t2.name });
+        }
+      }
+      return toMake.size;
+    }
     if (!toMake.size) return 0;
     const col = ensureOwnedCollection(cols, "semantic");
     let made = 0;
@@ -2183,9 +2217,9 @@
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_f = scopeForSemanticRole(name)) != null ? _f : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_g = scopeForSemanticRole(name)) != null ? _g : g.scopes, g.resolvedType);
       try {
-        (_g = v.setPluginData) == null ? void 0 : _g.call(v, AUTO_ROLE_KEY, "1");
+        (_h = v.setPluginData) == null ? void 0 : _h.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -2473,9 +2507,23 @@
     }
     return out;
   }
+  async function globalFamilyVars() {
+    var _a;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const pluginGlobalId = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id;
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const list = vars.filter((v) => v.resolvedType === "STRING" && tiers.get(v.variableCollectionId) === 1).sort((a, b) => {
+      const pa = a.variableCollectionId === pluginGlobalId ? 0 : 1;
+      const pb = b.variableCollectionId === pluginGlobalId ? 0 : 1;
+      return pa - pb || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+    return (family) => list.find((v) => directValue(v, modeOf) === family);
+  }
   async function createSemanticTextStyles(specs) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
     if (!specs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
     const styleById = new Map(existing.map((s) => [s.id, s]));
@@ -2596,6 +2644,7 @@
       for (const v of await figma.variables.getLocalVariablesAsync())
         if (v.variableCollectionId === semId) semByName.set(v.name, v);
     }
+    const familyVarFor = await globalFamilyVars();
     for (const spec of specs) {
       const anchored = anchoredStyle(spec);
       if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
@@ -2675,7 +2724,13 @@
           } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(`letter-spacing/${bindRole}`);
         }
       }
+      const famVar = familyVarFor(style.fontName.family);
+      if (famVar) {
+        style.setBoundVariable("fontFamily", famVar);
+        res.bound++;
+      }
       res[created ? "created" : "updated"]++;
+      if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
       styleByName.set(style.name, style);
     }
     return res;
@@ -2699,14 +2754,37 @@
   function isMixedTypography(t2) {
     return t2.fontSize === figma.mixed || t2.fontName === figma.mixed || t2.lineHeight === figma.mixed || t2.letterSpacing === figma.mixed || t2.textCase === figma.mixed || t2.textDecoration === figma.mixed;
   }
-  var TEXT_VAR_FIELDS = ["fontSize", "lineHeight", "letterSpacing", "fontFamily"];
-  function hasTextVarBinding(t2) {
+  var STYLE_TEXT_VAR_FIELDS = ["fontFamily", "fontSize", "fontStyle", "fontWeight", "letterSpacing", "lineHeight", "paragraphSpacing", "paragraphIndent"];
+  function unbindStyleTextVars(t2) {
+    var _a;
     const bv = t2.boundVariables;
-    if (!bv) return false;
-    return TEXT_VAR_FIELDS.some((f) => {
+    if (!bv) return;
+    const len = typeof t2.characters === "string" ? t2.characters.length : 0;
+    const node = t2;
+    for (const f of STYLE_TEXT_VAR_FIELDS) {
       const e = bv[f];
-      return Array.isArray(e) ? e.length > 0 : !!e;
-    });
+      if (!(Array.isArray(e) ? e.length > 0 : !!e)) continue;
+      if (len > 0 && node.setRangeBoundVariable) node.setRangeBoundVariable(0, len, f, null);
+      try {
+        (_a = node.setBoundVariable) == null ? void 0 : _a.call(node, f, null);
+      } catch (e2) {
+      }
+    }
+  }
+  async function loadTextFonts(t2, loaded) {
+    const len = typeof t2.characters === "string" ? t2.characters.length : 0;
+    const fonts = len > 0 && typeof t2.getRangeAllFontNames === "function" ? t2.getRangeAllFontNames(0, len) : t2.fontName !== figma.mixed ? [t2.fontName] : [];
+    for (const fn of fonts) {
+      const k = `${fn.family} ${fn.style}`;
+      if (loaded.has(k)) continue;
+      await figma.loadFontAsync(fn);
+      loaded.add(k);
+    }
+  }
+  async function attachTextStyle(t2, styleId, loaded) {
+    await loadTextFonts(t2, loaded);
+    unbindStyleTextVars(t2);
+    await t2.setTextStyleIdAsync(styleId);
   }
   function hasTextStyle(t2) {
     const id = t2.textStyleId;
@@ -2724,9 +2802,17 @@
     }
     return styleByKey;
   }
+  function planTexts(nodes) {
+    const texts = [];
+    const inInstance = [];
+    for (const n of nodes) {
+      if (insideInstance(n)) walkText(n, inInstance);
+      else walkText(n, texts, inInstance);
+    }
+    return { texts, inInstance };
+  }
   function textStyleFor(t2, styleByKey) {
     if (hasTextStyle(t2)) return "hasStyle";
-    if (hasTextVarBinding(t2)) return "boundVars";
     if (isMixedTypography(t2)) return "mixed";
     const hit = styleByKey.get(typoKey(t2));
     if (hit === void 0) return "noStyle";
@@ -2735,14 +2821,9 @@
   }
   async function planExistingTextStyles(nodes) {
     var _a;
-    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
     const styleByKey = await textStyleIndex();
-    const texts = [];
-    const inInstance = [];
-    for (const n of nodes) {
-      if (insideInstance(n)) walkText(n, inInstance);
-      else walkText(n, texts, inInstance);
-    }
+    const { texts, inInstance } = planTexts(nodes);
     skipReasons.instance += inInstance.length;
     const rows = /* @__PURE__ */ new Map();
     for (const t2 of texts) {
@@ -2758,7 +2839,7 @@
     return { rows: [...rows.values()], skipReasons };
   }
   async function applyTextStyleRows(rows) {
-    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
     const res = { applied: 0, skipped: 0, skipReasons };
     const styleByKey = await textStyleIndex();
     const loaded = /* @__PURE__ */ new Set();
@@ -2777,19 +2858,58 @@
           continue;
         }
         try {
-          const fn = t2.fontName;
-          const k = `${fn.family} ${fn.style}`;
-          if (!loaded.has(k)) {
-            await figma.loadFontAsync(fn);
-            loaded.add(k);
-          }
-          await t2.setTextStyleIdAsync(r.id);
+          await attachTextStyle(t2, r.id, loaded);
           res.applied++;
         } catch (e) {
         }
       }
     }
     return res;
+  }
+  async function textStyleCandidateTest() {
+    const styleByKey = await textStyleIndex();
+    return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
+  }
+  async function applyRegisteredTextStyles(roots, styleIds) {
+    var _a, _b;
+    const applyReasons = { hasStyle: 0, instance: 0, ambiguous: 0 };
+    const out = { applied: 0, applySkipped: 0, applyReasons };
+    if (!styleIds.length) return out;
+    const ids = new Set(styleIds);
+    const idByKey = /* @__PURE__ */ new Map();
+    for (const st of await figma.getLocalTextStylesAsync()) if (ids.has(st.id)) idByKey.set(typoKey(st), st.id);
+    if (!idByKey.size) return out;
+    const keyOf2 = (t2) => isMixedTypography(t2) ? void 0 : typoKey(t2);
+    const plan = planTexts(roots);
+    const skipped = (k) => {
+      applyReasons[k]++;
+      out.applySkipped++;
+    };
+    for (const t2 of plan.inInstance) if (idByKey.has((_a = keyOf2(t2)) != null ? _a : "\0")) skipped("instance");
+    const rows = /* @__PURE__ */ new Map();
+    const styleByKey = await textStyleIndex();
+    for (const t2 of plan.texts) {
+      const k = keyOf2(t2);
+      if (k === void 0 || !idByKey.has(k)) continue;
+      const r = textStyleFor(t2, styleByKey);
+      if (r === "hasStyle") {
+        if (t2.textStyleId !== idByKey.get(k)) skipped("hasStyle");
+        continue;
+      }
+      if (r === "ambiguous") {
+        skipped("ambiguous");
+        continue;
+      }
+      if (typeof r === "string" || !ids.has(r.id)) continue;
+      const arr = (_b = rows.get(r.id)) != null ? _b : [];
+      arr.push(t2.id);
+      rows.set(r.id, arr);
+    }
+    if (rows.size) {
+      const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
+      out.applied = r.applied;
+    }
+    return out;
   }
   var VarNameError = class extends Error {
   };
@@ -3304,7 +3424,10 @@
 
   // src/lib/textStyles.ts
   var RAMP_NAMES = ["display", "h1", "h2", "h3", "title", "body", "caption", "overline"];
-  var sigKey = (s) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+  function tsSig(s) {
+    return `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+  }
+  var sigKey = tsSig;
   function clusterTextStyles(samples) {
     var _a;
     const map = /* @__PURE__ */ new Map();
@@ -3885,7 +4008,8 @@
       owner: (n) => {
         if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
         return ownerCache.get(n);
-      }
+      },
+      skipText: opts.skipTextStyleNode
     };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
@@ -4325,9 +4449,11 @@
     });
   }
   async function bindText(node, ctx) {
+    var _a;
     const { res, preview } = ctx;
     if (node.type !== "TEXT") return;
     if (node.fontName === figma.mixed) return;
+    if ((_a = ctx.skipText) == null ? void 0 : _a.call(ctx, node)) return;
     if (hasStyleId(node, "textStyleId")) {
       if (node.fontSize !== figma.mixed) note(res, "styled", node, preview, "fontSize");
       if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") note(res, "styled", node, preview, "lineHeight");
@@ -9511,14 +9637,15 @@
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
           const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel));
-          post({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length });
+          post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
         case "CREATE_TOKENS": {
           if (!msg.preview && !requirePaid("tokens")) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
-          const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf);
+          const roleRows = [];
+          const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
@@ -9530,7 +9657,15 @@
             summary += t("create.sumBase", { base: msg.base, n: s.conversions.length, examples: ex, morePart });
           }
           if (s.skippedManual) summary += t("create.sumManual", { n: s.skippedManual });
-          post(__spreadValues({ type: "CREATE_RESULT", created: s.created, updated: s.updated, summary, preview: msg.preview, roles }, s.skippedManual ? { skippedManual: s.skippedManual } : {}));
+          const tokenStates = msg.preview && s.tokenStates ? Object.fromEntries(s.tokenStates) : void 0;
+          post(__spreadValues(__spreadValues(__spreadValues({
+            type: "CREATE_RESULT",
+            created: s.created,
+            updated: s.updated,
+            summary,
+            preview: msg.preview,
+            roles
+          }, s.skippedManual ? { skippedManual: s.skippedManual } : {}), msg.reqId != null ? { reqId: msg.reqId } : {}), msg.preview ? { tokenStates: tokenStates != null ? tokenStates : {}, roleRows } : {}));
           if (!msg.preview) {
             commitUndo(figma);
             await postPrereq();
@@ -9557,8 +9692,9 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              { ownerOf: bindOwnerOf(sel) }
-              // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
+              __spreadValues({
+                ownerOf: bindOwnerOf(sel)
+              }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {})
             );
             post({
               type: "APPLY_RESULT",
@@ -9685,7 +9821,7 @@
         }
         case "RENAME": {
           const r = await renameSelection(await resolveRoots(msg.nodeIds), { apply: msg.apply, maxDepth: msg.maxDepth });
-          post({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied });
+          post(__spreadValues({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           if (r.applied && r.changes.length) {
             commitUndo(figma);
           }
@@ -9710,7 +9846,7 @@
             if (before === after) continue;
             changes.push({ id, before, after });
           }
-          post({ type: "RENAME_RESULT", changes, nodes: [], applied: true });
+          post(__spreadValues({ type: "RENAME_RESULT", changes, nodes: [], applied: true }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           selfSelect = true;
           postSelection();
           if (changes.length || roleWrites) {
@@ -9728,11 +9864,13 @@
         }
         case "SCAN_TEXT_STYLES": {
           if (!requirePaid("textStyles")) break;
-          const { samples, warnings } = await scanTextStyles(selection());
-          lastTextSamples = samples;
+          const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
+          if (msg.reqId == null) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
           const styles = nameTextStyles(clusterTextStyles(samples), existing);
-          post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+          if (msg.reqId != null) {
+            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, reqId: msg.reqId, existing: existing.map((e) => ({ name: e.name, sig: tsSig(e) })) });
+          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {
@@ -9749,7 +9887,15 @@
         case "CREATE_TEXT_STYLES": {
           if (!requireTextStyles()) break;
           const r = await createSemanticTextStyles(msg.styles);
-          post({ type: "TEXT_STYLES_RESULT", created: r.created, updated: r.updated, bound: r.bound, missing: r.missing, notes: r.notes });
+          const ap = msg.applyTo ? await applyRegisteredTextStyles(await resolveRoots(msg.applyTo), r.styleIds) : null;
+          post(__spreadValues(__spreadValues({
+            type: "TEXT_STYLES_RESULT",
+            created: r.created,
+            updated: r.updated,
+            bound: r.bound,
+            missing: r.missing,
+            notes: r.notes
+          }, msg.reqId != null ? { reqId: msg.reqId } : {}), ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}));
           commitUndo(figma);
           await postPrereq();
           break;

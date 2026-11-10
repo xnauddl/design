@@ -151,11 +151,33 @@ export interface ComponentCandidate {
  * - hasStyle: 이미 텍스트 스타일이 붙음(원격·일부 구간 포함)
  * - noStyle: 모든 글자 속성이 같은 스타일이 없음
  * - ambiguous: 같은 모양의 스타일이 둘 이상
- * - boundVars: 크기·줄 높이·자간·글꼴에 변수가 붙음
  * - mixed: 구간마다 서식이 다름(크기·글꼴·대소문자·밑줄 등)
  * - instance: 인스턴스 안쪽 글자
+ * 글자 변수가 붙은 글자는 건너뛰지 않는다 — 변수 연결을 떼고 스타일을 붙인다(IA v4 §2.3-6, 예전 사유 `boundVars`는 없앴다).
  */
-export type TextStyleSkipReason = 'hasStyle' | 'noStyle' | 'ambiguous' | 'boundVars' | 'mixed' | 'instance';
+export type TextStyleSkipReason = 'hasStyle' | 'noStyle' | 'ambiguous' | 'mixed' | 'instance';
+
+/** 타이포 등록 · 바로 연결(IA v4 §4.3 "타이포 등록")에서 못 붙인 글자의 사유 — 값이 방금 스타일과 같은 글자만 센다. */
+export type TextStyleApplySkipReason = 'hasStyle' | 'instance' | 'ambiguous';
+
+/** 만들기 미리보기의 토큰별 상태(IA v4 §4.3 상태 태그). varName: reuse일 때 쓸 기존 변수 이름. */
+export interface TokenState {
+  state: 'new' | 'update' | 'reuse' | 'manual';
+  varName?: string;
+}
+
+/** 만들기 미리보기의 Semantic 줄(IA v4 §4.3) — 역할 이름 · 가리킬 Global 이름 · 그 역할을 만든 토큰 이름. */
+export interface RoleRow {
+  name: string;
+  global: string;
+  token: string;
+}
+
+/** 기존 로컬 텍스트 스타일 — 이름 겹침 잠금용(sig = `tsSig`). */
+export interface ExistingStyleSig {
+  name: string;
+  sig: string;
+}
 
 /**
  * 변수 고치기 실패 사유 — deleted: 변수가 없음(1단계) · conflict: 다른 곳에서 바뀜(2단계, 아무것도 안 바꿈) ·
@@ -169,11 +191,12 @@ export interface VarUpdateError {
 
 /** UI → code 요청. */
 export type UiToCode =
-  | { type: 'EXTRACT'; nodeIds?: string[] } // nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
+  | { type: 'EXTRACT'; nodeIds?: string[]; reqId?: number } // reqId: 만들기 화면 요청 번호(결과에 그대로 돌려줌, IA v4 §4.3) · nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
   // 매칭은 언제나 "같은 값"(IA v3 §2.11 — 숫자 소수 2자리, 색 #RRGGBB + 양쪽 불투명). 허용오차는 없앴다.
-  | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[] } // preview: UX1 dry-run(바인딩 없음)
+  // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
+  | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'PREVIEW_TEXT_STYLES'; reqId: number; nodeIds?: string[] } // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef }[]; textStyles?: { styleId: string; nodeIds: string[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
@@ -193,16 +216,18 @@ export type UiToCode =
   // 사용 레이어 선택 / 별칭으로 쓰는 레이어 선택 — 그때 새로 찾아 최대 200개 선택(응답은 SELECT_RESULT).
   | { type: 'SELECT_VAR_USERS'; varIds: string[]; nodeIds: string[] }
   | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
-  | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[] }
+  | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[]; reqId?: number }
   | { type: 'UNBIND_DELETED'; reqId: number; nodeIds?: string[] } // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3)
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
-  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string }[] } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
+  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
-  | { type: 'SCAN_TEXT_STYLES' } // Phase C: 선택 텍스트 후보 — 이름은 항상 크기 순(display/h1…)
+  // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
+  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 항상 크기 순(display/h1…)
   // 스캔 결과에 가로 행 라벨 이름을 덧입힌다. 스캔의 옵션이 아니라 뒤따르는 별도 동작이다
   // (결정 2026-08-06) — 켜고 스캔하는 대신, 결과를 보고 마음에 안 들면 눌러 이름만 다시 매긴다.
   | { type: 'NAME_TEXT_STYLES_BY_ROW' }
-  | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[] } // Phase C: 변수 보장+스타일 등록(화면 연결 없음)
+  // applyTo: 바로 연결 — 그 루트 안에서 방금 등록 · 갱신한 스타일과 값이 같은 글자에 붙인다(IA v4 §4.3 "타이포 등록", 같은 ⌘Z).
+  | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; reqId?: number; applyTo?: string[] } // Phase C: 변수 보장+스타일 등록
   | { type: 'GET_COLLECTIONS' }
   | { type: 'SET_UI_SIZE'; mode: 'default' | 'mini' } // IA v3: 최소화(400×48) / 펼치기(400×510), 저장 안 함
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
@@ -231,7 +256,7 @@ export type UiToCode =
 /** code → UI 응답. */
 export type CodeToUi =
   | { type: 'UI_SIZE'; mode: 'default' | 'mini' } // 지금 창 크기(최소화 여부)
-  | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number }
+  | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number; reqId?: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
@@ -246,15 +271,18 @@ export type CodeToUi =
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
   | { type: 'VAR_USERS'; reqId: number; layers: { id: string; name: string }[]; totalLayers: number; places: number }
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
-  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number } // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10)
+  // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10). tokenStates · roleRows: 미리보기만(IA v4 §4.3 — roleRows.length = roles).
+  | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number; reqId?: number; tokenStates?: Record<string, TokenState>; roleRows?: RoleRow[] }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipTotal?: number; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지) + skipTotal: 상한 전 실제 수. APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩)
-  | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean } // nodes: 선택형 트리(#13)용 전체 서브트리
+  | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean; reqId?: number } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[]; skippedManual?: number } // skippedManual: 직접 만든 변수라 건너뛴 역할 수(§4.9)
   // labeled/fallback은 「왼쪽 글자로 이름 채우기」를 눌렀을 때만 온다 — 맨 스캔은 전부 크기 순이라
   // `왼쪽 글자 0`을 적어 봐야 실패처럼 읽힐 뿐이다. undefined면 상태줄에서 그 조각을 생략한다.
-  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number }
-  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[] } // Phase C (notes=경고 아닌 알림)
+  // existing: reqId 스캔일 때만 — 로컬 텍스트 스타일 전부(이름 겹침 잠금, IA v4 §4.3).
+  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
+  // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
+  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number> } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).

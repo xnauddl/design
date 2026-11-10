@@ -13,6 +13,8 @@ export {
   applyExistingTextStyles,
   planExistingTextStyles,
   applyTextStyleRows,
+  applyRegisteredTextStyles,
+  textStyleCandidateTest,
   prunePaletteColors,
   isManualVar,
   createManualVariable,
@@ -26,7 +28,7 @@ export {
   SEMANTIC,
   COMPONENT,
 } from './variables';
-export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult } from './variables';
+export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult } from './variables';
 export { bindSelection, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
 export { assignNames, bgKindOf, colorRoleBases, colorSlotKey, colorUse, paddingProp, radiusName, strokeName, isOldPluginName } from './usageRoles';
 export type { BindResult } from './bind';

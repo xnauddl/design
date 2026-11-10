@@ -28,16 +28,16 @@ export const STRINGS: Record<string, string> = {
   // 추출 / 토큰 생성
   'create.preview': '미리보기 — {summary} · ‘적용’으로 반영',
   'create.colorsDone': '색 변수 {count}개 이미 생성됨 · 여기선 색 외만',
-  'color.summary': '색 {count}개 · 역할 지정 {roles} · 변수화 대기',
+  'color.summary': '색 {count}개 · Semantic 지정 {roles} · 변수화 대기',
   'color.needColors': '먼저 ‘선택에서 추출’ 또는 ‘팔레트 생성’으로 색을 모으세요.',
-  'color.fileVars': '파일에 색 변수 {n}개 · 역할 {roles}개 — ‘선택에서 추출’을 누르면 현재 화면의 색을 읽어요',
+  'color.fileVars': '파일에 색 변수 {n}개 · Semantic {roles}개 — ‘선택에서 추출’을 누르면 현재 화면의 색을 읽어요',
   'create.fileVars': '파일에 간격·크기·폰트 변수 {n}개 — ‘미리보기’를 누르면 현재 화면의 값을 읽어요',
   // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
   'color.extractEmpty': '고를 값을 찾지 못했어요 — 색·여백·크기가 있는 프레임이나 레이어를 선택하세요.',
   'create.baseChanged': 'base {base}px로 다시 계산 중…',
 
   // 시맨틱 매핑
-  'semantic.formatHint': '매핑을 한 줄에 “역할 = Global변수이름” 형식으로 입력하세요.',
+  'semantic.formatHint': '매핑을 한 줄에 “Semantic = Global변수이름” 형식으로 입력하세요.',
   'semantic.result': '시맨틱 {aliased}개 별칭 (생성 {created} / 갱신 {updated})',
   'semantic.missing': ' · 누락: {names}',
 
@@ -47,9 +47,7 @@ export const STRINGS: Record<string, string> = {
   'bind.layerSelectTip': '누르면 캔버스에서 이 레이어를 선택해요',
 
   // 리네임
-  'rename.previewCount': '{total}개 변경 예정 · {sel}개 체크 — ‘이름 적용’',
-  'rename.none': '바꿀 이름이 없어요.',
-  'rename.applied': '{count}개 이름 적용 완료.',
+  'rename.none': '바꿀 이름이 없어요',
 
   // 컴포넌트 / 베리언트
   'component.scanning': '후보 스캔 중…',
@@ -76,16 +74,12 @@ export const STRINGS: Record<string, string> = {
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
   // 마법사
-  'wizard.needSelect': '먼저 레이어를 선택하세요 — 선택에서 값을 뽑아요',
-  'wizard.result': '{state} — {summary}',
-  'wizard.stopped': '중단',
-  'wizard.completed': '완료',
 
   // 다크 테마 생성
   'dark.title': '다크 모드',
   'dark.hint': '라이트 색을 뒤집어 다크에 채워요. 목록 이름은 Figma 변수 컬렉션·모드예요',
   'dark.hintTip': '색상·채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뛰어요. 다크용 원시색은 dark/…로 따로 만들어요.',
-  'dark.collection': '역할 컬렉션',
+  'dark.collection': 'Semantic 컬렉션',
   'dark.fromMode': '라이트',
   'dark.toMode': '다크',
   'dark.genBtn': '다크 만들기',
@@ -104,24 +98,12 @@ export const STRINGS: Record<string, string> = {
   // 유료 게이팅
 
   // 마법사 단계 라벨(WIZARD_STEPS id 기준) + 건너뜀 사유
-  'wizard.step.extract': '추출',
-  'wizard.step.create': '토큰',
-  'wizard.step.semantics': '역할 매핑',
-  'wizard.step.dark': '다크',
+  'wizard.step.create': '만들기',
+  'wizard.step.dark': '다크 모드',
   'wizard.step.textStyles': '텍스트 스타일',
   'wizard.step.bind': '연결',
-  'wizard.step.rename': '이름',
-  'wizard.step.componentize': '컴포넌트',
-  'wizard.rerun': '다시 실행',
-  'wizard.rerunHint': '이미 정리한 선택이에요 — 다시 실행하면 변수는 갱신되고 이름은 그대로예요.',
-  'wizard.skip.optionOff': '옵션 꺼짐',
-  'wizard.skip.noMapping': '매핑 없음',
+  'wizard.step.rename': '이름 정리',
   // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
-  'wizard.rolesFromTokens': '만들기에서 함께 만들었어요 · 역할 {n}개',
-  'wizard.rolesFromTokensTail': ' · 만들기에서 역할 {n}개',
-  'wizard.skip.paid': '유료 기능',
-  'wizard.chip.paid': '유료 기능이라 이번 실행에서는 건너뛰어요 · 설정 › 라이선스',
-  'wizard.paidSkipped': ' · 유료 기능이라 건너뜀: {steps} — 새 변수는 만들지 않았어요',
 
   // 진행 안내(파이프라인) 단계 상태
   'pipeline.stat.done': '완료',
@@ -150,40 +132,28 @@ export const STRINGS: Record<string, string> = {
 
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',
-  'wizard.seq.running': '진행 중…',
-  'wizard.seq.noExtract': '뽑은 값이 없어요 — 색·폰트·간격이 있는 레이어를 선택하세요',
-  'wizard.seq.extractDone': '{count}개 후보',
   'wizard.seq.createDone': '생성 {created} · 갱신 {updated}',
-  'wizard.seq.semantics': '별칭 {aliased}',
-  'wizard.seq.semanticsMissing': ' · 누락 {n}',
   'wizard.seq.dark': '다크 {realiased}개 연결',
   'wizard.seq.darkModeCreated': ' · 다크 모드 추가',
   'wizard.seq.darkSkip': ' · 건너뜀 {n}(값을 직접 넣은 색)',
   'wizard.seq.darkNoTarget': '모드가 있는 컬렉션이 없어 건너뜀 — 먼저 토큰을 만드세요',
   'wizard.seq.darkNothing': '채울 색이 없음 — Global을 가리키는 시맨틱 색이 필요해요',
   'wizard.seq.textStyles': '스타일 생성 {created} · 갱신 {updated}',
-  'wizard.seq.textStylesNone': '선택에 텍스트가 없어 건너뜀',
+  'wizard.seq.textStylesLinked': ' · 글자 {a}개에 연결',
+  'wizard.seq.textStylesMissing': ' · 알림 {k}개',
   'wizard.seq.renameDone': '{count}개 이름 적용',
   'wizard.seq.bindDone': '{n}곳 연결',
-  'wizard.seq.bindRoles': ' · 새 역할 {k}개',
+  'wizard.seq.bindRoles': ' · 새 Semantic {k}개',
   'wizard.seq.bindNone': '연결 0곳 — 변수와 값이 같은 곳이 없어요',
   'wizard.seq.bindAllBound': '연결 0곳 — 이미 모두 연결돼 있어요',
   'wizard.seq.bindNoTier': '연결 0곳 — 계층으로 쓸 변수가 없어요',
-  'wizard.seq.componentize': '등록 {registered} · 세트 {sets}',
 
   // 마법사 완료 요약(summarize, wizard.ts)
-  'wizard.sum.tokens': '토큰 {n}',
-  'wizard.sum.dark': '다크 {n}',
-  'wizard.sum.textStyles': '텍스트 스타일 {n}',
-  'wizard.sum.bound': '연결 {n}곳',
-  'wizard.sum.renamed': '이름 {n}',
-  'wizard.sum.components': '컴포넌트 {n}',
-  'wizard.sum.empty': '끝낸 작업이 없어요',
 
   // 진행 안내 단계 라벨·안내
   'pipeline.step.colors': '색 변수',
   'pipeline.step.tokens': '간격·크기 토큰',
-  'pipeline.step.semantics': '역할 매핑',
+  'pipeline.step.semantics': 'Semantic 매핑',
   'pipeline.step.bind': '변수 연결',
   'pipeline.step.dark': '다크 모드',
   'pipeline.step.textStyles': '텍스트 스타일',
@@ -332,6 +302,12 @@ export const STRINGS: Record<string, string> = {
   'bind.needOn': '연결할 변수를 켜세요',
   // 빈 상태(목록 자리)
   // 배지 줄
+  // 트리 목록(IA v4 §2.7)
+  'tree.count': '{n}개',
+  'tree.expand': '펼치기',
+  'tree.collapse': '접기',
+  'tree.headAria': '{name} 모두 켜고 끄기',
+  'v4.bindTop': '켠 곳만 연결해요',
   'bind.allOn': '모두 켜기',
   'bind.allOff': '모두 끄기',
   // 변수 카드 "값 → 변수"
@@ -343,23 +319,11 @@ export const STRINGS: Record<string, string> = {
   'tsSkip.hasStyle': '이미 스타일 있음',
   'tsSkip.noStyle': '같은 스타일 없음',
   'tsSkip.ambiguous': '같은 모양 스타일이 둘 이상',
-  'tsSkip.boundVars': '글자 속성에 변수 있음',
   'tsSkip.mixed': '서식이 섞임',
   'tsSkip.instance': '인스턴스 안쪽',
   // IA v3 변수 탭(§4.2~§4.4)
   'var.loading': '변수 정보를 불러오는 중…',
-  'start.made': '변수 {n}개를 만들었어요',
-  'start.viewList': '변수 목록 보기',
-  'wizardCard.hintPaid': '선택한 프레임의 색·간격을 변수로 만들어요. 레이어 연결은 끝난 뒤 확인하고 해요',
-  'wizardCard.noSel': '레이어를 선택하면 실행할 수 있어요',
-  'wizard.toBind': '선택 탭에서 확인하고 연결하기 →',
-  'wizard.notLinked': ' · 연결은 아직 안 했어요',
-  'wizard.seq.cancelSkipped': '취소로 건너뜀',
-  'wizardCard.hintFree': '무료 버전에서는 기존 변수 연결과 레이어 이름 정리만 해요. 변수 만들기는 유료예요',
-  'wizardCard.runFree': '연결 · 이름 정리 실행',
-  'wizard.freeSum': '레이어 이름 {n}개 정리 · 변수는 만들지 않았어요',
-  'wizard.freeSumBound': '연결 {b}곳 · 레이어 이름 {n}개 정리 · 변수는 만들지 않았어요',
-  'wizard.madeStatus': '변수 {n}개 생성',
+  'wizard.toBind': '연결하기 →',
   'list.readiness': '준비 현황 {n}/{total}',
   'list.addTip': '추가',
   'list.moreTip': '더 보기',
@@ -388,7 +352,7 @@ export const STRINGS: Record<string, string> = {
   'list.menuExport': '코드로 내보내기…',
   'list.menuExpandAll': '사이드바 모두 펼치기',
   'list.menuCollapseAll': '사이드바 모두 접기',
-  'list.semanticsNote': '역할 매핑은 토큰을 적용할 때 함께 만들어져요',
+  'list.semanticsNote': 'Semantic 매핑은 토큰을 만들 때 함께 만들어져요',
   'tab.variables': '변수',
   'tab.select': '선택',
   // IA v4 선택 탭(§4.1)
@@ -449,6 +413,7 @@ export const STRINGS: Record<string, string> = {
   'v4.tidy': '레이어 정리',
   'v4.rename': '이름 정리',
   'v4.back': '돌아가기',
+  'v4.backHome': '← 돌아가기',
   'v4.subBind': '연결',
   'v4.subComponents': '컴포넌트 베타',
   'v4.subMake': '값을 직접 고르기',
@@ -463,6 +428,72 @@ export const STRINGS: Record<string, string> = {
   // 선택 표시줄(§4.1)
   'sel.unnamed': '(이름 없음)',
   'sel.noneHere': '선택이 없어요 — 캔버스에서 레이어를 선택하세요',
+  // 변수 만들기 화면(IA v4 §4.3)
+  'make.title': '변수 만들기',
+  'make.subRight': '{name}에서 찾은 값',
+  'make.top': '켠 값만 변수로 만들어요',
+  'make.freeBox': '무료는 변수를 만들지 않아요 · 아래는 유료에서 만들 변수예요',
+  'make.license': '라이선스 →',
+  'make.treeAria': '만들 변수',
+  'make.more': '격자 정리 · 테마 · 타이포까지 고르려면',
+  'make.pick': '값을 직접 고르기 →',
+  'make.after': '만든 뒤',
+  'make.optLink': '바로 연결',
+  'make.optRename': '이름 정리',
+  'make.optDark': '다크 모드',
+  'common.paidTag': '유료',
+  'make.run': '변수 만들기',
+  'make.runN': '변수 {g}개 만들기',
+  'make.runStyles': '스타일 {t}개 만들기',
+  'make.runFree': '연결 · 이름 정리 실행',
+  'make.freeCount': '기존 변수로 연결 · 이름 정리만 해요',
+  'make.freeNeedOpt': '무료로는 연결 · 이름 정리만 할 수 있어요',
+  'make.needOn': '만들 값을 켜 주세요',
+  'make.counting': '세는 중…',
+  'make.countGR': 'Global {g}개 · Semantic {r}개',
+  'make.countStyles': ' · 스타일 {t}개',
+  'make.layers': '레이어 {n}',
+  'make.tagHas': '있음',
+  'make.tagHasTip': '같은 이름 변수가 있어 값만 맞춰요',
+  'make.tagReuse': '있는 변수',
+  'make.tagReuseTip': '값이 같은 변수가 있어 새로 만들지 않고 그것을 써요',
+  'make.tagManual': '직접 만든 변수',
+  'make.tagManualTip': '직접 만든 변수라 덮어쓰지 않아요',
+  'make.rowAria': '{name} 만들기',
+  'make.semNote': '켠 Global을 가리키는 Semantic을 함께 만들어요 · 레이어에는 Semantic이 붙어요 · Global을 끄면 그 Semantic도 빠져요',
+  'make.tsNote': '이름을 더블클릭하면 고칠 수 있어요 · 스타일에 쓸 글자 크기 · 줄 높이 · 자간 변수도 함께 만들어요',
+  'make.tsDup': '스타일 이름이 겹쳐요',
+  'make.tsExists': '이미 있는 스타일 이름이에요',
+  'make.tsHasTip': '같은 값의 스타일이 있어 이름만 맞춰요',
+  'make.tsEditAria': '스타일 이름',
+  'make.zero': '이 선택에서 찾은 값이 없어요',
+  'make.runLocked': '만드는 동안은 바꿀 수 없어요',
+  'make.partialTitle': '일부 단계가 끝나지 않았어요',
+  'make.partialKept': '만든 변수는 남아 있어요 · 변수 탭에서 볼 수 있어요',
+  'make.partialStatus': '변수 만들기 일부 실패',
+  'make.stepOf': '{i}/{n}단계',
+  'make.stepOff': '껐음',
+  'make.run.create': '만드는 중…',
+  'make.run.dark': '다크 모드 만드는 중…',
+  'make.run.textStyles': '텍스트 스타일 등록하는 중…',
+  'make.run.bind': '연결하는 중…',
+  'make.run.rename': '이름 바꾸는 중…',
+  'make.cancelled': '취소했어요',
+  'make.cancelledUpTo': '취소했어요 · {step}까지 됐어요',
+  'make.done.create': 'Global {g}개 · Semantic {r}개',
+  'make.done.dark': '다크 {k}개',
+  'make.done.styles': '텍스트 스타일 {s}개',
+  'make.done.stylesLinked': '텍스트 스타일 {s}개(글자 {a}개)',
+  'make.done.bind': '{n}곳 연결',
+  'make.done.rename': '이름 {c}개 정리',
+  'make.done.manual': '직접 만든 변수라 건너뜀 {m}',
+  'make.done.free': '변수는 만들지 않았어요',
+  'make.done.notLinked': '연결은 아직 안 했어요',
+  'common.view': '보기',
+  'textStyle.linkNow': '레이어에 바로 연결',
+  'textStyle.linkNeedScan': '레이어를 선택하고 스캔하면 바로 붙일 수 있어요',
+  'textStyle.linkedN': ' · 글자 {a}개에 붙임',
+  'textStyle.linkSkipped': ' · 못 붙인 글자 {k}개',
   'make.noSel': '레이어를 선택하면 그 안의 값으로 만들어요',
   // 공통 상태 줄(§4.1·§2.3)
   'status.paid': '유료 기능이에요 · 설정 › 라이선스에서 풀 수 있어요',
@@ -474,7 +505,7 @@ export const STRINGS: Record<string, string> = {
   // 작업 이름 — 최소화 중 실패 안내("{op} 실패 · [보기]")
   'op.extract': '추출',
   'op.create': '토큰 만들기',
-  'op.semantics': '역할 매핑',
+  'op.semantics': 'Semantic 매핑',
   'op.dark': '다크 만들기',
   'op.textScan': '텍스트 스캔',
   'op.textStyles': '텍스트 스타일 등록',
@@ -508,23 +539,14 @@ export const STRINGS: Record<string, string> = {
   'ts.letterSpacing': '자간(px) · 음수도 돼요',
   'ts.weight': '굵기 — Regular · Medium · SemiBold · Bold 처럼 Figma가 쓰는 이름',
   'settings.grid': '여백 격자',
-  'settings.gridTip': '여백 토큰을 만들기에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요.',
+  'settings.gridTip': '여백 토큰을 값을 직접 고르기 › 토큰에서 이 격자로 모아요. 예: 8이면 13·15가 16으로. 옮긴 값의 변수는 원래 레이어에 연결되지 않아요.',
   // 격자로 옮긴 값이 허용오차 밖이면 스냅은 되고 연결만 실패한다 — 실제로 옮겼을 때만 붙이는 꼬리.
   'create.snapNoBind': ' · 격자로 옮긴 {k}개 값은 원래 레이어와 달라 연결되지 않아요',
   // 격자는 설정에서 고르는 값이라 스냅은 정책이 아니라 선택이다 — 색 정리와 같은 되돌리기.
   'create.tidyUndo': '되돌리기',
   // 마법사 카드
-  'wizardCard.title': '한 번에 정리',
-  'wizardCard.hint': '선택한 프레임의 색·간격을 변수로 만들고 레이어 이름을 정리해요',
-  'wizardCard.optSemantics': '역할 매핑',
-  'wizardCard.optDark': '다크',
-  'wizardCard.optTextStyles': '텍스트 스타일',
-  'wizardCard.optBind': '연결',
-  'wizardCard.optComponentize': '컴포넌트',
-  'wizardCard.run': '전체 실행',
   // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
   // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
-  'wizardCard.legend': '역할 매핑=쓰임 역할 · 다크=라이트에서 어두운 값 채우기',
   // 공통(정적 라벨)
   'common.selectAll': '전체',
   'prereq.gotoCreate': '토큰 만들기로 →',
@@ -534,7 +556,7 @@ export const STRINGS: Record<string, string> = {
   // 브랜드 팔레트
   'color.title': '색',
   'color.scope': '변수화',
-  'color.listHint': '추출·정리된 색 · Global = hue · Semantic = 역할',
+  'color.listHint': '추출·정리된 색 · Global = hue 이름 · Semantic = 쓰임 이름',
   'color.makeVars': '색 변수 만들기',
   'palette.brand2': '보조색',
   'palette.harmony': '하모니',
@@ -550,8 +572,8 @@ export const STRINGS: Record<string, string> = {
   // 추출
   'extract.scanBtn': '선택에서 추출',
   // 색 정리(추출 카드에 흡수)
-  'colorTidy.hint': '뽑거나 팔레트를 만든 뒤, 목록에서 역할을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료',
-  'colorTidy.hintTip': '추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 역할은 Semantic으로 붙어요.',
+  'colorTidy.hint': '뽑거나 팔레트를 만든 뒤, 목록에서 Semantic을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료',
+  'colorTidy.hintTip': '추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 쓰임 이름은 Semantic으로 붙어요.',
   // 토큰 생성
   'create.title': '간격·크기 토큰',
   'create.scopeHint': '여백·크기·폰트·효과만 다뤄요. 색은 이전 단계에서 이미 만들었어요',
@@ -564,14 +586,13 @@ export const STRINGS: Record<string, string> = {
   'create.rowCheckTip': '생성 대상',
   'create.rowCountTip': '이 값을 쓰는 레이어 {count}개',
   // 시맨틱 매핑 카드
-  'semantic.title': '시맨틱 매핑 (역할 → 토큰)',
-  'semantic.formatLabel': '형식: <code>역할 = Global변수이름</code>',
+  'semantic.title': 'Semantic 매핑 (쓰임 이름 → Global)',
+  'semantic.formatLabel': '형식: <code>Semantic = Global변수이름</code>',
   'semantic.aliasBtn': '시맨틱 별칭 생성',
   // 텍스트 스타일
   'textStyle.title': '텍스트 스타일',
-  'textStyle.hint': '스캔 후 이름을 다듬고 등록하세요. 화면 연결은 레이어 › 연결에서',
+  'textStyle.hint': '스캔 후 이름을 다듬고 등록하세요. 켜 두면 등록하면서 선택한 글자에 바로 붙여요',
   'textStyle.scanBtn': '스캔',
-  'textStyle.addRow': '행 추가',
   // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
   // 지금 무슨 일이 일어나는지를 적는다.
   'textStyle.rowLabelBtn': '왼쪽 글자로 이름 채우기',
@@ -593,7 +614,7 @@ export const STRINGS: Record<string, string> = {
   // 색 역할(Semantic) 어휘 — 드롭다운은 `한글 · role`로 병기한다(와이어).
   // 키의 `-`는 역할 이름의 `/`(surface/muted)를 대신한다 — 점 표기 키와 섞이지 않게.
   // 키 = `color/` 접두사를 뗀 역할 경로의 `/`→`-` (color/background/brand-bold → background-brand-bold).
-  'role.none': '역할 없음',
+  'role.none': 'Semantic 없음',
   'role.background-default': '면',
   'role.background-subtle': '옅은 면',
   'role.background-inverse': '반전 면',
@@ -621,19 +642,17 @@ export const STRINGS: Record<string, string> = {
   'role.icon-subtle': '옅은 아이콘',
   'role.icon-brand': '주색 아이콘',
   // 리네임
-  'rename.title': '이름 정리',
-  'rename.hint': '역할에 맞는 레이어 이름으로 바꿔요. 최상위·인스턴스 이름은 그대로 둬요',
-  'rename.preview': '미리보기',
-  'rename.apply': '이름 적용',
+  // 이름 정리 화면(IA v4 §4.4)
+  'rename.top': '켠 이름만 바꿔요',
+  'rename.treeAria': '바꿀 이름',
+  'rename.footNote': '레이어 이름만 바뀌어요 · ⌘Z로 되돌릴 수 있어요',
+  'rename.applyBtn': '이름 바꾸기',
+  'rename.applyN': '{k}개 이름 바꾸기',
+  'rename.switchAria': '{name}(으)로 바꾸기',
+  'rename.needOn': '바꿀 이름을 켜 주세요',
+  'rename.doneStatus': '이름 {k}개 바꿈 · ⌘Z로 되돌리기',
+  'rename.subRight': '{name} · 바꿀 이름 {n}개',
   // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
-  'rename.keep.root': '루트 보존',
-  'rename.keep.instance': '인스턴스 보존',
-  'rename.keep.component': '컴포넌트 보존',
-  'rename.keep.text': '텍스트 보존',
-  'rename.keep.locked': '잠긴 레이어',
-  'rename.keep.meta': '잠금',
-  'rename.hideKeep': '잠금 제외',
-  'rename.showKeep': '잠금 표시',
   // 컴포넌트 / 베리언트
   'structure.title': '컴포넌트',
   'structure.scope': '닮은 프레임',
@@ -688,14 +707,13 @@ export const STRINGS: Record<string, string> = {
   // 레이어 › 연결 — 찾기 · 연결의 수(2026-11-05, pr4-copy-table.md 11)
   // 새 역할(§2.12, §4.6)
   'bind.newRole': 'N',
-  'bind.newRoleAria': '새 역할',
+  'bind.newRoleAria': '새 Semantic',
   'bind.newRoleTip': '{global}을 가리켜요',
   'bind.linkingOf': '연결 중… {done} / {total}',
   'bind.waitLink': '연결이 끝나면 다시 해 주세요',
   'bind.waitOp': '{op} 작업이 끝나면 다시 해 주세요',
   'bind.skipSelected': '{reason} 레이어 {n}개 선택',
   // 레이어 › 이름
-  'rename.count': '후보 {total}',
   // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
   'component.extraSkipped': ' · 건너뜀 {n}',
   'component.extraSingles': ' · 단일 {n}',
@@ -787,7 +805,7 @@ export const STRINGS: Record<string, string> = {
   'color.usedCount': ' · {n}× 사용',
   'create.tidyMerged': ' · 같은 칸 {n}개 병합',
   // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
-  'create.sumRoles': ' · 역할 {n}개',
+  'create.sumRoles': ' · Semantic {n}개',
   'create.tidySummary': '여백 {before} → {after}개 ({grid}px 격자로 {n}개 이동{mergedPart}){gapPart}',
   'create.tidyUndone': '격자 정리를 되돌렸어요 — ‘미리보기’를 다시 누르면 또 정리해요',
   'create.onceOff': '1× 토큰 {n}개 해제',
@@ -827,7 +845,7 @@ export const STRINGS: Record<string, string> = {
   'textStyle.scanLhPct': ' · 행간% {n}',
   'textStyle.scanLsPct': ' · 자간% {n}',
   'textStyle.renaming': '왼쪽 글자로 이름을 다시 매기는 중…',
-  'textStyle.needSpecs': '먼저 ‘스캔’하거나 ‘행 추가’로 스타일을 정의하세요.',
+  'textStyle.needSpecs': '먼저 ‘스캔’으로 스타일을 읽어 주세요',
   'textStyle.nameSplit': ' · 왼쪽 글자 {a} · 크기 순 {b}',
   'textStyle.fallbackRamp': '선택에서 텍스트를 못 찾아 기본 램프로 채웠어요. 폰트·값을 조정하세요',
   'textStyle.registered': '텍스트 스타일 {n}개 (생성 {c} / 갱신 {u}) · 연결 {b}',

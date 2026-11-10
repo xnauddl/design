@@ -1,12 +1,14 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
-import { type TextStyleSpec, rampToSpecs } from './lib/textStyles';
+import { type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
+import { headState, headToggleTarget, mergeSameNameTokens, buildRenameTree, type RenameTreeItem } from './lib/treeState';
+import { renderTree, focusRow, type TreeItem } from './treeList';
 import { type Tier } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
@@ -23,7 +25,7 @@ import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMa
 import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import { planWizard, summarize, pickDarkTarget, type WizardOptions, type WizardContext, type WizardTotals, type WizardStepId, type WizardPlanItem } from './lib/wizard';
+import { planMake, makeDoneText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
 import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, PLACE_SKIP_REASONS, LAYER_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -885,7 +887,7 @@ function tsSummary(s: TextStyleSpec): string {
 }
 
 /**
- * 값을 고칠 수 있는 행인가 — 손으로 추가한 행(`행 추가`)과 텍스트를 못 찾아 채운 기본 램프.
+ * 값을 고칠 수 있는 행인가 — 텍스트를 못 찾아 채운 기본 램프.
  * 스캔 행은 캔버스에서 읽은 사실이라 읽기 전용으로 둔다(고치면 화면과 스타일이 어긋난다).
  * 두 부류 모두 세고 있는 글자(count)도, 이미 묶인 스타일(boundStyleId)도 없다.
  */
@@ -978,7 +980,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
     badge.addEventListener('click', () => selectNodes(ids, 'tsStatus'));
     (card.querySelector('.r-top') as HTMLElement).appendChild(badge);
   } else {
-    // 수동 추가 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
+    // 램프 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
     const del = document.createElement('button');
     del.className = 'link';
     del.textContent = t('textStyle.rowDelete');
@@ -1001,7 +1003,7 @@ function renderTextStyles(): void {
     return;
   }
   // 개수는 상태줄 한 곳에서만 — 제목 배지(#tsCount)는 걷었다(ui.html 주석 참고).
-  // 표에서 세므로 행 추가·삭제가 바로 반영된다(스캔 시점 스냅샷이던 옛 상태줄의 문제).
+  // 표에서 세므로 줄 삭제가 바로 반영된다(스캔 시점 스냅샷이던 옛 상태줄의 문제).
   const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
   setStatus(
     'tsStatus',
@@ -1014,7 +1016,7 @@ function renderTextStyles(): void {
   );
 }
 
-/** 등록에 넘길 스펙 — 이름이 빈 행은 뺀다(수동 추가 후 미입력). */
+/** 등록에 넘길 스펙 — 이름이 빈 행은 뺀다. */
 function readTextStyleRows(): TextStyleSpec[] {
   // 폰트가 빈 채로 넘어가면 code가 createTextStyle로 스타일을 먼저 만든 뒤
   // loadFontAsync({family:''})에서 던져, 값도 변수도 없는 껍데기 스타일이 파일에
@@ -1029,19 +1031,23 @@ function readTextStyleRows(): TextStyleSpec[] {
     }));
 }
 
-$('btnScanText').addEventListener('click', () => send({ type: 'SCAN_TEXT_STYLES' }));
+/** 마지막 스캔에 실어 보낸 nodeIds(§4.3 "타이포 등록") — [등록]의 바로 연결 대상. */
+let tsScanIds: string[] | null = null;
+$('btnScanText').addEventListener('click', () => {
+  // 기준 nodeIds, 없으면 지금 선택, 둘 다 없으면 nodeIds 없이(코드가 선택을 읽음).
+  const ids = baseline?.ids.length ? baseline.ids : curSel.ids.length ? curSel.ids : null;
+  tsScanIds = ids ? ids.slice() : null;
+  send(ids ? { type: 'SCAN_TEXT_STYLES', nodeIds: ids } : { type: 'SCAN_TEXT_STYLES' });
+  renderTsLink();
+});
+/** [✓] 레이어에 바로 연결 — 기억한 nodeIds가 없으면 잠금. */
+function renderTsLink(): void {
+  setLock($('tsLinkNow') as HTMLInputElement, tsScanIds ? null : 'prereq', t('textStyle.linkNeedScan'));
+}
 // 스캔 후 액션 — 눌러야 생기는 이름이라, 스캔이 표를 채우기 전엔 잠가 둔다(TEXT_STYLE_CANDIDATES에서 해제).
 $('btnTsRowLabels').addEventListener('click', () => {
   setStatus('tsStatus', t('textStyle.renaming'), 'ok');
   send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
-});
-$('btnTsAddRow').addEventListener('click', () => {
-  tsSpecs.push({ name: '', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: DEFAULT_TS_FAMILY, style: 'Regular' });
-  renderTextStyles();
-  // 추가한 카드로 데려가고 이름 칸에 커서를 둔다(어차피 다음 동작은 이름 입력).
-  const last = $('tsList').lastElementChild as HTMLElement | null;
-  last?.scrollIntoView({ block: 'nearest' });
-  (last?.querySelector('input') as HTMLInputElement | null)?.focus();
 });
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
@@ -1049,8 +1055,9 @@ $('btnTextStyles').addEventListener('click', () => {
     setStatus('tsStatus', t('textStyle.needSpecs'), 'warn');
     return;
   }
-  // 등록은 스타일 생성까지 — 화면에 붙이는 건 옆의 「기존만 연결」 담당(결정 2026-08-06).
-  send({ type: 'CREATE_TEXT_STYLES', styles });
+  // 바로 연결(§4.3 "타이포 등록", 2026-11-10 A+C) — 켜져 있고 스캔 대상이 있으면 등록하면서 그 글자에 붙인다.
+  const link = ($('tsLinkNow') as HTMLInputElement).checked && !!tsScanIds;
+  send(link ? { type: 'CREATE_TEXT_STYLES', styles, applyTo: tsScanIds! } : { type: 'CREATE_TEXT_STYLES', styles });
 });
 
 /** 선택이 멎은 뒤 이만큼 기다렸다 연결 현황을 읽는다 — 드래그 선택 중 매 이벤트마다 목록이 비었다 찼다 하지 않게. */
@@ -1170,40 +1177,6 @@ $('btnApplyCancel').addEventListener('click', () => {
   setStatus('applyStatus', t('apply.cancelRequested'), 'warn');
 });
 
-$('btnPreview').addEventListener('click', () => {
-  send({ type: 'RENAME', apply: false, maxDepth: readMaxDepth() });
-});
-
-$('btnRename').addEventListener('click', () => {
-  // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG).
-  const items = renameNodes
-    .filter((n) => n.after !== undefined && renameChecked.has(n.id))
-    .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role }));
-  if (!items.length) return;
-  // 이름이 안 바뀐 노드도 역할은 남긴다 — 마법사 경로(renameSelection)는 이미 그렇게 하고(멱등),
-  // 판넬만 빠져 있어 옛 빌드로 리네임한 파일·손으로 이름 지은 레이어에는 역할 기록이 영영 안 생겼다.
-  // 그러면 「컴포넌트 등록」의 말단 후보(아바타·아이콘·썸네일)가 통째로 죽는다.
-  // 체크 대상이 아닌 이유는 '바꿀 이름이 없어서'지 역할까지 남기지 말라는 뜻이 아니다.
-  const roleOnly = renameNodes
-    .filter((n) => n.after === undefined && n.role)
-    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
-  send({ type: 'RENAME_APPLY', items: [...items, ...roleOnly] });
-});
-
-$('renameAll').addEventListener('change', (e) => {
-  const on = (e.target as HTMLInputElement).checked;
-  renameChecked.clear();
-  if (on) for (const n of renameNodes) if (n.after !== undefined) renameChecked.add(n.id);
-  renderRenameTree();
-});
-
-// 보존 행 감추기/보이기 — 체크에는 영향이 없다(보존 행은 애초에 체크 대상이 아님).
-$('btnRenameKeep').addEventListener('click', () => {
-  renameHideKeep = !renameHideKeep;
-  renderRenameTree();
-});
-
-
 /* ============================================================
    시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
    순서대로 호출하는 UI 시퀀서. 신규 로직은 lib/wizard.ts(순수)에 분리.
@@ -1256,290 +1229,6 @@ function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[], r
   });
 }
 
-/** Paid라서 이번 실행에서 빠진 단계들. 칩과 요약 줄이 같은 목록을 쓴다. */
-function paidSkippedSteps(plan: WizardPlanItem[]): WizardPlanItem[] {
-  return plan.filter((p) => !p.run && p.skipReason === 'wizard.skip.paid');
-}
-
-/** 계획을 미니 파이프 칩으로 — 돌 단계는 번호순, 결과·사유는 칩 툴팁(와이어).
-    옵션을 꺼서 빠진 단계는 칩을 만들지 않는다: 왜 빠졌는지는 바로 위 체크박스가 이미 말한다.
-    반면 Paid로 빠진 단계는 화면 어디에도 단서가 없어, 칩까지 지우면 Free 사용자는 파이프가
-    왜 세 칸만 도는지 알 길이 없다 — 자물쇠 회색 칩으로 자리를 남긴다. */
-function renderWizardSteps(plan: WizardPlanItem[]): void {
-  const box = $('wizardSteps');
-  box.innerHTML = '';
-  let n = 0;
-  for (const p of plan) {
-    const paidSkip = !p.run && p.skipReason === 'wizard.skip.paid';
-    if (!p.run && !paidSkip) continue;
-    const chip = document.createElement('span');
-    chip.id = `wstep-${p.step.id}`;
-    const label = t('wizard.step.' + p.step.id);
-    if (p.run) {
-      chip.textContent = `${++n} ${label}`;
-    } else {
-      chip.className = 'skip';
-      chip.textContent = `${PAID_LOCK} ${label}`;
-      chip.title = t('wizard.chip.paid');
-    }
-    box.appendChild(chip);
-  }
-}
-
-/** 이번 마법사 실행에 실패한 단계가 있었는가(앞 단계가 멈춰 건너뛴 표시는 빼고) — 최소화 ⚠ 판정. */
-let wizardFailed = false;
-function setWizardStep(id: WizardStepId, state: 'active' | 'done' | 'fail', note: string): void {
-  if (state === 'fail' && note !== t('wizard.seq.stoppedPrev')) wizardFailed = true;
-  const chip = document.getElementById(`wstep-${id}`);
-  if (!chip) return;
-  chip.classList.remove('active', 'done', 'fail');
-  chip.classList.add(state);
-  // 칩에는 번호·라벨만 둔다 — 단계별 결과("생성 3 · 갱신 2")는 툴팁으로, 총평은 아래 요약 줄로.
-  chip.title = note;
-}
-
-async function runWizard(): Promise<void> {
-  if (wizardRunning) return;
-  if (lastSelCount <= 0) {
-    setStatus('wizardSummary', t('wizard.needSelect'), 'warn');
-    return;
-  }
-  // 설정값은 설정 탭 '플러그인 설정'에서 읽는다(단일 출처) — 격자·허용오차도 거기 값을 그대로 쓴다.
-  const base = Number(($('base') as HTMLInputElement).value) || 16;
-  const maxDepth = readMaxDepth();
-  let semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
-
-  const options: WizardOptions = {
-    semantics: ($('wizOptSemantics') as HTMLInputElement).checked,
-    dark: ($('wizOptDark') as HTMLInputElement).checked,
-    textStyles: ($('wizOptTextStyles') as HTMLInputElement).checked,
-    bind: ($('wizOptBind') as HTMLInputElement).checked,
-    // v1.0: 마법사에서 컴포넌트 등록 제외(체크박스 숨김) — 리네임 뒤 이름 기준 묶기가 디자인을 덮어쓴다.
-    componentize: false,
-  };
-  const ctx: WizardContext = { isPaid, hasSemanticMap: Object.keys(semMap).length > 0 };
-  const plan = planWizard(options, ctx);
-  // 기준은 시작할 때 한 번 정한다(§4.3) — 실행 중에 선택이 바뀌어도 추출 · 연결 · 이름 정리는 같은 레이어.
-  const wizIds = (baseline ?? curSel).ids.slice();
-  wizBindRan = false;
-
-  wizardRunning = true;
-  wizardFailed = false;
-  // 시작 화면 고정(①) — 로컬 변수 0개일 때 시작했으면 실행 중·요약 동안 시작 화면 유지.
-  wizBeforeCount = localVarCount();
-  wizFrom = activeTab === 'select' && selSub === 'make' ? 'make' : 'start';
-  wizLatch = wizBeforeCount === 0 ? { from: wizFrom, before: 0, summarySeen: false, done: false } : null;
-  opWizardStart();
-  ($('btnWizardRun') as HTMLButtonElement).disabled = true;
-  $('btnWizardCancel').style.display = '';
-  setStatus('wizardSummary', t('common.running'), '');
-  renderWizardSteps(plan);
-
-  const totals: WizardTotals = {};
-  let rolesFromTokens = 0; // 만들기 단계가 만든 쓰임 역할 수(§2.12 12.10)
-  let stopped = false;
-  let failNote = ''; // 실패 사유 — 칩 툴팁에만 두면 화면에서 사라진다(요약 줄에 함께 싣는다)
-
-  wizCancelReq = false;
-  wizEnded = false;
-  renderWizToBind();
-  for (const p of plan) {
-    if (!p.run) continue; // renderWizardSteps에서 이미 skip 표시
-    // 취소는 지금 단계가 끝난 뒤 남은 단계를 실행하지 않는다(§4.3).
-    if (wizCancelReq && !stopped) stopped = true;
-    if (stopped) {
-      setWizardStep(p.step.id, 'fail', wizCancelReq ? t('wizard.seq.cancelSkipped') : t('wizard.seq.stoppedPrev'));
-      continue;
-    }
-    setWizardStep(p.step.id, 'active', t('wizard.seq.running'));
-    try {
-      switch (p.step.id) {
-        case 'extract': {
-          // 응답은 메인 핸들러가 먼저 받아 `tokens`를 정규화(hue 이름·색 정리·역할 추천)해 둔다 —
-          // 여기서는 raw `r.tokens`가 아니라 그 결과(모듈 변수)를 쓴다. 버튼 경로와 같은 토큰이다.
-          await wizardRequest({ type: 'EXTRACT', nodeIds: wizIds }, ['EXTRACT_RESULT']);
-          if (!tokens.length) {
-            setWizardStep('extract', 'fail', t('wizard.seq.noExtract'));
-            stopped = true;
-            break;
-          }
-          // 만들기 탭의 색 표·토큰 목록은 '추출'/'미리보기' 버튼이 켜는 플래그로 가려져 있다 —
-          // 마법사가 같은 추출을 했으니 둘 다 펼쳐, 탭을 열면 무엇을 만들었는지 목록으로 보이게 한다.
-          colorRevealed = true;
-          previewRevealed = true;
-          renderColorTable();
-          renderTokens();
-          // 역할 매핑은 **이번 추출 토큰 기준으로 다시** 만든다(자동 추천 + 색 표에서 고른 역할) —
-          // '색 변수 만들기' 버튼과 같은 출처. 이전 세션의 textarea를 그대로 쓰면 지금은 없는
-          // 이름(옛 hex 이름 `color/000000`)에 역할이 붙거나, 색 4개만 남고 간격·크기·타이포
-          // 역할(spacing/sm, radius/md, font-size/body…)이 통째로 빠진다.
-          setSemMapText(colorAuthoritativeRoles(base));
-          semMap = textToSemanticMap(($('semMap') as HTMLTextAreaElement).value);
-          // 시작 시점엔 매핑이 없어 '매핑 없음'으로 빠졌어도 지금은 만들 별칭이 있다 — 단계를 되살린다.
-          const sem = plan.find((x) => x.step.id === 'semantics');
-          if (sem && !sem.run && sem.skipReason === 'wizard.skip.noMapping' && Object.keys(semMap).length) {
-            sem.run = true;
-            sem.skipReason = undefined;
-            renderWizardSteps(plan);
-            setWizardStep('extract', 'active', t('wizard.seq.running'));
-          }
-          setWizardStep('extract', 'done', t('wizard.seq.extractDone', { count: tokens.length }));
-          break;
-        }
-        case 'create': {
-          const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens, base }, ['CREATE_RESULT']);
-          totals.created = r.created + r.updated;
-          rolesFromTokens = r.roles ?? 0;
-          setWizardStep('create', 'done', t('wizard.seq.createDone', { created: r.created, updated: r.updated }));
-          // 쓰임 역할은 만들기가 이미 만들었다(§2.12 12.10) — 맵이 비어 '매핑 없음'으로 빠진 역할 매핑 단계를
-          // 건너뜀 대신 끝난 단계로 보인다(빈 맵이라 CREATE_SEMANTICS는 보내지 않는다).
-          const sem = plan.find((x) => x.step.id === 'semantics');
-          if (sem && !sem.run && sem.skipReason === 'wizard.skip.noMapping' && rolesFromTokens > 0) {
-            setWizardStep('semantics', 'done', t('wizard.rolesFromTokens', { n: rolesFromTokens }));
-          }
-          break;
-        }
-        case 'semantics': {
-          const r = await wizardRequest({ type: 'CREATE_SEMANTICS', map: semMap }, ['SEMANTICS_RESULT']);
-          totals.semanticsAliased = r.aliased;
-          setWizardStep(
-            'semantics',
-            'done',
-            t('wizard.seq.semantics', { aliased: r.aliased }) +
-              (r.missing.length ? t('wizard.seq.semanticsMissing', { n: r.missing.length }) : '') +
-              (rolesFromTokens > 0 ? t('wizard.rolesFromTokensTail', { n: rolesFromTokens }) : ''),
-          );
-          break;
-        }
-        case 'dark': {
-          // 대상은 변수 목록에서 직접 고른다 — 테마 카드의 셀렉트는 다른 리스너가 채우므로
-          // 같은 응답으로 깨어난 이 자리에서 읽으면 아직 비어 있을 수 있다.
-          const vars = await wizardRequest({ type: 'GET_VARIABLES' }, ['VARIABLES']);
-          const target = pickDarkTarget(vars.vars);
-          if (!target) {
-            setWizardStep('dark', 'done', t('wizard.seq.darkNoTarget'));
-            break;
-          }
-          const r = await wizardRequest(
-            { type: 'GENERATE_DARK_MODE', collectionId: target.collectionId, fromModeId: target.fromModeId, ...(target.toModeId ? { toModeId: target.toModeId } : {}) },
-            ['DARK_MODE_RESULT'],
-          );
-          if (r.error) {
-            setWizardStep('dark', 'fail', r.error);
-            break;
-          }
-          totals.darkFilled = r.realiased;
-          if (!r.realiased) {
-            // 모드만 생기고 값이 안 찬 상태 — '완료'로 적으면 다크가 된 줄 안다.
-            setWizardStep('dark', 'fail', t('wizard.seq.darkNothing'));
-            break;
-          }
-          setWizardStep(
-            'dark',
-            'done',
-            t('wizard.seq.dark', { realiased: r.realiased }) +
-              (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') +
-              (r.skipped ? t('wizard.seq.darkSkip', { n: r.skipped }) : ''),
-          );
-          break;
-        }
-        case 'textStyles': {
-          // 스캔(읽기) → 후보 그대로 등록. 화면의 표는 같은 응답을 받은 타이포 카드가 그린다.
-          const scan = await wizardRequest({ type: 'SCAN_TEXT_STYLES' }, ['TEXT_STYLE_CANDIDATES']);
-          if (!scan.styles.length) {
-            setWizardStep('textStyles', 'done', t('wizard.seq.textStylesNone'));
-            break;
-          }
-          const r = await wizardRequest({ type: 'CREATE_TEXT_STYLES', styles: scan.styles }, ['TEXT_STYLES_RESULT']);
-          totals.textStyles = r.created + r.updated;
-          setWizardStep('textStyles', 'done', t('wizard.seq.textStyles', { created: r.created, updated: r.updated }));
-          break;
-        }
-        case 'bind': {
-          // 기준 nodeIds로 실제 연결 — 연결 화면 [연결]과 같은 규칙(IA v4 §4.3). 텍스트 스타일은 붙이지 않는다.
-          wizBindReq = ++bindReqSeq;
-          wizBindPending = true;
-          const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: wizIds, reqId: wizBindReq }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
-          totals.bound = r.bound;
-          wizBindRan = true;
-          // 0곳 사유(§4.3): 계층으로 쓸 변수 없음 / 이미 모두 연결됨 / 값이 같은 곳 없음.
-          const reasons = r.reasons ?? {};
-          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !(reasons['no-match'] ?? 0) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
-          setWizardStep('bind', 'done', r.bound ? t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') : t(zero));
-          break;
-        }
-        case 'rename': {
-          const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth, nodeIds: wizIds }, ['RENAME_RESULT']);
-          totals.renamed = r.changes.length;
-          setWizardStep('rename', 'done', t('wizard.seq.renameDone', { count: r.changes.length }));
-          break;
-        }
-        case 'componentize': {
-          // 등록이 베이스 묶음 베리언트 세트까지 함께 수행(별도 분류 불필요).
-          const reg = await wizardRequest({ type: 'REGISTER_COMPONENTS' }, ['COMPONENTS_RESULT']);
-          totals.components = reg.registered;
-          setWizardStep('componentize', 'done', t('wizard.seq.componentize', { registered: reg.registered, sets: reg.sets }));
-          break;
-        }
-      }
-    } catch (e) {
-      if (e instanceof PaidRequiredError) failNote = t('status.paid');
-      else {
-        const fe = explainError(e instanceof Error ? e.message : String(e));
-        failNote = `${fe.message}${fe.action ? ` — ${fe.action}` : ''}`;
-      }
-      setWizardStep(p.step.id, 'fail', failNote);
-      stopped = true;
-    }
-  }
-
-  wizardRunning = false;
-  opWizardEnd(wizardFailed ? 'fail' : stopped ? 'cancel' : 'ok');
-  if (wizLatch) wizLatch.done = true;
-  ($('btnWizardRun') as HTMLButtonElement).disabled = false;
-  setWizardRunLabel(!stopped); // 완주했으면 '다시 실행' — 같은 선택을 또 돌리는 건 갱신이지 첫 실행이 아니다
-  $('btnWizardCancel').style.display = 'none';
-  // 칩 툴팁만으로는 사라진다 — 무엇이 왜 안 돌았는지는 요약 줄에도 적는다(#15).
-  // 특히 '토큰'이 빠지면 새 변수가 없어 연결 수가 0에 가까운데, 그 인과가 화면에 없었다.
-  const paidSkipped = paidSkippedSteps(plan);
-  const paidNote = paidSkipped.length
-    ? t('wizard.paidSkipped', { steps: paidSkipped.map((p) => t('wizard.step.' + p.step.id)).join(' · ') })
-    : '';
-  if (!isPaid && !stopped && !wizardFailed) {
-    // 무료 완료 요약(§4.3) — 로컬 변수 수와 관계없이 이름 정리만.
-    setStatus('wizardSummary', wizBindRan ? t('wizard.freeSumBound', { b: totals.bound ?? 0, n: totals.renamed ?? 0 }) : t('wizard.freeSum', { n: totals.renamed ?? 0 }) + t('wizard.notLinked'), 'ok');
-  } else setStatus(
-    'wizardSummary',
-    t('wizard.result', { state: stopped ? t('wizard.stopped') : t('wizard.completed'), summary: summarize(totals) }) +
-      // 연결 단계를 껐으면 다 끝난 것처럼 읽히지 않게 적는다(v4 §4.3 링크 표).
-      (!wizBindRan ? t('wizard.notLinked') : '') +
-      paidNote +
-      (failNote ? ` · ${failNote}` : ''),
-    stopped || paidSkipped.length || wizardFailed ? 'warn' : 'ok',
-  );
-  // 만들기 맨 위에서 실행했고 로컬 변수가 이미 있었으면 머리는 그대로, "변수 {n}개 생성"은 상태 줄에(§4.3).
-  // 변수 수는 작업 직후 다시 읽기로 오는 표에서 센다.
-  wizCountPending = wizFrom === 'make' && wizBeforeCount > 0;
-  wizEnded = true;
-  renderWizToBind();
-  renderVarScreen();
-}
-/** 마법사 취소 요청 — 지금 단계가 끝난 뒤 멈춘다. */
-let wizCancelReq = false;
-/** 마법사가 한 번 끝났다(취소·실패 포함) — 요약 끝 연결 안내를 보인다. */
-let wizEnded = false;
-/** 요약 끝 "레이어 › 연결에서 확인하고 연결하기 →"(§4.3). 연결할 변수가 없으면 숨기고, 선택이 없으면 잠근다. */
-/** 이번 마법사가 연결 단계를 돌렸나(요약 링크를 숨긴다). */
-let wizBindRan = false;
-function renderWizToBind(): void {
-  const b = $('btnWizToBind');
-  // 연결 단계를 껐을 때만(v4 §4.3) — 켜고 돌렸으면 이미 연결했다.
-  b.hidden = !wizEnded || wizardRunning || wizBindRan || (prereqKnown && !hasBindable);
-  if (curSel) setLock(b, curSel.count ? null : 'prereq', t('status.noSelection'));
-}
-/** 만들기 맨 위(로컬 변수 있음) 마법사가 끝난 뒤 — 다음 변수 표에서 "변수 {n}개 생성"을 상태 줄에. */
-let wizCountPending = false;
-
 let lastSelBound = 0;
 let lastSelRenamed = 0;
 /**
@@ -1553,23 +1242,7 @@ function applySelectionDone(): void {
   hasBoundNodes = !fresh && lastSelBound > 0;
   hasRenamedNodes = !fresh && lastSelRenamed > 0;
   renderPipeline();
-  if (!wizardRunning) setWizardRunLabel(hasBoundNodes || hasRenamedNodes);
 }
-
-/** 전체 실행 버튼 라벨 — 이미 정리한 선택이면 '다시 실행'(툴팁에 무엇이 달라지는지). */
-function setWizardRunLabel(rerun: boolean): void {
-  const b = $('btnWizardRun') as HTMLButtonElement;
-  b.dataset.rerun = rerun ? '1' : '';
-  b.title = rerun && isPaid ? t('wizard.rerunHint') : '';
-  reapplyWaitTip(b);
-  renderWizardCopy(); // 유료/무료·로컬 변수 유무에 따라 문구가 다르다(§4.3)
-}
-$('btnWizardRun').addEventListener('click', () => void runWizard());
-$('btnWizardCancel').addEventListener('click', () => {
-  wizCancelReq = true;
-  send({ type: 'CANCEL' });
-});
-$('btnWizToBind').addEventListener('click', () => findUnbound());
 
 // 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
 // HTML은 기본 display:none(배포 안전). dev 빌드에서만 여기서 노출한다.
@@ -1705,21 +1378,6 @@ function updateGates(): void {
   // 방금 disabled를 티어만 보고 덮었으니, 전제를 여기서 다시 적용해야 한다(순서 의존).
   // Dark 모드는 없으면 생성하므로 모드 2개 전제는 더 이상 없다.
   refreshDarkModes();
-  // 마법사 옵션은 모두 Paid 단계다(WIZARD_STEPS의 semantics·dark·textStyles·componentize).
-  // 하나라도 빠뜨리면 Free가 켤 수 있는 체크박스가 실행 계획에서 조용히 빠진다 — #11이 없애려던 바로 그 상태.
-  for (const [box, lock] of [
-    ['wizOptSemantics', 'wizSemanticLock'],
-    ['wizOptDark', 'wizDarkLock'],
-    ['wizOptTextStyles', 'wizTextStylesLock'],
-    ['wizOptComponentize', 'wizComponentLock'],
-  ]) {
-    $(lock).textContent = isPaid ? '' : PAID_LOCK;
-    // 잠긴 옵션은 체크 해제 + aria-disabled + 🔒. 풀리면 원래 체크를 되돌린다.
-    const input = $(box) as HTMLInputElement;
-    if (!isPaid && !isLocked(input)) { input.dataset.wasChecked = String(input.checked); input.checked = false; }
-    if (isPaid && isLocked(input) && input.dataset.wasChecked !== undefined) { input.checked = input.dataset.wasChecked === 'true'; delete input.dataset.wasChecked; }
-    setLock(input, isPaid ? null : 'paid');
-  }
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, t('semantic.needGlobal'));
@@ -1760,7 +1418,7 @@ function setPrereq(btnId: string, noticeId: string, okRaw: boolean, msg: string)
 
 /** 전제 미충족 안내의 ‘토큰 생성으로’ 바로가기 — 토큰 탭으로 이동 + 생성 카드 포커스. */
 function goToCreate(): void {
-  showMake('token'); // 토큰 생성은 '토큰' 단계에 있다 — 단계를 안 맞추면 빈 화면으로 보낸다
+  showPick('token'); // 토큰 생성은 '토큰' 단계에 있다 — 단계를 안 맞추면 빈 화면으로 보낸다
   $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   ($('btnCreate') as HTMLButtonElement).focus();
 }
@@ -1775,7 +1433,7 @@ const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: 
   dark: { make: 'theme', btn: 'btnGenDark' },
   textStyles: { make: 'type', btn: 'btnScanText' },
   bind: { make: null, btn: 'btnApplyConfirm' }, // 선택 탭 첫 화면
-  rename: { make: null, btn: 'btnPreview', apply: 'rename' }, // 적용 탭 · 이름 정리
+  rename: { make: null, btn: 'btnRename', apply: 'rename' }, // 적용 탭 · 이름 정리
 };
 
 function gotoStep(id: PipelineStep['id']): void {
@@ -1788,7 +1446,7 @@ function gotoStep(id: PipelineStep['id']): void {
     showSelSub(target.apply === 'rename' && curSel.count ? 'rename' : 'home');
     if (selSub === 'home') { $('selCards').querySelector<HTMLElement>('button')?.focus(); return; }
   } else {
-    showMake(target.make);
+    showPick(target.make, 'vars');
   }
   const b = $(target.btn) as HTMLButtonElement;
   b.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2085,6 +1743,7 @@ window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
   if (!msg) return;
   opReceived(msg); // 진행 테두리·✓/⚠·작업 직후 다시 읽기
+  if (makeTakes(msg)) return; // 만들기 화면의 reqId 응답(§4.3) — 값을 직접 고르기 처리기를 건드리지 않는다
   switch (msg.type) {
     case 'EXTRACT_RESULT': {
       tokens = msg.tokens;
@@ -2317,15 +1976,7 @@ window.onmessage = (event: MessageEvent) => {
       // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
       if (msg.styles.length) {
-        // 「왼쪽 글자로 이름 채우기」(labeled)는 **스캔 표본의 이름만** 다시 매기는 동작이다.
-        // 표를 통째로 갈아끼우면 그 사이 「행 추가」로 손수 만든 행이 말없이 사라진다 —
-        // 캔버스에서 온 행이 아니라(nodeIds 없음) 다시 계산해 줄 수 없는 행이라 남긴다.
-        // (맨 스캔은 '선택에서 다시 만들기'라 통째 교체가 맞다.)
-        const tsSig = (s: TextStyleSpec) => `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
-        const incoming = new Set(msg.styles.map(tsSig)); // 같은 타이포가 두 줄로 늘어나지 않게
-        const manual =
-          msg.labeled != null ? tsSpecs.filter((s) => !s.nodeIds?.length && !incoming.has(tsSig(s))) : [];
-        tsSpecs = [...msg.styles.map((x) => ({ ...x })), ...manual];
+        tsSpecs = msg.styles.map((x) => ({ ...x }));
         // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
         // `왼쪽 글자 0`이 실패처럼 읽힌다. 와이어 상태 줄: 신규 · 등록됨 · 왼쪽 글자 · 크기 순.
         tsScanNote = {
@@ -2335,6 +1986,8 @@ window.onmessage = (event: MessageEvent) => {
         renderTextStyles(); // 상태줄까지 여기서 쓴다
       } else {
         tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+        tsScanIds = null; // 기본 램프 — 붙일 글자가 없다
+        renderTsLink();
         tsScanNote = { namePart: '', warnings: [] };
         renderTextStyles();
         // 램프는 스캔 결과가 아니라 폴백 — 개수 요약 대신 무슨 일이 있었는지를 덮어쓴다.
@@ -2346,6 +1999,8 @@ window.onmessage = (event: MessageEvent) => {
       setStatus(
         'tsStatus',
         t('textStyle.registered', { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) +
+          (msg.applied ? t('textStyle.linkedN', { a: msg.applied }) : '') +
+          (msg.applySkipped ? t('textStyle.linkSkipped', { k: msg.applySkipped }) : '') +
           // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` · ${msg.notes.join(' · ')}` : '') +
           (msg.missing.length ? t('textStyle.unlinked', { names: msg.missing.join(', ') }) : ''),
@@ -2792,72 +2447,749 @@ function renderSelectableTree(
   renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange, opts.readOnly));
 }
 
-/* ---------- 리네임: 미리보기 트리 + 선택 적용 ---------- */
+/* ---------- 이름 정리(IA v4 §4.4): 소속 트리 + [k개 이름 바꾸기] ---------- */
 let renameNodes: RenameNode[] = []; // 마지막 미리보기 서브트리
-const renameChecked = new Set<string>(); // 체크된 영향 노드 id
-const renameHideContext = true; // 맥락(비영향) 노드는 항상 숨김(토글 없음)
-let renameHideKeep = false; // 보존 행(루트·인스턴스·잠금…)은 기본 표시, 「잠금 제외」로 감춤(와이어)
+/** 끈 바꿀 줄(레이어 id) — 같은 레이어면 다시 읽어도 꺼진 채 이어받는다. */
+const renameOff = new Set<string>();
+const renameCollapsed = new Set<string>();
+let renameTreeFresh = true;
+/** 이 화면의 미리보기 · 바꾸기 reqId — 맞는 응답만 받는다. */
+let renameReq = 0;
+let renameApplyReq = 0;
+/** 미리보기를 만든 기준(baseKey) · 읽는 중 · 미리보기를 받았나. */
+let renameFor: string | null = null;
+let renameReading = false;
+let renameTimer: ReturnType<typeof setTimeout> | null = null;
 
-function affectedRenameCount(): number {
-  return renameNodes.reduce((n, r) => n + (r.after !== undefined ? 1 : 0), 0);
+const renameRows = (): RenameNode[] => renameNodes.filter((n) => n.after !== undefined);
+const renameOnCount = (): number => renameRows().filter((n) => !renameOff.has(n.id)).length;
+
+/** 미리보기 다시 하기(조용한 읽기 · 300개 규칙 — §2.6). user = [읽기]. */
+function readRename(user = false): void {
+  if (renameTimer) { clearTimeout(renameTimer); renameTimer = null; }
+  if (!baseline || isMini || activeTab !== 'select' || selSub !== 'rename') { renderRenameScreen(); return; }
+  if (!user && baseline.scanned > BIG_SELECTION) { renameFor = null; renameNodes = []; renderRenameScreen(); return; }
+  if (opBusy() || wizardRunning) return; // 쓰기 중 — 끝난 뒤 작업 직후 다시 읽기가 부른다
+  renameReq = ++bindReqSeq;
+  renameReading = true;
+  opSilent = !user;
+  send({ type: 'RENAME', apply: false, maxDepth: readMaxDepth(), nodeIds: baseline.ids, reqId: renameReq });
+  opSilent = false;
+  renderRenameScreen();
+}
+function scheduleRename(): void {
+  if (renameTimer) clearTimeout(renameTimer);
+  renameTimer = setTimeout(() => { renameTimer = null; readRename(); }, AUTO_SCAN_DELAY);
 }
 
-function renderRenameTree(): void {
-  const rows: TreeRow[] = renameNodes.map((n) => ({
-    id: n.id,
-    name: n.name,
-    type: n.type,
-    depth: n.depth,
-    parentId: n.parentId,
-    change: n.after,
-    keep: n.keep ? { reason: t(`rename.keep.${n.keep}`), meta: t('rename.keep.meta') } : undefined,
-  }));
-  // 보존 행이 없으면 토글할 것도 없다 — 버튼을 걷어 빈 스위치를 남기지 않는다.
-  const keepBtn = $('btnRenameKeep');
-  keepBtn.style.display = rows.some((r) => r.keep) ? '' : 'none';
-  keepBtn.textContent = t(renameHideKeep ? 'rename.showKeep' : 'rename.hideKeep');
-  renderSelectableTree($('diff'), rows, renameChecked, {
-    hideContext: renameHideContext,
-    hideKeep: renameHideKeep,
-    onChange: updateRenameApply,
-  });
-  updateRenameApply();
+function renderRenameScreen(): void {
+  const empty = $('renameEmpty');
+  clearMount(empty);
+  let text = '';
+  let action: [string, () => void] | null = null;
+  if (!baseline) { text = t('v4.noSel'); action = [t('v4.backHome'), subBack]; }
+  else if (renameFor !== baseKey() && !renameReading && baseline.scanned > BIG_SELECTION) { text = t('list.big'); action = [t('list.read'), () => readRename(true)]; }
+  else if (renameReading && renameFor !== baseKey()) text = t('v4.reading');
+  else if (!renameRows().length) text = t('rename.none');
+  empty.hidden = !text;
+  if (text) {
+    const d = document.createElement('div');
+    d.className = 'be-text';
+    d.textContent = text;
+    empty.appendChild(d);
+    if (action) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'link link-btn';
+      b.textContent = action[0];
+      b.addEventListener('click', action[1]);
+      empty.appendChild(b);
+    }
+  }
+  const show = !text;
+  $('renameTop').hidden = !show;
+  const roots = show ? buildRenameTree(renameNodes) : [];
+  const toItem = (it: RenameTreeItem): TreeItem => {
+    const children = it.children.map(toItem);
+    if (it.kind === 'head') {
+      const st = headState(it.descendants.map((id) => ({ on: !renameOff.has(id) })));
+      return {
+        key: it.id, head: true, muted: true, name: it.name, countText: t('tree.count', { n: it.descendants.length }), indent: it.level * 16, children,
+        sw: { state: st, label: t('tree.headAria', { name: it.name }), onToggle: () => { const to = headToggleTarget(st); for (const id of it.descendants) to ? renameOff.delete(id) : renameOff.add(id); renderRenameScreen(); } },
+      };
+    }
+    const on = !renameOff.has(it.id);
+    const old = document.createElement('span');
+    old.className = 'tr-old';
+    old.textContent = it.name;
+    old.title = it.name;
+    const nw = document.createElement('b');
+    nw.className = 'tr-new';
+    nw.textContent = it.after ?? '';
+    nw.title = it.after ?? '';
+    const cells: HTMLElement[] = [old, arrowEl(), nw];
+    return {
+      key: it.id, indent: it.level * 16 + (children.length ? 0 : 22), off: !on, cells, children,
+      sw: { state: on, label: t('rename.switchAria', { name: it.after ?? '' }), onToggle: () => { on ? renameOff.add(it.id) : renameOff.delete(it.id); renderRenameScreen(); } },
+    };
+  };
+  const items = roots.map(toItem);
+  if (show && renameTreeFresh) {
+    renameTreeFresh = false;
+    renameCollapsed.clear();
+    const walk = (list: TreeItem[]): void => { for (const it of list) { if (it.head && it.sw?.state === false) renameCollapsed.add(it.key); if (it.children) walk(it.children); } };
+    walk(items);
+  }
+  renderTree($('renameTree'), items, { collapsed: renameCollapsed, rerender: renderRenameScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse') });
+  const k = show ? renameOnCount() : 0;
+  const btn = $('btnRename');
+  btn.textContent = show && renameRows().length ? t('rename.applyN', { k }) : t('rename.applyBtn');
+  setLock(btn, !show ? 'prereq' : !k ? 'prereq' : null, !baseline ? t('status.noSelection') : !show ? t('rename.none') : t('rename.needOn'));
+  if (activeTab === 'select' && selSub === 'rename') renderSubHead();
+  if (renameFocusPending && show) {
+    const row = $('renameTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
+    if (row) { renameFocusPending = false; row.focus({ preventScroll: true }); }
+  }
 }
+let renameFocusPending = false;
 
-/** 적용 버튼 활성/라벨 + 전체선택 마스터 상태를 체크 수에 맞춰 갱신. */
-function updateRenameApply(): void {
-  const total = affectedRenameCount();
-  const sel = renameChecked.size;
-  // 카드 제목의 개수 — 목록이 접혀 있거나 상한에 잘려 있어도 전체 규모를 먼저 알린다.
-  $('renameCount').textContent = total ? t('rename.count', { total }) : '';
-  ($('btnRename') as HTMLButtonElement).disabled = sel === 0;
-  const all = $('renameAll') as HTMLInputElement;
-  all.checked = total > 0 && sel === total;
-  all.indeterminate = sel > 0 && sel < total;
-  setStatus(
-    'renameStatus',
-    total === 0 ? t('rename.none') : t('rename.previewCount', { total, sel }),
-    '',
-  );
-}
-
+/** 미리보기 응답(이 화면 reqId) · 바꾸기 응답. */
 function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): void {
-  if (!msg.applied) {
-    // 미리보기: 전체 서브트리 + 영향 노드 기본 체크.
-    renameNodes = msg.nodes;
-    renameChecked.clear();
-    for (const n of msg.nodes) if (n.after !== undefined) renameChecked.add(n.id);
-    renderRenameTree();
+  if (msg.reqId != null && msg.reqId === renameApplyReq && msg.applied) {
+    renameApplyReq = 0;
+    renameNodes = [];
+    renameFor = null;
+    if (activeTab === 'select' && selSub === 'rename') showSelSub('home');
+    showStatusLine(t('rename.doneStatus', { k: msg.changes.length }), { cls: 'ok' });
     return;
   }
-  // 적용 완료(선택 적용 또는 마법사): 트리 비우고 결과만.
-  renameNodes = [];
-  renameChecked.clear();
-  clearMount($('diff'));
-  $('renameCount').textContent = '';
-  ($('btnRename') as HTMLButtonElement).disabled = true;
-  setStatus('renameStatus', t('rename.applied', { count: msg.changes.length }), 'ok');
+  if (msg.reqId == null || msg.reqId !== renameReq || msg.applied) return;
+  renameReading = false;
+  const sameBase = renameFor === baseKey();
+  renameNodes = msg.nodes;
+  renameFor = baseKey();
+  // 끈 줄은 같은 레이어면 이어받는다 — 없어진 레이어 id는 버린다.
+  const ids = new Set(renameRows().map((n) => n.id));
+  for (const id of Array.from(renameOff)) if (!ids.has(id)) renameOff.delete(id);
+  if (!sameBase) renameTreeFresh = true;
+  renderRenameScreen();
 }
+
+$('btnRename').addEventListener('click', () => {
+  if ($('btnRename').getAttribute('aria-disabled') === 'true') return;
+  const items = renameRows()
+    .filter((n) => !renameOff.has(n.id))
+    .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role }));
+  if (!items.length) return;
+  // 이름이 그대로인 노드도 역할은 남긴다(§4.4 — 세지 않음). 「컴포넌트 등록」의 말단 후보가 이 기록을 읽는다.
+  const roleOnly = renameNodes
+    .filter((n) => n.after === undefined && n.role)
+    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+  renameApplyReq = ++bindReqSeq;
+  send({ type: 'RENAME_APPLY', items: [...items, ...roleOnly], reqId: renameApplyReq });
+});
+$('renameAllOn').addEventListener('click', () => { renameOff.clear(); renderRenameScreen(); $('renameAllOn').focus(); });
+$('renameAllOff').addEventListener('click', () => { for (const n of renameRows()) renameOff.add(n.id); renderRenameScreen(); $('renameAllOff').focus(); });
+
+/* ---------- 변수 만들기(IA v4 §4.3): Global · Semantic · 텍스트 스타일 묶음 트리 + 실행 ---------- */
+type MakeKind = 'color' | 'gap' | 'radius' | 'size' | 'stroke' | 'opacity' | 'text';
+const MAKE_KINDS: readonly MakeKind[] = ['color', 'gap', 'radius', 'size', 'stroke', 'opacity', 'text'];
+const MAKE_KIND_OF: Partial<Record<DraftToken['category'], MakeKind>> = {
+  color: 'color', effectColor: 'color', gap: 'gap', radius: 'radius', size: 'size', strokeWidth: 'stroke', opacity: 'opacity',
+  fontSize: 'text', lineHeight: 'text', letterSpacing: 'text', fontFamily: 'text',
+};
+/** 추출 결과(색 이름 정리 · 같은 이름 합치기 뒤, 이 화면 종류만). 값을 직접 고르기의 `tokens`와 따로. */
+let mkTokens: DraftToken[] = [];
+let mkFor: string | null = null;
+let mkExtractReq = 0;
+let mkReading = false;
+/** 줄 스위치(토큰 이름 → 켬). 같은 토큰 이름이면 다시 읽어도 이어받는다. */
+const mkOn = new Map<string, boolean>();
+const mkCollapsed = new Set<string>();
+let mkTreeFresh = true;
+let mkStates: Record<string, TokenState> = {};
+let mkRoleRows: RoleRow[] = [];
+/** 만들 수(미리보기 응답) — null = 아직(세는 중) 또는 보내지 않음. */
+let mkPreview: { g: number; r: number; m: number } | null = null;
+let mkPreviewReq = 0;
+let mkPreviewTimer: ReturnType<typeof setTimeout> | null = null;
+/** 마지막 미리보기가 켠 Global 0개(잠긴 줄만)였다 — 응답은 태그에만 쓴다. */
+let mkPreviewTagsOnly = false;
+/** 텍스트 스타일 후보(유료). */
+let mkTs: TextStyleSpec[] = [];
+let mkTsExisting: ExistingStyleSig[] = [];
+let mkTsFor: string | null = null;
+let mkScanReq = 0;
+let mkTsReading = false;
+const mkTsOff = new Set<string>(); // sig
+const mkTsNames = new Map<string, string>(); // sig → 고친 이름
+let mkEditSig: string | null = null;
+let mkTsPending: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }> | null = null;
+/** 이 화면이 보낸 요청 reqId — 메인 처리기는 이 응답을 건드리지 않는다. */
+const mkOwned = new Set<number>();
+let mkReadTimer: ReturnType<typeof setTimeout> | null = null;
+let mkFocusPending = false;
+/** 실행 상태. */
+let mkRunning = false;
+let mkCancelReq = false;
+let mkProg: { steps: MakeStepId[]; i: number; done: MakeStepId[] } | null = null;
+let mkResults: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string }[] | null = null;
+let mkResultsCreated = false;
+let mkCancelNote = '';
+
+const mkNextReq = (): number => { const id = ++bindReqSeq; mkOwned.add(id); return id; };
+const mkKind = (tk: DraftToken): MakeKind | undefined => MAKE_KIND_OF[tk.category];
+const mkLocked = (tk: DraftToken): boolean => mkStates[tk.name]?.state === 'manual';
+const mkIsOn = (tk: DraftToken): boolean => !mkLocked(tk) && (mkOn.get(tk.name) ?? true);
+const mkGlobalsOn = (): DraftToken[] => mkTokens.filter(mkIsOn);
+const mkSendTokens = (): DraftToken[] => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
+const mkTsName = (s: TextStyleSpec): string => mkTsNames.get(tsSig(s)) ?? s.name;
+const mkTsOnList = (): TextStyleSpec[] => (isPaid ? mkTs.filter((s) => !mkTsOff.has(tsSig(s))) : []);
+const mkReady = (): boolean => !!baseline && mkFor === baseKey() && !mkReading && (!isPaid || (mkTsFor === baseKey() && !mkTsReading));
+
+/** 이름 겹침(§4.3 텍스트 스타일 묶음) — 'dup' 켠 줄끼리 · 'exists' 값이 다른 기존 스타일 이름. */
+function mkTsConflict(s: TextStyleSpec): 'dup' | 'exists' | null {
+  if (mkTsOff.has(tsSig(s))) return null;
+  const name = mkTsName(s);
+  const sig = tsSig(s);
+  if (mkTsOnList().some((o) => o !== s && mkTsName(o) === name)) return 'dup';
+  if (mkTsExisting.some((e) => e.name === name && e.sig !== sig)) return 'exists';
+  return null;
+}
+
+/** 추출 · 후보 읽기(조용한 읽기 · 300개 규칙 — §2.6). user = [읽기]. */
+function readMake(user = false): void {
+  if (mkReadTimer) { clearTimeout(mkReadTimer); mkReadTimer = null; }
+  if (!baseline || isMini || activeTab !== 'select' || selSub !== 'make' || mkRunning) { renderMakeScreen(); return; }
+  if (!user && baseline.scanned > BIG_SELECTION) { renderMakeScreen(); return; }
+  if (opBusy() || wizardRunning) return;
+  mkExtractReq = mkNextReq();
+  mkReading = true;
+  opSilent = true;
+  send({ type: 'EXTRACT', nodeIds: baseline.ids, reqId: mkExtractReq });
+  if (isPaid) {
+    mkScanReq = mkNextReq();
+    mkTsReading = true;
+    send({ type: 'SCAN_TEXT_STYLES', nodeIds: baseline.ids, reqId: mkScanReq });
+  }
+  opSilent = false;
+  renderMakeScreen();
+}
+function scheduleMake(): void {
+  if (mkReadTimer) clearTimeout(mkReadTimer);
+  mkReadTimer = setTimeout(() => { mkReadTimer = null; readMake(); }, AUTO_SCAN_DELAY);
+}
+
+/** 만들 수 다시 계산(250ms 합침) — 보내는 토큰 = 켠 줄 + 잠긴 직접 만든 변수 줄. */
+function mkPreviewSoon(): void {
+  if (mkPreviewTimer) clearTimeout(mkPreviewTimer);
+  mkPreviewTimer = setTimeout(() => { mkPreviewTimer = null; mkSendPreview(); }, AUTO_SCAN_DELAY);
+}
+function mkSendPreview(): void {
+  const toks = mkSendTokens();
+  mkPreview = null;
+  if (!toks.length) { mkRoleRows = []; mkPreviewReq = 0; renderMakeScreen(); return; }
+  mkPreviewTagsOnly = !mkGlobalsOn().length;
+  if (mkPreviewTagsOnly) mkRoleRows = [];
+  mkPreviewReq = mkNextReq();
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  opSilent = true;
+  send({ type: 'CREATE_TOKENS', tokens: toks, base, preview: true, reqId: mkPreviewReq });
+  opSilent = false;
+  renderMakeScreen();
+}
+
+/** 이 화면의 응답이면 받고 true(메인 처리기는 건드리지 않는다). */
+function makeTakes(msg: CodeToUi): boolean {
+  const rid = (msg as { reqId?: number }).reqId;
+  if (rid == null || !mkOwned.has(rid)) return false;
+  if (msg.type === 'EXTRACT_RESULT' && rid === mkExtractReq) onMakeExtract(msg);
+  else if (msg.type === 'CREATE_RESULT' && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
+  else if (msg.type === 'TEXT_STYLE_CANDIDATES' && rid === mkScanReq) onMakeScan(msg);
+  return true; // 실행 단계 응답은 wizardRequest가 받는다
+}
+
+function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
+  mkReading = false;
+  const sameBase = mkFor === baseKey();
+  const raw = msg.tokens.map((x) => ({ ...x }));
+  huefyTokenColors(raw);
+  const prevByKind = new Map<MakeKind, boolean[]>();
+  for (const tk of mkTokens) { const k = mkKind(tk); if (k) prevByKind.set(k, [...(prevByKind.get(k) ?? []), mkIsOn(tk)]); }
+  mkTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
+  for (const tk of mkTokens) {
+    if (mkOn.has(tk.name)) continue;
+    const k = mkKind(tk)!;
+    const prev = prevByKind.get(k);
+    // 새 줄: 그 종류가 지금 모두 꺼져 있으면 끔, 아니면 켬. 처음 보는 종류는 기본값(글자만 끔).
+    mkOn.set(tk.name, prev ? prev.some(Boolean) : k !== 'text');
+  }
+  mkFor = baseKey();
+  if (!sameBase) mkTreeFresh = true;
+  renderMakeScreen();
+  mkSendPreview();
+}
+function onMakePreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
+  const prev = mkStates;
+  mkStates = { ...mkStates, ...(msg.tokenStates ?? {}) };
+  // 잠금이 풀렸으면(manual이 아니게 됨) 켠다.
+  for (const [name, st] of Object.entries(msg.tokenStates ?? {})) if (prev[name]?.state === 'manual' && st.state !== 'manual') mkOn.set(name, true);
+  if (mkPreviewTagsOnly) { mkPreview = null; mkRoleRows = []; }
+  else {
+    mkPreview = { g: msg.created + msg.updated, r: msg.roles ?? 0, m: msg.skippedManual ?? 0 };
+    mkRoleRows = msg.roleRows ?? [];
+  }
+  renderMakeScreen();
+}
+function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): void {
+  if (mkEditSig) { mkTsPending = msg; return; } // 고치는 동안은 칸을 닫을 때까지 미룬다
+  mkTsReading = false;
+  mkTs = msg.styles;
+  mkTsExisting = msg.existing ?? [];
+  const sigs = new Set(mkTs.map(tsSig));
+  for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
+  mkTsFor = baseKey();
+  renderMakeScreen();
+}
+
+function mkValueChip(tk: DraftToken): HTMLElement {
+  const v = typeof tk.value === 'number' && tk.unit === 'percent' ? `${tk.value}%` : String(tk.value);
+  return valueChip(v);
+}
+function mkTag(text: string, tip: string, warn = false): HTMLElement {
+  const s = document.createElement('span');
+  s.className = `tr-tag${warn ? ' warn' : ''}`;
+  s.textContent = text;
+  s.title = tip;
+  return s;
+}
+function mkLayers(n: number | undefined): HTMLElement {
+  const s = document.createElement('span');
+  s.className = 'bv-tw';
+  s.textContent = t('make.layers', { n: n ?? 0 });
+  return s;
+}
+
+/** 세 묶음 트리 아이템(§4.3). */
+function makeTreeItems(): TreeItem[] {
+  const ro = !isPaid || mkRunning; // 무료는 보기만(스위치 없음), 실행 중은 잠금(renderTree locked)
+  const items: TreeItem[] = [];
+  // Global
+  const kindItems: TreeItem[] = [];
+  for (const k of MAKE_KINDS) {
+    const list = mkTokens.filter((tk) => mkKind(tk) === k);
+    if (!list.length) continue;
+    const rows: TreeItem[] = list.map((tk) => {
+      const st = mkStates[tk.name];
+      const locked = mkLocked(tk);
+      const on = mkIsOn(tk);
+      const name = st?.state === 'reuse' && st.varName ? st.varName : tk.name;
+      const cells: HTMLElement[] = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value))];
+      if (st?.state === 'update') cells.push(mkTag(t('make.tagHas'), t('make.tagHasTip')));
+      else if (st?.state === 'reuse') cells.push(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
+      else if (st?.state === 'manual') cells.push(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
+      return {
+        key: `g:${tk.name}`, indent: 40, off: !on && isPaid, cells, right: [mkLayers(tk.count)],
+        sw: ro && !isPaid ? null : { state: on, disabled: locked, label: t('make.rowAria', { name }), onToggle: () => { mkOn.set(tk.name, !on); mkPreviewSoon(); renderMakeScreen(); } },
+      };
+    });
+    const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
+    kindItems.push({
+      key: `gk:${k}`, head: true, name: t(`v4.kind.${k}`), countText: t('tree.count', { n: list.length }), indent: 16, children: rows,
+      sw: !isPaid ? null : { state: hs, label: t('tree.headAria', { name: t(`v4.kind.${k}`) }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
+    });
+  }
+  if (kindItems.length) {
+    const gs = headState(mkTokens.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
+    items.push({
+      key: 'grp:global', head: true, group: true, name: 'Global', countText: t('tree.count', { n: mkTokens.length }), indent: 0, children: kindItems,
+      sw: !isPaid ? null : { state: gs, label: t('tree.headAria', { name: 'Global' }), onToggle: () => { const to = headToggleTarget(gs); for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
+    });
+  }
+  // Semantic(보기만) — 켠 Global이 0개면 숨김.
+  if (mkGlobalsOn().length && (mkPreview == null || mkRoleRows.length)) {
+    const note = document.createElement('span');
+    note.className = 'tr-sub';
+    note.style.whiteSpace = 'normal';
+    note.textContent = t('make.semNote');
+    const semKids: TreeItem[] = [{ key: 'sem:note', indent: 24, cells: [note], cls: 'tr-noterow' }];
+    const byTok = new Map(mkTokens.map((tk) => [tk.name, tk]));
+    for (const k of MAKE_KINDS) {
+      const rows = mkRoleRows.filter((r) => { const tk = byTok.get(r.token); return tk && mkKind(tk) === k; });
+      if (!rows.length) continue;
+      semKids.push({
+        key: `sk:${k}`, head: true, name: t(`v4.kind.${k}`), countText: t('tree.count', { n: rows.length }), indent: 16,
+        children: rows.map((r) => {
+          const tk = byTok.get(r.token)!;
+          const eq = document.createElement('span');
+          eq.className = 'tr-sub';
+          eq.textContent = `= ${r.global}`;
+          return { key: `s:${r.name}`, indent: 40, cells: [varChip(r.name, String(tk.value)), eq] };
+        }),
+      });
+    }
+    items.push({ key: 'grp:semantic', head: true, group: true, name: 'Semantic', countText: mkPreview == null ? t('make.counting') : t('tree.count', { n: mkRoleRows.length }), indent: 0, children: mkPreview == null ? [] : semKids });
+  }
+  // 텍스트 스타일(유료만)
+  if (isPaid && (mkTs.length || (mkTsReading && mkTsFor !== baseKey()))) {
+    const note = document.createElement('span');
+    note.className = 'tr-sub';
+    note.style.whiteSpace = 'normal';
+    note.textContent = t('make.tsNote');
+    const kids: TreeItem[] = [{ key: 'ts:note', indent: 24, cells: [note], cls: 'tr-noterow' }];
+    for (const s of mkTs) {
+      const sig = tsSig(s);
+      const on = !mkTsOff.has(sig);
+      const aa = document.createElement('span');
+      aa.className = 'ts-aa';
+      aa.setAttribute('aria-hidden', 'true');
+      aa.textContent = 'Aa';
+      const cells: HTMLElement[] = [aa];
+      if (mkEditSig === sig) cells.push(mkEditInput(s));
+      else {
+        const chip = varChip(mkTsName(s), 'Aa');
+        chip.querySelector('.bv-mark')?.remove();
+        const c = mkTsConflict(s);
+        if (c) { chip.classList.add('dup'); chip.title = t(c === 'dup' ? 'make.tsDup' : 'make.tsExists'); }
+        chip.addEventListener('dblclick', () => { if (!mkRunning) mkStartEdit(sig); });
+        cells.push(chip);
+      }
+      const sub = document.createElement('span');
+      sub.className = 'tr-sub';
+      sub.textContent = tsSummary(s);
+      cells.push(sub);
+      if (s.boundStyleId) cells.push(mkTag(t('make.tagHas'), t('make.tsHasTip')));
+      kids.push({
+        key: `t:${sig}`, indent: 24, off: !on, cells, right: [mkLayers(s.count)], onEdit: () => mkStartEdit(sig),
+        sw: { state: on, label: t('make.rowAria', { name: mkTsName(s) }), onToggle: () => { on ? mkTsOff.add(sig) : mkTsOff.delete(sig); renderMakeScreen(); } },
+      });
+    }
+    const hs = headState(mkTs.map((s) => ({ on: !mkTsOff.has(tsSig(s)) })));
+    items.push({
+      key: 'grp:ts', head: true, group: true, name: t('v4.kind.textStyle'), countText: mkTsFor === baseKey() ? t('tree.count', { n: mkTs.length }) : t('make.counting'), indent: 0, children: mkTsFor === baseKey() ? kids : [],
+      sw: mkTs.length ? { state: hs, label: t('tree.headAria', { name: t('v4.kind.textStyle') }), onToggle: () => { const to = headToggleTarget(hs); for (const s of mkTs) to ? mkTsOff.delete(tsSig(s)) : mkTsOff.add(tsSig(s)); renderMakeScreen(); } } : null,
+    });
+  }
+  return items;
+}
+
+/** 이름 고치기 칸(§4.3) — Enter · 칸 밖 = 저장, Esc = 취소, 빈 이름은 되돌림. */
+function mkEditInput(s: TextStyleSpec): HTMLElement {
+  const sig = tsSig(s);
+  const inp = document.createElement('input');
+  inp.className = 'tr-edit';
+  inp.value = mkTsName(s);
+  inp.setAttribute('aria-label', t('make.tsEditAria'));
+  let done = false;
+  const finish = (save: boolean): void => {
+    if (done) return;
+    done = true;
+    const v = inp.value.trim();
+    if (save && v) { if (v === s.name) mkTsNames.delete(sig); else mkTsNames.set(sig, v); }
+    mkEditSig = null;
+    if (mkTsPending) { const p = mkTsPending; mkTsPending = null; onMakeScan(p); } else renderMakeScreen();
+    focusRow($('makeTree'), `t:${sig}`);
+  };
+  inp.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(false); }
+  });
+  inp.addEventListener('blur', () => finish(true));
+  requestAnimationFrame(() => { inp.focus(); inp.select(); });
+  return inp;
+}
+function mkStartEdit(sig: string): void {
+  if (mkRunning) return;
+  mkEditSig = sig;
+  renderMakeScreen();
+}
+/** 실행 버튼을 누를 때 열린 칸은 먼저 저장한다. */
+function mkCommitEdit(): void {
+  const inp = $('makeTree').querySelector<HTMLInputElement>('input.tr-edit');
+  if (inp) inp.blur();
+}
+
+function renderMakeScreen(): void {
+  if (!curSel) return;
+  const tree = $('makeTree');
+  const empty = $('makeEmpty');
+  clearMount(empty);
+  const showResults = !!mkResults;
+  $('makeResults').hidden = !showResults;
+  $('makeWarn').hidden = !mkCancelNote || showResults;
+  $('makeWarn').textContent = mkCancelNote;
+  let emptyText = '';
+  let emptyAction: [string, () => void] | null = null;
+  let skeleton = false;
+  if (!showResults) {
+    if (!baseline && !mkRunning) { emptyText = t('v4.noSel'); emptyAction = [t('v4.backHome'), subBack]; }
+    else if (!mkRunning && mkFor !== baseKey() && !mkReading && baseline && baseline.scanned > BIG_SELECTION) { emptyText = t('list.big'); emptyAction = [t('list.read'), () => readMake(true)]; }
+    else if (!mkRunning && (mkFor !== baseKey() || mkReading)) skeleton = true;
+    else if (!mkTokens.length && !mkTs.length) emptyText = t('make.zero');
+  }
+  empty.hidden = !emptyText;
+  if (emptyText) {
+    const d = document.createElement('div');
+    d.className = 'be-text';
+    d.textContent = emptyText;
+    empty.appendChild(d);
+    if (emptyAction) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'link link-btn';
+      b.textContent = emptyAction[0];
+      b.addEventListener('click', emptyAction[1]);
+      empty.appendChild(b);
+    }
+  }
+  const showTree = !showResults && !emptyText && !skeleton;
+  $('makeTop').hidden = showResults || (!showTree && !skeleton) || (!isPaid && !skeleton);
+  $('makeFree').hidden = isPaid || !showTree;
+  $('makeTopText').textContent = skeleton ? t('v4.reading') : t('make.top');
+  $('makeTopRight').hidden = skeleton;
+  $('makeAllOn').hidden = mkRunning;
+  $('makeAllOff').hidden = mkRunning;
+  $('makeAllSep').hidden = mkRunning;
+  if (mkRunning) $('makeTopRight').hidden = false;
+  $('makeTopRight').querySelector<HTMLElement>('.make-lockmsg')?.remove();
+  if (mkRunning) {
+    const m = document.createElement('span');
+    m.className = 'make-lockmsg';
+    m.textContent = t('make.runLocked');
+    $('makeTopRight').appendChild(m);
+  }
+  if (skeleton) {
+    tree.replaceChildren();
+    for (const w of [[30, 120], [40, 90], [34, 60], [28, 40]]) {
+      const r = document.createElement('div');
+      r.className = 'tr tr-head';
+      r.innerHTML = `<span style="width:22px"></span><span class="tr-skel" style="width:${w[0]}px"></span><span class="tr-skel" style="width:${w[1]}px;margin-left:12px"></span><span class="grow"></span><span class="tr-skel" style="width:28px;height:16px;border-radius:8px"></span>`;
+      tree.appendChild(r);
+    }
+  } else if (showTree) {
+    const items = makeTreeItems();
+    if (mkTreeFresh) {
+      mkTreeFresh = false;
+      mkCollapsed.clear();
+      mkCollapsed.add('grp:semantic');
+      const walk = (list: TreeItem[]): void => { for (const it of list) { if (it.head && it.sw?.state === false) mkCollapsed.add(it.key); if (it.children) walk(it.children); } };
+      walk(items);
+      for (const k of MAKE_KINDS) mkCollapsed.add(`sk:${k}`);
+      if (!isPaid) for (const tk of mkTokens) if (mkKind(tk) === 'text') mkCollapsed.add('gk:text');
+    }
+    // 실행 중에는 모두 접는다(끝나면 실행 전 접기 상태로).
+    const collapsed = mkRunning ? new Set(items.map((i) => i.key)) : mkCollapsed;
+    renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), locked: mkRunning });
+    tipTruncatedNames(tree);
+  } else tree.replaceChildren();
+  if (showResults) renderMakeResults();
+  $('makeMore').hidden = showResults || !!(emptyText && emptyText !== t('make.zero')) || skeleton;
+  setLock($('btnMakePick'), mkRunning ? 'prereq' : null, t('make.runLocked'));
+  renderMakeFoot(showResults);
+  if (activeTab === 'select' && selSub === 'make') renderSubHead();
+  if (mkFocusPending && activeTab === 'select' && selSub === 'make') {
+    const target = showTree ? tree.querySelector<HTMLElement>('[data-tkey][tabindex="0"]') : emptyAction ? empty.querySelector<HTMLElement>('button') : skeleton ? $('makeOptLink') : null;
+    if (target) { mkFocusPending = showTree || !!emptyAction ? false : mkFocusPending; target.focus({ preventScroll: true }); if (showTree) mkFocusPending = false; }
+  }
+}
+
+function renderMakeResults(): void {
+  const box = $('makeResults');
+  box.replaceChildren();
+  const top = document.createElement('div');
+  top.className = 'tree-top';
+  top.innerHTML = `<b style="color:var(--text)">${escapeHtml(t('make.partialTitle'))}</b>`;
+  box.appendChild(top);
+  for (const r of mkResults ?? []) {
+    const row = document.createElement('div');
+    row.className = 'tr tr-head';
+    const mark = document.createElement('span');
+    mark.className = 'tr-car';
+    mark.style.color = r.mark === 'ok' ? 'var(--ok)' : r.mark === 'warn' ? 'var(--warn)' : 'var(--text-2)';
+    mark.textContent = r.mark === 'ok' ? '✓' : r.mark === 'warn' ? '⚠' : '—';
+    const nm = document.createElement('span');
+    nm.className = `tr-name${r.mark === 'off' ? ' muted' : ''}`;
+    nm.textContent = t(`wizard.step.${r.id}`);
+    const tx = document.createElement('span');
+    tx.className = 'tr-cnt';
+    if (r.mark === 'warn') tx.style.color = 'var(--warn)';
+    tx.textContent = r.text;
+    row.append(mark, nm, tx);
+    box.appendChild(row);
+  }
+  if (mkResultsCreated) {
+    const n = document.createElement('div');
+    n.className = 'make-more';
+    n.textContent = t('make.partialKept');
+    box.appendChild(n);
+  }
+}
+
+function renderMakeFoot(showResults: boolean): void {
+  const run = $('btnMakeRun');
+  const opts = $('makeOpts');
+  opts.hidden = showResults;
+  const dark = $('makeOptDark') as HTMLInputElement;
+  $('makeDarkPaid').hidden = isPaid;
+  if (!isPaid) dark.checked = false;
+  for (const id of ['makeOptLink', 'makeOptRename', 'makeOptDark']) setLock($(id) as HTMLInputElement, mkRunning ? 'prereq' : id === 'makeOptDark' && !isPaid ? 'paid' : null, t('make.runLocked'));
+  $('btnMakeCancel').hidden = !mkRunning;
+  $('makeProg').hidden = !mkRunning;
+  $('makeCount').hidden = mkRunning;
+  run.hidden = mkRunning;
+  if (showResults) {
+    run.textContent = t('common.close');
+    setLock(run, null);
+    $('makeCount').textContent = '';
+    return;
+  }
+  if (mkRunning && mkProg) {
+    const { steps, i, done } = mkProg;
+    const cur = steps[i];
+    $('makeProgText').innerHTML = `${escapeHtml(cur ? t(`make.run.${cur}`) : '')} <span class="muted">${escapeHtml(t('make.stepOf', { i: i + 1, n: steps.length }))}${done.length ? ' · ' + escapeHtml(done.map((d) => `${t(`wizard.step.${d}`)} ✓`).join(' ')) : ''}</span>`;
+    ($('makeProgFill') as HTMLElement).style.width = `${Math.round((done.length / Math.max(1, steps.length)) * 100)}%`;
+    return;
+  }
+  const link = ($('makeOptLink') as HTMLInputElement).checked;
+  const ren = ($('makeOptRename') as HTMLInputElement).checked;
+  if (!isPaid) {
+    run.textContent = t('make.runFree');
+    $('makeCount').textContent = t('make.freeCount');
+    setLock(run, !baseline ? 'prereq' : !link && !ren ? 'prereq' : null, !baseline ? t('status.noSelection') : t('make.freeNeedOpt'));
+    return;
+  }
+  const gOn = mkGlobalsOn().length;
+  const tsOn = mkTsOnList().length;
+  const tsTail = tsOn ? t('make.countStyles', { t: tsOn }) : '';
+  let count = '';
+  if (gOn) count = mkPreview ? t('make.countGR', { g: mkPreview.g, r: mkPreview.r }) + (mkPreview.m ? t('create.sumManual', { n: mkPreview.m }) : '') : t('make.counting');
+  $('makeCount').textContent = count ? count + tsTail : tsTail.replace(/^ · /, '');
+  $('makeCount').title = $('makeCount').textContent ?? '';
+  run.textContent = gOn ? (mkPreview ? t('make.runN', { g: mkPreview.g }) : t('make.run')) : tsOn ? t('make.runStyles', { t: tsOn }) : t('make.run');
+  const conflict = mkTsOnList().map(mkTsConflict).find(Boolean);
+  const reason = !baseline ? t('status.noSelection') : !mkReady() ? t('v4.reading') : !gOn && !tsOn ? t('make.needOn') : conflict === 'dup' ? t('make.tsDup') : conflict === 'exists' ? t('make.tsExists') : '';
+  setLock(run, reason ? 'prereq' : null, reason);
+}
+
+/** 실행(§4.3 실행 순서) — 기준은 시작할 때 한 번 정한다, 다시 추출하지 않는다. */
+async function runMake(): Promise<void> {
+  if (mkRunning || wizardRunning) return;
+  mkCommitEdit();
+  renderMakeScreen();
+  if ($('btnMakeRun').getAttribute('aria-disabled') === 'true') return;
+  if (mkResults) { mkResults = null; showSelSub('home'); return; } // [닫기]
+  const link = ($('makeOptLink') as HTMLInputElement).checked;
+  const steps = planMake({ isPaid, globalsOn: mkGlobalsOn().length, stylesOn: mkTsOnList().length, link, rename: ($('makeOptRename') as HTMLInputElement).checked, dark: isPaid && ($('makeOptDark') as HTMLInputElement).checked });
+  if (!steps.length || !baseline) return;
+  const ids = baseline.ids.slice();
+  const toks = mkSendTokens();
+  const styles = mkTsOnList().map((s) => ({ ...s, name: mkTsName(s) }));
+  const base = Number(($('base') as HTMLInputElement).value) || 16;
+  mkRunning = true;
+  mkCancelReq = false;
+  mkCancelNote = '';
+  mkResults = null;
+  mkProg = { steps, i: 0, done: [] };
+  wizardRunning = true;
+  opWizardStart();
+  renderMakeScreen();
+  const totals: MakeTotals = {};
+  const results: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string }[] = [];
+  let stay = false;
+  let stopped = false;
+  for (let i = 0; i < steps.length; i++) {
+    const id = steps[i];
+    if (mkCancelReq) { stopped = true; break; }
+    mkProg = { steps, i, done: mkProg.done };
+    renderMakeScreen();
+    try {
+      if (id === 'create') {
+        const rid = mkNextReq();
+        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: toks, base, reqId: rid }, ['CREATE_RESULT'], rid);
+        totals.created = { g: r.created + r.updated, r: r.roles ?? 0, m: r.skippedManual ?? 0 };
+        results.push({ id, mark: 'ok', text: t('wizard.seq.createDone', { created: r.created, updated: r.updated }) });
+      } else if (id === 'dark') {
+        const vars = await wizardRequest({ type: 'GET_VARIABLES' }, ['VARIABLES']);
+        const target = pickDarkTarget(vars.vars);
+        if (!target) results.push({ id, mark: 'ok', text: t('wizard.seq.darkNoTarget') });
+        else {
+          const r = await wizardRequest({ type: 'GENERATE_DARK_MODE', collectionId: target.collectionId, fromModeId: target.fromModeId, ...(target.toModeId ? { toModeId: target.toModeId } : {}) }, ['DARK_MODE_RESULT']);
+          if (r.error) { results.push({ id, mark: 'warn', text: r.error }); stay = true; }
+          else if (!r.realiased) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkNothing') }); stay = true; }
+          else {
+            totals.darkFilled = r.realiased;
+            results.push({ id, mark: 'ok', text: t('wizard.seq.dark', { realiased: r.realiased }) + (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') + (r.skipped ? t('wizard.seq.darkSkip', { n: r.skipped }) : '') });
+          }
+        }
+      } else if (id === 'textStyles') {
+        const rid = mkNextReq();
+        const r = await wizardRequest({ type: 'CREATE_TEXT_STYLES', styles, reqId: rid, ...(link ? { applyTo: ids } : {}) }, ['TEXT_STYLES_RESULT'], rid);
+        totals.styles = { s: r.created + r.updated, a: r.applied ?? 0 };
+        results.push({ id, mark: 'ok', text: t('wizard.seq.textStyles', { created: r.created, updated: r.updated }) + (r.applied ? t('wizard.seq.textStylesLinked', { a: r.applied }) : '') + (r.missing.length ? t('wizard.seq.textStylesMissing', { k: r.missing.length }) : '') });
+      } else if (id === 'bind') {
+        wizBindReq = ++bindReqSeq;
+        wizBindPending = true;
+        const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
+        totals.bound = r.bound;
+        const reasons = r.reasons ?? {};
+        if (r.bound) results.push({ id, mark: 'ok', text: t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') });
+        else {
+          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !(reasons['no-match'] ?? 0) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
+          results.push({ id, mark: 'warn', text: t(zero) });
+          stay = true;
+        }
+      } else if (id === 'rename') {
+        const rid = mkNextReq();
+        const r = await wizardRequest({ type: 'RENAME', apply: true, maxDepth: readMaxDepth(), nodeIds: ids, reqId: rid }, ['RENAME_RESULT'], rid);
+        totals.renamed = r.changes.length;
+        results.push({ id, mark: 'ok', text: t('wizard.seq.renameDone', { count: r.changes.length }) });
+      }
+      mkProg = { steps, i, done: [...mkProg.done, id] };
+    } catch (e) {
+      const fe = e instanceof PaidRequiredError ? { message: t('status.paid'), action: '' } : explainError(e instanceof Error ? e.message : String(e));
+      results.push({ id, mark: 'warn', text: `${fe.message}${fe.action ? ` — ${fe.action}` : ''}` });
+      stay = true;
+      stopped = true;
+      for (const rest of steps.slice(i + 1)) results.push({ id: rest, mark: 'off', text: t('wizard.seq.stoppedPrev') });
+      break;
+    }
+  }
+  const finishedSteps = mkProg?.done ?? [];
+  mkRunning = false;
+  mkProg = null;
+  wizardRunning = false;
+  opWizardEnd(stay ? 'fail' : stopped ? 'cancel' : 'ok');
+  if (stopped && !stay) {
+    // 취소됨 — 화면에 남고 경고 줄.
+    const last = finishedSteps[finishedSteps.length - 1];
+    mkCancelNote = last
+      ? t('make.cancelledUpTo', { step: t(`wizard.step.${last}`) }) + (totals.created ? ` (${t('make.done.create', { g: totals.created.g, r: totals.created.r })}${totals.styles ? ' · ' + t('make.done.styles', { s: totals.styles.s }) : ''})` : '')
+      : t('make.cancelled');
+    renderMakeScreen();
+    return;
+  }
+  if (stay) {
+    for (const sid of MAKE_STEP_ORDER) if (!steps.includes(sid) && (isPaid || sid === 'bind' || sid === 'rename')) results.push({ id: sid, mark: 'off', text: t('make.stepOff') });
+    results.sort((a, b) => MAKE_STEP_ORDER.indexOf(a.id) - MAKE_STEP_ORDER.indexOf(b.id));
+    mkResults = results;
+    mkResultsCreated = !!totals.created;
+    if (!(activeTab === 'select' && selSub === 'make')) showStatusLine(t('make.partialStatus'), { cls: 'warn', action: { label: t('common.view'), run: () => { showTab('select'); showSelSub('make'); } } });
+    renderMakeScreen();
+    if (activeTab === 'select' && selSub === 'make') $('btnMakeRun').focus();
+    return;
+  }
+  // 다 됨 — 하위 화면을 첫 화면으로(탭은 바꾸지 않음) + 상태 줄.
+  const linkOff = !link;
+  if (selSub === 'make') showSelSub('home');
+  showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
+}
+$('btnMakeRun').addEventListener('click', () => void runMake());
+$('btnMakeCancel').addEventListener('click', () => { mkCancelReq = true; send({ type: 'CANCEL' }); });
+$('btnMakePick').addEventListener('click', (e) => { if ((e.currentTarget as HTMLElement).getAttribute('aria-disabled') === 'true') return; showPick(undefined, 'make'); });
+$('makeLicense').addEventListener('click', () => { showTab('settings'); });
+$('makeAllOn').addEventListener('click', () => { for (const tk of mkTokens) mkOn.set(tk.name, true); mkTsOff.clear(); mkPreviewSoon(); renderMakeScreen(); $('makeAllOn').focus(); });
+$('makeAllOff').addEventListener('click', () => { for (const tk of mkTokens) mkOn.set(tk.name, false); for (const s of mkTs) mkTsOff.add(tsSig(s)); mkPreviewSoon(); renderMakeScreen(); $('makeAllOff').focus(); });
+for (const id of ['makeOptLink', 'makeOptRename', 'makeOptDark']) $(id).addEventListener('change', () => renderMakeScreen());
 
 /* ---------- 연결 화면(IA v4 §4.2): 종류 머리 · (변수, 종류) 줄 · 스위치 · 텍스트 스타일 줄 · [n곳 연결] ---------- */
 let bindCandidates: BindCandidate[] = [];
@@ -2882,7 +3214,6 @@ let bindSkipReasons: Record<string, number> = {};
 /* 복귀 규칙 상태 */
 let bindPreviewSel: string[] | null = null; // 찾기를 만든 기준
 let bindLeftSince = false; // 찾은 뒤 창·탭을 떠났었다
-let bindForeignSel = false; // (v3 잔재 — v4는 기준이 바뀌지 않아 쓰지 않음)
 let bindHereSel = false; // 이 화면이 만든 선택 직후
 let bindLayerSelectPending = false; // 이 화면이 레이어 선택을 요청했다(다음 selfSelect가 그것)
 let bindPreviewMini = false; // 최소화 중에 끝난 찾기
@@ -2895,7 +3226,8 @@ let bindCounts: ReasonCounts | undefined;
 let layerLibUse: boolean | null = null;
 let layerLibReq = 0;
 /** 텍스트 스타일 미리보기(§4.2) — 스타일 줄 · 사유(레이어 단위) · 끈 줄. */
-let bindTsRows: { styleId: string; name: string; nodeIds: string[] }[] = [];
+type BindTsRow = { styleId: string; name: string; nodeIds: string[] };
+let bindTsRows: BindTsRow[] = [];
 let bindTsSkips: Record<string, number> = {};
 const bindTsOff = new Set<string>();
 let bindTsReq = 0;
@@ -3019,49 +3351,6 @@ function tipTruncatedNames(root: HTMLElement): void {
   });
 }
 
-/** 스위치 하나. */
-function switchEl(on: boolean, label: string, onToggle: () => void): HTMLButtonElement {
-  const sw = document.createElement('button');
-  sw.type = 'button';
-  sw.className = 'bv-switch';
-  sw.setAttribute('role', 'switch');
-  sw.setAttribute('aria-checked', String(on));
-  sw.setAttribute('aria-label', label);
-  sw.tabIndex = -1;
-  const track = document.createElement('span');
-  track.className = 'bv-track';
-  track.setAttribute('aria-hidden', 'true');
-  sw.appendChild(track);
-  sw.addEventListener('click', onToggle);
-  return sw;
-}
-/** 줄 하나(변수 줄 · 스타일 줄 공통) — [견본] 값 → 이름 · {n}곳 · 스위치. */
-function bindRowEl(key: string, left: HTMLElement[], n: number, on: boolean, label: string, onToggle: () => void): HTMLElement {
-  const row = document.createElement('div');
-  row.className = 'bv-card';
-  row.classList.toggle('off', !on);
-  row.dataset.var = key;
-  row.setAttribute('role', 'row');
-  const head = document.createElement('div');
-  head.className = 'bv-head';
-  const grow = document.createElement('span');
-  grow.className = 'grow';
-  const cnt = document.createElement('span');
-  cnt.className = 'bv-tw';
-  cnt.textContent = t('bind.count', { k: n });
-  head.append(...left, grow, cnt, switchEl(on, label, onToggle));
-  row.appendChild(head);
-  return row;
-}
-/** 종류 머리 — "색 9곳". */
-function kindHeadEl(label: string, n: number): HTMLElement {
-  const h = document.createElement('div');
-  h.className = 'bv-kind';
-  h.setAttribute('role', 'presentation');
-  h.textContent = t('v4.kindPlaces', { kind: label, n });
-  return h;
-}
-
 /** 빈 상태 · 읽는 중(§4.2 상태표). */
 function renderBindEmpty(): void {
   const box = $('bindEmpty');
@@ -3072,7 +3361,7 @@ function renderBindEmpty(): void {
   else if (!bindPreviewed) text = bindFinding || bindFindFailed ? '' : t('v4.reading');
   else if (!hasBindPreview() || (bindTsOnly() && !bindTsRows.length)) {
     text = t('v4.nothingToLink');
-    if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMake('color')];
+    if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMakeScreen()];
   }
   box.hidden = !text;
   if (!text) return;
@@ -3106,28 +3395,41 @@ function renderBindBadges(): void {
 /** 연결 화면 그리기. */
 function renderBindTree(): void {
   const tree = $('bindTree');
-  const hadFocus = tree.contains(document.activeElement) ? (document.activeElement as HTMLElement).closest<HTMLElement>('[data-var]')?.dataset.var ?? null : null;
-  clearMount(tree);
   const rows = bindTsOnly() ? [] : bindRows();
   const showList = bindPreviewed && !bindLinking && (rows.length > 0 || bindTsRows.length > 0);
   $('bindAllRow').hidden = !showList;
+  const items: TreeItem[] = [];
   if (showList) {
     for (const kind of [...SEL_KINDS, 'other' as const]) {
       const list = rows.filter((g) => g.kind === kind);
       if (!list.length) continue;
-      tree.appendChild(kindHeadEl(t(`v4.kind.${kind}`), list.reduce((a, g) => a + g.count, 0)));
-      for (const g of list) {
+      const children: TreeItem[] = list.map((g) => {
         const on = rowOn(g);
-        tree.appendChild(bindRowEl(g.rowKey, [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)], g.count, on, t('bind.switchAria', { name: g.variableName }), () => {
-          for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
-          renderBindTree();
-          focusBindRow(g.rowKey);
-        }));
-      }
+        const cnt = document.createElement('span');
+        cnt.className = 'bv-tw';
+        cnt.textContent = t('bind.count', { k: g.count });
+        return {
+          key: g.rowKey,
+          indent: 24,
+          off: !on,
+          cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf)],
+          right: [cnt],
+          sw: { state: on, label: t('bind.switchAria', { name: g.variableName }), onToggle: () => { for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k); renderBindTree(); } },
+        };
+      });
+      const st = headState(list.map((g) => ({ on: rowOn(g) })));
+      items.push({
+        key: `kind:${kind}`, head: true, name: t(`v4.kind.${kind}`), countText: t('tree.count', { n: list.length }), indent: 0, children,
+        sw: { state: st, label: t('tree.headAria', { name: t(`v4.kind.${kind}`) }), onToggle: () => { const to = headToggleTarget(st); for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k); renderBindTree(); } },
+      });
     }
     if (bindTsRows.length) {
-      tree.appendChild(kindHeadEl(t('v4.kind.textStyle'), bindTsRows.reduce((a, r) => a + r.nodeIds.length, 0)));
-      for (const r of bindTsRows) {
+      const tsToggle = (r: BindTsRow, on: boolean): void => {
+        on ? bindTsOff.delete(r.styleId) : bindTsOff.add(r.styleId);
+        // 스타일 줄을 끄면 그 레이어의 글자 변수 자리가 되살아난다 — 그 줄은 켜진 상태로(같은 줄의 스위치를 따른다).
+        if (!on) for (const c of bindCandidates) if (fieldKind(c.field) === 'text' && r.nodeIds.includes(c.nodeId)) bindChecked.add(candKey(c));
+      };
+      const children: TreeItem[] = bindTsRows.map((r) => {
         const on = !bindTsOff.has(r.styleId);
         const aa = document.createElement('span');
         aa.className = 'ts-aa';
@@ -3136,43 +3438,33 @@ function renderBindTree(): void {
         const nm = document.createElement('span');
         nm.className = 'bv-chip bv-var';
         nm.innerHTML = `<span class="bv-name">${escapeHtml(r.name)}</span>`;
-        tree.appendChild(bindRowEl(`ts:${r.styleId}`, [aa, arrowEl(), nm], r.nodeIds.length, on, t('bind.switchAria', { name: r.name }), () => {
-          on ? bindTsOff.add(r.styleId) : bindTsOff.delete(r.styleId);
-          // 스타일 줄을 끄면 그 레이어의 글자 변수 자리가 되살아난다 — 그 줄은 켜진 상태로(같은 줄의 스위치를 따른다).
-          if (on) for (const c of bindCandidates) if (fieldKind(c.field) === 'text' && r.nodeIds.includes(c.nodeId)) bindChecked.add(candKey(c));
-          renderBindTree();
-          focusBindRow(`ts:${r.styleId}`);
-        }));
-      }
+        const cnt = document.createElement('span');
+        cnt.className = 'bv-tw';
+        cnt.textContent = t('bind.count', { k: r.nodeIds.length });
+        return { key: `ts:${r.styleId}`, indent: 24, off: !on, cells: [aa, arrowEl(), nm], right: [cnt], sw: { state: on, label: t('bind.switchAria', { name: r.name }), onToggle: () => { tsToggle(r, !on); renderBindTree(); } } };
+      });
+      const st = headState(bindTsRows.map((r) => ({ on: !bindTsOff.has(r.styleId) })));
+      items.push({
+        key: 'kind:textStyle', head: true, name: t('v4.kind.textStyle'), countText: t('tree.count', { n: bindTsRows.length }), indent: 0, children,
+        sw: { state: st, label: t('tree.headAria', { name: t('v4.kind.textStyle') }), onToggle: () => { const to = headToggleTarget(st); for (const r of bindTsRows) tsToggle(r, to); renderBindTree(); } },
+      });
+    }
+    // 처음 모습(§2.7): 모두 펼침, 머리 스위치가 "모두 끔"인 머리는 접힘 — 화면에 들어와 처음 그릴 때만.
+    if (bindTreeFresh) {
+      bindTreeFresh = false;
+      bindCollapsed.clear();
+      for (const it of items) if (it.sw?.state === false) bindCollapsed.add(it.key);
     }
   }
-  // grid 키보드 — 정지점 1개(첫 줄 스위치), ↑↓ = 줄, Space = 스위치.
-  const switches = Array.from(tree.querySelectorAll<HTMLElement>('.bv-switch'));
-  const target = (hadFocus && tree.querySelector<HTMLElement>(`[data-var="${CSS.escape(hadFocus)}"] .bv-switch`)) || switches[0];
-  if (target) target.tabIndex = 0;
+  renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse') });
   tipTruncatedNames(tree);
   renderBindChrome();
   bindFocusFirst();
 }
-function focusBindRow(key: string): void {
-  const sw = $('bindTree').querySelector<HTMLElement>(`[data-var="${CSS.escape(key)}"] .bv-switch`);
-  if (!sw) return;
-  $('bindTree').querySelectorAll<HTMLElement>('.bv-switch').forEach((x) => (x.tabIndex = -1));
-  sw.tabIndex = 0;
-  sw.focus();
-}
-$('bindTree').addEventListener('keydown', (e) => {
-  const sws = Array.from($('bindTree').querySelectorAll<HTMLElement>('.bv-switch'));
-  const i = sws.indexOf(document.activeElement as HTMLElement);
-  if (i < 0) return;
-  const go = (j: number): void => { const tg = sws[Math.max(0, Math.min(sws.length - 1, j))]; sws.forEach((x) => (x.tabIndex = -1)); tg.tabIndex = 0; tg.focus(); };
-  if (e.key === 'ArrowDown') go(i + 1);
-  else if (e.key === 'ArrowUp') go(i - 1);
-  else if (e.key === 'Home') go(0);
-  else if (e.key === 'End') go(sws.length - 1);
-  else return;
-  e.preventDefault();
-});
+/** 연결 화면 트리의 접힌 머리(그 화면에 있는 동안 기억). */
+const bindCollapsed = new Set<string>();
+/** 화면에 들어온 뒤 아직 트리를 그리지 않았다 — 처음 접기 규칙을 쓴다. */
+let bindTreeFresh = true;
 /** 줄은 그대로 두고 빈 상태 · 칩 · 버튼 · 머리만 맞춘다. */
 function renderBindChrome(): void {
   if (!curSel) return;
@@ -3213,7 +3505,6 @@ function updateBindApply(): void {
 /** 찾은 결과를 지운다(기준 변경 · 취소) — "읽는 중"으로. */
 function clearBindPreview(): void {
   bindPreviewSel = null;
-  bindForeignSel = false;
   bindHereSel = false;
   bindPreviewed = false;
   bindCandidates = [];
@@ -3359,10 +3650,6 @@ function refreshTreeEmptyStates(): void {
   if (compCandidates.length === 0) {
     if (lastSelCount === 0) renderEmptyState($('compTree'), t('sel.noneHere'), '');
     else clearMount($('compTree'));
-  }
-  if (renameNodes.length === 0) {
-    if (lastSelCount === 0) renderEmptyState($('diff'), t('sel.noneHere'), '');
-    else clearMount($('diff'));
   }
   renderMakeNoSel();
 }
@@ -3893,12 +4180,12 @@ type OpGo = () => void;
 interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean }
 const goLayer = (step: ApplyStep): OpGo => () => { showTab('select'); showApplyStep(step); };
 const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
-  EXTRACT: { results: ['EXTRACT_RESULT'], label: 'op.extract', go: () => showMake('color'), write: false },
-  CREATE_TOKENS: { results: ['CREATE_RESULT'], label: 'op.create', go: () => showMake('token'), write: true },
-  CREATE_SEMANTICS: { results: ['SEMANTICS_RESULT'], label: 'op.semantics', go: () => showMake('token'), write: true },
-  GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showMake('theme'), write: true },
-  SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showMake('type'), write: false },
-  CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showMake('type'), write: true },
+  EXTRACT: { results: ['EXTRACT_RESULT'], label: 'op.extract', go: () => showPick('color'), write: false },
+  CREATE_TOKENS: { results: ['CREATE_RESULT'], label: 'op.create', go: () => showPick('token'), write: true },
+  CREATE_SEMANTICS: { results: ['SEMANTICS_RESULT'], label: 'op.semantics', go: () => showPick('token'), write: true },
+  GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showPick('theme'), write: true },
+  SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showPick('type'), write: false },
+  CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showPick('type'), write: true },
   APPLY: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: false },
   APPLY_SELECTED: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: true },
   // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
@@ -3935,7 +4222,7 @@ const WAIT_LINK_IDS = [
   'btnClassifyVariants', // CLASSIFY_VARIANTS
   'btnGenMissing', // GENERATE_MISSING_VARIANTS
   'btnComponentize', // COMPONENTIZE_SIMILAR
-  'btnWizardRun', // 마법사 [전체 실행]
+  'btnMakeRun', // 만들기 화면 실행(§4.3)
 ];
 /** 연결 화면의 [n곳 연결] — 사유는 화면 상태 줄(#applyStatus). */
 const WAIT_CARD_IDS = ['btnApplyConfirm'];
@@ -4055,7 +4342,7 @@ function opWizardEnd(result: 'ok' | 'fail' | 'cancel'): void {
   opWizard = false;
   opProg = null;
   renderWaitLocks();
-  if (result !== 'cancel') opFinished(result === 'ok', { results: [], label: 'op.wizard', go: () => showMake(), write: true });
+  if (result !== 'cancel') opFinished(result === 'ok', { results: [], label: 'op.wizard', go: () => showMakeScreen(), write: true });
   else if (isMini) renderMiniMark();
   readScreen('work');
   reentry.release();
@@ -4075,7 +4362,8 @@ function readScreen(why: ReadWhy): void {
   }
   if (why === 'work' && activeTab !== 'variables') send({ type: 'GET_VAR_TABLE' });
   if (activeTab === 'select') {
-    if (selSub === 'make') send({ type: 'GET_VARIABLES' });
+    if (selSub === 'rename' && (why !== 'enter' || (renameFor !== baseKey() && !renameReading))) readRename();
+    if (selSub === 'make' && !mkResults && (why === 'work' || why === 'reentry' || (why === 'enter' && mkFor !== baseKey() && !mkReading))) readMake();
     // 선택 탭 데이터(IA v4 §7): 찾기 + 쓰는 변수 + 삭제된 변수(300개 규칙, 조용히).
     // 연결 하위 화면의 복귀는 bindOnReturn이 조용히 다시 찾는다(§4.2) — 찾기를 두 번 보내지 않는다.
     const bindReturn = why !== 'work' && selSub === 'bind';
@@ -4125,6 +4413,7 @@ window.addEventListener('resize', syncStickyOffsets);
 // 목록마다 리스너를 달면 드래그 중 리사이즈 1회에 목록 수만큼 레이아웃이 돌아 끊긴다 →
 // 하나로 모아 디바운스한다(드래그가 멎은 뒤 한 번만 재계산해도 결과는 같다).
 updateGates();
+renderTsLink(); // 타이포 [✓] 레이어에 바로 연결 — 스캔 전에는 잠금
 renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 상태 표시
@@ -4144,7 +4433,7 @@ type SegTab = (typeof TABS)[number];
 /** settings = ⚙ 설정 화면(탭 밖). */
 type TabName = SegTab | 'settings';
 /** 선택 탭의 하위 화면(§2.1). */
-type SelSub = 'home' | 'bind' | 'rename' | 'structure' | 'make';
+type SelSub = 'home' | 'bind' | 'rename' | 'structure' | 'make' | 'pick';
 let activeTab: TabName = 'select';
 let selSub: SelSub = 'home';
 /** ⚙ 설정을 연 탭 — ←로 돌아간다. */
@@ -4192,12 +4481,12 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
   selSub = sub;
   $('selHome').style.display = sub === 'home' ? '' : 'none';
   $('subHead').hidden = sub === 'home';
-  $('varMake').style.display = sub === 'make' ? '' : 'none';
+  $('varMake').style.display = sub === 'pick' ? '' : 'none';
+  $('makeScreen').style.display = sub === 'make' ? '' : 'none';
   if (sub === 'bind' || sub === 'rename' || sub === 'structure') showStep('apply', sub);
   else for (const el of Array.from(document.querySelectorAll<HTMLElement>('.step[data-apply-step]'))) el.style.display = 'none';
-  if (sub === 'make') showMakeStep(curMakeStep);
+  if (sub === 'pick') showMakeStep(curMakeStep);
   renderSubHead();
-  placeWizard();
   syncStickyOffsets();
   if (changed && activeTab === 'select') {
     const y = screenScroll.get(screenKey()) ?? 0;
@@ -4206,16 +4495,18 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
   }
   renderSelHome();
   // 연결 화면에 들어오면 첫 스위치에 포커스(§4.2) — 목록이 아직 없으면 결과가 그려질 때.
-  if (changed && sub === 'bind') bindFocusPending = true;
+  if (changed && sub === 'bind') { bindFocusPending = true; bindTreeFresh = true; $('bindTree').dataset.focusKey = ''; if (bindPreviewed) renderBindTree(); }
+  if (changed && sub === 'make') { mkFocusPending = true; mkTreeFresh = true; mkCancelNote = ''; if (!mkRunning && !mkResults) readMake(); else renderMakeScreen(); }
+  if (changed && sub === 'rename') { renameFocusPending = true; renameTreeFresh = true; renameFor = null; renameNodes = []; readRename(); }
   bindFocusFirst();
 }
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
 function bindFocusFirst(): void {
   if (!bindFocusPending || activeTab !== 'select' || selSub !== 'bind') return;
-  const sw = $('bindTree').querySelector<HTMLElement>('.bv-switch[tabindex="0"]');
-  if (!sw) return;
+  const row = $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
+  if (!row) return;
   bindFocusPending = false;
-  sw.focus({ preventScroll: true });
+  row.focus({ preventScroll: true });
 }
 /** 연결 화면 머리 오른쪽(§4.2) — "변수 없는 값 {n}곳", 텍스트 스타일만 모습이면 "텍스트 스타일 {t}곳". */
 function bindHeadRight(): string {
@@ -4226,13 +4517,18 @@ function bindHeadRight(): string {
 }
 /** 하위 화면 머리 — 제목 · 오른쪽 보조 글(§4.2~§4.5). */
 function renderSubHead(): void {
-  const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'v4.subMake' };
+  const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'make.title', pick: 'v4.subMake' };
   if (selSub === 'home') return;
   $('subTitle').textContent = selSub === 'bind' ? baseLabel() : t(titles[selSub]);
-  $('subRight').textContent = selSub === 'make' || selSub === 'rename' ? baseLabel() : selSub === 'bind' ? bindHeadRight() : '';
+  $('subRight').textContent = selSub === 'make' ? (baseline ? t('make.subRight', { name: baseLabel() }) : '') : selSub === 'pick' ? '' : selSub === 'rename' ? (renameFor === baseKey() ? t('rename.subRight', { name: baseLabel(), n: renameRows().length }) : baseLabel()) : selSub === 'bind' ? bindHeadRight() : '';
 }
 /** ← · Esc — 첫 화면으로, 포커스는 연 버튼(없으면 첫 카드 버튼, §2.1). */
 function subBack(): void {
+  if (selSub === 'pick') {
+    if (pickFrom === 'make' && (baseline ?? curSel)?.count) { showSelSub('make'); $('btnMakePick').focus(); return; }
+    showSelSub('home');
+    if (pickFrom === 'vars') { showTab('variables'); return; }
+  }
   showSelSub('home');
   const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $('selCards').querySelector<HTMLElement>('button');
   (target ?? $('btnGoRename')).focus();
@@ -4243,7 +4539,7 @@ document.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-go-sub]');
   if (!el) return;
   const sub = el.dataset.goSub as SelSub;
-  if (!['home', 'bind', 'rename', 'structure', 'make'].includes(sub)) return;
+  if (!['home', 'bind', 'rename', 'structure', 'make', 'pick'].includes(sub)) return;
   showTab('select');
   showSelSub(sub, el);
 });
@@ -4257,12 +4553,20 @@ document.addEventListener('keydown', (e) => {
   else if (activeTab === 'select' && selSub !== 'home') { e.preventDefault(); subBack(); }
 });
 
-/** 만들기 하위 화면으로(필요하면 단계까지). 옛 '만들기' 바로가기가 모두 여기로 온다. v4: 선택 탭 › 값을 직접 고르기. */
-function showMake(step?: MakeStep): void {
+/** 값을 직접 고르기(v3 만들기 4단계)로 — from: 돌아갈 곳(만들기 화면 · 변수 탭). */
+let pickFrom: 'make' | 'vars' = 'make';
+function showPick(step?: MakeStep, from: 'make' | 'vars' = 'vars'): void {
   const opener = document.activeElement as HTMLElement | null;
+  pickFrom = from;
   showTab('select');
-  showSelSub('make', opener);
+  showSelSub('pick', opener);
   if (step) showMakeStep(step);
+}
+/** 변수 만들기 화면으로(§4.3) — 선택이 없으면 들어갈 수 없다. */
+function showMakeScreen(opener?: HTMLElement | null): void {
+  if (!(baseline ?? curSel)?.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
+  showTab('select');
+  showSelSub('make', opener ?? (document.activeElement as HTMLElement | null));
 }
 
 TABS.forEach((tb, i) => {
@@ -4280,7 +4584,7 @@ TABS.forEach((tb, i) => {
 });
 $('btnGoRename').addEventListener('click', (e) => { if (!curSel.count) return; showSelSub('rename', e.currentTarget as HTMLElement); });
 $('btnGoComponents').addEventListener('click', (e) => { if (!curSel.count) return; showSelSub('structure', e.currentTarget as HTMLElement); });
-$('btnVarEmptyMake').addEventListener('click', () => { if (!curSel.count) return; showMake('color'); });
+$('btnVarEmptyMake').addEventListener('click', (e) => { if (!curSel.count) return; showMakeScreen(e.currentTarget as HTMLElement); });
 
 /* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
 // 만들기 4단계·적용 3단계. 카드는 마크업의 data-make-step / data-apply-step으로 묶여 있고,
@@ -4638,7 +4942,6 @@ function leaveManagerUi(): void {
   closeModal();
   closeReadiness();
   // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
-  if (wizLatch && wizLatch.summarySeen && !wizardRunning) wizLatch = null;
 }
 
 /* ---------- 선택과 목록 기준 ---------- */
@@ -4658,6 +4961,8 @@ function setBaseline(b: SelInfo | null): void {
   vmUsageReq = 0;
   vmUsageInFlight = false;
   if (!b && activeTab === 'select' && selSub === 'bind' && !bindLinking) showSelSub('home');
+  if (activeTab === 'select' && selSub === 'rename') { if (b && b.scanned <= BIG_SELECTION) scheduleRename(); else renderRenameScreen(); }
+  if (activeTab === 'select' && selSub === 'make' && !mkRunning) { if (b && b.scanned <= BIG_SELECTION) scheduleMake(); else renderMakeScreen(); }
   if (!b) {
     usageMap = null;
     libVars = [];
@@ -4742,11 +5047,6 @@ function onVarTable(msg: Extract<CodeToUi, { type: 'VAR_TABLE' }>): void {
   vmTableSig = sig;
   vmCols = msg.collections;
   vmVars = msg.vars;
-  if (wizCountPending) {
-    wizCountPending = false;
-    const n = vmVars.length - wizBeforeCount;
-    if (n > 0) showStatusLine(t('wizard.madeStatus', { n }), { cls: 'ok' });
-  }
   if (vmOpen || first) renderVarScreen();
   if (edRebase) edOnVarTable(msg); // 목록을 새 표로 그린 뒤(이름 검사 · 후보도 새 표로)
   runAfterTable(); // 새 변수 · 복제 · 삭제 뒤 포커스 · 상세(§4.9)
@@ -6554,9 +6854,9 @@ function openAddMenu(): void {
   const limit = manualLimitReason();
   openMenu(r.left, r.bottom + 2, [
     { label: t('list.addNew'), disabled: !!limit, note: limit ?? undefined, onSelect: () => openNewVar(btn), focusElsewhere: true },
-    { label: t('list.addFromSel'), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? undefined : t('status.noSelection'), onSelect: () => showMake('color'), focusElsewhere: true },
-    { label: t('list.addDark'), onSelect: () => showMake('theme'), focusElsewhere: true },
-    { label: t('list.addTextStyles'), onSelect: () => showMake('type'), focusElsewhere: true },
+    { label: t('list.addFromSel'), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? undefined : t('status.noSelection'), onSelect: () => showMakeScreen(), focusElsewhere: true },
+    { label: t('list.addDark'), onSelect: () => showPick('theme', 'vars'), focusElsewhere: true },
+    { label: t('list.addTextStyles'), onSelect: () => showPick('type', 'vars'), focusElsewhere: true },
   ], btn);
 }
 /** ⋯ "그룹 모두 펼치기 / 접기" — 지금 컬렉션(검색 중이면 보이는 것)의 그룹. */
@@ -6566,19 +6866,6 @@ function setAllGroups(open: boolean): void {
     if (open) grpCollapsed.delete(g.key); else grpCollapsed.add(g.key);
   }
   renderVarList();
-}
-
-/* ---------- 변수 없는 값 찾기 → 레이어 › 연결(§4.6 예외 규칙은 PR 3) ---------- */
-function findUnbound(): void {
-  if (!curSel.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
-  // 진입 규칙(§4.6): 같은 선택의 결과가 있으면 / 실행 중이면 화면만, 연결할 변수가 없으면 안내만, 그 밖은 미리보기.
-  const sameResult = hasBindPreview() && !!bindPreviewSel && sameIds(bindPreviewSel, (baseline ?? curSel).ids) && !bindForeignSel;
-  bindLeftSince = false; // 지금 들어가는 것이라 복귀 재계산 대상이 아니다
-  showTab('select');
-  showApplyStep('bind');
-  if (sameResult || bindBusy()) return;
-  if (prereqKnown && !hasBindable) { renderBindPrereq(); return; }
-  runBindPreview();
 }
 
 /* ---------- 리스너 ---------- */
@@ -6591,51 +6878,6 @@ $('modeSelect').addEventListener('change', () => { modeName = ($('modeSelect') a
 /* =====================================================================
    시작 화면(§4.3) · 마법사 위치 · 준비 현황 팝오버
    ===================================================================== */
-/** 시작 화면 고정(①) — 로컬 변수 0개일 때 시작한 마법사가 실행 중이거나 그 요약이 보이는 동안. */
-let wizLatch: { from: 'start' | 'make'; before: number; summarySeen: boolean; done: boolean } | null = null;
-/** 이번 실행 시작 때 로컬 변수 수 — 완료 n = 전후 차이(만들기 맨 위, 로컬 변수 있음). */
-let wizBeforeCount = 0;
-let wizFrom: 'start' | 'make' = 'start';
-/** 마법사 카드(요소 1개)를 보이는 곳에 붙인다 — 만들기 하위 화면이면 맨 위, 아니면 시작 화면. */
-function placeWizard(): void {
-  const card = $('wizardCard');
-  const inMake = true; // v4: 마법사 카드는 만들기 하위 화면에만(시작 화면은 없앴다)
-  const slot = $('wizardSlotMake');
-  // 자리를 옮길 때만 기본 펼침을 정한다 — 다시 그릴 때마다 접으면 사용자가 펼친 것이 풀린다.
-  // 만들기 쪽에서는 접힌 채, 실행 중이거나 요약이 있으면 펼친다.
-  if (card.parentElement !== slot) {
-    slot.appendChild(card);
-    if (inMake) card.classList.toggle('collapsed', !wizardRunning && !wizHasSummary());
-    else card.classList.remove('collapsed');
-  }
-  if (wizardRunning) card.classList.remove('collapsed');
-  // 요약을 화면에서 봤다(①) — 끝난 뒤 카드가 실제로 보이면.
-  const visible = activeTab === 'select' && selSub === 'make' && !isMini;
-  if (wizLatch && wizLatch.done && visible) wizLatch.summarySeen = true;
-  renderWizardCopy();
-}
-const wizHasSummary = (): boolean => !!$('wizardSummary').textContent;
-
-/** 마법사 카드 문구(§4.3 표) — 유료 / 무료(로컬 변수 0개) / 무료(로컬 변수 있음). */
-function renderWizardCopy(): void {
-  const hint = $('wizardCard').querySelector<HTMLElement>('[data-i18n="wizardCard.hint"]');
-  // 마법사는 연결하지 않는다(§2.11) — 무료는 로컬 변수 수와 관계없이 이름 정리만.
-  if (hint) hint.textContent = t(isPaid ? 'wizardCard.hintPaid' : 'wizardCard.hintFree');
-  const btn = $('btnWizardRun') as HTMLButtonElement;
-  if (!wizardRunning) btn.textContent = isPaid ? t(btn.dataset.rerun === '1' ? 'wizard.rerun' : 'wizardCard.run') : t('wizardCard.runFree');
-  // 선택이 없으면 주 버튼은 aria-disabled, 누르면 상태 줄에 사유. 카드 안에도 안내(§4.1 — 선택 표시줄이 없다).
-  if (!wizardRunning) setLock(btn, curSel.count ? null : 'prereq', t('status.noSelection'));
-  $('wizNoSel').hidden = wizardRunning || !!curSel.count;
-  renderWizToBind();
-  // 완료 머리 — 로컬 변수 0개에서 시작했고 변수가 늘었을 때.
-  const done = $('wizDone');
-  const made = wizLatch && wizLatch.done ? localVarCount() - wizLatch.before : 0;
-  if (made > 0) {
-    $('wizDoneText').textContent = t('start.made', { n: made });
-    done.hidden = false;
-  } else done.hidden = true;
-}
-
 /* ---------- 준비 현황 팝오버 ---------- */
 function readinessDone(): number {
   return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === 'done').length;
@@ -6679,12 +6921,6 @@ document.addEventListener('pointerdown', (e) => {
   if (pop.contains(tgt) || readinessReturn?.contains(tgt)) return;
   closeReadiness();
 }, true);
-$('btnWizListView').addEventListener('click', () => {
-  wizLatch = null;
-  showTab('variables');
-  $('varTree').querySelector<HTMLElement>('[data-key]')?.focus();
-});
-
 /* =====================================================================
    레이어 › 연결(IA v3 §4.6)
    ===================================================================== */
@@ -6717,7 +6953,6 @@ document.documentElement.addEventListener('pointerleave', () => { if (hasBindPre
 window.addEventListener('blur', () => { if (hasBindPreview()) bindLeftSince = true; });
 
 /** 찾기·연결이 실행 중인가. 연결 쪽은 bindLinking(§4.6 "연결 중의 다른 일"). */
-const bindBusy = (): boolean => bindFinding || bindLinking !== 0;
 
 /* =====================================================================
    선택 탭 첫 화면(IA v4 §4.1) — 머리 줄 · 상태표 · 카드 1(변수 없는 값) · 카드 2(쓰는 변수) · 카드 3(삭제된 변수)
@@ -6868,7 +7103,7 @@ function renderSelHome(): void {
       const subs: string[] = [];
       if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== 'other').map((x) => t('v4.kindPlaces', { kind: kindLabel(x.kind), n: x.n })).join(' · '));
       else if (!findReady) subs.push(t('v4.reading'));
-      const actions: HTMLElement[] = [selBtn(t('v4.makeArrow'), (b) => { showMake('color'); subOpener = b; }, true)];
+      const actions: HTMLElement[] = [selBtn(t('v4.makeArrow'), (b) => { showMakeScreen(b); }, true)];
       const allSubs: (string | Node)[] = [...subs];
       tsOnlyExtra(allSubs, actions);
       put(selCard({ title: t('v4.noVarsFile'), subs: allSubs, actions }));
@@ -6899,7 +7134,7 @@ function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[]): void {
 function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | null): void {
   if (prereqKnown && !hasBindable) {
     // noTier — 계층 컬렉션에 변수가 없음
-    const b = selBtn(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; });
+    const b = selBtn(t('v4.makeArrow'), (el) => { showMakeScreen(el); });
     b.dataset.k = 'make';
     const subs: (string | Node)[] = [t('bind.noTier')];
     const actions: HTMLElement[] = [b];
@@ -6929,12 +7164,12 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     actions.push(go);
     if (k > 0) {
       sub.append(' · ' + t('v4.noVarPlaces', { k }) + ' ');
-      const mk = selLink(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; });
+      const mk = selLink(t('v4.makeArrow'), (el) => { showMakeScreen(el); });
       mk.dataset.k = 'make';
       sub.appendChild(mk);
     }
   } else {
-    const mk = selBtn(t('v4.makeArrow'), (el) => { showMake('color'); subOpener = el; }, true);
+    const mk = selBtn(t('v4.makeArrow'), (el) => { showMakeScreen(el); }, true);
     mk.dataset.k = 'make';
     actions.push(mk);
   }
@@ -7064,4 +7299,3 @@ function onDeletedUnbound(msg: Extract<CodeToUi, { type: 'DELETED_UNBOUND' }>): 
    처음 한 번은 탭이 '바뀌지' 않으므로 activeTab을 비켜 두어 들어올 때 읽기가 돌게 한다. */
 activeTab = 'variables';
 showTab('select'); // v4 §2.1 — 창을 열면 선택 탭
-placeWizard(); // 마법사 카드는 만들기 하위 화면 안에만

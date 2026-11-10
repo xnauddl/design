@@ -36,7 +36,7 @@ const check = (name, cond, detail = '') => {
 const pageErrors = [];
 async function open(width = 480, tab = 'layer') {
   const p = await browser.newPage({ viewport: { width, height: 510 } });
-  p.on('pageerror', (e) => pageErrors.push(e.message));
+  p.on("pageerror", (e) => { pageErrors.push(e.message); console.log("PAGEERROR", e.message, (e.stack||"").split("\n").slice(0,3).join(" | ")); });
   await p.addInitScript(() => {
     window.__sent = [];
     window.parent.postMessage = (m) => window.__sent.push(m.pluginMessage);
@@ -77,9 +77,9 @@ const locked = (p, sel) => p.getAttribute(sel, 'aria-disabled').then((v) => v ==
 const named = async (p, sel, name) => (await p.getByRole('button', { name, exact: true }).count()) >= 1 && (await p.$eval(sel, (e, n) => e.textContent.trim() === n, name));
 const emptyText = (p) => p.$eval('#bindEmpty', (e) => (e.hidden ? null : e.querySelector('.be-text')?.textContent ?? ''));
 const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return p.textContent('#statusText'); };
-/** 목록 — 종류 머리는 글자, 줄은 [이름, 곳 수, 켬]. */
-const bindList = (p) => p.$$eval('#bindTree > *', (e) => e.map((x) => (x.classList.contains('bv-kind') ? x.textContent : [x.querySelector('.bv-name').textContent, x.querySelector('.bv-tw').textContent, x.querySelector('.bv-switch').getAttribute('aria-checked') === 'true'])));
-const TS0 = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+/** 목록(트리 §2.7) — 머리는 "이름 {n}개", 줄은 [이름, 곳 수, 켬]. */
+const bindList = (p) => p.$$eval('#bindTree > .tr', (e) => e.map((x) => (x.classList.contains('tr-head') ? `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}` : [x.querySelector('.bv-name').textContent, x.querySelector('.bv-tw').textContent, x.querySelector('.bv-switch').getAttribute('aria-checked') === 'true'])));
+const TS0 = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
 const tsPrev = (reqId, rows = [], skipReasons = {}) => ({ type: 'TEXT_STYLES_PREVIEW', reqId, rows, skipReasons: { ...TS0, ...skipReasons } });
 /** 찾기 응답(변수 + 텍스트 스타일) — 마지막 APPLY 차례로. */
 async function found(p, extra = {}, rows = [], tsSkips = {}) {
@@ -319,7 +319,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   const p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
-  await goSub(p, 'make');
+  await goSub(p, 'pick');
   const r = await p.evaluate(() => {
     const card = document.getElementById('colorCard');
     const bar = card.querySelector('.toolbar').getBoundingClientRect();
@@ -357,7 +357,7 @@ const reenter = (p) => p.evaluate(() => {
   await goTab(p, 'layer');
   check('10 선택 없음 — 연결 화면 대신 첫 화면(선택 없음 안내)', (await visible(p, '#selHome')) && (await p.textContent('#selCards')).includes('디자인에서 레이어를 선택하세요'));
   await goSub(p, 'rename');
-  check('10 선택 없음 — 이름 목록 자리', (await p.textContent('#diff')).includes('선택이 없어요 — 캔버스에서 레이어를 선택하세요'));
+  check('10 선택 없음 — 이름 정리 "디자인에서 레이어를 선택하세요" + [← 돌아가기]', (await p.textContent('#renameEmpty')).includes('디자인에서 레이어를 선택하세요') && (await p.textContent('#renameEmpty')).includes('← 돌아가기'));
   await goSub(p, 'structure');
   check('10 선택 없음 — 컴포넌트 목록 자리', (await p.textContent('#compTree')).includes('선택이 없어요 — 캔버스에서 레이어를 선택하세요'));
   await recv(p, { ...sel(1, 0), scanned: 43, firstName: 'Card', ids: ['1:2'] });
@@ -366,13 +366,15 @@ const reenter = (p) => p.evaluate(() => {
   for (const tb of ['layer', 'settings', 'variables', 'layer', 'variables']) await goTab(p, tb);
   check('10 탭 전환 시 크기 요청 0회', (await count(p, 'SET_UI_SIZE')) === 0);
   // 하위 화면·단계 기억(§2.6)
-  await goSub(p, 'make');
+  await goSub(p, 'pick');
   await p.click('#makeRail [data-make-step="theme"]');
   await p.click('#tabbtn-variables');
   await p.click('#tabbtn-select');
   check('10 하위 화면 기억(선택 탭 › 값을 직접 고르기 › 테마)', (await visible(p, '#varMake')) && (await visible(p, '#darkCard')));
   await p.click('#btnSubBack');
-  check('10 ← → 선택 탭 첫 화면', (await visible(p, '#selHome')) && !(await visible(p, '#varMake')));
+  check('10 값을 직접 고르기 ← → 변수 만들기 화면', (await visible(p, '#makeScreen')) && !(await visible(p, '#varMake')));
+  await p.click('#btnSubBack');
+  check('10 ← → 선택 탭 첫 화면', (await visible(p, '#selHome')) && !(await visible(p, '#makeScreen')));
   await p.click('#btnSettings');
   check('10 ⚙ → 설정 화면 · 세그먼트 둘 다 고르지 않음', (await visible(p, '#tab-settings')) && (await p.$$eval('#tabBar .tab-btn', (e) => e.every((x) => x.getAttribute('aria-selected') === 'false'))));
   await p.keyboard.press('Escape');
@@ -458,7 +460,7 @@ const reenter = (p) => p.evaluate(() => {
   const p = await open(480, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
-  await goSub(p, 'make');
+  await goSub(p, 'pick');
   await p.focus('#btnColorVars');
   check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnColorVars');
   check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnColorVars', 'aria-disabled')) === 'true');
@@ -487,7 +489,7 @@ const reenter = (p) => p.evaluate(() => {
   const many = Array.from({ length: 40 }, (_, i) => cand('n1', 'itemSpacing', `v${i}`, `spacing/${i}`));
   await found(p, { candidates: many });
   await p.click('[data-k="link"]');
-  await p.evaluate(() => window.scrollTo(0, 900));
+  await p.evaluate(() => window.scrollTo(0, 300));
   await p.waitForTimeout(100);
   const tb = await p.evaluate(() => {
     const bar = document.getElementById('bindFoot').getBoundingClientRect();
@@ -519,23 +521,23 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 카드 1 — 스타일 먼저(한 자리 한 번) · [7곳 연결] · 텍스트 스타일 종류', card.includes('변수 없는 값 8곳') && card.includes('텍스트 스타일 2') && (await p.textContent('[data-k="link"]')) === '7곳 연결', card);
   await p.click('[data-k="link"]');
   check('B2 [7곳 연결] → 연결 화면 · 다시 찾지 않음', (await visible(p, '#subHead')) && (await sent(p, 'APPLY')).length === 1);
-  check('B2 들어오면 포커스는 첫 스위치', await p.evaluate(() => document.activeElement === document.querySelector('#bindTree .bv-switch')));
+  check('B2 들어오면 포커스는 트리 첫 줄(첫 종류 머리)', await p.evaluate(() => document.activeElement === document.querySelector('#bindTree [data-tkey]')));
   check('B2 머리 "← Card" · 오른쪽 "변수 없는 값 8곳"', (await p.textContent('#subTitle')) === 'Card' && (await p.textContent('#subRight')) === '변수 없는 값 8곳', await p.textContent('#subRight'));
   const list = await bindList(p);
   check('B2 종류 머리(카드 1 순서) · (변수, 종류) 줄 · 텍스트 스타일 머리 맨 끝',
-    JSON.stringify(list) === JSON.stringify(['간격 2곳', ['spacing/8', '2곳', true], '반경 1곳', ['spacing/8', '1곳', true], '색 1곳', ['color/text/default', '1곳', true], '글자 1곳', ['font/size/16', '1곳', true], '텍스트 스타일 2곳', ['body/medium', '2곳', true]]),
+    JSON.stringify(list) === JSON.stringify(['간격 1개', ['spacing/8', '2곳', true], '반경 1개', ['spacing/8', '1곳', true], '색 1개', ['color/text/default', '1곳', true], '글자 1개', ['font/size/16', '1곳', true], '텍스트 스타일 1개', ['body/medium', '2곳', true]]),
     JSON.stringify(list));
   check('B2 [7곳 연결] 주 버튼 · 단계 표시 · [찾기] · 필터 없음', (await named(p, '#btnApplyConfirm', '7곳 연결')) && !(await locked(p, '#btnApplyConfirm')) && (await p.$('#bindSteps')) === null && (await p.$('#btnApply')) === null && (await p.$('#bindFilter')) === null);
-  check('B2 목록 grid · 접근성 이름', (await p.getAttribute('#bindTree', 'role')) === 'grid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수');
+  check('B2 목록 treegrid · 접근성 이름 · 머리 줄 = 이름 · 개수 · 스위치만(미리보기 없음)', (await p.getAttribute('#bindTree', 'role')) === 'treegrid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수' && (await p.$$eval('#bindTree .tr-head', (e) => e.every((h) => !h.querySelector('.bv-chip') && !!h.querySelector('.bv-switch')))));
   // 스위치 — 줄 단위
-  await p.click('#bindTree .bv-card >> nth=1 >> .bv-switch'); // 반경 줄
+  await p.click('#bindTree .tr-row >> nth=1 >> .bv-switch'); // 반경 줄
   check('B2 반경 줄만 끔 → 간격 줄은 켠 채 · [6곳 연결]', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]) && (await named(p, '#btnApplyConfirm', '6곳 연결')));
   // 스타일 줄을 끄면 t1 글자 크기가 글자 변수 후보로 되돌아온다
-  await p.click('#bindTree .bv-card[data-var="ts:S:body"] .bv-switch');
+  await p.click('#bindTree .tr[data-tkey="ts:S:body"] .bv-switch');
   const l2 = await bindList(p);
-  check('B2 스타일 줄 끔 → 글자 줄 2곳(되돌림) · [5곳 연결]', l2.includes('글자 2곳') && JSON.stringify(l2.find((x) => Array.isArray(x) && x[0] === 'font/size/16')) === JSON.stringify(['font/size/16', '2곳', true]) && (await named(p, '#btnApplyConfirm', '5곳 연결')), JSON.stringify(l2));
-  check('B2 스타일 줄을 꺼도 포커스는 그 스위치', (await p.evaluate(() => document.activeElement?.closest('[data-var]')?.dataset.var)) === 'ts:S:body');
-  await p.click('#bindTree .bv-card[data-var="ts:S:body"] .bv-switch');
+  check('B2 스타일 줄 끔 → 글자 줄 2곳(되돌림) · [5곳 연결]', l2.includes('글자 1개') && JSON.stringify(l2.find((x) => Array.isArray(x) && x[0] === 'font/size/16')) === JSON.stringify(['font/size/16', '2곳', true]) && (await named(p, '#btnApplyConfirm', '5곳 연결')), JSON.stringify(l2));
+  check('B2 스타일 줄을 꺼도 포커스는 그 줄', (await p.evaluate(() => document.activeElement?.closest('[data-tkey]')?.dataset.tkey)) === 'ts:S:body');
+  await p.click('#bindTree .tr[data-tkey="ts:S:body"] .bv-switch');
   // 모두 끄기 → 잠금 사유, 모두 켜기
   await p.click('#bindAllOff');
   check('B2 모두 끄기 뒤 포커스는 링크', (await p.evaluate(() => document.activeElement?.id)) === 'bindAllOff');
@@ -545,12 +547,19 @@ const reenter = (p) => p.evaluate(() => {
   await p.click('#bindAllOn');
   check('B2 모두 켜기 → [7곳 연결]', (await named(p, '#btnApplyConfirm', '7곳 연결')) && (await bindList(p)).filter(Array.isArray).every((x) => x[2]));
   // 키보드 — 정지점 1개 · ↓ · Space
-  check('B2 줄 목록 정지점 1개(첫 스위치)', (await p.$$eval('#bindTree .bv-switch', (e) => e.filter((x) => x.tabIndex === 0).length)) === 1 && (await p.$eval('#bindTree .bv-switch', (e) => e.tabIndex)) === 0);
-  await p.focus('#bindTree .bv-switch');
-  await p.keyboard.press('ArrowDown');
+  check('B2 트리 정지점 1개 · 스위치는 tabIndex -1', (await p.$$eval('#bindTree [data-tkey]', (e) => e.filter((x) => x.tabIndex === 0).length)) === 1 && (await p.$$eval('#bindTree .bv-switch', (e) => e.every((x) => x.tabIndex === -1))));
+  await p.focus('#bindTree [data-tkey]');
+  for (let i = 0; i < 3; i++) await p.keyboard.press('ArrowDown');
   await p.keyboard.press('Space');
-  check('B2 ↓ → 둘째 줄 · Space → 끔', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]));
+  check('B2 ↓×3 → 반경 줄 · Space → 끔', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]));
   await p.keyboard.press('Space');
+  await p.keyboard.press('ArrowUp'); // 반경 머리
+  await p.keyboard.press('ArrowLeft');
+  check('B2 머리에서 ← → 접힘(줄 숨김) · → 펼침', (await p.getAttribute('#bindTree [data-tkey="kind:radius"]', 'aria-expanded')) === 'false' && (await bindList(p)).filter(Array.isArray).length === 4);
+  await p.keyboard.press('ArrowRight');
+  await p.click('#bindTree [data-tkey="kind:gap"] .bv-switch');
+  check('B2 머리 스위치 → 그 종류 줄 모두 끔', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([false, true, true, true, true]) && (await p.getAttribute('#bindTree [data-tkey="kind:gap"] .bv-switch', 'aria-checked')) === 'false');
+  await p.click('#bindTree [data-tkey="kind:gap"] .bv-switch');
   // 건너뜀 칩 — s는 자리 단위(스타일 사용 중 1곳), 레이어 단위 · 텍스트 스타일 사유는 칩 안에만
   check('B2 건너뜀 칩 "건너뜀 1곳 ▸"(카드와 같은 s)', (await p.textContent('#bindSkipToggle')) === '건너뜀 1곳 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#bindSkipToggle');
@@ -577,7 +586,7 @@ const reenter = (p) => p.evaluate(() => {
   await openSel(p);
   await found(p, { candidates: B2_CANDS.slice(0, 3) });
   await p.click('[data-k="link"]');
-  await p.click('#bindTree .bv-card >> nth=1 >> .bv-switch'); // 반경 줄 끔
+  await p.click('#bindTree .tr-row >> nth=1 >> .bv-switch'); // 반경 줄 끔
   await reenter(p);
   await recv(p, PREREQ);
   await p.waitForTimeout(500);
@@ -614,7 +623,7 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, tsPrev((await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1).reqId, B2_TS, { hasStyle: 1 }));
   check('B2 noTier 카드 1 안에 "텍스트 스타일 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('텍스트 스타일 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
   await p.click('[data-k="tsLink"]');
-  check('B2 텍스트 스타일만 — 머리 오른쪽 "텍스트 스타일 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === '텍스트 스타일 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['텍스트 스타일 2곳', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
+  check('B2 텍스트 스타일만 — 머리 오른쪽 "텍스트 스타일 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === '텍스트 스타일 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['텍스트 스타일 1개', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
   check('B2 텍스트 스타일만 — 칩 "건너뛴 레이어 ▸"', (await p.textContent('#bindSkipToggle')) === '건너뛴 레이어 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#btnApplyConfirm');
   const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
@@ -998,12 +1007,12 @@ async function saveAndGet(p) {
   const keep = { nodeId: 'n1', field: 'paddingLeft', currentValue: '8', variableId: 'vA', variableName: 'spacing/8', tier: 2 };
   await found(p, { candidates: [newCand('n1'), newCand('n2'), keep], bound: 3 });
   await p.click('[data-k="link"]');
-  const chips = await p.$$eval('#bindTree .bv-card', (cards) => cards.map((c) => {
+  const chips = await p.$$eval('#bindTree .tr-row', (cards) => cards.map((c) => {
     const b = c.querySelector('.bv-new');
     return { name: c.querySelector('.bv-name')?.textContent, badge: b?.textContent, role: b?.getAttribute('role'), aria: b?.getAttribute('aria-label'), tip: c.querySelector('.bv-var')?.getAttribute('title') };
   }));
   const inv = chips.find((x) => x.name === 'color/text/inverse');
-  check('16 새 역할 줄 — "N" 배지 · role=img · 읽기 이름 "새 역할"', !!inv && inv.badge === 'N' && inv.role === 'img' && inv.aria === '새 역할', JSON.stringify(inv));
+  check('16 새 Semantic 줄 — "N" 배지 · role=img · 읽기 이름 "새 Semantic"', !!inv && inv.badge === 'N' && inv.role === 'img' && inv.aria === '새 Semantic', JSON.stringify(inv));
   check('16 칩 툴팁 "color/gray/0을 가리켜요"', inv?.tip === 'color/gray/0을 가리켜요', JSON.stringify(inv));
   check('16 이미 있는 역할 줄은 "N" 없음', chips.find((x) => x.name === 'spacing/8')?.badge === undefined);
   const badgeStyle = await p.$eval('#bindTree .bv-new', (e) => { const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color, cs.borderTopWidth, cs.fontWeight]; });
@@ -1033,35 +1042,150 @@ async function saveAndGet(p) {
   await p.close();
 }
 
-/* ---------- 17 "한 번에 정리"는 연결까지(IA v4 §4.3 B.1 ~ B.3 마법사, 2026-11-09 사용자 결정) ---------- */
+/* ---------- 17 변수 만들기 화면(IA v4 §4.3 · B.4) — Global · Semantic · 텍스트 스타일 트리 · 실행 순서 ---------- */
 {
   const p = await open(480, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card' });
   await goSub(p, 'make');
-  check('17 마법사 체크 "연결" 기본 켬', await p.$eval('#wizOptBind', (e) => e.checked));
-  await p.$eval('#btnWizardRun', (b) => b.click()); // 만들기 화면에서는 카드가 접혀 있다
   await p.waitForTimeout(50);
-  check('17 추출도 시작 때 기준 nodeIds', (await sent(p, 'EXTRACT')).at(-1)?.nodeIds?.[0] === 'w1');
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+  check('17 들어오면 추출 + 텍스트 스타일 후보(조용한 읽기 · 기준 nodeIds · reqId)', ex?.nodeIds?.[0] === 'w1' && typeof ex?.reqId === 'number' && sc?.nodeIds?.[0] === 'w1' && typeof sc?.reqId === 'number' && !(await visible(p, '#applyProgress')));
+  check('17 읽는 중 — 위 줄 "선택을 읽는 중…" · 버튼 잠금', (await p.textContent('#makeTopText')) === '선택을 읽는 중…' && (await locked(p, '#btnMakeRun')));
+  check('17 머리 "← 변수 만들기" · 오른쪽 "Card에서 찾은 값"', (await p.textContent('#subTitle')) === '변수 만들기' && (await p.textContent('#subRight')) === 'Card에서 찾은 값');
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 },
+    { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2 },
+    { name: 'font-size/14', category: 'fontSize', value: 14, sources: ['fontSize'], count: 3 },
+  ] });
+  await p.waitForTimeout(50);
+  const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  check('17 만들 수 미리보기 — preview · reqId · 켠 줄만(글자 종류는 기본 끔)', pv?.preview === true && typeof pv.reqId === 'number' && JSON.stringify(pv.tokens.map((x) => x.name)) === JSON.stringify(['spacing/16', 'spacing/8']), JSON.stringify(pv?.tokens?.map((x) => x.name)));
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 1, updated: 0, summary: '', roles: 1, skippedManual: 0,
+    tokenStates: { 'spacing/16': { state: 'new' }, 'spacing/8': { state: 'update' } }, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [{ name: 'body/medium', sig: '99|0|0|Inter|Regular' }],
+    styles: [{ name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] }] });
+  await p.waitForTimeout(50);
+  const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
+  check('17 묶음 — Global(펼침) › 간격 · 글자(꺼져 접힘) · Semantic(접힘) · 텍스트 스타일', JSON.stringify(heads) === JSON.stringify(['Global 3개', '간격 2개', '글자 1개', 'Semantic 1개', '텍스트 스타일 1개']), JSON.stringify(heads));
+  check('17 Global 머리 스위치 — 일부(글자 끔)', (await p.getAttribute('#makeTree [data-tkey="grp:global"] .bv-switch', 'aria-checked')) === 'mixed');
+  check('17 상태 태그 "있음"(update) · 레이어 수', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('레이어 2'));
+  check('17 만들 수 "Global 1개 · Semantic 1개 · 스타일 1개" · [변수 1개 만들기]', (await p.textContent('#makeCount')) === 'Global 1개 · Semantic 1개 · 스타일 1개' && (await p.textContent('#btnMakeRun')) === '변수 1개 만들기', await p.textContent('#makeCount'));
+  check('17 기존 스타일과 이름이 같고 값이 다름 → 실행 잠금 "이미 있는 스타일 이름이에요"', (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '이미 있는 스타일 이름이에요');
+  // 이름 고치기 — 더블클릭 → 칸 → Enter 저장
+  await p.dblclick('#makeTree [data-tkey^="t:"] .bv-var');
+  await p.waitForTimeout(30);
+  await p.fill('#makeTree input.tr-edit', 'body/base');
+  await p.keyboard.press('Enter');
+  check('17 이름 고치기 → 잠금 풀림', !(await locked(p, '#btnMakeRun')) && (await p.textContent('#makeTree [data-tkey^="t:"]')).includes('body/base'));
+  check('17 만든 뒤 체크 3개(바로 연결 켬)', (await p.$$eval('#makeOpts input[type="checkbox"]', (e) => e.length)) === 3 && (await p.$eval('#makeOptLink', (e) => e.checked)));
+  // 실행: 만들기 → 텍스트 스타일 → 연결
+  const exBefore = (await sent(p, 'EXTRACT')).length;
+  const scBefore = (await sent(p, 'SCAN_TEXT_STYLES')).length;
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(50);
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  check('17 실행 만들기 — 켠 줄 토큰 · reqId · 다시 추출하지 않음', !!cr && cr.tokens.length === 2 && typeof cr.reqId === 'number' && (await sent(p, 'EXTRACT')).length === exBefore, JSON.stringify({ n: cr?.tokens?.length, r: cr?.reqId, ex: (await sent(p, 'EXTRACT')).length }));
+  check('17 실행 중 — 트리 잠금 · 진행 "1/3단계" · [취소]', (await visible(p, '#btnMakeCancel')) && (await p.textContent('#makeProgText')).includes('1/3단계'), await p.textContent('#makeProgText'));
   await recv(p, { ...sel(1, 0), ids: ['other'] }); // 실행 중 선택이 바뀌어도 기준은 그대로
-  await recv(p, { type: 'EXTRACT_RESULT', tokens: [{ name: 'spacing/16', category: 'gap', value: 16 }], warnings: [], selection: 1 });
-  await p.waitForTimeout(50);
-  await recv(p, { type: 'CREATE_RESULT', created: 1, updated: 0, summary: 'ok', roles: 1 });
+  await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 1, updated: 1, summary: '', roles: 1, skippedManual: 0 });
   await p.waitForTimeout(80);
-  if ((await sent(p, 'CREATE_SEMANTICS')).length) { await recv(p, { type: 'SEMANTICS_RESULT', aliased: 1, created: 1, updated: 0, missing: [] }); await p.waitForTimeout(80); }
+  const ts = (await sent(p, 'CREATE_TEXT_STYLES')).at(-1);
+  check('17 텍스트 스타일 — 다시 스캔 없이 켠 줄(고친 이름) · applyTo = 시작 때 기준', ts?.styles?.[0]?.name === 'body/base' && ts.applyTo?.[0] === 'w1' && (await sent(p, 'SCAN_TEXT_STYLES')).length === scBefore, String((await sent(p, 'SCAN_TEXT_STYLES')).length));
+  await recv(p, { type: 'TEXT_STYLES_RESULT', reqId: ts.reqId, created: 1, updated: 0, bound: 1, missing: [], notes: [], applied: 3, applySkipped: 0 });
+  await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
-  check('17 연결 단계 — APPLY(preview 아님) · 시작 때 기준 · reqId', !!ap && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
-  check('17 마법사 중 [연결] 잠금', await locked(p, '#btnApplyConfirm'));
-  await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 2, reqId: ap.reqId });
-  await p.waitForTimeout(80);
-  const rn = (await sent(p, 'RENAME')).at(-1);
-  check('17 이름 정리도 시작 때 기준', rn?.nodeIds?.[0] === 'w1');
-  await recv(p, { type: 'RENAME_RESULT', changes: [{ id: 'a', before: 'Frame', after: 'card' }], nodes: [], applied: true });
+  check('17 연결 — APPLY(preview 아님) · skipTextStyleNodes · 시작 때 기준 · reqId', !!ap && ap.skipTextStyleNodes === true && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
+  check('17 실행 중 [연결] 잠금', await locked(p, '#btnApplyConfirm'));
+  await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   await p.waitForTimeout(120);
-  check('17 요약 "연결 5곳" · 연결 안내 링크 숨김', (await p.textContent('#wizardSummary')).includes('연결 5곳') && !(await p.textContent('#wizardSummary')).includes('연결은 아직') && (await p.$eval('#btnWizToBind', (e) => e.hidden)));
-  check('17 마법사 결과로 연결 화면 상태 줄 "🔗 …곳 연결"을 쓰지 않음', !(await p.textContent('#statusText')).startsWith('🔗'));
+  check('17 다 됨 → 첫 화면 · 상태 줄 "Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 5곳 연결"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 5곳 연결', await p.textContent('#statusText'));
+  check('17 실행 결과로 연결 화면 상태 줄 "🔗 …곳 연결"을 쓰지 않음', !(await p.textContent('#statusText')).startsWith('🔗'));
+  await p.close();
+}
+{
+  // 일부 실패(연결 0곳) — 결과만 · [닫기] 하나 / 바로 연결 끔 → 상태 줄 [연결하기 →] / 무료
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w2'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+  await p.waitForTimeout(30);
+  check('17 스타일 후보 0 → 텍스트 스타일 묶음 숨김 · Semantic 0 → 숨김', JSON.stringify(await p.$$eval('#makeTree .tr-group .tr-name', (e) => e.map((x) => x.textContent))) === JSON.stringify(['Global']));
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(60);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'no-match': 2 }, preview: false, reqId: ap.reqId });
+  await p.waitForTimeout(80);
+  const res = await p.$$eval('#makeResults .tr-head', (e) => e.map((x) => x.textContent));
+  check('17 일부 실패 — 화면에 남고 단계별 결과 · 끈 단계는 "껐음" · [닫기] 하나', (await visible(p, '#makeResults')) && res.some((x) => x.includes('연결') && x.includes('같은 곳이 없어요')) && res.some((x) => x.includes('껐음')) && (await p.textContent('#btnMakeRun')) === '닫기' && !(await visible(p, '#makeOpts')), JSON.stringify(res));
+  await p.click('#btnMakeRun');
+  check('17 [닫기] → 첫 화면', await visible(p, '#selHome'));
+  await p.close();
+}
+{
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w3'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  check('17 무료 — 텍스트 스타일 후보를 읽지 않음', (await sent(p, 'SCAN_TEXT_STYLES')).length === 0);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await p.waitForTimeout(30);
+  check('17 무료 — 잠금 상자 · 스위치 없음 · [연결 · 이름 정리 실행] · 다크 잠금', (await visible(p, '#makeFree')) && (await p.$$eval('#makeTree .bv-switch', (e) => e.length)) === 0 && (await p.textContent('#btnMakeRun')) === '연결 · 이름 정리 실행' && (await locked(p, '#makeOptDark')));
+  await p.click('#makeOptLink');
+  check('17 무료 — 바로 연결 · 이름 정리 둘 다 끄면 잠금 사유', (await lockMsg(p, '#btnMakeRun')) === '무료로는 연결 · 이름 정리만 할 수 있어요');
+  await p.click('#makeOptRename');
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  const rn = (await sent(p, 'RENAME')).at(-1);
+  check('17 무료 실행 — 만들기 없이 이름 정리만(기준 nodeIds · reqId)', (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).length === 0 && rn?.apply === true && rn.nodeIds?.[0] === 'w3' && typeof rn.reqId === 'number');
+  await recv(p, { type: 'RENAME_RESULT', reqId: rn.reqId, changes: [{ id: 'a', before: 'Frame', after: 'card' }], nodes: [], applied: true });
+  await p.waitForTimeout(100);
+  check('17 무료 다 됨 — "이름 1개 정리 · 변수는 만들지 않았어요 · 연결은 아직 안 했어요" + [연결하기 →]', (await p.textContent('#statusText')) === '이름 1개 정리 · 변수는 만들지 않았어요 · 연결은 아직 안 했어요' && (await p.textContent('#statusAction')) === '연결하기 →', await p.textContent('#statusText'));
+  await p.close();
+}
+
+/* ---------- 18 이름 정리 화면(IA v4 §4.4 · B.4) — 소속 트리 · 스위치 · [k개 이름 바꾸기] ---------- */
+{
+  const p = await open(480, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 0), ids: ['r0'], firstName: 'Product card' });
+  await p.click('#btnGoRename');
+  await p.waitForTimeout(30);
+  const rq = (await sent(p, 'RENAME')).at(-1);
+  check('18 들어오면 미리보기(조용한 읽기 · 기준 nodeIds · reqId)', rq?.apply === false && rq.nodeIds?.[0] === 'r0' && typeof rq.reqId === 'number');
+  await recv(p, { type: 'RENAME_RESULT', reqId: rq.reqId, applied: false, changes: [], nodes: [
+    { id: 'r0', name: 'Product card', type: 'FRAME', depth: 0, parentId: null, keep: 'root' },
+    { id: 'a', name: 'Frame 12', type: 'FRAME', depth: 1, parentId: 'r0', after: 'card-header', role: 'card-header' },
+    { id: 'a1', name: 'Ellipse 2', type: 'ELLIPSE', depth: 2, parentId: 'a', after: 'avatar' },
+    { id: 'k', name: 'Title', type: 'TEXT', depth: 1, parentId: 'r0', keep: 'text', role: 'title' },
+  ] });
+  await p.waitForTimeout(30);
+  const rows = await p.$$eval('#renameTree .tr', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+  check('18 소속 트리 — 그대로 조상 머리 "Product card 2개" · 바꿀 줄 · 보존 줄 숨김', rows.length === 3 && rows[0].includes('Product card') && rows[0].includes('2개') && rows[1].includes('Frame 12') && rows[1].includes('card-header') && !rows.some((x) => x.includes('Title')), JSON.stringify(rows));
+  check('18 머리 오른쪽 "Product card · 바꿀 이름 2개" · [2개 이름 바꾸기]', (await p.textContent('#subRight')) === 'Product card · 바꿀 이름 2개' && (await p.textContent('#btnRename')) === '2개 이름 바꾸기');
+  await p.click('#renameTree [data-tkey="a1"] .bv-switch');
+  check('18 하나 끔 → 머리 스위치 일부 · [1개 이름 바꾸기]', (await p.getAttribute('#renameTree [data-tkey="r0"] .bv-switch', 'aria-checked')) === 'mixed' && (await p.textContent('#btnRename')) === '1개 이름 바꾸기');
+  await p.click('#btnRename');
+  const ap = (await sent(p, 'RENAME_APPLY')).at(-1);
+  check('18 바꾸기 — 켠 줄 + 이름 그대로인 노드의 역할만(roleOnly) · reqId', !!ap && typeof ap.reqId === 'number' && JSON.stringify(ap.items.map((i) => i.id)) === JSON.stringify(['a', 'k']) && ap.items[1].after === 'Title', JSON.stringify(ap?.items));
+  await recv(p, { type: 'RENAME_RESULT', reqId: ap.reqId, applied: true, changes: [{ id: 'a', before: 'Frame 12', after: 'card-header' }], nodes: [] });
+  await p.waitForTimeout(60);
+  check('18 끝 → 첫 화면 · 상태 줄 "이름 1개 바꿈 · ⌘Z로 되돌리기"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === '이름 1개 바꿈 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
   await p.close();
 }
 

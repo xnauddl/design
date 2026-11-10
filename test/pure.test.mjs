@@ -1806,11 +1806,11 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */
 test('t — 키 조회·보간·폴백', () => {
-  assert.equal(t('rename.none'), '바꿀 이름이 없어요.');
-  assert.equal(t('rename.applied', { count: 3 }), '3개 이름 적용 완료.');
+  assert.equal(t('rename.none'), '바꿀 이름이 없어요');
+  assert.equal(t('rename.doneStatus', { k: 3 }), '이름 3개 바꿈 · ⌘Z로 되돌리기');
   assert.equal(t('export.saved', { format: 'CSS', file: 'tokens.css' }), 'CSS — tokens.css로 저장했어요.');
   // 누락 변수는 자리표시자 유지
-  assert.equal(t('rename.applied', {}), '{count}개 이름 적용 완료.');
+  assert.equal(t('rename.doneStatus', {}), '이름 {k}개 바꿈 · ⌘Z로 되돌리기');
   // 누락 키는 key 그대로 폴백
   assert.equal(t('no.such.key'), 'no.such.key');
   assert.equal(t('no.such.key', { a: 1 }), 'no.such.key');

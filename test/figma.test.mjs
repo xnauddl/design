@@ -27,6 +27,8 @@ import {
   applyExistingTextStyles,
   planExistingTextStyles,
   applyTextStyleRows,
+  applyRegisteredTextStyles,
+  textStyleCandidateTest,
   bindSelection,
   bindSelectedItems,
   countUsage,
@@ -4686,7 +4688,7 @@ test('bindSelectedItems — 칠하기 배열 쓰기가 실패하면 bound에 세
   assert.equal(ok.fills[0].boundVariables.color.id, blue.id);
 });
 
-test('applyExistingTextStyles — 이미 스타일 · 글자 변수 · 인스턴스 안쪽 · 섞인 서식은 건너뛰고 사유별로 센다', async () => {
+test('applyExistingTextStyles — 이미 스타일 · 인스턴스 안쪽 · 섞인 서식은 건너뛰고 사유별로 센다 · 글자 변수는 떼고 붙인다(§2.3-6)', async () => {
   const figma = installFigma();
   await createSemanticTextStyles([{ name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
   const style = figma._state.textStyles.find((s) => s.name === 'body');
@@ -4700,7 +4702,11 @@ test('applyExistingTextStyles — 이미 스타일 · 글자 변수 · 인스턴
   const ok = mk('ok');
   const hasStyle = mk('hasStyle', { textStyleId: 'S:remote' });
   const mixedStyle = mk('mixedStyle', { textStyleId: figma.mixed });
-  const boundVars = mk('boundVars', { boundVariables: { letterSpacing: [{ type: 'VARIABLE_ALIAS', id: 'VariableID:x' }] } });
+  const boundVars = mk('boundVars', {
+    boundVariables: { letterSpacing: [{ type: 'VARIABLE_ALIAS', id: 'VariableID:x' }] },
+    setRangeBoundVariable(s, e, f, v) { if (v == null) delete this.boundVariables[f]; },
+    setBoundVariable(f, v) { if (v == null) delete this.boundVariables[f]; },
+  });
   const mixed = mk('mixed', { fontSize: figma.mixed });
   const inInst = mk('inInst');
   const inst = { type: 'INSTANCE', id: 'inst', name: 'inst', visible: true, children: [inInst] };
@@ -4713,11 +4719,13 @@ test('applyExistingTextStyles — 이미 스타일 · 글자 변수 · 인스턴
 
   // 인스턴스 안쪽 프레임을 직접 고른 경우도 안쪽으로 본다.
   const r = await applyExistingTextStyles([root, instFrame]);
-  assert.equal(r.applied, 1);
+  assert.equal(r.applied, 2);
   assert.equal(ok._styleId, style.id);
-  for (const n of [hasStyle, mixedStyle, boundVars, mixed, inInst, deepInInst]) assert.equal(n._styleId, null, n.id);
-  assert.deepEqual(r.skipReasons, { hasStyle: 2, noStyle: 0, ambiguous: 0, boundVars: 1, mixed: 1, instance: 2 });
-  assert.equal(r.skipped, 6);
+  assert.equal(boundVars._styleId, style.id); // 글자 변수가 붙은 글자도 붙는다 — 연결은 뗀다
+  assert.equal(boundVars.boundVariables.letterSpacing, undefined);
+  for (const n of [hasStyle, mixedStyle, mixed, inInst, deepInInst]) assert.equal(n._styleId, null, n.id);
+  assert.deepEqual(r.skipReasons, { hasStyle: 2, noStyle: 0, ambiguous: 0, mixed: 1, instance: 2 });
+  assert.equal(r.skipped, 5);
 });
 
 test('applyExistingTextStyles — 스타일의 모든 글자 속성(대소문자·밑줄·문단 간격·들여쓰기)이 같아야 붙고, 같은 모양 둘이면 모호', async () => {
@@ -6039,4 +6047,328 @@ test('직접 만든 변수 지키기 — 다크: manual Semantic은 다시 걸�
   const r2 = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
   assert.deepEqual(r2, { created: 0, realiased: 1, skipped: 2 });
   assert.equal(f.figma._state.variables.length, count);
+});
+
+/* ================= B.4 — 텍스트 스타일 A+C · 바로 연결 · 만들기 미리보기 · reqId (IA v4 §2.3-6 · §4.3) ================= */
+/** 스타일 연결 · 변수 연결 풀기를 기록하는 글자 목. ranges: 구간 연결 풀기 기록. */
+function tsText(id, fontSize, extra = {}) {
+  return {
+    type: 'TEXT', id, name: id, visible: true, characters: 'Hello', fills: [],
+    fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    textStyleId: '', boundVariables: {}, unbound: [],
+    getRangeAllFontNames() { return [this.fontName]; },
+    getRangeBoundVariable() { return null; },
+    setBoundVariable(f, v) { if (v == null) { this.unbound.push(`node:${f}`); delete this.boundVariables[f]; } else this.boundVariables[f] = { type: 'VARIABLE_ALIAS', id: v.id }; },
+    setRangeBoundVariable(st, en, f, v) { if (v == null) { this.unbound.push(`range:${f}:${st}-${en}`); delete this.boundVariables[f]; } },
+    async setTextStyleIdAsync(sid) { this.textStyleId = sid; },
+    ...extra,
+  };
+}
+const BODY = { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' };
+const TITLE = { name: 'title', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Regular' };
+const alias = (id) => ({ type: 'VARIABLE_ALIAS', id });
+
+test('텍스트 스타일 규칙 C — 글자 변수(전체 · 구간)가 붙은 글자도 후보 · 붙일 때 8가지 연결을 모두 떼고 붙임 · 값이 다르면 건너뜀', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([BODY]);
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  const bound = tsText('bound', 16, {
+    boundVariables: { fontSize: [alias('v1')], fontFamily: alias('v2'), paragraphSpacing: [alias('v3')], fontWeight: [alias('v4')] },
+  });
+  const off = tsText('off', 17, { boundVariables: { fontSize: [alias('v1')] } });
+  const plan = await planExistingTextStyles([bound, off]);
+  assert.deepEqual(plan.rows.map((r) => [r.name, r.nodeIds]), [['body', ['bound']]]);
+  assert.equal(plan.skipReasons.noStyle, 1);
+  assert.equal('boundVars' in plan.skipReasons, false, 'boundVars 사유는 없다');
+  registerNodes(figma, [bound, off]);
+  const r = await applyTextStyleRows([{ styleId: body.id, nodeIds: ['bound', 'off'] }]);
+  assert.equal(r.applied, 1);
+  assert.equal(bound.textStyleId, body.id);
+  assert.deepEqual(bound.boundVariables, {}, '스타일이 정하는 글자 속성 연결은 모두 뗀다');
+  assert.ok(bound.unbound.includes('range:fontSize:0-5'), '구간 연결은 구간으로 뗀다');
+  assert.ok(bound.unbound.includes('range:paragraphSpacing:0-5'));
+  assert.ok(bound.unbound.includes('node:fontFamily'));
+  assert.equal(off.textStyleId, '', '값이 다르면 붙이지 않는다');
+  assert.deepEqual(off.boundVariables, { fontSize: [alias('v1')] }, '건너뛴 글자의 연결은 그대로');
+});
+
+test('createSemanticTextStyles — 글꼴: 값이 같은 Global STRING 변수(플러그인 Global 먼저 · 이름 순)를 스타일에 붙인다, 없으면 붙이지 않는다', async () => {
+  // 없음 → 붙이지 않음(새로 만들지 않음)
+  let figma = installFigma();
+  await createSemanticTextStyles([BODY]);
+  let st = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(st.boundVariables.fontFamily, undefined);
+  assert.equal(figma._state.variables.some((v) => v.resolvedType === 'STRING'), false);
+
+  // 사용자 Global(값만 있는 컬렉션)에만 있음 → 그것. 이름 순.
+  figma = installFigma();
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const zz = figma.variables.createVariable('zz/inter', prim, 'STRING');
+  zz.setValueForMode(prim.defaultModeId, 'Inter');
+  const aa = figma.variables.createVariable('aa/inter', prim, 'STRING');
+  aa.setValueForMode(prim.defaultModeId, 'Inter');
+  const other = figma.variables.createVariable('a/roboto', prim, 'STRING');
+  other.setValueForMode(prim.defaultModeId, 'Roboto');
+  const r = await createSemanticTextStyles([BODY]);
+  st = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(st.boundVariables.fontFamily.id, aa.id);
+  assert.deepEqual(r.styleIds, [st.id]);
+
+  // 플러그인 Global에도 있으면 플러그인 Global 먼저
+  await createTokens([{ name: 'font-family/Inter', category: 'fontFamily', sources: ['fontFamily'], value: 'Inter' }], 16);
+  const mine = findVar(figma, 'Global', 'font-family/Inter');
+  assert.ok(mine);
+  await createSemanticTextStyles([BODY]);
+  assert.equal(st.boundVariables.fontFamily.id, mine.id);
+});
+
+test('applyRegisteredTextStyles — 방금 등록한 스타일만 붙임(글자 변수는 뗌) · 값이 같은 글자만 셈 · 이미 그 스타일이면 세지 않음', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([TITLE]); // 다른 기존 스타일
+  const title = figma._state.textStyles.find((s) => s.name === 'title');
+  const r0 = await createSemanticTextStyles([BODY]);
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.deepEqual(r0.styleIds, [body.id]);
+  const plain = tsText('plain', 16);
+  const withVars = tsText('withVars', 16, { boundVariables: { lineHeight: [alias('v')] } });
+  const already = tsText('already', 16, { textStyleId: body.id });
+  const otherStyle = tsText('otherStyle', 16, { textStyleId: 'S:remote' });
+  const titleText = tsText('titleText', 24); // 다른 기존 스타일에 맞음 — 건드리지도 세지도 않음
+  const mixedText = tsText('mixedText', 16, { fontSize: figma.mixed }); // 범위 밖
+  const notSame = tsText('notSame', 15); // 범위 밖
+  const inInst = tsText('inInst', 16);
+  const instTitle = tsText('instTitle', 24);
+  const inst = { type: 'INSTANCE', id: 'inst', name: 'inst', visible: true, children: [inInst, instTitle] };
+  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, children: [plain, withVars, already, otherStyle, titleText, mixedText, notSame, inst] };
+  registerNodes(figma, [plain, withVars, already, otherStyle, titleText, mixedText, notSame, inInst, instTitle]);
+  const r = await applyRegisteredTextStyles([root], r0.styleIds);
+  assert.equal(r.applied, 2);
+  assert.equal(plain.textStyleId, body.id);
+  assert.equal(withVars.textStyleId, body.id);
+  assert.deepEqual(withVars.boundVariables, {});
+  assert.equal(titleText.textStyleId, '', '다른 기존 스타일 글자는 건드리지 않는다');
+  assert.equal(inInst.textStyleId, '');
+  assert.deepEqual(r.applyReasons, { hasStyle: 1, instance: 1, ambiguous: 0 });
+  assert.equal(r.applySkipped, 2);
+  assert.equal(title.id !== body.id, true);
+
+  // 같은 모양 스타일이 둘이면 모호
+  const dup = figma.createTextStyle();
+  Object.assign(dup, { name: 'body-copy', fontName: { family: 'Inter', style: 'Regular' }, fontSize: 16, lineHeight: { value: 24, unit: 'PIXELS' }, letterSpacing: { value: 0, unit: 'PIXELS' } });
+  const amb = tsText('amb', 16);
+  registerNodes(figma, [amb]);
+  const r2 = await applyRegisteredTextStyles([amb], [body.id]);
+  assert.equal(r2.applied, 0);
+  assert.deepEqual(r2.applyReasons, { hasStyle: 0, instance: 0, ambiguous: 1 });
+  assert.equal(r2.applySkipped, 1);
+});
+
+test('createUsageRoles · previewCreateTokens — tokenStates(new · update · reuse · manual · 같은 값 직접 만든 변수는 reuse) · roleRows(길이 = 역할 수)', async () => {
+  const figma = installFigma();
+  withRoot(figma);
+  const gcol = figma.variables.createVariableCollection('Global');
+  const same = figma.variables.createVariable('color/ff0000', gcol, 'COLOR');
+  same.setValueForMode(gcol.defaultModeId, { r: 1, g: 0, b: 0, a: 1 });
+  same.setPluginData('dsl.manual', '1');
+  const diff = figma.variables.createVariable('color/00ff00', gcol, 'COLOR');
+  diff.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
+  diff.setPluginData('dsl.manual', '1');
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const blue = figma.variables.createVariable('blue/500', prim, 'COLOR');
+  blue.scopes = ['ALL_SCOPES'];
+  blue.setValueForMode(prim.defaultModeId, rgbOf('#0066ff'));
+  const toks = [
+    colorTok('#0066ff', 'color/text'), // 사용자 Global 재사용
+    colorTok('#ff0000', 'color/border'), // 같은 이름 · 같은 값 직접 만든 변수
+    colorTok('#00ff00', 'color/icon'), // 같은 이름 · 값 다름 → manual
+    { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8, uses: [{ name: 'spacing/card/gap', count: 2 }] }, // 있음 → update
+    { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12, uses: [{ name: 'spacing/padding', count: 1 }] }, // 새로
+  ];
+  const s = await previewCreateTokens(toks, 16);
+  assert.deepEqual(Object.fromEntries(s.tokenStates), {
+    'color/0066ff': { state: 'reuse', varName: 'blue/500' },
+    'color/ff0000': { state: 'reuse', varName: 'color/ff0000' },
+    'color/00ff00': { state: 'manual' },
+    'spacing/8': { state: 'update' },
+    'spacing/12': { state: 'new' },
+  });
+  assert.equal(s.created + s.updated, 2);
+  const rows = [];
+  const roleToks = toks.filter((x) => !s.skippedManualNames.has(x.name));
+  const roles = await createUsageRoles(roleToks, true, s.globalOf, rows);
+  assert.equal(rows.length, roles);
+  const byToken = Object.fromEntries(rows.map((r) => [r.token, r]));
+  assert.equal(byToken['color/0066ff'].global, 'blue/500', 'globalOf의 변수 이름');
+  assert.equal(byToken['spacing/12'].global, 'spacing/12', '없으면 토큰 이름');
+  assert.equal(byToken['spacing/12'].name, 'spacing/padding');
+  assert.equal(byToken['color/00ff00'], undefined, '건너뛴 직접 만든 변수의 역할은 없다');
+  // 실제 만들기에는 rowsOut을 채우지 않는다
+  const rows2 = [];
+  await createUsageRoles(roleToks, false, s.globalOf, rows2);
+  assert.equal(rows2.length, 0);
+});
+
+test('bindSelection skipTextStyleNode — 텍스트 스타일 후보 글자의 글자 자리는 찾지 않는다(그 밖의 글자는 그대로)', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([BODY]);
+  const styled = tsText('styledCand', 16); // body와 값이 같음 → 후보
+  const notCand = tsText('notCand', 16, { lineHeight: { unit: 'PIXELS', value: 20 } }); // 값이 다름 → 후보 아님
+  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, fills: [], children: [styled, notCand] };
+  styled.parent = root;
+  notCand.parent = root;
+  const base = await bindSelection([root], false);
+  assert.ok(base.candidates.some((c) => c.nodeId === 'styledCand' && c.field === 'fontSize'));
+  const skipTextStyleNode = await textStyleCandidateTest();
+  assert.equal(skipTextStyleNode(styled), true);
+  assert.equal(skipTextStyleNode(notCand), false);
+  const r = await bindSelection([root], false, {}, { skipTextStyleNode });
+  assert.equal(r.candidates.some((c) => c.nodeId === 'styledCand'), false);
+  assert.ok(r.candidates.some((c) => c.nodeId === 'notCand' && c.field === 'fontSize'));
+});
+
+/* ---------- code.ts 메시지 처리(플러그인을 개발 빌드로 묶어 목 figma 위에서 돌린다) ---------- */
+let pluginSrc;
+async function loadPlugin(figma) {
+  if (!pluginSrc) {
+    const esbuild = await import('esbuild');
+    const { fileURLToPath } = await import('node:url');
+    const entry = fileURLToPath(new URL('../src/code.ts', import.meta.url));
+    const out = await esbuild.build({ entryPoints: [entry], bundle: true, write: false, format: 'iife', target: 'es2017', logLevel: 'silent', define: { __DEV__: 'true', __html__: '""' } });
+    pluginSrc = out.outputFiles[0].text;
+  }
+  const posted = [];
+  const store = {};
+  Object.assign(figma, {
+    showUI() {},
+    on() {},
+    commitUndo() { figma._undo = (figma._undo ?? 0) + 1; },
+    clientStorage: { getAsync: async (k) => store[k], setAsync: async (k, v) => { store[k] = v; }, deleteAsync: async (k) => { delete store[k]; } },
+    ui: { postMessage: (m) => posted.push(m), onmessage: null },
+    currentPage: { id: 'page', selection: [] },
+    root: { children: [], getPluginData: () => '', setPluginData() {}, findAllWithCriteria: () => [] },
+  });
+  if (!figma.getNodeByIdAsync) figma.getNodeByIdAsync = async () => null;
+  new Function(pluginSrc)();
+  await new Promise((r) => setTimeout(r, 0));
+  const send = async (m) => { posted.length = 0; await figma.ui.onmessage(m); return posted.slice(); };
+  await send({ type: 'SET_LICENSE', tier: 'paid' });
+  return { send, posted };
+}
+const ofType = (msgs, type) => msgs.filter((m) => m.type === type);
+
+test('code.ts — reqId를 돌려준다: EXTRACT · CREATE_TOKENS(미리보기 · 실제) · RENAME · RENAME_APPLY, 없으면 싣지 않는다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const fr = { type: 'FRAME', id: 'f', name: 'Frame 1', visible: true, fills: [], children: [], parent: { type: 'PAGE' }, setPluginData() {}, getPluginData: () => '' };
+  registerNodes(figma, [fr]);
+  let out = await p.send({ type: 'EXTRACT', nodeIds: ['f'], reqId: 7 });
+  assert.equal(ofType(out, 'EXTRACT_RESULT')[0].reqId, 7);
+  out = await p.send({ type: 'EXTRACT', nodeIds: ['f'] });
+  assert.equal('reqId' in ofType(out, 'EXTRACT_RESULT')[0], false);
+  const toks = [{ name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12, uses: [{ name: 'spacing/padding', count: 1 }] }];
+  out = await p.send({ type: 'CREATE_TOKENS', tokens: toks, base: 16, preview: true, reqId: 8 });
+  let cr = ofType(out, 'CREATE_RESULT')[0];
+  assert.equal(cr.reqId, 8);
+  assert.deepEqual(cr.tokenStates, { 'spacing/12': { state: 'new' } });
+  assert.deepEqual(cr.roleRows, [{ name: 'spacing/padding', global: 'spacing/12', token: 'spacing/12' }]);
+  assert.equal(cr.roleRows.length, cr.roles);
+  out = await p.send({ type: 'CREATE_TOKENS', tokens: toks, base: 16, reqId: 9 });
+  cr = ofType(out, 'CREATE_RESULT')[0];
+  assert.equal(cr.reqId, 9);
+  assert.equal(cr.tokenStates, undefined, '실제 만들기에는 싣지 않는다');
+  assert.equal(cr.roleRows, undefined);
+  out = await p.send({ type: 'RENAME', apply: false, maxDepth: 8, nodeIds: ['f'], reqId: 10 });
+  assert.equal(ofType(out, 'RENAME_RESULT')[0].reqId, 10);
+  out = await p.send({ type: 'RENAME_APPLY', items: [{ id: 'f', before: 'Frame 1', after: 'card' }], reqId: 11 });
+  const rr = ofType(out, 'RENAME_RESULT')[0];
+  assert.equal(rr.reqId, 11);
+  assert.equal(rr.applied, true);
+});
+
+test('code.ts — CREATE_TOKENS 미리보기: 값 다른 직접 만든 변수는 manual · 그 역할은 roleRows에 없다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const gcol = figma.variables.createVariableCollection('Global');
+  const diff = figma.variables.createVariable('color/00ff00', gcol, 'COLOR');
+  diff.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
+  diff.setPluginData('dsl.manual', '1');
+  const out = await p.send({ type: 'CREATE_TOKENS', tokens: [colorTok('#00ff00', 'color/icon'), colorTok('#123456', 'color/text')], base: 16, preview: true, reqId: 1 });
+  const cr = ofType(out, 'CREATE_RESULT')[0];
+  assert.equal(cr.tokenStates['color/00ff00'].state, 'manual');
+  assert.equal(cr.tokenStates['color/123456'].state, 'new');
+  assert.equal(cr.roleRows.length, cr.roles);
+  assert.equal(cr.roleRows.some((r) => r.token === 'color/00ff00'), false);
+});
+
+test('code.ts — SCAN_TEXT_STYLES: reqId 스캔은 기준 nodeIds를 읽고 existing을 싣고 lastTextSamples를 덮어쓰지 않는다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  await createSemanticTextStyles([TITLE]);
+  const small = tsText('small', 16);
+  const big = tsText('big', 40, { parent: { type: 'PAGE' } }); // resolveRoots는 붙어 있는 노드만
+  figma.currentPage.selection = [small];
+  registerNodes(figma, [small, big]);
+  let out = await p.send({ type: 'SCAN_TEXT_STYLES' }); // 지금 선택(16px)
+  let c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
+  assert.deepEqual(c.styles.map((s) => s.fontSize), [16]);
+  assert.equal(c.reqId, undefined);
+  assert.equal(c.existing, undefined);
+  out = await p.send({ type: 'SCAN_TEXT_STYLES', nodeIds: ['big'], reqId: 3 });
+  c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
+  assert.equal(c.reqId, 3);
+  assert.deepEqual(c.styles.map((s) => s.fontSize), [40]);
+  assert.deepEqual(c.existing, [{ name: 'title', sig: '24|36|0|Inter|Regular' }]);
+  // 「왼쪽 글자로 이름 채우기」는 reqId 없는 마지막 스캔(16px)을 쓴다
+  out = await p.send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
+  c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
+  assert.deepEqual(c.styles.map((s) => s.fontSize), [16]);
+});
+
+test('code.ts — CREATE_TEXT_STYLES applyTo: 등록 + 방금 스타일만 붙임 · applied/applySkipped/applyReasons · reqId · ⌘Z 한 번', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const t1 = tsText('t1', 16, { boundVariables: { fontSize: [alias('v')] } });
+  const t2 = tsText('t2', 16, { textStyleId: 'S:remote' });
+  const t3 = tsText('t3', 24);
+  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, children: [t1, t2, t3], parent: { type: 'PAGE' } };
+  registerNodes(figma, [root, t1, t2, t3]);
+  figma._undo = 0;
+  let out = await p.send({ type: 'CREATE_TEXT_STYLES', styles: [BODY], applyTo: ['root'], reqId: 5 });
+  const res = ofType(out, 'TEXT_STYLES_RESULT')[0];
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  assert.equal(res.reqId, 5);
+  assert.equal(res.created, 1);
+  assert.equal(res.applied, 1);
+  assert.equal(res.applySkipped, 1);
+  assert.deepEqual(res.applyReasons, { hasStyle: 1, instance: 0, ambiguous: 0 });
+  assert.equal(t1.textStyleId, body.id);
+  assert.deepEqual(t1.boundVariables, {});
+  assert.equal(t3.textStyleId, '');
+  assert.equal(figma._undo, 1, '등록과 적용이 ⌘Z 한 번');
+  // applyTo 없으면 결과에 applied 없음
+  out = await p.send({ type: 'CREATE_TEXT_STYLES', styles: [TITLE] });
+  const res2 = ofType(out, 'TEXT_STYLES_RESULT')[0];
+  assert.equal(res2.applied, undefined);
+  assert.equal(res2.reqId, undefined);
+  assert.equal(t3.textStyleId, '');
+});
+
+test('code.ts — APPLY skipTextStyleNodes: 실제 연결에서 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  await createSemanticTextStyles([BODY]);
+  const styled = tsText('styledCand', 16);
+  const notCand = tsText('notCand', 16, { lineHeight: { unit: 'PIXELS', value: 20 } });
+  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, fills: [], children: [styled, notCand], parent: { type: 'PAGE' } };
+  styled.parent = root;
+  notCand.parent = root;
+  const ranges = [];
+  for (const t of [styled, notCand]) t.setRangeBoundVariable = function (st, en, f, v) { if (v) { ranges.push(`${this.id}:${f}`); this.boundVariables[f] = [alias(v.id)]; } };
+  registerNodes(figma, [root, styled, notCand]);
+  const out = await p.send({ type: 'APPLY', preview: false, nodeIds: ['root'], reqId: 4, skipTextStyleNodes: true });
+  assert.equal(ofType(out, 'APPLY_RESULT')[0].reqId, 4);
+  assert.equal(ranges.some((x) => x.startsWith('styledCand:')), false);
+  assert.ok(ranges.includes('notCand:fontSize'));
 });

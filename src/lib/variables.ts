@@ -26,7 +26,7 @@ import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } fro
 import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
-import type { TextStyleSkipReason } from '../shared/messages';
+import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow } from '../shared/messages';
 
 export const GLOBAL = 'Global';
 export const SEMANTIC = 'Semantic';
@@ -163,6 +163,8 @@ export interface CreateSummary {
   skippedManual: number;
   /** 그 토큰 이름들 — 부르는 쪽이 쓰임 역할에서 뺀다. */
   skippedManualNames: Set<string>;
+  /** 토큰별 상태(미리보기만, IA v4 §4.3 상태 태그) — new · update(같은 이름 있음) · reuse(있는 변수 씀 + 그 이름) · manual(값 다른 직접 만든 변수). */
+  tokenStates?: Map<string, TokenState>;
 }
 
 /**
@@ -235,7 +237,12 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   const existing = new Set<string>();
   for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
 
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set() };
+  const states = new Map<string, TokenState>();
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), tokenStates: states };
+  // 같은 이름이 두 번 오면 첫 판정을 그대로 둔다(태그는 이름당 하나).
+  const setState = (name: string, st: TokenState): void => {
+    if (!states.has(name)) states.set(name, st);
+  };
   const seen = new Set<string>();
   const tally = (colId: string, name: string, kind: 'globals' | 'semantics'): void => {
     const k = vkey(colId, name);
@@ -257,6 +264,7 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
     const r = reuse.get(t.name);
     if (r) {
       summary.globalOf.set(t.name, r.id);
+      setState(t.name, { state: 'reuse', varName: r.name });
       continue;
     }
     const mine = manualByName.get(t.name);
@@ -264,13 +272,16 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
       const type = resolvedTypeForToken(t);
       if (!summary.skippedManualNames.has(t.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gCol.defaultModeId], literalOf(t, type, base), type)) {
         summary.globalOf.set(t.name, mine.id);
+        setState(t.name, { state: 'reuse', varName: mine.name });
       } else if (!summary.skippedManualNames.has(t.name)) {
         summary.globalOf.delete(t.name);
         summary.skippedManualNames.add(t.name);
         summary.skippedManual++;
+        states.set(t.name, { state: 'manual' }); // 같은 실행의 두 번째가 값이 달라도 건너뜀이 이긴다(위 판정과 같게)
       }
       continue;
     }
+    setState(t.name, { state: existing.has(vkey(gId, t.name)) ? 'update' : 'new' });
     tally(gId, t.name, 'globals');
   }
   return summary;
@@ -281,8 +292,9 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
  * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 번호(12.5): 같은 값이 이미 있으면 그 이름을
  * 쓰고(만들지 않음), 다른 값이 차지했으면 다음 번호. 이미 있는 역할의 값은 바꾸지 않는다.
  * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
+ * rowsOut을 주면 preview일 때 셀 역할마다 {이름, 가리킬 Global 이름, 만든 토큰 이름}을 넣는다(IA v4 §4.3 `roleRows` — 길이 = 반환값).
  */
-export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>): Promise<number> {
+export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[]): Promise<number> {
   const withUses = tokens.filter((t) => t.uses?.length);
   if (!withUses.length) return 0;
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -355,7 +367,15 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     if (existing.has(name) || toMake.has(name)) continue; // 같은 값이 이미 있음(재사용)
     toMake.set(name, r.token);
   }
-  if (preview) return toMake.size;
+  if (preview) {
+    if (rowsOut) {
+      for (const [name, t] of toMake) {
+        const id = globalOf?.get(t.name);
+        rowsOut.push({ name, global: (id && byId.get(id)?.name) || t.name, token: t.name });
+      }
+    }
+    return toMake.size;
+  }
   if (!toMake.size) return 0;
   const col = ensureOwnedCollection(cols, 'semantic'); // 쓰임 역할은 플러그인 Semantic에만(13.6)
   let made = 0;
@@ -755,6 +775,26 @@ export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
   return out;
 }
 
+/**
+ * 글꼴 이름 → 값이 같은 Global STRING 변수(계층이 Global인 컬렉션 — 플러그인 Global · 사용자 Global 모두).
+ * 여럿이면 플러그인 Global 먼저, 그다음 이름 순(IA v4 §4.3 "스타일의 글꼴 변수"). 없으면 undefined.
+ */
+async function globalFamilyVars(): Promise<(family: string) => Variable | undefined> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const tiers = collectionTiers(cols, vars);
+  const pluginGlobalId = ownedCollection(cols, 'global')?.id;
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const list = vars
+    .filter((v) => v.resolvedType === 'STRING' && tiers.get(v.variableCollectionId) === 1)
+    .sort((a, b) => {
+      const pa = a.variableCollectionId === pluginGlobalId ? 0 : 1;
+      const pb = b.variableCollectionId === pluginGlobalId ? 0 : 1;
+      return pa - pb || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+  return (family) => list.find((v) => directValue(v, modeOf) === family);
+}
+
 export interface TextStyleResult {
   created: number;
   updated: number;
@@ -764,6 +804,8 @@ export interface TextStyleResult {
   missing: string[];
   /** 경고가 아닌 알림(의도된 미바인딩 등). missing과 섞으면 정상 동작이 경고로 읽힌다. */
   notes: string[];
+  /** 이번에 만들거나 고친 스타일 id(바로 연결이 이 스타일만 붙인다 — IA v4 §4.3 "타이포 등록"). */
+  styleIds: string[];
 }
 
 /**
@@ -773,7 +815,7 @@ export interface TextStyleResult {
  * 되돌릴 때 무엇까지 되돌려야 하는지가 흐려진다.
  */
 export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<TextStyleResult> {
-  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [] };
+  const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
   if (!specs.length) return res;
 
   // 0) 재스캔 rename 준비: boundStyleId가 **실제로 존재하는** 스타일을 가리킬 때만 rename.
@@ -928,6 +970,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   if (semId)
     for (const v of await figma.variables.getLocalVariablesAsync())
       if (v.variableCollectionId === semId) semByName.set(v.name, v);
+  const familyVarFor = await globalFamilyVars();
 
   // 3) 텍스트 스타일 upsert + 시맨틱 바인딩. 유효 boundStyleId만 rename(이름만, 타이포 보존).
   //    이름 충돌로 막힌 rename은 스타일·바인딩을 그대로 두고 스킵(위에서 missing 보고됨).
@@ -1037,7 +1080,14 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(`letter-spacing/${bindRole}`);
       }
     }
+    // 글꼴 — 값이 같은 Global STRING 변수가 있으면 붙인다(IA v4 §4.3 "스타일의 글꼴 변수"). 없으면 만들지 않는다.
+    const famVar = familyVarFor(style.fontName.family);
+    if (famVar) {
+      style.setBoundVariable('fontFamily', famVar);
+      res.bound++;
+    }
     res[created ? 'created' : 'updated']++;
+    if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
     styleByName.set(style.name, style);
   }
 
@@ -1098,16 +1148,55 @@ function isMixedTypography(t: TextNode): boolean {
   );
 }
 
-const TEXT_VAR_FIELDS = ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily'] as const;
+/** 텍스트 스타일이 정하는 글자 속성 중 변수를 붙일 수 있는 것(IA v4 §2.3-6의 8가지). */
+const STYLE_TEXT_VAR_FIELDS = ['fontFamily', 'fontSize', 'fontStyle', 'fontWeight', 'letterSpacing', 'lineHeight', 'paragraphSpacing', 'paragraphIndent'] as const;
 
-/** 글자 속성(크기·줄 높이·자간·글꼴)에 변수가 하나라도 붙었는가(일부 구간·지워진 변수 포함). */
-function hasTextVarBinding(t: TextNode): boolean {
+/**
+ * 스타일을 붙이기 직전 — 그 글자의 글자 속성 변수 연결을 모두 뗀다(전체 · 구간, IA v4 §2.3-6).
+ * 값이 스타일과 같은 글자만 오므로 모습은 바뀌지 않는다. 구간 연결을 풀려면 글꼴이 불려 있어야 한다(부르는 쪽이 부른다).
+ */
+function unbindStyleTextVars(t: TextNode): void {
   const bv = (t as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
-  if (!bv) return false;
-  return TEXT_VAR_FIELDS.some((f) => {
+  if (!bv) return;
+  const len = typeof t.characters === 'string' ? t.characters.length : 0;
+  const node = t as unknown as {
+    setBoundVariable?: (f: string, v: null) => void;
+    setRangeBoundVariable?: (s: number, e: number, f: string, v: null) => void;
+  };
+  for (const f of STYLE_TEXT_VAR_FIELDS) {
     const e = bv[f];
-    return Array.isArray(e) ? e.length > 0 : !!e;
-  });
+    if (!(Array.isArray(e) ? e.length > 0 : !!e)) continue;
+    if (len > 0 && node.setRangeBoundVariable) node.setRangeBoundVariable(0, len, f, null);
+    try {
+      node.setBoundVariable?.(f, null);
+    } catch {
+      /* 구간으로 이미 뗐다 — 전체 연결이 없는 속성은 피그마가 거절할 수 있다 */
+    }
+  }
+}
+
+/** 이 글자의 모든 글꼴을 불러온다(구간 연결 풀기 · 스타일 붙이기 전). */
+async function loadTextFonts(t: TextNode, loaded: Set<string>): Promise<void> {
+  const len = typeof t.characters === 'string' ? t.characters.length : 0;
+  const fonts: FontName[] =
+    len > 0 && typeof (t as { getRangeAllFontNames?: unknown }).getRangeAllFontNames === 'function'
+      ? t.getRangeAllFontNames(0, len)
+      : t.fontName !== figma.mixed
+        ? [t.fontName as FontName]
+        : [];
+  for (const fn of fonts) {
+    const k = `${fn.family} ${fn.style}`;
+    if (loaded.has(k)) continue;
+    await figma.loadFontAsync(fn);
+    loaded.add(k);
+  }
+}
+
+/** 글자 변수 연결을 떼고 스타일을 붙인다(IA v4 §2.3-6). 글꼴을 못 불러오면 던진다. */
+async function attachTextStyle(t: TextNode, styleId: string, loaded: Set<string>): Promise<void> {
+  await loadTextFonts(t, loaded);
+  unbindStyleTextVars(t);
+  await t.setTextStyleIdAsync(styleId);
 }
 
 /** 텍스트 스타일이 붙어 있는가(원격 스타일·일부 구간(mixed) 포함). */
@@ -1124,8 +1213,8 @@ function insideInstance(node: SceneNode): boolean {
 
 /**
  * 적용만(생성 없음, IA v3 §4.6): 선택 텍스트를 모든 글자 속성이 같은 **기존** 로컬 스타일에 연결한다.
- * 건너뛰는 글자(§2.11): 이미 텍스트 스타일이 있음 · 글자 속성에 변수가 있음 · 인스턴스 안쪽 ·
- * 서식이 섞임 · 같은 스타일이 없음 · 같은 모양 스타일이 둘 이상. 스타일·변수는 만들거나 고치지 않는다.
+ * 건너뛰는 글자(§2.11): 이미 텍스트 스타일이 있음 · 인스턴스 안쪽 ·
+ * 서식이 섞임 · 같은 스타일이 없음 · 같은 모양 스타일이 둘 이상. 글자 변수가 붙은 글자는 연결을 떼고 붙인다(IA v4 §2.3-6). 스타일·변수는 만들거나 고치지 않는다.
  */
 /** 텍스트 스타일 미리보기의 줄 — 스타일 하나와 붙을 글자 레이어들(IA v4 §4.2). */
 export interface TextStylePlanRow {
@@ -1142,10 +1231,20 @@ async function textStyleIndex(): Promise<Map<string, TextStyle | null>> {
   }
   return styleByKey;
 }
+/** 루트들 안의 글자 — 인스턴스 밖(texts)과 안쪽(inInstance)으로 나눈다(계획 · 바로 연결 공통). */
+function planTexts(nodes: readonly SceneNode[]): { texts: TextNode[]; inInstance: TextNode[] } {
+  const texts: TextNode[] = [];
+  const inInstance: TextNode[] = [];
+  for (const n of nodes) {
+    if (insideInstance(n)) walkText(n, inInstance);
+    else walkText(n, texts, inInstance);
+  }
+  return { texts, inInstance };
+}
 /** 이 글자에 붙일 수 있는 스타일(없으면 건너뜀 사유). */
 function textStyleFor(t: TextNode, styleByKey: Map<string, TextStyle | null>): TextStyle | TextStyleSkipReason {
   if (hasTextStyle(t)) return 'hasStyle';
-  if (hasTextVarBinding(t)) return 'boundVars';
+  // 글자 변수가 붙어 있어도 후보다 — 붙일 때 그 연결을 뗀다(IA v4 §2.3-6).
   if (isMixedTypography(t)) return 'mixed';
   const hit = styleByKey.get(typoKey(t as unknown as TypoFields));
   if (hit === undefined) return 'noStyle';
@@ -1157,14 +1256,9 @@ function textStyleFor(t: TextNode, styleByKey: Map<string, TextStyle | null>): T
  * 사유는 레이어 단위로 센다(연결 화면 건너뜀 칩 "레이어 n개").
  */
 export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promise<{ rows: TextStylePlanRow[]; skipReasons: Record<TextStyleSkipReason, number> }> {
-  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
   const styleByKey = await textStyleIndex();
-  const texts: TextNode[] = [];
-  const inInstance: TextNode[] = [];
-  for (const n of nodes) {
-    if (insideInstance(n)) walkText(n, inInstance);
-    else walkText(n, texts, inInstance);
-  }
+  const { texts, inInstance } = planTexts(nodes);
   skipReasons.instance += inInstance.length;
   const rows = new Map<string, TextStylePlanRow>();
   for (const t of texts) {
@@ -1181,7 +1275,7 @@ export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promi
  * 반환: 붙인 레이어 수 · 건너뛴 사유.
  */
 export async function applyTextStyleRows(rows: readonly { styleId: string; nodeIds: readonly string[] }[]): Promise<ApplyTextStylesResult> {
-  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
   const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
   const styleByKey = await textStyleIndex();
   const loaded = new Set<string>();
@@ -1192,10 +1286,7 @@ export async function applyTextStyleRows(rows: readonly { styleId: string; nodeI
       const r = textStyleFor(t as TextNode, styleByKey);
       if (typeof r === 'string' || r.id !== row.styleId) { skipReasons[typeof r === 'string' ? r : 'noStyle']++; res.skipped++; continue; }
       try {
-        const fn = (t as TextNode).fontName as FontName;
-        const k = `${fn.family} ${fn.style}`;
-        if (!loaded.has(k)) { await figma.loadFontAsync(fn); loaded.add(k); }
-        await (t as TextNode).setTextStyleIdAsync(r.id);
+        await attachTextStyle(t as TextNode, r.id, loaded);
         res.applied++;
       } catch {
         /* 폰트를 못 불러옴 */
@@ -1205,8 +1296,69 @@ export async function applyTextStyleRows(rows: readonly { styleId: string; nodeI
   return res;
 }
 
+/**
+ * 텍스트 스타일 후보 판정(연결의 "텍스트 스타일이 먼저" — IA v4 §4.2 · §4.3 `APPLY.skipTextStyleNodes`).
+ * `planExistingTextStyles`가 줄에 넣을 글자(인스턴스 밖 · 붙일 로컬 스타일이 하나로 정해짐)면 true.
+ */
+export async function textStyleCandidateTest(): Promise<(t: TextNode) => boolean> {
+  const styleByKey = await textStyleIndex();
+  return (t) => !insideInstance(t) && typeof textStyleFor(t, styleByKey) !== 'string';
+}
+
+/** 타이포 등록 · 바로 연결 결과(IA v4 §4.3 "타이포 등록"). */
+export interface ApplyRegisteredResult {
+  applied: number;
+  applySkipped: number;
+  applyReasons: Record<TextStyleApplySkipReason, number>;
+}
+
+/**
+ * 방금 등록 · 갱신한 스타일(styleIds)만 roots 안 글자에 붙인다(IA v4 §4.3 "타이포 등록" — 연결 화면과 같은 계획 ·
+ * §2.3-6대로 글자 변수 연결을 떼고). 세는 범위는 값(`typoKey`)이 그 스타일과 같은 글자뿐: 이미 바로 그 스타일이
+ * 붙은 글자는 세지 않고, 못 붙인 글자는 다른 스타일이 붙음(hasStyle) · 인스턴스 안쪽(instance) · 같은 모양 스타일
+ * 여럿(ambiguous)으로 센다. 서식이 섞인 글자는 값이 하나로 정해지지 않아 범위 밖이다.
+ */
+export async function applyRegisteredTextStyles(roots: readonly SceneNode[], styleIds: readonly string[]): Promise<ApplyRegisteredResult> {
+  const applyReasons: Record<TextStyleApplySkipReason, number> = { hasStyle: 0, instance: 0, ambiguous: 0 };
+  const out: ApplyRegisteredResult = { applied: 0, applySkipped: 0, applyReasons };
+  if (!styleIds.length) return out;
+  const ids = new Set(styleIds);
+  // 방금 스타일의 값 열쇠 → 스타일 id
+  const idByKey = new Map<string, string>();
+  for (const st of await figma.getLocalTextStylesAsync()) if (ids.has(st.id)) idByKey.set(typoKey(st as unknown as TypoFields), st.id);
+  if (!idByKey.size) return out;
+  const keyOf = (t: TextNode): string | undefined => (isMixedTypography(t) ? undefined : typoKey(t as unknown as TypoFields));
+  const plan = planTexts(roots);
+  const skipped = (k: TextStyleApplySkipReason): void => {
+    applyReasons[k]++;
+    out.applySkipped++;
+  };
+  for (const t of plan.inInstance) if (idByKey.has(keyOf(t) ?? '\u0000')) skipped('instance');
+  const rows = new Map<string, string[]>();
+  const styleByKey = await textStyleIndex();
+  for (const t of plan.texts) {
+    const k = keyOf(t);
+    if (k === undefined || !idByKey.has(k)) continue; // 범위 밖(값이 방금 스타일과 다름 · 섞인 서식)
+    const r = textStyleFor(t, styleByKey);
+    if (r === 'hasStyle') {
+      if ((t as { textStyleId?: unknown }).textStyleId !== idByKey.get(k)) skipped('hasStyle'); // 바로 그 스타일이면 세지 않음
+      continue;
+    }
+    if (r === 'ambiguous') { skipped('ambiguous'); continue; }
+    if (typeof r === 'string' || !ids.has(r.id)) continue;
+    const arr = rows.get(r.id) ?? [];
+    arr.push(t.id);
+    rows.set(r.id, arr);
+  }
+  if (rows.size) {
+    const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
+    out.applied = r.applied;
+  }
+  return out;
+}
+
 export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Promise<ApplyTextStylesResult> {
-  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, boundVars: 0, mixed: 0, instance: 0 };
+  const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
   const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
   const skipText = (k: TextStyleSkipReason): void => {
     skipReasons[k]++;
@@ -1223,27 +1375,17 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
   for (let i = 0; i < inInstance.length; i++) skipText('instance');
 
   const loaded = new Set<string>();
-  const ensureFont = async (fn: FontName): Promise<void> => {
-    const k = `${fn.family} ${fn.style}`;
-    if (loaded.has(k)) return;
-    await figma.loadFontAsync(fn);
-    loaded.add(k);
-  };
 
   for (const t of texts) {
     if (hasTextStyle(t)) {
       skipText('hasStyle');
       continue;
     }
-    if (hasTextVarBinding(t)) {
-      skipText('boundVars');
-      continue;
-    }
+    // 글자 변수가 붙은 글자도 붙인다 — 연결을 떼고(IA v4 §2.3-6).
     if (isMixedTypography(t)) {
       skipText('mixed');
       continue;
     }
-    const fn = t.fontName as FontName;
     const hit = styleByKey.get(typoKey(t as unknown as TypoFields));
     if (hit === undefined) {
       skipText('noStyle');
@@ -1254,8 +1396,7 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
       continue;
     }
     try {
-      await ensureFont(fn);
-      await t.setTextStyleIdAsync(hit.id);
+      await attachTextStyle(t, hit.id, loaded);
       res.applied++;
     } catch {
       /* 폰트를 못 불러옴 — 적용 수에 넣지 않는다(결과 줄은 적용 수 + 건너뜀 사유만 보인다) */
