@@ -310,6 +310,28 @@ function stateReason(s: SlotState): 'already-bound' | 'deleted-var' | null {
   return s === 'bound' ? 'already-bound' : s === 'deleted' ? 'deleted-var' : null;
 }
 
+/**
+ * 비율이 잠긴 레이어(ia-v3 §2.11 "비율 고정") — 피그마는 크기 변수를 한 축만 붙여 둔다(세로를 붙이면 가로 연결이 풀린다).
+ * 새 API(targetAspectRatio)와 낡은 API(constrainProportions)를 둘 다 본다.
+ */
+function aspectLocked(n: SceneNode): boolean {
+  const x = n as unknown as { targetAspectRatio?: unknown; constrainProportions?: boolean };
+  return x.targetAspectRatio != null || x.constrainProportions === true;
+}
+/** 잠긴 레이어의 크기 연결 상태 — 두 축 중 연결된 축 하나로(삭제된 변수가 먼저). */
+function lockedSizeState(n: SceneNode): { state: SlotState; field: 'width' | 'height' } {
+  const w = nodeFieldState(n, 'width');
+  const h = nodeFieldState(n, 'height');
+  if (w === 'deleted' || h === 'deleted') return { state: 'deleted', field: w === 'deleted' ? 'width' : 'height' };
+  if (w === 'bound' || h === 'bound') return { state: 'bound', field: w === 'bound' ? 'width' : 'height' };
+  return { state: 'none', field: 'width' };
+}
+/** 잠긴 레이어에서 볼 축 — FIXED인 축 하나(가로 먼저). 둘 다 HUG/FILL이면 null. */
+function lockedAxis(n: SceneNode): 'width' | 'height' | null {
+  const x = n as unknown as { layoutSizingHorizontal?: string; layoutSizingVertical?: string };
+  return x.layoutSizingHorizontal === 'FIXED' ? 'width' : x.layoutSizingVertical === 'FIXED' ? 'height' : null;
+}
+
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
 function isEffectivelyVisible(node: SceneNode): boolean {
   let p: BaseNode | null = node;
@@ -877,8 +899,20 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
         const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
         tryBind(ctx, node, field, v, `size/${kind}`, fraction ? 'size-fraction' : undefined);
       };
-      bindAxis(node.layoutSizingHorizontal, 'width', node.width);
-      bindAxis(node.layoutSizingVertical, 'height', node.height);
+      if (aspectLocked(node)) {
+        // 한 자리로 본다: 이미 연결 → 볼 축(FIXED 하나) → 소수(§2.11 "비율 고정").
+        const ls = lockedSizeState(node);
+        const st = stateReason(ls.state);
+        if (st) note(res, st, node, preview, ls.field);
+        else {
+          const axis = lockedAxis(node);
+          if (!axis) note(res, 'hug-fill', node, preview, 'width');
+          else bindAxis('FIXED', axis, axis === 'width' ? node.width : node.height);
+        }
+      } else {
+        bindAxis(node.layoutSizingHorizontal, 'width', node.width);
+        bindAxis(node.layoutSizingVertical, 'height', node.height);
+      }
     } else {
       note(res, 'size-free-layout', node, preview);
     }
@@ -1280,6 +1314,18 @@ export async function bindSelectedItems(
         if ((it.field === 'width' || it.field === 'height') && !isSizeTarget(node)) {
           fail('changed', node, it.field);
           continue;
+        }
+        // 비율 잠김 — 볼 축 하나만 붙인다. 한 축이라도 이미 붙었으면(이 묶음에서 방금 붙인 것 포함) 그 사유로(§2.11 "비율 고정").
+        if ((it.field === 'width' || it.field === 'height') && aspectLocked(node)) {
+          const ls = stateReason(lockedSizeState(node).state);
+          if (ls) {
+            fail(ls, node, it.field);
+            continue;
+          }
+          if (lockedAxis(node) !== it.field) {
+            fail('changed', node, it.field);
+            continue;
+          }
         }
         const st = stateReason(nodeFieldState(node, it.field));
         if (st) {

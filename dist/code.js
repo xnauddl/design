@@ -3949,6 +3949,21 @@
   function stateReason(s) {
     return s === "bound" ? "already-bound" : s === "deleted" ? "deleted-var" : null;
   }
+  function aspectLocked(n) {
+    const x = n;
+    return x.targetAspectRatio != null || x.constrainProportions === true;
+  }
+  function lockedSizeState(n) {
+    const w = nodeFieldState(n, "width");
+    const h = nodeFieldState(n, "height");
+    if (w === "deleted" || h === "deleted") return { state: "deleted", field: w === "deleted" ? "width" : "height" };
+    if (w === "bound" || h === "bound") return { state: "bound", field: w === "bound" ? "width" : "height" };
+    return { state: "none", field: "width" };
+  }
+  function lockedAxis(n) {
+    const x = n;
+    return x.layoutSizingHorizontal === "FIXED" ? "width" : x.layoutSizingVertical === "FIXED" ? "height" : null;
+  }
   function isEffectivelyVisible2(node) {
     let p = node;
     while (p) {
@@ -4358,8 +4373,19 @@
           const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
           tryBind(ctx, node, field, v, `size/${kind}`, fraction ? "size-fraction" : void 0);
         };
-        bindAxis(node.layoutSizingHorizontal, "width", node.width);
-        bindAxis(node.layoutSizingVertical, "height", node.height);
+        if (aspectLocked(node)) {
+          const ls = lockedSizeState(node);
+          const st = stateReason(ls.state);
+          if (st) note(res, st, node, preview, ls.field);
+          else {
+            const axis = lockedAxis(node);
+            if (!axis) note(res, "hug-fill", node, preview, "width");
+            else bindAxis("FIXED", axis, axis === "width" ? node.width : node.height);
+          }
+        } else {
+          bindAxis(node.layoutSizingHorizontal, "width", node.width);
+          bindAxis(node.layoutSizingVertical, "height", node.height);
+        }
       } else {
         note(res, "size-free-layout", node, preview);
       }
@@ -4661,6 +4687,17 @@
           if ((it.field === "width" || it.field === "height") && !isSizeTarget(node)) {
             fail("changed", node, it.field);
             continue;
+          }
+          if ((it.field === "width" || it.field === "height") && aspectLocked(node)) {
+            const ls = stateReason(lockedSizeState(node).state);
+            if (ls) {
+              fail(ls, node, it.field);
+              continue;
+            }
+            if (lockedAxis(node) !== it.field) {
+              fail("changed", node, it.field);
+              continue;
+            }
           }
           const st = stateReason(nodeFieldState(node, it.field));
           if (st) {

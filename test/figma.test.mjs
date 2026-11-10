@@ -5087,6 +5087,89 @@ function sizeFixtures() {
   return { ok, no, root };
 }
 
+/* ---------- 비율 고정 레이어의 크기는 한 자리 (ia-v3 §2.11 "비율 고정", 2026-11-10 실기 확인 · 실험) ---------- */
+/** 오토레이아웃 부모 안의 20×20 아이콘 — setBoundVariable은 피그마처럼 비율이 잠겼으면 다른 축 연결을 지운다. */
+function lockedIcon(id, extra = {}) {
+  const icon = sizedFrame(id, 20, 20, {
+    children: [vec(`${id}-v`)],
+    constrainProportions: true,
+    setBoundVariable(field, v) {
+      this.boundVariables ??= {};
+      const locked = this.constrainProportions === true || this.targetAspectRatio != null;
+      if (locked && (field === 'width' || field === 'height')) delete this.boundVariables[field === 'width' ? 'height' : 'width'];
+      this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+    },
+    ...extra,
+  });
+  const root = { type: 'FRAME', id: `${id}-root`, name: 'root', fills: [], layoutMode: 'HORIZONTAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [icon], setBoundVariable() {} };
+  icon.parent = root;
+  return icon;
+}
+const sizeCands = (r) => r.candidates.filter((c) => c.field === 'width' || c.field === 'height').map((c) => c.field);
+
+test('비율 고정 — 비어 있으면 가로만 후보(세로는 찾지도 세지도 않음)', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const dry = await bindSelection([lockedIcon('a')], false);
+  assert.deepEqual(sizeCands(dry), ['width']);
+});
+
+test('비율 고정 — 가로만 연결돼 있으면 후보 0 · already-bound 1(세로를 다시 연결할 곳으로 세지 않음)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const v = findVar(figma, 'Global', 'size/20');
+  const n = lockedIcon('b', { boundVariables: { width: { type: 'VARIABLE_ALIAS', id: v.id } } });
+  const dry = await bindSelection([n], false);
+  assert.deepEqual(sizeCands(dry), []);
+  assert.equal(dry.reasons['already-bound'], 1);
+});
+
+test('비율 고정 — 가로 HUG · 세로 FIXED면 세로 1개, 가로 HUG(연결됨)면 후보 0 · already-bound 1', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const dry = await bindSelection([lockedIcon('c', { layoutSizingHorizontal: 'HUG' })], false);
+  assert.deepEqual(sizeCands(dry), ['height']);
+  const v = findVar(figma, 'Global', 'size/20');
+  const dry2 = await bindSelection([lockedIcon('c2', { layoutSizingHorizontal: 'HUG', boundVariables: { width: { type: 'VARIABLE_ALIAS', id: v.id } } })], false);
+  assert.deepEqual(sizeCands(dry2), []);
+  assert.equal(dry2.reasons['already-bound'], 1);
+});
+
+test('비율 고정 — 가로가 삭제된 변수에 연결돼 있으면 후보 0 · deleted-var 1', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const n = lockedIcon('d', { boundVariables: { width: { type: 'VARIABLE_ALIAS', id: 'VariableID:gone' } } });
+  const dry = await bindSelection([n], false);
+  assert.deepEqual(sizeCands(dry), []);
+  assert.equal(dry.reasons['deleted-var'], 1);
+});
+
+test('비율 고정 — 잠김 꺼짐이면 두 축, targetAspectRatio로만 잠겨도 한 자리', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const off = await bindSelection([lockedIcon('e', { constrainProportions: false })], false);
+  assert.deepEqual(sizeCands(off), ['width', 'height']);
+  const tar = await bindSelection([lockedIcon('f', { constrainProportions: false, targetAspectRatio: { x: 1, y: 1 } })], false);
+  assert.deepEqual(sizeCands(tar), ['width']);
+});
+
+test('비율 고정 — 연결 직전 다시 확인: width · height를 함께 보내면 width만 붙고 height는 changed', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const v = findVar(figma, 'Global', 'size/20');
+  const n = lockedIcon('g');
+  const known = new Map([[n.id, n]]);
+  const r = await bindSelectedItems([{ nodeId: n.id, field: 'width', variableId: v.id }, { nodeId: n.id, field: 'height', variableId: v.id }], {}, known);
+  assert.equal(r.bound, 1);
+  assert.deepEqual(Object.keys(n.boundVariables), ['width']);
+  assert.equal(r.reasons['already-bound'], 1); // 이미 연결이 먼저(방금 붙인 가로) — 세로를 붙여 가로를 풀지 않는다
+  // 세로만 보내면(볼 축이 아님) changed
+  const n2 = lockedIcon('g2');
+  const r2 = await bindSelectedItems([{ nodeId: n2.id, field: 'height', variableId: v.id }], {}, new Map([[n2.id, n2]]));
+  assert.equal(r2.bound, 0);
+  assert.equal(r2.reasons.changed, 1);
+});
+
 test('isIconOrAvatar — 아이콘 · 아바타만 참', () => {
   const figma = installFigma();
   const { ok, no } = sizeFixtures();
