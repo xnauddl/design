@@ -37,7 +37,7 @@ export function mergeSameNameTokens(tokens: readonly DraftToken[]): DraftToken[]
       out.push(copy);
       continue;
     }
-    // 같은 이름은 같은 hex(색 이름 정리) — 합친 토큰은 color로 본다(§4.3).
+    // 같은 이름은 같은 hex · 같은 투명도(색 이름 정리 — `-a{%}`) — alpha는 그대로, 합친 토큰은 color로 본다(§4.3).
     if (prev.category === 'effectColor' || prev.category === 'color') prev.category = 'color';
     for (const s of t.sources) if (!prev.sources.includes(s)) prev.sources.push(s);
     if (t.uses?.length) {

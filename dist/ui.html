@@ -431,16 +431,14 @@
     }
     .r-group:first-child { margin-top: 0; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
-    .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
-    .skip-chip {
-      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: 4px; padding: 1px 6px; white-space: nowrap; cursor: pointer;
-    }
-    .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .skip-chip.static { cursor: default; color: var(--muted); }
-    .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
-    .skip-chip.info { color: var(--text-2); }
+    .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
+    .skip-head { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; }
+    .skip-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .skip-row .skip-n { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+    .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .skip-row .grow { flex: 1 1 auto; }
+    .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
+    .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
        상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
@@ -592,7 +590,7 @@
     .bd-found { background: var(--ok-subtle); color: var(--ok); cursor: default; }
     button.bd-skip { min-height: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
     button.bd-skip:hover:not([aria-disabled="true"]) { background: var(--surface-hover); }
-    .bind-badges .skip-row { order: 10; flex: 1 0 100%; margin-top: 0; }
+    .bind-badges .skip-list { order: 10; flex: 1 0 100%; margin-top: 0; }
     button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 10.5px; }
     button.bd-all:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
     .bind-filter-row input { width: 170px; }
@@ -604,6 +602,8 @@
     .be-art { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
     .be-art.icon { font-size: 18px; line-height: 1; color: var(--muted); align-items: center; flex-direction: row; gap: 2px; }
     .be-row { display: flex; align-items: center; gap: 6px; }
+    .bind-empty.done { border: none; padding: 6px 2px; align-items: flex-start; text-align: left; }
+    .bind-empty.done .be-text { color: var(--ok, #12805c); font-weight: 600; }
     .be-text { font-size: var(--fs); }
     /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
     .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }
@@ -977,7 +977,7 @@
       <div id="bindTree" class="tree" role="treegrid" data-i18n-aria-label="v4.bindListAria" aria-label="연결할 변수"></div>
       <div class="bind-badges" id="bindBadges" hidden>
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
-        <div class="skip-row" id="bindSkips" hidden></div>
+        <div class="skip-list" id="bindSkips" hidden></div>
       </div>
       <div class="status" id="applyStatus"></div>
       <div class="sub-foot" id="bindFoot">
@@ -1433,7 +1433,6 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
-    "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
     "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
     // 마법사 시퀀서 단계 결과
@@ -1677,18 +1676,32 @@
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
-    "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
-    "v4.skipLayers": "\uAC74\uB108\uB6F4 \uB808\uC774\uC5B4",
+    "v4.fixPlacesChip": "\uC190\uBCFC \uACF3 {s}\uACF3",
+    "v4.skipFixHead": "\uC190\uBCFC \uC218 \uC788\uB294 \uACF3",
+    "v4.skipKeepHead": "\uADF8\uB300\uB85C \uB46C\uB3C4 \uB418\uB294 \uACF3",
+    "v4.skippedTitle": "\uAC74\uB108\uB6F4 \uACF3",
+    "v4.layerCount": "\uB808\uC774\uC5B4 {n}\uAC1C",
+    "reasonHelp.fraction": "\uC815\uC218\uB85C \uB9DE\uCD94\uBA74 \uB2E4\uC74C\uC5D0 \uC5F0\uACB0\uB3FC\uC694",
+    "reasonHelp.size-fraction": "\uD06C\uAE30\uB97C \uC815\uC218\uB85C \uB9DE\uCD94\uBA74 \uC5F0\uACB0\uB3FC\uC694",
+    "reasonHelp.deleted-var": "\uCCAB \uD654\uBA74 [\uC5F0\uACB0 \uD480\uAE30]\uB85C \uC815\uB9AC\uD574\uC694",
+    "reasonHelp.styled": "\uC2A4\uD0C0\uC77C\uB85C \uC774\uBBF8 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "reasonHelp.space-between": "\uD53C\uADF8\uB9C8\uAC00 \uACC4\uC0B0\uD558\uB294 \uAC04\uACA9\uC774\uC5D0\uC694",
+    "reasonHelp.hug-fill": "\uC790\uB3D9 \uD06C\uAE30\uB77C \uBCC0\uC218\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
+    "reasonHelp.empty-text": "\uBE48 \uAE00\uC790\uC608\uC694",
+    "reasonHelp.instance-children": "\uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
+    "reasonHelp.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uC608\uC694",
+    "reasonHelp.no-autolayout": "\uC5EC\uBC31 \xB7 \uAC04\uACA9\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4\uC608\uC694",
+    "reasonHelp.size-free-layout": "\uC790\uC720 \uBC30\uCE58\uB77C \uD06C\uAE30\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
+    "reasonHelp.font": "\uC774 \uCEF4\uD4E8\uD130\uC5D0 \uC5C6\uB294 \uAE00\uAF34\uC774\uC5D0\uC694",
     "bind.skippedPlacesChip": "\uAC74\uB108\uB6F4 \uACF3",
+    "bind.skipSelectBtn": "\uC120\uD0DD \u203A",
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
     "v4.tsPlaces": "Text Style {t}\uACF3",
-    "v4.reasonPlaces": "{reason} {n}\uACF3",
-    "v4.reasonLayers": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C",
     "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
     "v4.reread": "\uB2E4\uC2DC \uC77D\uAE30",
-    "v4.skippedPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
+    "v4.fixPlaces": "\uC190\uBCFC \uACF3 {s}\uACF3",
     "v4.view": "\uBCF4\uAE30",
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
     "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
@@ -2243,6 +2256,16 @@
     const n = parseInt(m[1], 16);
     return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
+  function roundAlpha(a) {
+    return Math.round(clamp01(a != null ? a : 1) * 100) / 100;
+  }
+  function colorKey(hex, alpha) {
+    const a = roundAlpha(alpha);
+    return a === 1 ? hex.toLowerCase() : `${hex.toLowerCase()}@${a}`;
+  }
+  function alphaPct(alpha) {
+    return Math.round(alpha * 100);
+  }
   var SNAP_CATEGORIES = /* @__PURE__ */ new Set(["gap"]);
   var TOKEN_GROUP = { gap: "spacing" };
   var cloneToken = (t2) => __spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {});
@@ -2377,8 +2400,8 @@
     return "other";
   }
   var NO_VAR_REASONS = ["no-match"];
-  var PLACE_SKIP_REASONS = ["hug-fill", "translucent", "space-between", "fraction", "size-fraction", "empty-text", "deleted-var"];
-  var INFO_SKIP_REASONS = ["styled"];
+  var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
+  var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
   var sumKinds = (r) => Object.values(r != null ? r : {}).reduce((a, b) => a + (b != null ? b : 0), 0);
   function cardCounts(candidateFields, counts) {
@@ -2399,7 +2422,7 @@
       }
     }
     let s = 0;
-    for (const r of PLACE_SKIP_REASONS) s += sumKinds(counts == null ? void 0 : counts[r]);
+    for (const r of FIX_SKIP_REASONS) s += sumKinds(counts == null ? void 0 : counts[r]);
     const order = (map) => [...SEL_KINDS, "other"].map((kind) => {
       var _a2;
       return { kind, n: (_a2 = map.get(kind)) != null ? _a2 : 0 };
@@ -2414,7 +2437,7 @@
     return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}|${c.variableId}`;
   }
   function groupByVariable(cands) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const byVar = /* @__PURE__ */ new Map();
     for (const c of cands) {
       const arr = byVar.get(c.variableId);
@@ -2445,7 +2468,8 @@
       const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : list[0].currentValue;
       const keys = lines.flatMap((l) => l.keys);
       const nr = list.find((c) => c.newRole);
-      groups.push(__spreadValues({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines }, nr ? { newRoleOf: (_c = nr.newRoleGlobalName) != null ? _c : "" } : {}));
+      const variableAlpha = (_c = list.find((c) => c.variableAlpha != null)) == null ? void 0 : _c.variableAlpha;
+      groups.push(__spreadValues(__spreadProps(__spreadValues({ variableId, variableName: list[0].variableName, variableValue }, variableAlpha != null ? { variableAlpha } : {}), { count: keys.length, keys, lines }), nr ? { newRoleOf: (_d = nr.newRoleGlobalName) != null ? _d : "" } : {}));
     }
     groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
     return groups;
@@ -3985,8 +4009,10 @@
   var tokenChecked = /* @__PURE__ */ new Set();
   function tokenKey(t2) {
     var _a;
-    return `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
+    const v = typeof t2.value === "string" && t2.value.startsWith("#") ? colorKey(t2.value, t2.alpha) : t2.value;
+    return `${t2.category}|${v}|${(_a = t2.unit) != null ? _a : ""}`;
   }
+  var alphaTail = (alpha) => alpha != null && alpha < 1 ? ` ${alphaPct(alpha)}%` : "";
   function creatableTokens() {
     return tokens.filter((t2) => t2.category !== "color");
   }
@@ -4174,12 +4200,14 @@
       }
     });
     if (!idx.length) return;
-    const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))];
+    const opaqueFirst = [...idx.filter((ti) => toks[ti].alpha == null), ...idx.filter((ti) => toks[ti].alpha != null)];
+    const uniq = [...new Set(opaqueFirst.map((ti) => toks[ti].value.toLowerCase()))];
     const names = nameColorsByHue(uniq);
     const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
     idx.forEach((ti, k) => {
-      var _a;
-      toks[ti].name = (_a = nameOf.get(hexes[k].toLowerCase())) != null ? _a : toks[ti].name;
+      const base = nameOf.get(hexes[k].toLowerCase());
+      const a = toks[ti].alpha;
+      if (base) toks[ti].name = a != null && a < 1 ? `${base}-a${alphaPct(a)}` : base;
     });
   }
   var COLOR_ROLES = [
@@ -4259,7 +4287,7 @@
       const card2 = resultCard({
         title: tok.name,
         titleMono: true,
-        summary: `${tok.value}${used}`,
+        summary: `${tok.value}${alphaTail(tok.alpha)}${used}`,
         summaryMono: true,
         metaEl: role
       });
@@ -4275,7 +4303,8 @@
     for (const c of colors) {
       const i = document.createElement("i");
       i.style.background = c.value;
-      i.title = `${c.name} \xB7 ${c.value}`;
+      if (c.alpha != null) i.style.opacity = String(c.alpha);
+      i.title = `${c.name} \xB7 ${c.value}${alphaTail(c.alpha)}`;
       row.appendChild(i);
     }
   }
@@ -6068,7 +6097,7 @@
   }
   function mkValueChip(tk) {
     const v = typeof tk.value === "number" && tk.unit === "percent" ? `${tk.value}%` : String(tk.value);
-    return valueChip(v);
+    return valueChip(v, tk.alpha);
   }
   function mkTag(text, tip, warn = false) {
     const s = document.createElement("span");
@@ -6737,7 +6766,7 @@
     for (const s of bindSkips) {
       if (!ts.has(s.nodeId) || fieldKind(s.field) !== "text") continue;
       if (NO_VAR_REASONS.includes(s.reason)) dk++;
-      else if (PLACE_SKIP_REASONS.includes(s.reason)) ds++;
+      else if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
     }
     const t2 = ts.size;
     const m = c.m + t2;
@@ -6750,14 +6779,21 @@
   function typeMark(value) {
     return isHexColor(value) ? "\u25CF" : /^-?\d/.test(value) ? "#" : "T";
   }
-  function valueChip(value) {
+  function valueChip(value, alpha) {
     const chip = document.createElement("span");
     chip.className = "bv-chip bv-val";
     if (isHexColor(value)) {
       const sw = document.createElement("span");
       sw.className = "bv-sw";
       sw.style.background = value;
+      if (alpha != null && alpha < 1) sw.style.opacity = String(alpha);
       chip.append(sw, value.toUpperCase());
+      if (alpha != null && alpha < 1) {
+        const a = document.createElement("span");
+        a.className = "bv-alpha";
+        a.textContent = alphaTail(alpha);
+        chip.appendChild(a);
+      }
     } else chip.textContent = value;
     return chip;
   }
@@ -6807,8 +6843,10 @@
     clearMount(box);
     let text = "";
     let action = null;
+    box.classList.toggle("done", bindSkipMode());
     if (bindLinking) text = "";
     else if (!bindPreviewed) text = bindFinding || bindFindFailed ? "" : t("v4.reading");
+    else if (bindSkipMode()) text = t("v4.allLinked");
     else if (!hasBindPreview() || bindTsOnly() && !bindTsRows.length) {
       text = t("v4.nothingToLink");
       if (bindCardCounts().k > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
@@ -6828,17 +6866,26 @@
       box.appendChild(b);
     }
   }
+  function bindSkipMode() {
+    return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+  }
+  function tsSkipVisible(key) {
+    return key !== "hasStyle" || bindTsOnly();
+  }
   function renderBindBadges() {
     const c = bindCardCounts();
-    const layerReasons = Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && LAYER_SKIP_REASONS.includes(k)).length + Object.values(bindTsSkips).filter((n) => n > 0).length;
     const s = bindTsOnly() ? 0 : c.s;
-    const info = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && INFO_SKIP_REASONS.includes(k)).length;
-    const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0 || info > 0);
+    const keep = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && (INFO_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k))).length;
+    const ts = Object.entries(bindTsSkips).filter(([k, n]) => n > 0 && tsSkipVisible(k)).length;
+    const any = s > 0 || keep > 0 || ts > 0;
+    const skipMode = bindSkipMode();
+    const show = !bindLinking && bindPreviewed && any;
     $("bindBadges").hidden = !show;
     const skip = $("bindSkipToggle");
-    skip.textContent = `${s > 0 ? t("v4.skipPlaces", { s }) : info > 0 ? t("bind.skippedPlacesChip") : t("v4.skipLayers")} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
+    skip.hidden = skipMode;
+    skip.textContent = `${s > 0 ? t("v4.fixPlacesChip", { s }) : t("bind.skippedPlacesChip")} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
     skip.setAttribute("aria-expanded", String(show && bindSkipsOpen));
-    $("bindSkips").hidden = !(show && bindSkipsOpen);
+    $("bindSkips").hidden = !(show && (bindSkipsOpen || skipMode));
   }
   function renderBindTree() {
     var _a;
@@ -6860,7 +6907,7 @@
             key: g.rowKey,
             indent: 24,
             off: !on,
-            cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
+            cells: [valueChip(g.variableValue, g.variableAlpha), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
             right: [cnt],
             sw: { state: on, label: t("bind.switchAria", { name: g.variableName }), onToggle: () => {
               for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
@@ -6965,7 +7012,7 @@
     const confirm = $("btnApplyConfirm");
     const n = bindOnCount();
     $("btnApplyConfirmLabel").textContent = bindPreviewed && hasBindPreview() ? t("bind.linkN", { n }) : t("bind.link");
-    $("bindFoot").hidden = !!bindLinking;
+    $("bindFoot").hidden = !!bindLinking || bindSkipMode();
     if (!curSel.count && !baseline) setLock(confirm, "prereq", t("status.noSelection"));
     else if (!bindPreviewed) setLock(confirm, "prereq", t("v4.reading"));
     else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
@@ -7081,38 +7128,74 @@
     const box = $("bindSkips");
     clearMount(box);
     const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
-    const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k) || INFO_SKIP_REASONS.includes(k)));
-    for (const [key, n] of varEntries) {
-      const ids = [...new Set(bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId))];
-      const layer = LAYER_SKIP_REASONS.includes(key);
-      const label = t(layer ? "v4.reasonLayers" : "v4.reasonPlaces", { reason: t("reason." + key), n: layer && ids.length ? ids.length : n });
-      const info = INFO_SKIP_REASONS.includes(key) ? " info" : "";
-      if (!ids.length) {
-        const span = document.createElement("span");
-        span.className = `skip-chip static${info}`;
-        span.textContent = label;
-        box.appendChild(span);
-        continue;
+    const tsOnly = bindTsOnly();
+    const row = (label, count, help, ids, key) => {
+      const r = document.createElement("div");
+      r.className = "skip-row";
+      const nm = document.createElement("span");
+      nm.className = "skip-name";
+      nm.textContent = label;
+      const n = document.createElement("span");
+      n.className = "skip-n";
+      n.textContent = count;
+      r.append(nm, n);
+      if (help) {
+        const h = document.createElement("span");
+        h.className = "skip-help";
+        h.textContent = help;
+        r.appendChild(h);
       }
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = `skip-chip${info}`;
-      btn.textContent = `${label} \u203A`;
-      const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ");
-      btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
-      btn.addEventListener("click", () => {
-        bindLayerSelectPending = true;
-        selectNodes(ids, "applyStatus");
-        setStatus("applyStatus", t("bind.skipSelected", { reason: t("reason." + key), n: ids.length }), "");
-      });
-      box.appendChild(btn);
+      const grow = document.createElement("span");
+      grow.className = "grow";
+      r.appendChild(grow);
+      if (ids.length && key) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "link link-btn skip-sel";
+        btn.textContent = t("bind.skipSelectBtn");
+        const names = bindSkips.filter((x) => x.reason === key).slice(0, 5).map((x) => x.name).join(", ");
+        btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
+        btn.addEventListener("click", () => {
+          bindLayerSelectPending = true;
+          selectNodes(ids, "applyStatus");
+          setStatus("applyStatus", t("bind.skipSelected", { reason: t("reason." + key), n: ids.length }), "");
+        });
+        r.appendChild(btn);
+      }
+      return r;
+    };
+    const varRow = (key, n) => {
+      const ids = [...new Set(bindSkips.filter((x) => x.reason === key).map((x) => x.nodeId))];
+      const layer = LAYER_SKIP_REASONS.includes(key);
+      const count = layer ? t("v4.layerCount", { n: ids.length || n }) : t("bind.count", { k: n });
+      return row(t("reason." + key), count, t("reasonHelp." + key), ids, key);
+    };
+    const head = (text) => {
+      const h = document.createElement("div");
+      h.className = "skip-head";
+      h.textContent = text;
+      box.appendChild(h);
+    };
+    const fix = tsOnly ? [] : FIX_SKIP_REASONS.filter((k) => {
+      var _a;
+      return ((_a = reasons[k]) != null ? _a : 0) > 0;
+    });
+    const keep = tsOnly ? [] : [...INFO_SKIP_REASONS, ...LAYER_SKIP_REASONS].filter((k) => {
+      var _a;
+      return ((_a = reasons[k]) != null ? _a : 0) > 0;
+    });
+    const tsKeys = Object.keys(bindTsSkips).filter((k) => {
+      var _a;
+      return ((_a = bindTsSkips[k]) != null ? _a : 0) > 0 && tsSkipVisible(k);
+    });
+    if (fix.length) {
+      head(t("v4.skipFixHead"));
+      for (const k of fix) box.appendChild(varRow(k, reasons[k]));
     }
-    for (const [key, n] of Object.entries(bindTsSkips)) {
-      if (!(n > 0)) continue;
-      const span = document.createElement("span");
-      span.className = "skip-chip static";
-      span.textContent = t("v4.reasonLayers", { reason: t("tsSkip." + key), n });
-      box.appendChild(span);
+    if (keep.length || tsKeys.length) {
+      head(t("v4.skipKeepHead"));
+      for (const k of keep) box.appendChild(varRow(k, reasons[k]));
+      for (const k of tsKeys) box.appendChild(row(t("tsSkip." + k), t("v4.layerCount", { n: bindTsSkips[k] }), "", []));
     }
   }
   function placeTailText(key, names) {
@@ -7836,8 +7919,9 @@ ${opts.tip}` : text;
     bindFocusFirst();
   }
   function bindFocusFirst() {
+    var _a;
     if (!bindFocusPending || activeTab !== "select" || selSub !== "bind") return;
-    const row = $("bindTree").querySelector('[data-tkey][tabindex="0"]');
+    const row = bindSkipMode() ? (_a = $("bindSkips").querySelector(".skip-sel")) != null ? _a : $("btnSubBack") : $("bindTree").querySelector('[data-tkey][tabindex="0"]');
     if (!row) return;
     bindFocusPending = false;
     row.focus({ preventScroll: true });
@@ -7846,6 +7930,7 @@ ${opts.tip}` : text;
     if (!bindPreviewed) return "";
     const c = bindCardCounts();
     if (bindTsOnly()) return c.t ? t("v4.tsPlaces", { t: c.t }) : "";
+    if (bindSkipMode()) return c.s ? t("v4.fixPlaces", { s: c.s }) : "";
     return c.n ? t("v4.findN", { n: c.n }) : "";
   }
   function setSubRight(name, tail, sep) {
@@ -7869,7 +7954,7 @@ ${opts.tip}` : text;
   function renderSubHead() {
     const titles = { bind: "v4.subBind", rename: "v4.rename", structure: "v4.subComponents", make: "make.title", pick: "v4.subMake" };
     if (selSub === "home") return;
-    $("subTitle").textContent = t(titles[selSub]);
+    $("subTitle").textContent = selSub === "bind" && bindSkipMode() ? t("v4.skippedTitle") : t(titles[selSub]);
     const name = baseline ? baseLabel() : "";
     if (selSub === "make") setSubRight(name, name ? t("make.subRight") : "", "");
     else if (selSub === "rename") setSubRight(name, renameFor === baseKey() ? t("rename.subRight", { n: renameRows().length }) : "", " \xB7 ");
@@ -10632,7 +10717,7 @@ ${opts.tip}` : text;
         renderBindTree();
       });
       v.dataset.k = "skips";
-      put(selCard({ title: t("v4.allLinked"), subs: [t("v4.skippedPlaces", { s })], actions: [v] }));
+      put(selCard({ title: t("v4.allLinked"), subs: [t("v4.fixPlaces", { s })], actions: [v] }));
       return;
     }
     const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];

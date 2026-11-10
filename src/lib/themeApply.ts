@@ -155,7 +155,9 @@ export async function generateDarkMode(
       globalByName.set(dname, dark);
       created++;
     }
-    dark.setValueForMode(gMode, hexToRgb(darkHex));
+    // 밝기만 바꾸고 투명도는 그대로(ia-v3 §2.11 "반투명 색 토큰")
+    const la = (lightRaw as RGBA).a;
+    dark.setValueForMode(gMode, { ...hexToRgb(darkHex), a: typeof la === 'number' ? la : 1 });
     v.setValueForMode(to, figma.variables.createVariableAlias(dark));
     realiased++;
   }

@@ -126,7 +126,6 @@
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
-    "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
     "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
     // 마법사 시퀀서 단계 결과
@@ -370,18 +369,32 @@
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
-    "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
-    "v4.skipLayers": "\uAC74\uB108\uB6F4 \uB808\uC774\uC5B4",
+    "v4.fixPlacesChip": "\uC190\uBCFC \uACF3 {s}\uACF3",
+    "v4.skipFixHead": "\uC190\uBCFC \uC218 \uC788\uB294 \uACF3",
+    "v4.skipKeepHead": "\uADF8\uB300\uB85C \uB46C\uB3C4 \uB418\uB294 \uACF3",
+    "v4.skippedTitle": "\uAC74\uB108\uB6F4 \uACF3",
+    "v4.layerCount": "\uB808\uC774\uC5B4 {n}\uAC1C",
+    "reasonHelp.fraction": "\uC815\uC218\uB85C \uB9DE\uCD94\uBA74 \uB2E4\uC74C\uC5D0 \uC5F0\uACB0\uB3FC\uC694",
+    "reasonHelp.size-fraction": "\uD06C\uAE30\uB97C \uC815\uC218\uB85C \uB9DE\uCD94\uBA74 \uC5F0\uACB0\uB3FC\uC694",
+    "reasonHelp.deleted-var": "\uCCAB \uD654\uBA74 [\uC5F0\uACB0 \uD480\uAE30]\uB85C \uC815\uB9AC\uD574\uC694",
+    "reasonHelp.styled": "\uC2A4\uD0C0\uC77C\uB85C \uC774\uBBF8 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "reasonHelp.space-between": "\uD53C\uADF8\uB9C8\uAC00 \uACC4\uC0B0\uD558\uB294 \uAC04\uACA9\uC774\uC5D0\uC694",
+    "reasonHelp.hug-fill": "\uC790\uB3D9 \uD06C\uAE30\uB77C \uBCC0\uC218\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
+    "reasonHelp.empty-text": "\uBE48 \uAE00\uC790\uC608\uC694",
+    "reasonHelp.instance-children": "\uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
+    "reasonHelp.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uC608\uC694",
+    "reasonHelp.no-autolayout": "\uC5EC\uBC31 \xB7 \uAC04\uACA9\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4\uC608\uC694",
+    "reasonHelp.size-free-layout": "\uC790\uC720 \uBC30\uCE58\uB77C \uD06C\uAE30\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
+    "reasonHelp.font": "\uC774 \uCEF4\uD4E8\uD130\uC5D0 \uC5C6\uB294 \uAE00\uAF34\uC774\uC5D0\uC694",
     "bind.skippedPlacesChip": "\uAC74\uB108\uB6F4 \uACF3",
+    "bind.skipSelectBtn": "\uC120\uD0DD \u203A",
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
     "v4.tsPlaces": "Text Style {t}\uACF3",
-    "v4.reasonPlaces": "{reason} {n}\uACF3",
-    "v4.reasonLayers": "{reason} \uB808\uC774\uC5B4 {n}\uAC1C",
     "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
     "v4.reread": "\uB2E4\uC2DC \uC77D\uAE30",
-    "v4.skippedPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
+    "v4.fixPlaces": "\uC190\uBCFC \uACF3 {s}\uACF3",
     "v4.view": "\uBCF4\uAE30",
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
     "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
@@ -957,6 +970,16 @@
     const n = parseInt(m[1], 16);
     return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255 };
   }
+  function roundAlpha(a) {
+    return Math.round(clamp01(a != null ? a : 1) * 100) / 100;
+  }
+  function colorKey(hex, alpha) {
+    const a = roundAlpha(alpha);
+    return a === 1 ? hex.toLowerCase() : `${hex.toLowerCase()}@${a}`;
+  }
+  function alphaPct(alpha) {
+    return Math.round(alpha * 100);
+  }
   function resolvedTypeFor(category) {
     switch (category) {
       case "color":
@@ -1335,18 +1358,19 @@
     if (o.c >= LOW_CHROMA) return "chroma";
     return o.l < 0.5 ? "dark" : "light";
   }
-  function colorSlotKey(hex, bg) {
-    return bg ? `${hex.toLowerCase()}|${bg}` : hex.toLowerCase();
+  function colorSlotKey(hex, bg, alpha) {
+    const k = colorKey(hex, alpha);
+    return bg ? `${k}|${bg}` : k;
   }
   var INVERSE_USES = /* @__PURE__ */ new Set(["text", "icon", "border"]);
   var byCountThenHex = (a, b) => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
   function colorRoleBases(colors, existingDefaultHex, use) {
-    var _a, _b;
+    var _a, _b, _c;
     const out = /* @__PURE__ */ new Map();
     const totals = /* @__PURE__ */ new Map();
     for (const c of colors) totals.set(c.hex.toLowerCase(), ((_a = totals.get(c.hex.toLowerCase())) != null ? _a : 0) + c.count);
     const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-    const refHex = (_b = existingDefaultHex != null ? existingDefaultHex : top == null ? void 0 : top.hex) == null ? void 0 : _b.toLowerCase();
+    const refHex = (_c = (_b = existingDefaultHex == null ? void 0 : existingDefaultHex.split("@")[0]) != null ? _b : top == null ? void 0 : top.hex) == null ? void 0 : _c.toLowerCase();
     if (!refHex) return out;
     const ref = hexToOklch(refHex);
     const refDark = ref.l < 0.35;
@@ -1355,7 +1379,7 @@
     const inverseUse = use == null || INVERSE_USES.has(use);
     for (const c of colors) {
       const hex = c.hex.toLowerCase();
-      const key = colorSlotKey(hex, c.bg);
+      const key = colorSlotKey(hex, c.bg, c.alpha);
       if (hex === refHex) {
         out.set(key, "default");
         continue;
@@ -1438,12 +1462,15 @@
     if (!ok) acc.skipped.add(SKIP_FRACTION);
     return ok;
   }
-  function keyOf(category, value, unit) {
-    return `${category}|${value}|${unit != null ? unit : ""}`;
+  function keyOf(category, value, unit, alpha) {
+    return `${category}|${value}|${unit != null ? unit : ""}|${alpha != null ? alpha : 1}`;
+  }
+  function colorToken(category, hex, alpha) {
+    return alpha < 1 ? { name: `${colorTokenName(hex)}-a${alphaPct(alpha)}`, category, value: hex, alpha } : { name: colorTokenName(hex), category, value: hex };
   }
   function add(acc, token, source, nodeId, use, bg) {
     var _a, _b;
-    const k = keyOf(token.category, token.value, token.unit);
+    const k = keyOf(token.category, token.value, token.unit, token.alpha);
     let existing = acc.map.get(k);
     if (existing) {
       if (!existing.sources.includes(source)) existing.sources.push(source);
@@ -1486,10 +1513,12 @@
         acc.skipped.add(SKIP_GRADIENT);
         continue;
       }
+      const alpha = roundAlpha(p.opacity);
+      if (alpha === 0) continue;
       const hex = rgbToHex(p.color);
       const cu = colorUse(node.type, source === "fill" ? "fills" : "strokes", isInsideIconFrame(node));
       const bgHex = cu === "text" || cu === "icon" || cu === "border" ? backgroundOf(node) : void 0;
-      add(acc, { name: colorTokenName(hex), category: "color", value: hex }, source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : void 0);
+      add(acc, colorToken("color", hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : void 0);
     }
   }
   function collectText(acc, node) {
@@ -1675,8 +1704,10 @@
     for (const e of node.effects) {
       if (e.visible === false) continue;
       if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
+        const alpha = roundAlpha(e.color.a);
+        if (alpha === 0) continue;
         const hex = rgbToHex(e.color);
-        add(acc, { name: colorTokenName(hex), category: "effectColor", value: hex }, "effectColor", node.id, "color/shadow");
+        add(acc, colorToken("effectColor", hex, alpha), "effectColor", node.id, "color/shadow");
         for (const [g, val] of [
           ["shadow-blur", e.radius],
           ["shadow-spread", (_a = e.spread) != null ? _a : 0],
@@ -1953,7 +1984,7 @@
   var REUSE_MAP_KEY = "dsl.reuseMap";
   function literalOf(t2, type, base) {
     var _a;
-    if (type === "COLOR") return String(t2.value).toLowerCase();
+    if (type === "COLOR") return colorKey(String(t2.value), t2.alpha);
     if (type === "STRING") return String(t2.value);
     return t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base }) : Number(t2.value);
   }
@@ -1967,8 +1998,7 @@
     if (raw == null) return false;
     if (type === "COLOR") {
       if (typeof raw !== "object" || !("r" in raw)) return false;
-      const a = raw.a;
-      return (typeof a !== "number" || a === 1) && rgbToHex(raw).toLowerCase() === lit;
+      return colorKey(rgbToHex(raw), raw.a) === lit;
     }
     if (type === "STRING") return typeof raw === "string" && raw === lit;
     return typeof raw === "number" && Math.round(raw * 100) === Math.round(Number(lit) * 100);
@@ -2148,7 +2178,7 @@
     };
     const keyOfValue = (val) => {
       if (val == null) return "";
-      if (typeof val === "object" && "r" in val) return valueKey(rgbToHex(val));
+      if (typeof val === "object" && "r" in val) return colorKey(rgbToHex(val), val.a);
       return typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
     };
     const colIdx = new Map(cols.map((c, i) => [c.id, i]));
@@ -2183,13 +2213,14 @@
     for (const [use, list] of colorUses) {
       const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
       const bases = colorRoleBases(
-        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
+        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
         defKey || void 0,
+        // 색 값 키여도 colorRoleBases가 hex만 본다
         use.slice("color/".length)
       );
       for (const x of list) {
         const hex = String(x.token.value).toLowerCase();
-        reqs.push({ base: `${use}/${(_d = bases.get(colorSlotKey(hex, x.bg))) != null ? _d : "default"}`, value: valueKey(hex), count: x.count, token: x.token });
+        reqs.push({ base: `${use}/${(_d = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _d : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
       }
     }
     const names = assignNames(reqs, existing);
@@ -2226,14 +2257,14 @@
     return made;
   }
   function setGlobalLiteral(v, modeId, t2, type, base) {
-    var _a;
+    var _a, _b;
     if (type === "COLOR") {
       const { r, g, b } = hexToRgb(String(t2.value));
-      v.setValueForMode(modeId, { r, g, b, a: 1 });
+      v.setValueForMode(modeId, { r, g, b, a: (_a = t2.alpha) != null ? _a : 1 });
     } else if (type === "STRING") {
       v.setValueForMode(modeId, String(t2.value));
     } else {
-      const num = t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base }) : Number(t2.value);
+      const num = t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_b = t2.fontSize) != null ? _b : base }) : Number(t2.value);
       v.setValueForMode(modeId, num);
     }
   }
@@ -4105,7 +4136,9 @@
       if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
       if (tier === 2 && readAutoRole(v)) e.auto = true;
       if (v.resolvedType === "COLOR" && isRGB(val)) {
-        if (isOpaqueColorValue(val)) e.colorHex = rgbToHex(val);
+        e.colorHex = rgbToHex(val);
+        e.colorAlpha = roundAlpha(val.a);
+        e.colorKey = colorKey(e.colorHex, e.colorAlpha);
       } else if (v.resolvedType === "FLOAT" && typeof val === "number") e.num = val;
       else if (v.resolvedType === "STRING" && typeof val === "string") e.str = val;
       if (tier === 2) addSem(v.name, entryKey(e));
@@ -4123,7 +4156,7 @@
     }
   }
   function entryKey(e) {
-    if (e.colorHex) return valueKey(e.colorHex);
+    if (e.colorKey) return valueKey(e.colorKey);
     if (e.num != null) return valueKey(e.num);
     if (e.str != null) return valueKey(e.str);
     return "";
@@ -4141,16 +4174,9 @@
     }
     return void 0;
   }
-  function isOpaqueColorValue(v) {
-    const a = v.a;
-    return typeof a !== "number" || a === 1;
-  }
-  function isTranslucentPaint(p) {
-    return typeof p.opacity === "number" && p.opacity < 1;
-  }
-  function isTranslucentEffectColor(e) {
-    const a = e.color.a;
-    return typeof a === "number" && a < 1;
+  function itemAlpha(x) {
+    var _a;
+    return roundAlpha(x.type === "SOLID" ? x.opacity : (_a = x.color) == null ? void 0 : _a.a);
   }
   function isRGB(v) {
     return typeof v === "object" && v !== null && "r" in v && "g" in v && "b" in v;
@@ -4164,7 +4190,7 @@
   function sameValueEntries(ctx, s) {
     return ctx.index.entries.filter((e) => {
       if (!scopeOk(e.scopes, s.allowed)) return false;
-      if (s.kind === "color") return e.colorHex === s.value;
+      if (s.kind === "color") return e.colorKey === s.value;
       if (typeof s.value === "number") return e.num != null && sameNumber(e.num, s.value);
       return e.str != null && e.str === s.value;
     });
@@ -4186,7 +4212,7 @@
     const colorLeft = [];
     const emit = (s, e) => {
       res.bound++;
-      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s)));
+      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e)));
     };
     const globalFor = (cands) => {
       var _a2;
@@ -4221,15 +4247,15 @@
     for (const [use, list] of byUse) {
       const counts = /* @__PURE__ */ new Map();
       for (const x of list) {
-        const k = colorSlotKey(x.slot.value, x.slot.bg);
+        const k = colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha);
         const c = counts.get(k);
         if (c) c.count++;
-        else counts.set(k, { hex: x.slot.value, count: 1, bg: x.slot.bg });
+        else counts.set(k, __spreadValues({ hex: x.slot.display, count: 1, bg: x.slot.bg }, x.slot.alpha != null ? { alpha: x.slot.alpha } : {}));
       }
       const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
       for (const x of list) {
-        const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.value, x.slot.bg))) != null ? _a : "default"}`;
+        const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha))) != null ? _a : "default"}`;
         const re = nameRe(base);
         const two = x.cands.filter((e) => e.tier === 2 && re.test(e.variable.name)).sort(byName)[0];
         if (two) {
@@ -4260,23 +4286,27 @@
       }
       res.bound++;
       const g = p.global;
-      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot))), {
+      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g))), {
         newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
         newRoleGlobalName: spec.globalName
       }));
     }
   }
-  function candOf(s, variableId, variableName, tier, variableValue) {
-    return __spreadProps(__spreadValues({
+  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha) {
+    return __spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
-      currentValue: s.display,
+      currentValue: s.display
+    }), s.alpha != null ? { currentAlpha: s.alpha } : {}), {
       variableId,
       variableName,
       tier,
       variableValue
-    });
+    }), variableAlpha != null ? { variableAlpha } : {});
+  }
+  function entryAlpha(e) {
+    return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;
   }
   function entryDisplay(e, s) {
     var _a;
@@ -4347,17 +4377,15 @@
           note(res, st, node, preview, key);
           return;
         }
-        if (isTranslucentPaint(p)) {
-          skip(res, "translucent", node, preview, key);
-          return;
-        }
+        const alpha = itemAlpha(p);
+        if (alpha === 0) return;
         const hex = rgbToHex(p.color);
         use != null ? use : use = colorUse(node.type, key, isInsideIconFrame(node));
         if (bg === null) {
           const bgHex = use === "text" || use === "icon" || use === "border" ? backgroundOf(node) : void 0;
           bg = bgHex ? bgKindOf(bgHex) : void 0;
         }
-        ctx.slots.push(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: hex, display: hex, allowed, usage: use }, bg ? { bg } : {}), { noMatchReason: "no-match" }));
+        ctx.slots.push(__spreadProps(__spreadValues(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: colorKey(hex, alpha), display: hex }, alpha !== 1 ? { alpha } : {}), { allowed, usage: use }), bg ? { bg } : {}), { noMatchReason: "no-match" }));
       });
     }
   }
@@ -4478,12 +4506,10 @@
         note(res, st, node, preview, "effects");
         return;
       }
-      if (isTranslucentEffectColor(e)) {
-        skip(res, "translucent", node, preview, "effects");
-        return;
-      }
+      const alpha = itemAlpha(e);
+      if (alpha === 0) return;
       const hex = rgbToHex(e.color);
-      ctx.slots.push({ node, field: "effects", index: i, kind: "color", value: hex, display: hex, allowed: EFFECT_SCOPES, usage: "shadow", noMatchReason: "no-match" });
+      ctx.slots.push(__spreadProps(__spreadValues({ node, field: "effects", index: i, kind: "color", value: colorKey(hex, alpha), display: hex }, alpha !== 1 ? { alpha } : {}), { allowed: EFFECT_SCOPES, usage: "shadow", noMatchReason: "no-match" }));
     });
   }
   async function bindText(node, ctx) {
@@ -4637,10 +4663,10 @@
               fail(st2, node, key);
               continue;
             }
-            const translucent = key === "effects" ? isTranslucentEffectColor(x) : isTranslucentPaint(x);
             const hex = rgbToHex(x.color);
+            const alpha = itemAlpha(x);
             const allowed = key === "fills" ? fillScopesFor(node.type) : key === "strokes" ? STROKE_SCOPES : EFFECT_SCOPES;
-            if (translucent || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex || !scopeOk(scopesOf(), allowed)) {
+            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha(value.a) !== alpha || !scopeOk(scopesOf(), allowed)) {
               fail("changed", node, key);
               continue;
             }
@@ -8697,7 +8723,8 @@
         globalByName.set(dname, dark);
         created++;
       }
-      dark.setValueForMode(gMode, hexToRgb(darkHex));
+      const la = lightRaw.a;
+      dark.setValueForMode(gMode, __spreadProps(__spreadValues({}, hexToRgb(darkHex)), { a: typeof la === "number" ? la : 1 }));
       v.setValueForMode(to, figma.variables.createVariableAlias(dark));
       realiased++;
     }
@@ -10056,7 +10083,8 @@
               if (!target) continue;
               t2.aliasOf = target;
             } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-              t2.value = rgbToHex(raw);
+              const a = raw.a;
+              t2.value = roundAlpha(a) !== 1 ? `${rgbToHex(raw)}${Math.round(a * 255).toString(16).padStart(2, "0")}` : rgbToHex(raw);
             } else {
               t2.value = raw;
             }

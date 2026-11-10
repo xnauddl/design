@@ -438,8 +438,7 @@
     .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .skip-row .grow { flex: 1 1 auto; }
     .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
-    .bind-empty.done { border: none; padding: 6px 2px; text-align: left; }
-    .bind-empty.done .be-text { color: var(--ok, #12805c); font-weight: 600; }
+    .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
        상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
@@ -603,6 +602,8 @@
     .be-art { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
     .be-art.icon { font-size: 18px; line-height: 1; color: var(--muted); align-items: center; flex-direction: row; gap: 2px; }
     .be-row { display: flex; align-items: center; gap: 6px; }
+    .bind-empty.done { border: none; padding: 6px 2px; align-items: flex-start; text-align: left; }
+    .bind-empty.done .be-text { color: var(--ok, #12805c); font-weight: 600; }
     .be-text { font-size: var(--fs); }
     /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
     .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }

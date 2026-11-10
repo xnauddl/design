@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig } from './shared/messages';
-import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
+import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
@@ -262,8 +262,12 @@ const tokenChecked = new Set<string>();
 
 /** 체크 키 — 이름은 편집 대상이라 값으로 식별한다(추출의 dedup 키와 같은 규칙). */
 function tokenKey(t: DraftToken): string {
-  return `${t.category}|${t.value}|${t.unit ?? ''}`;
+  // 색은 투명도까지 값(ia-v3 §2.11 "반투명 색 토큰") — 같은 hex의 불투명 · 반투명이 체크를 함께 쓰지 않게.
+  const v = typeof t.value === 'string' && t.value.startsWith('#') ? colorKey(t.value, t.alpha) : t.value;
+  return `${t.category}|${v}|${t.unit ?? ''}`;
 }
+/** 투명도 꼬리(" 8%") — 1이면 빈 글. */
+const alphaTail = (alpha?: number): string => (alpha != null && alpha < 1 ? ` ${alphaPct(alpha)}%` : '');
 
 /** 이 카드가 고르는 대상(색 외 토큰). */
 function creatableTokens(): DraftToken[] {
@@ -521,11 +525,15 @@ function huefyTokenColors(toks: DraftToken[]): void {
   if (!idx.length) return;
   // 같은 hex는 같은 이름 — 채움색과 그림자색이 둘 다 #000000이면 `gray/950`·`gray/950-2` 두 변수가
   // 아니라 한 변수(스코프 합집합)가 돼야 한다. 고유 hex만 이름 짓고 되돌려 붙인다.
-  const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))];
+  // 불투명 토큰의 hex를 먼저 — 반투명 때문에 불투명 색 이름이 `-2`로 밀리지 않게(ia-v3 §2.11 "반투명 색 토큰").
+  const opaqueFirst = [...idx.filter((ti) => toks[ti].alpha == null), ...idx.filter((ti) => toks[ti].alpha != null)];
+  const uniq = [...new Set(opaqueFirst.map((ti) => (toks[ti].value as string).toLowerCase()))];
   const names = nameColorsByHue(uniq);
   const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
   idx.forEach((ti, k) => {
-    toks[ti].name = nameOf.get(hexes[k].toLowerCase()) ?? toks[ti].name;
+    const base = nameOf.get(hexes[k].toLowerCase());
+    const a = toks[ti].alpha;
+    if (base) toks[ti].name = a != null && a < 1 ? `${base}-a${alphaPct(a)}` : base;
   });
 }
 
@@ -608,7 +616,7 @@ function renderColorTable(): void {
     const card = resultCard({
       title: tok.name,
       titleMono: true,
-      summary: `${tok.value}${used}`,
+      summary: `${tok.value}${alphaTail(tok.alpha)}${used}`,
       summaryMono: true,
       metaEl: role,
     });
@@ -626,7 +634,8 @@ function renderPaletteRow(colors: DraftToken[]): void {
   for (const c of colors) {
     const i = document.createElement('i');
     i.style.background = c.value as string;
-    i.title = `${c.name} · ${c.value}`;
+    if (c.alpha != null) i.style.opacity = String(c.alpha);
+    i.title = `${c.name} · ${c.value}${alphaTail(c.alpha)}`;
     row.appendChild(i);
   }
 }
@@ -2762,7 +2771,7 @@ function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): 
 
 function mkValueChip(tk: DraftToken): HTMLElement {
   const v = typeof tk.value === 'number' && tk.unit === 'percent' ? `${tk.value}%` : String(tk.value);
-  return valueChip(v);
+  return valueChip(v, tk.alpha);
 }
 function mkTag(text: string, tip: string, warn = false): HTMLElement {
   const s = document.createElement('span');
@@ -3382,14 +3391,22 @@ function typeMark(value: string): string {
   return isHexColor(value) ? '●' : /^-?\d/.test(value) ? '#' : 'T';
 }
 /** 값 칩 — 색은 견본 + #RRGGBB, 숫자는 숫자. */
-function valueChip(value: string): HTMLElement {
+function valueChip(value: string, alpha?: number): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'bv-chip bv-val';
   if (isHexColor(value)) {
     const sw = document.createElement('span');
     sw.className = 'bv-sw';
     sw.style.background = value;
+    if (alpha != null && alpha < 1) sw.style.opacity = String(alpha);
     chip.append(sw, value.toUpperCase());
+    // 반투명 색 — hex 뒤 회색 "8%"(ia-v3 §2.11 "반투명 색 토큰")
+    if (alpha != null && alpha < 1) {
+      const a = document.createElement('span');
+      a.className = 'bv-alpha';
+      a.textContent = alphaTail(alpha);
+      chip.appendChild(a);
+    }
   } else chip.textContent = value;
   return chip;
 }
@@ -3515,7 +3532,7 @@ function renderBindTree(): void {
           key: g.rowKey,
           indent: 24,
           off: !on,
-          cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
+          cells: [valueChip(g.variableValue, g.variableAlpha), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
           right: [cnt],
           sw: { state: on, label: t('bind.switchAria', { name: g.variableName }), onToggle: () => { for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k); renderBindTree(); } },
         };

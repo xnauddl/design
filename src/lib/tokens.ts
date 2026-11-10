@@ -74,6 +74,8 @@ export interface DraftToken {
   uses?: { name: string; count: number; bg?: 'chroma' | 'dark' | 'light' }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;
+  /** 색상 투명도(소수 둘째 자리) — 1이면 없음. 값 키는 colorKey(value, alpha). */
+  alpha?: number;
   /** 수치 토큰의 의도 단위(px 외에는 STRING 보존 + 선택적 px 환산). */
   unit?: Unit;
   /**
@@ -107,6 +109,22 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   if (!m) throw new Error(t('err.badHex', { value: hex }));
   const n = parseInt(m[1], 16);
   return { r: ((n >> 16) & 255) / 255, g: ((n >> 8) & 255) / 255, b: (n & 255) / 255 };
+}
+
+/** 투명도(0~1)를 소수 둘째 자리로 — 색 값 비교 단위(§2.11 "색"). 없으면 1. */
+export function roundAlpha(a: number | undefined): number {
+  return Math.round(clamp01(a ?? 1) * 100) / 100;
+}
+
+/** 색 값 키 — 투명도 1(또는 없음)이면 `#rrggbb`, 아니면 `#rrggbb@0.08`(§2.11 "반투명 색 토큰"). */
+export function colorKey(hex: string, alpha?: number): string {
+  const a = roundAlpha(alpha);
+  return a === 1 ? hex.toLowerCase() : `${hex.toLowerCase()}@${a}`;
+}
+
+/** 투명도 % 접미 숫자 — 0.08 → 8, 0.125 → 13. 이름 `-a{%}` · 값 칩 "8%"에 쓴다. */
+export function alphaPct(alpha: number): number {
+  return Math.round(alpha * 100);
 }
 
 /* ---------- 타입/스코프 매핑 ---------- */

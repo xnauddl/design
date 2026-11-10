@@ -127,6 +127,16 @@ function installFigma() {
     return v;
   };
 
+  // 색 변수의 첫 모드 값 alpha(별칭은 따라감) — 목 setBoundVariableFor*가 쓴다.
+  const colorAlphaOf = (v) => {
+    let cur = v;
+    for (let i = 0; i < 12 && cur; i++) {
+      const val = Object.values(cur.valuesByMode)[0];
+      if (val && val.type === 'VARIABLE_ALIAS') cur = variables.find((x) => x.id === val.id);
+      else return val && typeof val === 'object' && typeof val.a === 'number' ? val.a : undefined;
+    }
+    return undefined;
+  };
   const figma = {
     mixed,
     variables: {
@@ -138,15 +148,18 @@ function installFigma() {
       createVariableAlias: (v) => ({ type: 'VARIABLE_ALIAS', id: v.id }),
       getVariableByIdAsync: async (id) => variables.find((v) => v.id === id) ?? null,
       // v = null이면 연결을 뗀다(IA v4 연결 풀기).
+      // 실제 피그마처럼 색 변수를 붙이면 칠 불투명도 · 그림자 alpha가 변수 값의 alpha로 바뀐다(ia-v3 §2.11 "색" 실험).
       setBoundVariableForPaint: (paint, field, v) => {
         const bv = { ...(paint.boundVariables ?? {}) };
         if (v) bv[field] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete bv[field];
-        return { ...paint, boundVariables: bv };
+        const a = v && field === 'color' ? colorAlphaOf(v) : undefined;
+        return { ...paint, ...(a != null && a !== (paint.opacity ?? 1) ? { opacity: a } : {}), boundVariables: bv };
       },
       setBoundVariableForEffect: (effect, field, v) => {
         const bv = { ...(effect.boundVariables ?? {}) };
         if (v) bv[field] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete bv[field];
-        return { ...effect, boundVariables: bv };
+        const a = v && field === 'color' ? colorAlphaOf(v) : undefined;
+        return { ...effect, ...(a != null && effect.color && a !== (effect.color.a ?? 1) ? { color: { ...effect.color, a } } : {}), boundVariables: bv };
       },
     },
     loadFontAsync: async () => {},
@@ -1508,12 +1521,14 @@ test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색�
   assert.equal(res.bound, 2);
 });
 
-test('bindSelection — 반투명 페인트·그림자 색은 바인딩하지 않는다(변수 alpha가 불투명도를 덮어씀)', async () => {
+test('bindSelection — 반투명 칠하기 · 그림자는 hex · 투명도까지 같은 변수에만 붙고 레이어 값은 그대로(ia-v3 §2.11 "색")', async () => {
   const figma = installFigma();
   await createTokens(
     [
       { name: 'color/000000', category: 'color', sources: ['fill', 'stroke', 'effectColor'], value: '#000000' },
       { name: 'color/ffffff', category: 'color', sources: ['fill'], value: '#ffffff' },
+      { name: 'color/000000-a8', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.08 },
+      { name: 'color/000000-a25', category: 'effectColor', sources: ['effectColor'], value: '#000000', alpha: 0.25 },
     ],
     16,
   );
@@ -1523,12 +1538,15 @@ test('bindSelection — 반투명 페인트·그림자 색은 바인딩하지 �
     name: 'tr',
     fills: [
       { type: 'SOLID', color: { r: 1, g: 1, b: 1 } }, // 불투명 → 붙는다
-      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.08 }, // 8% 검정 → 붙이면 100% 검정이 되므로 제외
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.08 }, // 8% 검정 → 8% 변수
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.5 }, // 50% 검정 → 같은 투명도 변수 없음
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.004 }, // 투명도 0(반올림) → 찾지 않음
     ],
-    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.12, visible: true }], // 12% 테두리 → 제외
+    strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.12, visible: true }], // 12% → 같은 투명도 변수 없음
     effects: [
-      { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.25 }, offset: { x: 0, y: 2 }, radius: 4, visible: true }, // 25% 그림자 → 제외
+      { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.25 }, offset: { x: 0, y: 2 }, radius: 4, visible: true }, // 25% → 25% 변수
       { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 1 }, offset: { x: 0, y: 1 }, radius: 0, visible: true }, // 불투명 → 붙는다
+      { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0 }, offset: { x: 0, y: 1 }, radius: 0, visible: true }, // 투명도 0 → 찾지 않음
     ],
     layoutSizingHorizontal: 'HUG',
     layoutSizingVertical: 'HUG',
@@ -1539,13 +1557,48 @@ test('bindSelection — 반투명 페인트·그림자 색은 바인딩하지 �
 
   const white = findVar(figma, 'Global', 'color/ffffff');
   const black = findVar(figma, 'Global', 'color/000000');
+  const a8 = findVar(figma, 'Global', 'color/000000-a8');
+  const a25 = findVar(figma, 'Global', 'color/000000-a25');
+  assert.deepEqual(Object.values(a8.valuesByMode)[0], { r: 0, g: 0, b: 0, a: 0.08 }, 'Global은 RGBA');
   assert.equal(roleTarget(figma, node.fills[0].boundVariables.color.id), white.id);
-  assert.equal(node.fills[1].boundVariables, undefined); // 반투명 fill 보존
-  assert.equal(node.strokes[0].boundVariables, undefined); // 반투명 stroke 보존(테두리 색·두께 체감 변화 방지)
-  assert.equal(node.effects[0].boundVariables, undefined); // 반투명 그림자 보존
+  assert.equal(roleTarget(figma, node.fills[1].boundVariables.color.id), a8.id, '같은 투명도 → 반투명 Global을 가리키는 역할');
+  assert.equal(node.fills[1].opacity, 0.08, '레이어 값 그대로(목도 변수 alpha를 칠 불투명도로 옮긴다)');
+  assert.equal(node.fills[2].boundVariables, undefined, '다른 투명도 → 붙지 않음');
+  assert.equal(node.fills[2].opacity, 0.5);
+  assert.equal(node.fills[3].boundVariables, undefined, '투명도 0 → 찾지 않음');
+  assert.equal(node.strokes[0].boundVariables, undefined);
+  assert.equal(roleTarget(figma, node.effects[0].boundVariables.color.id), a25.id);
+  assert.equal(node.effects[0].color.a, 0.25, '그림자 alpha 그대로');
   assert.equal(roleTarget(figma, node.effects[1].boundVariables.color.id), black.id);
-  assert.equal(res.bound, 2);
-  assert.equal(res.reasons['translucent'], 3);
+  assert.equal(node.effects[1].color.a, 1);
+  assert.equal(node.effects[2].boundVariables, undefined);
+  assert.equal(res.bound, 4);
+  assert.equal(res.reasons['translucent'], undefined, '사유 translucent는 없어짐');
+  assert.equal(res.reasons['no-match'], 2, '50% 칠 · 12% 선 — 투명도 0은 세지 않음');
+});
+
+test('bindSelection — 찾기 미리보기: 반투명 후보는 currentAlpha · variableAlpha, 불투명이면 없음', async () => {
+  installFigma();
+  await createTokens(
+    [
+      { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000' },
+      { name: 'color/000000-a8', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.08 },
+    ],
+    16,
+  );
+  const node = {
+    type: 'RECTANGLE', id: 'r', name: 'r',
+    fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.08 }, { type: 'SOLID', color: { r: 0, g: 0, b: 0 } }],
+  };
+  const res = await bindSelection([node], false);
+  const c = res.candidates.slice().sort((a, b) => a.index - b.index);
+  assert.equal(c.length, 2);
+  assert.equal(c[0].currentValue, '#000000');
+  assert.equal(c[0].currentAlpha, 0.08);
+  assert.equal(c[0].variableAlpha, 0.08);
+  assert.equal('currentAlpha' in c[1], false);
+  assert.equal('variableAlpha' in c[1], false);
+  assert.notEqual(c[0].variableName, c[1].variableName, '값이 다르면 다른 역할');
 });
 
 test('bindSelection — 역할 별칭(text)이 같은 값의 Semantic 거울(color/gray/950)보다 먼저, 옛 이름(spacing/sm) 대신 쓰임 역할(§2.12)', async () => {
@@ -4467,17 +4520,19 @@ function registerNodes(figma, nodes) {
   figma.getNodeByIdAsync = async (id) => byId.get(id) ?? null;
 }
 
-test('bindSelectedItems — 연결 직전 다시 확인: 붙음·삭제된 변수·스타일·값 변화·반투명은 건너뛰고 사유로 돌려줌', async () => {
+test('bindSelectedItems — 연결 직전 다시 확인: 붙음·삭제된 변수·스타일·값 변화·투명도 다름은 건너뛰고 사유로 돌려줌, 같은 투명도면 연결', async () => {
   const figma = installFigma();
   await createTokens(
     [
       { name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' },
+      { name: 'color/0066ff-a50', category: 'color', sources: ['fill'], value: '#0066ff', alpha: 0.5 },
       { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 },
       { name: 'font-size/16', category: 'fontSize', sources: ['fontSize'], value: 16 },
     ],
     16,
   );
   const blue = findVar(figma, 'Global', 'color/0066ff');
+  const blue50 = findVar(figma, 'Global', 'color/0066ff-a50');
   const sp8 = findVar(figma, 'Global', 'spacing/8');
   const fs16 = findVar(figma, 'Global', 'font-size/16');
   const mkFrame = (id, extra = {}) => ({
@@ -4493,6 +4548,8 @@ test('bindSelectedItems — 연결 직전 다시 확인: 붙음·삭제된 변�
   const styled = mkFrame('styled', { fillStyleId: 'S:1' });
   const changed = mkFrame('changed', { itemSpacing: 9, fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 } }] });
   const translucent = mkFrame('translucent', { fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 }, opacity: 0.5 }] });
+  const half = mkFrame('half', { fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 }, opacity: 0.5 }] }); // 같은 투명도 변수 → 연결
+  const zero = mkFrame('zero', { fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 }, opacity: 0.001 }] }); // 투명도 0으로 바뀜 → changed
   const ranges = [];
   const partial = {
     type: 'TEXT', id: 'partial', name: 'partial', characters: 'Hello', fontSize: 16, fontName: { family: 'Inter', style: 'Regular' },
@@ -4501,7 +4558,7 @@ test('bindSelectedItems — 연결 직전 다시 확인: 붙음·삭제된 변�
     setRangeBoundVariable(s, e, f, v) { ranges.push([s, e, f, v.id]); },
   };
   const text = { ...partial, id: 'text', name: 'text', boundVariables: {} };
-  registerNodes(figma, [ok, bound, deleted, styled, changed, translucent, partial, text]);
+  registerNodes(figma, [ok, bound, deleted, styled, changed, translucent, half, zero, partial, text]);
 
   const items = [
     { nodeId: 'ok', field: 'fills', index: 0, variableId: blue.id },
@@ -4512,15 +4569,20 @@ test('bindSelectedItems — 연결 직전 다시 확인: 붙음·삭제된 변�
     { nodeId: 'changed', field: 'itemSpacing', variableId: sp8.id },
     { nodeId: 'changed', field: 'fills', index: 0, variableId: blue.id },
     { nodeId: 'changed', field: 'fills', index: 3, variableId: blue.id }, // 칠하기 자리가 없어짐
-    { nodeId: 'translucent', field: 'fills', index: 0, variableId: blue.id },
+    { nodeId: 'translucent', field: 'fills', index: 0, variableId: blue.id }, // 50% 칠 + 불투명 변수 → changed
+    { nodeId: 'half', field: 'fills', index: 0, variableId: blue50.id },
+    { nodeId: 'zero', field: 'fills', index: 0, variableId: blue.id },
     { nodeId: 'partial', field: 'fontSize', variableId: fs16.id },
     { nodeId: 'text', field: 'fontSize', variableId: fs16.id },
     { nodeId: 'gone', field: 'width', variableId: sp8.id }, // 레이어가 없어짐
   ];
   const r = await bindSelectedItems(items);
-  assert.equal(r.bound, 3); // ok.fills · ok.itemSpacing · text.fontSize
-  assert.deepEqual(r.reasons, { 'already-bound': 2, 'deleted-var': 1, styled: 1, changed: 5 });
-  assert.equal(r.skipped, 9);
+  assert.equal(r.bound, 4); // ok.fills · ok.itemSpacing · half.fills · text.fontSize
+  assert.deepEqual(r.reasons, { 'already-bound': 2, 'deleted-var': 1, styled: 1, changed: 6 });
+  assert.equal(r.skipped, 10);
+  assert.equal(half.fills[0].boundVariables.color.id, blue50.id);
+  assert.equal(half.fills[0].opacity, 0.5, '레이어 값 그대로');
+  assert.equal(zero.fills[0].boundVariables, undefined);
   assert.equal(ok.fills[0].boundVariables.color.id, blue.id);
   assert.equal(ok.boundVariables.itemSpacing.id, sp8.id);
   assert.equal(bound.boundVariables.itemSpacing.id, sp8.id);
@@ -4530,7 +4592,7 @@ test('bindSelectedItems — 연결 직전 다시 확인: 붙음·삭제된 변�
   assert.deepEqual(ranges, [[0, 5, 'fontSize', fs16.id]]); // 일부 구간이 붙은 글자는 채우지 않음
   // 칩용 레이어 목록 — 노드×사유, 필드 포함
   const keyed = r.skips.map((s) => `${s.nodeId}:${s.reason}`).sort();
-  assert.deepEqual(keyed, ['bound:already-bound', 'changed:changed', 'deleted:deleted-var', 'partial:already-bound', 'styled:styled', 'translucent:changed']);
+  assert.deepEqual(keyed, ['bound:already-bound', 'changed:changed', 'deleted:deleted-var', 'partial:already-bound', 'styled:styled', 'translucent:changed', 'zero:changed']);
   assert.equal(r.skips.find((s) => s.nodeId === 'styled').field, 'fills');
 });
 
@@ -6542,4 +6604,163 @@ test('code.ts — APPLY skipTextStyleNodes: 실제 연결에서 텍스트 스타
   assert.equal(ofType(out, 'APPLY_RESULT')[0].reqId, 4);
   assert.equal(ranges.some((x) => x.startsWith('styledCand:')), false);
   assert.ok(ranges.includes('notCand:fontSize'));
+});
+
+/* ---- 반투명 색 토큰(ia-v3 §2.11 "반투명 색 토큰", ia-v4 B.7) ---- */
+test('extractFromSelection — 반투명 칠하기 · 그림자는 불투명 색과 다른 토큰(-a{%} · alpha), 투명도 0은 버림', () => {
+  installFigma();
+  const rect = {
+    type: 'RECTANGLE', id: 'r', name: 'Rect',
+    fills: [
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 } },
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.08 },
+      { type: 'SOLID', color: { r: 0, g: 0, b: 0 }, opacity: 0.125 }, // 0.13 → -a13
+      { type: 'SOLID', color: { r: 1, g: 0, b: 0 }, opacity: 0.004 }, // 투명도 0 → 버림
+    ],
+    effects: [
+      { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 0, a: 0.25 }, offset: { x: 0, y: 2 }, radius: 4, spread: 0, visible: true },
+      { type: 'DROP_SHADOW', color: { r: 0, g: 0, b: 1, a: 0 }, offset: { x: 0, y: 3 }, radius: 6, spread: 0, visible: true }, // 투명도 0 → 그림자째 버림
+    ],
+  };
+  const { tokens, warnings } = extractFromSelection([rect]);
+  const colors = tokens.filter((t) => t.category === 'color' || t.category === 'effectColor').map((t) => ({ name: t.name, category: t.category, value: t.value, ...(t.alpha != null ? { alpha: t.alpha } : {}) }));
+  assert.deepEqual(colors.sort((a, b) => a.name.localeCompare(b.name)), [
+    { name: 'color/000000', category: 'color', value: '#000000' },
+    { name: 'color/000000-a13', category: 'color', value: '#000000', alpha: 0.13 },
+    { name: 'color/000000-a25', category: 'effectColor', value: '#000000', alpha: 0.25 },
+    { name: 'color/000000-a8', category: 'color', value: '#000000', alpha: 0.08 },
+  ]);
+  assert.equal(tokens.some((t) => t.value === '#ff0000' || t.value === '#0000ff'), false, '투명도 0 색은 토큰 없음');
+  assert.equal(tokens.some((t) => t.name === 'shadow-y/3' || t.name === 'shadow-blur/6'), false, '투명도 0 그림자는 숨긴 효과처럼');
+  assert.equal(warnings.length, 0, '사유 없음');
+});
+
+test('mergeSameNameTokens — 반투명 토큰의 alpha는 그대로', async () => {
+  const { mergeSameNameTokens } = await import('../dist/pure.mjs');
+  const out = mergeSameNameTokens([
+    { name: 'color/gray/1000-a8', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.08, count: 2 },
+    { name: 'color/gray/1000-a8', category: 'effectColor', sources: ['effectColor'], value: '#000000', alpha: 0.08, count: 1 },
+    { name: 'color/gray/1000', category: 'color', sources: ['fill'], value: '#000000', count: 5 },
+  ]);
+  assert.equal(out.length, 2);
+  assert.equal(out[0].alpha, 0.08);
+  assert.deepEqual(out[0].sources, ['fill', 'effectColor']);
+  assert.equal('alpha' in out[1], false);
+});
+
+test('createTokens · previewCreateTokens — 반투명 Global은 RGBA, 재사용 · 직접 만든 변수 비교는 hex와 투명도', async () => {
+  const figma = installFigma();
+  const ucol = figma.variables.createVariableCollection('Brand');
+  // 사용자 Global(계층 1 판정용 — 직접 값만) — 같은 hex · 다른 투명도는 재사용하지 않는다
+  const u = figma.variables.createVariable('black', ucol, 'COLOR');
+  u.scopes = ['ALL_SCOPES'];
+  u.setValueForMode(ucol.defaultModeId, { r: 0, g: 0, b: 0, a: 1 });
+  const tokens = [
+    { name: 'color/000000-a8', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.08, uses: [{ name: 'color/border', count: 1 }] },
+    { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/border', count: 3 }] },
+  ];
+  const pv = await previewCreateTokens(tokens, 16);
+  assert.deepEqual(pv.tokenStates.get('color/000000'), { state: 'reuse', varName: 'black' });
+  assert.deepEqual(pv.tokenStates.get('color/000000-a8'), { state: 'new' }, '투명도가 다르면 재사용하지 않음');
+  const s = await createTokens(tokens, 16);
+  const g = findVar(figma, 'Global', 'color/000000-a8');
+  assert.deepEqual(Object.values(g.valuesByMode)[0], { r: 0, g: 0, b: 0, a: 0.08 });
+  assert.equal(s.globalOf.get('color/000000'), u.id);
+  // 같은 이름의 직접 만든 변수: 투명도까지 같으면 재사용, 다르면 건너뜀
+  const f2 = installFigma();
+  const gcol = f2.variables.createVariableCollection('Global');
+  f2.variables.createVariableCollection('Semantic');
+  const same = f2.variables.createVariable('color/000000-a8', gcol, 'COLOR');
+  same.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 0, a: 0.0801 });
+  same.setPluginData('dsl.manual', '1');
+  const diff = f2.variables.createVariable('color/000000-a25', gcol, 'COLOR');
+  diff.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 0, a: 1 });
+  diff.setPluginData('dsl.manual', '1');
+  const s2 = await createTokens([
+    { name: 'color/000000-a8', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.08 },
+    { name: 'color/000000-a25', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.25 },
+  ], 16);
+  assert.equal(s2.globalOf.get('color/000000-a8'), same.id, '소수 둘째 자리까지 같으면 같은 값');
+  assert.deepEqual([...s2.skippedManualNames], ['color/000000-a25']);
+});
+
+test('createUsageRoles — 같은 hex · 다른 투명도는 같은 밝기 이름에 번호(default · default-2), 별칭은 반투명 Global', async () => {
+  const figma = installFigma();
+  const tokens = [
+    { name: 'color/000000', category: 'color', sources: ['stroke'], value: '#000000', uses: [{ name: 'color/border', count: 30 }] },
+    { name: 'color/000000-a8', category: 'color', sources: ['stroke'], value: '#000000', alpha: 0.08, uses: [{ name: 'color/border', count: 12 }] },
+  ];
+  const s = await createTokens(tokens, 16);
+  const rows = [];
+  assert.equal(await createUsageRoles(tokens, true, s.globalOf, rows), 2);
+  assert.deepEqual(rows.map((r) => [r.name, r.token]).sort(), [['color/border/default', 'color/000000'], ['color/border/default-2', 'color/000000-a8']]);
+  assert.equal(await createUsageRoles(tokens, false, s.globalOf), 2);
+  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default').id), findVar(figma, 'Global', 'color/000000').id);
+  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default-2').id), findVar(figma, 'Global', 'color/000000-a8').id);
+  assert.equal(await createUsageRoles(tokens, false, s.globalOf), 0, '다시 돌리면 같은 값 재사용');
+});
+
+test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default · default-2(곳 수 많은 쪽이 번호 없음)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'color/000000', category: 'color', sources: ['stroke'], value: '#000000' },
+      { name: 'color/000000-a8', category: 'color', sources: ['stroke'], value: '#000000', alpha: 0.08 },
+    ],
+    16,
+  );
+  const mk = (id, opacity) => ({ type: 'RECTANGLE', id, name: id, strokes: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, ...(opacity != null ? { opacity } : {}) }] });
+  const nodes = [mk('a'), mk('b'), mk('c'), mk('t1', 0.08), mk('t2', 0.08)];
+  const dry = await bindSelection(nodes, false);
+  const nameOf = (id) => dry.candidates.find((c) => c.nodeId === id).variableName;
+  assert.equal(nameOf('a'), 'color/border/default');
+  assert.equal(nameOf('t1'), 'color/border/default-2');
+  await bindSelection(nodes);
+  assert.equal(roleTarget(figma, nodes[3].strokes[0].boundVariables.color.id), findVar(figma, 'Global', 'color/000000-a8').id);
+  assert.equal(nodes[3].strokes[0].opacity, 0.08);
+  // 다음 찾기는 만든 반투명 역할을 쓴다
+  const again = await bindSelection([mk('t3', 0.08)], false);
+  assert.equal(again.candidates[0].variableName, 'color/border/default-2');
+});
+
+test('colorSlotKey · colorRoleBases — 키는 투명도까지, 밝기는 hex로만', () => {
+  assert.equal(colorSlotKey('#000000'), '#000000');
+  assert.equal(colorSlotKey('#000000', 'light', 0.08), '#000000@0.08|light');
+  assert.equal(colorSlotKey('#000000', undefined, 1), '#000000');
+  const b = colorRoleBases([{ hex: '#000000', count: 30 }, { hex: '#000000', count: 12, alpha: 0.08 }, { hex: '#777777', count: 1, alpha: 0.5 }], undefined, 'border');
+  assert.equal(b.get('#000000'), 'default');
+  assert.equal(b.get('#000000@0.08'), 'default');
+  assert.equal(b.get('#777777@0.5'), 'subtle');
+  assert.equal(colorRoleBases([{ hex: '#ffffff', count: 1 }], '#000000@0.08', 'border').get('#ffffff'), 'subtle', '기준이 색 값 키여도 hex만 본다');
+});
+
+test('generateDarkMode — 다크 짝은 밝기만 바꾸고 투명도는 그대로', async () => {
+  const f = darkFixture();
+  const g = f.figma.variables.createVariable('color/gray/0-a8', f.global, 'COLOR');
+  g.scopes = ['FRAME_FILL'];
+  g.setValueForMode(f.global.defaultModeId, { r: 1, g: 1, b: 1, a: 0.08 });
+  const s = f.mkSemantic('overlay');
+  s.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(g));
+  const r = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
+  assert.equal(r.realiased, 1);
+  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0-a8');
+  const val = dark.valuesByMode[f.global.defaultModeId];
+  assert.equal(val.a, 0.08);
+  assert.equal(rgbToHex(val), '#121212');
+});
+
+test('code.ts — EXPORT: 투명도가 1이 아닌 색은 #rrggbbaa, 1이면 #rrggbb', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  await createTokens(
+    [
+      { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000' },
+      { name: 'color/000000-a8', category: 'color', sources: ['fill'], value: '#000000', alpha: 0.08 },
+    ],
+    16,
+  );
+  const out = await p.send({ type: 'EXPORT', format: 'w3c', fontSizeUnit: 'px', base: 16 });
+  const content = ofType(out, 'EXPORT_RESULT')[0].content;
+  assert.ok(content.includes('"#00000014"'), content);
+  assert.ok(content.includes('"#000000"'));
 });

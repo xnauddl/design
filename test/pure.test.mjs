@@ -2696,15 +2696,15 @@ test('bindExamples — 계층 컬렉션을 사이드바 순서로 훑어 첫 색
   assert.deepEqual(bindExamples(cols, [vars[0]]), {}, '계층 없는 컬렉션은 보지 않는다');
 });
 
-test('bindExamples — 투명도가 1이 아닌 색 변수는 예시로 고르지 않는다(§2.11 · A.3c)', async () => {
+test('bindExamples — 투명도가 1이 아닌 색 변수도 예시로 쓴다(투명도까지 같은 곳에 붙음, ia-v3 §2.11 "색")', async () => {
   const { bindExamples } = await import('../dist/pure.mjs');
   const cols = [{ id: 's', tier: 2, modes: [{ modeId: 'l' }], defaultModeId: 'l' }];
   const vars = [
     { id: 'a', name: 'overlay', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#000000', alpha: 0.5 } } },
     { id: 'b', name: 'text', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#111111', alpha: 1 } } },
   ];
-  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#111111', name: 'text' } });
-  assert.deepEqual(bindExamples(cols, [vars[0]]), {});
+  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#000000', name: 'overlay', alpha: 0.5 } }, '첫 색 변수 — 반투명이어도');
+  assert.deepEqual(bindExamples(cols, [vars[1]]), { color: { value: '#111111', name: 'text' } }, '불투명이면 alpha 없음');
 });
 
 /* ---------- 변수 고치기(§4.4 고치기 · PR 3.5) ---------- */

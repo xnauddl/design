@@ -699,10 +699,10 @@
 - [x] 테스트: pure `cardCounts` s 2 → 1, verify B2 567(칩 이름 "건너뛴 곳 ▸") · 569(스타일 사용 중 칩이 info로 남음) · 604(그대로), 새로: 카드 n = 0 · s > 0 → ✓ 문구 · 보통 바탕 · [보기] / styled만 있음 → 칩 보임 · s에 안 더함 · 카드는 ✓ "찾은 값은 모두 연결돼 있어요" / 텍스트 스타일만 모습 + styled → styled 칩 없음 · 칩 이름 "건너뛴 레이어 ▸"
 
 ### B.7 PR 7 — 건너뛴 곳 화면 · 반투명 색 (2026-11-10 실기 확인 · 사용자 결정)
-- [ ] 반투명 색 규칙(ia-v3 §2.11 "색" · "반투명 색 토큰"): 추출 `DraftToken.alpha` · 이름 `-a{%}` · Global RGBA · 같은 이름 합치기 · 재사용 · 직접 만든 변수 비교에 투명도, 연결 찾기 · 다시 확인은 hex + 투명도(소수 둘째 자리), 투명도 0은 찾지 않음, `translucent` 사유 · 키 지움, 값 칩 "#000000 8%"
-- [ ] s = 손볼 곳(`FIX_SKIP_REASONS`), `INFO_SKIP_REASONS` 넓힘, `PLACE_SKIP_REASONS` 없앰, 카드 1 "손볼 곳 {s}곳"(`v4.fixPlaces`)
-- [ ] 연결 화면 건너뛴 곳 칩 이름(`v4.fixPlacesChip` · `bind.skippedPlacesChip`) · 건너뛴 곳 목록(두 묶음 · 줄 · 설명 `reasonHelp.*` · [선택 ›] · hasStyle 숨김) · 건너뛴 곳 모습(m = k = 0 — 제목 `v4.skippedTitle`, ✓ 줄, 펼친 목록, 버튼 줄 없음)
-- [ ] 다크 짝 투명도 유지(`themeApply.ts`), 코드 내보내기 `#rrggbbaa`, 값을 직접 고르기 색 표 · `tokenKey`에 투명도, `bindExamples` 주석
-- [ ] 키 지움: `v4.skipPlaces` · `v4.skipLayers` · `v4.skippedPlaces` · `v4.reasonPlaces` · `v4.reasonLayers` · `reason.translucent`(동적 키라 검사에 안 걸림 — 손으로) · CSS `.skip-chip*`. 새 키: `v4.fixPlaces` · `v4.fixPlacesChip` · `v4.skipFixHead` · `v4.skipKeepHead` · `v4.skippedTitle` · `v4.layerCount` · `reasonHelp.*`(`bind.skippedPlacesChip`은 그대로)
-- [ ] 테스트(figma): 1511–1548 반투명 테스트 다시 씀(같은 투명도 변수 → 후보 · 다른 투명도 → no-match · 투명도 0 → 없음), 4470–4533 다시 확인에 같은 투명도 성공 경우, 목 `setBoundVariableForPaint` · `ForEffect`가 변수 alpha를 `paint.opacity` · `effect.color.a`로 옮기게(레이어 값 불변 확인), 추출 `-a8` 이름 · 불투명 이름이 밀리지 않음, createTokens RGBA, 역할 이름 분리(`default` · `default-2`), 다크 짝 alpha 유지
-- [ ] 테스트(pure · verify): `cardCounts` s = 손볼 곳, `bindCardCounts` ds도 `FIX_SKIP_REASONS`, verify 305 "손볼 곳 n곳" · 577–579 칩 이름 · 목록 줄(`.skip-row`, 묶음 머리, [선택 ›]) · 640 텍스트 스타일만 모습("[건너뛴 곳 ▸]", hasStyle 보임) · 592 연결 뒤 상태 줄 " · 건너뜀 {m}"(다시 확인 실패 수 — 그대로) · 새로: 건너뛴 곳 모습(m = k = 0 — 제목 · ✓ 줄 · 버튼 줄 없음)
+- [x] 반투명 색 규칙(ia-v3 §2.11 "색" · "반투명 색 토큰"): 추출 `DraftToken.alpha` · 이름 `-a{%}` · Global RGBA · 같은 이름 합치기 · 재사용 · 직접 만든 변수 비교에 투명도, 연결 찾기 · 다시 확인은 hex + 투명도(소수 둘째 자리), 투명도 0은 찾지 않음, `translucent` 사유 · 키 지움, 값 칩 "#000000 8%"
+- [x] s = 손볼 곳(`FIX_SKIP_REASONS`), `INFO_SKIP_REASONS` 넓힘, `PLACE_SKIP_REASONS` 없앰, 카드 1 "손볼 곳 {s}곳"(`v4.fixPlaces`)
+- [x] 연결 화면 건너뛴 곳 칩 이름(`v4.fixPlacesChip` · `bind.skippedPlacesChip`) · 건너뛴 곳 목록(두 묶음 · 줄 · 설명 `reasonHelp.*` · [선택 ›] · hasStyle 숨김) · 건너뛴 곳 모습(m = k = 0 — 제목 `v4.skippedTitle`, ✓ 줄, 펼친 목록, 버튼 줄 없음)
+- [x] 다크 짝 투명도 유지(`themeApply.ts`), 코드 내보내기 `#rrggbbaa`, 값을 직접 고르기 색 표 · `tokenKey`에 투명도, `bindExamples` 주석
+- [x] 키 지움: `v4.skipPlaces` · `v4.skipLayers` · `v4.skippedPlaces` · `v4.reasonPlaces` · `v4.reasonLayers` · `reason.translucent`(동적 키라 검사에 안 걸림 — 손으로) · CSS `.skip-chip*`. 새 키: `v4.fixPlaces` · `v4.fixPlacesChip` · `v4.skipFixHead` · `v4.skipKeepHead` · `v4.skippedTitle` · `v4.layerCount` · `reasonHelp.*`(`bind.skippedPlacesChip`은 그대로)
+- [x] 테스트(figma): 1511–1548 반투명 테스트 다시 씀(같은 투명도 변수 → 후보 · 다른 투명도 → no-match · 투명도 0 → 없음), 4470–4533 다시 확인에 같은 투명도 성공 경우, 목 `setBoundVariableForPaint` · `ForEffect`가 변수 alpha를 `paint.opacity` · `effect.color.a`로 옮기게(레이어 값 불변 확인), 추출 `-a8` 이름 · 불투명 이름이 밀리지 않음, createTokens RGBA, 역할 이름 분리(`default` · `default-2`), 다크 짝 alpha 유지
+- [x] 테스트(pure · verify): `cardCounts` s = 손볼 곳, `bindCardCounts` ds도 `FIX_SKIP_REASONS`, verify 305 "손볼 곳 n곳" · 577–579 칩 이름 · 목록 줄(`.skip-row`, 묶음 머리, [선택 ›]) · 640 텍스트 스타일만 모습("[건너뛴 곳 ▸]", hasStyle 보임) · 592 연결 뒤 상태 줄 " · 건너뜀 {m}"(다시 확인 실패 수 — 그대로) · 새로: 건너뛴 곳 모습(m = k = 0 — 제목 · ✓ 줄 · 버튼 줄 없음)

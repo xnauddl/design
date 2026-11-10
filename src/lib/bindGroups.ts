@@ -12,6 +12,8 @@ export interface GroupCand extends BindItem {
   nodeId: string;
   /** 변수 값(표시용). 없으면 정확히 같은 후보의 현재 값으로 대신한다. */
   variableValue?: string;
+  /** 변수 투명도(1이면 없음 — ia-v3 §2.11 "반투명 색 토큰"). */
+  variableAlpha?: number;
   /** 새 역할(§2.12) — 연결할 때 만든다. 가리킬 Global 이름. */
   newRole?: unknown;
   newRoleGlobalName?: string;
@@ -33,6 +35,7 @@ export interface VarGroup {
   variableId: string;
   variableName: string;
   variableValue: string;
+  variableAlpha?: number;
   /** 곳 수(= keys.length). */
   count: number;
   keys: string[];
@@ -82,7 +85,8 @@ export function groupByVariable(cands: readonly GroupCand[]): VarGroup[] {
     const variableValue = list.find((c) => c.variableValue != null)?.variableValue ?? list[0].currentValue;
     const keys = lines.flatMap((l) => l.keys);
     const nr = list.find((c) => c.newRole);
-    groups.push({ variableId, variableName: list[0].variableName, variableValue, count: keys.length, keys, lines, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}) });
+    const variableAlpha = list.find((c) => c.variableAlpha != null)?.variableAlpha;
+    groups.push({ variableId, variableName: list[0].variableName, variableValue, ...(variableAlpha != null ? { variableAlpha } : {}), count: keys.length, keys, lines, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}) });
   }
   groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
   return groups;
@@ -136,6 +140,8 @@ export function fieldIcon(field: string): string {
 export interface BindExample {
   value: string;
   name: string;
+  /** 색: 투명도(소수 둘째 자리) — 1이면 없음. */
+  alpha?: number;
 }
 interface ExCol { id: string; tier: number; modes: { modeId: string }[]; defaultModeId?: string }
 type ExCell = { kind: string; hex?: string; alpha?: number; text?: string; aliasId?: string };
@@ -144,7 +150,7 @@ interface ExVar { id: string; name: string; collectionId: string; type: string; 
 /**
  * 찾기 전 예시 — 계층이 지정된 로컬 컬렉션을 사이드바 순서(Component → Semantic → Global, 같으면 피그마 순서)로
  * 훑어 첫 색 변수와 첫 숫자 변수. 값은 그 컬렉션 기본 모드(별칭이면 로컬 대상을 따라 최대 5단계).
- * 값을 못 읽는 변수(라이브러리 별칭 등)와 투명도가 1이 아닌 색은 건너뛴다. 없으면 그 종류는 빠진다.
+ * 값을 못 읽는 변수(라이브러리 별칭 등)는 건너뛴다. 투명도가 1이 아닌 색도 연결 대상이라 예시로 쓴다(§2.11 "색"). 없으면 그 종류는 빠진다.
  */
 export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { color?: BindExample; number?: BindExample } {
   const rank = (t: number): number => (t === 3 ? 0 : t === 2 ? 1 : 2);
@@ -171,8 +177,11 @@ export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { 
       if (v.collectionId !== col.id) continue;
       if (!out.color && v.type === 'COLOR') {
         const cell = resolve(v);
-        // 투명도가 1이 아닌 색 변수는 연결 대상이 아니다(§2.11) — 예시로도 고르지 않는다.
-        if (cell?.kind === 'color' && cell.hex && (cell.alpha ?? 1) === 1) out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name };
+        // 반투명 색 변수도 투명도까지 같은 곳에 붙으므로 예시로 쓴다(§2.11 "색").
+        if (cell?.kind === 'color' && cell.hex) {
+          const alpha = Math.round((cell.alpha ?? 1) * 100) / 100;
+          out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name, ...(alpha !== 1 ? { alpha } : {}) };
+        }
       } else if (!out.number && v.type === 'FLOAT') {
         const cell = resolve(v);
         if (cell?.kind === 'number' && cell.text != null) out.number = { value: cell.text, name: v.name };

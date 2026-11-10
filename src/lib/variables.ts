@@ -11,6 +11,7 @@ import {
   ScopeName,
   hexToRgb,
   rgbToHex,
+  colorKey,
   numberTokenName,
   pxConversions,
   resolvedTypeForToken,
@@ -77,7 +78,7 @@ export const REUSE_MAP_KEY = 'dsl.reuseMap';
 
 /** 토큰의 Global 리터럴 — 비교 · 쓰기가 같은 값을 쓴다(setGlobalLiteral과 같은 환산). */
 function literalOf(t: DraftToken, type: ResolvedType, base: number): string | number {
-  if (type === 'COLOR') return String(t.value).toLowerCase();
+  if (type === 'COLOR') return colorKey(String(t.value), t.alpha); // 색 값 키(hex + 투명도)
   if (type === 'STRING') return String(t.value);
   return t.unit && t.unit !== 'px' && typeof t.value === 'number' ? toPx(t.value, t.unit, { base, fontSize: t.fontSize ?? base }) : Number(t.value);
 }
@@ -93,8 +94,7 @@ function sameLiteral(raw: VariableValue | undefined, lit: string | number, type:
   if (raw == null) return false;
   if (type === 'COLOR') {
     if (typeof raw !== 'object' || !('r' in raw)) return false;
-    const a = (raw as RGBA).a;
-    return (typeof a !== 'number' || a === 1) && rgbToHex(raw as RGB).toLowerCase() === lit;
+    return colorKey(rgbToHex(raw as RGB), (raw as RGBA).a) === lit; // hex · 투명도(소수 둘째 자리) 모두 같아야
   }
   if (type === 'STRING') return typeof raw === 'string' && raw === lit;
   return typeof raw === 'number' && Math.round(raw * 100) === Math.round(Number(lit) * 100);
@@ -314,7 +314,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
   };
   const keyOfValue = (val: VariableValue | undefined): string => {
     if (val == null) return '';
-    if (typeof val === 'object' && 'r' in val) return valueKey(rgbToHex(val as RGB));
+    if (typeof val === 'object' && 'r' in val) return colorKey(rgbToHex(val as RGB), (val as RGBA).a); // 색 값 키
     return typeof val === 'number' || typeof val === 'string' ? valueKey(val) : '';
   };
   // 이미 있는 이름 = Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음. 같은 이름이면 사용자 컬렉션 먼저 · 목록 순(13.5).
@@ -351,13 +351,14 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
     const defKey = existing.get(`${use}/default`)?.[0];
     const bases = colorRoleBases(
-      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
-      defKey || undefined,
+      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
+      defKey || undefined, // 색 값 키여도 colorRoleBases가 hex만 본다
       use.slice('color/'.length),
     );
     for (const x of list) {
       const hex = String(x.token.value).toLowerCase();
-      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg)) ?? 'default'}`, value: valueKey(hex), count: x.count, token: x.token });
+      // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 번호가 붙는다(default · default-2)
+      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
     }
   }
   const names = assignNames(reqs, existing);
@@ -398,7 +399,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
 function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {
   if (type === 'COLOR') {
     const { r, g, b } = hexToRgb(String(t.value));
-    v.setValueForMode(modeId, { r, g, b, a: 1 });
+    v.setValueForMode(modeId, { r, g, b, a: t.alpha ?? 1 }); // 반투명 색은 투명도를 담은 Global
   } else if (type === 'STRING') {
     v.setValueForMode(modeId, String(t.value)); // fontFamily 등
   } else {
