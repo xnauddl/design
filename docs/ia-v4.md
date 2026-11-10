@@ -137,8 +137,8 @@
 - 숫자는 연결 화면과 **같은 규칙**(§4.2 "텍스트 스타일이 먼저다" · 스위치는 모두 켬)으로 센다 — 카드의 m과 연결 화면 첫 [n곳 연결]은 같다.
 - **숫자** (찾기 결과의 자리 단위, 사유 키는 `reason.*`):
   - m = 연결할 수 있는 곳 = preview 후보 자리 수 − 스타일 후보 레이어의 글자 종류 자리 + 스타일 후보 레이어 수.
-  - k = 변수가 없는 값 = 건너뜀 사유가 `no-match` · `size-fraction`인 자리 수.
-  - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`styled` · `hug-fill` · `translucent` · `space-between` · `fraction` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다.
+  - k = 변수가 없는 값 = 건너뜀 사유가 `no-match`인 자리 수 — **만들기 화면이 변수로 만들 수 있는 값만**이다(2026-11-10 실기 확인: 만들고 연결해도 "새로 만들 값"이 줄지 않았다). 그래서 ① 값이 **0인 숫자 자리**(여백 · 간격 · 그리드 간격 — 만들기가 0을 변수로 만들지 않는다)는 같은 값 변수가 없으면 찾기에서 세지 않는다(사유도 남기지 않는다 — 0 여백은 "고칠 곳"이 아니다. 사용자가 0 변수를 만들어 두었으면 그대로 연결 후보). ② 소수 크기(`size-fraction` — 만들기가 정수 크기만 만든다)는 k가 아니라 s(자리 단위 건너뜀)로 센다.
+  - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`styled` · `hug-fill` · `translucent` · `space-between` · `fraction` · `size-fraction` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다.
   - 스타일 후보 레이어의 글자 종류 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 m에서만이 아니라 k · s에서도 뺀다 — 그 레이어는 스타일 줄 1곳으로만 센다(④ · 종류별 수도 같다).
   - n = m + k. 제목 "변수 없는 값 {n}곳"(n 툴팁 "인스턴스 안쪽 · 숨긴 레이어 제외").
 - 둘째 줄 종류별 수(아래 속성 → 종류 표의 순서, 0은 뺌, 종류 이름은 §2.7 영어 — 예 "Spacing 2 · Radius 1 · Color 3 · Text Style 2"). **연결할 곳(m)만 종류별로 센다**(합 = m — Other 자리는 요약에 없어 빠진다, 아래 표, 연결 화면 종류 머리 수와 같다 — 2026-11-10 UX 검수 B. 전에는 k도 더해 연결 화면 머리와 달랐다). 새로 만들 값 k는 아래처럼 끝에 따로. 버튼 **[{m}곳 연결]**(주 버튼) → 연결 화면(§4.2).
@@ -678,3 +678,4 @@
 - [x] 연결 화면 종류 머리 "{n}곳"(줄 곳 수 합, 새 키 `tree.places`), 만들기 · 이름 정리 머리는 "{n}개" 그대로
 - [x] 카드 1 종류별 수 = 연결할 곳만(`CardCounts.linkByKind` 같은 새 필드 — 후보 자리 + 스타일 줄, k는 "새로 만들 값"으로만), 대체 포커스 `btnGoRename` → `btnGoMake`(subBack · 연결 풀기 뒤 · 기준 바꾸기 뒤 · 처음), 잠금 · 클릭 가드 기준 = 목록 기준
 - [x] verify-bind-flow: 블록 9 "레이어 정리 잠금" → 세 버튼 잠금, "변수가 없는 값 2곳" → "새로 만들 값 2곳", 블록 14 버튼 둘 → 셋(`btnGoMake`), B2 카드 1 종류별 수 기대값(연결할 곳만), B2 연결 머리 목록 "{n}곳" · 스타일 줄 끔 뒤 Typography 머리 수, 머리 줄에 "레이어 1개" 없음, [변수 만들기] → 만들기 화면 · ← 포커스
+- [ ] 실기 확인 버그: 값 0인 여백 · 간격 · 그리드 간격은 같은 값 변수가 없으면 세지 않음(`no-match` 아님), `size-fraction`은 s로(`NO_VAR_REASONS` · `PLACE_SKIP_REASONS`), 선 두께 방향별 기록 = 이미 연결됨(완료), 테스트
