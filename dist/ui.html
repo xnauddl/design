@@ -1035,7 +1035,7 @@
       <div class="mk-tabs" id="makeTabs" role="tablist" data-i18n-aria-label="make.tabsAria" aria-label="만들 것" hidden>
         <button type="button" role="tab" id="makeTab-global" data-mtab="global" aria-controls="makePanel" aria-selected="true">Global<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-semantic" data-mtab="semantic" aria-controls="makePanel" aria-selected="false" tabindex="-1">Semantic<span class="n"></span></button>
-        <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1"><span data-i18n="v4.kind.textStyle">텍스트 스타일</span><span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
+        <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
       </div>
       <div id="makePanel">
         <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
@@ -5863,6 +5863,17 @@
     renderRenameScreen();
     $("renameAllOff").focus();
   });
+  var KIND_HEAD = {
+    gap: "Spacing",
+    radius: "Radius",
+    size: "Size",
+    stroke: "Stroke",
+    opacity: "Opacity",
+    color: "Color",
+    text: "Typography",
+    other: "Other",
+    textStyle: "Text Style"
+  };
   var MAKE_KINDS = ["color", "gap", "radius", "size", "stroke", "opacity", "text"];
   var MAKE_KIND_OF = {
     color: "color",
@@ -6084,7 +6095,7 @@
     if (mkPreview == null) return "counting";
     return mkRoleRows.length ? "rows" : "zero";
   }
-  var mkTabName = (tab) => tab === "global" ? "Global" : tab === "semantic" ? "Semantic" : t("v4.kind.textStyle");
+  var mkTabName = (tab) => tab === "global" ? "Global" : tab === "semantic" ? "Semantic" : KIND_HEAD.textStyle;
   function makeTreeItems(tab) {
     const items = [];
     if (tab === "global") {
@@ -6117,11 +6128,11 @@
         items.push({
           key: `gk:${k}`,
           head: true,
-          name: t(`v4.kind.${k}`),
+          name: KIND_HEAD[k],
           countText: t("tree.count", { n: list.length }),
           indent: 0,
           children: rows,
-          sw: !isPaid ? null : { state: hs, label: t("tree.headAria", { name: t(`v4.kind.${k}`) }), onToggle: () => {
+          sw: !isPaid ? null : { state: hs, label: t("tree.headAria", { name: KIND_HEAD[k] }), onToggle: () => {
             const to = headToggleTarget(hs);
             for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to);
             mkPreviewSoon();
@@ -6141,7 +6152,7 @@
         items.push({
           key: `sk:${k}`,
           head: true,
-          name: t(`v4.kind.${k}`),
+          name: KIND_HEAD[k],
           countText: t("tree.count", { n: rows.length }),
           indent: 0,
           children: rows.map((r) => {
@@ -6861,11 +6872,11 @@
         items.push({
           key: `kind:${kind}`,
           head: true,
-          name: t(`v4.kind.${kind}`),
+          name: KIND_HEAD[kind],
           countText: t("tree.count", { n: list.length }),
           indent: 0,
           children,
-          sw: { state: st, label: t("tree.headAria", { name: t(`v4.kind.${kind}`) }), onToggle: () => {
+          sw: { state: st, label: t("tree.headAria", { name: KIND_HEAD[kind] }), onToggle: () => {
             const to = headToggleTarget(st);
             for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k);
             renderBindTree();
@@ -6900,11 +6911,11 @@
         items.push({
           key: "kind:textStyle",
           head: true,
-          name: t("v4.kind.textStyle"),
+          name: KIND_HEAD.textStyle,
           countText: t("tree.count", { n: bindTsRows.length }),
           indent: 0,
           children,
-          sw: { state: st, label: t("tree.headAria", { name: t("v4.kind.textStyle") }), onToggle: () => {
+          sw: { state: st, label: t("tree.headAria", { name: KIND_HEAD.textStyle }), onToggle: () => {
             const to = headToggleTarget(st);
             for (const r of bindTsRows) tsToggle(r, to);
             renderBindTree();

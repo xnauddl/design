@@ -85,7 +85,7 @@
 - **줄**(30px, 아래 구분선): 머리 아래 24px 들여쓰기(이름 정리는 깊이마다 16px) · 화면마다 내용 · 오른쪽 스위치. 끈 줄은 칩 · 글자를 회색으로(지금 연결 화면 `.off` 규칙 — opacity 쓰지 않음).
   - **접을 수 있는 줄**(이름 정리에서 아래에 또 줄이 있는 바꿀 줄): 맨 앞에 접기 단추가 붙는다. 스위치는 그 줄 자신만이고, 개수는 붙지 않는다.
 - **여러 단 머리:** 머리 아래에 또 머리가 올 수 있다(지금 쓰는 화면은 없다 — 만들기의 묶음은 탭으로 올렸다, §4.3). 위 머리의 "{n}개" · 스위치는 그 아래 모든 깊이의 줄로 정한다. 키보드의 "부모 줄"은 바로 위 머리다.
-- **머리 이름은 영어**(2026-11-10 사용자 결정 — 탭 "Global · Semantic"과 한 화면에 한글 종류 이름이 섞여 이질감): 트리의 종류 머리는 Color · Spacing · Radius · Size · Stroke · Opacity · Typography · Other, 텍스트 스타일 머리 · 탭은 Text Style. 고유 이름처럼 번역하지 않는다(i18n 키가 아니라 코드 상수 한 곳 — `KIND_HEAD` 표, 만들기 · 연결 화면이 같이 쓴다 — "Global" · "Semantic"과 같음). `v4.kind.textStyle` 키는 지운다(쓰던 곳 3곳 — 연결 화면 머리 · `aria-label`, 만들기 탭 이름, `ui.html` `makeTab-ts` — 모두 상수로, `makeTab-ts`는 `data-i18n`을 떼고 "Text Style"을 정적 글로). 머리 스위치 `aria-label`(`tree.headAria`)도 이 이름을 넣는다. "{n}개" 등 나머지 글과, 카드 1 요약 · 건너뜀 칩처럼 문장 속 종류 이름(`v4.kind.*`)은 한글 그대로.
+- **머리 이름은 영어**(2026-11-10 사용자 결정 — 탭 "Global · Semantic"과 한 화면에 한글 종류 이름이 섞여 이질감): 트리의 종류 머리는 Color · Spacing · Radius · Size · Stroke · Opacity · Typography · Other, 텍스트 스타일 머리 · 탭은 Text Style. 고유 이름처럼 번역하지 않는다(i18n 키가 아니라 코드 상수 한 곳 — `KIND_HEAD` 표, 만들기 · 연결 화면이 같이 쓴다 — "Global" · "Semantic"과 같음). 트리 머리 · 탭에서 `v4.kind.*`를 쓰던 곳(연결 화면 머리 · `aria-label`, 만들기 종류 머리 · 탭 이름, `ui.html` `makeTab-ts`)은 모두 상수로 바꾸고, `makeTab-ts`는 `data-i18n`을 떼고 "Text Style"을 정적 글로 둔다. `v4.kind.*` 키(`v4.kind.textStyle` 포함)는 카드 1 요약 문장(`kindLabel` — "텍스트 스타일 2곳")이 계속 쓰므로 남긴다. 머리 스위치 `aria-label`(`tree.headAria`)도 이 이름을 넣는다. "{n}개" 등 나머지 글과, 카드 1 요약 · 건너뜀 칩처럼 문장 속 종류 이름(`v4.kind.*`)은 한글 그대로.
 - **접기:** 처음 모습은 모두 펼침(화면이 따로 정한 것 제외), 단 머리 스위치가 "모두 끔"인 머리는 접힘(접을 수 있는 줄은 늘 펼침). 머리 스위치가 없는 무료 트리는 유료와 같은 기본 켬/끔(글자 줄 끔)으로 처음 접기를 정한다 — 그래서 무료에서도 글자 머리는 처음에 접힘. 접기 상태는 그 화면에 있는 동안만 기억하고(다시 읽어도 같은 머리면 이어받음), 화면을 나갔다 들어오면 처음 모습.
 - **키보드:** 트리는 `treegrid`(정지점 1개, 들어오면 트리의 첫 줄 — 머리든 줄이든 맨 위 줄). ↑↓ = 보이는 줄(머리 포함) 이동, Home/End. 머리 · 접을 수 있는 줄에서 → = 펼치기(이미 펼쳤으면 첫 아래 줄로), ← = 접기(이미 접혔으면 바로 위 부모 줄로), Enter = 접기/펼치기. 그 밖의 줄에서 ← = 바로 위 부모 줄(가장 가까운 머리 · 접을 수 있는 줄)로. Space = 그 줄 스위치(머리면 머리 스위치) 켜고 끄기. 줄 스위치 · 접기 단추는 `tabIndex=-1`(클릭은 됨).
 - 스위치를 바꾸면 아래 고정 버튼 숫자가 바로 바뀐다(화면마다 정의).
@@ -665,4 +665,4 @@
 - [x] 새 키 `make.tabsAria` · `make.semTop` · `make.tsTop` · `make.freeTop` · `make.freeSemNote` · `make.semNone` · `make.semZero`, `make.semNote` 글 바꿈, `make.treeAria` 지움
 - [x] 무료: 잠금 상자를 탭 줄 위로, 도구 줄 "유료에서 만들 값이에요"
 - [x] verify-bind-flow 블록 17(탭 전환 · 탭별 모두 켜기 · 끄기, '레이어 n' · `grp:global` 검사 고침) · 연결 화면 칩 검사 고침
-- [ ] 트리 머리 이름 영어(§2.7 — Color · Spacing · Radius · Size · Stroke · Opacity · Typography · Other · Text Style, `KIND_HEAD` 상수), 만들기 탭 "Text Style"(`makeTab-ts`의 `data-i18n` 뗌), `v4.kind.textStyle` 키 지움
+- [x] 트리 머리 이름 영어(§2.7 — Color · Spacing · Radius · Size · Stroke · Opacity · Typography · Other · Text Style, `KIND_HEAD` 상수), 만들기 탭 "Text Style"(`makeTab-ts`의 `data-i18n` 뗌), 카드 1 요약(`kindLabel`)은 한글 그대로

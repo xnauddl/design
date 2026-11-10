@@ -2591,6 +2591,11 @@ $('btnRename').addEventListener('click', () => {
 $('renameAllOn').addEventListener('click', () => { renameOff.clear(); renderRenameScreen(); $('renameAllOn').focus(); });
 $('renameAllOff').addEventListener('click', () => { for (const n of renameRows()) renameOff.add(n.id); renderRenameScreen(); $('renameAllOff').focus(); });
 
+/** 트리 머리 이름(§2.7) — 영어 고유 이름, 번역하지 않는다(만들기 · 연결 화면 공용). 문장 속 종류 이름은 `v4.kind.*`. */
+const KIND_HEAD: Record<string, string> = {
+  gap: 'Spacing', radius: 'Radius', size: 'Size', stroke: 'Stroke', opacity: 'Opacity', color: 'Color', text: 'Typography', other: 'Other', textStyle: 'Text Style',
+};
+
 /* ---------- 변수 만들기(IA v4 §4.3): Global · Semantic · 텍스트 스타일 묶음 트리 + 실행 ---------- */
 type MakeKind = 'color' | 'gap' | 'radius' | 'size' | 'stroke' | 'opacity' | 'text';
 const MAKE_KINDS: readonly MakeKind[] = ['color', 'gap', 'radius', 'size', 'stroke', 'opacity', 'text'];
@@ -2786,7 +2791,7 @@ function mkSemState(): 'none' | 'counting' | 'zero' | 'rows' {
   if (mkPreview == null) return 'counting';
   return mkRoleRows.length ? 'rows' : 'zero';
 }
-const mkTabName = (tab: MkTab): string => (tab === 'global' ? 'Global' : tab === 'semantic' ? 'Semantic' : t('v4.kind.textStyle'));
+const mkTabName = (tab: MkTab): string => (tab === 'global' ? 'Global' : tab === 'semantic' ? 'Semantic' : KIND_HEAD.textStyle);
 
 /** 고른 탭의 트리 아이템(§4.3) — 종류 머리 › 줄 한 단(텍스트 스타일은 줄만). */
 function makeTreeItems(tab: MkTab): TreeItem[] {
@@ -2811,8 +2816,8 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       });
       const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
       items.push({
-        key: `gk:${k}`, head: true, name: t(`v4.kind.${k}`), countText: t('tree.count', { n: list.length }), indent: 0, children: rows,
-        sw: !isPaid ? null : { state: hs, label: t('tree.headAria', { name: t(`v4.kind.${k}`) }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
+        key: `gk:${k}`, head: true, name: KIND_HEAD[k], countText: t('tree.count', { n: list.length }), indent: 0, children: rows,
+        sw: !isPaid ? null : { state: hs, label: t('tree.headAria', { name: KIND_HEAD[k] }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
       });
     }
   } else if (tab === 'semantic') {
@@ -2822,7 +2827,7 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       const rows = mkRoleRows.filter((r) => { const tk = byTok.get(r.token); return tk && mkKind(tk) === k; });
       if (!rows.length) continue;
       items.push({
-        key: `sk:${k}`, head: true, name: t(`v4.kind.${k}`), countText: t('tree.count', { n: rows.length }), indent: 0,
+        key: `sk:${k}`, head: true, name: KIND_HEAD[k], countText: t('tree.count', { n: rows.length }), indent: 0,
         children: rows.map((r) => {
           const tk = byTok.get(r.token)!;
           const eq = document.createElement('span');
@@ -3501,8 +3506,8 @@ function renderBindTree(): void {
       });
       const st = headState(list.map((g) => ({ on: rowOn(g) })));
       items.push({
-        key: `kind:${kind}`, head: true, name: t(`v4.kind.${kind}`), countText: t('tree.count', { n: list.length }), indent: 0, children,
-        sw: { state: st, label: t('tree.headAria', { name: t(`v4.kind.${kind}`) }), onToggle: () => { const to = headToggleTarget(st); for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k); renderBindTree(); } },
+        key: `kind:${kind}`, head: true, name: KIND_HEAD[kind], countText: t('tree.count', { n: list.length }), indent: 0, children,
+        sw: { state: st, label: t('tree.headAria', { name: KIND_HEAD[kind] }), onToggle: () => { const to = headToggleTarget(st); for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k); renderBindTree(); } },
       });
     }
     if (bindTsRows.length) {
@@ -3527,8 +3532,8 @@ function renderBindTree(): void {
       });
       const st = headState(bindTsRows.map((r) => ({ on: !bindTsOff.has(r.styleId) })));
       items.push({
-        key: 'kind:textStyle', head: true, name: t('v4.kind.textStyle'), countText: t('tree.count', { n: bindTsRows.length }), indent: 0, children,
-        sw: { state: st, label: t('tree.headAria', { name: t('v4.kind.textStyle') }), onToggle: () => { const to = headToggleTarget(st); for (const r of bindTsRows) tsToggle(r, to); renderBindTree(); } },
+        key: 'kind:textStyle', head: true, name: KIND_HEAD.textStyle, countText: t('tree.count', { n: bindTsRows.length }), indent: 0, children,
+        sw: { state: st, label: t('tree.headAria', { name: KIND_HEAD.textStyle }), onToggle: () => { const to = headToggleTarget(st); for (const r of bindTsRows) tsToggle(r, to); renderBindTree(); } },
       });
     }
     // 처음 모습(§2.7): 모두 펼침, 머리 스위치가 "모두 끔"인 머리는 접힘 — 화면에 들어와 처음 그릴 때만.

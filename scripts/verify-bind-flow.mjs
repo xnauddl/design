@@ -526,7 +526,7 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 머리 "← Card" · 오른쪽 "변수 없는 값 8곳"', (await p.textContent('#subTitle')) === 'Card' && (await p.textContent('#subRight')) === '변수 없는 값 8곳', await p.textContent('#subRight'));
   const list = await bindList(p);
   check('B2 종류 머리(카드 1 순서) · (변수, 종류) 줄 · 텍스트 스타일 머리 맨 끝',
-    JSON.stringify(list) === JSON.stringify(['간격 1개', ['spacing/8', '2곳', true], '반경 1개', ['spacing/8', '1곳', true], '색 1개', ['color/text/default', '1곳', true], '글자 1개', ['font/size/16', '1곳', true], '텍스트 스타일 1개', ['body/medium', '2곳', true]]),
+    JSON.stringify(list) === JSON.stringify(['Spacing 1개', ['spacing/8', '2곳', true], 'Radius 1개', ['spacing/8', '1곳', true], 'Color 1개', ['color/text/default', '1곳', true], 'Typography 1개', ['font/size/16', '1곳', true], 'Text Style 1개', ['body/medium', '2곳', true]]),
     JSON.stringify(list));
   check('B2 [7곳 연결] 주 버튼 · 단계 표시 · [찾기] · 필터 없음', (await named(p, '#btnApplyConfirm', '7곳 연결')) && !(await locked(p, '#btnApplyConfirm')) && (await p.$('#bindSteps')) === null && (await p.$('#btnApply')) === null && (await p.$('#bindFilter')) === null);
   check('B2 줄 이름 칩 — 종류 표시(● · #) 없음(값 칩과 중복)', (await p.$$eval('#bindTree .tr-row .bv-var .bv-mark', (e) => e.length)) === 0);
@@ -537,7 +537,7 @@ const reenter = (p) => p.evaluate(() => {
   // 스타일 줄을 끄면 t1 글자 크기가 글자 변수 후보로 되돌아온다
   await p.click('#bindTree .tr[data-tkey="ts:S:body"] .bv-switch');
   const l2 = await bindList(p);
-  check('B2 스타일 줄 끔 → 글자 줄 2곳(되돌림) · [5곳 연결]', l2.includes('글자 1개') && JSON.stringify(l2.find((x) => Array.isArray(x) && x[0] === 'font/size/16')) === JSON.stringify(['font/size/16', '2곳', true]) && (await named(p, '#btnApplyConfirm', '5곳 연결')), JSON.stringify(l2));
+  check('B2 스타일 줄 끔 → 글자 줄 2곳(되돌림) · [5곳 연결]', l2.includes('Typography 1개') && JSON.stringify(l2.find((x) => Array.isArray(x) && x[0] === 'font/size/16')) === JSON.stringify(['font/size/16', '2곳', true]) && (await named(p, '#btnApplyConfirm', '5곳 연결')), JSON.stringify(l2));
   check('B2 스타일 줄을 꺼도 포커스는 그 줄', (await p.evaluate(() => document.activeElement?.closest('[data-tkey]')?.dataset.tkey)) === 'ts:S:body');
   await p.click('#bindTree .tr[data-tkey="ts:S:body"] .bv-switch');
   // 모두 끄기 → 잠금 사유, 모두 켜기
@@ -625,7 +625,7 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, tsPrev((await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1).reqId, B2_TS, { hasStyle: 1 }));
   check('B2 noTier 카드 1 안에 "텍스트 스타일 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('텍스트 스타일 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
   await p.click('[data-k="tsLink"]');
-  check('B2 텍스트 스타일만 — 머리 오른쪽 "텍스트 스타일 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === '텍스트 스타일 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['텍스트 스타일 1개', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
+  check('B2 텍스트 스타일만 — 머리 오른쪽 "텍스트 스타일 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === '텍스트 스타일 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['Text Style 1개', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
   check('B2 텍스트 스타일만 — 칩 "건너뛴 레이어 ▸"', (await p.textContent('#bindSkipToggle')) === '건너뛴 레이어 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#btnApplyConfirm');
   const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
@@ -1071,9 +1071,9 @@ async function saveAndGet(p) {
   await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [{ name: 'body/medium', sig: '99|0|0|Inter|Regular' }],
     styles: [{ name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] }] });
   await p.waitForTimeout(50);
-  check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', '텍스트 스타일1']), JSON.stringify(await tabsOf(p)));
+  check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', 'Text Style1']), JSON.stringify(await tabsOf(p)));
   const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
-  check('17 Global 탭 — 종류 머리만(묶음 머리 없음) · 글자(꺼져 접힘)', JSON.stringify(heads) === JSON.stringify(['간격 2개', '글자 1개']) && (await p.getAttribute('#makeTree [data-tkey="gk:text"]', 'aria-expanded')) === 'false', JSON.stringify(heads));
+  check('17 Global 탭 — 종류 머리만(묶음 머리 없음) · 글자(꺼져 접힘)', JSON.stringify(heads) === JSON.stringify(['Spacing 2개', 'Typography 1개']) && (await p.getAttribute('#makeTree [data-tkey="gk:text"]', 'aria-expanded')) === 'false', JSON.stringify(heads));
   check('17 Global 탭 도구 줄 — "켠 값만 변수로 만들어요" · ⓘ 없음 · 모두 켜기 · 끄기', (await p.textContent('#makeTopText')) === '켠 값만 변수로 만들어요' && !(await visible(p, '#makeInfo')) && (await visible(p, '#makeAllOn')));
   check('17 상태 태그 "있음"(update) · "Layer 2" · 이름 칩에 종류 표시 없음', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('Layer 2') && (await p.$$eval('#makeTree [data-tkey^="g:"] .bv-var .bv-mark', (e) => e.length)) === 0);
   // 탭 키보드 — → 로 Semantic(바로 고름)
