@@ -64,6 +64,7 @@ async function rightClick(p, selector) {
   await p.waitForTimeout(100);
   await p.click(selector, { button: 'right' });
 }
+const tabsOf = (p) => p.$$eval('#makeTabs [role="tab"]:not([hidden])', (e) => e.map((x) => `${x.textContent}${x.getAttribute('aria-selected') === 'true' ? '*' : ''}`));
 const visible = (p, sel) => p.$eval(sel, (e) => e.offsetParent !== null && getComputedStyle(e).display !== 'none');
 
 const PREREQ = { type: 'PREREQ_STATE', hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasDarkMode: false, hasTextStyles: false, hasSemanticRoles: true };
@@ -528,6 +529,7 @@ const reenter = (p) => p.evaluate(() => {
     JSON.stringify(list) === JSON.stringify(['간격 1개', ['spacing/8', '2곳', true], '반경 1개', ['spacing/8', '1곳', true], '색 1개', ['color/text/default', '1곳', true], '글자 1개', ['font/size/16', '1곳', true], '텍스트 스타일 1개', ['body/medium', '2곳', true]]),
     JSON.stringify(list));
   check('B2 [7곳 연결] 주 버튼 · 단계 표시 · [찾기] · 필터 없음', (await named(p, '#btnApplyConfirm', '7곳 연결')) && !(await locked(p, '#btnApplyConfirm')) && (await p.$('#bindSteps')) === null && (await p.$('#btnApply')) === null && (await p.$('#bindFilter')) === null);
+  check('B2 줄 이름 칩 — 종류 표시(● · #) 없음(값 칩과 중복)', (await p.$$eval('#bindTree .tr-row .bv-var .bv-mark', (e) => e.length)) === 0);
   check('B2 목록 treegrid · 접근성 이름 · 머리 줄 = 이름 · 개수 · 스위치만(미리보기 없음)', (await p.getAttribute('#bindTree', 'role')) === 'treegrid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수' && (await p.$$eval('#bindTree .tr-head', (e) => e.every((h) => !h.querySelector('.bv-chip') && !!h.querySelector('.bv-switch')))));
   // 스위치 — 줄 단위
   await p.click('#bindTree .tr-row >> nth=1 >> .bv-switch'); // 반경 줄
@@ -1069,18 +1071,47 @@ async function saveAndGet(p) {
   await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [{ name: 'body/medium', sig: '99|0|0|Inter|Regular' }],
     styles: [{ name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] }] });
   await p.waitForTimeout(50);
+  check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', '텍스트 스타일1']), JSON.stringify(await tabsOf(p)));
   const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
-  check('17 묶음 — Global(펼침) › 간격 · 글자(꺼져 접힘) · Semantic(접힘) · 텍스트 스타일', JSON.stringify(heads) === JSON.stringify(['Global 3개', '간격 2개', '글자 1개', 'Semantic 1개', '텍스트 스타일 1개']), JSON.stringify(heads));
-  check('17 Global 머리 스위치 — 일부(글자 끔)', (await p.getAttribute('#makeTree [data-tkey="grp:global"] .bv-switch', 'aria-checked')) === 'mixed');
-  check('17 상태 태그 "있음"(update) · 레이어 수', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('레이어 2'));
+  check('17 Global 탭 — 종류 머리만(묶음 머리 없음) · 글자(꺼져 접힘)', JSON.stringify(heads) === JSON.stringify(['간격 2개', '글자 1개']) && (await p.getAttribute('#makeTree [data-tkey="gk:text"]', 'aria-expanded')) === 'false', JSON.stringify(heads));
+  check('17 Global 탭 도구 줄 — "켠 값만 변수로 만들어요" · ⓘ 없음 · 모두 켜기 · 끄기', (await p.textContent('#makeTopText')) === '켠 값만 변수로 만들어요' && !(await visible(p, '#makeInfo')) && (await visible(p, '#makeAllOn')));
+  check('17 상태 태그 "있음"(update) · "Layer 2" · 이름 칩에 종류 표시 없음', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('Layer 2') && (await p.$$eval('#makeTree [data-tkey^="g:"] .bv-var .bv-mark', (e) => e.length)) === 0);
+  // 탭 키보드 — → 로 Semantic(바로 고름)
+  await p.focus('#makeTab-global');
+  await p.keyboard.press('ArrowRight');
+  await p.waitForTimeout(20);
+  check('17 → 키로 Semantic 탭 — 포커스 · 고름 · 도구 줄 ⓘ · 링크 없음', (await p.evaluate(() => document.activeElement?.id)) === 'makeTab-semantic' && (await p.getAttribute('#makeTab-semantic', 'aria-selected')) === 'true' && (await p.textContent('#makeTopText')) === '켠 Global을 따라 함께 만들어요' && (await visible(p, '#makeInfo')) && !(await visible(p, '#makeAllOn')) && (await p.getAttribute('#makePanel', 'aria-labelledby')) === 'makeTab-semantic');
+  check('17 Semantic 탭 — 종류 머리 › Semantic 줄(칩 종류 표시 그대로)', (await p.textContent('#makeTree')).includes('spacing/card/gap') && (await p.textContent('#makeTree')).includes('= spacing/16') && (await p.$$eval('#makeTree .bv-mark', (e) => e.length)) === 1);
+  await p.focus('#makeInfo');
+  await p.waitForTimeout(20);
+  const tipUp = () => p.$eval('#uiTip', (e) => !e.hidden && e.classList.contains('show'));
+  const tipShown = await tipUp();
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(20);
+  check('17 ⓘ 포커스 = 툴팁 · Esc는 툴팁만 닫음(화면에 남음)', tipShown && !(await tipUp()) && (await visible(p, '#makeScreen')), JSON.stringify([tipShown, await tipUp(), await visible(p, '#makeScreen')]));
+  await p.click('#makeTab-ts');
+  await p.waitForTimeout(20);
+  check('17 텍스트 스타일 탭 — 머리 없이 줄 · "켠 스타일만 등록해요" · 모두 켜기 · 끄기', (await p.$$eval('#makeTree .tr-head', (e) => e.length)) === 0 && (await p.$$eval('#makeTree [data-tkey^="t:"]', (e) => e.length)) === 1 && (await p.textContent('#makeTopText')) === '켠 스타일만 등록해요' && (await visible(p, '#makeAllOff')));
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
+  check('17 겹침 잠금 중 다른 탭이면 텍스트 스타일 탭에 주황 점(aria-label = 사유)', (await visible(p, '#makeTab-ts .mk-dot')) && (await p.getAttribute('#makeTab-ts .mk-dot', 'aria-label')) === '이미 있는 스타일 이름이에요');
   check('17 만들 수 "Global 1개 · Semantic 1개 · 스타일 1개" · [변수 1개 만들기]', (await p.textContent('#makeCount')) === 'Global 1개 · Semantic 1개 · 스타일 1개' && (await p.textContent('#btnMakeRun')) === '변수 1개 만들기', await p.textContent('#makeCount'));
   check('17 기존 스타일과 이름이 같고 값이 다름 → 실행 잠금 "이미 있는 스타일 이름이에요"', (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '이미 있는 스타일 이름이에요');
   // 이름 고치기 — 더블클릭 → 칸 → Enter 저장
+  await p.click('#makeTab-ts');
+  await p.waitForTimeout(20);
   await p.dblclick('#makeTree [data-tkey^="t:"] .bv-var');
   await p.waitForTimeout(30);
   await p.fill('#makeTree input.tr-edit', 'body/base');
   await p.keyboard.press('Enter');
   check('17 이름 고치기 → 잠금 풀림', !(await locked(p, '#btnMakeRun')) && (await p.textContent('#makeTree [data-tkey^="t:"]')).includes('body/base'));
+  // 모두 끄기는 고른 탭(텍스트 스타일)의 줄만
+  await p.click('#makeAllOff');
+  await p.waitForTimeout(20);
+  check('17 텍스트 스타일 탭 모두 끄기 — 스타일만 끔(Global 줄 그대로)', (await p.getAttribute('#makeTree [data-tkey^="t:"] .bv-switch', 'aria-checked')) === 'false' && (await p.textContent('#makeCount')) === 'Global 1개 · Semantic 1개');
+  await p.click('#makeAllOn');
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
   check('17 만든 뒤 체크 3개(바로 연결 켬)', (await p.$$eval('#makeOpts input[type="checkbox"]', (e) => e.length)) === 3 && (await p.$eval('#makeOptLink', (e) => e.checked)));
   // 실행: 만들기 → 텍스트 스타일 → 연결
   const exBefore = (await sent(p, 'EXTRACT')).length;
@@ -1120,7 +1151,12 @@ async function saveAndGet(p) {
   await p.waitForTimeout(30);
   await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
   await p.waitForTimeout(30);
-  check('17 스타일 후보 0 → 텍스트 스타일 묶음 숨김 · Semantic 0 → 숨김', JSON.stringify(await p.$$eval('#makeTree .tr-group .tr-name', (e) => e.map((x) => x.textContent))) === JSON.stringify(['Global']));
+  check('17 스타일 후보 0 → 텍스트 스타일 탭 없음 · Semantic 탭은 남음(0)', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global1*', 'Semantic0']), JSON.stringify(await tabsOf(p)));
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(20);
+  check('17 Semantic r = 0 → 탭 안 "만들 Semantic이 없어요"(트리 없음)', (await visible(p, '#makeTabNote')) && (await p.textContent('#makeTabNote')) === '만들 Semantic이 없어요' && !(await visible(p, '#makeTree')));
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
   await p.click('#btnMakeRun');
   await p.waitForTimeout(30);
   await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });

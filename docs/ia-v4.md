@@ -656,10 +656,10 @@
 - [x] 컴포넌트 하위 화면(v3 내용 그대로)
 
 ### B.5 PR 5 — 만들기 화면 탭 (2026-11-10 사용자 결정 A안)
-- [ ] 만들기 묶음 머리 → 위 밑줄 탭(Global · Semantic · 텍스트 스타일 — 개수 = 총 줄 수, 응답 전 "…"), `tablist` · ← → 키, 고른 탭 기억(화면에 있는 동안), 보이는 탭 규칙
-- [ ] 탭마다 도구 줄(안내 · ⓘ 툴팁 · 그 탭의 모두 켜기 · 끄기), 안내 줄(`make.semNote` · `make.tsNote`)을 ⓘ로 옮김, Global 묶음 머리 스위치 삭제
-- [ ] Semantic 탭 빈 모습("켠 Global이 없어 만들 Semantic이 없어요"), 텍스트 스타일 이름 겹침 주황 점
-- [ ] 줄 숫자 "레이어 {n}" → "Layer {n}"(`make.layers`), 만들기 Global 줄 · 연결 화면 줄 이름 칩의 종류 표시(● · # · T) 삭제 — 공용 `varChip`에 종류 표시를 끄는 선택지, Semantic 줄 칩은 그대로
-- [ ] 새 키 `make.tabsAria` · `make.semTop` · `make.tsTop` · `make.freeTop` · `make.freeSemNote` · `make.semNone` · `make.semZero`, `make.semNote` 글 바꿈, `make.treeAria` 지움
-- [ ] 무료: 잠금 상자를 탭 줄 위로, 도구 줄 "유료에서 만들 값이에요"
-- [ ] verify-bind-flow 블록 17(탭 전환 · 탭별 모두 켜기 · 끄기, '레이어 n' · `grp:global` 검사 고침) · 연결 화면 칩 검사 고침
+- [x] 만들기 묶음 머리 → 위 밑줄 탭(Global · Semantic · 텍스트 스타일 — 개수 = 총 줄 수, 응답 전 "…"), `tablist` · ← → 키, 고른 탭 기억(화면에 있는 동안), 보이는 탭 규칙
+- [x] 탭마다 도구 줄(안내 · ⓘ 툴팁 · 그 탭의 모두 켜기 · 끄기), 안내 줄(`make.semNote` · `make.tsNote`)을 ⓘ로 옮김, Global 묶음 머리 스위치 삭제
+- [x] Semantic 탭 빈 모습("켠 Global이 없어 만들 Semantic이 없어요"), 텍스트 스타일 이름 겹침 주황 점
+- [x] 줄 숫자 "레이어 {n}" → "Layer {n}"(`make.layers`), 만들기 Global 줄 · 연결 화면 줄 이름 칩의 종류 표시(● · # · T) 삭제 — 공용 `varChip`에 종류 표시를 끄는 선택지, Semantic 줄 칩은 그대로
+- [x] 새 키 `make.tabsAria` · `make.semTop` · `make.tsTop` · `make.freeTop` · `make.freeSemNote` · `make.semNone` · `make.semZero`, `make.semNote` 글 바꿈, `make.treeAria` 지움
+- [x] 무료: 잠금 상자를 탭 줄 위로, 도구 줄 "유료에서 만들 값이에요"
+- [x] verify-bind-flow 블록 17(탭 전환 · 탭별 모두 켜기 · 끄기, '레이어 n' · `grp:global` 검사 고침) · 연결 화면 칩 검사 고침
