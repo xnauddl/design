@@ -3371,7 +3371,7 @@ function bindCardCounts(): CardCounts & { t: number } {
   const t = ts.size;
   const m = c.m + t;
   const k = Math.max(0, c.k - dk);
-  const byKind = c.byKind.map((x) => (x.kind === 'text' ? { ...x, n: x.n - dk } : x)).filter((x) => x.n > 0);
+  const byKind = [...c.byKind];
   const noVarByKind = c.noVarByKind.map((x) => (x.kind === 'text' ? { ...x, n: x.n - dk } : x)).filter((x) => x.n > 0);
   if (t) byKind.push({ kind: 'textStyle' as SelKind, n: t });
   return { ...c, m, k, s: Math.max(0, c.s - ds), n: m + k, byKind, noVarByKind, t };
@@ -3506,7 +3506,7 @@ function renderBindTree(): void {
       });
       const st = headState(list.map((g) => ({ on: rowOn(g) })));
       items.push({
-        key: `kind:${kind}`, head: true, name: KIND_HEAD[kind], countText: t('tree.count', { n: list.length }), indent: 0, children,
+        key: `kind:${kind}`, head: true, name: KIND_HEAD[kind], countText: t('tree.places', { n: list.reduce((a, g) => a + g.count, 0) }), indent: 0, children,
         sw: { state: st, label: t('tree.headAria', { name: KIND_HEAD[kind] }), onToggle: () => { const to = headToggleTarget(st); for (const g of list) for (const k of g.keys) to ? bindChecked.add(k) : bindChecked.delete(k); renderBindTree(); } },
       });
     }
@@ -3532,7 +3532,7 @@ function renderBindTree(): void {
       });
       const st = headState(bindTsRows.map((r) => ({ on: !bindTsOff.has(r.styleId) })));
       items.push({
-        key: 'kind:textStyle', head: true, name: KIND_HEAD.textStyle, countText: t('tree.count', { n: bindTsRows.length }), indent: 0, children,
+        key: 'kind:textStyle', head: true, name: KIND_HEAD.textStyle, countText: t('tree.places', { n: bindTsRows.reduce((a, r) => a + r.nodeIds.length, 0) }), indent: 0, children,
         sw: { state: st, label: t('tree.headAria', { name: KIND_HEAD.textStyle }), onToggle: () => { const to = headToggleTarget(st); for (const r of bindTsRows) tsToggle(r, to); renderBindTree(); } },
       });
     }
@@ -4639,7 +4639,7 @@ function subBack(): void {
   }
   showSelSub('home');
   const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $('selCards').querySelector<HTMLElement>('button');
-  (target ?? $('btnGoRename')).focus();
+  (target ?? $('btnGoMake')).focus();
 }
 $('btnSubBack').addEventListener('click', subBack);
 // [data-go-sub] — 선택 탭 하위 화면으로 가는 링크(위임). 카드 버튼과 같은 이동.
@@ -4690,8 +4690,9 @@ TABS.forEach((tb, i) => {
     $(`tabbtn-${target}`).focus();
   });
 });
-$('btnGoRename').addEventListener('click', (e) => { if (!curSel.count) return; showSelSub('rename', e.currentTarget as HTMLElement); });
-$('btnGoComponents').addEventListener('click', (e) => { if (!curSel.count) return; showSelSub('structure', e.currentTarget as HTMLElement); });
+$('btnGoMake').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showMakeScreen(e.currentTarget as HTMLElement); });
+$('btnGoRename').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showSelSub('rename', e.currentTarget as HTMLElement); });
+$('btnGoComponents').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showSelSub('structure', e.currentTarget as HTMLElement); });
 $('btnVarEmptyMake').addEventListener('click', (e) => { if (!curSel.count) return; showMakeScreen(e.currentTarget as HTMLElement); });
 
 /* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
@@ -5173,7 +5174,7 @@ function renderSelBase(): void {
 /** [기준 바꾸기](§2.5) — 지금 선택을 기준으로 삼고 읽는다. 버튼이 사라지면 첫 카드 버튼(없으면 [이름 정리])으로. */
 function doRebase(): void {
   rebaseToCurrent();
-  ($('selCards').querySelector<HTMLElement>('button') ?? $('btnGoRename')).focus();
+  ($('selCards').querySelector<HTMLElement>('button') ?? $('btnGoMake')).focus();
 }
 
 /* ---------- 칩 줄 ---------- */
@@ -5638,7 +5639,7 @@ function focusAfterDetail(id: string): { el: HTMLElement; present: boolean } {
   const ret = detailReturn;
   if (ret && !detailFromVars) {
     if (document.body.contains(ret) && ret.offsetParent) return { el: ret, present: true };
-    return { el: $('selCards').querySelector<HTMLElement>('button') ?? $('btnGoRename'), present: false };
+    return { el: $('selCards').querySelector<HTMLElement>('button') ?? $('btnGoMake'), present: false };
   }
   const items = gridItems();
   const hit = items.find((x) => x.dataset.key === `v:${id}`);
@@ -7153,17 +7154,14 @@ function renderSelHome(): void {
   clearMount(head);
   clearMount(cards);
   const noSel = !baseline;
-  // 레이어 정리(§4.1) — 선택이 없으면 잠금.
-  for (const id of ['btnGoRename', 'btnGoComponents']) setLock($(id), curSel.count ? null : 'prereq', t('status.noSelection'));
+  // 할 일(§4.1) — 목록 기준이 없으면 잠금.
+  for (const id of ['btnGoMake', 'btnGoRename', 'btnGoComponents']) setLock($(id), (baseline ?? curSel).count ? null : 'prereq', t('status.noSelection'));
   // 머리 줄
   if (baseline) {
     const b = document.createElement('b');
     b.textContent = baseLabel();
     b.title = baseLabel();
-    const n = document.createElement('span');
-    n.className = 'sel-n';
-    n.textContent = t('v4.layers', { n: baseline.count });
-    head.append(b, n);
+    head.append(b);
     if (baseDiffers()) {
       const diff = document.createElement('span');
       diff.className = 'sel-diff';
@@ -7262,20 +7260,16 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     put(selCard({ title: t('v4.nothingToLink'), subs: [t('v4.skippedPlaces', { s })], actions: [v] }));
     return;
   }
-  const kinds = counts.byKind.filter((x) => x.kind !== 'other').map((x) => `${kindLabel(x.kind)} ${x.n}`).join(' · ');
+  // 둘째 줄: 종류별 연결할 곳(합 = m, Other 제외) + " · 새로 만들 값 {k}곳"(링크 없음 — 입구는 할 일 [변수 만들기]).
+  const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== 'other').map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
+  if (k > 0) parts.push(t('v4.noVarPlaces', { k }));
   const sub = document.createElement('span');
-  sub.textContent = kinds;
+  sub.textContent = parts.join(' · ');
   const actions: HTMLElement[] = [];
   if (m > 0) {
     const go = selBtn(t('v4.linkN', { n: m }), (el) => { showSelSub('bind', el); }, true);
     go.dataset.k = 'link';
     actions.push(go);
-    if (k > 0) {
-      sub.append(' · ' + t('v4.noVarPlaces', { k }) + ' ');
-      const mk = selLink(t('v4.makeArrow'), (el) => { showMakeScreen(el); });
-      mk.dataset.k = 'make';
-      sub.appendChild(mk);
-    }
   } else {
     const mk = selBtn(t('v4.makeArrow'), (el) => { showMakeScreen(el); }, true);
     mk.dataset.k = 'make';
@@ -7398,8 +7392,8 @@ function onDeletedUnbound(msg: Extract<CodeToUi, { type: 'DELETED_UNBOUND' }>): 
   const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t('v4.unbindFail.' + k)} ${n}`).join(' · ');
   if (tip) $('statusText').title = tip;
   // 카드가 사라지면 포커스는 [이름 정리](§4.1).
-  if (document.activeElement === document.body || !document.activeElement?.isConnected) $('btnGoRename').focus();
-  queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) $('btnGoRename').focus(); });
+  if (document.activeElement === document.body || !document.activeElement?.isConnected) $('btnGoMake').focus();
+  queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) $('btnGoMake').focus(); });
 }
 
 /* ---------- 첫 화면 — 변수 탭(IA v3) ----------

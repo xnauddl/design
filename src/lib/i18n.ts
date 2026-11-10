@@ -304,6 +304,7 @@ export const STRINGS: Record<string, string> = {
   // 배지 줄
   // 트리 목록(IA v4 §2.7)
   'tree.count': '{n}개',
+  'tree.places': '{n}곳',
   'tree.expand': '펼치기',
   'tree.collapse': '접기',
   'tree.headAria': '{name} 모두 켜고 끄기',
@@ -356,7 +357,6 @@ export const STRINGS: Record<string, string> = {
   'tab.variables': '변수',
   'tab.select': '선택',
   // IA v4 선택 탭(§4.1)
-  'v4.layers': '레이어 {n}개',
   'v4.selMany': '{name} 외 {k}개',
   'v4.baseDiff': '지금 선택과 달라요',
   'v4.loading': '불러오는 중…',
@@ -370,7 +370,7 @@ export const STRINGS: Record<string, string> = {
   'v4.findN': '변수 없는 값 {n}곳',
   'v4.findTip': '인스턴스 안쪽 · 숨긴 레이어 제외',
   'v4.linkN': '{n}곳 연결',
-  'v4.noVarPlaces': '변수가 없는 값 {k}곳',
+  'v4.noVarPlaces': '새로 만들 값 {k}곳',
   'v4.allBound': '✓ 찾은 값은 모두 변수에 연결돼 있어요',
   'v4.nothingToLink': '연결할 수 있는 값이 없어요',
   'v4.skipPlaces': '건너뜀 {s}곳',
@@ -401,7 +401,7 @@ export const STRINGS: Record<string, string> = {
   'v4.unboundFailed': ' · {m}곳은 풀지 못했어요',
   'v4.unbindFail.font': '글꼴을 불러올 수 없음',
   'v4.unbindFail.error': '오류',
-  'v4.tidy': '레이어 정리',
+  'v4.tidy': '할 일',
   'v4.rename': '이름 정리',
   'v4.back': '돌아가기',
   'v4.backHome': '← 돌아가기',

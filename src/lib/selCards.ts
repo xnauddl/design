@@ -46,7 +46,7 @@ export interface CardCounts {
   s: number;
   /** m + k. */
   n: number;
-  /** 종류별 곳 수(m + k, SEL_KINDS 순서, 0은 뺌). */
+  /** 종류별 연결할 곳 수(m만 — 합 = m, 연결 화면 종류 머리 수와 같다. SEL_KINDS 순서, 0은 뺌). k는 noVarByKind. */
   byKind: { kind: SelKind; n: number }[];
   /** 종류별 변수가 없는 값(④ 둘째 줄). */
   noVarByKind: { kind: SelKind; n: number }[];
@@ -65,7 +65,6 @@ export function cardCounts(candidateFields: readonly string[], counts: ReasonCou
     for (const [kind, n] of Object.entries(counts?.[r] ?? {})) {
       if (!n) continue;
       k += n;
-      add(byKind, kind as SelKind, n);
       add(noVar, kind as SelKind, n);
     }
   }

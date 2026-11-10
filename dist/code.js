@@ -300,6 +300,7 @@
     // 배지 줄
     // 트리 목록(IA v4 §2.7)
     "tree.count": "{n}\uAC1C",
+    "tree.places": "{n}\uACF3",
     "tree.expand": "\uD3BC\uCE58\uAE30",
     "tree.collapse": "\uC811\uAE30",
     "tree.headAria": "{name} \uBAA8\uB450 \uCF1C\uACE0 \uB044\uAE30",
@@ -352,7 +353,6 @@
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
-    "v4.layers": "\uB808\uC774\uC5B4 {n}\uAC1C",
     "v4.selMany": "{name} \uC678 {k}\uAC1C",
     "v4.baseDiff": "\uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694",
     "v4.loading": "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
@@ -366,7 +366,7 @@
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
-    "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
+    "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
     "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
@@ -397,7 +397,7 @@
     "v4.unboundFailed": " \xB7 {m}\uACF3\uC740 \uD480\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "v4.unbindFail.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC74C",
     "v4.unbindFail.error": "\uC624\uB958",
-    "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
+    "v4.tidy": "\uD560 \uC77C",
     "v4.rename": "\uC774\uB984 \uC815\uB9AC",
     "v4.back": "\uB3CC\uC544\uAC00\uAE30",
     "v4.backHome": "\u2190 \uB3CC\uC544\uAC00\uAE30",

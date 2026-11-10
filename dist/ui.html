@@ -210,7 +210,6 @@
     /* ── IA v4 선택 탭(§4.1 · §8) ── */
     .sel-head { display: flex; align-items: center; gap: 6px; min-height: 32px; flex-wrap: wrap; }
     .sel-head b { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-    .sel-head .sel-n { color: var(--text-2); }
     .sel-head .sel-diff { margin-left: auto; color: var(--text-2); font-size: 10.5px; display: inline-flex; gap: 4px; align-items: center; }
     .sel-empty { padding: 48px 8px; text-align: center; color: var(--text-2); }
     .sel-empty .sub { margin-top: 4px; font-size: 11px; }
@@ -949,7 +948,8 @@
       <div class="sel-head" id="selHead"></div>
       <div id="selCards"></div>
       <div class="sel-tools" id="selTools">
-        <span data-i18n="v4.tidy">레이어 정리</span>
+        <span data-i18n="v4.tidy">할 일</span>
+        <button id="btnGoMake" type="button" data-i18n="make.title">변수 만들기</button>
         <button id="btnGoRename" type="button" data-i18n="v4.rename">이름 정리</button>
         <button id="btnGoComponents" type="button" data-i18n-aria-label="layer.componentsBetaAria" aria-label="컴포넌트 (베타)"><span data-i18n="rail.structure">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span></button>
       </div>
@@ -1606,6 +1606,7 @@
     // 배지 줄
     // 트리 목록(IA v4 §2.7)
     "tree.count": "{n}\uAC1C",
+    "tree.places": "{n}\uACF3",
     "tree.expand": "\uD3BC\uCE58\uAE30",
     "tree.collapse": "\uC811\uAE30",
     "tree.headAria": "{name} \uBAA8\uB450 \uCF1C\uACE0 \uB044\uAE30",
@@ -1658,7 +1659,6 @@
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
-    "v4.layers": "\uB808\uC774\uC5B4 {n}\uAC1C",
     "v4.selMany": "{name} \uC678 {k}\uAC1C",
     "v4.baseDiff": "\uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694",
     "v4.loading": "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
@@ -1672,7 +1672,7 @@
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
-    "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
+    "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
     "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
@@ -1703,7 +1703,7 @@
     "v4.unboundFailed": " \xB7 {m}\uACF3\uC740 \uD480\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "v4.unbindFail.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC74C",
     "v4.unbindFail.error": "\uC624\uB958",
-    "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
+    "v4.tidy": "\uD560 \uC77C",
     "v4.rename": "\uC774\uB984 \uC815\uB9AC",
     "v4.back": "\uB3CC\uC544\uAC00\uAE30",
     "v4.backHome": "\u2190 \uB3CC\uC544\uAC00\uAE30",
@@ -2391,7 +2391,6 @@
       for (const [kind, n] of Object.entries((_a = counts == null ? void 0 : counts[r]) != null ? _a : {})) {
         if (!n) continue;
         k += n;
-        add(byKind, kind, n);
         add(noVar, kind, n);
       }
     }
@@ -6739,7 +6738,7 @@
     const t2 = ts.size;
     const m = c.m + t2;
     const k = Math.max(0, c.k - dk);
-    const byKind = c.byKind.map((x) => x.kind === "text" ? __spreadProps(__spreadValues({}, x), { n: x.n - dk }) : x).filter((x) => x.n > 0);
+    const byKind = [...c.byKind];
     const noVarByKind = c.noVarByKind.map((x) => x.kind === "text" ? __spreadProps(__spreadValues({}, x), { n: x.n - dk }) : x).filter((x) => x.n > 0);
     if (t2) byKind.push({ kind: "textStyle", n: t2 });
     return __spreadProps(__spreadValues({}, c), { m, k, s: Math.max(0, c.s - ds), n: m + k, byKind, noVarByKind, t: t2 });
@@ -6869,7 +6868,7 @@
           key: `kind:${kind}`,
           head: true,
           name: KIND_HEAD[kind],
-          countText: t("tree.count", { n: list.length }),
+          countText: t("tree.places", { n: list.reduce((a, g) => a + g.count, 0) }),
           indent: 0,
           children,
           sw: { state: st, label: t("tree.headAria", { name: KIND_HEAD[kind] }), onToggle: () => {
@@ -6908,7 +6907,7 @@
           key: "kind:textStyle",
           head: true,
           name: KIND_HEAD.textStyle,
-          countText: t("tree.count", { n: bindTsRows.length }),
+          countText: t("tree.places", { n: bindTsRows.reduce((a, r) => a + r.nodeIds.length, 0) }),
           indent: 0,
           children,
           sw: { state: st, label: t("tree.headAria", { name: KIND_HEAD.textStyle }), onToggle: () => {
@@ -7887,7 +7886,7 @@ ${opts.tip}` : text;
     }
     showSelSub("home");
     const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $("selCards").querySelector("button");
-    (target != null ? target : $("btnGoRename")).focus();
+    (target != null ? target : $("btnGoMake")).focus();
   }
   $("btnSubBack").addEventListener("click", subBack);
   document.addEventListener("click", (e) => {
@@ -7949,12 +7948,16 @@ ${opts.tip}` : text;
       $(`tabbtn-${target}`).focus();
     });
   });
+  $("btnGoMake").addEventListener("click", (e) => {
+    if (!(baseline != null ? baseline : curSel).count) return;
+    showMakeScreen(e.currentTarget);
+  });
   $("btnGoRename").addEventListener("click", (e) => {
-    if (!curSel.count) return;
+    if (!(baseline != null ? baseline : curSel).count) return;
     showSelSub("rename", e.currentTarget);
   });
   $("btnGoComponents").addEventListener("click", (e) => {
-    if (!curSel.count) return;
+    if (!(baseline != null ? baseline : curSel).count) return;
     showSelSub("structure", e.currentTarget);
   });
   $("btnVarEmptyMake").addEventListener("click", (e) => {
@@ -8426,7 +8429,7 @@ ${opts.tip}` : text;
   function doRebase() {
     var _a;
     rebaseToCurrent();
-    ((_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoRename")).focus();
+    ((_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoMake")).focus();
   }
   function currentSel() {
     var _a;
@@ -8929,7 +8932,7 @@ ${opts.tip}` : text;
     const ret = detailReturn;
     if (ret && !detailFromVars) {
       if (document.body.contains(ret) && ret.offsetParent) return { el: ret, present: true };
-      return { el: (_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoRename"), present: false };
+      return { el: (_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoMake"), present: false };
     }
     const items = gridItems();
     const hit = items.find((x) => x.dataset.key === `v:${id}`);
@@ -10497,15 +10500,12 @@ ${opts.tip}` : text;
     clearMount(head);
     clearMount(cards);
     const noSel = !baseline;
-    for (const id of ["btnGoRename", "btnGoComponents"]) setLock($(id), curSel.count ? null : "prereq", t("status.noSelection"));
+    for (const id of ["btnGoMake", "btnGoRename", "btnGoComponents"]) setLock($(id), (baseline != null ? baseline : curSel).count ? null : "prereq", t("status.noSelection"));
     if (baseline) {
       const b = document.createElement("b");
       b.textContent = baseLabel();
       b.title = baseLabel();
-      const n = document.createElement("span");
-      n.className = "sel-n";
-      n.textContent = t("v4.layers", { n: baseline.count });
-      head.append(b, n);
+      head.append(b);
       if (baseDiffers()) {
         const diff = document.createElement("span");
         diff.className = "sel-diff";
@@ -10629,9 +10629,10 @@ ${opts.tip}` : text;
       put(selCard({ title: t("v4.nothingToLink"), subs: [t("v4.skippedPlaces", { s })], actions: [v] }));
       return;
     }
-    const kinds = counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`).join(" \xB7 ");
+    const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
+    if (k > 0) parts.push(t("v4.noVarPlaces", { k }));
     const sub = document.createElement("span");
-    sub.textContent = kinds;
+    sub.textContent = parts.join(" \xB7 ");
     const actions = [];
     if (m > 0) {
       const go = selBtn(t("v4.linkN", { n: m }), (el) => {
@@ -10639,14 +10640,6 @@ ${opts.tip}` : text;
       }, true);
       go.dataset.k = "link";
       actions.push(go);
-      if (k > 0) {
-        sub.append(" \xB7 " + t("v4.noVarPlaces", { k }) + " ");
-        const mk = selLink(t("v4.makeArrow"), (el) => {
-          showMakeScreen(el);
-        });
-        mk.dataset.k = "make";
-        sub.appendChild(mk);
-      }
     } else {
       const mk = selBtn(t("v4.makeArrow"), (el) => {
         showMakeScreen(el);
@@ -10793,9 +10786,9 @@ ${opts.tip}` : text;
     showStatusLine(text, { cls: msg.failed ? "warn" : "ok" });
     const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t("v4.unbindFail." + k)} ${n}`).join(" \xB7 ");
     if (tip) $("statusText").title = tip;
-    if (document.activeElement === document.body || !((_a = document.activeElement) == null ? void 0 : _a.isConnected)) $("btnGoRename").focus();
+    if (document.activeElement === document.body || !((_a = document.activeElement) == null ? void 0 : _a.isConnected)) $("btnGoMake").focus();
     queueMicrotask(() => {
-      if (!$("selCards").contains(document.activeElement)) $("btnGoRename").focus();
+      if (!$("selCards").contains(document.activeElement)) $("btnGoMake").focus();
     });
   }
   activeTab = "variables";

@@ -2844,7 +2844,7 @@ test('cardCounts — m · k · s · n, 레이어 단위 사유와 already-bound�
   assert.equal(c.k, 4);
   assert.equal(c.s, 1);
   assert.equal(c.n, 7);
-  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 2 }, { kind: 'size', n: 1 }, { kind: 'color', n: 4 }]);
+  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]); // 연결할 곳만(k는 noVarByKind)
   assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'size', n: 1 }, { kind: 'color', n: 2 }]);
   assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
 });
