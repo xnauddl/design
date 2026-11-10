@@ -142,14 +142,14 @@
     - ② **정수만 만드는 숫자의 소수 값** — 여백 · 간격 · 그리드 간격 · 반경 · 글자 크기 · 행간 · 자간(`onScale`)과 크기(`addSize`): 소수 = 소수 둘째 자리로 반올림해도 정수가 아님(`|v − round(v)| ≥ 0.005` — extract `round` · `onScale`과 같은 판정, 그래서 4.004는 4로 보고 만든 `spacing/4`에 연결된다). 연결 후보가 나오지 않으면 k가 아니라 s(사유 `fraction` — 글 "소수 값(정수만)"으로 넓힘, 크기는 `size-fraction`). 선 두께 소수는 지금처럼 후보를 찾지 않고 `fraction`.
     - ③ **숨긴 칠 · 숨긴 효과**(`visible: false` — `collectPaints` · `collectEffects`가 건너뜀)는 찾지 않는다(사유 없음, 연결도 하지 않음).
     - 구현: 자리마다 실패 사유를 정해 두고(`noMatchReason` — ①은 버림 표시, ②는 `fraction` · `size-fraction`), `resolveSlots`의 마지막 거르기에서 ①은 사유 없이 버리고 ②는 그 사유로 남긴다.
-  - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`styled` · `hug-fill` · `translucent` · `space-between` · `fraction` · `size-fraction` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다.
+  - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`hug-fill` · `translucent` · `space-between` · `fraction` · `size-fraction` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다. **`styled`(스타일 사용 중)는 s에 넣지 않는다**(2026-11-10 실기 확인 · 사용자 결정 A — 스타일이 붙은 자리는 이미 디자인 시스템에 연결된 것이라 "건너뜀"이 아니다. 실기에서 텍스트 스타일을 붙인 글자 97곳이 건너뜀 156곳 중 97곳을 차지했다). 연결 화면 건너뜀 칩에서는 레이어 단위 사유처럼 s에 더하지 않는 회색 칩 "스타일 사용 중 {n}곳"으로 보인다.
   - 스타일 후보 레이어의 글자 종류 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 m에서만이 아니라 k · s에서도 뺀다 — 그 레이어는 스타일 줄 1곳으로만 센다(④ · 종류별 수도 같다).
   - n = m + k. 제목 "변수 없는 값 {n}곳"(n 툴팁 "인스턴스 안쪽 · 숨긴 레이어 제외").
 - 둘째 줄 종류별 수(아래 속성 → 종류 표의 순서, 0은 뺌, 종류 이름은 §2.7 영어 — 예 "Spacing 2 · Radius 1 · Color 3 · Text Style 2"). **연결할 곳(m)만 종류별로 센다**(합 = m — Other 자리는 요약에 없어 빠진다, 아래 표, 연결 화면 종류 머리 수와 같다 — 2026-11-10 UX 검수 B. 전에는 k도 더해 연결 화면 머리와 달랐다). 새로 만들 값 k는 아래처럼 끝에 따로. 버튼 **[{m}곳 연결]**(주 버튼) → 연결 화면(§4.2).
 - m = 0이고 k > 0이면 버튼 대신 [변수 만들기 →](→ §4.3 — 이 카드의 유일한 동작이라 주 버튼으로 남긴다, 아래 할 일 [변수 만들기]와 같은 곳으로 간다).
 - m > 0이고 k > 0이면 둘째 줄 끝에 " · 새로 만들 값 {k}곳"(`v4.noVarPlaces` 글을 바꿈 — 제목 "변수 없는 값"과 헷갈리지 않게, 링크 없음: 입구는 아래 할 일 [변수 만들기], 2026-11-10 UX 검수 B). 그래서 둘째 줄의 수를 모두 더하면 제목 n이다(Other 제외).
 - m = 0이고 k > 0이면 둘째 줄은 "새로 만들 값 {k}곳"만(종류별 수 없음).
-- n = 0이고 s = 0이면 카드를 `--ok-subtle` 바탕 "✓ 찾은 값은 모두 변수에 연결돼 있어요"로 바꾸고 버튼은 없다. n = 0이고 s > 0이면 "연결할 수 있는 값이 없어요 · 건너뜀 {s}곳 [보기]"([보기] → 연결 화면, 건너뜀 칩이 펼쳐진 채).
+- n = 0이고 s = 0이면 카드를 `--ok-subtle` 바탕 "✓ 찾은 값은 모두 변수에 연결돼 있어요"로 바꾸고 버튼은 없다. n = 0이고 s > 0이면 제목 "✓ 연결할 곳은 모두 연결됐어요"(`v4.nothingToLink` 글을 바꿈 — 전에는 "연결할 수 있는 값이 없어요"라 실패처럼 읽혔다, 2026-11-10 실기 확인 · 사용자 결정 A) · 둘째 줄 "건너뜀 {s}곳" · [보기](→ 연결 화면, 건너뜀 칩이 펼쳐진 채). 바탕은 보통 카드(손볼 곳이 남아 있을 수 있어서 `--ok-subtle`은 s = 0일 때만).
 - **연결할 변수가 없을 때**(v3 §4.6 표를 이렇게 바꾼다):
   - 로컬 변수는 있지만 계층 컬렉션에 변수가 없음(`hasBindable` false): 둘째 줄 "변수는 있지만 계층으로 쓸 컬렉션이 없어요"(`bind.noTier`) + [변수 만들기 →].
   - 로컬 변수 0개: 위 상태표 5 · 6번.
@@ -218,7 +218,7 @@
   - 텍스트 스타일(로컬 텍스트 스타일과 값이 같은 글자 — v3 [기존 스타일 연결])은 "Text Style" 머리(같은 트리 규칙) 아래 같은 모양의 줄로(견본 Aa · 스타일 이름 · "{n}곳" · 스위치). **글자 변수가 붙은 글자도 후보다**(§2.3-6) — 붙일 때 그 글자의 글자 변수 연결을 떼고 스타일을 붙인다. 그래서 텍스트 스타일 사유 `boundVars`("글자 속성에 변수 있음")는 없앤다.
   - **텍스트 스타일이 먼저다:** 스타일 후보가 있는 글자 레이어의 글자 종류 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 글자 변수 후보에서 뺀다. 그 스타일 줄을 끄면 그 자리들을 글자 변수 후보로 되돌린다. 곳 수는 한 자리를 한 번만 센다(스타일 줄은 레이어 1개 = 1곳).
   - 줄 수 상한은 없다(줄이 변수 단위라 많아야 수십 개).
-- [건너뜀 {s}곳 ▸] 칩: s는 카드 1과 **같은 정의**(자리 단위 사유의 곳 수)라 카드의 "건너뜀 {s}곳"과 숫자가 같다. 누르면 사유 칩이 펼쳐진다: 자리 단위 사유는 "{사유} {n}곳", 레이어 단위 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)와 텍스트 스타일 사유(hasStyle · noStyle · ambiguous · mixed · instance)는 "{사유} 레이어 {n}개" — 이 둘은 s에 더하지 않는다. s = 0이고 레이어 단위 사유만 있으면 칩은 "[건너뛴 레이어 ▸]".
+- [건너뜀 {s}곳 ▸] 칩: s는 카드 1과 **같은 정의**(자리 단위 사유의 곳 수)라 카드의 "건너뜀 {s}곳"과 숫자가 같다. 누르면 사유 칩이 펼쳐진다: 자리 단위 사유는 "{사유} {n}곳", 레이어 단위 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)와 텍스트 스타일 사유(hasStyle · noStyle · ambiguous · mixed · instance)는 "{사유} 레이어 {n}개" — 이 둘과 `styled`(스타일 사용 중, "{사유} {n}곳")는 s에 더하지 않는다(회색 칩). s = 0이고 레이어 단위 사유만 있으면 칩은 "[건너뛴 레이어 ▸]".
 - 아래 고정: [{n}곳 연결](주 버튼). 연결 직전 다시 확인(v3 그대로) → 끝나면 첫 화면으로 돌아오고 상태 줄 "🔗 {n}곳 연결 · ⌘Z로 되돌리기"(건너뛴 곳이 있으면 " · 건너뜀 {m}"). 카드는 다시 읽는다.
 
 **상태**
@@ -685,3 +685,4 @@
 - [x] 실기 확인 버그(§4.1 k ①~③): 뽑지 않는 값(0 이하 여백 · 간격 · 그리드 간격, 자간 0, 행간 0 이하)은 후보가 없으면 사유 없이 버림, 소수 숫자는 `fraction`(글 "소수 값(정수만)") · 크기는 `size-fraction` — 둘 다 s(`NO_VAR_REASONS` = no-match만, `PLACE_SKIP_REASONS`에 size-fraction), 숨긴 칠 · 효과는 찾지 않음, 선 두께 방향별 기록 = 이미 연결됨(완료)
 - [x] 테스트: `cardCounts`(pure 2834 — k 3 · s 2 · noVarByKind에서 size 빠짐), figma 1443 주석, 새로: 여백 0 네 방향 → no-match 0 · skips 없음 / 0 변수가 있으면 후보 / 별칭뿐인 0 → 버림 / 음수 간격 → 버림 / 소수 여백 · 반경 → fraction / 자간 0 → 버림 / 스타일 글자 자간 0 → styled에 안 셈 / 4.004 여백 → 만든 4 변수에 연결(fraction 아님) / 숨긴 칠 → 찾지 않음
 - [x] 실기 확인 버그: 비율 잠김 레이어의 크기는 한 자리(v3 §2.11 "비율 고정" — `targetAspectRatio` · `constrainProportions`, FIXED인 축 하나, 이미 연결은 한 번 · deleted 먼저, 다시 확인은 볼 축만), 테스트: 가로만 연결 → 후보 0 · already-bound 1 / 비어 있음 → 후보 width 1개 / 가로 HUG · 세로 FIXED → 후보 height 1개 / 가로 HUG(연결됨) · 세로 FIXED → 후보 0 · already-bound 1 / 가로가 삭제 변수 → deleted-var 1 / 잠김 꺼짐 → 두 축 / targetAspectRatio로만 잠김 → 한 자리 / APPLY_SELECTED에 width · height 함께 → width만 · height changed(목 setBoundVariable이 잠김이면 다른 축을 지움)
+- [ ] 카드 1 완료 문구: n = 0 · s > 0이면 "✓ 연결할 곳은 모두 연결됐어요 · 건너뜀 {s}곳 [보기]"(`v4.nothingToLink`), `styled`는 s에서 뺌(`PLACE_SKIP_REASONS`) · 연결 화면 칩은 회색(s에 안 더함), 테스트(pure cardCounts · verify 건너뜀 칩)
