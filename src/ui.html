@@ -235,6 +235,10 @@
     .sub-back { width: 28px; height: 28px; padding: 0; border: none; background: transparent; font-size: 16px; color: var(--text); border-radius: var(--r-sm); }
     .sub-back:hover { background: var(--surface-hover); }
     .sub-title { font-size: 13px; }
+    .sub-head .sub-title { flex: 0 0 auto; }
+    .sub-right { display: flex; min-width: 0; font-size: 11px; white-space: nowrap; }
+    .sub-right-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+    .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: 40px 8px; text-align: center; }
     /* IA v4 §4.2 연결 화면 */
     .bind-v4 .bv-kind { padding: 10px 2px 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
@@ -677,7 +681,8 @@
     .make-opts label.inline { display: inline-flex; align-items: center; gap: 4px; margin-right: 10px; }
     .make-act { display: flex; align-items: center; gap: 8px; margin-top: 4px; min-height: 36px; }
     .make-act .grow { flex: 1 1 auto; }
-    .make-count { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+    .make-act > button { flex: 0 0 auto; }
+    .make-count { font-size: 11px; line-height: 1.35; white-space: normal; word-break: keep-all; min-width: 0; flex: 0 1 auto; }
     .make-prog { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; font-size: 11px; }
     .make-prog .bar { height: 4px; display: block; }
     .make-prog .bar-fill { display: block; height: 4px; }

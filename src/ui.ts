@@ -2591,7 +2591,7 @@ $('btnRename').addEventListener('click', () => {
 $('renameAllOn').addEventListener('click', () => { renameOff.clear(); renderRenameScreen(); $('renameAllOn').focus(); });
 $('renameAllOff').addEventListener('click', () => { for (const n of renameRows()) renameOff.add(n.id); renderRenameScreen(); $('renameAllOff').focus(); });
 
-/** 트리 머리 이름(§2.7) — 영어 고유 이름, 번역하지 않는다(만들기 · 연결 화면 공용). 문장 속 종류 이름은 `v4.kind.*`. */
+/** 종류 이름(§2.7) — 영어 고유 이름, 번역하지 않는다(트리 머리 · 탭 · 카드 종류별 수 공용). */
 const KIND_HEAD: Record<string, string> = {
   gap: 'Spacing', radius: 'Radius', size: 'Size', stroke: 'Stroke', opacity: 'Opacity', color: 'Color', text: 'Typography', other: 'Other', textStyle: 'Text Style',
 };
@@ -4595,19 +4595,40 @@ function bindFocusFirst(): void {
   bindFocusPending = false;
   row.focus({ preventScroll: true });
 }
-/** 연결 화면 머리 오른쪽(§4.2) — "변수 없는 값 {n}곳", 텍스트 스타일만 모습이면 "텍스트 스타일 {t}곳". */
-function bindHeadRight(): string {
+/** 연결 화면 머리 오른쪽 꼬리(§4.2) — "변수 없는 값 {n}곳", 텍스트 스타일만 모습이면 "Text Style {t}곳". 없으면 ''. */
+function bindHeadTail(): string {
   if (!bindPreviewed) return '';
   const c = bindCardCounts();
   if (bindTsOnly()) return c.t ? t('v4.tsPlaces', { t: c.t }) : '';
   return c.n ? t('v4.findN', { n: c.n }) : '';
 }
+/** 머리 오른쪽 = 이름(넘치면 이것만 줄임) + 꼬리(늘 보임, §4.2). */
+function setSubRight(name: string, tail: string, sep: string): void {
+  const box = $('subRight');
+  box.replaceChildren();
+  if (!name && !tail) return;
+  const nm = document.createElement('span');
+  nm.className = 'sub-right-name';
+  nm.textContent = name;
+  box.appendChild(nm);
+  if (tail) {
+    const tl = document.createElement('span');
+    tl.className = 'sub-right-tail';
+    tl.textContent = (name ? sep : '') + tail;
+    box.appendChild(tl);
+  }
+  requestAnimationFrame(() => { nm.title = nm.scrollWidth > nm.clientWidth ? name : ''; });
+}
 /** 하위 화면 머리 — 제목 · 오른쪽 보조 글(§4.2~§4.5). */
 function renderSubHead(): void {
   const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'make.title', pick: 'v4.subMake' };
   if (selSub === 'home') return;
-  $('subTitle').textContent = selSub === 'bind' ? baseLabel() : t(titles[selSub]);
-  $('subRight').textContent = selSub === 'make' ? (baseline ? t('make.subRight', { name: baseLabel() }) : '') : selSub === 'pick' ? '' : selSub === 'rename' ? (renameFor === baseKey() ? t('rename.subRight', { name: baseLabel(), n: renameRows().length }) : baseLabel()) : selSub === 'bind' ? bindHeadRight() : '';
+  $('subTitle').textContent = t(titles[selSub]);
+  const name = baseline ? baseLabel() : '';
+  if (selSub === 'make') setSubRight(name, name ? t('make.subRight') : '', '');
+  else if (selSub === 'rename') setSubRight(name, renameFor === baseKey() ? t('rename.subRight', { n: renameRows().length }) : '', ' · ');
+  else if (selSub === 'bind') setSubRight(name, bindHeadTail(), ' · ');
+  else setSubRight('', '', '');
 }
 /** ← · Esc — 첫 화면으로, 포커스는 연 버튼(없으면 첫 카드 버튼, §2.1). */
 function subBack(): void {
@@ -7122,7 +7143,7 @@ function selLink(label: string, onClick: (b: HTMLButtonElement) => void): HTMLBu
   b.className = 'link link-btn';
   return b;
 }
-const kindLabel = (k: SelKind): string => t(`v4.kind.${k}`);
+const kindLabel = (k: SelKind): string => KIND_HEAD[k];
 
 function renderSelHome(): void {
   if (activeTab !== 'select' || selSub !== 'home' || !curSel) return;

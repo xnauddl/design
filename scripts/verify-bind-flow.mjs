@@ -519,11 +519,11 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, tsPrev(a[0].reqId, B2_TS, { noStyle: 3 }));
   const card = await p.textContent('#selCards');
   // m = 변수 줄 5곳(t1 글자 크기 뺌) + 스타일 2곳 = 7, k = 1
-  check('B2 카드 1 — 스타일 먼저(한 자리 한 번) · [7곳 연결] · 텍스트 스타일 종류', card.includes('변수 없는 값 8곳') && card.includes('텍스트 스타일 2') && (await p.textContent('[data-k="link"]')) === '7곳 연결', card);
+  check('B2 카드 1 — 스타일 먼저(한 자리 한 번) · [7곳 연결] · 텍스트 스타일 종류', card.includes('변수 없는 값 8곳') && card.includes('Text Style 2') && !card.includes('간격') && (await p.textContent('[data-k="link"]')) === '7곳 연결', card);
   await p.click('[data-k="link"]');
   check('B2 [7곳 연결] → 연결 화면 · 다시 찾지 않음', (await visible(p, '#subHead')) && (await sent(p, 'APPLY')).length === 1);
   check('B2 들어오면 포커스는 트리 첫 줄(첫 종류 머리)', await p.evaluate(() => document.activeElement === document.querySelector('#bindTree [data-tkey]')));
-  check('B2 머리 "← Card" · 오른쪽 "변수 없는 값 8곳"', (await p.textContent('#subTitle')) === 'Card' && (await p.textContent('#subRight')) === '변수 없는 값 8곳', await p.textContent('#subRight'));
+  check('B2 머리 "← 연결" · 오른쪽 "Card · 변수 없는 값 8곳"(이름 · 꼬리 두 span)', (await p.textContent('#subTitle')) === '연결' && (await p.textContent('#subRight')) === 'Card · 변수 없는 값 8곳' && (await p.textContent('#subRight .sub-right-name')) === 'Card', await p.textContent('#subRight'));
   const list = await bindList(p);
   check('B2 종류 머리(카드 1 순서) · (변수, 종류) 줄 · 텍스트 스타일 머리 맨 끝',
     JSON.stringify(list) === JSON.stringify(['Spacing 1개', ['spacing/8', '2곳', true], 'Radius 1개', ['spacing/8', '1곳', true], 'Color 1개', ['color/text/default', '1곳', true], 'Typography 1개', ['font/size/16', '1곳', true], 'Text Style 1개', ['body/medium', '2곳', true]]),
@@ -623,9 +623,9 @@ const reenter = (p) => p.evaluate(() => {
   await openSel(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 3 });
   check('B2 noTier → 변수 찾기 없이 텍스트 스타일 미리보기만', (await sent(p, 'APPLY')).length === 0 && (await sent(p, 'PREVIEW_TEXT_STYLES')).length === 1);
   await recv(p, tsPrev((await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1).reqId, B2_TS, { hasStyle: 1 }));
-  check('B2 noTier 카드 1 안에 "텍스트 스타일 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('텍스트 스타일 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
+  check('B2 noTier 카드 1 안에 "Text Style 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('Text Style 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
   await p.click('[data-k="tsLink"]');
-  check('B2 텍스트 스타일만 — 머리 오른쪽 "텍스트 스타일 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === '텍스트 스타일 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['Text Style 1개', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
+  check('B2 텍스트 스타일만 — 머리 오른쪽 "Card · Text Style 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === 'Card · Text Style 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['Text Style 1개', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
   check('B2 텍스트 스타일만 — 칩 "건너뛴 레이어 ▸"', (await p.textContent('#bindSkipToggle')) === '건너뛴 레이어 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#btnApplyConfirm');
   const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
@@ -1095,6 +1095,7 @@ async function saveAndGet(p) {
   await p.click('#makeTab-global');
   await p.waitForTimeout(20);
   check('17 겹침 잠금 중 다른 탭이면 텍스트 스타일 탭에 주황 점(aria-label = 사유)', (await visible(p, '#makeTab-ts .mk-dot')) && (await p.getAttribute('#makeTab-ts .mk-dot', 'aria-label')) === '이미 있는 스타일 이름이에요');
+  check('17 만들 수 잘림 없음 · 두 줄 이하', await p.$eval('#makeCount', (e) => e.scrollWidth <= e.clientWidth && e.getBoundingClientRect().height <= 32));
   check('17 만들 수 "Global 1개 · Semantic 1개 · 스타일 1개" · [변수 1개 만들기]', (await p.textContent('#makeCount')) === 'Global 1개 · Semantic 1개 · 스타일 1개' && (await p.textContent('#btnMakeRun')) === '변수 1개 만들기', await p.textContent('#makeCount'));
   check('17 기존 스타일과 이름이 같고 값이 다름 → 실행 잠금 "이미 있는 스타일 이름이에요"', (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '이미 있는 스타일 이름이에요');
   // 이름 고치기 — 더블클릭 → 칸 → Enter 저장
