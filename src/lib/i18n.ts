@@ -128,7 +128,7 @@ export const STRINGS: Record<string, string> = {
   'reason.font': '폰트 미로드',
   'reason.translucent': '반투명',
   'reason.space-between': '사이 간격 자동',
-  'reason.fraction': '소수 선 두께',
+  'reason.fraction': '소수 값(정수만)',
 
   // 마법사 시퀀서 단계 결과
   'wizard.seq.stoppedPrev': '이전 단계 중단으로 건너뜀',

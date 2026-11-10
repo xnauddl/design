@@ -1434,7 +1434,7 @@
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
-    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
+    "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
@@ -2373,8 +2373,8 @@
     if (TEXT.has(field)) return "text";
     return "other";
   }
-  var NO_VAR_REASONS = ["no-match", "size-fraction"];
-  var PLACE_SKIP_REASONS = ["styled", "hug-fill", "translucent", "space-between", "fraction", "empty-text", "deleted-var"];
+  var NO_VAR_REASONS = ["no-match"];
+  var PLACE_SKIP_REASONS = ["styled", "hug-fill", "translucent", "space-between", "fraction", "size-fraction", "empty-text", "deleted-var"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
   var sumKinds = (r) => Object.values(r != null ? r : {}).reduce((a, b) => a + (b != null ? b : 0), 0);
   function cardCounts(candidateFields, counts) {

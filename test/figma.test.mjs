@@ -1440,7 +1440,8 @@ test('bindSelection — 여백(padding/gap)은 GAP 변수에만 — size/line-he
   // itemSpacing·paddingLeft는 GAP 변수로만 연결(크기/행간/자간으로 새지 않음)
   assert.equal(roleTarget(figma, node._bound.itemSpacing), gap.id);
   assert.equal(roleTarget(figma, node._bound.paddingLeft), gap.id);
-  assert.equal(res.bound, 2); // itemSpacing + paddingLeft (0짜리 padding 3개는 no-match)
+  assert.equal(res.bound, 2); // itemSpacing + paddingLeft (0짜리 padding 3개는 만들 수 없는 값 — 세지 않는다, §4.1 k ①)
+  assert.equal(res.reasons['no-match'] ?? 0, 0);
 });
 
 test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바인딩(여백 변수로 안 샘)', async () => {
@@ -4961,6 +4962,80 @@ test('bindSelection — strokeWeight를 붙인 뒤 피그마가 방향별(stroke
   const dry = await bindSelection([node], false);
   assert.equal(dry.candidates.length, 0);
   assert.equal(dry.reasons['already-bound'], 1);
+});
+
+/* ---------- 만들기가 뽑지 않는 값은 "새로 만들 값"(no-match)이 아니다 (IA v4 §4.1 k ①~③, 2026-11-10 실기 확인) ---------- */
+const alFrame = (id, extra = {}) => ({
+  type: 'FRAME', id, name: id, fills: [], strokes: [], layoutMode: 'VERTICAL', primaryAxisAlignItems: 'MIN', layoutWrap: 'NO_WRAP',
+  itemSpacing: 8, counterAxisSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; }, ...extra,
+});
+
+test('k ① — 여백 0 네 방향은 no-match가 아니고 사유도 남기지 않는다', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const dry = await bindSelection([alFrame('z')], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.skips.length, 0);
+  assert.equal(dry.candidates.length, 1); // itemSpacing 8만
+});
+
+test('k ① — 사용자가 만든 0 변수가 있으면 여백 0도 연결 후보', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/0', category: 'gap', sources: ['gap'], value: 0 }, { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const dry = await bindSelection([alFrame('z0')], false);
+  assert.equal(dry.candidates.filter((c) => c.field.startsWith('padding')).length, 4);
+});
+
+test('k ① — 같은 값 변수가 별칭뿐(직접 값 Global 없음)인 0 여백은 버린다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const col = figma.variables.createVariableCollection('Aliases');
+  const g = figma.variables.createVariable('zero-src', col, 'FLOAT');
+  g.setValueForMode(col.defaultModeId, 0);
+  const a = figma.variables.createVariable('zero-alias', col, 'FLOAT');
+  a.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: g.id });
+  const dry = await bindSelection([alFrame('za')], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+});
+
+test('k ① — 음수 간격은 버린다', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const dry = await bindSelection([alFrame('neg', { itemSpacing: -8 })], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.skips.length, 0);
+});
+
+test('k ② — 소수 여백 · 반경은 fraction(s), 4.004 여백은 만든 4 변수에 연결', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/4', category: 'gap', sources: ['gap'], value: 4 }], 16);
+  const dry = await bindSelection([alFrame('fr', { itemSpacing: 4.5, paddingLeft: 4.004, cornerRadius: 2.5, topLeftRadius: 2.5, topRightRadius: 2.5, bottomLeftRadius: 2.5, bottomRightRadius: 2.5 })], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.reasons.fraction, 5); // itemSpacing 4.5 + 모서리 4곳 2.5
+  assert.ok(dry.candidates.some((c) => c.field === 'paddingLeft'));
+});
+
+test('k ① — 자간 0은 버리고, 스타일이 붙은 글자의 자간 0은 styled로도 세지 않는다', async () => {
+  installFigma();
+  await createTokens([{ name: 'font-size/16', category: 'fontSize', sources: ['fontSize'], value: 16 }], 16);
+  const txt = (id, extra = {}) => ({
+    type: 'TEXT', id, name: id, characters: 'Hi', fontName: { family: 'Inter', style: 'Regular' }, fontSize: 16,
+    lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, fills: [], strokes: [],
+    getRangeBoundVariable() { return null; }, setRangeBoundVariable() {}, ...extra,
+  });
+  const dry = await bindSelection([txt('t0')], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  const styled = await bindSelection([txt('ts', { textStyleId: 'S:1' })], false);
+  assert.equal(styled.reasons.styled, 1); // fontSize만
+});
+
+test('k ③ — 숨긴 칠은 찾지 않는다', async () => {
+  installFigma();
+  const node = { type: 'RECTANGLE', id: 'hid', name: 'hid', fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, visible: false }], strokes: [], setBoundVariable() {} };
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.candidates.length, 0);
 });
 
 /* ---------- 크기는 아이콘 · 아바타만 (§2.11, 2026-11-06 사용자 결정 · QA 대기 목록 1번) ---------- */

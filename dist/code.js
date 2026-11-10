@@ -128,7 +128,7 @@
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
-    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
+    "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
@@ -4141,6 +4141,9 @@
   function scopeOk(scopes, allowed) {
     return scopes.includes("ALL_SCOPES") || allowed.some((s) => scopes.includes(s));
   }
+  var DROP = "drop";
+  var isFrac = (v) => Math.abs(v - Math.round(v)) >= 5e-3;
+  var numReason = (v, dropAtOrBelowZero = true) => dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? "fraction" : "no-match";
   function sameValueEntries(ctx, s) {
     return ctx.index.entries.filter((e) => {
       if (!scopeOk(e.scopes, s.allowed)) return false;
@@ -4221,7 +4224,7 @@
     }
     const live = pending.filter((p) => {
       if (p.global) return true;
-      skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
+      if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
       return false;
     });
     const names = assignNames(
@@ -4321,6 +4324,7 @@
       let bg = null;
       paints2.forEach((p, i) => {
         if (p.type !== "SOLID") return;
+        if (p.visible === false) return;
         const st = stateReason(colorState(p, node, key, i));
         if (st) {
           note(res, st, node, preview, key);
@@ -4366,21 +4370,22 @@
     }
     const owner = ctx.owner(node);
     if (node.layoutMode === "GRID") {
-      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap", owner));
-      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap", owner));
+      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap", owner), numReason(node.gridRowGap));
+      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap", owner), numReason(node.gridColumnGap));
     } else {
       for (const f of ["itemSpacing", "counterAxisSpacing"]) {
         const v = node[f];
         if (typeof v !== "number") continue;
         const gs = gapSkip(node, f);
         if (gs === "no-wrap") continue;
-        if (gs === "space-between") note(res, "space-between", node, preview, f);
-        else tryBind(ctx, node, f, v, simpleNumericName(f, owner));
+        if (gs === "space-between") {
+          if (v > 0) note(res, "space-between", node, preview, f);
+        } else tryBind(ctx, node, f, v, simpleNumericName(f, owner), numReason(v));
       }
     }
     const pad = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
     for (const f of ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]) {
-      tryBind(ctx, node, f, node[f], composeName("spacing", owner, paddingProp(f, pad)));
+      tryBind(ctx, node, f, node[f], composeName("spacing", owner, paddingProp(f, pad)), numReason(node[f]));
     }
   }
   function bindRadius(node, ctx) {
@@ -4391,7 +4396,7 @@
     if (r !== figma.mixed && !(typeof r === "number" && r > 0)) return;
     const owner = ctx.owner(node);
     corners.forEach((c, i) => {
-      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values));
+      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
     });
   }
   function bindOpacity(node, ctx) {
@@ -4439,6 +4444,7 @@
     }
     effects.forEach((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return;
+      if (e.visible === false) return;
       const st = stateReason(colorState(e, node, "effects", i));
       if (st) {
         note(res, st, node, preview, "effects");
@@ -4460,8 +4466,8 @@
     if ((_a = ctx.skipText) == null ? void 0 : _a.call(ctx, node)) return;
     if (hasStyleId(node, "textStyleId")) {
       if (node.fontSize !== figma.mixed) note(res, "styled", node, preview, "fontSize");
-      if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") note(res, "styled", node, preview, "lineHeight");
-      if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") note(res, "styled", node, preview, "letterSpacing");
+      if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS" && node.lineHeight.value > 0) note(res, "styled", node, preview, "lineHeight");
+      if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS" && node.letterSpacing.value !== 0) note(res, "styled", node, preview, "letterSpacing");
       const fam2 = node.fontName.family;
       if (ctx.index.entries.some((e) => e.str === fam2 && scopeOk(e.scopes, ["FONT_FAMILY"]))) note(res, "styled", node, preview, "fontFamily");
       return;
@@ -4487,7 +4493,10 @@
   }
   function tryBindText(ctx, node, field, value) {
     const { res, preview } = ctx;
+    const drop = field === "lineHeight" && value <= 0 || field === "letterSpacing" && value === 0;
+    const reason = drop ? DROP : isFrac(value) ? "fraction" : "no-match";
     if (node.characters.length === 0) {
+      if (drop) return;
       skip(res, "empty-text", node, preview, field);
       return;
     }
@@ -4496,7 +4505,7 @@
       note(res, st, node, preview, field);
       return;
     }
-    ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: "no-match" });
+    ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: reason });
   }
   function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match") {
     const allowed = numAllowed(field);
