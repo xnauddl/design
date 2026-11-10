@@ -1,91 +1,37 @@
 /* ============================================================
-   wizard.ts — 시스템화 마법사의 순수 로직(단계 정의·계획·요약)
-   figma/DOM 의존 없음. 실제 메시지 시퀀싱은 ui.ts가 이 정의를 따라 수행한다.
+   wizard.ts — 만들기 화면 실행(IA v4 §4.3)의 순수 로직: 단계 계획 · 다크 대상 · 다 됨 문구.
+   figma/DOM 의존 없음. 실제 메시지 시퀀싱은 ui.ts가 이 계획을 따라 수행한다.
    ============================================================ */
 import { t } from './i18n';
 
-/** 마법사 단계 식별자(각 단계는 기존 UiToCode 메시지 1개로 매핑된다). */
-export type WizardStepId =
-  | 'extract' // EXTRACT (읽기)
-  | 'create' // CREATE_TOKENS (쓰기)
-  | 'semantics' // CREATE_SEMANTICS (쓰기, 선택)
-  | 'dark' // GENERATE_DARK_MODE (쓰기, 선택) — 시맨틱 별칭이 있어야 채울 게 많다
-  | 'textStyles' // SCAN_TEXT_STYLES → CREATE_TEXT_STYLES (쓰기, 선택)
-  // 연결 — 기준 nodeIds로 APPLY(preview 아님). 연결 화면 [연결]과 같은 규칙(IA v4 §2.3-2 · §4.3 "B.1 ~ B.3 동안의 v3 마법사").
-  | 'bind' // APPLY (쓰기, 선택, 무료)
-  | 'rename' // RENAME (쓰기)
-  // 등록이 같은 이름 묶음의 세트 결합까지 함께 수행하므로 별도 CLASSIFY_VARIANTS를 보내지 않는다.
-  | 'componentize'; // REGISTER_COMPONENTS (쓰기, 선택, Paid)
+/** 실행 단계(순서 = 실제 순서). 만들기 → 다크 → 텍스트 스타일 → 연결 → 이름 정리. */
+export type MakeStepId = 'create' | 'dark' | 'textStyles' | 'bind' | 'rename';
+export const MAKE_STEP_ORDER: readonly MakeStepId[] = ['create', 'dark', 'textStyles', 'bind', 'rename'];
 
-export interface WizardStepDef {
-  id: WizardStepId;
-  /** 문서를 변경하는 단계인지(읽기 전용이면 false). */
-  write: boolean;
-  /** 옵션(체크박스)로 끌 수 있는 단계인지. 필수 단계는 항상 실행. */
-  optional: boolean;
-  /** Paid 필요 여부. */
-  paid?: boolean;
-}
-
-/** 단계 순서 = 실제 데이터 의존 순서. 연결은 만들기 · 다크 · 텍스트 스타일 뒤, 이름 정리 앞(IA v4 §4.3 — "한 번에 정리는 연결까지").
- *  표시 라벨은 i18n `wizard.step.<id>` 키로 UI가 해석(외부화). */
-export const WIZARD_STEPS: readonly WizardStepDef[] = [
-  { id: 'extract', write: false, optional: false },
-  { id: 'create', write: true, optional: false, paid: true },
-  { id: 'semantics', write: true, optional: true, paid: true },
-  // 다크는 시맨틱 다음 — Global을 가리키는 별칭이 있어야 채울 대상이 생긴다(없으면 skipped로 돌아온다).
-  { id: 'dark', write: true, optional: true, paid: true },
-  { id: 'textStyles', write: true, optional: true, paid: true },
-  { id: 'bind', write: true, optional: true }, // 무료 — 연결은 무료 기능이다
-  { id: 'rename', write: true, optional: false },
-  { id: 'componentize', write: true, optional: true, paid: true },
-];
-
-/** 사용자가 켠 선택 단계(필수 단계는 포함하지 않는다). */
-export interface WizardOptions {
-  semantics: boolean;
-  bind: boolean;
-  dark: boolean;
-  textStyles: boolean;
-  componentize: boolean;
-}
-
-/** 실행 시점의 게이팅 컨텍스트(티어·매핑 존재 여부). */
-export interface WizardContext {
+export interface MakePlanInput {
   isPaid: boolean;
-  /** 시맨틱 매핑 텍스트에 한 줄이라도 매핑이 있는지. */
-  hasSemanticMap: boolean;
-}
-
-export interface WizardPlanItem {
-  step: WizardStepDef;
-  /** 이번 실행에서 이 단계를 돌릴지. */
-  run: boolean;
-  /** run=false일 때의 사유(스테퍼에 표시). */
-  skipReason?: string;
+  /** 켠 Global 줄 수(잠긴 줄 제외). 0이면 만들기 단계가 없다. */
+  globalsOn: number;
+  /** 켠 텍스트 스타일 줄 수. 0이면 텍스트 스타일 단계가 없다. */
+  stylesOn: number;
+  /** 만든 뒤 옵션. */
+  link: boolean;
+  rename: boolean;
+  dark: boolean;
 }
 
 /**
- * 옵션·컨텍스트로 각 단계의 실행 여부를 결정한다.
- * - Paid 단계: Free면 **필수 단계여도** 건너뛴다. 보내 봐야 code가 PREMIUM_REQUIRED로
- *   거부해 시퀀스 전체가 그 자리에서 멈춘다 — Free의 마법사는 추출·이름 정리로 완주해야 한다.
- * - 그 외 필수 단계: 항상 실행.
- * - 선택 단계: 옵션이 꺼져 있으면 건너뜀.
- * - 시맨틱: 옵션이 켜져도 매핑이 없으면 건너뜀(만들 별칭이 없음).
+ * 이번 실행에서 도는 단계(§4.3 "실행 순서"). 무료는 연결 · 이름 정리만(만들기 · 다크 · 텍스트 스타일은 유료).
+ * 텍스트 스타일 단계가 연결보다 먼저인 이유: 스타일이 붙은 글자는 연결이 글자 자리를 건너뛴다(`styled`).
  */
-export function planWizard(options: WizardOptions, ctx: WizardContext): WizardPlanItem[] {
-  return WIZARD_STEPS.map((step) => {
-    // skipReason은 i18n 키(UI가 t()로 해석 — 외부화).
-    // 선택 단계는 티어보다 옵션을 먼저 본다: 끄고 시작한 단계까지 'Paid 전용'으로 적으면
-    // 화면이 사지도 않을 것을 잠금으로 세고, UI가 그 사유로 자물쇠 칩을 그리게 된다.
-    if (step.optional) {
-      const enabled = options[step.id as keyof WizardOptions];
-      if (!enabled) return { step, run: false, skipReason: 'wizard.skip.optionOff' };
-      if (step.id === 'semantics' && !ctx.hasSemanticMap) return { step, run: false, skipReason: 'wizard.skip.noMapping' };
-    }
-    if (step.paid && !ctx.isPaid) return { step, run: false, skipReason: 'wizard.skip.paid' };
-    return { step, run: true };
-  });
+export function planMake(i: MakePlanInput): MakeStepId[] {
+  const out: MakeStepId[] = [];
+  if (i.isPaid && i.globalsOn > 0) out.push('create');
+  if (i.isPaid && i.dark) out.push('dark');
+  if (i.isPaid && i.stylesOn > 0) out.push('textStyles');
+  if (i.link) out.push('bind');
+  if (i.rename) out.push('rename');
+  return out;
 }
 
 /** 다크 단계가 보낼 대상(컬렉션·출처 모드·대상 모드). */
@@ -97,16 +43,10 @@ export interface DarkTarget {
 }
 
 /**
- * 변수 목록에서 다크 채움 대상을 고른다(순수) — 마법사는 테마 카드의 셀렉트 상태에
- * 기대지 않는다. 그 셀렉트는 `VARIABLES` 응답을 받은 **다른 리스너**가 채우므로,
- * 마법사가 같은 응답으로 깨어나 읽으면 아직 비어 있을 수 있다.
- *
- * 규칙은 테마 카드(`refreshDarkOptions`/`refreshDarkModes`)와 같다:
- * 플러그인 Semantic(§2.13 13.7) → 출처는 Dark가 아닌 첫 모드 →
- * 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
+ * 변수 목록에서 다크 채움 대상을 고른다(순수). 대상은 플러그인 Semantic 하나뿐(§2.13 13.7) →
+ * 출처는 Dark가 아닌 첫 모드 → 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
  */
 export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; tier?: number; owned?: string; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
-  // 대상은 플러그인 Semantic 하나뿐(§2.13 13.7). 없으면 단계를 건너뛴다.
   const target = vars.find((v) => v.owned === 'semantic' && v.modes.length >= 1);
   if (!target) return null;
   const dark = target.modes.find((m) => m.name.toLowerCase() === 'dark');
@@ -115,25 +55,30 @@ export function pickDarkTarget(vars: readonly { collectionId: string; collection
   return { collectionId: target.collectionId, fromModeId: from.modeId, ...(dark ? { toModeId: dark.modeId } : {}) };
 }
 
-/** 마법사가 단계 결과로 누적하는 집계값(완료 요약용). */
-export interface WizardTotals {
-  created?: number; // 생성/갱신된 토큰 변수 수
-  semanticsAliased?: number;
-  darkFilled?: number; // 다크 모드로 다시 별칭된 색 수
-  textStyles?: number; // 생성/갱신된 텍스트 스타일 수
-  bound?: number; // 연결한 곳 수
+/** 실행이 단계 결과로 모은 수(다 됨 문구용). 단계가 돌지 않았으면 그 필드는 없다. */
+export interface MakeTotals {
+  /** 만들기: g = created + updated, r = Semantic 수, m = 직접 만든 변수라 건너뜀. */
+  created?: { g: number; r: number; m: number };
+  darkFilled?: number;
+  /** 텍스트 스타일: s = created + updated, a = 붙인 글자 수. */
+  styles?: { s: number; a: number };
+  bound?: number;
   renamed?: number;
-  components?: number;
 }
 
-/** 누적 집계 → 사람이 읽는 완료 요약 한 줄. */
-export function summarize(totals: WizardTotals): string {
+/**
+ * 다 됨 상태 줄 문구(§4.3 실행 상태표 "다 됨"). 한 단계도 하지 않은 부분은 뺀다.
+ * 무료는 끝에 " · 변수는 만들지 않았어요", 바로 연결을 껐으면 끝에 " · 연결은 아직 안 했어요".
+ */
+export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOff: boolean }): string {
   const parts: string[] = [];
-  if (totals.created != null) parts.push(t('wizard.sum.tokens', { n: totals.created }));
-  if (totals.darkFilled != null && totals.darkFilled > 0) parts.push(t('wizard.sum.dark', { n: totals.darkFilled }));
-  if (totals.textStyles != null && totals.textStyles > 0) parts.push(t('wizard.sum.textStyles', { n: totals.textStyles }));
-  if (totals.bound != null) parts.push(t('wizard.sum.bound', { n: totals.bound }));
-  if (totals.renamed != null) parts.push(t('wizard.sum.renamed', { n: totals.renamed }));
-  if (totals.components != null && totals.components > 0) parts.push(t('wizard.sum.components', { n: totals.components }));
-  return parts.length ? parts.join(' · ') : t('wizard.sum.empty');
+  if (totals.created) parts.push(t('make.done.create', { g: totals.created.g, r: totals.created.r }));
+  if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
+  if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
+  if (totals.bound != null) parts.push(t('make.done.bind', { n: totals.bound }));
+  if (totals.renamed != null) parts.push(t('make.done.rename', { c: totals.renamed }));
+  if (totals.created && totals.created.m > 0) parts.push(t('make.done.manual', { m: totals.created.m }));
+  if (!opts.isPaid) parts.push(t('make.done.free'));
+  if (opts.linkOff) parts.push(t('make.done.notLinked'));
+  return parts.join(' · ');
 }

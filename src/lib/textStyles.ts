@@ -89,8 +89,14 @@ export interface ExistingTextStyle {
 /** 크기 랭킹 순으로 부여하는 기본 역할명. 초과분은 text-N. */
 export const RAMP_NAMES = ['display', 'h1', 'h2', 'h3', 'title', 'body', 'caption', 'overline'] as const;
 
-const sigKey = (s: { fontSize: number; lineHeight: number; letterSpacing: number; family: string; style: string }) =>
-  `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+/**
+ * 텍스트 스타일 값 열쇠(px 환산 행간 · 자간 + 글꼴) — 스캔 군집 · UI 이어받기(`tsSig`) ·
+ * 만들기 화면의 이름 겹침 잠금(IA v4 §4.3 `TEXT_STYLE_CANDIDATES.existing[].sig`)이 같은 값을 쓴다.
+ */
+export function tsSig(s: { fontSize: number; lineHeight: number; letterSpacing: number; family: string; style: string }): string {
+  return `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+}
+const sigKey = tsSig;
 
 /** 텍스트 샘플 → 동일 시그니처 군집(빈도순 누적). 바인딩된 스타일 id도 군집별로 모은다.
    시그니처는 px 환산 행간 기준이므로 `16px/150%`와 `24px` 노드가 한 군집으로 합쳐진다.

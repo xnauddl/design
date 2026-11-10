@@ -1,14 +1,14 @@
 /* ============================================================
    code.ts — 샌드박스 엔트리 & 메시지 라우터 (모든 figma.* 호출 지점)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError, RoleRow, TokenState } from './shared/messages';
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
 import { FREE_MANUAL_CREATE_LIMIT } from './lib/varKind';
-import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels } from './lib/textStyles';
+import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
@@ -1110,7 +1110,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'EXTRACT': {
         const sel = await resolveRoots(msg.nodeIds);
         const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel)); // 쓰임 이름의 주인(§2.12 12.3)
-        post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length });
+        post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         break;
       }
       case 'CREATE_TOKENS': {
@@ -1121,7 +1121,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
         // 같은 이름의 직접 만든 변수라 건너뛴 토큰은 그 토큰을 가리킬 역할도 만들지 않는다(§4.9).
         const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
-        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf);
+        const roleRows: RoleRow[] = [];
+        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
@@ -1135,7 +1136,19 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           summary += t('create.sumBase', { base: msg.base, n: s.conversions.length, examples: ex, morePart });
         }
         if (s.skippedManual) summary += t('create.sumManual', { n: s.skippedManual });
-        post({ type: 'CREATE_RESULT', created: s.created, updated: s.updated, summary, preview: msg.preview, roles, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
+        // 미리보기는 토큰별 상태 · Semantic 줄을 함께 싣는다(IA v4 §4.3 — 만들기 화면의 상태 태그 · Semantic 묶음).
+        const tokenStates: Record<string, TokenState> | undefined = msg.preview && s.tokenStates ? Object.fromEntries(s.tokenStates) : undefined;
+        post({
+          type: 'CREATE_RESULT',
+          created: s.created,
+          updated: s.updated,
+          summary,
+          preview: msg.preview,
+          roles,
+          ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}),
+          ...(msg.reqId != null ? { reqId: msg.reqId } : {}),
+          ...(msg.preview ? { tokenStates: tokenStates ?? {}, roleRows } : {}),
+        });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 토큰 생성 전체를 단일 Undo로
           await postPrereq(); // #11: 토큰 생성 → 시맨틱/바인딩 전제 충족 갱신
@@ -1164,7 +1177,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             shouldCancel: () => bindCancel,
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
           },
-          { ownerOf: bindOwnerOf(sel) }, // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
+          {
+            ownerOf: bindOwnerOf(sel), // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
+            // 만들기 실행의 연결(IA v4 §4.3) — 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다(실제 연결만).
+            ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
+          },
         );
         post({
           type: 'APPLY_RESULT',
@@ -1296,7 +1313,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'RENAME': {
         const r = await renameSelection(await resolveRoots(msg.nodeIds), { apply: msg.apply, maxDepth: msg.maxDepth });
-        post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied });
+        post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         if (r.applied && r.changes.length) {
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
         }
@@ -1334,7 +1351,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (before === after) continue;
           changes.push({ id, before, after });
         }
-        post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true });
+        post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         selfSelect = true;
         postSelection();
         // 이름이 하나도 안 바뀌어도 역할을 새로 기록했으면 커밋한다. 안 하면 그 pluginData
@@ -1358,11 +1375,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
         if (!requirePaid('textStyles')) break;
         // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
-        const { samples, warnings } = await scanTextStyles(selection());
-        lastTextSamples = samples;
+        // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
+        // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
+        const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
+        if (msg.reqId == null) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
         const styles = nameTextStyles(clusterTextStyles(samples), existing);
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+        if (msg.reqId != null) {
+          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings, reqId: msg.reqId, existing: existing.map((e) => ({ name: e.name, sig: tsSig(e) })) });
+        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
@@ -1382,8 +1403,19 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CREATE_TEXT_STYLES': {
         if (!requireTextStyles()) break;
         const r = await createSemanticTextStyles(msg.styles);
-        post({ type: 'TEXT_STYLES_RESULT', created: r.created, updated: r.updated, bound: r.bound, missing: r.missing, notes: r.notes });
-        commitUndo(figma); // UX2: 변수+스타일 생성을 단일 Undo로
+        // 바로 연결(IA v4 §4.3 "타이포 등록") — 방금 등록 · 갱신한 스타일만 그 루트들의 글자에 붙인다. 같은 메시지라 ⌘Z 한 번.
+        const ap = msg.applyTo ? await applyRegisteredTextStyles(await resolveRoots(msg.applyTo), r.styleIds) : null;
+        post({
+          type: 'TEXT_STYLES_RESULT',
+          created: r.created,
+          updated: r.updated,
+          bound: r.bound,
+          missing: r.missing,
+          notes: r.notes,
+          ...(msg.reqId != null ? { reqId: msg.reqId } : {}),
+          ...(ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}),
+        });
+        commitUndo(figma); // UX2: 변수+스타일 생성(+ 바로 연결)을 단일 Undo로
         await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → 「기존만 연결」 등 전제 게이트 갱신
         break;
       }

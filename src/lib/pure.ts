@@ -28,5 +28,6 @@ export * from './tiers';
 export * from './bindDisplay';
 export * from './bindGroups';
 export * from './varTable';
+export * from './treeState';
 export * from './selCards';
 export * from './varKind';

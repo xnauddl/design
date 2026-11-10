@@ -351,6 +351,11 @@ function skip(res: BindResult, key: string, node?: SceneNode, preview?: Preview 
 export interface BindOptions {
   /** 레이어의 주인 역할. 없으면 이름 정리가 남긴 역할(`dsRole`)만 본다. */
   ownerOf?: (node: SceneNode) => string | undefined;
+  /**
+   * 텍스트 스타일이 먼저(IA v4 §4.2 · §4.3 `APPLY.skipTextStyleNodes`) — true인 글자는 글자 자리
+   * (fontSize · lineHeight · letterSpacing · fontFamily)를 찾지도 세지도 않는다(스타일 연결은 연결 화면에서).
+   */
+  skipTextStyleNode?: (node: TextNode) => boolean;
 }
 
 /** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). */
@@ -389,6 +394,7 @@ export async function bindSelection(
       if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
       return ownerCache.get(n);
     },
+    skipText: opts.skipTextStyleNode,
   };
   for (const node of selection) {
     // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
@@ -573,6 +579,7 @@ interface Ctx {
   preview: Preview;
   slots: Slot[];
   owner: (n: SceneNode) => string | undefined;
+  skipText?: (node: TextNode) => boolean;
 }
 
 /** 값 · 용도가 맞는 변수들(12.2 전제). */
@@ -965,6 +972,7 @@ async function bindText(node: SceneNode, ctx: Ctx): Promise<void> {
   const { res, preview } = ctx;
   if (node.type !== 'TEXT') return;
   if (node.fontName === figma.mixed) return;
+  if (ctx.skipText?.(node)) return; // 텍스트 스타일 후보 — 글자 자리는 스타일 몫(IA v4 §4.3)
   // 텍스트 스타일이 붙은 글자는 글자 속성을 건너뛴다(스타일 사용 중) — 속성 단위로 센다.
   if (hasStyleId(node, 'textStyleId')) {
     // 스타일이 없었다면 시도했을 자리만 센다(px 아닌 줄 높이·자간, 같은 글꼴 변수가 없는 글꼴은 원래 대상이 아님).
