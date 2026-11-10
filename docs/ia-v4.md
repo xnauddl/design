@@ -138,8 +138,8 @@
 - **숫자** (찾기 결과의 자리 단위, 사유 키는 `reason.*`):
   - m = 연결할 수 있는 곳 = preview 후보 자리 수 − 스타일 후보 레이어의 글자 종류 자리 + 스타일 후보 레이어 수.
   - k = 변수가 없는 값 = 건너뜀 사유가 `no-match`인 자리 수 — **만들기 화면이 변수로 만들 수 있는 값만**이다(2026-11-10 실기 확인: 만들고 연결해도 "새로 만들 값"이 줄지 않았다). 만들기(`extract.ts`)가 뽑지 않는 값은 k에 넣지 않는다:
-    - ① **뽑지 않는 값** — 여백 · 간격 · 그리드 간격 0 이하(`collectSpacing`은 g > 0만), 자간 0, 행간 0 이하(`collectText`): 연결 후보가 나오지 않으면(§2.12 보는 순서 1 → 3 → 2 → 4가 모두 실패) **사유 없이 버린다**(어디에도 세지 않는다 — 고칠 곳이 아니다). 연결 후보가 나오면(사용자가 만든 0 변수 등) 그대로 후보.
-    - ② **정수만 만드는 숫자의 소수 값** — 여백 · 간격 · 그리드 간격 · 반경 · 글자 크기 · 행간 · 자간(`onScale`)과 크기(`addSize`): 연결 후보가 나오지 않으면 k가 아니라 s(사유 `fraction` — 글 "소수 값(정수만)"으로 넓힘, 크기는 `size-fraction`). 선 두께 소수는 지금처럼 후보를 찾지 않고 `fraction`.
+    - ① **뽑지 않는 값** — 여백 · 간격 · 그리드 간격 0 이하(`collectSpacing`은 g > 0만), 자간 0, 행간 0 이하(`collectText`): 연결 후보가 나오지 않으면(§2.12 보는 순서 1 → 3 → 2 → 4가 모두 실패) **사유 없이 버린다**(어디에도 세지 않는다 — 고칠 곳이 아니다). 연결 후보가 나오면(사용자가 만든 0 변수 등) 그대로 후보. ① 값은 그보다 앞의 자리 단위 사유(`styled` · `empty-text` · `space-between`)로도 세지 않는다 — 그 분기들은 ① 값에서 사유를 남기지 않는다(고칠 수도 만들 수도 없는 곳이 "건너뜀"으로 보이지 않게). `already-bound` · `deleted-var`는 그대로 센다.
+    - ② **정수만 만드는 숫자의 소수 값** — 여백 · 간격 · 그리드 간격 · 반경 · 글자 크기 · 행간 · 자간(`onScale`)과 크기(`addSize`): 소수 = 소수 둘째 자리로 반올림해도 정수가 아님(`|v − round(v)| ≥ 0.005` — extract `round` · `onScale`과 같은 판정, 그래서 4.004는 4로 보고 만든 `spacing/4`에 연결된다). 연결 후보가 나오지 않으면 k가 아니라 s(사유 `fraction` — 글 "소수 값(정수만)"으로 넓힘, 크기는 `size-fraction`). 선 두께 소수는 지금처럼 후보를 찾지 않고 `fraction`.
     - ③ **숨긴 칠 · 숨긴 효과**(`visible: false` — `collectPaints` · `collectEffects`가 건너뜀)는 찾지 않는다(사유 없음, 연결도 하지 않음).
     - 구현: 자리마다 실패 사유를 정해 두고(`noMatchReason` — ①은 버림 표시, ②는 `fraction` · `size-fraction`), `resolveSlots`의 마지막 거르기에서 ①은 사유 없이 버리고 ②는 그 사유로 남긴다.
   - s = 그 밖의 건너뜀 중 **자리 단위** 사유만(`styled` · `hug-fill` · `translucent` · `space-between` · `fraction` · `size-fraction` · `empty-text` · `deleted-var`). 이미 연결 `already-bound`과, 코드가 레이어 단위로 세는 사유(`instance-children` · `hidden` · `no-autolayout` · `size-free-layout` · `font`)는 세지 않는다 — 연결 화면의 건너뜀 칩에만 레이어 수로 나온다.
@@ -683,4 +683,4 @@
 - [x] 카드 1 종류별 수 = 연결할 곳만(`CardCounts.linkByKind` 같은 새 필드 — 후보 자리 + 스타일 줄, k는 "새로 만들 값"으로만), 대체 포커스 `btnGoRename` → `btnGoMake`(subBack · 연결 풀기 뒤 · 기준 바꾸기 뒤 · 처음), 잠금 · 클릭 가드 기준 = 목록 기준
 - [x] verify-bind-flow: 블록 9 "레이어 정리 잠금" → 세 버튼 잠금, "변수가 없는 값 2곳" → "새로 만들 값 2곳", 블록 14 버튼 둘 → 셋(`btnGoMake`), B2 카드 1 종류별 수 기대값(연결할 곳만), B2 연결 머리 목록 "{n}곳" · 스타일 줄 끔 뒤 Typography 머리 수, 머리 줄에 "레이어 1개" 없음, [변수 만들기] → 만들기 화면 · ← 포커스
 - [ ] 실기 확인 버그(§4.1 k ①~③): 뽑지 않는 값(0 이하 여백 · 간격 · 그리드 간격, 자간 0, 행간 0 이하)은 후보가 없으면 사유 없이 버림, 소수 숫자는 `fraction`(글 "소수 값(정수만)") · 크기는 `size-fraction` — 둘 다 s(`NO_VAR_REASONS` = no-match만, `PLACE_SKIP_REASONS`에 size-fraction), 숨긴 칠 · 효과는 찾지 않음, 선 두께 방향별 기록 = 이미 연결됨(완료)
-- [ ] 테스트: `cardCounts`(pure 2834 — k 3 · s 2 · noVarByKind에서 size 빠짐), figma 1443 주석, 새로: 여백 0 네 방향 → no-match 0 · skips 없음 / 0 변수가 있으면 후보 / 별칭뿐인 0 → 버림 / 음수 간격 → 버림 / 소수 여백 · 반경 → fraction / 자간 0 → 버림 / 숨긴 칠 → 찾지 않음
+- [ ] 테스트: `cardCounts`(pure 2834 — k 3 · s 2 · noVarByKind에서 size 빠짐), figma 1443 주석, 새로: 여백 0 네 방향 → no-match 0 · skips 없음 / 0 변수가 있으면 후보 / 별칭뿐인 0 → 버림 / 음수 간격 → 버림 / 소수 여백 · 반경 → fraction / 자간 0 → 버림 / 스타일 글자 자간 0 → styled에 안 셈 / 4.004 여백 → 만든 4 변수에 연결(fraction 아님) / 숨긴 칠 → 찾지 않음
