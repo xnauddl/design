@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, PLACE_SKIP_REASONS, LAYER_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, PLACE_SKIP_REASONS, LAYER_SKIP_REASONS, INFO_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -3471,10 +3471,12 @@ function renderBindBadges(): void {
   const c = bindCardCounts();
   const layerReasons = Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && LAYER_SKIP_REASONS.includes(k)).length + Object.values(bindTsSkips).filter((n) => n > 0).length;
   const s = bindTsOnly() ? 0 : c.s;
-  const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0);
+  // 스타일 사용 중(styled)은 s에 넣지 않고 칩으로만 — 텍스트 스타일만 모습에서는 보지 않는다(§4.2).
+  const info = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && INFO_SKIP_REASONS.includes(k)).length;
+  const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0 || info > 0);
   $('bindBadges').hidden = !show;
   const skip = $('bindSkipToggle');
-  skip.textContent = `${s > 0 ? t('v4.skipPlaces', { s }) : t('v4.skipLayers')} ${bindSkipsOpen ? '▾' : '▸'}`;
+  skip.textContent = `${s > 0 ? t('v4.skipPlaces', { s }) : info > 0 ? t('bind.skippedPlacesChip') : t('v4.skipLayers')} ${bindSkipsOpen ? '▾' : '▸'}`;
   skip.setAttribute('aria-expanded', String(show && bindSkipsOpen));
   $('bindSkips').hidden = !(show && bindSkipsOpen);
 }
@@ -3757,21 +3759,22 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   const box = $('bindSkips');
   clearMount(box);
   const capNote = bindSkipsCapped ? t('bind.skipCappedTip', { shown: bindSkips.length }) : '';
-  const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k)));
+  const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k) || INFO_SKIP_REASONS.includes(k)));
   for (const [key, n] of varEntries) {
     const ids = [...new Set(bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId))];
     const layer = LAYER_SKIP_REASONS.includes(key);
     const label = t(layer ? 'v4.reasonLayers' : 'v4.reasonPlaces', { reason: t('reason.' + key), n: layer && ids.length ? ids.length : n });
+    const info = INFO_SKIP_REASONS.includes(key) ? ' info' : ''; // 손볼 곳이 아님 — 글자 --text-2
     if (!ids.length) {
       const span = document.createElement('span');
-      span.className = 'skip-chip static';
+      span.className = `skip-chip static${info}`;
       span.textContent = label;
       box.appendChild(span);
       continue;
     }
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'skip-chip';
+    btn.className = `skip-chip${info}`;
     btn.textContent = `${label} ›`;
     const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
     btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
@@ -7257,7 +7260,7 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
   if (n === 0) {
     const v = selLink(t('v4.view'), (el) => { bindSkipsOpen = true; showSelSub('bind', el); renderBindTree(); });
     v.dataset.k = 'skips';
-    put(selCard({ title: t('v4.nothingToLink'), subs: [t('v4.skippedPlaces', { s })], actions: [v] }));
+    put(selCard({ title: t('v4.allLinked'), subs: [t('v4.skippedPlaces', { s })], actions: [v] }));
     return;
   }
   // 둘째 줄: 종류별 연결할 곳(합 = m, Other 제외) + " · 새로 만들 값 {k}곳"(링크 없음 — 입구는 할 일 [변수 만들기]).

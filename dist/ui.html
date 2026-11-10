@@ -440,6 +440,7 @@
     .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
     .skip-chip.static { cursor: default; color: var(--muted); }
     .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
+    .skip-chip.info { color: var(--text-2); }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
        상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
@@ -1673,10 +1674,12 @@
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
-    "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
     "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
     "v4.skipLayers": "\uAC74\uB108\uB6F4 \uB808\uC774\uC5B4",
+    "bind.skippedPlacesChip": "\uAC74\uB108\uB6F4 \uACF3",
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
@@ -2374,7 +2377,8 @@
     return "other";
   }
   var NO_VAR_REASONS = ["no-match"];
-  var PLACE_SKIP_REASONS = ["styled", "hug-fill", "translucent", "space-between", "fraction", "size-fraction", "empty-text", "deleted-var"];
+  var PLACE_SKIP_REASONS = ["hug-fill", "translucent", "space-between", "fraction", "size-fraction", "empty-text", "deleted-var"];
+  var INFO_SKIP_REASONS = ["styled"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
   var sumKinds = (r) => Object.values(r != null ? r : {}).reduce((a, b) => a + (b != null ? b : 0), 0);
   function cardCounts(candidateFields, counts) {
@@ -6828,10 +6832,11 @@
     const c = bindCardCounts();
     const layerReasons = Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && LAYER_SKIP_REASONS.includes(k)).length + Object.values(bindTsSkips).filter((n) => n > 0).length;
     const s = bindTsOnly() ? 0 : c.s;
-    const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0);
+    const info = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && INFO_SKIP_REASONS.includes(k)).length;
+    const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0 || info > 0);
     $("bindBadges").hidden = !show;
     const skip = $("bindSkipToggle");
-    skip.textContent = `${s > 0 ? t("v4.skipPlaces", { s }) : t("v4.skipLayers")} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
+    skip.textContent = `${s > 0 ? t("v4.skipPlaces", { s }) : info > 0 ? t("bind.skippedPlacesChip") : t("v4.skipLayers")} ${bindSkipsOpen ? "\u25BE" : "\u25B8"}`;
     skip.setAttribute("aria-expanded", String(show && bindSkipsOpen));
     $("bindSkips").hidden = !(show && bindSkipsOpen);
   }
@@ -7076,21 +7081,22 @@
     const box = $("bindSkips");
     clearMount(box);
     const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
-    const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k)));
+    const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k) || INFO_SKIP_REASONS.includes(k)));
     for (const [key, n] of varEntries) {
       const ids = [...new Set(bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId))];
       const layer = LAYER_SKIP_REASONS.includes(key);
       const label = t(layer ? "v4.reasonLayers" : "v4.reasonPlaces", { reason: t("reason." + key), n: layer && ids.length ? ids.length : n });
+      const info = INFO_SKIP_REASONS.includes(key) ? " info" : "";
       if (!ids.length) {
         const span = document.createElement("span");
-        span.className = "skip-chip static";
+        span.className = `skip-chip static${info}`;
         span.textContent = label;
         box.appendChild(span);
         continue;
       }
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "skip-chip";
+      btn.className = `skip-chip${info}`;
       btn.textContent = `${label} \u203A`;
       const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(", ");
       btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
@@ -10626,7 +10632,7 @@ ${opts.tip}` : text;
         renderBindTree();
       });
       v.dataset.k = "skips";
-      put(selCard({ title: t("v4.nothingToLink"), subs: [t("v4.skippedPlaces", { s })], actions: [v] }));
+      put(selCard({ title: t("v4.allLinked"), subs: [t("v4.skippedPlaces", { s })], actions: [v] }));
       return;
     }
     const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
