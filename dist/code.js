@@ -128,7 +128,7 @@
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.translucent": "\uBC18\uD22C\uBA85",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
-    "reason.fraction": "\uC18C\uC218 \uC120 \uB450\uAED8",
+    "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
@@ -300,6 +300,7 @@
     // 배지 줄
     // 트리 목록(IA v4 §2.7)
     "tree.count": "{n}\uAC1C",
+    "tree.places": "{n}\uACF3",
     "tree.expand": "\uD3BC\uCE58\uAE30",
     "tree.collapse": "\uC811\uAE30",
     "tree.headAria": "{name} \uBAA8\uB450 \uCF1C\uACE0 \uB044\uAE30",
@@ -352,7 +353,6 @@
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
-    "v4.layers": "\uB808\uC774\uC5B4 {n}\uAC1C",
     "v4.selMany": "{name} \uC678 {k}\uAC1C",
     "v4.baseDiff": "\uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694",
     "v4.loading": "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
@@ -366,11 +366,13 @@
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
-    "v4.noVarPlaces": "\uBCC0\uC218\uAC00 \uC5C6\uB294 \uAC12 {k}\uACF3",
-    "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
+    "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
     "v4.skipPlaces": "\uAC74\uB108\uB700 {s}\uACF3",
     "v4.skipLayers": "\uAC74\uB108\uB6F4 \uB808\uC774\uC5B4",
+    "bind.skippedPlacesChip": "\uAC74\uB108\uB6F4 \uACF3",
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
@@ -397,7 +399,7 @@
     "v4.unboundFailed": " \xB7 {m}\uACF3\uC740 \uD480\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "v4.unbindFail.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC74C",
     "v4.unbindFail.error": "\uC624\uB958",
-    "v4.tidy": "\uB808\uC774\uC5B4 \uC815\uB9AC",
+    "v4.tidy": "\uD560 \uC77C",
     "v4.rename": "\uC774\uB984 \uC815\uB9AC",
     "v4.back": "\uB3CC\uC544\uAC00\uAE30",
     "v4.backHome": "\u2190 \uB3CC\uC544\uAC00\uAE30",
@@ -3912,9 +3914,16 @@
   function nodeFieldState(node, field) {
     const bv = node.boundVariables;
     const entry = bv == null ? void 0 : bv[field];
-    if (!entry) return "none";
+    if (!entry) {
+      if (field === "strokeWeight") {
+        const sides = STROKE_SIDE_FIELDS.map((f) => bv == null ? void 0 : bv[f]).filter((x) => !!x);
+        if (sides.length) return aliasesState(sides);
+      }
+      return "none";
+    }
     return aliasesState(Array.isArray(entry) ? entry : [entry]);
   }
+  var STROKE_SIDE_FIELDS = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
   function colorState(x, node, field, index) {
     var _a;
     const own = (_a = x.boundVariables) == null ? void 0 : _a.color;
@@ -3941,6 +3950,21 @@
   var STYLE_KEY_OF = { fills: "fillStyleId", strokes: "strokeStyleId", effects: "effectStyleId" };
   function stateReason(s) {
     return s === "bound" ? "already-bound" : s === "deleted" ? "deleted-var" : null;
+  }
+  function aspectLocked(n) {
+    const x = n;
+    return x.targetAspectRatio != null || x.constrainProportions === true;
+  }
+  function lockedSizeState(n) {
+    const w = nodeFieldState(n, "width");
+    const h = nodeFieldState(n, "height");
+    if (w === "deleted" || h === "deleted") return { state: "deleted", field: w === "deleted" ? "width" : "height" };
+    if (w === "bound" || h === "bound") return { state: "bound", field: w === "bound" ? "width" : "height" };
+    return { state: "none", field: "width" };
+  }
+  function lockedAxis(n) {
+    const x = n;
+    return x.layoutSizingHorizontal === "FIXED" ? "width" : x.layoutSizingVertical === "FIXED" ? "height" : null;
   }
   function isEffectivelyVisible2(node) {
     let p = node;
@@ -4134,6 +4158,9 @@
   function scopeOk(scopes, allowed) {
     return scopes.includes("ALL_SCOPES") || allowed.some((s) => scopes.includes(s));
   }
+  var DROP = "drop";
+  var isFrac = (v) => Math.abs(v - Math.round(v)) >= 5e-3;
+  var numReason = (v, dropAtOrBelowZero = true) => dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? "fraction" : "no-match";
   function sameValueEntries(ctx, s) {
     return ctx.index.entries.filter((e) => {
       if (!scopeOk(e.scopes, s.allowed)) return false;
@@ -4214,7 +4241,7 @@
     }
     const live = pending.filter((p) => {
       if (p.global) return true;
-      skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
+      if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
       return false;
     });
     const names = assignNames(
@@ -4314,6 +4341,7 @@
       let bg = null;
       paints2.forEach((p, i) => {
         if (p.type !== "SOLID") return;
+        if (p.visible === false) return;
         const st = stateReason(colorState(p, node, key, i));
         if (st) {
           note(res, st, node, preview, key);
@@ -4347,8 +4375,19 @@
           const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
           tryBind(ctx, node, field, v, `size/${kind}`, fraction ? "size-fraction" : void 0);
         };
-        bindAxis(node.layoutSizingHorizontal, "width", node.width);
-        bindAxis(node.layoutSizingVertical, "height", node.height);
+        if (aspectLocked(node)) {
+          const ls = lockedSizeState(node);
+          const st = stateReason(ls.state);
+          if (st) note(res, st, node, preview, ls.field);
+          else {
+            const axis = lockedAxis(node);
+            if (!axis) note(res, "hug-fill", node, preview, "width");
+            else bindAxis("FIXED", axis, axis === "width" ? node.width : node.height);
+          }
+        } else {
+          bindAxis(node.layoutSizingHorizontal, "width", node.width);
+          bindAxis(node.layoutSizingVertical, "height", node.height);
+        }
       } else {
         note(res, "size-free-layout", node, preview);
       }
@@ -4359,21 +4398,22 @@
     }
     const owner = ctx.owner(node);
     if (node.layoutMode === "GRID") {
-      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap", owner));
-      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap", owner));
+      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap", owner), numReason(node.gridRowGap));
+      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap", owner), numReason(node.gridColumnGap));
     } else {
       for (const f of ["itemSpacing", "counterAxisSpacing"]) {
         const v = node[f];
         if (typeof v !== "number") continue;
         const gs = gapSkip(node, f);
         if (gs === "no-wrap") continue;
-        if (gs === "space-between") note(res, "space-between", node, preview, f);
-        else tryBind(ctx, node, f, v, simpleNumericName(f, owner));
+        if (gs === "space-between") {
+          if (v > 0) note(res, "space-between", node, preview, f);
+        } else tryBind(ctx, node, f, v, simpleNumericName(f, owner), numReason(v));
       }
     }
     const pad = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
     for (const f of ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]) {
-      tryBind(ctx, node, f, node[f], composeName("spacing", owner, paddingProp(f, pad)));
+      tryBind(ctx, node, f, node[f], composeName("spacing", owner, paddingProp(f, pad)), numReason(node[f]));
     }
   }
   function bindRadius(node, ctx) {
@@ -4384,7 +4424,7 @@
     if (r !== figma.mixed && !(typeof r === "number" && r > 0)) return;
     const owner = ctx.owner(node);
     corners.forEach((c, i) => {
-      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values));
+      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
     });
   }
   function bindOpacity(node, ctx) {
@@ -4432,6 +4472,7 @@
     }
     effects.forEach((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return;
+      if (e.visible === false) return;
       const st = stateReason(colorState(e, node, "effects", i));
       if (st) {
         note(res, st, node, preview, "effects");
@@ -4453,8 +4494,8 @@
     if ((_a = ctx.skipText) == null ? void 0 : _a.call(ctx, node)) return;
     if (hasStyleId(node, "textStyleId")) {
       if (node.fontSize !== figma.mixed) note(res, "styled", node, preview, "fontSize");
-      if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") note(res, "styled", node, preview, "lineHeight");
-      if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") note(res, "styled", node, preview, "letterSpacing");
+      if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS" && node.lineHeight.value > 0) note(res, "styled", node, preview, "lineHeight");
+      if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS" && node.letterSpacing.value !== 0) note(res, "styled", node, preview, "letterSpacing");
       const fam2 = node.fontName.family;
       if (ctx.index.entries.some((e) => e.str === fam2 && scopeOk(e.scopes, ["FONT_FAMILY"]))) note(res, "styled", node, preview, "fontFamily");
       return;
@@ -4480,7 +4521,10 @@
   }
   function tryBindText(ctx, node, field, value) {
     const { res, preview } = ctx;
+    const drop = field === "lineHeight" && value <= 0 || field === "letterSpacing" && value === 0;
+    const reason = drop ? DROP : isFrac(value) ? "fraction" : "no-match";
     if (node.characters.length === 0) {
+      if (drop) return;
       skip(res, "empty-text", node, preview, field);
       return;
     }
@@ -4489,7 +4533,7 @@
       note(res, st, node, preview, field);
       return;
     }
-    ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: "no-match" });
+    ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: reason });
   }
   function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match") {
     const allowed = numAllowed(field);
@@ -4645,6 +4689,17 @@
           if ((it.field === "width" || it.field === "height") && !isSizeTarget(node)) {
             fail("changed", node, it.field);
             continue;
+          }
+          if ((it.field === "width" || it.field === "height") && aspectLocked(node)) {
+            const ls = stateReason(lockedSizeState(node).state);
+            if (ls) {
+              fail(ls, node, it.field);
+              continue;
+            }
+            if (lockedAxis(node) !== it.field) {
+              fail("changed", node, it.field);
+              continue;
+            }
           }
           const st = stateReason(nodeFieldState(node, it.field));
           if (st) {

@@ -28,9 +28,11 @@ export function fieldKind(field: string | undefined): SelKind {
 }
 
 /** k = 변수가 없는 값(§4.1). */
-export const NO_VAR_REASONS: readonly string[] = ['no-match', 'size-fraction'];
+export const NO_VAR_REASONS: readonly string[] = ['no-match'];
 /** s = 자리 단위 건너뜀만(§4.1). 레이어 단위(instance-children · hidden · no-autolayout · size-free-layout · font)와 already-bound는 뺀다. */
-export const PLACE_SKIP_REASONS: readonly string[] = ['styled', 'hug-fill', 'translucent', 'space-between', 'fraction', 'empty-text', 'deleted-var'];
+export const PLACE_SKIP_REASONS: readonly string[] = ['hug-fill', 'translucent', 'space-between', 'fraction', 'size-fraction', 'empty-text', 'deleted-var'];
+/** s에 넣지 않고 칩으로만 보이는 자리 단위 사유(§4.2) — 스타일이 붙은 자리는 이미 디자인 시스템에 연결된 것. */
+export const INFO_SKIP_REASONS: readonly string[] = ['styled'];
 /** 레이어 단위 건너뜀(§4.2 — 건너뜀 칩 안에만 사유로 보인다). */
 export const LAYER_SKIP_REASONS: readonly string[] = ['instance-children', 'hidden', 'no-autolayout', 'size-free-layout', 'font'];
 
@@ -46,7 +48,7 @@ export interface CardCounts {
   s: number;
   /** m + k. */
   n: number;
-  /** 종류별 곳 수(m + k, SEL_KINDS 순서, 0은 뺌). */
+  /** 종류별 연결할 곳 수(m만 — 합 = m, 연결 화면 종류 머리 수와 같다. SEL_KINDS 순서, 0은 뺌). k는 noVarByKind. */
   byKind: { kind: SelKind; n: number }[];
   /** 종류별 변수가 없는 값(④ 둘째 줄). */
   noVarByKind: { kind: SelKind; n: number }[];
@@ -65,7 +67,6 @@ export function cardCounts(candidateFields: readonly string[], counts: ReasonCou
     for (const [kind, n] of Object.entries(counts?.[r] ?? {})) {
       if (!n) continue;
       k += n;
-      add(byKind, kind as SelKind, n);
       add(noVar, kind as SelKind, n);
     }
   }

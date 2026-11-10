@@ -240,9 +240,18 @@ function aliasesState(list: readonly unknown[]): SlotState {
 function nodeFieldState(node: SceneNode, field: string): SlotState {
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const entry = bv?.[field];
-  if (!entry) return 'none';
+  if (!entry) {
+    // 프레임 · 사각형에 strokeWeight를 붙이면 피그마는 방향별(strokeTopWeight …)로 기록한다 —
+    // strokeWeight만 보면 방금 붙인 선 두께를 다시 "연결할 곳"으로 센다. 한 방향이라도 붙었으면 그 상태로 본다.
+    if (field === 'strokeWeight') {
+      const sides = STROKE_SIDE_FIELDS.map((f) => bv?.[f]).filter((x) => !!x);
+      if (sides.length) return aliasesState(sides);
+    }
+    return 'none';
+  }
   return aliasesState(Array.isArray(entry) ? entry : [entry]);
 }
+const STROKE_SIDE_FIELDS = ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const;
 
 /**
  * paint·effect 자신(`boundVariables.color`) **또는** 노드 쪽
@@ -299,6 +308,28 @@ const STYLE_KEY_OF = { fills: 'fillStyleId', strokes: 'strokeStyleId', effects: 
 /** 상태 → 사유 키(연결 대상이면 null). */
 function stateReason(s: SlotState): 'already-bound' | 'deleted-var' | null {
   return s === 'bound' ? 'already-bound' : s === 'deleted' ? 'deleted-var' : null;
+}
+
+/**
+ * 비율이 잠긴 레이어(ia-v3 §2.11 "비율 고정") — 피그마는 크기 변수를 한 축만 붙여 둔다(세로를 붙이면 가로 연결이 풀린다).
+ * 새 API(targetAspectRatio)와 낡은 API(constrainProportions)를 둘 다 본다.
+ */
+function aspectLocked(n: SceneNode): boolean {
+  const x = n as unknown as { targetAspectRatio?: unknown; constrainProportions?: boolean };
+  return x.targetAspectRatio != null || x.constrainProportions === true;
+}
+/** 잠긴 레이어의 크기 연결 상태 — 두 축 중 연결된 축 하나로(삭제된 변수가 먼저). */
+function lockedSizeState(n: SceneNode): { state: SlotState; field: 'width' | 'height' } {
+  const w = nodeFieldState(n, 'width');
+  const h = nodeFieldState(n, 'height');
+  if (w === 'deleted' || h === 'deleted') return { state: 'deleted', field: w === 'deleted' ? 'width' : 'height' };
+  if (w === 'bound' || h === 'bound') return { state: 'bound', field: w === 'bound' ? 'width' : 'height' };
+  return { state: 'none', field: 'width' };
+}
+/** 잠긴 레이어에서 볼 축 — FIXED인 축 하나(가로 먼저). 둘 다 HUG/FILL이면 null. */
+function lockedAxis(n: SceneNode): 'width' | 'height' | null {
+  const x = n as unknown as { layoutSizingHorizontal?: string; layoutSizingVertical?: string };
+  return x.layoutSizingHorizontal === 'FIXED' ? 'width' : x.layoutSizingVertical === 'FIXED' ? 'height' : null;
 }
 
 /** 조상까지 실제로 보이는가 — extract.ts와 같은 기준(숨긴 그룹 안의 레이어를 직접 고른 경우). */
@@ -570,8 +601,16 @@ interface Slot {
   usage: string;
   /** 색: 배경 종류(12.4 inverse 판정 — text · icon · border만). */
   bg?: BgKind;
+  /** 연결 후보가 없을 때의 사유 — 'drop'은 만들기가 뽑지 않는 값이라 어디에도 세지 않는다(§4.1 k ①). */
   noMatchReason: string;
 }
+
+/** 만들기(extract)가 뽑지 않는 값 — 후보가 없으면 사유 없이 버린다(§4.1 k ①). */
+const DROP = 'drop';
+/** 소수 = 소수 둘째 자리로 반올림해도 정수가 아님(extract round · onScale과 같은 판정, §4.1 k ②). */
+const isFrac = (v: number): boolean => Math.abs(v - Math.round(v)) >= 0.005;
+/** 정수만 만드는 숫자 자리의 실패 사유 — 0 이하는 버림, 소수는 fraction(s), 그 밖은 no-match(k). */
+const numReason = (v: number, dropAtOrBelowZero = true): string => (dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? 'fraction' : 'no-match');
 
 interface Ctx {
   index: VarIndexAll;
@@ -686,7 +725,7 @@ function resolveSlots(ctx: Ctx): void {
   // 순서 4 — 새 역할. 이름 번호는 한꺼번에(곳 수 순).
   const live = pending.filter((p) => {
     if (p.global) return true;
-    skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
+    if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
     return false;
   });
   const names = assignNames(
@@ -813,6 +852,7 @@ function bindPaints(node: SceneNode, ctx: Ctx): void {
     let bg: BgKind | undefined | null = null; // null = 아직 안 봄
     paints.forEach((p, i) => {
       if (p.type !== 'SOLID') return;
+      if (p.visible === false) return; // 숨긴 칠은 찾지 않는다(extract collectPaints와 같음, §4.1 k ③)
       const st = stateReason(colorState(p, node, key, i));
       if (st) {
         note(res, st, node, preview, key);
@@ -859,8 +899,20 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
         const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
         tryBind(ctx, node, field, v, `size/${kind}`, fraction ? 'size-fraction' : undefined);
       };
-      bindAxis(node.layoutSizingHorizontal, 'width', node.width);
-      bindAxis(node.layoutSizingVertical, 'height', node.height);
+      if (aspectLocked(node)) {
+        // 한 자리로 본다: 이미 연결 → 볼 축(FIXED 하나) → 소수(§2.11 "비율 고정").
+        const ls = lockedSizeState(node);
+        const st = stateReason(ls.state);
+        if (st) note(res, st, node, preview, ls.field);
+        else {
+          const axis = lockedAxis(node);
+          if (!axis) note(res, 'hug-fill', node, preview, 'width');
+          else bindAxis('FIXED', axis, axis === 'width' ? node.width : node.height);
+        }
+      } else {
+        bindAxis(node.layoutSizingHorizontal, 'width', node.width);
+        bindAxis(node.layoutSizingVertical, 'height', node.height);
+      }
     } else {
       note(res, 'size-free-layout', node, preview);
     }
@@ -874,8 +926,8 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
   const owner = ctx.owner(node);
   if (node.layoutMode === 'GRID') {
     // 그리드 모드의 간격은 gridRowGap/gridColumnGap(extract.ts와 동일 기준).
-    tryBind(ctx, node, 'gridRowGap', node.gridRowGap, simpleNumericName('gridRowGap', owner) as string);
-    tryBind(ctx, node, 'gridColumnGap', node.gridColumnGap, simpleNumericName('gridColumnGap', owner) as string);
+    tryBind(ctx, node, 'gridRowGap', node.gridRowGap, simpleNumericName('gridRowGap', owner) as string, numReason(node.gridRowGap));
+    tryBind(ctx, node, 'gridColumnGap', node.gridColumnGap, simpleNumericName('gridColumnGap', owner) as string, numReason(node.gridColumnGap));
   } else {
     // 사이 간격 자동(Space between)이면 간격 값은 피그마가 쓰지 않는다 — 붙이면 정렬이 MIN으로 바뀌어
     // 레이어 모양이 바뀐다(§2.11 "사이 간격 자동", QA #3 불합격 1). 사유만 남기고 건너뛴다.
@@ -885,13 +937,14 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
       if (typeof v !== 'number') continue;
       const gs = gapSkip(node, f);
       if (gs === 'no-wrap') continue;
-      if (gs === 'space-between') note(res, 'space-between', node, preview, f);
-      else tryBind(ctx, node, f, v, simpleNumericName(f, owner) as string);
+      if (gs === 'space-between') {
+        if (v > 0) note(res, 'space-between', node, preview, f); // 0 이하는 만들 수 없는 값 — 건너뜀으로도 세지 않는다(§4.1 k ①)
+      } else tryBind(ctx, node, f, v, simpleNumericName(f, owner) as string, numReason(v));
     }
   }
   const pad: Padding = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
   for (const f of ['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const) {
-    tryBind(ctx, node, f, node[f], composeName('spacing', owner, paddingProp(f, pad)));
+    tryBind(ctx, node, f, node[f], composeName('spacing', owner, paddingProp(f, pad)), numReason(node[f]));
   }
 }
 
@@ -903,7 +956,7 @@ function bindRadius(node: SceneNode, ctx: Ctx): void {
   if (r !== figma.mixed && !(typeof r === 'number' && r > 0)) return;
   const owner = ctx.owner(node);
   corners.forEach((c, i) => {
-    if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values));
+    if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
   });
 }
 
@@ -953,6 +1006,7 @@ function bindEffects(node: SceneNode, ctx: Ctx): void {
   }
   effects.forEach((e, i) => {
     if (e.type !== 'DROP_SHADOW' && e.type !== 'INNER_SHADOW') return;
+    if (e.visible === false) return; // 숨긴 효과는 찾지 않는다(extract collectEffects와 같음, §4.1 k ③)
     const st = stateReason(colorState(e, node, 'effects', i));
     if (st) {
       note(res, st, node, preview, 'effects');
@@ -977,8 +1031,9 @@ async function bindText(node: SceneNode, ctx: Ctx): Promise<void> {
   if (hasStyleId(node, 'textStyleId')) {
     // 스타일이 없었다면 시도했을 자리만 센다(px 아닌 줄 높이·자간, 같은 글꼴 변수가 없는 글꼴은 원래 대상이 아님).
     if (node.fontSize !== figma.mixed) note(res, 'styled', node, preview, 'fontSize');
-    if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') note(res, 'styled', node, preview, 'lineHeight');
-    if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') note(res, 'styled', node, preview, 'letterSpacing');
+    // 만들기가 뽑지 않는 값(행간 0 이하 · 자간 0)은 스타일이 없어도 시도하지 않을 자리라 세지 않는다(§4.1 k ①).
+    if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS' && node.lineHeight.value > 0) note(res, 'styled', node, preview, 'lineHeight');
+    if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS' && node.letterSpacing.value !== 0) note(res, 'styled', node, preview, 'letterSpacing');
     const fam = node.fontName.family;
     if (ctx.index.entries.some((e) => e.str === fam && scopeOk(e.scopes, ['FONT_FAMILY']))) note(res, 'styled', node, preview, 'fontFamily');
     return;
@@ -1007,7 +1062,11 @@ async function bindText(node: SceneNode, ctx: Ctx): Promise<void> {
 
 function tryBindText(ctx: Ctx, node: TextNode, field: VariableBindableTextField, value: number): void {
   const { res, preview } = ctx;
+  // 만들기(collectText)가 뽑지 않는 값 — 행간 0 이하 · 자간 0(§4.1 k ①).
+  const drop = (field === 'lineHeight' && value <= 0) || (field === 'letterSpacing' && value === 0);
+  const reason = drop ? DROP : isFrac(value) ? 'fraction' : 'no-match';
   if (node.characters.length === 0) {
+    if (drop) return; // 빈 글자의 만들 수 없는 값은 건너뜀으로도 세지 않는다
     skip(res, 'empty-text', node, preview, field);
     return;
   }
@@ -1017,7 +1076,7 @@ function tryBindText(ctx: Ctx, node: TextNode, field: VariableBindableTextField,
     note(res, st, node, preview, field);
     return;
   }
-  ctx.slots.push({ node, field, kind: 'text', value, display: String(value), allowed: [FIELD_SCOPE[field] as VariableScope], usage: textUsageName(field) as string, noMatchReason: 'no-match' });
+  ctx.slots.push({ node, field, kind: 'text', value, display: String(value), allowed: [FIELD_SCOPE[field] as VariableScope], usage: textUsageName(field) as string, noMatchReason: reason });
 }
 
 function tryBind(
@@ -1255,6 +1314,18 @@ export async function bindSelectedItems(
         if ((it.field === 'width' || it.field === 'height') && !isSizeTarget(node)) {
           fail('changed', node, it.field);
           continue;
+        }
+        // 비율 잠김 — 볼 축 하나만 붙인다. 한 축이라도 이미 붙었으면(이 묶음에서 방금 붙인 것 포함) 그 사유로(§2.11 "비율 고정").
+        if ((it.field === 'width' || it.field === 'height') && aspectLocked(node)) {
+          const ls = stateReason(lockedSizeState(node).state);
+          if (ls) {
+            fail(ls, node, it.field);
+            continue;
+          }
+          if (lockedAxis(node) !== it.field) {
+            fail('changed', node, it.field);
+            continue;
+          }
         }
         const st = stateReason(nodeFieldState(node, it.field));
         if (st) {

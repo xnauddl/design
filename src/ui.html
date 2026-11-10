@@ -210,7 +210,6 @@
     /* ── IA v4 선택 탭(§4.1 · §8) ── */
     .sel-head { display: flex; align-items: center; gap: 6px; min-height: 32px; flex-wrap: wrap; }
     .sel-head b { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-    .sel-head .sel-n { color: var(--text-2); }
     .sel-head .sel-diff { margin-left: auto; color: var(--text-2); font-size: 10.5px; display: inline-flex; gap: 4px; align-items: center; }
     .sel-empty { padding: 48px 8px; text-align: center; color: var(--text-2); }
     .sel-empty .sub { margin-top: 4px; font-size: 11px; }
@@ -441,6 +440,7 @@
     .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
     .skip-chip.static { cursor: default; color: var(--muted); }
     .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
+    .skip-chip.info { color: var(--text-2); }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
        상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
@@ -949,7 +949,8 @@
       <div class="sel-head" id="selHead"></div>
       <div id="selCards"></div>
       <div class="sel-tools" id="selTools">
-        <span data-i18n="v4.tidy">레이어 정리</span>
+        <span data-i18n="v4.tidy">할 일</span>
+        <button id="btnGoMake" type="button" data-i18n="make.title">변수 만들기</button>
         <button id="btnGoRename" type="button" data-i18n="v4.rename">이름 정리</button>
         <button id="btnGoComponents" type="button" data-i18n-aria-label="layer.componentsBetaAria" aria-label="컴포넌트 (베타)"><span data-i18n="rail.structure">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span></button>
       </div>

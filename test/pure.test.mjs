@@ -2841,11 +2841,11 @@ test('cardCounts — m · k · s · n, 레이어 단위 사유와 already-bound�
     font: { other: 2 },
   });
   assert.equal(c.m, 3);
-  assert.equal(c.k, 4);
-  assert.equal(c.s, 1);
-  assert.equal(c.n, 7);
-  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 2 }, { kind: 'size', n: 1 }, { kind: 'color', n: 4 }]);
-  assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'size', n: 1 }, { kind: 'color', n: 2 }]);
+  assert.equal(c.k, 3); // size-fraction은 k가 아니라 s(만들기가 소수 크기를 만들지 않는다 — §4.1 k ②)
+  assert.equal(c.s, 1); // styled(스타일 사용 중)는 s에 넣지 않는다 — 칩으로만(§4.1 · §4.2 INFO_SKIP_REASONS)
+  assert.equal(c.n, 6);
+  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]); // 연결할 곳만(k는 noVarByKind)
+  assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]);
   assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
 });
 

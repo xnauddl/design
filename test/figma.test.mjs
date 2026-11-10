@@ -1440,7 +1440,8 @@ test('bindSelection — 여백(padding/gap)은 GAP 변수에만 — size/line-he
   // itemSpacing·paddingLeft는 GAP 변수로만 연결(크기/행간/자간으로 새지 않음)
   assert.equal(roleTarget(figma, node._bound.itemSpacing), gap.id);
   assert.equal(roleTarget(figma, node._bound.paddingLeft), gap.id);
-  assert.equal(res.bound, 2); // itemSpacing + paddingLeft (0짜리 padding 3개는 no-match)
+  assert.equal(res.bound, 2); // itemSpacing + paddingLeft (0짜리 padding 3개는 만들 수 없는 값 — 세지 않는다, §4.1 k ①)
+  assert.equal(res.reasons['no-match'] ?? 0, 0);
 });
 
 test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바인딩(여백 변수로 안 샘)', async () => {
@@ -4950,6 +4951,93 @@ test('bindSelection — 이미 1.5 변수에 붙은 선 두께는 Semantic · Gl
   assert.equal(dry2.candidates.length, 0);
 });
 
+test('bindSelection — strokeWeight를 붙인 뒤 피그마가 방향별(strokeTopWeight …)로 기록해도 "이미 연결됨"(다시 연결할 곳으로 세지 않음)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'stroke-width/1', category: 'strokeWidth', sources: ['strokeWidth'], value: 1 }], 16);
+  const v1 = findVar(figma, 'Global', 'stroke-width/1');
+  const role = designerRole(figma, 'stroke-width/card', v1);
+  const node = strokedFrame('sides', 1);
+  const alias = { type: 'VARIABLE_ALIAS', id: role.id };
+  node.boundVariables = { strokeTopWeight: alias, strokeRightWeight: alias, strokeBottomWeight: alias, strokeLeftWeight: alias };
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.candidates.length, 0);
+  assert.equal(dry.reasons['already-bound'], 1);
+});
+
+/* ---------- 만들기가 뽑지 않는 값은 "새로 만들 값"(no-match)이 아니다 (IA v4 §4.1 k ①~③, 2026-11-10 실기 확인) ---------- */
+const alFrame = (id, extra = {}) => ({
+  type: 'FRAME', id, name: id, fills: [], strokes: [], layoutMode: 'VERTICAL', primaryAxisAlignItems: 'MIN', layoutWrap: 'NO_WRAP',
+  itemSpacing: 8, counterAxisSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; }, ...extra,
+});
+
+test('k ① — 여백 0 네 방향은 no-match가 아니고 사유도 남기지 않는다', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const dry = await bindSelection([alFrame('z')], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.skips.length, 0);
+  assert.equal(dry.candidates.length, 1); // itemSpacing 8만
+});
+
+test('k ① — 사용자가 만든 0 변수가 있으면 여백 0도 연결 후보', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/0', category: 'gap', sources: ['gap'], value: 0 }, { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const dry = await bindSelection([alFrame('z0')], false);
+  assert.equal(dry.candidates.filter((c) => c.field.startsWith('padding')).length, 4);
+});
+
+test('k ① — 같은 값 변수가 별칭뿐(직접 값 Global 없음)인 0 여백은 버린다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const col = figma.variables.createVariableCollection('Aliases');
+  const g = figma.variables.createVariable('zero-src', col, 'FLOAT');
+  g.setValueForMode(col.defaultModeId, 0);
+  const a = figma.variables.createVariable('zero-alias', col, 'FLOAT');
+  a.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: g.id });
+  const dry = await bindSelection([alFrame('za')], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+});
+
+test('k ① — 음수 간격은 버린다', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8 }], 16);
+  const dry = await bindSelection([alFrame('neg', { itemSpacing: -8 })], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.skips.length, 0);
+});
+
+test('k ② — 소수 여백 · 반경은 fraction(s), 4.004 여백은 만든 4 변수에 연결', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/4', category: 'gap', sources: ['gap'], value: 4 }], 16);
+  const dry = await bindSelection([alFrame('fr', { itemSpacing: 4.5, paddingLeft: 4.004, cornerRadius: 2.5, topLeftRadius: 2.5, topRightRadius: 2.5, bottomLeftRadius: 2.5, bottomRightRadius: 2.5 })], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.reasons.fraction, 5); // itemSpacing 4.5 + 모서리 4곳 2.5
+  assert.ok(dry.candidates.some((c) => c.field === 'paddingLeft'));
+});
+
+test('k ① — 자간 0은 버리고, 스타일이 붙은 글자의 자간 0은 styled로도 세지 않는다', async () => {
+  installFigma();
+  await createTokens([{ name: 'font-size/16', category: 'fontSize', sources: ['fontSize'], value: 16 }], 16);
+  const txt = (id, extra = {}) => ({
+    type: 'TEXT', id, name: id, characters: 'Hi', fontName: { family: 'Inter', style: 'Regular' }, fontSize: 16,
+    lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 }, fills: [], strokes: [],
+    getRangeBoundVariable() { return null; }, setRangeBoundVariable() {}, ...extra,
+  });
+  const dry = await bindSelection([txt('t0')], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  const styled = await bindSelection([txt('ts', { textStyleId: 'S:1' })], false);
+  assert.equal(styled.reasons.styled, 1); // fontSize만
+});
+
+test('k ③ — 숨긴 칠은 찾지 않는다', async () => {
+  installFigma();
+  const node = { type: 'RECTANGLE', id: 'hid', name: 'hid', fills: [{ type: 'SOLID', color: { r: 1, g: 0, b: 0 }, visible: false }], strokes: [], setBoundVariable() {} };
+  const dry = await bindSelection([node], false);
+  assert.equal(dry.reasons['no-match'] ?? 0, 0);
+  assert.equal(dry.candidates.length, 0);
+});
+
 /* ---------- 크기는 아이콘 · 아바타만 (§2.11, 2026-11-06 사용자 결정 · QA 대기 목록 1번) ---------- */
 
 /** 오토레이아웃 부모 안의 FIXED 프레임 — 크기 판정 픽스처. */
@@ -4998,6 +5086,89 @@ function sizeFixtures() {
   for (const c of root.children) c.parent = root;
   return { ok, no, root };
 }
+
+/* ---------- 비율 고정 레이어의 크기는 한 자리 (ia-v3 §2.11 "비율 고정", 2026-11-10 실기 확인 · 실험) ---------- */
+/** 오토레이아웃 부모 안의 20×20 아이콘 — setBoundVariable은 피그마처럼 비율이 잠겼으면 다른 축 연결을 지운다. */
+function lockedIcon(id, extra = {}) {
+  const icon = sizedFrame(id, 20, 20, {
+    children: [vec(`${id}-v`)],
+    constrainProportions: true,
+    setBoundVariable(field, v) {
+      this.boundVariables ??= {};
+      const locked = this.constrainProportions === true || this.targetAspectRatio != null;
+      if (locked && (field === 'width' || field === 'height')) delete this.boundVariables[field === 'width' ? 'height' : 'width'];
+      this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id };
+    },
+    ...extra,
+  });
+  const root = { type: 'FRAME', id: `${id}-root`, name: 'root', fills: [], layoutMode: 'HORIZONTAL', layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [icon], setBoundVariable() {} };
+  icon.parent = root;
+  return icon;
+}
+const sizeCands = (r) => r.candidates.filter((c) => c.field === 'width' || c.field === 'height').map((c) => c.field);
+
+test('비율 고정 — 비어 있으면 가로만 후보(세로는 찾지도 세지도 않음)', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const dry = await bindSelection([lockedIcon('a')], false);
+  assert.deepEqual(sizeCands(dry), ['width']);
+});
+
+test('비율 고정 — 가로만 연결돼 있으면 후보 0 · already-bound 1(세로를 다시 연결할 곳으로 세지 않음)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const v = findVar(figma, 'Global', 'size/20');
+  const n = lockedIcon('b', { boundVariables: { width: { type: 'VARIABLE_ALIAS', id: v.id } } });
+  const dry = await bindSelection([n], false);
+  assert.deepEqual(sizeCands(dry), []);
+  assert.equal(dry.reasons['already-bound'], 1);
+});
+
+test('비율 고정 — 가로 HUG · 세로 FIXED면 세로 1개, 가로 HUG(연결됨)면 후보 0 · already-bound 1', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const dry = await bindSelection([lockedIcon('c', { layoutSizingHorizontal: 'HUG' })], false);
+  assert.deepEqual(sizeCands(dry), ['height']);
+  const v = findVar(figma, 'Global', 'size/20');
+  const dry2 = await bindSelection([lockedIcon('c2', { layoutSizingHorizontal: 'HUG', boundVariables: { width: { type: 'VARIABLE_ALIAS', id: v.id } } })], false);
+  assert.deepEqual(sizeCands(dry2), []);
+  assert.equal(dry2.reasons['already-bound'], 1);
+});
+
+test('비율 고정 — 가로가 삭제된 변수에 연결돼 있으면 후보 0 · deleted-var 1', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const n = lockedIcon('d', { boundVariables: { width: { type: 'VARIABLE_ALIAS', id: 'VariableID:gone' } } });
+  const dry = await bindSelection([n], false);
+  assert.deepEqual(sizeCands(dry), []);
+  assert.equal(dry.reasons['deleted-var'], 1);
+});
+
+test('비율 고정 — 잠김 꺼짐이면 두 축, targetAspectRatio로만 잠겨도 한 자리', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const off = await bindSelection([lockedIcon('e', { constrainProportions: false })], false);
+  assert.deepEqual(sizeCands(off), ['width', 'height']);
+  const tar = await bindSelection([lockedIcon('f', { constrainProportions: false, targetAspectRatio: { x: 1, y: 1 } })], false);
+  assert.deepEqual(sizeCands(tar), ['width']);
+});
+
+test('비율 고정 — 연결 직전 다시 확인: width · height를 함께 보내면 width만 붙고 height는 changed', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  const v = findVar(figma, 'Global', 'size/20');
+  const n = lockedIcon('g');
+  const known = new Map([[n.id, n]]);
+  const r = await bindSelectedItems([{ nodeId: n.id, field: 'width', variableId: v.id }, { nodeId: n.id, field: 'height', variableId: v.id }], {}, known);
+  assert.equal(r.bound, 1);
+  assert.deepEqual(Object.keys(n.boundVariables), ['width']);
+  assert.equal(r.reasons['already-bound'], 1); // 이미 연결이 먼저(방금 붙인 가로) — 세로를 붙여 가로를 풀지 않는다
+  // 세로만 보내면(볼 축이 아님) changed
+  const n2 = lockedIcon('g2');
+  const r2 = await bindSelectedItems([{ nodeId: n2.id, field: 'height', variableId: v.id }], {}, new Map([[n2.id, n2]]));
+  assert.equal(r2.bound, 0);
+  assert.equal(r2.reasons.changed, 1);
+});
 
 test('isIconOrAvatar — 아이콘 · 아바타만 참', () => {
   const figma = installFigma();
