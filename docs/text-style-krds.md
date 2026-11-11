@@ -108,7 +108,7 @@
   - 팝업 줄: 옛 이름(취소선) → 새 이름 · ("같은 이름이 남아요" — 있을 때) · 스위치.
   - Text Style 탭 줄: 요약 칸(`tr-sub`)은 `tsSummary` 글 하나(기호 `span` 없음).
 - **코드에서 지우는 것**
-  - `src/ui.ts`: `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail`, `import { offScale } from './lib/krdsType'`. `textStyleCard`의 `putOffMark` 호출, `textStyleEditRow` 크기 칸의 `putOffMark`(입력 때) · `change` 리스너(`tsRefreshTail`), 팝업 줄의 `offMarkEl(r.fontSize, false)`, 만들기 Text Style 탭 줄의 기호(`sub.textContent = tsSummary(s)`만 남김). `setTsStatus(kind, text, cls, tip)`는 꼬리를 붙이지 않으므로 종류 인자가 필요 없다 — `setTsStatus(text, cls, tip)`로 줄이거나 `setStatus('tsStatus', …)`를 바로 쓴다(부르는 곳: `renderTextStyles` · 행 라벨 · 이름 다시 짓기 뒤 · `btnTextStyles` · 램프 · 스캔 결과).
+  - `src/ui.ts`: `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail`, `import { offScale } from './lib/krdsType'`. `textStyleCard`의 `putOffMark` 호출, `textStyleEditRow` 크기 칸의 `putOffMark`(입력 때) · `change` 리스너(`tsRefreshTail`), 팝업 줄의 `offMarkEl(r.fontSize, false)`, 만들기 Text Style 탭 줄의 기호(`sub.textContent = tsSummary(s)`만 남김). `setTsStatus(kind, text, cls, tip)`는 꼬리를 붙이지 않으므로 종류 인자가 필요 없다 — `setTsStatus(text, cls, tip)`로 줄이거나 `setStatus('tsStatus', …)`를 바로 쓴다(부르는 곳: `renderTextStyles` · 행 라벨 · 이름 다시 짓기 뒤 · `btnTextStyles` · 램프 · 스캔 결과 · 등록 결과 `TEXT_STYLES_RESULT` — 이 곳은 툴팁 `tip` 인자(알림 목록)를 넘기므로 줄인 함수도 `tip`을 받는다).
   - `src/ui.html`: `.r-top.has-off` · `.r-top.no-check.has-off` · `.ts-off` · `.ts-off.decimal` · `.ts-off.off`.
   - `src/lib/i18n.ts`: `textStyle.offDecimal` · `textStyle.offScale` · `textStyle.offTip` · `textStyle.offSum`.
   - `src/lib/krdsType.ts`: `offScale`, 그리고 `offScale`만 쓰던 `KRDS_SIZES`(크기 모음은 이 문서 §1에만 남긴다). 이름 짓기 함수(`round1` · `krdsStep` · `nameKrdsStyles` 등)는 그대로.

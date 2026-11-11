@@ -135,7 +135,7 @@
      - 오류(`.ux.danger`): 경고 ⚠, `--danger`. 오류 제목 앞.
   2. **머리 띠**(2026-11-11 사용자 결정 "모든 트리 머리에 띠"): 목록 · 트리의 머리 줄을 같은 회색 띠로 둔다 — 최소 높이 32px, 배경 `--surface-2`, 아래 구분선 1px `--border`, 머리 이름 12.5px 굵게 `--text`, 테두리 · 둥근 모서리 없음, 머리 위아래 틈 0.
      - **트리 머리 줄**(§2.7 — 트리가 머리로 만드는 줄: 연결의 종류 머리, 만들기 탭의 종류 머리, 이름 정리의 맥락 머리): 지금은 흰 줄이다. 띠를 더한다. 이름 정리의 맥락 머리 이름은 띠 위에서도 회색(굵기 500 · `--text-2` — 이름을 바꾸지 않는다는 표시, §4.4) 그대로다. 읽는 중 자리 줄과 만들기 결과 줄은 머리 모양을 빌려 쓸 뿐 머리가 아니라 띠를 받지 않는다.
-     - **목록 안 그룹 머리**(`resultGroup`이 만드는 줄 — 지금 화면에 그려지는 곳은 베리언트 리포트의 구분줄이다. 컴포넌트 트리의 루트 · 맥락 줄 갈래도 같은 클래스를 받지만, 컴포넌트 트리는 맥락 줄을 늘 숨겨(`compHideContext`) 화면에 나오지 않는다): 지금 10px 회색 작은 라벨이다. 같은 띠로 바꾼다. 그룹 머리는 고르는 줄이 아니라 라벨이다(체크 · 개수를 더하지 않는다). 긴 이름은 말줄임 "…"을 지킨다. 들여쓰기는 왼쪽 안쪽 여백(2px + 깊이 × 12px — 지금 깊이 값). 흐린 맥락 줄(`.ctx`) · 누르면 레이어 선택(`.pick`) · 경고 색(`.warn`)은 그대로.
+     - **목록 안 그룹 머리**(`resultGroup`이 만드는 줄 — 지금 화면에 그려지는 곳은 베리언트 리포트의 구분줄이다. 컴포넌트 트리의 루트 · 맥락 줄 갈래도 같은 클래스를 받지만, 컴포넌트 트리는 맥락 줄을 늘 숨겨(`compHideContext`) 화면에 나오지 않는다): 지금 10px 회색 작은 라벨이다. 같은 띠로 바꾼다. 그룹 머리는 고르는 줄이 아니라 라벨이다(체크 · 개수를 더하지 않는다 — **예외:** 베리언트 결과 구분줄 "빈 변형" · "처리 중 문제"는 그 아래 항목 수를 단다, UX 검수 C §4.3a-6. 컴포넌트 트리 · 이름 정리 v3 트리의 그룹 머리는 그대로 개수 없음). 긴 이름은 말줄임 "…"을 지킨다. 들여쓰기는 왼쪽 안쪽 여백(2px + 깊이 × 12px — 지금 깊이 값). 흐린 맥락 줄(`.ctx`) · 누르면 레이어 선택(`.pick`) · 경고 색(`.warn`)은 그대로.
      - **카드 안 목록 제목**(정적 라벨 3곳 — 컴포넌트 카드의 "컴포넌트 후보" `#compTreeGroup` · "닮은 프레임" `#similarGroup` · "선택한 컴포넌트 정리" `#variantRow`): 띠로 바꾸지 않고 지금의 작은 라벨 그대로 둔다. 목록 위에 붙는 제목이라 바로 아래 그룹 머리 띠와 두 줄로 겹치지 않게 하려는 것이다. **UX 검수 C(§4.3a-6)에서 바뀐다:** `#compTreeGroup` · `#similarGroup`은 개수를 단 머리 띠가 된다(바로 아래에 다른 머리 띠가 오지 않는다 — 컴포넌트 트리는 맥락 줄을 늘 숨기고, 닮은 프레임 목록에는 그룹이 없다). `#variantRow`는 목록이 아니라 버튼 줄의 제목이라 작은 라벨 그대로다.
   3. **마우스 올림 띠**: 카드 안 목록 행(`.r-card`)과 트리 줄(`.tree .tr`, 머리 줄 모양 `.tr-head` 제외 — 트리 머리 · 읽는 중 자리 줄 · 만들기 결과 줄이 빠진다)에 마우스를 올리면 배경을 `--surface-hover`로 칠한다. 흐린 행도 같다. 머리 띠(`.r-group` 포함)는 마우스를 올려도 그대로다. 키보드 포커스 모양은 그대로다. 연결 · 만들기 · 이름 정리 화면의 트리 줄도 이 띠를 얻는다. 값을 직접 고르기 › 타이포 목록(`#tsList`)은 마우스 올림 띠까지 이 절의 범위 밖이다(#139).
 - **함께 바뀌는 다른 절:** §4.3 [값을 직접 고르기 →]의 "내용 그대로"와 §4.5의 "v3 레이어 › 컴포넌트 그대로"는 **행 · 상자 모양만 이 절을 따른다**(내용 · 문구 · 순서는 그대로 — 단 UX 검수 C가 바꾸는 탭 · 버튼 · 문구 · 머리 띠는 §4.3a를 따른다).
@@ -343,7 +343,7 @@
     - **후보 읽기:** 추출과 같은 때(들어올 때 · 기준이 바뀌어 250ms 뒤 · 창에 다시 들어올 때, 조용한 읽기 · 300개 규칙 — §2.6) `SCAN_TEXT_STYLES{reqId, nodeIds(기준)}` → `TEXT_STYLE_CANDIDATES{reqId, styles}`. reqId 응답은 이 화면만 받는다(타이포 표 `tsSpecs` · `#tsStatus` · 마지막 스캔 nodeIds 기억을 바꾸지 않고, 코드는 reqId 스캔으로 `lastTextSamples`를 덮어쓰지 않는다). 후보가 0개면 텍스트 스타일 탭을 숨긴다. 응답 전에는 탭 개수 자리에 "…", 탭 안에는 "세는 중…".
     - **이름 고치기:** 이름을 더블클릭하거나 그 줄에서 Enter · F2를 누르면 그 자리에서 글자 칸이 된다(칸 폭 = 이름 자리, 값 요약은 그대로). Enter · 칸 밖 클릭 = 저장, Esc = 취소. 앞뒤 공백은 지운다. 빈 이름이면 저장하지 않고 원래 이름으로 되돌린다. 켠 줄끼리 이름이 같으면 두 줄 이름을 주황 테두리로 보이고 실행 버튼은 `aria-disabled`(사유 "스타일 이름이 겹쳐요"). 켠 줄의 이름이 **값이 다른 기존 로컬 스타일**의 이름과 같아도 같은 모습으로 잠근다(사유 "이미 있는 스타일 이름이에요") — 등록이 그 스타일의 값을 덮어써 그 스타일을 쓰는 다른 레이어 모습이 바뀌기 때문이다(`createSemanticTextStyles`의 이름 찾기). 이를 위해 reqId 스캔 응답에 기존 로컬 스타일 목록을 싣는다: `TEXT_STYLE_CANDIDATES{reqId, styles, existing: {name, sig}[]}`(새 필드, sig = `tsSig`와 같은 값 열쇠 — 공용 함수로 뺀다). 그 줄의 `boundStyleId` 스타일 이름과 같은 경우("있음" 줄이 원래 이름을 쓸 때)는 잠그지 않는다. 이 두 사유(겹침 · 이미 있는 이름) 중 하나로 잠겼고 사용자가 다른 만들기 탭(Global · Semantic)을 보고 있으면 텍스트 스타일 탭 이름 뒤에 주황 점(6px, `aria-label` = 그 잠금 사유 문구 — `make.tsDup` · `make.tsExists`)을 붙인다 — 잠금 사유를 탭을 열지 않아도 알 수 있게.
     - **이름 고치기와 실행 · 다시 읽기:** 실행 중에는 이름 고치기도 잠근다. 실행 버튼을 누를 때 칸이 열려 있으면 먼저 저장(위 규칙)한 뒤 잠금 조건을 다시 보고 실행한다. 고치는 동안 후보 응답이 오면 칸을 닫을 때까지 미뤄 두고, 닫은 뒤 `tsSig`로 이어받아 다시 그린다. 고친 이름은 같은 후보(값이 같음 — `tsSig`)면 다시 읽어도 이어받는다. 스위치 이어받기도 같은 열쇠. 더 세밀한 이름 작업(왼쪽 글자로 이름 채우기)은 값을 직접 고르기 › 타이포에서.
-  - 탭 패널 아래 한 줄(트리 밖, 모든 만들기 탭에 공통): "팔레트 생성 · 격자 정리 · Semantic 직접 지정 · 왼쪽 글자로 이름 짓기는 [값을 직접 고르기 →]"(`make.more` — 2026-11-11 UX 검수 C: 테마(다크)는 "만든 뒤 › 다크 모드", 타이포(스타일 등록)는 Text Style 탭이 이미 하므로, 이 화면에 없는 일만 적는다. 480px에서 두 줄이 될 수 있다 — 흐름 안의 줄이라 받아들임, 2026-11-11 사용자 확인).
+  - 탭 패널 아래 한 줄(트리 밖, 모든 만들기 탭에 공통): "팔레트 생성 · 격자 정리 · Semantic 직접 지정 · 왼쪽 글자로 이름 채우기는 [값을 직접 고르기 →]"(마지막 말은 타이포 버튼 `textStyle.rowLabelBtn`과 같게)(`make.more` — 2026-11-11 UX 검수 C: 테마(다크)는 "만든 뒤 › 다크 모드", 타이포(스타일 등록)는 Text Style 탭이 이미 하므로, 이 화면에 없는 일만 적는다. 480px에서 두 줄이 될 수 있다 — 흐름 안의 줄이라 받아들임, 2026-11-11 사용자 확인).
 
 | 종류 머리(보이는 이름 — §2.7) | 추출 분류(TokenCategory) |
 |---|---|
@@ -487,6 +487,7 @@
 │ │ ░ [■] #3366ff  ☑ 중립 ☑ 상태  5계열 · 48색 생성 ░ │ │
 │ │ ░ ☐ 보조색 [■] #ff5722  하모니 [보색 ▾]        ░ │ │
 │ │ ░                              [팔레트 만들기] ░ │ │
+│ │ 색이 아닌 값 4개는 토큰 탭에서 골라요 토큰 →  │ │ (추출한 색이 있을 때 — 띠 아래)
 ```
 
 빈 상태(색 0개): [선택에서 추출]이 주 버튼, [색 변수 만들기]는 잠금(`aria-disabled`, 회색 글자) — 누르면 공통 상태 줄 "먼저 ‘선택에서 추출’이나 ‘팔레트 생성’으로 색을 모아 주세요".
@@ -496,9 +497,11 @@
 - 이름은 한 줄: "색" · "토큰" · "다크 모드" · "텍스트 스타일". `rail.color` · `rail.token` 그대로, `rail.theme` "테마" → "다크 모드", `rail.type` "타이포" → "텍스트 스타일"(그 단계 카드 제목과 같은 말 — 두 줄째 설명이 하던 일을 이름이 맡는다). 둘째 줄 키 `rail.colorSub` · `rail.tokenSub` · `rail.themeSub` · `rail.typeSub`는 지운다. "토큰"은 그대로 둔다 — 다크 단계 "토큰 만들기로 →"(`prereq.gotoCreate`) · 아래 색 단계 안내가 이 이름을 쓴다.
 - 접근성(지금은 `role="tablist"` 안의 칩이 `role="tab"` 없이 `aria-current="step"`을 써서 어긋난다): 탭은 `role="tab"` · 새 id `pickTab-color` · `pickTab-token` · `pickTab-theme` · `pickTab-type` · `aria-selected` · `aria-controls` = 그 단계 카드 id(`colorCard` · `createCard` · `darkCard` · 타이포 카드에 새 id `typeCard`). 그 네 카드에 `role="tabpanel"` · `aria-labelledby` = 그 탭 id. 토큰 단계의 숨은 Semantic 매핑 카드(`data-always-hidden`)는 패널이 아니다. tablist 이름은 `rail.makeAria` "만들기 단계" 그대로.
 - 키보드: 만들기 화면 탭과 같다 — 정지점은 고른 탭 하나(`tabIndex` 0 / 나머지 −1), ← → = 옆 탭으로 옮기며 바로 고름(끝에서 처음으로 돈다 — `nextTabIndex`, ↑↓는 쓰지 않음), Home · End = 처음 · 끝 탭. 클릭 · Enter · Space = 그 탭 고름.
-- 포커스: 이 하위 화면에 들어오면 고른 탭으로 간다(§2.1 "첫 컨트롤" — 지금은 포커스를 옮기지 않는다). 다른 곳이 특정 버튼으로 보내는 길(준비 현황 줄 `gotoStep` · `goToCreate`)은 그 버튼 포커스가 이긴다. 순서: ← → 고른 탭 → 카드 안.
+- 포커스: 이 하위 화면에 들어오면 고른 탭으로 간다(§2.1 "첫 컨트롤" — 지금은 포커스를 옮기지 않는다). **시점:** 단계를 먼저 정한 뒤에 준다 — 지금 `showPick(step)`은 `showSelSub('pick')` 다음에 `showMakeStep(step)`을 불러, 들어가는 순간에 포커스를 주면 옛 탭에 간다(OPS [보기] `go: () => showPick(…)` · 변수 탭 ＋ 메뉴 "다크 모드" · "텍스트 스타일"). 그래서 `showPick`이 단계를 정한 뒤, 하위 화면이 바뀌었거나(값을 직접 고르기에 새로 들어옴) 단계가 바뀌었을 때만 고른 탭에 포커스를 준다. 다른 탭 · ⚙ 설정에서 돌아와 하위 화면 · 단계가 그대로면 포커스를 옮기지 않는다(탭 전환 · 설정 닫기의 지금 규칙 — 설정은 Esc · ← 때 ⚙ 버튼). 다른 곳이 특정 버튼으로 보내는 길(준비 현황 줄 `gotoStep` · `goToCreate`)은 그 버튼 포커스가 이긴다(그 뒤에 버튼에 포커스). 순서: ← → 고른 탭 → 카드 안.
 - 고른 탭 기억은 지금 그대로(`curMakeStep` — 세션 동안, 하위 화면을 나갔다 와도 그 탭).
 - 코드: 컨테이너 id `makeRail` · 버튼의 `data-make-step`은 그대로 둔다(`showStep` · 검사가 쓴다). 클래스 `steps steps-4` → `mk-tabs`, 버튼의 `step-chip` 클래스와 `.n` 이름 span은 없앤다. `showStep('make')`는 `aria-current` 대신 `aria-selected` · `tabIndex`를 단다(지금 `subtab` 갈래가 하는 일 — 그 갈래를 쓰는 곳이 없으면 합친다). `.steps` · `.steps-4` · `.steps-3` · `.step-chip` CSS는 다른 곳이 쓰지 않으면 지운다.
+
+- 토큰 카드 안내 `create.scopeHint` "여백·크기·폰트·효과만 다뤄요. 색은 이전 단계에서 이미 만들었어요" → "여백·크기·폰트·효과만 다뤄요. 색은 색 탭에서 만들어요"(단계 순서를 전제하지 않게 — 아래 2).
 
 **2. [다음 →] 없앰**
 - 색 · 토큰 · 다크 모드 카드 버튼 줄의 [다음 →](`.btn-next` 3개 — `data-next-make`), 그 리스너, CSS `.btn-next`, 키 `rail.next`를 지운다. 탭이 늘 보이고 네 단계는 순서대로 할 필요가 없다(v3 §4.7이 레이어 탭의 [다음 →]을 없앤 것과 같은 판단).
@@ -520,14 +523,18 @@
 | 화면 | 잠그는 버튼 | 잠그는 조건 | 사유(누르면 공통 상태 줄) | 주 버튼 |
 |---|---|---|---|---|
 | 색 | [색 변수 만들기] `btnColorVars` | 보이는 색이 0개(`!colorRevealed` 또는 색 토큰 0 — 토큰 단계 [미리보기]가 추출을 일으켜 색이 들어와도 색 목록이 숨어 있으면 보지 못한 색을 만들게 되므로 잠근다) | `color.needColors` → "먼저 ‘선택에서 추출’이나 ‘팔레트 생성’으로 색을 모아 주세요"(글 바꿈 — 다른 잠금 사유처럼 마침표 없음) | 잠김 → [선택에서 추출] `btnExtract`, 아니면 [색 변수 만들기] |
-| 토큰 | — ([적용]은 미리보기 뒤에만 보인다 — 그대로) | — | — | [적용]이 보이면 [적용], 아니면 [미리보기] `btnCreate` |
+| 토큰 | [미리보기] `btnCreate` · [적용] `btnCreateApply` | 색 외 토큰이 있는데 하나도 체크하지 않았고 색 토큰도 없음(지금 `updateTokenCreate`의 `nothing` — 조건은 그대로) | 새 `create.needCheck` "만들 토큰을 체크해 주세요" | [적용]이 보이면 [적용], 아니면 [미리보기] |
 | 텍스트 스타일 | [등록] `btnTextStyles` | 표 줄 0개(`tsSpecs` 빔 — 스캔 전, 줄을 다 지움, 이름 다시 짓기가 표를 비움) | `textStyle.needSpecs` "먼저 ‘스캔’으로 스타일을 읽어 주세요"(그대로) | 잠김 → [스캔] `btnScanText`, 아니면 [등록] |
-| 컴포넌트 | [등록] `btnRegisterComp` | ① 후보 목록 없음(찾기 전 · 지움) ② 찾았지만 등록할 후보 0 ③ 체크한 후보 0 | ① 새 `component.needScan` "먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요" ② `component.noEligibleShort`(그대로) ③ `component.noChecked` → "등록할 후보를 체크해 주세요"(글 바꿈) | 아래 |
-| 컴포넌트 | [하나의 컴포넌트로 합치기] `btnComponentize` | 합칠 닮은 프레임이 없음(멤버 < 2 또는 원본 없음 — 찾기 전 · 합친 뒤 비움 · 찾았는데 2개 미만) | 찾은 적 없음(또는 합친 뒤) → `similar.needScan` → "먼저 ‘닮은 프레임 찾기’를 눌러 주세요"(글 바꿈), 찾았는데 2개 미만 → `similar.needTwo`(그대로) | 아래 |
+| 컴포넌트 | [등록] `btnRegisterComp` | ① 후보 목록 없음(찾기 전 · 지움) ② 찾았지만 등록할 후보 0 ③ 체크한 후보 0 | ① 새 `component.needScan` "먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요" ② `component.noEligibleShort` → "등록할 수 있는 프레임이 없어요"(끝 마침표만 지움) ③ `component.noChecked` → "등록할 후보를 체크해 주세요"(글 바꿈) | 아래 |
+| 컴포넌트 | [하나의 컴포넌트로 합치기] `btnComponentize` | 합칠 닮은 프레임이 없음(멤버 < 2 또는 원본 없음 — 찾기 전 · 합친 뒤 비움 · 찾았는데 2개 미만) | 찾은 적 없음(또는 합친 뒤) → `similar.needScan` → "먼저 ‘닮은 프레임 찾기’를 눌러 주세요"(글 바꿈), 찾았는데 2개 미만 → `similar.needTwo` → "구조가 같은 프레임이 2개 이상 있어야 해요"(글 바꿈 — 지금 "…2개 이상 선택하세요."는 찾은 뒤 상황과 어긋난다. `similar.none`의 {why}에도 그대로 들어간다) | 아래 |
 
-- 컴포넌트 화면의 주 버튼: 등록할 후보가 1개 이상 → [등록], 아니면 합칠 닮은 프레임이 있으면 → [하나의 컴포넌트로 합치기], 아니면 → [컴포넌트 후보 찾기] `btnScanComp`. [닮은 프레임 찾기]는 늘 보조다.
+- 컴포넌트 화면의 주 버튼: 등록할 후보가 1개 이상 → [등록], 아니면 합칠 닮은 프레임이 있으면 → [하나의 컴포넌트로 합치기], 아니면 → [컴포넌트 후보 찾기] `btnScanComp`. [닮은 프레임 찾기]는 유료에서 늘 보조다.
+- **무료의 주 버튼:** 위 판정에서 고른 버튼이 유료 잠금이면, 그 카드에서 **누를 수 있는 버튼**이 주 버튼이다 — 색 = [선택에서 추출], 컴포넌트 = [닮은 프레임 찾기]. 누를 수 있는 버튼이 없으면(토큰 · 텍스트 스타일 — 모두 유료) 주 버튼 없음. 잠긴 버튼을 파랑으로 두지 않는다.
+- **토큰 단계의 잠금은 공통 잠금으로 바꾼다:** 지금 `updateTokenCreate`는 [미리보기] · [적용]에 네이티브 `disabled`(`nothing || !isPaid`)를 건다 — 포커스를 받지 못하고 사유도 없다(§2.2 잠금 규칙과 어긋남). `nothing`이면 `setLock(…, 'prereq', t('create.needCheck'))`, 유료 잠금은 PAID_FIELDS(`updateGates`)에 맡기고 여기서 `disabled`를 쓰지 않는다(유료가 먼저 — 아래 판정 함수 한 곳).
+- **[적용] 보이기 · 숨기기는 함수 하나로**(예 `setTokenApplyShown(on)`): 지금 `style.display`를 직접 쓰는 곳(`undoNumTidy` · `base` 입력 · `EXTRACT_RESULT` · `CREATE_RESULT` 미리보기 · 적용 결과)을 모두 이 함수로 바꾸고, 함수가 토큰 단계 주 버튼을 다시 정한다.
 - **[이름 다시 짓기](`btnTsRename`)는 잠그지 않는다:** 스캔 표가 아니라 파일의 로컬 텍스트 스타일 전체를 읽는다(text-style-krds.md §5.2). 표가 비어도 바꿀 이름이 있을 수 있고, 없으면 팝업이 "바꿀 이름이 없어요"라고 말한다. 보조 버튼 그대로.
-- 잠금은 공통 잠금이다(§2.2 "잠금 표시와 사유"): `setLock(el, 'prereq', 사유)` — `aria-disabled`, 포커스는 받고, 누르면 동작 대신 공통 상태 줄에 사유. **유료 잠금이 먼저다**(무료면 `'paid'`와 그 사유 — 지금 `updateGates`가 PAID_FIELDS에 거는 것). 그래서 판정 함수(예 `updateEmptyLocks()`)는 `updateGates` 끝과, 조건이 바뀌는 모든 곳(추출 결과 · 팔레트 만들기 · 색 표 그리기 · 타이포 표 그리기 · 후보 트리 그리기 · 체크 바꿈 · 후보 지움 · 닮은 프레임 결과 · 합친 뒤 비움)에서 다시 부른다.
+- **준비 현황 줄 → 색:** `PIPELINE_TARGET.colors`는 `btnColorVars`로 포커스를 보낸다. 그 버튼이 빈 상태 잠금(`prereq`)이면 `gotoStep`은 [선택에서 추출] `btnExtract`로 보낸다(할 수 있는 첫 일로 — 유료 잠금이면 지금처럼 `btnColorVars`).
+- 잠금은 공통 잠금이다(§2.2 "잠금 표시와 사유"): `setLock(el, 'prereq', 사유)` — `aria-disabled`, 포커스는 받고, 누르면 동작 대신 공통 상태 줄에 사유. **유료 잠금이 먼저다**(무료면 `'paid'`와 그 사유 — 지금 `updateGates`가 PAID_FIELDS에 거는 것). 그래서 판정 함수(예 `updateEmptyLocks()`)는 `updateGates` 끝과, 조건이 바뀌는 모든 곳(추출 결과 · 팔레트 만들기 · 색 표 그리기 · 토큰 체크 바꿈(`updateTokenCreate`) · [적용] 보이기 · 숨기기(위 함수) · 타이포 표 그리기 · 후보 트리 그리기 · 체크 바꿈 · 후보 지움 · 닮은 프레임 결과 · 합친 뒤 비움)에서 다시 부른다.
 - 클릭 처리기 안의 같은 검사(`btnColorVars`의 `color.needColors` 경고, `btnRegisterComp`의 `component.noChecked` 경고, `btnComponentize`의 `similar.needScan` · `needScanAfterComp` 경고)는 잠금이 대신하므로 지운다. `btnTextStyles`의 `needSpecs` 검사는 남긴다(줄이 있어도 이름이 모두 비면 `readTextStyleRows`가 0개를 돌려준다).
 - **후보 없이 [등록]하던 길을 닫는다:** 지금 [등록]은 후보 목록이 없으면 `REGISTER_COMPONENTS`를 `nodeIds` 없이 보내 선택 전체를 미리보기 없이 등록한다(`ui.ts` `btnRegisterComp` 처리기의 else 갈래 — ia-v3 §4.7 "스캔 없는 [등록]"). 이 갈래를 지운다 — UI는 늘 후보를 보고 고른 `nodeIds`를 보낸다. 플러그인 쪽 처리(`nodeIds` 없는 등록 경로 · 그 테스트)는 바꾸지 않는다(UI가 부르지 않을 뿐).
 - `similar.needScanAfterComp`("‘후보 스캔’ 결과는 ‘등록’이 써요…")는 지운다 — 잠금 사유와 새 버튼 이름("컴포넌트 후보 찾기" · "닮은 프레임 찾기")이 그 헷갈림을 대신 푼다.
@@ -540,7 +547,7 @@
 ┌──────────────────────────────────────────────┐
 │ ← 컴포넌트 베타                                │
 │ ┌──────────────────────────────────────────┐ │
-│ │ 컴포넌트 [베타]                             │ │ 제목 줄 — 개수 · "닮은 프레임" 꼬리 없음(유료 화면)
+│ │ › 컴포넌트 [베타]                           │ │ 제목 줄 — 개수 · "닮은 프레임" 꼬리 없음(유료 화면, 접기 › 그대로)
 │ │ 후보를 찾아 등록하거나, 닮은 프레임을 하나의 │ │ 안내
 │ │ 컴포넌트로 합쳐요 · 닮은 프레임 찾기는 무료   │ │
 │ │ [컴포넌트 후보 찾기] [닮은 프레임 찾기]       │ │
@@ -564,7 +571,7 @@
 
 빈 상태(후보 · 닮은 프레임 없음): [컴포넌트 후보 찾기]가 주 버튼, [등록] · [하나의 컴포넌트로 합치기]는 잠금. 머리 띠 · 목록은 숨김(지금 그대로).
 
-- **문구(i18n, 지금 → 바뀜).** 해요체. 결과 줄 · 닮은 프레임 문구도 배지와 같은 말로 맞춘다(2026-11-11 사용자 결정 "같이 맞춤" — "세트 · 단일" → "변형 세트 · 컴포넌트", 닮은 프레임의 "마스터" → "원본"). 진단 `component.fail.*`(결정 ⑨ — 내부 말 그대로)과 [등록]의 툴팁 `component.registerHelp`("원본의 연결과 값은 마스터를 따라요" — 여기 "원본"은 등록 전 레이어라 "마스터"를 바꾸면 뜻이 겹친다), `extract.skipInstance`는 그대로다.
+- **문구(i18n, 지금 → 바뀜).** 해요체. 결과 줄 · 닮은 프레임 문구도 배지와 같은 말로 맞춘다(2026-11-11 사용자 결정 "같이 맞춤" — "세트 · 단일" → "변형 세트 · 컴포넌트", 닮은 프레임의 "마스터" → "원본"). 진단 `component.fail.*`(결정 ⑨ — 내부 말 그대로)과 [등록]의 툴팁 `component.registerHelp`("원본의 연결과 값은 마스터를 따라요" — 여기 "원본"은 등록 전 레이어라 "마스터"를 바꾸면 뜻이 겹친다), `extract.skipInstance`는 그대로다. 결과 꼬리 `component.extraProps`(" · 속성 {n}" — 노출한 컴포넌트 속성 수) · `extraIcons` · `extraSkipped`도 그대로다(배지 이름이 아니라 세는 대상의 이름이다). 이 표에 없는 컴포넌트 · 닮은 프레임 키는 그대로다.
 - **버튼 배치**는 지금 두 줄 그대로다(찾기 둘 / 실행 둘 — 2026-11-11 사용자 확인, 화면 재구성은 다음 PR).
 
 | 키 | 지금 | 바뀜 |
@@ -600,6 +607,13 @@
 | `similar.noMaster` | 마스터 프레임을 찾을 수 없어요. | 원본 프레임을 찾을 수 없어요. |
 | `similar.needScan` | 먼저 ‘닮은 스캔’으로 묶을 프레임과 마스터를 고르세요. | 먼저 ‘닮은 프레임 찾기’를 눌러 주세요 |
 | `component.needScan` (새) | — | 먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요 |
+| `component.noEligibleShort` | 등록할 수 있는 프레임이 없어요. | 등록할 수 있는 프레임이 없어요 |
+| `similar.needTwo` | 구조가 같은 프레임을 2개 이상 선택하세요. | 구조가 같은 프레임이 2개 이상 있어야 해요 |
+| `similar.scanHelp` | 구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요. | 구조가 같고 내용만 다른 프레임을 찾아 보여 줘요. 파일은 안 바꿔요. |
+| `similar.componentizing` | 컴포넌트화하는 중… | 하나의 컴포넌트로 합치는 중… |
+| `similar.none` | 컴포넌트화할 프레임이 없어요 — {why} | 합칠 프레임이 없어요 — {why} |
+| `similar.failed` | 컴포넌트화하지 못했어요{warnPart} | 합치지 못했어요{warnPart} |
+| `similar.tooFew` (code.ts) | 대상 프레임이 2개보다 적어요. 다시 스캔하세요. | 대상 프레임이 2개보다 적어요 — 다시 ‘닮은 프레임 찾기’를 눌러 주세요 |
 | `component.fromName` (새) | — | 원래 이름 {name} |
 | `similar.needScanAfterComp` · `component.changeProps` · `component.count` · `similar.count` · `component.tagMissing` · `component.tagIssue` · `component.tagAdded` · `component.tagCount` · `structure.scope` | (위 · 아래 설명) | 지움 |
 
@@ -610,17 +624,17 @@
   - 베리언트 결과(`#variantReport`)의 구분줄: "빈 변형" + "{n}개" · "처리 중 문제" + "{n}개"(단위 "건" → "개"로 맞춤). 머리 띠는 본문 글꼴이다(`#variantReport`의 mono를 물려받지 않게). 항목 줄은 mono 11px 그대로, 굵기만 보통(400 — 지금 `.r-title` 600). 경고 색(`.warn`)은 그대로.
   - `#variantRow`의 "선택한 컴포넌트 정리"는 버튼 줄 제목이라 작은 라벨 그대로(§2.8).
 - **후보 줄의 이름**(지금 "Button / primary → Button · Type=primary" — 왼쪽이 레이어 이름, 오른쪽이 등록할 이름이라 무엇이 결과인지 읽기 어렵다): 화살표를 없애고 **등록할 이름을 제목**으로, 레이어 이름을 둘째 줄로 내린다.
-  - 제목: 변형 세트면 "{세트 이름}"(굵게) + 회색 보통 굵기 "{변형 이름}"(예 "Button  Type=primary"), 컴포넌트 · 속성 컴포넌트면 "{이름}", 재사용이면 기존 컴포넌트 이름 그대로(`reuse.name` — 세트면 "{세트} · {변형}"). 속성 컴포넌트에 붙던 " · 속성"(`component.changeProps`)은 배지 "속성 컴포넌트"가 맡으므로 지운다.
+  - 제목: 변형 세트면 "{세트 이름}"(굵게) + 회색 보통 굵기 "{변형 이름}"(예 "Button  Type=primary"), 컴포넌트 · 속성 컴포넌트면 "{이름}", 재사용이면 기존 컴포넌트 이름 그대로(`reuse.name` — 세트면 "{세트} · {변형}"을 한 덩어리로, 굵게). 재사용 줄은 나눠 그리지 않는다 — 플러그인이 보여 줄 이름 전체를 한 문자열로 보내고(ia-v3 §4.7 "재사용" 7번), 나누려면 메시지 모양을 바꿔야 한다. 줄 끝 배지 [재사용]이 새 후보 줄과 구분해 준다. 속성 컴포넌트에 붙던 " · 속성"(`component.changeProps`)은 배지 "속성 컴포넌트"가 맡으므로 지운다.
   - 둘째 줄(요약 `.r-sum`, 회색): "원래 이름 {레이어 이름}"(새 `component.fromName`) — 레이어 이름이 제목 글(세트는 "{세트} · {변형}")과 다를 때만. 같으면 한 줄.
   - 줄 툴팁 = "{레이어 이름} → {제목 글}"(지금과 같은 정보). 배지 · 체크 · 들여쓰기 · 기본 체크는 그대로. 이 모양은 컴포넌트 후보 줄(`makeTreeRow`의 `replace === false` 갈래)에만 — 다른 트리는 그대로.
 
 **7. 색 단계 위쪽 정리**
-- **안내 한 줄** `colorTidy.hint` → "색을 뽑거나 팔레트를 만든 뒤 Semantic을 정하고 변수로 만들어요"(툴팁 `colorTidy.hintTip` 그대로). 뺀 두 구절: "보조색을 켠 뒤에만 하모니를 고를 수 있어요" → 팔레트 띠 안 하모니 고르개의 툴팁(새 `palette.harmonyTip` "보조색을 켜면 고를 수 있어요"), "추출은 무료 · 팔레트·변수화는 유료" → 버튼의 🔒 배지 · 툴팁이 이미 말한다.
-- **[팔레트 생성]은 띠를 여는 단추가 된다**(`btnPalette` — 글 `palette.gen` 그대로, 뒤에 ▸ / ▾, `aria-expanded`, `aria-controls="paletteBand"`). 처음은 접힘, 연 상태는 이 하위 화면 상태로 남는다(§2.1 상태 기억 — 나갔다 와도 그대로).
-  - 열면 버튼 줄 바로 아래(선택 없음 안내 · 아래 "색이 아닌 값" 줄 다음)에 새 `#paletteBand` — **테두리 없는 옅은 배경 띠**(배경 `--surface-2`, 둥근 모서리, 안쪽 8px — §2.8 "카드가 아닌 것")에 지금의 두 줄(브랜드색 피커 · hex · 중립 · 상태 · 요약 `#paletteInfo` / 보조색 · 피커 · hex · 하모니)과 오른쪽 아래 [팔레트 만들기](새 `btnPaletteRun`, 새 키 `palette.run` "팔레트 만들기" — 지금 [팔레트 생성]이 하던 생성 동작을 그대로 옮긴다)를 둔다. 만든 뒤에도 띠는 열린 채다(값을 고쳐 다시 만들 수 있게).
+- **안내 한 줄** `colorTidy.hint` → "색을 뽑거나 팔레트를 만든 뒤 Semantic을 정하고 변수로 만들어요"(툴팁 `colorTidy.hintTip` 그대로). 뺀 두 구절: "보조색을 켠 뒤에만 하모니를 고를 수 있어요" → 팔레트 띠 안 하모니 `label`(고르개를 감싼 `label.inline`)의 `title`(새 `palette.harmonyTip` "보조색을 켜면 고를 수 있어요" — 꺼진 `select`는 마우스 이벤트를 받지 않으므로 감싼 `label`에 단다), "추출은 무료 · 팔레트·변수화는 유료" → 버튼의 🔒 배지 · 툴팁이 이미 말한다.
+- **[팔레트 생성]은 띠를 여는 단추가 된다**(`btnPalette` — 안의 순서: 글 `palette.gen` 그대로 → 🔒 `paletteBtnLock`(무료만, 지금 그대로) → ▸ / ▾ 표시 `span`(`aria-hidden="true"` — 열림은 `aria-expanded`가 말한다), `aria-controls="paletteBand"`). 보조 버튼이다. 처음은 접힘, 연 상태는 이 하위 화면 상태로 남는다(§2.1 상태 기억 — 나갔다 와도 그대로).
+  - 열면 버튼 줄 아래(선택 없음 안내가 있으면 그 아래), 아래 "색이 아닌 값" 줄 **위**에 새 `#paletteBand` — **테두리 없는 옅은 배경 띠**(배경 `--surface-2`, 둥근 모서리, 안쪽 8px — §2.8 "카드가 아닌 것")에 지금의 두 줄(브랜드색 피커 · hex · 중립 · 상태 · 요약 `#paletteInfo` / 보조색 · 피커 · hex · 하모니)과 오른쪽 아래 [팔레트 만들기](새 `btnPaletteRun`, 새 키 `palette.run` "팔레트 만들기" — 지금 [팔레트 생성]이 하던 생성 동작을 그대로 옮긴다, **보조 버튼** — 카드의 주 버튼은 §4.3a-5 판정 하나)를 둔다. 만든 뒤에도 띠는 열린 채다(값을 고쳐 다시 만들 수 있게).
   - 유료: `btnPalette`는 지금처럼 PAID_FIELDS(무료면 잠금 + 🔒 `paletteBtnLock` — 띠를 열지 않고 유료 사유). `btnPaletteRun`도 PAID_FIELDS에 넣는다.
   - 열고 닫아도 포커스는 단추에 남는다(Tab으로 띠 안 첫 칸).
-- **"그 외 {o}" → 토큰 탭 안내:** `#selInfo`("선택 {n}개 · 색 {c} · 그 외 {o}" — 지금 팔레트 둘째 줄 끝)를 띠 밖으로 꺼내 버튼 줄 아래 회색 한 줄로 둔다: "색이 아닌 값 {o}개는 토큰 탭에서 골라요" + 링크 [토큰 →](새 `color.gotoToken` → 같은 하위 화면의 토큰 탭을 고르고 그 탭에 포커스). `color.selInfo` 글을 이것으로 바꾸고 인자 n · c를 지운다(색 수는 상태 줄 `color.summary`가 이미 말한다). o = 토큰 목록에 보일 색 외 토큰 수(`creatableTokens().length`). o = 0이면 줄을 숨긴다. 추출 결과(`EXTRACT_RESULT`)에서 정하고, 팔레트를 만들면(색만 남음) 숨긴다.
+- **"그 외 {o}" → 토큰 탭 안내:** `#selInfo`("선택 {n}개 · 색 {c} · 그 외 {o}" — 지금 팔레트 둘째 줄 끝)를 띠 밖으로 꺼내 회색 한 줄로 둔다(자리: 팔레트 띠 아래, 목록 위). 구조: 줄 `#selInfoRow`(숨김은 이 줄에 — `hidden`) 안에 글 `span#selInfo`(지금처럼 `textContent`로 씀 — 링크를 덮어쓰지 않게 따로 둔다)와 링크 `button.link`(새 id `btnSelInfoToken`). 글: "색이 아닌 값 {o}개는 토큰 탭에서 골라요" + 링크 [토큰 →](새 `color.gotoToken` → 같은 하위 화면의 토큰 탭을 고르고 그 탭에 포커스). `color.selInfo` 글을 이것으로 바꾸고 인자 n · c를 지운다(색 수는 상태 줄 `color.summary`가 이미 말한다). o = 토큰 목록에 보일 색 외 토큰 수(`creatableTokens().length`). o = 0이면 줄을 숨긴다. 추출 결과(`EXTRACT_RESULT`)에서 정하고, 팔레트를 만들면(색만 남음) 숨긴다.
 
 ### 4.4 이름 정리 (⑨)
 
@@ -1035,23 +1049,25 @@
 
 ### B.14 PR 14 — UX 검수 C (2026-11-11 사용자 결정 · §4.3a · docs/text-style-krds.md §4)
 
-- [ ] 단계 탭(§4.3a-1): `ui.html` `#makeRail` 클래스 `steps steps-4` → `mk-tabs`, 버튼 `step-chip` · `.n` span 없앰 · `role="tab"` · id `pickTab-color|token|theme|type` · `aria-controls`, 카드 `colorCard` · `createCard` · `darkCard` · 새 id `typeCard`에 `role="tabpanel"` · `aria-labelledby`. `ui.ts` `showStep('make')` → `aria-selected` · `tabIndex`(쓰지 않는 `subtab` 갈래 합침), ← → · Home · End 리스너(`nextTabIndex`, ↑↓ 무시), 들어오면 고른 탭 포커스(`showSelSub('pick')` — `gotoStep` · `goToCreate`의 버튼 포커스가 뒤에서 이김). 키: `rail.theme` "다크 모드" · `rail.type` "텍스트 스타일", `rail.*Sub` 4개 지움. CSS `.steps*` · `.step-chip` 지움(다른 데서 안 쓰면)
+- [ ] 단계 탭(§4.3a-1): `ui.html` `#makeRail` 클래스 `steps steps-4` → `mk-tabs`, 버튼 `step-chip` · `.n` span 없앰 · `role="tab"` · id `pickTab-color|token|theme|type` · `aria-controls`, 카드 `colorCard` · `createCard` · `darkCard` · 새 id `typeCard`에 `role="tabpanel"` · `aria-labelledby`. `ui.ts` `showStep('make')`의 `.step-chip` 선택자(지금 5061행 근처) → `[data-make-step]`(또는 `[role="tab"]`), `aria-current` → `aria-selected` · `tabIndex`(쓰지 않는 `subtab` 갈래 합침), 클릭 리스너 `#makeRail .step-chip`(5103행 근처) → `#makeRail [data-make-step]` + keydown 리스너(← → · Home · End, `nextTabIndex`, ↑↓ 무시). 포커스: `showPick`이 단계를 정한 뒤 하위 화면 · 단계가 바뀌었을 때만 고른 탭(§4.3a-1 "시점" — OPS [보기] · ＋ 메뉴 경로 포함, `gotoStep` · `goToCreate`의 버튼 포커스가 뒤에서 이김). 쓰는 곳이 없어지는 CSS `.subtabs` · `.subtab*`(ui.html 571–577행 근처)도 지운다. 키: `rail.theme` "다크 모드" · `rail.type` "텍스트 스타일", `rail.*Sub` 4개 지움. CSS `.steps*` · `.step-chip` 지움(다른 데서 안 쓰면)
 - [ ] [다음 →] 지움(§4.3a-2): `.btn-next` 3개 · `[data-next-make]` 리스너 · CSS `.btn-next` · 키 `rail.next` · `verify-bind-flow.mjs` 머리 주석 "7 480 폭에서도 ‘다음 →’…"
 - [ ] 카드 접기 화살표(§4.3a-3): `applyCardChrome`이 `#varMake .step`에는 `.chev` · 머리 토글을 걸지 않음(머리 `.step-head`는 만든다 — 새 클래스로 `cursor` 기본)
+- [ ] 토큰 카드 안내 `create.scopeHint` 글 바꿈(§4.3a-1 끝) — `i18n.ts` · `ui.html` 기본 글
 - [ ] "Layer {n}"(§4.3a-4): `renderColorTable` 요약 꼬리 → `' · ' + t('make.layers')`, `makeTokenRow` meta → `t('make.layers')`, 흐린 줄 요약 끝 `create.onceTail`(새 " · 한 곳에만 쓰임"). 키: `color.usedCount` 지움, `create.dropOnce` · `create.dropOnceTip` · `create.onceOff` · `create.onceNone` 글 바꿈, `ui.html` `btnTokenDropOnce`의 기본 글 · `title`도
-- [ ] 빈 상태 잠금 · 주 버튼(§4.3a-5): 판정 함수(`updateEmptyLocks` 같은 이름) — `btnColorVars` · `btnTextStyles` · `btnRegisterComp` · `btnComponentize`에 `setLock(…, 'prereq', 사유)`(무료면 `'paid'`가 먼저), `primary` 옮김(색: `btnExtract` ↔ `btnColorVars`, 토큰: `btnCreate` ↔ `btnCreateApply`, 타이포: `btnScanText` ↔ `btnTextStyles`, 컴포넌트: `btnScanComp` → `btnRegisterComp` → `btnComponentize` 순 판정 — `ui.html`의 고정 `class="primary"`는 판정이 덮음). 부르는 곳: `updateGates` 끝 · 추출 결과 · 팔레트 만들기 · 색 표 · 타이포 표 · 후보 트리 · 체크 바꿈 · `clearCompPreview` · `renderSimilar` · 합친 뒤 비움. 닮은 프레임을 찾은 적 있는지(사유 `similar.needTwo` ↔ `needScan`) 기억 변수
-- [ ] 클릭 처리기 정리: `btnColorVars`의 `needColors` 경고 · `btnRegisterComp`의 `noChecked` 경고와 **`nodeIds` 없이 보내는 else 갈래** · `btnComponentize`의 `needScan` · `needScanAfterComp` 경고 지움(`btnTextStyles`의 `needSpecs` 검사는 남김). 플러그인 쪽 `REGISTER_COMPONENTS`(nodeIds 없음) 처리 · figma 테스트는 그대로. 새 키 `component.needScan`, 글 바꿈 `color.needColors` · `component.noChecked` · `similar.needScan`, 지움 `similar.needScanAfterComp`
-- [ ] 컴포넌트 문구(§4.3a-6 표) — `i18n.ts` · `ui.html` 기본 글(`btnScanComp` · `btnScanSimilar` · `btnComponentize` · `btnClassifyVariants` · `btnGenMissing` · `component.hint` 줄 · `btnComponentize`의 `data-tip` = `similar.componentizeHelp`). 결과 줄 `component.registered` · `component.extraSingles`, 닮은 프레임 `similar.componentizeHelp` · `similar.resMaster` · `similar.noMaster`(2026-11-11 사용자 결정 "같이 맞춤"). 코드 주석의 "(세트 · 단일)"도 맞춘다
-- [ ] 컴포넌트 제목 줄 · 머리 띠(§4.3a-6): `ui.html` h2의 `#compCount` · `#similarCount` · `#componentCount` · `structure.scope` span 지움, `#compTreeGroup` · `#similarGroup` → `r-group r-ghead` + 이름 span + 개수 span(`tree.count`), `updateCompRegister` · `clearCompPreview` · `renderSimilar` · 합친 뒤 비움이 개수 span을 씀. `renderVariantReport` — `VariantReportSection.tag` 지움, `head`는 이름 + 개수, 구분줄 = 머리 띠 + 개수 span. CSS: 머리 띠 안 개수(`.tr-cnt`와 같은 값), `#variantReport .r-ghead` 본문 글꼴, `#variantReport .r-title` 굵기 400. 키 지움: `component.count` · `similar.count` · `component.tagMissing` · `component.tagIssue` · `component.tagAdded` · `component.tagCount` · `structure.scope` · `component.changeProps`
+- [ ] 토큰 단계: `updateTokenCreate`의 네이티브 `disabled` → `setLock(…, 'prereq', t('create.needCheck'))`(새 키 "만들 토큰을 체크해 주세요", 유료는 PAID_FIELDS에만), [적용] 보이기 · 숨기기 함수 하나(`setTokenApplyShown` — `undoNumTidy` · `base` 입력 · `EXTRACT_RESULT` · `CREATE_RESULT` 미리보기 · 적용 결과의 `style.display` 직접 쓰기를 바꿈)
+- [ ] 빈 상태 잠금 · 주 버튼(§4.3a-5): 판정 함수(`updateEmptyLocks` 같은 이름) — `btnColorVars` · `btnTextStyles` · `btnRegisterComp` · `btnComponentize`(+ 토큰 `btnCreate` · `btnCreateApply`)에 `setLock(…, 'prereq', 사유)`(무료면 `'paid'`가 먼저), `primary` 옮김(색: `btnExtract` ↔ `btnColorVars`, 토큰: `btnCreate` ↔ `btnCreateApply`, 타이포: `btnScanText` ↔ `btnTextStyles`, 컴포넌트: `btnScanComp` → `btnRegisterComp` → `btnComponentize` 순 판정 — `ui.html`의 고정 `class="primary"`는 판정이 덮음). 무료: 고른 버튼이 유료 잠금이면 누를 수 있는 버튼(색 `btnExtract` · 컴포넌트 `btnScanSimilar`), 없으면 주 버튼 없음. `gotoStep('colors')`: `btnColorVars`가 빈 상태 잠금이면 `btnExtract`로 포커스. 부르는 곳: `updateGates` 끝 · 추출 결과 · 팔레트 만들기 · 색 표 · 타이포 표 · 후보 트리 · 체크 바꿈 · `clearCompPreview` · `renderSimilar` · 합친 뒤 비움. 닮은 프레임을 찾은 적 있는지(사유 `similar.needTwo` ↔ `needScan`) 기억 변수
+- [ ] 클릭 처리기 정리: `btnColorVars`의 `needColors` 경고 · `btnRegisterComp`의 `noChecked` 경고와 **`nodeIds` 없이 보내는 else 갈래** · `btnComponentize`의 `needScan` · `needScanAfterComp` 경고 지움(`btnTextStyles`의 `needSpecs` 검사는 남김). 플러그인 쪽 `REGISTER_COMPONENTS`(nodeIds 없음) 처리 · figma 테스트는 그대로. 새 키 `component.needScan`, 글 바꿈 `color.needColors` · `component.noChecked` · `component.noEligibleShort` · `similar.needScan` · `similar.needTwo`, 지움 `similar.needScanAfterComp`
+- [ ] 컴포넌트 문구(§4.3a-6 표) — `i18n.ts` · `ui.html` 기본 글(`btnScanComp` · `btnScanSimilar` · `btnComponentize` · `btnClassifyVariants` · `btnGenMissing` · `component.hint` 줄 · `btnComponentize`의 `data-tip` = `similar.componentizeHelp`). **`ui.html`의 폴백 글도 모두 새 글로**(`data-tip` · `title` 기본값 — `btnScanSimilar` `similar.scanHelp` · `btnComponentize` · `btnClassifyVariants` `classifyHelp` · `btnGenMissing` `genMissingHelp` · `btnTokenDropOnce` `dropOnceTip` · 색 안내 `colorTidy.hint` — `verify:i18n`이 기본 글과 키 글이 다르면 잡는다). 닮은 프레임 진행 · 결과 `similar.scanHelp` · `componentizing` · `none` · `failed` · `tooFew`(code.ts가 씀)도 표대로. 결과 줄 `component.registered` · `component.extraSingles`, 닮은 프레임 `similar.componentizeHelp` · `similar.resMaster` · `similar.noMaster`(2026-11-11 사용자 결정 "같이 맞춤"). 코드 주석의 "(세트 · 단일)"도 맞춘다
+- [ ] 컴포넌트 제목 줄 · 머리 띠(§4.3a-6): `ui.html` h2의 `#compCount` · `#similarCount` · `#componentCount` · `structure.scope` span 지움, `#compTreeGroup` · `#similarGroup` → `r-group r-ghead` + 이름 span + 개수 span(`tree.count`), `resultGroup(label, count?)` — 선택 인자 `count`가 있으면 이름 뒤에 개수 span(베리언트 구분줄만 넘김, `makeTreeRow`의 그룹 머리는 넘기지 않음 — §2.8 ② 예외), `updateCompRegister` · `clearCompPreview` · `renderSimilar` · 합친 뒤 비움이 개수 span을 씀. `renderVariantReport` — `VariantReportSection.tag` 지움, `head`는 이름 + 개수, 구분줄 = 머리 띠 + 개수 span. CSS: 머리 띠 안 개수(`.tr-cnt`와 같은 값), `#variantReport .r-ghead` 본문 글꼴, `#variantReport .r-title` 굵기 400. 키 지움: `component.count` · `similar.count` · `component.tagMissing` · `component.tagIssue` · `component.tagAdded` · `component.tagCount` · `structure.scope` · `component.changeProps`
 - [ ] 후보 줄 이름(§4.3a-6): `compRows` → 제목(세트 이름 + 회색 변형 · 단일 이름 · 재사용 이름) · 둘째 줄 `component.fromName`(레이어 이름이 다를 때만) · 툴팁 "{레이어} → {제목}", `makeTreeRow`의 `replace === false` 갈래만(`TreeRow`에 필드가 필요하면 더함)
 - [ ] 입구 문구 `make.more`(§4.3 "탭 패널 아래 한 줄") — `i18n.ts` · `ui.html` `#makeMore` 기본 글
-- [ ] 색 단계 위쪽(§4.3a-7): `colorTidy.hint` 한 줄, 새 `palette.harmonyTip`(하모니 고르개 툴팁), `btnPalette` = 펼침 단추(▸/▾ · `aria-expanded` · `aria-controls`), 새 `#paletteBand`(옅은 배경 띠 — 두 입력 줄 + 새 `btnPaletteRun` `palette.run` "팔레트 만들기", 생성 리스너를 옮김, `PAID_FIELDS`에 더함), `#selInfo`를 버튼 줄 아래로 + 새 링크 `color.gotoToken`, `color.selInfo` 글 · 인자 바꿈, o = `creatableTokens().length`, 0이거나 팔레트 뒤면 숨김
+- [ ] 색 단계 위쪽(§4.3a-7): `colorTidy.hint` 한 줄, 새 `palette.harmonyTip`(하모니 고르개 툴팁), `btnPalette` = 펼침 단추(▸/▾ · `aria-expanded` · `aria-controls`), 새 `#paletteBand`(옅은 배경 띠 — 두 입력 줄 + 새 `btnPaletteRun` `palette.run` "팔레트 만들기" — 보조, 생성 리스너를 옮김, `PAID_FIELDS`에 더함), `btnPalette` 안 순서 글 → 🔒 → ▸/▾(`aria-hidden` span), 하모니 `label`에 `title` = `palette.harmonyTip`, `#selInfoRow`(숨김은 이 줄) 안 `span#selInfo` + 새 링크 `button.link#btnSelInfoToken`(`color.gotoToken`) — 자리는 팔레트 띠 아래, `color.selInfo` 글 · 인자 바꿈, o = `creatableTokens().length`, 0이거나 팔레트 뒤면 숨김
 - [ ] KRDS 크기 표시 없앰 — docs/text-style-krds.md §4 · 부록 A의 "UX 검수 C" 항목 전부(`ui.ts` `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail` · `setTsStatus`의 종류 인자, `ui.html` `.r-top.has-off` · `.ts-off*`, 키 `textStyle.offDecimal` · `offScale` · `offTip` · `offSum`, `krdsType.ts` `offScale` · `KRDS_SIZES`, `messages.ts` `TsRenameRow.fontSize` · `offScale` · `nearest`, `variables.ts` `planTsRename`)
 - [ ] 단위 · figma 테스트: `test/pure.test.mjs` 3086 `krdsType — offScale` 테스트와 import(`KRDS_SIZES` · `offScale`) 지움, `test/figma.test.mjs` 7067 `planTsRename` — 이름에서 "· 규칙 밖 표시" 빼고, `by.h1` 기대값에서 `fontSize` · `offScale` · `nearest` 빼고, 7079–7080(`by.odd.offScale` · `nearest`) 지움
 - [ ] verify-bind-flow — 바꿀 것:
   - 블록 7("‘다음 →’ 오른쪽 끝" · 가로 스크롤 없음) → 지움. 가로 스크롤 검사는 아래 새 탭 검사로 옮김
   - 블록 10 516행 `#makeRail [data-make-step="theme"]` — 선택자는 그대로 동작(id · 속성을 남김). 610–614행 무료 `btnColorVars` 유료 사유 — 그대로(유료 잠금이 먼저)
-  - 블록 13 1148행 배지 `'단독'` → `'컴포넌트'`
+  - 블록 13 1148행 배지 `'단독'` → `'컴포넌트'`, 1114행 `startsWith('컴포넌트화하지 못했어요')` → `startsWith('합치지 못했어요')`(`similar.failed`)
   - 블록 13 결과 줄 정확 문구(2026-11-11 "같이 맞춤"): 1115행 주석 "(세트 · 단일)" → "(변형 세트 · 컴포넌트)", 1119–1120행 `'컴포넌트 1 (세트 0 · 단일 1) · '` → `'컴포넌트 1 (변형 세트 0 · 컴포넌트 1) · '`, 단일 꼬리 없음 검사 `split('단일').length === 2` → 괄호 뒤에 " · 컴포넌트 1" 꼬리가 없음(`!s1.text.includes(') · 컴포넌트 ')`), 1126행 `'컴포넌트 11 (세트 7 · 단일 4) · 속성 3'` → `'컴포넌트 11 (변형 세트 7 · 컴포넌트 4) · 속성 3'`, 1129행 `'컴포넌트 0 (세트 0 · 단일 0) · 기존 컴포넌트 재사용 1: ItemButton'` → `'컴포넌트 0 (변형 세트 0 · 컴포넌트 0) · 기존 컴포넌트 재사용 1: ItemButton'`. 13의 [합치기] 결과 검사(1111 · 1114)는 "마스터"를 보지 않아 그대로
   - 새: `VARIANTS_RESULT`(단일 1) 상태 줄 꼬리 " · 컴포넌트 1" · `COMPONENTIZE_RESULT` 상태 줄 "원본 Card · …" · [하나의 컴포넌트로 합치기] 툴팁에 "마스터" 없음
   - 블록 17 1236행 "Text Style 탭 요약 끝 ○" → "Text Style 탭 줄에 `.ts-off` 없음 · 요약은 `tsSummary` 글 그대로"
@@ -1060,10 +1076,12 @@
 - [ ] verify-bind-flow — 새 검사(새 블록 23 "UX 검수 C"):
   - 단계 탭: `#makeRail [role="tab"]` 4개 · 글 "색" · "토큰" · "다크 모드" · "텍스트 스타일"(한 줄 — 탭 높이 ≤ 36) · 고른 탭 하나만 `aria-selected="true"` · `tabindex="0"` · `aria-controls`가 보이는 카드 id · 그 카드 `role="tabpanel"` · 들어오면 포커스 = 고른 탭 · → 두 번 = 다크 모드(카드 `darkCard` 보임) · End = 텍스트 스타일 · Home = 색 · 480px 가로 스크롤 없음
   - `#varMake .btn-next` 0개 · `#varMake .step-head .chev` 0개 · 색 카드 머리를 눌러도 `.collapsed` 없음
-  - 색 목록 요약에 "Layer 6" · "×" 없음. 토큰 목록 오른쪽 "Layer 4" · count 1 줄은 `.dim` + 요약 끝 "한 곳에만 쓰임" · 버튼 글 "한 곳에만 쓰인 값 빼기" · 누르면 상태 줄 "한 곳에만 쓰인 값 1개를 뺐어요"
+  - 색 목록 요약에 "Layer 6" · "×" 없음. 토큰 데이터는 격자 정리(`tidyNumbers` — 격자 8, 값의 15% 안이면 옮김)가 합치지 않는 값으로 둔다: `spacing/16` count 4 · `spacing/13` count 1(13은 16과 3 떨어져 1.95를 넘어 그대로 — `spacing/15`는 16으로 합쳐지므로 쓰지 않는다). 토큰 목록 오른쪽 "Layer 4" · `spacing/13` 줄은 `.dim` + 요약 끝 "한 곳에만 쓰임" · 버튼 글 "한 곳에만 쓰인 값 빼기" · 누르면 상태 줄 "한 곳에만 쓰인 값 1개를 뺐어요"
+  - 토큰: 모두 체크 끔(색 토큰 없음) → `btnCreate` `aria-disabled`(네이티브 `disabled` 아님) · 포커스 가능 · 누르면 사유 "만들 토큰을 체크해 주세요". 무료: 색 단계 `#btnExtract.primary` · `btnColorVars`에 `primary` 없음, 컴포넌트 `#btnScanSimilar.primary`, 토큰 · 텍스트 스타일 단계 `primary` 0개
+  - 단계 탭 포커스 시점: 값을 직접 고르기에서 나간 뒤 OPS [보기](`showPick('theme')`) 경로로 들어오면 포커스 = "다크 모드" 탭(옛 탭 아님)
   - 빈 상태(유료): 색 0 → `btnColorVars` `aria-disabled` · `#btnExtract.primary` · `#btnColorVars`에 `primary` 없음 · 누르면 공통 상태 줄 사유 · `CREATE_TOKENS` 0. 토큰 단계 [미리보기]로만 추출(색 목록 숨음) → 색 단계 `btnColorVars` 여전히 잠김. 추출 뒤 → 풀림 · 주 버튼 옮김. 타이포 줄 0 → `btnTextStyles` 잠김 · `#btnScanText.primary` · `btnTsRename` 잠기지 않음(`aria-disabled` 없음) · 스캔 결과 뒤 → 풀림
   - 컴포넌트(유료): 처음 → `btnRegisterComp` · `btnComponentize` 잠김 · `#btnScanComp.primary` · [등록] 누르면 사유 "먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요" · `REGISTER_COMPONENTS` 0. 후보 받음 → [등록] 풀림 · `primary`. 전체 끔 → 잠김 · 사유 "등록할 후보를 체크해 주세요". `SIMILAR_CANDIDATES`(2개) → [합치기] 풀림. 1개 → 잠김 · 사유 `similar.needTwo`. `COMPONENTIZE_RESULT` 뒤 → 다시 잠김. 주 버튼은 화면마다 하나
-  - 컴포넌트 제목 줄 글 = "컴포넌트베타"(🔒 제외 — 개수 · "닮은 프레임" 없음) · `#compTreeGroup` "컴포넌트 후보" + "2개" · `#similarGroup` "닮은 프레임" + "2개" · 버튼 글(표의 새 문구) · 세트 후보 줄 제목 "Button" + 변형 "Type=primary" · 둘째 줄 "원래 이름 Button / primary" · 이름이 같은 단일 줄은 둘째 줄 없음 · 닮은 프레임 추천 줄 태그 "원본 추천"
+  - 컴포넌트 제목 줄 글(`#structureCard h2`의 `textContent`에서 공백을 모두 지운 뒤) = "컴포넌트베타"(유료 — 개수 · "닮은 프레임" 없음) · `#compTreeGroup` "컴포넌트 후보" + "2개" · `#similarGroup` "닮은 프레임" + "2개" · 버튼 글(표의 새 문구) · 세트 후보 줄 제목 "Button" + 변형 "Type=primary" · 둘째 줄 "원래 이름 Button / primary" · 이름이 같은 단일 줄은 둘째 줄 없음 · 닮은 프레임 추천 줄 태그 "원본 추천"
   - 베리언트 결과: `VARIANTS_RESULT`(빈 조합 3 · 실패 1) → 머리 띠 글 "빈 변형" · "3개"(콜론 없음) · "처리 중 문제" · "1개" · 띠 글꼴이 mono 아님 · 항목 `.r-title` 굵기 400
   - 만들기 화면 `#makeMore` 글 = `make.more` 새 글
   - 색 단계 위쪽: 안내 한 줄(높이 ≤ 한 줄) · `#paletteBand` 처음 숨김 · `btnPalette` `aria-expanded="false"` → 누르면 "true" · 띠 보임 · [팔레트 만들기] → 색 목록 · 띠는 열린 채 · `#selInfo` "색이 아닌 값 2개는 토큰 탭에서 골라요" · [토큰 →] → 토큰 탭 고름 · 포커스 그 탭. 팔레트 뒤 `#selInfo` 숨김
