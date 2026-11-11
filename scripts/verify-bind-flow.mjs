@@ -332,8 +332,48 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 카드 1 완료 — 스타일 사용 중만 → "✓ 찾은 값은 모두 연결돼 있어요"(버튼 없음)', (await p.textContent('#selCards')).includes('✓ 찾은 값은 모두 연결돼 있어요') && (await p.$('[data-k="skips"]')) === null);
   await recv(p, { ...preview(ap.reqId), counts: { 'no-match': { color: 2 }, styled: { color: 1 }, 'instance-children': { other: 4 } } });
   await p.waitForTimeout(30);
+  // 카드 2 [보기 →] → 변수 탭 쓰는 변수 필터(IA v4 §4.6)
+  const USE9 = { tx: { places: 2, layers: 1 }, L1: { places: 1, layers: 1 } };
+  const LIB9 = { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }], deleted: { count: 3, nodeIds: ['x'] } };
+  check('9 카드 2 — [보기 →](펼침 목록 없음)', (await p.textContent('[data-k="uses"]')) === '보기 →' && (await p.$('.sel-list')) === null);
   await p.click('[data-k="uses"]');
-  check('9 카드 2 펼침 — 경로 머리 · 줄', JSON.stringify(await p.$$eval('.sel-list .sl-path', (e) => e.map((x) => x.textContent))) === JSON.stringify(['S Semantic › color/text', '라이브러리 › Core']));
+  await p.waitForTimeout(80);
+  const active = () => p.evaluate(() => document.activeElement?.dataset?.key ?? document.activeElement?.id ?? '');
+  check('9 필터 켬 — 변수 탭 · 필터 줄 "쓰는 변수 · {이름}" · 첫 항목 포커스', (await p.getAttribute('#tabbtn-variables', 'aria-selected')) === 'true' && (await visible(p, '#usesFilterBar')) && (await p.textContent('#usesFilterName')).startsWith('쓰는 변수 · ') && (await active()).startsWith('g:s|'), `${await p.textContent('#usesFilterName')} / ${await active()}`);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b8-filter.png` : '/dev/null' }).catch(() => {});
+  check('9 필터 사이드바 — 쓴 변수 있는 컬렉션(쓴 수) + 라이브러리', JSON.stringify(await sideItems(p)) === JSON.stringify([['Semantic', '1'], ['라이브러리', '1']]), JSON.stringify(await sideItems(p)));
+  check('9 필터 줄 — 쓴 변수만 · "{n}곳"', JSON.stringify(await p.$$eval('#varTree .vt-row', (e) => e.map((x) => [x.dataset.id, x.querySelector('.vr-n')?.textContent]))) === JSON.stringify([['tx', '2곳']]));
+  await p.click('#varSide [data-key="side:lib"]');
+  await p.waitForTimeout(40);
+  check('9 라이브러리 항목 — 그룹 "Core › core/blue" · 줄 "500 · 1곳" · 모드 메뉴 숨김', (await p.textContent('#varTree .vt-group')) .includes('Core › core/blue') && (await p.textContent('#varTree .vt-row .nm')) === '500' && (await p.textContent('#varTree .vt-row .vr-n')) === '1곳' && !(await visible(p, '#modeSelect')));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b8-filter-lib.png` : '/dev/null' }).catch(() => {});
+  await p.click('#varTree [data-key="v:L1"]');
+  await p.waitForTimeout(40);
+  check('9 라이브러리 줄 클릭 = 상세(연결 안 함)', (await p.$('.modal')) !== null && !(await sent(p, 'APPLY_VARIABLE')).some((m) => m.id === 'L1'));
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(40);
+  check('9 상세 닫으면 그 줄로', (await active()) === 'v:L1', await active());
+  // 쓴 변수 0 → "쓰는 변수가 없어요 · [필터 지우기]"
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}, { deleted: { count: 3, nodeIds: ['x'] } }));
+  await p.waitForTimeout(40);
+  check('9 필터 — 쓴 변수 0 → "쓰는 변수가 없어요 · [필터 지우기]"', (await p.textContent('#varTree')).includes('쓰는 변수가 없어요') && (await sideItems(p)).length === 0, await p.textContent('#varTree'));
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, USE9, LIB9));
+  await p.waitForTimeout(40);
+  await p.click('#usesFilterX');
+  await p.waitForTimeout(40);
+  check('9 ✕ → 일반 목록(전체 수 · 라이브러리 항목 없음) · 포커스 사이드바', !(await visible(p, '#usesFilterBar')) && JSON.stringify(await sideItems(p)) === JSON.stringify([['Semantic', '1'], ['Global', '4']]) && (await active()).startsWith('side:col:'), `${JSON.stringify(await sideItems(p))} / ${await active()}`);
+  // 다시 켜고 선택 탭에 갔다 오면 꺼져 있다
+  await p.click('#tabbtn-select');
+  await p.waitForTimeout(30);
+  await p.click('[data-k="uses"]');
+  await p.waitForTimeout(40);
+  await p.click('#tabbtn-select');
+  await p.waitForTimeout(30);
+  await p.click('#tabbtn-variables');
+  await p.waitForTimeout(40);
+  check('9 선택 탭에 갔다 오면 필터 꺼짐', !(await visible(p, '#usesFilterBar')));
+  await p.click('#tabbtn-select');
+  await p.waitForTimeout(30);
   await p.click('[data-k="unbind"]');
   const ub = (await sent(p, 'UNBIND_DELETED')).at(-1);
   check('9 [연결 풀기] → UNBIND_DELETED(기준)', ub?.nodeIds?.[0] === '1:2');
@@ -347,6 +387,52 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 [2곳 연결] → 연결 하위 화면(← 머리)', (await visible(p, '#subHead')) && !(await visible(p, '#selHome')));
   await p.keyboard.press('Escape');
   check('9 Esc → 첫 화면 · 포커스는 연 버튼', (await visible(p, '#selHome')) && (await p.evaluate(() => document.activeElement?.dataset?.k)) === 'link');
+  await p.close();
+}
+{
+  // 쓰는 변수 필터(IA v4 §4.6) — Global도 줄 · 큰 선택 [읽기] · 기준 바꾸기
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, preview(ap.reqId));
+  await recv(p, tsPrev(ap.reqId));
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { g9: { places: 3, layers: 1 }, tx: { places: 2, layers: 1 } }));
+  await p.waitForTimeout(30);
+  await p.click('[data-k="uses"]');
+  await p.waitForTimeout(60);
+  await p.click('#varSide [data-key="side:col:g"]');
+  await p.waitForTimeout(30);
+  check('9F Global도 줄 + "{n}곳"(알약 · 동그라미 아님)', JSON.stringify(await p.$$eval('#varTree .vt-row', (e) => e.map((x) => [x.dataset.id, x.querySelector('.vr-n')?.textContent]))) === JSON.stringify([['g9', '3곳']]) && (await p.$('#varTree .vp-line')) === null);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b8-filter-global.png` : '/dev/null' }).catch(() => {});
+  // 큰 선택으로 기준이 바뀌면 [읽기]
+  await recv(p, { ...sel(1, 0), scanned: 500, ids: ['big'], firstName: 'Big' });
+  await p.waitForTimeout(40);
+  check('9F 큰 선택 → "선택이 커서 자동으로 읽지 않아요 · [읽기]" · 필터 줄 이름 바뀜', (await p.textContent('#varTree')).includes('선택이 커서') && (await p.textContent('#usesFilterName')).includes('Big'), await p.textContent('#varTree'));
+  const before = (await sent(p, 'SCAN_USAGE')).length;
+  await p.click('#varTree button');
+  await p.waitForTimeout(40);
+  check('9F [읽기] → 쓰는 변수 읽기 · "읽는 중"', (await sent(p, 'SCAN_USAGE')).length === before + 1 && (await p.textContent('#varTree')).includes('읽는 중'));
+  await p.close();
+}
+{
+  // 쓰는 변수 필터 — 로컬 변수 0개 + 라이브러리만(상태 5): 빈 화면 대신 목록 화면 · 라이브러리 항목만
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 1), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const su = (await sent(p, 'SCAN_USAGE')).at(-1);
+  await recv(p, usageResult(su.reqId, { L1: { places: 2, layers: 1 } }, { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }] }));
+  await p.waitForTimeout(40);
+  await p.click('[data-k="uses"]');
+  await p.waitForTimeout(60);
+  check('9F 상태 5 — 목록 화면 · 사이드바 라이브러리만 · 줄 "2곳"', !(await visible(p, '#varEmpty')) && JSON.stringify(await sideItems(p)) === JSON.stringify([['라이브러리', '1']]) && (await p.textContent('#varTree .vt-row .vr-n')) === '2곳', JSON.stringify(await sideItems(p)));
+  await p.click('#usesFilterX');
+  await p.waitForTimeout(40);
+  check('9F 상태 5 — ✕ → 빈 화면 · 포커스 [선택에서 변수 만들기]', (await visible(p, '#varEmpty')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnVarEmptyMake');
   await p.close();
 }
 

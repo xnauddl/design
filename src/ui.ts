@@ -4645,6 +4645,7 @@ const screenScroll = new Map<string, number>();
 const screenKey = (): string => (activeTab === 'select' ? `select:${selSub}` : activeTab);
 
 function showTab(name: TabName): void {
+  if (usesFilter && name === 'select') usesFilter = false; // 선택 탭으로 바뀌는 모든 길에서 필터를 끈다(§4.6 — 설정 · 최소화는 유지)
   const changed = name !== activeTab;
   if (changed) screenScroll.set(screenKey(), window.scrollY);
   if (changed && activeTab === 'select' && selSub === 'bind' && hasBindPreview()) bindLeftSince = true; // 미리보기 뒤 탭을 떠남(⑧)
@@ -5137,6 +5138,7 @@ const localVarCount = (): number => vmVars.length;
 type VarScreen = 'loading' | 'empty' | 'list';
 function varScreen(): VarScreen {
   if (!vmTableKnown) return 'loading';
+  if (usesFilter) return 'list'; // 쓰는 변수 필터 중에는 로컬 0개여도 목록 화면(라이브러리 항목 — §4.6)
   if (localVarCount() === 0) return 'empty'; // 로컬 변수 0개(컬렉션이 있어도) — §4.6 빈 상태
   return 'list';
 }
@@ -5190,6 +5192,7 @@ function setBaseline(b: SelInfo | null): void {
   if (activeTab === 'select' && selSub === 'rename') { if (b && b.scanned <= BIG_SELECTION) scheduleRename(); else renderRenameScreen(); }
   if (activeTab === 'select' && selSub === 'make' && !mkRunning) { if (b && b.scanned <= BIG_SELECTION) scheduleMake(); else renderMakeScreen(); }
   if (!b) {
+    usesFilter = false; // 목록 기준이 없어지면 쓰는 변수 필터를 끈다(§4.6)
     usageMap = null;
     libVars = [];
     deletedUse = { count: 0, nodeIds: [] };
@@ -5207,6 +5210,7 @@ function setBaseline(b: SelInfo | null): void {
     return;
   }
   usageMap = null; // 새 기준 — 카드는 "읽는 중"(§4.1 상태 4)
+  if (vmOpen && usesFilter) renderVarScreen(); // 필터는 새 기준의 결과가 올 때까지 "읽는 중"
   renderSelHome();
   if (!usageVisible() || isMini) return; // 보이지 않으면 들어올 때 읽는다
   vmUsageTimer = setTimeout(() => { vmUsageTimer = null; requestManagerUsage('selection'); readSelFind(); }, AUTO_SCAN_DELAY);
@@ -5308,8 +5312,99 @@ function currentSel(): SideSel {
   return sideSel!;
 }
 let focusSideKey: string | null = null;
+
+/* ---------- 쓰는 변수 필터(IA v4 §4.6) — 선택 탭 카드 2 [보기 →] ---------- */
+let usesFilter = false;
+/** 필터에서 고른 항목(col · lib) — 일반 sideSel과 따로 기억. */
+let usesSel: SideSel | null = null;
+/** 필터의 접은 그룹 — 일반 목록과 따로, 켤 때마다 비움. */
+const usesCollapsed = new Set<string>();
+const usesPlaces = (id: string): number => usageMap?.get(id)?.places ?? 0;
+const usedLocal = (): VarRow[] => (usageMap ? vmVars.filter((v) => usesPlaces(v.id) > 0) : []);
+const usedLib = (): LibraryVar[] => (usageMap ? libVars.filter((l) => usesPlaces(l.id) > 0) : []);
+/** 목록에 쓸 로컬 변수 — 필터 중이면 쓴 것만. */
+const listVars = (): VarRow[] => (usesFilter ? usedLocal() : vmVars);
+const collapsedSet = (): Set<string> => (usesFilter ? usesCollapsed : grpCollapsed);
+/** 필터의 사이드바 항목 — 쓴 변수가 있는 컬렉션(쓴 수) + 라이브러리(쓴 라이브러리 변수가 있을 때). */
+function usesSides(): { sides: ReturnType<typeof sidebarCollections>; lib: number } {
+  const sides = sidebarCollections(vmCols, usedLocal(), null, new Set()).filter((x) => x.total > 0);
+  return { sides, lib: usedLib().length };
+}
+/** 필터에서 지금 고른 항목 — 사라졌으면 사이드바 첫 항목. */
+function usesCurrentSel(): SideSel {
+  const { sides, lib } = usesSides();
+  const cur = usesSel;
+  const ok = cur && ((cur.kind === 'col' && sides.some((x) => x.collection.id === cur.id)) || (cur.kind === 'lib' && lib > 0));
+  if (!ok) usesSel = sides[0] ? { kind: 'col', id: sides[0].collection.id } : lib > 0 ? { kind: 'lib' } : null;
+  return usesSel ?? { kind: 'lib' };
+}
+const listSel = (): SideSel => (usesFilter ? usesCurrentSel() : currentSel());
+/** 라이브러리 항목의 그룹 — 컬렉션 이름 → 경로(localeCompare), 같은 경로 안은 받은 순서. */
+function libGroups(): { key: string; label: string; rows: LibraryVar[] }[] {
+  const by = new Map<string, { key: string; label: string; col: string; path: string; rows: LibraryVar[] }>();
+  for (const l of usedLib()) {
+    const cut = l.name.lastIndexOf('/');
+    const path = cut < 0 ? '' : l.name.slice(0, cut);
+    const key = `lib|${l.collection}|${path}`;
+    let g = by.get(key);
+    if (!g) { g = { key, label: path ? `${l.collection} › ${path}` : l.collection, col: l.collection, path, rows: [] }; by.set(key, g); }
+    g.rows.push(l);
+  }
+  return [...by.values()].sort((a, b) => a.col.localeCompare(b.col) || a.path.localeCompare(b.path));
+}
+/** 카드 2 [보기 →] — 변수 탭으로 바꾸고 필터를 켠다. 첫 항목에 포커스, 스크롤 맨 위. */
+function openUsesFilter(): void {
+  if (!baseline) return;
+  usesFilter = true;
+  usesSel = null;
+  usesCollapsed.clear();
+  query = '';
+  ($('varSearch') as HTMLInputElement).value = '';
+  focusKey = null;
+  showTab('variables');
+  renderVarScreen();
+  requestAnimationFrame(() => window.scrollTo(0, 0)); // showTab이 되살린 스크롤보다 뒤에
+  usesFocusFirst();
+}
+/** 필터의 첫 포커스 — 오른쪽 첫 항목, 없으면 목록 안 버튼([읽기] · [필터 지우기]), 그것도 없으면 [✕]. */
+function usesFocusFirst(): void {
+  const items = gridItems();
+  const el = items[0] ?? $('varTree').querySelector<HTMLElement>('button') ?? $('usesFilterX');
+  if (items[0]) { items.forEach((x) => (x.tabIndex = -1)); items[0].tabIndex = 0; focusKey = items[0].dataset.key ?? null; }
+  el.focus({ preventScroll: true });
+}
+/** [✕] · [필터 지우기] — 일반 목록(필터 전 컬렉션)으로. 포커스는 사이드바의 고른 항목(빈 화면이면 그 버튼). */
+function closeUsesFilter(): void {
+  usesFilter = false;
+  usesSel = null;
+  focusKey = null;
+  if (varScreen() === 'list') focusSideKey = `side:${sideSelKey(currentSel())}`;
+  renderVarScreen();
+  if (varScreen() === 'empty') $('btnVarEmptyMake').focus();
+}
+$('usesFilterX').addEventListener('click', closeUsesFilter);
+$('usesFilterRebase').addEventListener('click', () => { rebaseToCurrent(); if (usesFilter) $('usesFilterX').focus(); });
+/** 필터 줄(§4.6) — "쓰는 변수 · {기준 이름}" · 다름 표시 + [기준 바꾸기] · [✕]. */
+function renderUsesBar(): void {
+  const bar = $('usesFilterBar');
+  bar.hidden = !usesFilter;
+  if (!usesFilter) return;
+  const nm = $('usesFilterName');
+  nm.textContent = t('v4.usesFilter', { name: baseLabel() });
+  nm.title = nm.textContent;
+  const diff = baseDiffers();
+  $('usesFilterDiff').hidden = !diff;
+  $('usesFilterDiff').textContent = `· ${t('v4.baseDiff')}`;
+  $('usesFilterRebase').hidden = !diff;
+  $('usesFilterRebase').textContent = t('list.rebase');
+  const x = $('usesFilterX');
+  x.setAttribute('aria-label', t('v4.usesFilterClear'));
+  x.title = t('v4.usesFilterClear');
+}
+
 function pickSide(sel: SideSel, focus = true): void {
   if (query) clearSearch(false); // 검색 중에 사이드바를 누르면 검색을 지우고 그 항목(§4.4)
+  if (usesFilter) { usesSel = sel; focusSideKey = focus ? `side:${sideSelKey(sel)}` : null; focusKey = null; renderVarList(); return; }
   sideSel = sel;
   focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
   focusKey = null;
@@ -5321,7 +5416,8 @@ function renderSidebar(sel: SideSel): void {
   nav.setAttribute('role', 'listbox');
   const hadFocus = nav.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.key ?? null : null;
   clearMount(nav);
-  const sides = sidebarCollections(vmCols, vmVars, null, new Set());
+  const uf = usesFilter ? usesSides() : null;
+  const sides = uf ? uf.sides : sidebarCollections(vmCols, vmVars, null, new Set());
   const selKey = query.trim() ? '' : sideSelKey(sel);
   for (const side of sides) {
     const c = side.collection;
@@ -5333,7 +5429,7 @@ function renderSidebar(sel: SideSel): void {
     d.setAttribute('aria-selected', String(selKey === key));
     const badge = tierBadge(c);
     const why = tierWhyText(c);
-    d.setAttribute('aria-label', t('list.sideColAria', { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ''));
+    d.setAttribute('aria-label', (uf ? t('v4.usesSideAria', { name: c.name, badge, num: String(side.total) }) : t('list.sideColAria', { name: c.name, badge, num: String(side.total) })) + (why ? `, ${why}` : ''));
     d.tabIndex = -1;
     const b = document.createElement('span');
     b.className = 'vs-badge';
@@ -5349,6 +5445,32 @@ function renderSidebar(sel: SideSel): void {
     n.textContent = String(side.total);
     d.append(b, nm, n);
     const pick = (): void => pickSide({ kind: 'col', id: c.id });
+    d.addEventListener('click', pick);
+    d.addEventListener('keydown', (ev) => sideKey(ev, d, pick));
+    nav.appendChild(d);
+  }
+  // 라이브러리 항목 — 필터가 켜졌을 때만(§4.6)
+  if (uf && uf.lib > 0) {
+    const d = document.createElement('div');
+    d.className = 'vs-item lv1';
+    d.dataset.key = 'side:lib';
+    d.setAttribute('role', 'option');
+    d.setAttribute('aria-selected', String(selKey === 'lib'));
+    d.setAttribute('aria-label', t('v4.usesSideAria', { name: t('v4.libName'), badge: 'L', num: String(uf.lib) }));
+    d.tabIndex = -1;
+    const b = document.createElement('span');
+    b.className = 'vs-badge';
+    b.setAttribute('aria-hidden', 'true');
+    b.textContent = 'L';
+    b.title = t('v4.libBadgeTip');
+    const nm = document.createElement('span');
+    nm.className = 'vs-name';
+    nm.textContent = t('v4.libName');
+    const n = document.createElement('span');
+    n.className = 'vs-num';
+    n.textContent = String(uf.lib);
+    d.append(b, nm, n);
+    const pick = (): void => pickSide({ kind: 'lib' });
     d.addEventListener('click', pick);
     d.addEventListener('keydown', (ev) => sideKey(ev, d, pick));
     nav.appendChild(d);
@@ -5470,7 +5592,8 @@ function setColorView(v: 'list' | 'grid'): void {
 
 function renderVarList(): void {
   if (!vmOpen || varScreen() !== 'list') return;
-  const sel = currentSel();
+  renderUsesBar();
+  const sel = listSel();
   renderSidebar(sel);
   const tree = $('varTree');
   const prevScroll = window.scrollY;
@@ -5480,25 +5603,50 @@ function renderVarList(): void {
   $('varSide').classList.toggle('dim', searching);
   ($('btnSearchClear') as HTMLElement).hidden = !query;
   const colId = sel.kind === 'col' ? sel.id : null;
-  const groups = paletteGroups(vmCols, vmVars, colId, query);
+  const uf = usesFilter;
+  const groups = uf && !usageMap ? [] : paletteGroups(vmCols, listVars(), colId, query);
   lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
   const lines: HTMLElement[] = [];
+  const set = collapsedSet();
+  // 필터 · 라이브러리 항목(검색 중이 아니면) — 라이브러리 그룹 · 줄(§4.6)
+  if (uf && usageMap && sel.kind === 'lib' && !searching) {
+    for (const g of libGroups()) {
+      const open = !set.has(g.key);
+      lines.push(groupHeadEl({ key: g.key, label: g.label, collectionId: '', head: true, kind: 'other', rows: [] } as PaletteGroup, open));
+      if (open) for (const l of g.rows) lines.push(libRowEl(l));
+    }
+  }
   for (const g of groups) {
     const col = vmCols.find((c) => c.id === g.collectionId);
-    const open = !grpCollapsed.has(g.key);
+    const open = !set.has(g.key);
     if (g.head) lines.push(groupHeadEl(g, open));
     if (!open) continue;
-    if (col?.tier === 1) {
+    if (uf) for (const v of g.rows) lines.push(varRowEl(v, usesPlaces(v.id))); // 필터 중에는 모든 계층을 줄 + "{n}곳"
+    else if (col?.tier === 1) {
       const colors = g.rows.filter((v) => v.type === 'COLOR');
       const others = g.rows.filter((v) => v.type !== 'COLOR');
       if (others.length) lines.push(paletteLineEl(others, 'pill'));
       if (colors.length) lines.push(paletteLineEl(colors, colorView === 'grid' ? 'dot' : 'swatch'));
     } else for (const v of g.rows) lines.push(varRowEl(v));
   }
-  if (!groups.length) {
+  if (!lines.length) {
     const d = document.createElement('div');
     d.className = 'vt-empty';
-    if (searching) {
+    const btn = (label: string, run: () => void): HTMLButtonElement => {
+      const b = document.createElement('button');
+      b.className = 'link link-btn';
+      b.type = 'button';
+      b.textContent = label;
+      b.addEventListener('click', run);
+      return b;
+    };
+    if (uf && !usageMap) {
+      // 쓰는 변수 결과 전 — 큰 선택이고 읽는 중이 아니면 [읽기], 그 밖(읽는 중 · 마법사 중)은 "읽는 중"(§4.6)
+      if (baseline && baseline.scanned > BIG_SELECTION && !vmUsageInFlight) d.append(t('list.big'), ' · ', btn(t('list.read'), () => { requestManagerUsage('user'); renderVarList(); $('usesFilterX').focus(); }));
+      else d.textContent = t('v4.reading');
+    } else if (uf && !searching && !usedLocal().length && !usedLib().length) {
+      d.append(t('v4.usesNone'), ' · ', btn(t('v4.usesFilterClear'), closeUsesFilter));
+    } else if (searching) {
       d.append(t('list.noMatch', { q: query.trim() }), ' · ');
       const b = document.createElement('button');
       b.className = 'link link-btn';
@@ -5541,7 +5689,8 @@ function groupHeadEl(g: PaletteGroup, open: boolean): HTMLElement {
   d.title = g.label;
   d.append(tw, lb);
   const toggle = (): void => {
-    if (open) grpCollapsed.add(g.key); else grpCollapsed.delete(g.key);
+    const set = collapsedSet(); // 필터 중이면 필터의 접기(§4.6)
+    if (open) set.add(g.key); else set.delete(g.key);
     focusKey = d.dataset.key ?? null;
     renderVarList();
     gridItems().find((x) => x.dataset.key === focusKey)?.focus();
@@ -5587,9 +5736,9 @@ function paletteLineEl(rows: VarRow[], mode: 'pill' | 'swatch' | 'dot'): HTMLEle
   return line;
 }
 /** Semantic · Component · 계층 아님 — 줄(끝 이름 · 값 알약 180px). */
-function varRowEl(v: VarRow): HTMLElement {
+function varRowEl(v: VarRow, places?: number): HTMLElement {
   const d = document.createElement('div');
-  d.className = 'vt-row';
+  d.className = places != null ? 'vt-row uses' : 'vt-row'; // 쓰는 변수 필터: 값 140 + "{n}곳"(§4.6)
   d.dataset.key = `v:${v.id}`;
   d.dataset.id = v.id;
   d.setAttribute('role', 'row');
@@ -5606,7 +5755,50 @@ function varRowEl(v: VarRow): HTMLElement {
   d.title = `${v.name} / ${cellTipText(cell)}`;
   d.setAttribute('aria-label', `${v.name}, ${cellTipText(cell)}`);
   d.append(nm, val);
+  if (places != null) d.appendChild(placesEl(places));
   wireItem(d, v);
+  return d;
+}
+function placesEl(n: number): HTMLElement {
+  const c = document.createElement('span');
+  c.className = 'vr-n';
+  c.textContent = t('v4.places', { n });
+  return c;
+}
+/** 쓰는 변수 필터의 라이브러리 줄(§4.6) — 끝 이름 · 값 알약 · "{n}곳". 클릭 · Enter · Space = 상세(고치지 않는다). */
+function libRowEl(l: LibraryVar): HTMLElement {
+  const d = document.createElement('div');
+  d.className = 'vt-row uses';
+  d.dataset.key = `v:${l.id}`;
+  d.setAttribute('role', 'row');
+  const nm = document.createElement('span');
+  nm.className = 'nm';
+  nm.textContent = leafName(l.name);
+  const val = document.createElement('span');
+  val.className = 'vr-val';
+  const pill = document.createElement('span');
+  pill.className = `vr-pill${l.value?.kind === 'alias' ? ' alias' : ''}`;
+  pill.innerHTML = `${l.type === 'COLOR' ? swatchHtml(resolveSwatch(l.value)) : ''}${escapeHtml(cellText(l.value))}`;
+  val.appendChild(pill);
+  d.title = `${l.name} / ${cellTipText(l.value)}`;
+  d.setAttribute('aria-label', `${l.name}, ${cellTipText(l.value)}`);
+  d.append(nm, val, placesEl(usesPlaces(l.id)));
+  const open = (): void => openDetail({ lib: l }, d);
+  d.addEventListener('click', (e) => {
+    focusKey = d.dataset.key ?? null;
+    gridItems().forEach((x) => (x.tabIndex = -1));
+    d.tabIndex = 0;
+    if (e.detail > 1) return; // 더블클릭의 두 번째 click — 상세가 두 번 열리지 않게
+    open();
+  });
+  d.addEventListener('contextmenu', (e) => { e.preventDefault(); openMenu(e.clientX, e.clientY, [{ label: t('v4.detail'), onSelect: open, focusElsewhere: true }], d); });
+  d.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); return; }
+    if (ev.key === 'ContextMenu' || (ev.key === 'F10' && ev.shiftKey)) { ev.preventDefault(); const r = d.getBoundingClientRect(); openMenu(r.left + 16, r.bottom, [{ label: t('v4.detail'), onSelect: open, focusElsewhere: true }], d); return; }
+    gridKey(ev, d);
+  });
+  d.addEventListener('focus', () => { if (d.matches(':focus-visible')) showItemTip(d); });
+  d.addEventListener('blur', hideItemTip);
   return d;
 }
 
@@ -5747,17 +5939,8 @@ let detailReq = 0;
 let detailBox: HTMLElement | null = null;
 let detailUsesEl: HTMLElement | null = null;
 
-/** 상세를 연 자리(§4.8) — 선택 탭 카드 2의 줄이면 닫은 뒤 그리로. */
-let detailReturn: HTMLElement | null = null;
-/** 상세를 변수 탭 목록에서 열었나 — 다시 그린 뒤 원래 요소가 떨어져 있어도 변수 탭 규칙을 쓴다. */
-let detailFromVars = true;
-/** 닫은 뒤 포커스(§4.8) — 연 곳이 선택 탭이면 그 줄, 변수 탭이면 그 변수(새 자리). 보이지 않으면 첫 항목 + present=false. */
+/** 닫은 뒤 포커스(§4.8) — 변수 탭(일반 · 쓰는 변수 필터)의 그 변수(새 자리). 보이지 않으면 첫 항목 + present=false. */
 function focusAfterDetail(id: string): { el: HTMLElement; present: boolean } {
-  const ret = detailReturn;
-  if (ret && !detailFromVars) {
-    if (document.body.contains(ret) && ret.offsetParent) return { el: ret, present: true };
-    return { el: $('selCards').querySelector<HTMLElement>('button') ?? $('btnGoMake'), present: false };
-  }
   const items = gridItems();
   const hit = items.find((x) => x.dataset.key === `v:${id}`);
   const el = hit ?? items[0] ?? $('varSearch');
@@ -5799,8 +5982,7 @@ function usesBlock(id: string): { box: HTMLElement; list: HTMLElement; run: () =
 
 /** focusName: "고치기…"로 열면 이름 칸, "상세"(Enter · 더블클릭 · 메뉴)면 [닫기](§2.10). */
 function openDetail(ref: RowRef, returnEl: HTMLElement, focusName = false): void {
-  detailReturn = returnEl;
-  detailFromVars = $('varTree').contains(returnEl);
+  void returnEl; // 닫은 뒤 포커스는 focusAfterDetail이 변수 탭 목록에서 찾는다
   if (ref.local) { openEditor(ref.local, focusName); return; }
   const l = ref.lib;
   const title = document.createElement('span');
@@ -6803,10 +6985,9 @@ function edGoTarget(targetId: string): void {
 function varJump(id: string): void {
   const v = vmVars.find((x) => x.id === id);
   if (!v) { showStatusLine(t('list.libVar')); return; }
-  const fromVars = activeTab === 'variables';
-  const undo = fromVars
-    ? { tab: 'variables' as const, sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey }
-    : { tab: 'select' as const, usesOpen: selUsesOpen, scroll: window.scrollY, focusK: (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-k]')?.dataset.k ?? null };
+  // 상세는 변수 탭에서만 열린다(§4.8). 쓰는 변수 필터 중이면 필터를 끄고 이동, 되돌리기는 필터까지(§4.8 [→]).
+  const undo = { sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey, uses: usesFilter ? { sel: usesSel, collapsed: new Set(usesCollapsed) } : null };
+  usesFilter = false;
   showTab('variables');
   query = '';
   ($('varSearch') as HTMLInputElement).value = '';
@@ -6826,23 +7007,20 @@ function varJump(id: string): void {
     action: {
       label: t('list.undo'),
       run: () => {
-        if (undo.tab === 'variables') {
-          sideSel = undo.sel;
-          grpCollapsed.clear(); undo.collapsed.forEach((k) => grpCollapsed.add(k));
-          query = undo.query;
-          ($('varSearch') as HTMLInputElement).value = query;
-          focusKey = undo.focusKey;
-          renderVarList();
-          window.scrollTo(0, undo.scroll);
-          gridItems().find((x) => x.dataset.key === focusKey)?.focus({ preventScroll: true });
-        } else {
-          showTab('select');
-          selUsesOpen = undo.usesOpen;
-          renderSelHome();
-          window.scrollTo(0, undo.scroll);
-          const back = undo.focusK ? $('selCards').querySelector<HTMLElement>(`[data-k="${CSS.escape(undo.focusK)}"]`) : null;
-          (back ?? $('selCards').querySelector<HTMLElement>('button'))?.focus({ preventScroll: true });
+        if (activeTab !== 'variables') showTab('variables');
+        sideSel = undo.sel;
+        grpCollapsed.clear(); undo.collapsed.forEach((k) => grpCollapsed.add(k));
+        if (undo.uses && baseline) {
+          usesFilter = true;
+          usesSel = undo.uses.sel;
+          usesCollapsed.clear(); undo.uses.collapsed.forEach((k) => usesCollapsed.add(k));
         }
+        query = undo.query;
+        ($('varSearch') as HTMLInputElement).value = query;
+        focusKey = undo.focusKey;
+        renderVarScreen();
+        window.scrollTo(0, undo.scroll);
+        gridItems().find((x) => x.dataset.key === focusKey)?.focus({ preventScroll: true });
       },
     },
   });
@@ -6890,9 +7068,11 @@ function revealVar(v: VarRow): void {
   if (activeTab !== 'variables') showTab('variables');
   query = '';
   ($('varSearch') as HTMLInputElement).value = '';
-  sideSel = { kind: 'col', id: v.collectionId };
   const cut = v.name.lastIndexOf('/');
-  grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? '' : v.name.slice(0, cut)}`);
+  const gk = `${v.collectionId}|${cut < 0 ? '' : v.name.slice(0, cut)}`;
+  // 쓰는 변수 필터 중(삭제 뒤 등)이면 필터의 고른 항목 · 접기를 쓴다(§4.6 — 일반 sideSel은 건드리지 않음).
+  if (usesFilter) { usesSel = { kind: 'col', id: v.collectionId }; usesCollapsed.delete(gk); }
+  else { sideSel = { kind: 'col', id: v.collectionId }; grpCollapsed.delete(gk); }
   focusKey = `v:${v.id}`;
   renderVarList();
 }
@@ -6901,7 +7081,9 @@ function revealVar(v: VarRow): void {
 function openNewVar(opener: HTMLElement | null): void {
   const lock = manualLimitReason();
   if (lock) { showStatusLine(lock, { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } }); return; }
-  const sel = currentSel();
+  // 컬렉션: 필터에서 고른 컬렉션, 라이브러리 항목이면 일반 목록의 고른 컬렉션(§4.6 쓰는 변수 필터).
+  const fsel = usesFilter ? usesCurrentSel() : null;
+  const sel = fsel?.kind === 'col' ? fsel : currentSel();
   const col = sel.kind === 'col' ? vmCols.find((c) => c.id === sel.id) : undefined;
   // 타입 기본값: 지금 보이는 첫 그룹의 첫 변수 타입, 그룹이 없으면 숫자.
   const first = paletteGroups(vmCols, vmVars, col?.id ?? null, '')[0]?.rows[0];
@@ -6942,6 +7124,7 @@ function onVariableCreated(msg: Extract<CodeToUi, { type: 'VARIABLE_CREATED' }>)
   manualUsed = msg.manualUsed;
   const e = ed;
   if (!e?.create || e.create.reqId !== msg.reqId) return;
+  usesFilter = false; // 새 변수는 아직 쓴 변수가 아니다 — 필터를 끄고 이동(§4.6)
   afterTable = { focus: `v:${msg.id}` };
   e.create.opener = null;
   closeModal();
@@ -6959,6 +7142,7 @@ function duplicateVar(v: VarRow): void {
 function onVariableDuplicated(msg: Extract<CodeToUi, { type: 'VARIABLE_DUPLICATED' }>): void {
   manualUsed = msg.manualUsed;
   if (msg.reqId !== dupReq) return;
+  usesFilter = false; // 복제본도 아직 쓴 변수가 아니다(§4.6)
   afterTable = { openDetail: msg.newId }; // 만든 뒤 상세를 열고 이름 칸에 포커스
 }
 let delReq = 0;
@@ -7068,7 +7252,7 @@ function openMoreMenu(): void {
   openMenu(r.left, r.bottom + 2, [
     { label: t('list.readiness', { n: readinessDone(), total: 7 }) + '…', onSelect: () => openReadiness(btn), focusElsewhere: true },
     { label: t('list.menuExport'), onSelect: () => openExportPopup(btn), focusElsewhere: true },
-    { label: colorView === 'grid' ? t('list.colorList') : t('list.colorGrid'), separatorBefore: true, onSelect: () => setColorView(colorView === 'grid' ? 'list' : 'grid') },
+    { label: colorView === 'grid' ? t('list.colorList') : t('list.colorGrid'), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t('v4.usesViewOff') : undefined, onSelect: () => setColorView(colorView === 'grid' ? 'list' : 'grid') },
     { label: t('list.menuExpandAll'), onSelect: () => setAllGroups(true) },
     { label: t('list.menuCollapseAll'), onSelect: () => setAllGroups(false) },
   ], btn);
@@ -7087,9 +7271,11 @@ function openAddMenu(): void {
 }
 /** ⋯ "그룹 모두 펼치기 / 접기" — 지금 컬렉션(검색 중이면 보이는 것)의 그룹. */
 function setAllGroups(open: boolean): void {
-  const sel = currentSel();
-  for (const g of paletteGroups(vmCols, vmVars, sel.kind === 'col' ? sel.id : null, query)) {
-    if (open) grpCollapsed.delete(g.key); else grpCollapsed.add(g.key);
+  const sel = listSel();
+  const set = collapsedSet();
+  const keys = sel.kind === 'lib' && !query.trim() ? libGroups().map((g) => g.key) : paletteGroups(vmCols, listVars(), sel.kind === 'col' ? sel.id : null, query).map((g) => g.key);
+  for (const k of keys) {
+    if (open) set.delete(k); else set.add(k);
   }
   renderVarList();
 }
@@ -7190,7 +7376,6 @@ let selFindInFlight = false;
 /** 쓰기 작업 중이라 미룬 자동 찾기(§7). */
 let selFindDeferred = false;
 /** 카드 2 펼침(세션 동안 기억). */
-let selUsesOpen = false;
 let unbindReq = 0;
 
 const baseKey = (): string => (baseline ? baseline.ids.join(',') : '');
@@ -7412,75 +7597,12 @@ function renderUsesCard(put: (el: HTMLElement) => void): void {
   if (lib.length) tierN.set(t('v4.libName'), lib.length);
   const order = ['Component', 'Semantic', 'Global', t('v4.noTierName'), t('v4.libName')];
   const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(' · ');
-  const tog = selLink(selUsesOpen ? t('v4.collapse') : t('v4.expand'), () => { selUsesOpen = !selUsesOpen; renderSelHome(); });
-  tog.dataset.k = 'uses';
-  tog.setAttribute('aria-expanded', String(selUsesOpen));
-  const card = selCard({ title: t('v4.usesN', { n }), subs: [sub], actions: [tog] });
+  // [보기 →] = 변수 탭의 쓰는 변수 필터(IA v4 §4.6) — 카드 아래 펼침 목록은 없앴다.
+  const view = selLink(t('v4.viewArrow'), () => openUsesFilter());
+  view.dataset.k = 'uses';
+  const card = selCard({ title: t('v4.usesN', { n }), subs: [sub], actions: [view] });
   (card.querySelector('.t') as HTMLElement).title = t('v4.usesTip');
   put(card);
-  if (!selUsesOpen) return;
-  // 펼친 목록 — 계층(C → S → G → 없음 → 라이브러리) → 그룹 → 피그마 순서. grid, 정지점 1개.
-  const list = document.createElement('div');
-  list.className = 'sel-list';
-  list.setAttribute('role', 'grid');
-  list.setAttribute('aria-label', t('v4.usesN', { n }));
-  const tierRank = (tier: number | undefined): number => (tier === 3 ? 0 : tier === 2 ? 1 : tier === 1 ? 2 : 3);
-  const rows: { path: string; name: string; ref: RowRef; cell: VarCell | undefined; places: number; rank: number; order: number }[] = [];
-  local.forEach((v) => {
-    const c = vmCols.find((x) => x.id === v.collectionId);
-    const cut = v.name.lastIndexOf('/');
-    rows.push({ path: `${tierBadge(c ?? { tier: 0 })} ${c?.name ?? ''}${cut > 0 ? ' › ' + v.name.slice(0, cut) : ''}`, name: cut >= 0 ? v.name.slice(cut + 1) : v.name, ref: { local: v }, cell: currentModeCell(v), places: usageMap!.get(v.id)?.places ?? 0, rank: tierRank(c?.tier), order: vmVars.indexOf(v) });
-  });
-  lib.forEach((l, i) => {
-    const cut = l.name.lastIndexOf('/');
-    rows.push({ path: `${t('v4.libName')} › ${l.collection}`, name: cut >= 0 ? l.name.slice(cut + 1) : l.name, ref: { lib: l }, cell: l.value, places: usageMap!.get(l.id)?.places ?? 0, rank: 4, order: i });
-  });
-  rows.sort((a, b) => a.rank - b.rank || a.path.localeCompare(b.path) || a.order - b.order);
-  let lastPath = '';
-  const focusables: HTMLElement[] = [];
-  for (const r of rows) {
-    if (r.path !== lastPath) {
-      const ph = document.createElement('div');
-      ph.className = 'sl-path';
-      ph.textContent = r.path;
-      list.appendChild(ph);
-      lastPath = r.path;
-    }
-    const row = document.createElement('div');
-    row.className = 'sl-row';
-    row.setAttribute('role', 'row');
-    row.tabIndex = -1;
-    row.dataset.k = `use:${r.ref.local ? r.ref.local.id : r.ref.lib.id}`;
-    const nm = document.createElement('span');
-    nm.className = 'nm';
-    nm.textContent = r.name;
-    const num = document.createElement('span');
-    num.className = 'num';
-    num.textContent = t('v4.places', { n: r.places });
-    row.append(nm, valueEl(r.cell), num);
-    const open = (): void => openDetail(r.ref, row);
-    row.addEventListener('click', open);
-    row.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      openMenu(e.clientX, e.clientY, [{ label: t('v4.detail'), onSelect: open, focusElsewhere: true }], row);
-    });
-    row.addEventListener('keydown', (e) => {
-      const i = focusables.indexOf(row);
-      const go = (j: number): void => { const tg = focusables[Math.max(0, Math.min(focusables.length - 1, j))]; focusables.forEach((x) => (x.tabIndex = -1)); tg.tabIndex = 0; tg.focus(); };
-      if (e.key === 'ArrowDown') go(i + 1);
-      else if (e.key === 'ArrowUp') go(i - 1);
-      else if (e.key === 'Home') go(0);
-      else if (e.key === 'End') go(focusables.length - 1);
-      else if (e.key === 'Enter') open();
-      else if (e.key === 'ContextMenu' || (e.key === 'F10' && e.shiftKey)) { const rc = row.getBoundingClientRect(); openMenu(rc.left + 16, rc.bottom, [{ label: t('v4.detail'), onSelect: open, focusElsewhere: true }], row); }
-      else return;
-      e.preventDefault();
-    });
-    focusables.push(row);
-    list.appendChild(row);
-  }
-  if (focusables[0]) focusables[0].tabIndex = 0;
-  put(list);
 }
 /** 카드 3 — 삭제된 변수(§4.1) · [선택] · [연결 풀기]. */
 function renderDeletedCard(put: (el: HTMLElement) => void): void {
