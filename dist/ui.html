@@ -2427,13 +2427,13 @@
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
-  function skipRowCounts(reasons, skips, tsNodes, tsOnly = false) {
+  function skipRowCounts(reasons, skips, tsNodes, tsOnly = false, layers) {
     if (tsOnly) return { fix: [], keep: [] };
     const rowOf = (key, layer) => {
-      var _a3;
+      var _a3, _b, _c;
       const all = skips.filter((x) => x.reason === key);
       const items = layer ? all : all.filter((x) => !(tsNodes.has(x.nodeId) && fieldKind(x.field) === "text"));
-      const n = Math.max(0, ((_a3 = reasons[key]) != null ? _a3 : 0) - (all.length - items.length));
+      const n = layer ? (_b = (_a3 = layers == null ? void 0 : layers[key]) != null ? _a3 : reasons[key]) != null ? _b : 0 : Math.max(0, ((_c = reasons[key]) != null ? _c : 0) - (all.length - items.length));
       return n > 0 ? { key, n, layer, items } : null;
     };
     const pick = (keys, layer) => keys.map((k) => rowOf(k, layer)).filter((r) => r != null);
@@ -4708,7 +4708,7 @@
       bindCandidates = [];
       bindCounts = void 0;
       bindSkips = [];
-      bindSkipsCapped = false;
+      bindSkipLayers = {};
       bindSkipReasons = {};
     }
     bindPreviewSel = base.ids.slice();
@@ -5286,7 +5286,7 @@
         bindSilentReq = 0;
         if (isMini && msg.preview) bindPreviewMini = true;
         bindSkips = (_a3 = msg.skips) != null ? _a3 : [];
-        bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
+        bindSkipLayers = (_b = msg.skipLayers) != null ? _b : {};
         if (msg.cancelled) {
           clearBindPreview();
           bindVarPending = false;
@@ -5333,7 +5333,6 @@
         break;
       case "VAR_TABLE":
         onVarTable(msg);
-        renderBindEmpty();
         break;
       case "USAGE_RESULT":
         onUsageResult(msg);
@@ -6801,7 +6800,15 @@
     return n;
   }
   var bindTsOnly = () => prereqKnown && !hasBindable;
+  var bindCountsMemo = null;
   function bindCardCounts() {
+    const src = [bindCandidates, bindCounts, bindSkips, bindTsRows];
+    if (bindCountsMemo && bindCountsMemo.src.every((x, i) => x === src[i])) return bindCountsMemo.val;
+    const val = countBindCards();
+    bindCountsMemo = { src, val };
+    return val;
+  }
+  function countBindCards() {
     const ts = tsAllNodes();
     const fields = bindCandidates.filter((c2) => !(fieldKind(c2.field) === "text" && ts.has(c2.nodeId))).map((c2) => c2.field);
     const c = cardCounts(fields, bindCounts);
@@ -6915,7 +6922,7 @@
     return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
   }
   function skipListRows() {
-    const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly());
+    const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly(), bindSkipLayers);
     const ts = Object.keys(bindTsSkips).filter((k) => {
       var _a3;
       return ((_a3 = bindTsSkips[k]) != null ? _a3 : 0) > 0 && tsSkipVisible(k);
@@ -7116,7 +7123,7 @@
     bindPreviewed = false;
     bindCandidates = [];
     bindSkips = [];
-    bindSkipsCapped = false;
+    bindSkipLayers = {};
     bindSkipReasons = {};
     bindSkipsOpen = false;
     bindTsRows = [];
@@ -7213,13 +7220,13 @@
     renderMakeNoSel();
   }
   var bindSkips = [];
-  var bindSkipsCapped = false;
+  var bindSkipLayers = {};
   function renderSkipReasons(reasons) {
     bindSkipReasons = __spreadValues({}, reasons);
     const box = $("bindSkips");
     clearMount(box);
-    const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
     const row = (label, count, help, items, key) => {
+      var _a3;
       const ids = [...new Set(items.map((x) => x.nodeId))];
       const r = document.createElement("div");
       r.className = "skip-row";
@@ -7246,6 +7253,8 @@
         btn.dataset.reason = key;
         btn.textContent = t("bind.skipSelectBtn");
         const names = items.slice(0, 5).map((x) => x.name).join(", ");
+        const got = new Set(bindSkips.filter((x) => x.reason === key).map((x) => x.nodeId)).size;
+        const capNote = got < ((_a3 = bindSkipLayers[key]) != null ? _a3 : 0) ? t("bind.skipCappedTip", { shown: ids.length }) : "";
         btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
         btn.addEventListener("click", () => {
           bindLayerSelectPending = true;
@@ -7257,8 +7266,7 @@
       return r;
     };
     const varRow = (r) => {
-      const layers = new Set(r.items.map((x) => x.nodeId)).size;
-      const count = r.layer ? t("v4.layerCount", { n: layers || r.n }) : t("bind.count", { k: r.n });
+      const count = r.layer ? t("v4.layerCount", { n: r.n }) : t("bind.count", { k: r.n });
       return row(t("reason." + r.key), count, t("reasonHelp." + r.key), r.items, r.key);
     };
     const head = (text) => {

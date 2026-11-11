@@ -136,62 +136,6 @@ export function fieldIcon(field: string): string {
   return '·';
 }
 
-/** 찾기 전 빈 상태의 예시 한 줄(§4.6) — 값(기본 모드)과 변수 전체 경로. */
-export interface BindExample {
-  value: string;
-  name: string;
-  /** 색: 투명도(소수 둘째 자리) — 1이면 없음. */
-  alpha?: number;
-}
-interface ExCol { id: string; tier: number; modes: { modeId: string }[]; defaultModeId?: string }
-type ExCell = { kind: string; hex?: string; alpha?: number; text?: string; aliasId?: string };
-interface ExVar { id: string; name: string; collectionId: string; type: string; values: Record<string, ExCell> }
-
-/**
- * 찾기 전 예시 — 계층이 지정된 로컬 컬렉션을 사이드바 순서(Component → Semantic → Global, 같으면 피그마 순서)로
- * 훑어 첫 색 변수와 첫 숫자 변수. 값은 그 컬렉션 기본 모드(별칭이면 로컬 대상을 따라 최대 5단계).
- * 값을 못 읽는 변수(라이브러리 별칭 등)는 건너뛴다. 투명도가 1이 아닌 색도 연결 대상이라 예시로 쓴다(§2.11 "색"). 없으면 그 종류는 빠진다.
- */
-export function bindExamples(cols: readonly ExCol[], vars: readonly ExVar[]): { color?: BindExample; number?: BindExample } {
-  const rank = (t: number): number => (t === 3 ? 0 : t === 2 ? 1 : 2);
-  const tiered = cols.map((c, i) => ({ c, i })).filter((x) => x.c.tier > 0)
-    .sort((a, b) => rank(a.c.tier) - rank(b.c.tier) || a.i - b.i).map((x) => x.c);
-  const colById = new Map(cols.map((c) => [c.id, c]));
-  const varById = new Map(vars.map((v) => [v.id, v]));
-  const defaultCell = (v: ExVar): ExCell | undefined => {
-    const col = colById.get(v.collectionId);
-    const mode = col?.defaultModeId ?? col?.modes[0]?.modeId ?? '';
-    return v.values[mode];
-  };
-  const resolve = (v: ExVar): ExCell | undefined => {
-    let cell = defaultCell(v);
-    for (let depth = 0; cell && cell.kind === 'alias' && depth < 5; depth++) {
-      const next = cell.aliasId ? varById.get(cell.aliasId) : undefined;
-      cell = next ? defaultCell(next) : undefined;
-    }
-    return cell && cell.kind !== 'alias' ? cell : undefined;
-  };
-  const out: { color?: BindExample; number?: BindExample } = {};
-  for (const col of tiered) {
-    for (const v of vars) {
-      if (v.collectionId !== col.id) continue;
-      if (!out.color && v.type === 'COLOR') {
-        const cell = resolve(v);
-        // 반투명 색 변수도 투명도까지 같은 곳에 붙으므로 예시로 쓴다(§2.11 "색").
-        if (cell?.kind === 'color' && cell.hex) {
-          const alpha = Math.round((cell.alpha ?? 1) * 100) / 100;
-          out.color = { value: cell.hex.slice(0, 7).toUpperCase(), name: v.name, ...(alpha !== 1 ? { alpha } : {}) };
-        }
-      } else if (!out.number && v.type === 'FLOAT') {
-        const cell = resolve(v);
-        if (cell?.kind === 'number' && cell.text != null) out.number = { value: cell.text, name: v.name };
-      }
-      if (out.color && out.number) return out;
-    }
-  }
-  return out;
-}
-
 /* ---------- IA v4 §4.2 연결 화면 — 줄 = (변수, 종류) 한 쌍 ---------- */
 
 /** 연결 화면의 줄 — 변수 묶음 + 종류. */
