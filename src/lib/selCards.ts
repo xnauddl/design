@@ -46,7 +46,7 @@ export interface SkipItem {
 /** 건너뛴 곳 목록의 줄 하나(변수 사유). */
 export interface SkipRow {
   key: string;
-  /** 자리 단위는 곳 수, 레이어 단위는 사유 수(표시는 `items` 레이어 수 우선). */
+  /** 자리 단위는 곳 수, 레이어 단위는 레이어 수(상한 전 `skipLayers`, 없으면 사유 수). */
   n: number;
   layer: boolean;
   /** [선택 ›] · 툴팁에 쓰는 항목 — 뺀 항목은 없다. */
@@ -62,12 +62,14 @@ export function skipRowCounts(
   skips: readonly SkipItem[],
   tsNodes: ReadonlySet<string>,
   tsOnly = false,
+  /** 사유별 레이어 수(상한 전 — `APPLY_RESULT.skipLayers`). 레이어 단위 줄의 수로 쓴다. */
+  layers?: Readonly<Record<string, number>>,
 ): { fix: SkipRow[]; keep: SkipRow[] } {
   if (tsOnly) return { fix: [], keep: [] };
   const rowOf = (key: string, layer: boolean): SkipRow | null => {
     const all = skips.filter((x) => x.reason === key);
     const items = layer ? all : all.filter((x) => !(tsNodes.has(x.nodeId) && fieldKind(x.field) === 'text'));
-    const n = Math.max(0, (reasons[key] ?? 0) - (all.length - items.length));
+    const n = layer ? layers?.[key] ?? reasons[key] ?? 0 : Math.max(0, (reasons[key] ?? 0) - (all.length - items.length));
     return n > 0 ? { key, n, layer, items } : null;
   };
   const pick = (keys: readonly string[], layer: boolean): SkipRow[] => keys.map((k) => rowOf(k, layer)).filter((r): r is SkipRow => r != null);

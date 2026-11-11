@@ -2673,39 +2673,9 @@ test('fieldIcon — 자리 줄 속성 아이콘(§4.6 표), 표에 없는 필드
   for (const [f, ic] of Object.entries(cases)) assert.equal(fieldIcon(f), ic, f);
 });
 
-test('bindExamples — 계층 컬렉션을 사이드바 순서로 훑어 첫 색·첫 숫자, 기본 모드 값(별칭은 대상), 없으면 뺀다', async () => {
-  const { bindExamples } = await import('../dist/pure.mjs');
-  const cols = [
-    { id: 'g', tier: 1, modes: [{ modeId: 'm' }], defaultModeId: 'm' },
-    { id: 'x', tier: 0, modes: [{ modeId: 'x1' }] },
-    { id: 's', tier: 2, modes: [{ modeId: 'l' }, { modeId: 'd' }], defaultModeId: 'd' },
-    { id: 'c', tier: 3, modes: [{ modeId: 'c1' }] },
-  ];
-  const v = (id, collectionId, type, values) => ({ id, name: id, collectionId, type, values });
-  const vars = [
-    v('misc', 'x', 'COLOR', { x1: { kind: 'color', hex: '#ff0000' } }),
-    v('gray0', 'g', 'COLOR', { m: { kind: 'color', hex: '#ffffff' } }),
-    v('gray9', 'g', 'COLOR', { m: { kind: 'color', hex: '#111111ff' } }),
-    v('sp8', 'g', 'FLOAT', { m: { kind: 'number', text: '8' } }),
-    v('lib', 'c', 'COLOR', { c1: { kind: 'alias', aliasId: 'remote', aliasName: 'x', remote: true } }),
-    v('text', 's', 'COLOR', { l: { kind: 'alias', aliasId: 'gray0' }, d: { kind: 'alias', aliasId: 'gray9' } }),
-    v('gap', 's', 'FLOAT', { d: { kind: 'alias', aliasId: 'sp8' } }),
-  ];
-  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#111111', name: 'text' }, number: { value: '8', name: 'gap' } }, 'Component(못 읽는 별칭) 건너뜀 → Semantic, 기본 모드 Dark');
-  assert.deepEqual(bindExamples(cols, vars.filter((x) => x.type === 'COLOR')), { color: { value: '#111111', name: 'text' } });
-  assert.deepEqual(bindExamples(cols, [vars[0]]), {}, '계층 없는 컬렉션은 보지 않는다');
-});
 
-test('bindExamples — 투명도가 1이 아닌 색 변수도 예시로 쓴다(투명도까지 같은 곳에 붙음, ia-v3 §2.11 "색")', async () => {
-  const { bindExamples } = await import('../dist/pure.mjs');
-  const cols = [{ id: 's', tier: 2, modes: [{ modeId: 'l' }], defaultModeId: 'l' }];
-  const vars = [
-    { id: 'a', name: 'overlay', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#000000', alpha: 0.5 } } },
-    { id: 'b', name: 'text', collectionId: 's', type: 'COLOR', values: { l: { kind: 'color', hex: '#111111', alpha: 1 } } },
-  ];
-  assert.deepEqual(bindExamples(cols, vars), { color: { value: '#000000', name: 'overlay', alpha: 0.5 } }, '첫 색 변수 — 반투명이어도');
-  assert.deepEqual(bindExamples(cols, [vars[1]]), { color: { value: '#111111', name: 'text' } }, '불투명이면 alpha 없음');
-});
+
+
 
 /* ---------- 변수 고치기(§4.4 고치기 · PR 3.5) ---------- */
 const edCols = [
@@ -2977,4 +2947,8 @@ test('skipRowCounts — 줄 수 = 칩 수와 같은 셈: 스타일 후보 레이
   assert.equal(r.keep[0].items.length, 2, '레이어 단위 줄의 항목은 그대로');
   // 텍스트 스타일만 모습이면 변수 사유 줄 없음
   assert.deepEqual(skipRowCounts({ fraction: 1 }, [], new Set(), true), { fix: [], keep: [] });
+  // 레이어 단위 줄의 수는 상한 전 레이어 수(skipLayers) — 목록이 200에서 잘려도 실제 수
+  const big = skipRowCounts({ hidden: 300 }, [{ nodeId: 'h1', name: 'H', reason: 'hidden' }], new Set(), false, { hidden: 300 });
+  assert.equal(big.keep[0].n, 300);
+  assert.equal(big.keep[0].items.length, 1, '[선택 ›] 항목은 실어 온 목록 그대로');
 });

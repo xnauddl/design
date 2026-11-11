@@ -2427,13 +2427,13 @@
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
-  function skipRowCounts(reasons, skips, tsNodes, tsOnly = false) {
+  function skipRowCounts(reasons, skips, tsNodes, tsOnly = false, layers) {
     if (tsOnly) return { fix: [], keep: [] };
     const rowOf = (key, layer) => {
-      var _a3;
+      var _a3, _b, _c;
       const all = skips.filter((x) => x.reason === key);
       const items = layer ? all : all.filter((x) => !(tsNodes.has(x.nodeId) && fieldKind(x.field) === "text"));
-      const n = Math.max(0, ((_a3 = reasons[key]) != null ? _a3 : 0) - (all.length - items.length));
+      const n = layer ? (_b = (_a3 = layers == null ? void 0 : layers[key]) != null ? _a3 : reasons[key]) != null ? _b : 0 : Math.max(0, ((_c = reasons[key]) != null ? _c : 0) - (all.length - items.length));
       return n > 0 ? { key, n, layer, items } : null;
     };
     const pick = (keys, layer) => keys.map((k) => rowOf(k, layer)).filter((r) => r != null);
@@ -4708,6 +4708,7 @@
       bindCandidates = [];
       bindCounts = void 0;
       bindSkips = [];
+      bindSkipLayers = {};
       bindSkipsCapped = false;
       bindSkipReasons = {};
     }
@@ -5180,7 +5181,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -5286,7 +5287,8 @@
         bindSilentReq = 0;
         if (isMini && msg.preview) bindPreviewMini = true;
         bindSkips = (_a3 = msg.skips) != null ? _a3 : [];
-        bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
+        bindSkipLayers = (_b = msg.skipLayers) != null ? _b : {};
+        bindSkipsCapped = ((_c = msg.skipTotal) != null ? _c : bindSkips.length) > bindSkips.length;
         if (msg.cancelled) {
           clearBindPreview();
           bindVarPending = false;
@@ -5297,11 +5299,11 @@
         } else if (msg.preview) {
           const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
-          bindCandidates = (_c = msg.candidates) != null ? _c : [];
+          bindCandidates = (_d = msg.candidates) != null ? _d : [];
           bindCounts = msg.counts;
           bindVarPending = false;
           bindChecked.clear();
-          renderSkipReasons((_d = msg.reasons) != null ? _d : {});
+          renderSkipReasons((_e = msg.reasons) != null ? _e : {});
           if (silent) {
             const r = carryRowChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
@@ -5313,8 +5315,8 @@
           setStatus("applyStatus", "", "");
           bindFindSettle();
         } else {
-          const n = msg.bound + ((_e = msg.textStylesApplied) != null ? _e : 0);
-          const m = msg.skipped + ((_f = msg.textStylesSkipped) != null ? _f : 0);
+          const n = msg.bound + ((_f = msg.textStylesApplied) != null ? _f : 0);
+          const m = msg.skipped + ((_g = msg.textStylesSkipped) != null ? _g : 0);
           clearBindPreview();
           setStatus("applyStatus", "", "");
           if (activeTab === "select" && selSub === "bind") showSelSub("home");
@@ -5385,7 +5387,7 @@
         if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
-            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_g = msg.fallback) != null ? _g : 0 }) : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_h = msg.fallback) != null ? _h : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -5400,7 +5402,7 @@
         break;
       }
       case "TEXT_STYLES_RESULT": {
-        const why = Object.entries((_h = msg.applyReasons) != null ? _h : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const why = Object.entries((_i = msg.applyReasons) != null ? _i : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setStatus(
           "tsStatus",
@@ -5433,7 +5435,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_i = msg.tierVars) != null ? _i : 0) + ((_j = msg.otherVars) != null ? _j : 0);
+        prereqLocalVars = ((_j = msg.tierVars) != null ? _j : 0) + ((_k = msg.otherVars) != null ? _k : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -5448,7 +5450,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_k = msg.noteKind) != null ? _k : "ok");
+          setStatus("licenseStatus", msg.note, (_l = msg.noteKind) != null ? _l : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -5480,12 +5482,12 @@
       }
       case "COMPONENTS_RESULT": {
         clearCompPreview();
-        const misplaced = (_l = msg.placeFailed) != null ? _l : [];
-        const cloned = (_m = msg.placeCloned) != null ? _m : [];
-        const propFailed = (_n = msg.propFailed) != null ? _n : [];
-        const fillKept = (_o = msg.fillKept) != null ? _o : [];
-        const reused = (_p = msg.reused) != null ? _p : [];
-        const reuseKept = (_q = msg.reuseKept) != null ? _q : [];
+        const misplaced = (_m = msg.placeFailed) != null ? _m : [];
+        const cloned = (_n = msg.placeCloned) != null ? _n : [];
+        const propFailed = (_o = msg.propFailed) != null ? _o : [];
+        const fillKept = (_p = msg.fillKept) != null ? _p : [];
+        const reused = (_q = msg.reused) != null ? _q : [];
+        const reuseKept = (_r = msg.reuseKept) != null ? _r : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -5549,7 +5551,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_r = msg.placeFailed) != null ? _r : [];
+          const misplaced0 = (_s = msg.placeFailed) != null ? _s : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -5558,7 +5560,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_s = msg.placeFailed) != null ? _s : [];
+        const misplaced = (_t = msg.placeFailed) != null ? _t : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -6801,7 +6803,15 @@
     return n;
   }
   var bindTsOnly = () => prereqKnown && !hasBindable;
+  var bindCountsMemo = null;
   function bindCardCounts() {
+    const src = [bindCandidates, bindCounts, bindSkips, bindTsRows];
+    if (bindCountsMemo && bindCountsMemo.src.every((x, i) => x === src[i])) return bindCountsMemo.val;
+    const val = countBindCards();
+    bindCountsMemo = { src, val };
+    return val;
+  }
+  function countBindCards() {
     const ts = tsAllNodes();
     const fields = bindCandidates.filter((c2) => !(fieldKind(c2.field) === "text" && ts.has(c2.nodeId))).map((c2) => c2.field);
     const c = cardCounts(fields, bindCounts);
@@ -6915,7 +6925,7 @@
     return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
   }
   function skipListRows() {
-    const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly());
+    const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly(), bindSkipLayers);
     const ts = Object.keys(bindTsSkips).filter((k) => {
       var _a3;
       return ((_a3 = bindTsSkips[k]) != null ? _a3 : 0) > 0 && tsSkipVisible(k);
@@ -7116,6 +7126,7 @@
     bindPreviewed = false;
     bindCandidates = [];
     bindSkips = [];
+    bindSkipLayers = {};
     bindSkipsCapped = false;
     bindSkipReasons = {};
     bindSkipsOpen = false;
@@ -7214,6 +7225,7 @@
   }
   var bindSkips = [];
   var bindSkipsCapped = false;
+  var bindSkipLayers = {};
   function renderSkipReasons(reasons) {
     bindSkipReasons = __spreadValues({}, reasons);
     const box = $("bindSkips");
@@ -7257,8 +7269,7 @@
       return r;
     };
     const varRow = (r) => {
-      const layers = new Set(r.items.map((x) => x.nodeId)).size;
-      const count = r.layer ? t("v4.layerCount", { n: layers || r.n }) : t("bind.count", { k: r.n });
+      const count = r.layer ? t("v4.layerCount", { n: r.n }) : t("bind.count", { k: r.n });
       return row(t("reason." + r.key), count, t("reasonHelp." + r.key), r.items, r.key);
     };
     const head = (text) => {

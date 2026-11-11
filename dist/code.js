@@ -4094,7 +4094,7 @@
     return pickOwner(role, void 0, isKnownRole);
   }
   async function bindSelection(selection2, apply = true, hooks = {}, opts = {}) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const index = await buildIndex();
     liveVarIds = await collectLiveVarIds(selection2, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
     const res = { bound: 0, skipped: 0, reasons: {} };
@@ -4146,8 +4146,11 @@
       res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
       res.skips = skips;
       res.skipTotal = preview.skips.length;
+      const layers = {};
+      for (const s of preview.skips) layers[s.reason] = ((_c = layers[s.reason]) != null ? _c : 0) + 1;
+      res.skipLayers = layers;
     }
-    (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
+    (_d = hooks.onProgress) == null ? void 0 : _d.call(hooks, prog.done, prog.total);
     return res;
   }
   async function buildIndex() {
@@ -9840,6 +9843,8 @@
               // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
               skipTotal: r.skipTotal,
               // 상한 전 실제 수 — 잘렸으면 UI가 알린다
+              skipLayers: r.skipLayers,
+              // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"
               reqId: msg.reqId,
               // UI가 낡은 응답을 가려낸다
               newRoles: r.newRoles,

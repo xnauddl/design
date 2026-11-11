@@ -80,6 +80,8 @@ export interface BindResult {
   skips?: BindSkip[];
   /** dry-run일 때만 — 상한 적용 전 실제 스킵 레이어 수(잘렸는지 알리려고). */
   skipTotal?: number;
+  /** dry-run일 때만 — 사유별 건너뛴 레이어 수(상한 전, 레이어 × 사유 중복 제거 — 건너뛴 곳 목록의 "레이어 {n}개"). */
+  skipLayers?: Record<string, number>;
   /** 적용 모드 — 새로 만든 역할 수(§2.12). */
   newRoles?: number;
   /** 사유 × 종류별 자리 수(상한 없음, IA v4 §4.1 카드 숫자). */
@@ -467,6 +469,9 @@ export async function bindSelection(
     res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
     res.skips = skips;
     res.skipTotal = preview.skips.length;
+    const layers: Record<string, number> = {};
+    for (const s of preview.skips) layers[s.reason] = (layers[s.reason] ?? 0) + 1; // skipSeen이 레이어 × 사유를 한 번만 남긴다
+    res.skipLayers = layers;
   }
   hooks.onProgress?.(prog.done, prog.total); // 최종 진행률(100%)
   return res;

@@ -1124,6 +1124,7 @@ function runBindPreview(silent = false): void {
     bindCandidates = [];
     bindCounts = undefined;
     bindSkips = [];
+    bindSkipLayers = {};
     bindSkipsCapped = false;
     bindSkipReasons = {};
   }
@@ -1876,6 +1877,7 @@ window.onmessage = (event: MessageEvent) => {
       bindSilentReq = 0;
       if (isMini && msg.preview) bindPreviewMini = true; // 최소화 중에 끝난 미리보기 — 펼쳐도 다시 계산하지 않는다
       bindSkips = msg.skips ?? [];
+      bindSkipLayers = msg.skipLayers ?? {};
       // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 칩 툴팁이 그렇다고 말한다.
       bindSkipsCapped = (msg.skipTotal ?? bindSkips.length) > bindSkips.length;
       if (msg.cancelled) {
@@ -3372,7 +3374,16 @@ function bindOnCount(): number {
 const bindTsOnly = (): boolean => prereqKnown && !hasBindable;
 
 /** 카드 1 · 연결 화면 공통 숫자(§4.1) — 텍스트 스타일 줄 반영. */
+/** 숫자 기억 — 같은 찾기 결과(배열 · 객체는 바꿀 때마다 새로 넣는다)면 다시 세지 않는다(한 번 그릴 때 여러 번 부름). */
+let bindCountsMemo: { src: readonly unknown[]; val: CardCounts & { t: number } } | null = null;
 function bindCardCounts(): CardCounts & { t: number } {
+  const src = [bindCandidates, bindCounts, bindSkips, bindTsRows];
+  if (bindCountsMemo && bindCountsMemo.src.every((x, i) => x === src[i])) return bindCountsMemo.val;
+  const val = countBindCards();
+  bindCountsMemo = { src, val };
+  return val;
+}
+function countBindCards(): CardCounts & { t: number } {
   const ts = tsAllNodes();
   const fields = bindCandidates.filter((c) => !(fieldKind(c.field) === 'text' && ts.has(c.nodeId))).map((c) => c.field);
   const c = cardCounts(fields, bindCounts);
@@ -3500,7 +3511,7 @@ function bindZero(): boolean {
 }
 /** 건너뛴 곳 목록의 줄(§4.2) — 변수 사유(스타일 후보 글자 자리를 뺀 셈, `skipRowCounts`) + 보이는 텍스트 스타일 사유. 칩 · 목록 · 모습이 함께 쓴다. */
 function skipListRows(): ReturnType<typeof skipRowCounts> & { ts: string[] } {
-  const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly());
+  const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly(), bindSkipLayers);
   const ts = Object.keys(bindTsSkips).filter((k) => (bindTsSkips[k] ?? 0) > 0 && tsSkipVisible(k));
   return { ...r, ts };
 }
@@ -3681,6 +3692,7 @@ function clearBindPreview(): void {
   bindPreviewed = false;
   bindCandidates = [];
   bindSkips = [];
+  bindSkipLayers = {};
   bindSkipsCapped = false;
   bindSkipReasons = {};
   bindSkipsOpen = false;
@@ -3834,6 +3846,8 @@ function refreshTreeEmptyStates(): void {
 let bindSkips: BindSkip[] = [];
 /** 스킵 목록이 상한에서 잘렸는가 — 힌트 줄이 "목록은 N개까지"라고 밝힌다. */
 let bindSkipsCapped = false;
+/** 사유별 건너뛴 레이어 수(상한 전) — 목록이 잘려도 "레이어 {n}개"가 실제 수(§4.2). */
+let bindSkipLayers: Record<string, number> = {};
 
 /** 건너뜀 사유 칩(§4.2) — [건너뜀 ▸]을 펼치면 보인다. 자리 단위 사유는 "{사유} {n}곳", 레이어 단위 · 텍스트 스타일 사유는 "{사유} 레이어 {n}개".
     레이어 목록이 있는 사유만 버튼(누르면 캔버스 선택). 텍스트 스타일만 모습이면 텍스트 스타일 사유만. */
@@ -3881,8 +3895,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     return r;
   };
   const varRow = (r: SkipRow): HTMLElement => {
-    const layers = new Set(r.items.map((x) => x.nodeId)).size;
-    const count = r.layer ? t('v4.layerCount', { n: layers || r.n }) : t('bind.count', { k: r.n });
+    const count = r.layer ? t('v4.layerCount', { n: r.n }) : t('bind.count', { k: r.n }); // 레이어 수는 상한 전(skipLayers)
     return row(t('reason.' + r.key), count, t('reasonHelp.' + r.key), r.items, r.key);
   };
   const head = (text: string): void => {
