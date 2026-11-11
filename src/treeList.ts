@@ -95,7 +95,8 @@ export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts:
     for (const it of list) {
       flat.push({ item: it, parentKey, level });
       const row = document.createElement('div');
-      row.className = `tr ${it.head ? 'tr-head' : 'tr-row'}${it.group ? ' tr-group' : ''}${it.off ? ' off' : ''}${it.cls ? ' ' + it.cls : ''}`;
+      // 트리 머리 줄은 회색 머리 띠(.tr-group — ia-v4 §2.7 · §2.8 B안 ②)
+      row.className = `tr ${it.head ? 'tr-head' : 'tr-row'}${it.head || it.group ? ' tr-group' : ''}${it.off ? ' off' : ''}${it.cls ? ' ' + it.cls : ''}`;
       row.setAttribute('role', 'row');
       row.setAttribute('aria-level', String(level + 1));
       row.dataset.tkey = it.key;
