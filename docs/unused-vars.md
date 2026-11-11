@@ -33,7 +33,7 @@
 - **들어가기:** ⋯ › "안 쓰는 변수 찾기…" → 팝업이 열리고 ①부터 시작한다. 로컬 변수가 0개면 메뉴 항목을 잠근다(`disabled`, 메모 "로컬 변수가 없어요"). 다른 쓰기 작업 중이면 잠근다(메모 = `writeLockReason`, ia-v4 ⋯ 메뉴의 "텍스트 스타일 이름 다시 짓기…"와 같은 방식).
 - **닫힘 = 취소(①②④):** [취소] · Esc · 팝업 바깥 누름 · 최소화(ia-v3 §4.9 "팝업은 닫고 작업은 계속"의 예외 — 이것은 결과를 볼 팝업이 없으면 쓸모없는 읽기이므로 멈춘다) 모두 읽기 · 확인을 멈추고 팝업을 닫는다. ④의 다시 확인 중에 닫으면 지우지 않는다(다시 확인이 끝나 지우기가 시작된 뒤의 닫힘은 지우기를 멈추지 않는다 — §4-2).
 - **결과(③)에서 [선택한 {k}개 지우기]:** 확인 팝업을 따로 띄우지 않는다(이 팝업이 확인 단계 — 목록 · 경고 · 직접 고름. ia-v4 §4.9 "확인 팝업(늘)"의 예외로 §4.9에 한 줄 적는다). ④로 가서 다시 확인 → 지우기 → 팝업을 닫고 §7 "플러그인 작업 직후" 다시 읽기 → 공통 상태 줄(§4 문구).
-- **오류:** 읽기(`ERROR{op:'SCAN_UNUSED_VARS'}`) 중이면 ⑤ — [다시 시도] = 다시 읽기. 지우기 요청(`ERROR{op:'DELETE_VARIABLES'}` — 다시 확인 · 지우기 어느 단계든 하나의 길)이면 팝업이 열려 있을 때 ⑤ — [다시 시도] = 같은 `DELETE_VARIABLES`를 다시(다시 확인부터), 그리고 쓰기 작업 규칙대로 공통 상태 줄 "안 쓰는 변수 지우기 실패 · [보기]"(도착: 변수 탭 — 팝업은 다시 열지 않음).
+- **오류:** 읽기(`ERROR{op:'SCAN_UNUSED_VARS'}`) 중이면 ⑤ — [다시 시도] = 다시 읽기. 지우기 요청(`ERROR{op:'DELETE_VARIABLES'}` — 다시 확인 · 지우기 어느 단계든 하나의 길)이면 세 경우로 나눈다: ⓐ 팝업이 열려 있으면 ⑤만(공통 상태 줄은 쓰지 않음 — 팝업 뒤라 보이지 않는다) — [다시 시도] = 같은 `DELETE_VARIABLES`를 다시(다시 확인부터). ⓑ 팝업이 닫힌 뒤(지우기 시작 뒤 닫음)면 공통 상태 줄에 이 기능의 실패 문구 "안 쓰는 변수를 지우지 못했어요"(`unused.deleteFail`, 툴팁 = `explainError` 사유). ⓒ 최소화 중이면 쓰기 작업 규칙(⚠ 표시 → 펼칠 때 "안 쓰는 변수 지우기 실패 · [보기]", 도착: 변수 탭 — 팝업은 다시 열지 않음).
 
 ## 2. "쓰임" 판정
 
@@ -79,16 +79,16 @@
 - **포커스:** 열면 [취소]. 결과가 오면 — 사용자가 그동안 포커스를 옮기지 않았으면(아직 [취소]) 결과 있음 → 트리(첫 줄), 0개 · 오류 → [닫기]. 옮겼으면 그대로 둔다(text-style-krds §5.2와 같다). 닫거나 취소 · 지우기로 팝업이 닫히면 변수 탭 [⋯] 단추로 돌아간다.
 - 직접 만든 변수(`dsl.manual`, §4.9)도 목록에 든다 — 사용자가 켤 때만 지운다.
 - 결과의 id가 지금 변수 표에 없으면(그 사이 지워짐) 그 줄은 그리지 않는다. UI는 결과를 받으면 변수 표를 한 번 다시 읽고(`GET_VAR_TABLE`, 조용히) 그린다. 제목 "안 쓰는 변수 {n}개" · 머리 "{n}개"는 **그린 줄 수**이고, 그린 줄이 0이면 ③'.
-- **구현 메모(팝업 한 개로 상태 바꾸기):** `openModal`은 한 번만 부른다(다시 부르면 `closeModal` → 취소 · 포커스 되돌림이 먼저 돈다). 상태가 바뀌면 같은 팝업 안의 본문과 아래 줄(`.m-foot`) 단추를 바꿔 끼운다 — 바꾸기 전에 `document.activeElement`가 [취소]였는지 먼저 보고, 맞으면 위 포커스 규칙의 자리로 옮긴다. 빨강 띠는 아래 줄 위 자리(`footTop`)에 처음부터 숨겨 두고 보이기만 바꾼다. 취소는 팝업의 `onClose`에 건다(최소화 `setMini`는 `closeModal`을 바로 부르므로 `beforeClose`로는 놓친다). 트리 마운트에는 `.tree` 클래스를 준다.
+- **구현 메모(팝업 한 개로 상태 바꾸기):** `openModal`은 한 번만 부른다(다시 부르면 `closeModal` → 취소 · 포커스 되돌림이 먼저 돈다). 상태가 바뀌면 같은 팝업 안의 본문과 아래 줄(`.m-foot`) 단추를 바꿔 끼운다 — 바꾸기 전에 `document.activeElement`가 [취소]였는지 먼저 보고, 맞으면 위 포커스 규칙의 자리로 옮긴다. 빨강 띠는 아래 줄 위 자리(`footTop`)에 처음부터 숨겨 두고 보이기만 바꾼다. 취소는 팝업의 `onClose`에 걸되 **①②④(읽는 중 · 다시 확인 중)일 때만** `CANCEL{op:'unused'}`를 보낸다 — ③ [닫기] · ⑤ · 지우기 시작 뒤의 닫힘은 보내지 않는다(최소화 `setMini`는 `closeModal`을 바로 부르므로 `beforeClose`로는 놓친다). 트리 마운트에는 `.tree` 클래스를 준다.
 
 ## 4. 지우기 직전 다시 확인 · 지우기
 
 1. **다시 확인(④):** 처음 읽기와 **똑같이 파일 전체를 다시 읽어**(§2 — 뿌리 · 따라가기, 비용도 같다) 지금의 안 쓰임 집합 U′를 구한다. 켠 변수 집합 S 중 U′에 없는 것(그 사이 쓰이기 시작했거나, 쓰이는 변수가 가리키게 됐거나, 이미 지워진 것)이 **건너뜀 집합 K = S − U′**(K ⊆ S, s = |K|)다.
-   - U′의 정의상 쓰이는 변수는 U′의 변수를 가리키지 않으므로, S ∩ U′만 지우면 쓰이는 변수가 '삭제된 변수'를 가리키는 일은 없다. 남는 것은 **안 쓰이는 변수**가 지운 변수를 가리키는 경우뿐이고, 이것은 사용자가 빨강 띠(§3)를 보고 고른 것이다.
+   - U′의 정의상 쓰이는 변수는 U′의 변수를 가리키지 않으므로, S ∩ U′만 지우면 쓰이는 변수가 '삭제된 변수'를 가리키는 일은 없다. 남는 것은 **안 쓰이는 변수**가 지운 변수를 가리키는 경우뿐이고, 이것은 사용자가 빨강 띠(§3)를 보고 고른 것이다 — 단 읽은 뒤 새로 생긴 안 쓰이는 변수가 켠 변수를 가리키게 된 경우는 띠에 나오지 않았다(드묾, 한계).
    - 코드는 처음 결과를 기억할 필요가 없다(메시지에 처음 결과를 싣지 않는다).
 2. **지우기:** S − K를 하나씩 `variable.remove()`. **지우기를 시작한 뒤에 온 취소는 무시한다**(다시 확인이 끝나는 순간이 취소를 보는 마지막 지점) — 팝업이 이미 닫혔어도 결과는 공통 상태 줄에 나온다. 실패하면 그 변수는 실패 수 f로 세고 다음으로 간다. 지운 수 d > 0이면 한 번 `commitUndo`(⌘Z 한 번에 모두 돌아옴), d = 0이면 부르지 않는다.
 3. **결과 문구(공통 상태 줄):**
-   - d > 0: "변수 {d}개를 지웠어요 · ⌘Z로 되돌리기" + (s > 0이면) " · 건너뜀 {s}"(툴팁 "읽은 뒤 쓰이기 시작했거나 이미 지워졌어요") + (f > 0이면) " · 못 지움 {f}"(경고 모양).
+   - d > 0: "변수 {d}개를 지웠어요 · ⌘Z로 되돌리기" + (s > 0이면) " · 건너뜀 {s}"(툴팁 "읽은 뒤 쓰이기 시작했거나(쓰는 변수가 가리키는 경우 포함) 이미 지워졌어요") + (f > 0이면) " · 못 지움 {f}"(경고 모양).
    - d = 0: "지운 변수가 없어요" + 같은 꼬리.
    - 상태 줄은 쓰기 작업 결과와 같은 모양(성공 ✓ · 일부 실패 ⚠).
 
@@ -96,7 +96,7 @@
 
 - `SCAN_UNUSED_VARS{reqId}` → `PROGRESS{op: 'unused', done, total}`(불러오는 중은 `done: 0, total: 0` 한 번 — UI는 total 0을 "불러오는 중"으로 그린다, 그 뒤 페이지 단위) → `UNUSED_VARS{reqId, items: {id, kind: 'none' | 'chain'}[], pages, layers, cancelled?: true}` / `ERROR{op: 'SCAN_UNUSED_VARS', reqId}`.
 - `DELETE_VARIABLES{reqId, ids}` → `PROGRESS{op: 'unused-delete', done, total}`(다시 확인, 같은 규칙) → `VARIABLES_DELETED{reqId, deleted, skipped, failed, cancelled?: true}` / `ERROR{op: 'DELETE_VARIABLES', reqId}`.
-- `CANCEL{op?: 'unused'}`: op가 없으면 지금처럼 찾기만 멈춘다(`bindCancel`). `'unused'`면 따로 둔 플래그 하나만 켜고 `bindCancel`은 건드리지 않는다. 읽기 · 확인은 다음 양보 지점에서 멈추고 `cancelled: true`인 응답을 보낸다(UI는 이 응답으로 대기 상태를 푼다 — 응답이 늘 온다).
+- `CANCEL{op?: 'unused'}`: op가 없으면 지금처럼 찾기만 멈춘다(`bindCancel`). `'unused'`면 따로 둔 플래그(`unusedCancel`) 하나만 켜고 `bindCancel`은 건드리지 않는다. `SCAN_UNUSED_VARS` · `DELETE_VARIABLES`를 **시작할 때 `unusedCancel = false`**(지금 찾기가 새 요청마다 `bindCancel`을 지우는 것과 같다 — 남은 플래그가 다음 요청을 멈추지 않게). 읽기 · 확인은 다음 양보 지점에서 멈추고 `cancelled: true`인 응답을 보낸다(UI는 이 응답으로 대기 상태를 푼다 — 응답이 늘 온다).
 - `shared/messages.ts`: 새 메시지 4개, `PROGRESS.op`에 `'unused'` · `'unused-delete'`, `CANCEL`에 `op?`.
 - **UI 작업 등록:** 읽기(`SCAN_UNUSED_VARS`)는 진행 테두리 · 최소화 고리 대상이 **아니다**(팝업이 진행을 보인다 — `OPS`에 넣지 않음, 닫히면 취소이므로 최소화 중 결과도 없다). 그래서 `opReceived`는 `PROGRESS{op:'unused'}`를 무시한다(전역 진행 `opProg`를 덮지 않게). 팝업은 이 진행을 자기 띠에 그린다. ia-v4 §2.6에 예외를 적었다. 지우기(`DELETE_VARIABLES`)는 쓰기 작업이다 — `OPS`에 `write: true`, 라벨 `op.deleteUnused`("안 쓰는 변수 지우기"), `VAR_WRITE_OPS`에 넣는다(다른 쓰기와 서로 잠금). 결과 판정(`opReceived`): `VARIABLES_DELETED{cancelled}` → 취소(표시 없음 — ia-v3 §4.9), `failed > 0` → 일부 실패(⚠), 그 밖 → 성공(✓). §7 "플러그인 작업 직후" 다시 읽기는 `deleted > 0`일 때만. 실패 · [보기] 도착은 변수 탭(ia-v4 §2.6).
 
@@ -116,7 +116,7 @@
 - [ ] `code.ts`: 직접 스택 순회 · 2,000개마다 양보 · 취소 플래그(`unusedCancel`, `bindCancel`과 분리) · 다시 확인(전체 다시 읽기 → K = S − U′) · 지우기 시작 뒤 취소 무시 · 하나씩 지우기 · 실패 수 · d > 0일 때만 `commitUndo` + 단위 테스트(읽은 뒤 쓰이기 시작한 변수 · 쓰이게 된 변수가 가리키는 켠 변수 건너뜀 · 일부 실패 · d = 0)
 - [ ] UI `opReceived`: `PROGRESS{op:'unused'}` 무시 · `VARIABLES_DELETED` cancelled = 표시 없음 · failed > 0 = ⚠ · 다시 읽기는 deleted > 0
 - [ ] UI: ⋯ 메뉴 항목(로컬 0개 · 쓰기 잠금) · 팝업 다섯 상태 · 트리(§2.7, 처음 모두 끔 · 모두 펼침) · 칩 · 별칭 "→" · chain 태그 · 빨강 띠 {m} · 버튼 잠금 사유 · 진행 띠 role=status · 포커스 규칙 · 닫힘 = 취소(Esc · 바깥 · 최소화) · 결과 받으면 변수 표 다시 읽기 · 상태 줄 문구 · `OPS` 지우기 · `VAR_WRITE_OPS`
-- [ ] i18n 키: `vars.unusedMenu` · `unused.title` · `unused.loading` · `unused.reading` · `unused.checking` · `unused.summary` · `unused.libNote` · `unused.none` · `unused.top` · `unused.chainTag` · `unused.chainTip` · `unused.keepWarn` · `unused.deleteBtn` · `unused.deleteNeed` · `unused.readFail` · `unused.deleted` · `unused.deletedNone` · `unused.skippedTail` · `unused.skippedTip` · `unused.failedTail` · `op.deleteUnused` · `vars.unusedNoVars`(이름은 구현 때 기존 키 규칙에 맞춘다)
+- [ ] i18n 키: `vars.unusedMenu` · `unused.title` · `unused.loading` · `unused.reading` · `unused.checking` · `unused.summary` · `unused.libNote` · `unused.none` · `unused.top` · `unused.chainTag` · `unused.chainTip` · `unused.keepWarn` · `unused.deleteBtn` · `unused.deleteNeed` · `unused.readFail` · `unused.deleted` · `unused.deletedNone` · `unused.skippedTail` · `unused.skippedTip` · `unused.failedTail` · `unused.deleteFail` · `op.deleteUnused` · `vars.unusedNoVars`(이름은 구현 때 기존 키 규칙에 맞춘다)
 - [ ] `docs/ia-v4.md`: §2.6 진행 · 취소 예외와 [보기] 도착 · §4.9 확인 팝업 예외 · §6 무료 칸 · §7 작업 직후 목록 (§4.6 ⋯ 메뉴 한 줄은 했음)
 - [ ] verify-bind-flow 블록: 메뉴 항목 → `SCAN_UNUSED_VARS` 보냄 · 진행 → 결과 트리 · 처음 모두 끔 · k = 0 잠금 · 켜면 [선택한 k개 지우기] · chain 태그 · 빨강 띠 · Esc = `CANCEL{op:'unused'}` · `cancelled` 응답으로 닫힘 · 지우기 → `DELETE_VARIABLES` · 결과 문구 · 카드 안 카드 0
 - [ ] 4검사 · 스크린샷
