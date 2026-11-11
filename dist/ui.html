@@ -2237,8 +2237,8 @@
     return Object.prototype.hasOwnProperty.call(STRINGS, key);
   }
   function t(key, vars) {
-    var _a;
-    const tpl = (_a = STRINGS[key]) != null ? _a : key;
+    var _a3;
+    const tpl = (_a3 = STRINGS[key]) != null ? _a3 : key;
     if (!vars) return tpl;
     return tpl.replace(/\{(\w+)\}/g, (_, k) => k in vars ? String(vars[k]) : `{${k}}`);
   }
@@ -2277,7 +2277,7 @@
     return rungs.sort((a, b) => a - b);
   }
   function tidyNumberTokens(tokens2, opts) {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a3, _b, _c, _d, _e, _f, _g;
     const { base, ratio } = opts;
     const out = tokens2.map(cloneToken);
     const targets = out.filter(
@@ -2302,7 +2302,7 @@
     const seen = /* @__PURE__ */ new Map();
     const dropped = /* @__PURE__ */ new Set();
     for (const t2 of targets) {
-      const k = `${t2.category}|${t2.value}|${(_a = t2.unit) != null ? _a : ""}`;
+      const k = `${t2.category}|${t2.value}|${(_a3 = t2.unit) != null ? _a3 : ""}`;
       const cur = seen.get(k);
       if (!cur) {
         seen.set(k, t2);
@@ -2355,12 +2355,12 @@
     return fields.length === 4 ? "strokeWeight" : fields.length === 1 ? fields[0] : "strokeSome";
   }
   function groupBindLines(items) {
-    var _a;
+    var _a3;
     const lines = [];
     const byKey = /* @__PURE__ */ new Map();
     for (const it of items) {
       const fam = familyOf(it.field);
-      const key = fam ? `${fam}|${it.variableId}` : `${it.field}|${(_a = it.index) != null ? _a : 0}|${it.variableId}`;
+      const key = fam ? `${fam}|${it.variableId}` : `${it.field}|${(_a3 = it.index) != null ? _a3 : 0}|${it.variableId}`;
       const hit = byKey.get(key);
       if (hit) {
         hit.fields.push(it.field);
@@ -2403,19 +2403,31 @@
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
+  function skipRowCounts(reasons, skips, tsNodes, tsOnly = false) {
+    if (tsOnly) return { fix: [], keep: [] };
+    const rowOf = (key, layer) => {
+      var _a3;
+      const all = skips.filter((x) => x.reason === key);
+      const items = layer ? all : all.filter((x) => !(tsNodes.has(x.nodeId) && fieldKind(x.field) === "text"));
+      const n = Math.max(0, ((_a3 = reasons[key]) != null ? _a3 : 0) - (all.length - items.length));
+      return n > 0 ? { key, n, layer, items } : null;
+    };
+    const pick = (keys, layer) => keys.map((k) => rowOf(k, layer)).filter((r) => r != null);
+    return { fix: pick(FIX_SKIP_REASONS, false), keep: [...pick(INFO_SKIP_REASONS, false), ...pick(LAYER_SKIP_REASONS, true)] };
+  }
   var sumKinds = (r) => Object.values(r != null ? r : {}).reduce((a, b) => a + (b != null ? b : 0), 0);
   function cardCounts(candidateFields, counts) {
-    var _a;
+    var _a3;
     const byKind = /* @__PURE__ */ new Map();
     const noVar = /* @__PURE__ */ new Map();
     const add = (map, k2, n) => {
-      var _a2;
-      map.set(k2, ((_a2 = map.get(k2)) != null ? _a2 : 0) + n);
+      var _a4;
+      map.set(k2, ((_a4 = map.get(k2)) != null ? _a4 : 0) + n);
     };
     for (const f of candidateFields) add(byKind, fieldKind(f), 1);
     let k = 0;
     for (const r of NO_VAR_REASONS) {
-      for (const [kind, n] of Object.entries((_a = counts == null ? void 0 : counts[r]) != null ? _a : {})) {
+      for (const [kind, n] of Object.entries((_a3 = counts == null ? void 0 : counts[r]) != null ? _a3 : {})) {
         if (!n) continue;
         k += n;
         add(noVar, kind, n);
@@ -2424,8 +2436,8 @@
     let s = 0;
     for (const r of FIX_SKIP_REASONS) s += sumKinds(counts == null ? void 0 : counts[r]);
     const order = (map) => [...SEL_KINDS, "other"].map((kind) => {
-      var _a2;
-      return { kind, n: (_a2 = map.get(kind)) != null ? _a2 : 0 };
+      var _a4;
+      return { kind, n: (_a4 = map.get(kind)) != null ? _a4 : 0 };
     }).filter((x) => x.n > 0);
     const m = candidateFields.length;
     return { m, k, s, n: m + k, byKind: order(byKind), noVarByKind: order(noVar) };
@@ -2433,11 +2445,11 @@
 
   // src/lib/bindGroups.ts
   function placeKey(c) {
-    var _a;
-    return `${c.nodeId}|${c.field}|${(_a = c.index) != null ? _a : ""}|${c.variableId}`;
+    var _a3;
+    return `${c.nodeId}|${c.field}|${(_a3 = c.index) != null ? _a3 : ""}|${c.variableId}`;
   }
   function groupByVariable(cands) {
-    var _a, _b, _c, _d;
+    var _a3, _b, _c, _d;
     const byVar = /* @__PURE__ */ new Map();
     for (const c of cands) {
       const arr = byVar.get(c.variableId);
@@ -2465,7 +2477,7 @@
           });
         }
       }
-      const variableValue = (_b = (_a = list.find((c) => c.variableValue != null)) == null ? void 0 : _a.variableValue) != null ? _b : list[0].currentValue;
+      const variableValue = (_b = (_a3 = list.find((c) => c.variableValue != null)) == null ? void 0 : _a3.variableValue) != null ? _b : list[0].currentValue;
       const keys = lines.flatMap((l) => l.keys);
       const nr = list.find((c) => c.newRole);
       const variableAlpha = (_c = list.find((c) => c.variableAlpha != null)) == null ? void 0 : _c.variableAlpha;
@@ -2492,12 +2504,12 @@
     return out;
   }
   function carryRowChecks(prev, prevChecked, next) {
-    var _a, _b;
+    var _a3, _b;
     const prevKeys = new Set(prev.map(placeKey));
     const rowOn2 = /* @__PURE__ */ new Map();
     for (const c of prev) {
       const rk = rowKeyOf(c.variableId, fieldKind(c.field));
-      rowOn2.set(rk, ((_a = rowOn2.get(rk)) != null ? _a : false) || prevChecked.has(placeKey(c)));
+      rowOn2.set(rk, ((_a3 = rowOn2.get(rk)) != null ? _a3 : false) || prevChecked.has(placeKey(c)));
     }
     const checked = /* @__PURE__ */ new Set();
     const nextKeys = /* @__PURE__ */ new Set();
@@ -2529,8 +2541,8 @@
     900: "Black"
   };
   function fontStyleForWeight(weight, italic = false) {
-    var _a;
-    const base = (_a = STYLE_BY_WEIGHT[weight]) != null ? _a : "Regular";
+    var _a3;
+    const base = (_a3 = STYLE_BY_WEIGHT[weight]) != null ? _a3 : "Regular";
     if (!italic) return base;
     return base === "Regular" ? "Italic" : `${base} Italic`;
   }
@@ -2566,7 +2578,7 @@
     return state2 === false;
   }
   function mergeSameNameTokens(tokens2) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     const out = [];
     const byName = /* @__PURE__ */ new Map();
     for (const t2 of tokens2) {
@@ -2579,7 +2591,7 @@
       }
       if (prev.category === "effectColor" || prev.category === "color") prev.category = "color";
       for (const s of t2.sources) if (!prev.sources.includes(s)) prev.sources.push(s);
-      if ((_a = t2.uses) == null ? void 0 : _a.length) {
+      if ((_a3 = t2.uses) == null ? void 0 : _a3.length) {
         const uses = (_b = prev.uses) != null ? _b : prev.uses = [];
         for (const u of t2.uses) {
           const same = uses.find((x) => x.name === u.name && x.bg === u.bg);
@@ -2647,15 +2659,15 @@
     return b;
   }
   function renderTree(mount, items, opts) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     const active = document.activeElement;
     const hadFocus = !!active && mount.contains(active) && !active.matches("input, textarea");
-    const focusKey2 = hadFocus ? (_b = (_a = active.closest("[data-tkey]")) == null ? void 0 : _a.dataset.tkey) != null ? _b : null : (_c = mount.dataset.focusKey) != null ? _c : null;
+    const focusKey2 = hadFocus ? (_b = (_a3 = active.closest("[data-tkey]")) == null ? void 0 : _a3.dataset.tkey) != null ? _b : null : (_c = mount.dataset.focusKey) != null ? _c : null;
     mount.replaceChildren();
     mount.setAttribute("role", "treegrid");
     const flat = [];
     const walk = (list, parentKey, level) => {
-      var _a2, _b2, _c2, _d;
+      var _a4, _b2, _c2, _d;
       for (const it of list) {
         flat.push({ item: it, parentKey, level });
         const row = document.createElement("div");
@@ -2665,7 +2677,7 @@
         row.dataset.tkey = it.key;
         row.tabIndex = -1;
         row.style.paddingLeft = `${it.indent}px`;
-        const hasKids = !!((_a2 = it.children) == null ? void 0 : _a2.length);
+        const hasKids = !!((_a4 = it.children) == null ? void 0 : _a4.length);
         const open = hasKids && !opts.collapsed.has(it.key);
         if (hasKids) row.setAttribute("aria-expanded", String(open));
         if (hasKids || it.head) {
@@ -2735,7 +2747,7 @@
     r.focus({ preventScroll: false });
   }
   function onKey(mount, e) {
-    var _a, _b;
+    var _a3, _b;
     const st = state.get(mount);
     if (!st) return;
     if (e.target.matches("input, textarea")) return;
@@ -2746,7 +2758,7 @@
     const f = st.flat.find((x) => x.item.key === cur.dataset.tkey);
     if (!f) return;
     const it = f.item;
-    const hasKids = !!((_a = it.children) == null ? void 0 : _a.length);
+    const hasKids = !!((_a3 = it.children) == null ? void 0 : _a3.length);
     const open = hasKids && !st.opts.collapsed.has(it.key);
     const go = (j) => {
       const tg = rows[Math.max(0, Math.min(rows.length - 1, j))];
@@ -3036,11 +3048,11 @@
     FONT_FAMILY: "text"
   };
   function varKind(v) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     if (v.type === "COLOR") return "color";
     if (v.type === "BOOLEAN") return "other";
     const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
-    const first = (_a = segs[0]) != null ? _a : "";
+    const first = (_a3 = segs[0]) != null ? _a3 : "";
     const last = (_b = segs[segs.length - 1]) != null ? _b : "";
     if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
     if (v.type === "STRING" && first === "font-family") return "text";
@@ -3172,9 +3184,9 @@
   }
   var sideSelKey = (s) => s.kind === "col" ? `col:${s.id}` : s.kind === "grp" ? `grp:${s.key}` : s.kind;
   function rowState(id, direct, indirect) {
-    var _a;
+    var _a3;
     if (!direct) return "none";
-    if (((_a = direct.get(id)) != null ? _a : 0) > 0) return "direct";
+    if (((_a3 = direct.get(id)) != null ? _a3 : 0) > 0) return "direct";
     if (indirect.has(id)) return "indirect";
     return "unused";
   }
@@ -3231,11 +3243,11 @@
     return other ? { from, to, clash: other.name } : { from, to };
   }
   function cellKey(c) {
-    var _a;
+    var _a3;
     if (!c) return "";
     switch (c.kind) {
       case "color":
-        return `c:${c.hex.toUpperCase()}:${Math.round(((_a = c.alpha) != null ? _a : 1) * 255)}`;
+        return `c:${c.hex.toUpperCase()}:${Math.round(((_a3 = c.alpha) != null ? _a3 : 1) * 255)}`;
       case "number":
         return `n:${Number("value" in c ? c.value : c.text)}`;
       case "string":
@@ -3268,7 +3280,7 @@
     return c.text;
   }
   function resolveEditValue(cell, cols, vars, maxDepth = 5) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     let c = cell;
     for (let d = 0; c && c.kind === "alias"; d++) {
       if (d >= maxDepth) return null;
@@ -3276,7 +3288,7 @@
       const t2 = vars.find((v) => v.id === id);
       if (!t2) return null;
       const col = cols.find((x) => x.id === t2.collectionId);
-      c = t2.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
+      c = t2.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a3 = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a3.modeId) != null ? _c : ""];
     }
     return c != null ? c : null;
   }
@@ -3296,9 +3308,9 @@
     return false;
   }
   function aliasCandidates(self, cols, vars, query2 = "") {
-    var _a;
+    var _a3;
     const own = cols.find((c) => c.id === self.collectionId);
-    const tier = (_a = own == null ? void 0 : own.tier) != null ? _a : 0;
+    const tier = (_a3 = own == null ? void 0 : own.tier) != null ? _a3 : 0;
     if (tier === 1) return { global: true, allTiers: false, groups: [] };
     const okCol = (c) => tier === 0 ? true : c.tier >= 1 && c.tier < tier;
     const groups = [];
@@ -3342,8 +3354,8 @@
 
   // src/lib/reread.ts
   function createReentryScheduler(run, isHeld, clock, opts = {}) {
-    var _a, _b;
-    const debounceMs = (_a = opts.debounceMs) != null ? _a : 400;
+    var _a3, _b;
+    const debounceMs = (_a3 = opts.debounceMs) != null ? _a3 : 400;
     const minIntervalMs = (_b = opts.minIntervalMs) != null ? _b : 2e3;
     let debounce = null;
     let interval = null;
@@ -3520,10 +3532,10 @@
   function nameColorsByHue(hexes) {
     const seen = /* @__PURE__ */ new Map();
     return hexes.map((hex) => {
-      var _a;
+      var _a3;
       const { family, step } = classifyColor(hex);
       const base = `${family}/${step}`;
-      const n = ((_a = seen.get(base)) != null ? _a : 0) + 1;
+      const n = ((_a3 = seen.get(base)) != null ? _a3 : 0) + 1;
       seen.set(base, n);
       return n === 1 ? `color/${base}` : `color/${family}/${step}-${n}`;
     });
@@ -3539,9 +3551,9 @@
     return { step, hex: oklchToHex(lch), oklch: lch };
   }
   function buildScale(family, brandHex2, opts = {}) {
-    var _a;
+    var _a3;
     const base = hexToOklch(brandHex2);
-    const [lLight, lDark] = (_a = opts.lightRange) != null ? _a : [0.97, 0.16];
+    const [lLight, lDark] = (_a3 = opts.lightRange) != null ? _a3 : [0.97, 0.16];
     const n = STEPS.length;
     const targetL = STEPS.map((_, i) => lerp(lLight, lDark, i / (n - 1)));
     let peak = Math.round((n - 1) / 2);
@@ -3592,12 +3604,12 @@
     });
   }
   function scaleHue(scale) {
-    var _a;
-    const mid = (_a = scale.swatches.find((s) => s.step === 500)) != null ? _a : scale.swatches[Math.floor(scale.swatches.length / 2)];
+    var _a3;
+    const mid = (_a3 = scale.swatches.find((s) => s.step === 500)) != null ? _a3 : scale.swatches[Math.floor(scale.swatches.length / 2)];
     return classifyColor(mid.hex).family;
   }
   function generatePalette(input) {
-    var _a;
+    var _a3;
     const warnings = [];
     const base = hexToOklch(input.brand.primary);
     if (base.c < LOW_CHROMA) {
@@ -3618,7 +3630,7 @@
     const roles = [];
     for (const b of built) {
       const hue = scaleHue(b.scale);
-      const n = ((_a = used.get(hue)) != null ? _a : 0) + 1;
+      const n = ((_a3 = used.get(hue)) != null ? _a3 : 0) + 1;
       used.set(hue, n);
       const family = n === 1 ? hue : `${hue}-${n}`;
       scales.push({ family, swatches: b.scale.swatches });
@@ -3698,9 +3710,9 @@
       }
     });
     return values.map((_, i) => {
-      var _a, _b;
+      var _a3, _b;
       if (i === bodyI) return "body";
-      if (i > bodyI) return (_a = FS_UP[i - bodyI - 1]) != null ? _a : `display-${i - bodyI - FS_UP.length + 1}`;
+      if (i > bodyI) return (_a3 = FS_UP[i - bodyI - 1]) != null ? _a3 : `display-${i - bodyI - FS_UP.length + 1}`;
       return (_b = FS_DOWN[bodyI - i - 1]) != null ? _b : `overline-${bodyI - i - FS_DOWN.length + 1}`;
     });
   }
@@ -4008,9 +4020,9 @@
   var UNIT_CHIP = { px: "px", percent: "%", em: "em", rem: "rem", ratio: "\xD7" };
   var tokenChecked = /* @__PURE__ */ new Set();
   function tokenKey(t2) {
-    var _a;
+    var _a3;
     const v = typeof t2.value === "string" && t2.value.startsWith("#") ? colorKey(t2.value, t2.alpha) : t2.value;
-    return `${t2.category}|${v}|${(_a = t2.unit) != null ? _a : ""}`;
+    return `${t2.category}|${v}|${(_a3 = t2.unit) != null ? _a3 : ""}`;
   }
   var alphaTail = (alpha) => alpha != null && alpha < 1 ? ` ${alphaPct(alpha)}%` : "";
   function creatableTokens() {
@@ -4033,8 +4045,8 @@
     }
   }
   function makeTokenRow(tok) {
-    var _a;
-    const n = (_a = tok.count) != null ? _a : 0;
+    var _a3;
+    const n = (_a3 = tok.count) != null ? _a3 : 0;
     const unit = tok.unit && tok.unit !== "px" ? ` \xB7 ${UNIT_CHIP[tok.unit]}` : "";
     const input = document.createElement("input");
     input.value = tok.name;
@@ -4280,8 +4292,8 @@
     }
     renderPaletteRow(colors);
     renderChunked($("colorTable"), colors, (tok) => {
-      var _a;
-      const role = roleSelect((_a = roleByName.get(tok.name)) != null ? _a : "");
+      var _a3;
+      const role = roleSelect((_a3 = roleByName.get(tok.name)) != null ? _a3 : "");
       role.dataset.name = tok.name;
       const used = tok.count ? t("color.usedCount", { n: tok.count }) : "";
       const card2 = resultCard({
@@ -4393,8 +4405,8 @@
   });
   $("btnTokenDropOnce").addEventListener("click", () => {
     const once = creatableTokens().filter((t2) => {
-      var _a;
-      return ((_a = t2.count) != null ? _a : 0) <= 1;
+      var _a3;
+      return ((_a3 = t2.count) != null ? _a3 : 0) <= 1;
     });
     for (const t2 of once) tokenChecked.delete(tokenKey(t2));
     renderTokens();
@@ -4483,8 +4495,8 @@
     return `${s.family} \xB7 ${s.fontSize} / ${lh} / ${ls} \xB7 ${s.style}`;
   }
   function isEditableTextRow(s) {
-    var _a;
-    return !s.boundStyleId && !((_a = s.count) != null ? _a : 0);
+    var _a3;
+    return !s.boundStyleId && !((_a3 = s.count) != null ? _a3 : 0);
   }
   function textStyleEditRow(s) {
     const row = document.createElement("div");
@@ -4537,7 +4549,7 @@
     return row;
   }
   function textStyleCard(s) {
-    var _a, _b;
+    var _a3, _b;
     const name = document.createElement("input");
     name.value = s.name;
     name.placeholder = t("textStyle.namePlaceholder");
@@ -4554,7 +4566,7 @@
     const editable = isEditableTextRow(s);
     const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
     if (editable) card.appendChild(textStyleEditRow(s));
-    const n = (_a = s.count) != null ? _a : 0;
+    const n = (_a3 = s.count) != null ? _a3 : 0;
     const ids = (_b = s.nodeIds) != null ? _b : [];
     if (n > 0 && ids.length) {
       const badge = document.createElement("button");
@@ -4586,18 +4598,18 @@
     setStatus(
       "tsStatus",
       t("textStyle.scanSummary", { a: fresh, b: tsSpecs.length - fresh }) + tsScanNote.namePart + t("textStyle.scanLhPct", { n: tsSpecs.filter((s) => s.lineHeightPercent).length }) + t("textStyle.scanLsPct", { n: tsSpecs.filter((s) => {
-        var _a;
-        return ((_a = s.letterSpacingPercent) != null ? _a : 0) !== 0;
+        var _a3;
+        return ((_a3 = s.letterSpacingPercent) != null ? _a3 : 0) !== 0;
       }).length }) + (tsScanNote.warnings.length ? " \xB7 " + tsScanNote.warnings.join(" ") : ""),
       tsScanNote.warnings.length ? "warn" : "ok"
     );
   }
   function readTextStyleRows() {
     return tsSpecs.filter((s) => s.name.trim()).map((s) => {
-      var _a, _b;
+      var _a3, _b;
       return __spreadProps(__spreadValues({}, s), {
         name: s.name.trim(),
-        family: ((_a = s.family) == null ? void 0 : _a.trim()) || DEFAULT_TS_FAMILY,
+        family: ((_a3 = s.family) == null ? void 0 : _a3.trim()) || DEFAULT_TS_FAMILY,
         style: ((_b = s.style) == null ? void 0 : _b.trim()) || "Regular"
       });
     });
@@ -4693,7 +4705,7 @@
     startLink({ items, textStyles });
   });
   function startLink(job) {
-    var _a;
+    var _a3;
     if (bindLinking) return;
     const other = otherWriteOp();
     if (other) {
@@ -4703,7 +4715,7 @@
     updateBindApply();
     const confirm = $("btnApplyConfirm");
     if (isLocked(confirm)) {
-      setStatus("applyStatus", (_a = confirm.dataset.lockMsg) != null ? _a : "", "warn");
+      setStatus("applyStatus", (_a3 = confirm.dataset.lockMsg) != null ? _a3 : "", "warn");
       return;
     }
     lastLinkItems = job;
@@ -4867,19 +4879,19 @@
     renderBindPrereq();
   }
   function setLockTitle(el, locked) {
-    var _a;
+    var _a3;
     const attr = el.hasAttribute("data-tip") ? "data-tip" : "title";
-    if (el.dataset.baseTip === void 0) el.dataset.baseTip = (_a = el.getAttribute(attr)) != null ? _a : "";
+    if (el.dataset.baseTip === void 0) el.dataset.baseTip = (_a3 = el.getAttribute(attr)) != null ? _a3 : "";
     const base = el.dataset.baseTip;
     const note = t("lock.tipSuffix");
     el.setAttribute(attr, locked ? base ? `${base} \xB7 ${note}` : note : base);
     reapplyWaitTip(el);
   }
   function reapplyWaitTip(el) {
-    var _a;
+    var _a3;
     if (!el.dataset.wait) return;
     delete el.dataset.waitTail;
-    setWait(el, el.dataset.wait, (_a = el.dataset.waitTarget) != null ? _a : "");
+    setWait(el, el.dataset.wait, (_a3 = el.dataset.waitTarget) != null ? _a3 : "");
   }
   function setPrereq(btnId, noticeId, okRaw, msg) {
     const ok = okRaw || !prereqKnown;
@@ -4907,7 +4919,7 @@
     // 적용 탭 · 이름 정리
   };
   function gotoStep(id) {
-    var _a;
+    var _a3;
     closeReadiness();
     const target = PIPELINE_TARGET[id];
     if (id === "semantics") showStatusLine(t("list.semanticsNote"));
@@ -4915,7 +4927,7 @@
       showTab("select");
       showSelSub(target.apply === "rename" && curSel.count ? "rename" : "home");
       if (selSub === "home") {
-        (_a = $("selCards").querySelector("button")) == null ? void 0 : _a.focus();
+        (_a3 = $("selCards").querySelector("button")) == null ? void 0 : _a3.focus();
         return;
       }
     } else {
@@ -4962,7 +4974,7 @@
   var allVars = [];
   var varsLoaded = false;
   function refreshDarkOptions() {
-    var _a, _b, _c, _d;
+    var _a3, _b, _c, _d;
     const cols = /* @__PURE__ */ new Map();
     for (const v of allVars) if (v.owned === "semantic" && !cols.has(v.collectionId)) cols.set(v.collectionId, v);
     const sel = $("darkCollection");
@@ -4976,7 +4988,7 @@
     }
     if (prev && cols.has(prev)) sel.value = prev;
     const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const usable = (_a = withModes.find((v) => v.tier === 2)) != null ? _a : withModes[0];
+    const usable = (_a3 = withModes.find((v) => v.tier === 2)) != null ? _a3 : withModes[0];
     if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
     if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.tier) === 1) && usable.tier === 2) {
       sel.value = usable.collectionId;
@@ -4986,7 +4998,7 @@
     refreshDarkModes();
   }
   function refreshDarkModes() {
-    var _a;
+    var _a3;
     const colId = $("darkCollection").value;
     const v = allVars.find((x) => x.collectionId === colId);
     const modes = v ? v.modes : [];
@@ -5026,7 +5038,7 @@
       }
     }
     const darkBtn = $("btnGenDark");
-    setLock(darkBtn, !isPaid ? "paid" : ok ? null : "prereq", ((_a = text == null ? void 0 : text.textContent) != null ? _a : "") || t("status.noSelection"));
+    setLock(darkBtn, !isPaid ? "paid" : ok ? null : "prereq", ((_a3 = text == null ? void 0 : text.textContent) != null ? _a3 : "") || t("status.noSelection"));
     const toSel = $("darkToMode");
     const darkMode = modes.find((m) => m.name.toLowerCase() === "dark");
     if (!restored["darkToMode"]) {
@@ -5073,7 +5085,7 @@
     send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
   });
   $("btnRegisterComp").addEventListener("click", () => {
-    var _a;
+    var _a3;
     if (compCandidates.length) {
       const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
       if (!nodeIds.length) {
@@ -5084,7 +5096,7 @@
       const names = {};
       for (const c of compCandidates) {
         if (c.reuse) continue;
-        const shown = (_a = c.group) != null ? _a : c.single;
+        const shown = (_a3 = c.group) != null ? _a3 : c.single;
         if (shown && compChecked.has(c.id)) names[c.id] = shown;
       }
       send({ type: "REGISTER_COMPONENTS", nodeIds, names });
@@ -5142,7 +5154,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -5247,7 +5259,7 @@
         const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
         bindSilentReq = 0;
         if (isMini && msg.preview) bindPreviewMini = true;
-        bindSkips = (_a = msg.skips) != null ? _a : [];
+        bindSkips = (_a3 = msg.skips) != null ? _a3 : [];
         bindSkipsCapped = ((_b = msg.skipTotal) != null ? _b : bindSkips.length) > bindSkips.length;
         if (msg.cancelled) {
           clearBindPreview();
@@ -5622,13 +5634,13 @@
       btn.className = "primary";
       btn.textContent = t("common.retry");
       btn.addEventListener("click", () => {
-        var _a;
+        var _a3;
         if (linkRetry) {
           startLink(linkRetry);
           return;
         }
         if (!retry) return;
-        if (bindLinking && ((_a = OPS[retry.type]) == null ? void 0 : _a.write)) {
+        if (bindLinking && ((_a3 = OPS[retry.type]) == null ? void 0 : _a3.write)) {
           setStatus(id, t("bind.waitLink"), "warn");
           return;
         }
@@ -5642,7 +5654,7 @@
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
   function makeTreeRow(r, base, checked, onChange, readOnly = false) {
-    var _a, _b;
+    var _a3, _b;
     const indent = `${(r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
       const title2 = document.createElement("span");
@@ -5672,7 +5684,7 @@
       }
       return group;
     }
-    const keys = (_a = r.keys) != null ? _a : [r.id];
+    const keys = (_a3 = r.keys) != null ? _a3 : [r.id];
     const cb = document.createElement("input");
     cb.type = "checkbox";
     cb.checked = keys.every((k) => checked.has(k));
@@ -5785,7 +5797,7 @@
     $("renameTop").hidden = !show;
     const roots = show ? buildRenameTree(renameNodes) : [];
     const toItem = (it) => {
-      var _a, _b, _c;
+      var _a3, _b, _c;
       const children = it.children.map(toItem);
       if (it.kind === "head") {
         const st = headState(it.descendants.map((id) => ({ on: !renameOff.has(id) })));
@@ -5811,7 +5823,7 @@
       old.title = it.name;
       const nw = document.createElement("b");
       nw.className = "tr-new";
-      nw.textContent = (_a = it.after) != null ? _a : "";
+      nw.textContent = (_a3 = it.after) != null ? _a3 : "";
       nw.title = (_b = it.after) != null ? _b : "";
       const cells = [old, arrowEl(), nw];
       return {
@@ -5831,9 +5843,9 @@
       renameTreeFresh = false;
       renameCollapsed.clear();
       const walk = (list) => {
-        var _a;
+        var _a3;
         for (const it of list) {
-          if (it.head && ((_a = it.sw) == null ? void 0 : _a.state) === false) renameCollapsed.add(it.key);
+          if (it.head && ((_a3 = it.sw) == null ? void 0 : _a3.state) === false) renameCollapsed.add(it.key);
           if (it.children) walk(it.children);
         }
       };
@@ -5955,18 +5967,18 @@
   };
   var mkKind = (tk) => MAKE_KIND_OF[tk.category];
   var mkLocked = (tk) => {
-    var _a;
-    return ((_a = mkStates[tk.name]) == null ? void 0 : _a.state) === "manual";
+    var _a3;
+    return ((_a3 = mkStates[tk.name]) == null ? void 0 : _a3.state) === "manual";
   };
   var mkIsOn = (tk) => {
-    var _a;
-    return !mkLocked(tk) && ((_a = mkOn.get(tk.name)) != null ? _a : true);
+    var _a3;
+    return !mkLocked(tk) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : true);
   };
   var mkGlobalsOn = () => mkTokens.filter(mkIsOn);
   var mkSendTokens = () => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
   var mkTsName = (s) => {
-    var _a;
-    return (_a = mkTsNames.get(tsSig(s))) != null ? _a : s.name;
+    var _a3;
+    return (_a3 = mkTsNames.get(tsSig(s))) != null ? _a3 : s.name;
   };
   var mkTsOnList = () => isPaid ? mkTs.filter((s) => !mkTsOff.has(tsSig(s))) : [];
   var mkReady = () => !!baseline && mkFor === baseKey() && !mkReading && (!isPaid || mkTsFor === baseKey() && !mkTsReading);
@@ -6045,7 +6057,7 @@
     return true;
   }
   function onMakeExtract(msg) {
-    var _a;
+    var _a3;
     mkReading = false;
     const sameBase = mkFor === baseKey();
     const raw = msg.tokens.map((x) => __spreadValues({}, x));
@@ -6053,7 +6065,7 @@
     const prevByKind = /* @__PURE__ */ new Map();
     for (const tk of mkTokens) {
       const k = mkKind(tk);
-      if (k) prevByKind.set(k, [...(_a = prevByKind.get(k)) != null ? _a : [], mkIsOn(tk)]);
+      if (k) prevByKind.set(k, [...(_a3 = prevByKind.get(k)) != null ? _a3 : [], mkIsOn(tk)]);
     }
     mkTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
     for (const tk of mkTokens) {
@@ -6068,9 +6080,9 @@
     mkSendPreview();
   }
   function onMakePreview(msg) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a3, _b, _c, _d, _e, _f;
     const prev = mkStates;
-    mkStates = __spreadValues(__spreadValues({}, mkStates), (_a = msg.tokenStates) != null ? _a : {});
+    mkStates = __spreadValues(__spreadValues({}, mkStates), (_a3 = msg.tokenStates) != null ? _a3 : {});
     for (const [name, st] of Object.entries((_b = msg.tokenStates) != null ? _b : {})) if (((_c = prev[name]) == null ? void 0 : _c.state) === "manual" && st.state !== "manual") mkOn.set(name, true);
     if (mkPreviewTagsOnly) {
       mkPreview = null;
@@ -6082,14 +6094,14 @@
     renderMakeScreen();
   }
   function onMakeScan(msg) {
-    var _a;
+    var _a3;
     if (mkEditSig) {
       mkTsPending = msg;
       return;
     }
     mkTsReading = false;
     mkTs = msg.styles;
-    mkTsExisting = (_a = msg.existing) != null ? _a : [];
+    mkTsExisting = (_a3 = msg.existing) != null ? _a3 : [];
     const sigs = new Set(mkTs.map(tsSig));
     for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
     mkTsFor = baseKey();
@@ -6237,9 +6249,9 @@
     return items;
   }
   function renderMakeTabs(vis) {
-    var _a;
+    var _a3;
     const sem = mkSemState();
-    const conflict = isPaid ? (_a = mkTs.map(mkTsConflict).find((c) => c)) != null ? _a : null : null;
+    const conflict = isPaid ? (_a3 = mkTs.map(mkTsConflict).find((c) => c)) != null ? _a3 : null : null;
     for (const b of Array.from(document.querySelectorAll("#makeTabs [data-mtab]"))) {
       const tab = b.dataset.mtab;
       b.hidden = !vis.includes(tab);
@@ -6310,7 +6322,7 @@
     if (inp) inp.blur();
   }
   function renderMakeScreen() {
-    var _a, _b;
+    var _a3, _b;
     if (!curSel) return;
     const tree = $("makeTree");
     const empty = $("makeEmpty");
@@ -6394,7 +6406,7 @@
     $("makeAllOff").hidden = mkRunning || !links;
     $("makeAllSep").hidden = mkRunning || !links;
     $("makeTopRight").hidden = !links;
-    (_a = $("makeTopRight").querySelector(".make-lockmsg")) == null ? void 0 : _a.remove();
+    (_a3 = $("makeTopRight").querySelector(".make-lockmsg")) == null ? void 0 : _a3.remove();
     if (mkRunning && links) {
       const m = document.createElement("span");
       m.className = "make-lockmsg";
@@ -6483,7 +6495,7 @@
     }
   }
   function renderMakeFoot(showResults) {
-    var _a;
+    var _a3;
     const run = $("btnMakeRun");
     const opts = $("makeOpts");
     opts.hidden = showResults;
@@ -6522,14 +6534,14 @@
     let count = "";
     if (gOn) count = mkPreview ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
     $("makeCount").textContent = count ? count + tsTail : tsTail.replace(/^ · /, "");
-    $("makeCount").title = (_a = $("makeCount").textContent) != null ? _a : "";
+    $("makeCount").title = (_a3 = $("makeCount").textContent) != null ? _a3 : "";
     run.textContent = gOn ? mkPreview ? t("make.runN", { g: mkPreview.g }) : t("make.run") : tsOn ? t("make.runStyles", { t: tsOn }) : t("make.run");
     const conflict = mkTsOnList().map(mkTsConflict).find(Boolean);
     const reason = !baseline ? t("status.noSelection") : !mkReady() ? t("v4.reading") : !gOn && !tsOn ? t("make.needOn") : conflict === "dup" ? t("make.tsDup") : conflict === "exists" ? t("make.tsExists") : "";
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a, _b, _c, _d, _e, _f, _g;
+    var _a3, _b, _c, _d, _e, _f, _g;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -6570,7 +6582,7 @@
         if (id === "create") {
           const rid = mkNextReq();
           const r = await wizardRequest({ type: "CREATE_TOKENS", tokens: toks, base, reqId: rid }, ["CREATE_RESULT"], rid);
-          totals.created = { g: r.created + r.updated, r: (_a = r.roles) != null ? _a : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
+          totals.created = { g: r.created + r.updated, r: (_a3 = r.roles) != null ? _a3 : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
           const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
@@ -6829,11 +6841,11 @@
   };
   function tipTruncatedNames(root) {
     requestAnimationFrame(() => {
-      var _a;
+      var _a3;
       for (const nm of Array.from(root.querySelectorAll(".bv-name"))) {
         const chip = nm.parentElement;
         if (chip.dataset.tip) continue;
-        if (nm.scrollWidth > nm.clientWidth + 1) chip.title = (_a = nm.textContent) != null ? _a : "";
+        if (nm.scrollWidth > nm.clientWidth + 1) chip.title = (_a3 = nm.textContent) != null ? _a3 : "";
         else chip.removeAttribute("title");
       }
     });
@@ -6843,10 +6855,11 @@
     clearMount(box);
     let text = "";
     let action = null;
-    box.classList.toggle("done", bindSkipMode());
+    const zero = bindZero();
+    box.classList.toggle("done", zero);
     if (bindLinking) text = "";
     else if (!bindPreviewed) text = bindFinding || bindFindFailed ? "" : t("v4.reading");
-    else if (bindSkipMode()) text = t("v4.allLinked");
+    else if (zero) text = bindSkipMode() && bindCardCounts().s > 0 ? t("v4.allLinked") : t("v4.allBound");
     else if (!hasBindPreview() || bindTsOnly() && !bindTsRows.length) {
       text = t("v4.nothingToLink");
       if (bindCardCounts().k > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
@@ -6866,8 +6879,23 @@
       box.appendChild(b);
     }
   }
-  function bindSkipMode() {
+  function bindZero() {
     return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+  }
+  function skipListRows() {
+    const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly());
+    const ts = Object.keys(bindTsSkips).filter((k) => {
+      var _a3;
+      return ((_a3 = bindTsSkips[k]) != null ? _a3 : 0) > 0 && tsSkipVisible(k);
+    });
+    return __spreadProps(__spreadValues({}, r), { ts });
+  }
+  function skipListAny() {
+    const r = skipListRows();
+    return r.fix.length + r.keep.length + r.ts.length > 0;
+  }
+  function bindSkipMode() {
+    return bindZero() && skipListAny();
   }
   function tsSkipVisible(key) {
     return key !== "hasStyle" || bindTsOnly();
@@ -6875,10 +6903,9 @@
   function renderBindBadges() {
     const c = bindCardCounts();
     const s = bindTsOnly() ? 0 : c.s;
-    const keep = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && (INFO_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k))).length;
-    const ts = Object.entries(bindTsSkips).filter(([k, n]) => n > 0 && tsSkipVisible(k)).length;
-    const any = s > 0 || keep > 0 || ts > 0;
-    const skipMode = bindSkipMode();
+    const rows = skipListRows();
+    const any = rows.fix.length + rows.keep.length + rows.ts.length > 0;
+    const skipMode = bindZero() && any;
     const show = !bindLinking && bindPreviewed && any;
     $("bindBadges").hidden = !show;
     const skip = $("bindSkipToggle");
@@ -6888,7 +6915,7 @@
     $("bindSkips").hidden = !(show && (bindSkipsOpen || skipMode));
   }
   function renderBindTree() {
-    var _a;
+    var _a3;
     const tree = $("bindTree");
     const rows = bindTsOnly() ? [] : bindRows();
     const showList = bindPreviewed && !bindLinking && (rows.length > 0 || bindTsRows.length > 0);
@@ -6972,7 +6999,7 @@
       if (bindTreeFresh) {
         bindTreeFresh = false;
         bindCollapsed.clear();
-        for (const it of items) if (((_a = it.sw) == null ? void 0 : _a.state) === false) bindCollapsed.add(it.key);
+        for (const it of items) if (((_a3 = it.sw) == null ? void 0 : _a3.state) === false) bindCollapsed.add(it.key);
       }
     }
     renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse") });
@@ -6989,6 +7016,38 @@
     updateBindApply();
     if (activeTab === "select" && selSub === "bind") renderSubHead();
     renderSelHome();
+    restoreBindFocus();
+  }
+  var lastBindFocus = null;
+  var _a;
+  (_a = document.querySelector('[data-apply-step="bind"]')) == null ? void 0 : _a.addEventListener("focusin", (e) => {
+    lastBindFocus = e.target instanceof HTMLElement ? e.target : null;
+  });
+  var _a2;
+  (_a2 = document.querySelector('[data-apply-step="bind"]')) == null ? void 0 : _a2.addEventListener("focusout", (e) => {
+    const to = e.relatedTarget;
+    if (to instanceof Node && !e.currentTarget.contains(to)) lastBindFocus = null;
+  });
+  var goneEl = (el) => !el.isConnected || el.closest("[hidden]") != null;
+  function restoreBindFocus() {
+    var _a3, _b;
+    const was = lastBindFocus;
+    if (!was || activeTab !== "select" || selSub !== "bind") return;
+    const active = document.activeElement;
+    if (active && active !== document.body && !goneEl(active) || !goneEl(was)) return;
+    lastBindFocus = null;
+    const list = $("bindSkips");
+    const sels = list.hidden ? [] : Array.from(list.querySelectorAll(".skip-sel"));
+    const chip = $("bindSkipToggle");
+    const chipOn = !chip.hidden && !$("bindBadges").hidden;
+    const reason = was.classList.contains("skip-sel") ? was.dataset.reason : void 0;
+    let to;
+    if (reason != null && sels.length) to = (_a3 = sels.find((b) => b.dataset.reason === reason)) != null ? _a3 : sels[0];
+    else if (bindSkipMode()) to = (_b = sels[0]) != null ? _b : null;
+    else if (bindZero()) to = null;
+    else if (reason != null) to = chipOn ? chip : null;
+    else to = $("bindTree").querySelector('[data-tkey][tabindex="0"]');
+    (to != null ? to : $("btnSubBack")).focus({ preventScroll: true });
   }
   $("bindSkipToggle").addEventListener("click", () => {
     bindSkipsOpen = !bindSkipsOpen;
@@ -7012,7 +7071,7 @@
     const confirm = $("btnApplyConfirm");
     const n = bindOnCount();
     $("btnApplyConfirmLabel").textContent = bindPreviewed && hasBindPreview() ? t("bind.linkN", { n }) : t("bind.link");
-    $("bindFoot").hidden = !!bindLinking || bindSkipMode();
+    $("bindFoot").hidden = !!bindLinking || bindZero();
     if (!curSel.count && !baseline) setLock(confirm, "prereq", t("status.noSelection"));
     else if (!bindPreviewed) setLock(confirm, "prereq", t("v4.reading"));
     else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
@@ -7128,8 +7187,8 @@
     const box = $("bindSkips");
     clearMount(box);
     const capNote = bindSkipsCapped ? t("bind.skipCappedTip", { shown: bindSkips.length }) : "";
-    const tsOnly = bindTsOnly();
-    const row = (label, count, help, ids, key) => {
+    const row = (label, count, help, items, key) => {
+      const ids = [...new Set(items.map((x) => x.nodeId))];
       const r = document.createElement("div");
       r.className = "skip-row";
       const nm = document.createElement("span");
@@ -7152,8 +7211,9 @@
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "link link-btn skip-sel";
+        btn.dataset.reason = key;
         btn.textContent = t("bind.skipSelectBtn");
-        const names = bindSkips.filter((x) => x.reason === key).slice(0, 5).map((x) => x.name).join(", ");
+        const names = items.slice(0, 5).map((x) => x.name).join(", ");
         btn.title = t(ids.length > 5 ? "bind.skipChipTipMore" : "bind.skipChipTip", { count: ids.length, names }) + capNote;
         btn.addEventListener("click", () => {
           bindLayerSelectPending = true;
@@ -7164,11 +7224,10 @@
       }
       return r;
     };
-    const varRow = (key, n) => {
-      const ids = [...new Set(bindSkips.filter((x) => x.reason === key).map((x) => x.nodeId))];
-      const layer = LAYER_SKIP_REASONS.includes(key);
-      const count = layer ? t("v4.layerCount", { n: ids.length || n }) : t("bind.count", { k: n });
-      return row(t("reason." + key), count, t("reasonHelp." + key), ids, key);
+    const varRow = (r) => {
+      const layers = new Set(r.items.map((x) => x.nodeId)).size;
+      const count = r.layer ? t("v4.layerCount", { n: layers || r.n }) : t("bind.count", { k: r.n });
+      return row(t("reason." + r.key), count, t("reasonHelp." + r.key), r.items, r.key);
     };
     const head = (text) => {
       const h = document.createElement("div");
@@ -7176,25 +7235,14 @@
       h.textContent = text;
       box.appendChild(h);
     };
-    const fix = tsOnly ? [] : FIX_SKIP_REASONS.filter((k) => {
-      var _a;
-      return ((_a = reasons[k]) != null ? _a : 0) > 0;
-    });
-    const keep = tsOnly ? [] : [...INFO_SKIP_REASONS, ...LAYER_SKIP_REASONS].filter((k) => {
-      var _a;
-      return ((_a = reasons[k]) != null ? _a : 0) > 0;
-    });
-    const tsKeys = Object.keys(bindTsSkips).filter((k) => {
-      var _a;
-      return ((_a = bindTsSkips[k]) != null ? _a : 0) > 0 && tsSkipVisible(k);
-    });
+    const { fix, keep, ts: tsKeys } = skipListRows();
     if (fix.length) {
       head(t("v4.skipFixHead"));
-      for (const k of fix) box.appendChild(varRow(k, reasons[k]));
+      for (const r of fix) box.appendChild(varRow(r));
     }
     if (keep.length || tsKeys.length) {
       head(t("v4.skipKeepHead"));
-      for (const k of keep) box.appendChild(varRow(k, reasons[k]));
+      for (const r of keep) box.appendChild(varRow(r));
       for (const k of tsKeys) box.appendChild(row(t("tsSkip." + k), t("v4.layerCount", { n: bindTsSkips[k] }), "", []));
     }
   }
@@ -7400,7 +7448,7 @@
   var statusTimer = null;
   var statusSticky = false;
   function showStatusLine(text, opts = {}) {
-    var _a;
+    var _a3;
     if (opts.background && statusSticky) return;
     const line = $("statusLine");
     const txt = $("statusText");
@@ -7412,7 +7460,7 @@
     txt.textContent = text;
     txt.title = opts.tip ? `${text}
 ${opts.tip}` : text;
-    line.className = `status-line ${(_a = opts.cls) != null ? _a : ""}`.trim();
+    line.className = `status-line ${(_a3 = opts.cls) != null ? _a3 : ""}`.trim();
     if (opts.action) {
       btn.textContent = opts.action.label;
       btn.onclick = () => {
@@ -7489,9 +7537,9 @@ ${opts.tip}` : text;
     }
   }
   function setWait(el, msg, target = "") {
-    var _a, _b;
+    var _a3, _b;
     const attr = el.hasAttribute("data-tip") ? "data-tip" : "title";
-    let tip = (_a = el.getAttribute(attr)) != null ? _a : "";
+    let tip = (_a3 = el.getAttribute(attr)) != null ? _a3 : "";
     const prevTail = (_b = el.dataset.waitTail) != null ? _b : "";
     if (prevTail && tip.endsWith(prevTail)) tip = tip.slice(0, tip.length - prevTail.length);
     if (msg) {
@@ -7516,8 +7564,8 @@ ${opts.tip}` : text;
     return el.getAttribute("aria-disabled") === "true";
   }
   function onLockedActivate(e) {
-    var _a;
-    const el = (_a = e.target) == null ? void 0 : _a.closest('[aria-disabled="true"]');
+    var _a3;
+    const el = (_a3 = e.target) == null ? void 0 : _a3.closest('[aria-disabled="true"]');
     if (!el) return;
     if (e.type === "keydown") {
       const k = e.key;
@@ -7699,7 +7747,7 @@ ${opts.tip}` : text;
     if (def.write) renderWaitLocks();
   }
   function opReceived(m) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     if (m.type === "PROGRESS") {
       opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
       if (isMini) renderMiniMark();
@@ -7731,7 +7779,7 @@ ${opts.tip}` : text;
       let failed = false;
       let cancelled = false;
       if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
-      if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a = m.failures) == null ? void 0 : _a.length) != null ? _b : 0) > 0) failed = true;
+      if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a3 = m.failures) == null ? void 0 : _a3.length) != null ? _b : 0) > 0) failed = true;
       if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.reuseKept) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeCloned) == null ? void 0 : _i.length) != null ? _j : 0) + ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
       if (m.type === "COMPONENTIZE_RESULT" && ((_n = (_m = m.placeFailed) == null ? void 0 : _m.length) != null ? _n : 0) > 0) failed = true;
       if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
@@ -7744,8 +7792,8 @@ ${opts.tip}` : text;
     }
   }
   function changedFile(m) {
-    var _a, _b;
-    if (m.type === "COMPONENTS_RESULT") return m.registered > 0 || m.sets > 0 || ((_b = (_a = m.reused) == null ? void 0 : _a.length) != null ? _b : 0) > 0;
+    var _a3, _b;
+    if (m.type === "COMPONENTS_RESULT") return m.registered > 0 || m.sets > 0 || ((_b = (_a3 = m.reused) == null ? void 0 : _a3.length) != null ? _b : 0) > 0;
     if (m.type === "COMPONENTIZE_RESULT") return !!m.master;
     if (m.type === "VARIANTS_RESULT") return m.sets > 0;
     return false;
@@ -7848,7 +7896,7 @@ ${opts.tip}` : text;
   var screenScroll = /* @__PURE__ */ new Map();
   var screenKey = () => activeTab === "select" ? `select:${selSub}` : activeTab;
   function showTab(name) {
-    var _a;
+    var _a3;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
     if (changed && activeTab === "select" && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
@@ -7866,15 +7914,15 @@ ${opts.tip}` : text;
     syncManagerVisibility(false);
     syncStickyOffsets();
     if (changed) {
-      const y = (_a = screenScroll.get(screenKey())) != null ? _a : 0;
+      const y = (_a3 = screenScroll.get(screenKey())) != null ? _a3 : 0;
       requestAnimationFrame(() => window.scrollTo(0, y));
       readScreen("enter");
     }
     renderSelHome();
   }
   function showSelSub(sub, opener) {
-    var _a, _b;
-    if (sub === "bind" && !((_a = baseline != null ? baseline : curSel) == null ? void 0 : _a.count)) sub = "home";
+    var _a3, _b;
+    if (sub === "bind" && !((_a3 = baseline != null ? baseline : curSel) == null ? void 0 : _a3.count)) sub = "home";
     const changed = sub !== selSub;
     if (changed && activeTab === "select") screenScroll.set(screenKey(), window.scrollY);
     if (changed && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
@@ -7919,9 +7967,9 @@ ${opts.tip}` : text;
     bindFocusFirst();
   }
   function bindFocusFirst() {
-    var _a;
+    var _a3;
     if (!bindFocusPending || activeTab !== "select" || selSub !== "bind") return;
-    const row = bindSkipMode() ? (_a = $("bindSkips").querySelector(".skip-sel")) != null ? _a : $("btnSubBack") : $("bindTree").querySelector('[data-tkey][tabindex="0"]');
+    const row = bindZero() ? (_a3 = $("bindSkips").querySelector(".skip-sel")) != null ? _a3 : $("btnSubBack") : $("bindTree").querySelector('[data-tkey][tabindex="0"]');
     if (!row) return;
     bindFocusPending = false;
     row.focus({ preventScroll: true });
@@ -7962,9 +8010,9 @@ ${opts.tip}` : text;
     else setSubRight("", "", "");
   }
   function subBack() {
-    var _a;
+    var _a3;
     if (selSub === "pick") {
-      if (pickFrom === "make" && ((_a = baseline != null ? baseline : curSel) == null ? void 0 : _a.count)) {
+      if (pickFrom === "make" && ((_a3 = baseline != null ? baseline : curSel) == null ? void 0 : _a3.count)) {
         showSelSub("make");
         $("btnMakePick").focus();
         return;
@@ -7981,8 +8029,8 @@ ${opts.tip}` : text;
   }
   $("btnSubBack").addEventListener("click", subBack);
   document.addEventListener("click", (e) => {
-    var _a;
-    const el = (_a = e.target) == null ? void 0 : _a.closest("[data-go-sub]");
+    var _a3;
+    const el = (_a3 = e.target) == null ? void 0 : _a3.closest("[data-go-sub]");
     if (!el) return;
     const sub = el.dataset.goSub;
     if (!["home", "bind", "rename", "structure", "make", "pick"].includes(sub)) return;
@@ -8019,8 +8067,8 @@ ${opts.tip}` : text;
     if (step) showMakeStep(step);
   }
   function showMakeScreen(opener) {
-    var _a;
-    if (!((_a = baseline != null ? baseline : curSel) == null ? void 0 : _a.count)) {
+    var _a3;
+    if (!((_a3 = baseline != null ? baseline : curSel) == null ? void 0 : _a3.count)) {
       showStatusLine(t("status.noSelection"), { cls: "warn" });
       return;
     }
@@ -8056,14 +8104,14 @@ ${opts.tip}` : text;
     showMakeScreen(e.currentTarget);
   });
   function showStep(attr, step) {
-    var _a;
+    var _a3;
     const key = attr === "make" ? "data-make-step" : "data-apply-step";
     const rail = attr === "make" ? $("makeRail") : null;
     for (const el of Array.from(document.querySelectorAll(`.step[${key}]`))) {
       if (el.dataset.alwaysHidden !== void 0) continue;
       el.style.display = el.getAttribute(key) === step ? "" : "none";
     }
-    for (const b of Array.from((_a = rail == null ? void 0 : rail.querySelectorAll(".step-chip")) != null ? _a : [])) {
+    for (const b of Array.from((_a3 = rail == null ? void 0 : rail.querySelectorAll(".step-chip")) != null ? _a3 : [])) {
       const on = b.getAttribute(key) === step;
       if (b.classList.contains("subtab")) {
         b.setAttribute("aria-selected", String(on));
@@ -8125,7 +8173,7 @@ ${opts.tip}` : text;
     reentry.release();
   }
   function openMenu(x, y, items, returnFocus, onClose) {
-    var _a;
+    var _a3;
     closeMenu();
     menuOnClose = onClose != null ? onClose : null;
     const m = buildMenu(items, returnFocus, false);
@@ -8133,7 +8181,7 @@ ${opts.tip}` : text;
     const r = m.el.getBoundingClientRect();
     m.el.style.left = `${Math.max(4, Math.min(x, window.innerWidth - r.width - 4))}px`;
     m.el.style.top = `${Math.max(4, Math.min(y, window.innerHeight - r.height - 4))}px`;
-    (_a = m.buttons[0]) == null ? void 0 : _a.focus();
+    (_a3 = m.buttons[0]) == null ? void 0 : _a3.focus();
     menuEl = m.el;
   }
   function buildMenu(items, returnFocus, isSub, parentBtn) {
@@ -8142,7 +8190,7 @@ ${opts.tip}` : text;
     m.setAttribute("role", "menu");
     const buttons = [];
     const openSub = (it, b) => {
-      var _a;
+      var _a3;
       if (!it.submenu || it.disabled) return;
       closeSubmenu();
       const sub = buildMenu(it.submenu, returnFocus, true, b);
@@ -8154,7 +8202,7 @@ ${opts.tip}` : text;
       sub.el.style.top = `${Math.max(4, Math.min(br.top, window.innerHeight - sr.height - 4))}px`;
       b.setAttribute("aria-expanded", "true");
       menuSubEl = sub.el;
-      (_a = sub.buttons[0]) == null ? void 0 : _a.focus();
+      (_a3 = sub.buttons[0]) == null ? void 0 : _a3.focus();
     };
     for (const it of items) {
       if (it.separatorBefore) m.appendChild(document.createElement("hr"));
@@ -8196,11 +8244,11 @@ ${opts.tip}` : text;
       buttons.push(b);
     }
     m.addEventListener("keydown", (e) => {
-      var _a, _b;
+      var _a3, _b;
       const i = buttons.indexOf(document.activeElement);
       if (e.key === "ArrowDown") {
         e.preventDefault();
-        (_a = buttons[(i + 1) % buttons.length]) == null ? void 0 : _a.focus();
+        (_a3 = buttons[(i + 1) % buttons.length]) == null ? void 0 : _a3.focus();
       } else if (e.key === "ArrowUp") {
         e.preventDefault();
         (_b = buttons[(i - 1 + buttons.length) % buttons.length]) == null ? void 0 : _b.focus();
@@ -8230,7 +8278,7 @@ ${opts.tip}` : text;
   var modalOnClose = null;
   var modalBeforeClose = null;
   function closeModal() {
-    var _a;
+    var _a3;
     if (!modalEl) return;
     const cb = modalOnClose;
     modalOnClose = null;
@@ -8240,7 +8288,7 @@ ${opts.tip}` : text;
     modalEl = null;
     const rf = modalReturnFocus;
     modalReturnFocus = null;
-    (_a = typeof rf === "function" ? rf() : rf) == null ? void 0 : _a.focus();
+    (_a3 = typeof rf === "function" ? rf() : rf) == null ? void 0 : _a3.focus();
     reentry.release();
   }
   function requestCloseModal(how) {
@@ -8248,12 +8296,12 @@ ${opts.tip}` : text;
     closeModal();
   }
   function openModal(title, body, foot, returnFocus, onClose, opts = {}) {
-    var _a, _b, _c, _d;
+    var _a3, _b, _c, _d;
     closeModal();
     closeMenu();
     modalReturnFocus = returnFocus != null ? returnFocus : document.activeElement;
     modalOnClose = onClose != null ? onClose : null;
-    modalBeforeClose = (_a = opts.beforeClose) != null ? _a : null;
+    modalBeforeClose = (_a3 = opts.beforeClose) != null ? _a3 : null;
     const back = document.createElement("div");
     back.className = "modal-backdrop";
     const box = document.createElement("div");
@@ -8310,9 +8358,9 @@ ${opts.tip}` : text;
     return b;
   }
   async function copyText(text) {
-    var _a;
+    var _a3;
     try {
-      if ((_a = navigator.clipboard) == null ? void 0 : _a.writeText) {
+      if ((_a3 = navigator.clipboard) == null ? void 0 : _a3.writeText) {
         await navigator.clipboard.writeText(text);
         return true;
       }
@@ -8394,8 +8442,8 @@ ${opts.tip}` : text;
     closeReadiness();
   }
   function onSelectionForList(m) {
-    var _a, _b;
-    curSel = { ids: (_a = m.ids) != null ? _a : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
+    var _a3, _b;
+    curSel = { ids: (_a3 = m.ids) != null ? _a3 : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
     if (m.selfSelect) {
       renderSelBase();
       return;
@@ -8494,9 +8542,9 @@ ${opts.tip}` : text;
     reentry.release();
   }
   function onVarTable(msg) {
-    var _a;
+    var _a3;
     const sig = JSON.stringify([msg.collections, msg.vars]);
-    const edRebase = !!((_a = ed == null ? void 0 : ed.saving) == null ? void 0 : _a.awaitingTable);
+    const edRebase = !!((_a3 = ed == null ? void 0 : ed.saving) == null ? void 0 : _a3.awaitingTable);
     const first = !vmTableKnown;
     vmTableKnown = true;
     if (sig === vmTableSig && !first) {
@@ -8518,17 +8566,17 @@ ${opts.tip}` : text;
     renderSelHome();
   }
   function doRebase() {
-    var _a;
+    var _a3;
     rebaseToCurrent();
-    ((_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoMake")).focus();
+    ((_a3 = $("selCards").querySelector("button")) != null ? _a3 : $("btnGoMake")).focus();
   }
   function currentSel() {
-    var _a;
+    var _a3;
     const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
     const cur = sideSel;
     if (!cur || cur.kind !== "col" || !sides.some((x) => x.collection.id === cur.id)) {
       const first = sides[0];
-      if (cur && ((_a = document.activeElement) == null ? void 0 : _a.closest("#varSide")) && first) focusSideKey = `side:col:${first.collection.id}`;
+      if (cur && ((_a3 = document.activeElement) == null ? void 0 : _a3.closest("#varSide")) && first) focusSideKey = `side:col:${first.collection.id}`;
       sideSel = first ? { kind: "col", id: first.collection.id } : { kind: "inspect" };
     }
     return sideSel;
@@ -8542,10 +8590,10 @@ ${opts.tip}` : text;
     renderVarList();
   }
   function renderSidebar(sel) {
-    var _a;
+    var _a3;
     const nav = $("varSide");
     nav.setAttribute("role", "listbox");
-    const hadFocus = nav.contains(document.activeElement) ? (_a = document.activeElement.dataset.key) != null ? _a : null : null;
+    const hadFocus = nav.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.key) != null ? _a3 : null : null;
     clearMount(nav);
     const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
     const selKey = query.trim() ? "" : sideSelKey(sel);
@@ -8629,17 +8677,17 @@ ${opts.tip}` : text;
     sel.value = modeName && names.includes(modeName) ? modeName : "";
   }
   function modeIdFor(col) {
-    var _a, _b;
+    var _a3, _b;
     if (!col) return void 0;
     if (modeName) {
       const m = col.modes.find((x) => x.name === modeName);
       if (m) return m.modeId;
     }
-    return (_b = col.defaultModeId) != null ? _b : (_a = col.modes[0]) == null ? void 0 : _a.modeId;
+    return (_b = col.defaultModeId) != null ? _b : (_a3 = col.modes[0]) == null ? void 0 : _a3.modeId;
   }
   function currentModeCell(v) {
-    var _a;
-    return v.values[(_a = modeIdFor(vmCols.find((c) => c.id === v.collectionId))) != null ? _a : ""];
+    var _a3;
+    return v.values[(_a3 = modeIdFor(vmCols.find((c) => c.id === v.collectionId))) != null ? _a3 : ""];
   }
   function resolveSwatch(cell) {
     let c = cell;
@@ -8772,10 +8820,10 @@ ${opts.tip}` : text;
     d.title = g.label;
     d.append(tw, lb);
     const toggle = () => {
-      var _a, _b;
+      var _a3, _b;
       if (open) grpCollapsed.add(g.key);
       else grpCollapsed.delete(g.key);
-      focusKey = (_a = d.dataset.key) != null ? _a : null;
+      focusKey = (_a3 = d.dataset.key) != null ? _a3 : null;
       renderVarList();
       (_b = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _b.focus();
     };
@@ -8791,7 +8839,7 @@ ${opts.tip}` : text;
     return d;
   }
   function paletteLineEl(rows, mode) {
-    var _a;
+    var _a3;
     const line = document.createElement("div");
     line.className = `vp-line vp-${mode}`;
     line.setAttribute("role", "row");
@@ -8809,7 +8857,7 @@ ${opts.tip}` : text;
       else {
         const dot = document.createElement("span");
         dot.className = "vp-dot";
-        dot.style.background = (_a = resolveSwatch(cell)) != null ? _a : "transparent";
+        dot.style.background = (_a3 = resolveSwatch(cell)) != null ? _a3 : "transparent";
         b.appendChild(dot);
         if (mode === "swatch") {
           const nm = document.createElement("span");
@@ -8847,8 +8895,8 @@ ${opts.tip}` : text;
   }
   function wireItem(el, v) {
     el.addEventListener("click", (e) => {
-      var _a;
-      focusKey = (_a = el.dataset.key) != null ? _a : null;
+      var _a3;
+      focusKey = (_a3 = el.dataset.key) != null ? _a3 : null;
       gridItems().forEach((x) => x.tabIndex = -1);
       el.tabIndex = 0;
       if (e.detail > 1) return;
@@ -8902,8 +8950,8 @@ ${opts.tip}` : text;
   function gridKey(ev, el) {
     const all = gridItems();
     const lineOf = (x) => {
-      var _a;
-      return (_a = x.closest(".vp-line")) != null ? _a : x;
+      var _a3;
+      return (_a3 = x.closest(".vp-line")) != null ? _a3 : x;
     };
     const lines = [];
     for (const x of all) {
@@ -8912,11 +8960,11 @@ ${opts.tip}` : text;
     }
     const itemsIn = (l) => l.matches("[data-key]") ? [l] : Array.from(l.querySelectorAll("[data-key]"));
     const go = (target) => {
-      var _a;
+      var _a3;
       if (!target) return;
       all.forEach((x) => x.tabIndex = -1);
       target.tabIndex = 0;
-      focusKey = (_a = target.dataset.key) != null ? _a : null;
+      focusKey = (_a3 = target.dataset.key) != null ? _a3 : null;
       target.focus();
     };
     const toLine = (j) => {
@@ -8985,11 +9033,11 @@ ${opts.tip}` : text;
     showStatusLine(t("apply.done", { n: msg.applied, name: msg.name }) + (msg.skipped ? t("apply.skipped", { m: msg.skipped }) : "") + t("apply.undo"), { cls: msg.skipped ? "warn" : "ok", tip });
   }
   function openVarMenuFor(v, el, x, y) {
-    var _a;
+    var _a3;
     const r = el.getBoundingClientRect();
     el.classList.add("menu-open");
     const kind = varKind(v);
-    const targets = (_a = APPLY_TARGETS[kind]) != null ? _a : [];
+    const targets = (_a3 = APPLY_TARGETS[kind]) != null ? _a3 : [];
     const items = [];
     if (targets.length) {
       const sub = targets.map((tg) => {
@@ -9019,11 +9067,11 @@ ${opts.tip}` : text;
   var detailReturn = null;
   var detailFromVars = true;
   function focusAfterDetail(id) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     const ret = detailReturn;
     if (ret && !detailFromVars) {
       if (document.body.contains(ret) && ret.offsetParent) return { el: ret, present: true };
-      return { el: (_a = $("selCards").querySelector("button")) != null ? _a : $("btnGoMake"), present: false };
+      return { el: (_a3 = $("selCards").querySelector("button")) != null ? _a3 : $("btnGoMake"), present: false };
     }
     const items = gridItems();
     const hit = items.find((x) => x.dataset.key === `v:${id}`);
@@ -9141,10 +9189,10 @@ ${opts.tip}` : text;
   var edDeadReqs = /* @__PURE__ */ new Set();
   var EDIT_TIMEOUT = 1e4;
   function edTarget(f, id) {
-    var _a;
+    var _a3;
     const local = vmVars.find((v) => v.id === id);
     if (local) return { name: local.name, remote: false, deleted: false };
-    const b = ((_a = f.base) == null ? void 0 : _a.kind) === "alias" && f.base.aliasId === id ? f.base : void 0;
+    const b = ((_a3 = f.base) == null ? void 0 : _a3.kind) === "alias" && f.base.aliasId === id ? f.base : void 0;
     if (b == null ? void 0 : b.remote) return { name: b.aliasName, remote: true, deleted: false };
     return { name: t("edit.deletedTarget"), remote: false, deleted: true };
   }
@@ -9153,9 +9201,9 @@ ${opts.tip}` : text;
     return r && r.kind === "color" ? r.hex : null;
   }
   function edDraft(f, type) {
-    var _a, _b;
+    var _a3, _b;
     if (f.mode === "alias") {
-      const changed = !(((_a = f.base) == null ? void 0 : _a.kind) === "alias" && f.base.aliasId === f.aliasId);
+      const changed = !(((_a3 = f.base) == null ? void 0 : _a3.kind) === "alias" && f.base.aliasId === f.aliasId);
       return { changed, err: null, value: { kind: "alias", targetId: (_b = f.aliasId) != null ? _b : "" } };
     }
     if (!f.touched) return { changed: false, err: null };
@@ -9202,7 +9250,7 @@ ${opts.tip}` : text;
     return null;
   }
   function edChrome() {
-    var _a, _b, _c, _d, _e, _f;
+    var _a3, _b, _c, _d, _e, _f;
     const e = ed;
     if (!e) return;
     const st = edState(e);
@@ -9211,7 +9259,7 @@ ${opts.tip}` : text;
     e.nameField.classList.toggle("changed", n.changed);
     e.nameField.classList.toggle("err", !!n.err || e.nameFigmaErr !== null);
     e.nameInput.disabled = saving;
-    e.nameErr.textContent = (_a = n.err) != null ? _a : e.nameFigmaErr !== null ? t("edit.nameRejected") : "";
+    e.nameErr.textContent = (_a3 = n.err) != null ? _a3 : e.nameFigmaErr !== null ? t("edit.nameRejected") : "";
     e.nameErr.title = !n.err && e.nameFigmaErr ? e.nameFigmaErr : "";
     e.nameErr.hidden = !e.nameErr.textContent;
     for (const f of e.fields) {
@@ -9302,7 +9350,7 @@ ${opts.tip}` : text;
     edChrome();
   }
   function edLockedSave() {
-    var _a;
+    var _a3;
     const e = ed;
     if (!e || e.saving || e.sticky) return;
     const st = edState(e);
@@ -9310,12 +9358,12 @@ ${opts.tip}` : text;
     else if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
     else if (st.hasErr) {
       e.event = { text: t("edit.checkInput"), err: true };
-      (_a = st.firstErr) == null ? void 0 : _a.focus();
+      (_a3 = st.firstErr) == null ? void 0 : _a3.focus();
     }
     edChrome();
   }
   function edRenderField(f) {
-    var _a;
+    var _a3;
     const e = ed;
     clearMount(f.dd);
     const wrap = document.createElement("div");
@@ -9386,15 +9434,15 @@ ${opts.tip}` : text;
     const dd = document.createElement("button");
     dd.type = "button";
     dd.className = "ed-dd";
-    const open = ((_a = e.picker) == null ? void 0 : _a.modeId) === f.modeId;
+    const open = ((_a3 = e.picker) == null ? void 0 : _a3.modeId) === f.modeId;
     dd.textContent = open ? "\u25B4" : "\u25BE";
     dd.setAttribute("aria-label", t("edit.pickAria", { mode: f.modeName }));
     dd.setAttribute("aria-haspopup", "listbox");
     dd.setAttribute("aria-expanded", String(open));
     dd.addEventListener("click", () => edTogglePicker(f));
     dd.addEventListener("keydown", (ev) => {
-      var _a2;
-      if (ev.key === "Escape" && ((_a2 = ed == null ? void 0 : ed.picker) == null ? void 0 : _a2.modeId) === f.modeId) {
+      var _a4;
+      if (ev.key === "Escape" && ((_a4 = ed == null ? void 0 : ed.picker) == null ? void 0 : _a4.modeId) === f.modeId) {
         ev.preventDefault();
         ev.stopPropagation();
         edClosePicker(true);
@@ -9433,7 +9481,7 @@ ${opts.tip}` : text;
     }
   }
   function edTogglePicker(f) {
-    var _a;
+    var _a3;
     const e = ed;
     if (!e || e.saving) return;
     const prev = e.picker ? e.fields.find((x) => x.modeId === e.picker.modeId) : void 0;
@@ -9448,10 +9496,10 @@ ${opts.tip}` : text;
     if (prev) edRenderField(prev);
     edRenderField(f);
     edChrome();
-    (_a = f.dd.querySelector(".ed-psearch")) == null ? void 0 : _a.focus();
+    (_a3 = f.dd.querySelector(".ed-psearch")) == null ? void 0 : _a3.focus();
   }
   function edClosePicker(focusDd) {
-    var _a;
+    var _a3;
     const e = ed;
     if (!(e == null ? void 0 : e.picker)) return;
     const f = e.fields.find((x) => x.modeId === e.picker.modeId);
@@ -9459,7 +9507,7 @@ ${opts.tip}` : text;
     if (!f) return;
     edRenderField(f);
     edChrome();
-    if (focusDd) (_a = f.ddBtn) == null ? void 0 : _a.focus();
+    if (focusDd) (_a3 = f.ddBtn) == null ? void 0 : _a3.focus();
   }
   function edPick(f, id) {
     f.mode = "alias";
@@ -9471,7 +9519,7 @@ ${opts.tip}` : text;
     edClosePicker(true);
   }
   function edWriteValue(f) {
-    var _a;
+    var _a3;
     const r = f.aliasId ? resolveEditValue({ kind: "alias", aliasId: f.aliasId, aliasName: "" }, vmCols, vmVars) : null;
     f.mode = "value";
     f.touched = true;
@@ -9487,7 +9535,7 @@ ${opts.tip}` : text;
     }
     ed.event = null;
     edClosePicker(false);
-    (_a = f.ctl) == null ? void 0 : _a.focus();
+    (_a3 = f.ctl) == null ? void 0 : _a3.focus();
   }
   function edPicker(f) {
     const e = ed;
@@ -9522,11 +9570,11 @@ ${opts.tip}` : text;
       if (!onPick) o.setAttribute("aria-disabled", "true");
       else o.addEventListener("click", onPick);
       o.addEventListener("keydown", (ev) => {
-        var _a;
+        var _a3;
         const i = opts.indexOf(o);
         if (ev.key === "ArrowDown") {
           if (i >= opts.length - 1 && !link.hidden) link.focus();
-          else (_a = opts[Math.min(opts.length - 1, i + 1)]) == null ? void 0 : _a.focus();
+          else (_a3 = opts[Math.min(opts.length - 1, i + 1)]) == null ? void 0 : _a3.focus();
         } else if (ev.key === "ArrowUp") (i <= 0 ? search : opts[i - 1]).focus();
         else if ((ev.key === "Enter" || ev.key === " ") && onPick) onPick();
         else return;
@@ -9543,7 +9591,7 @@ ${opts.tip}` : text;
       return `<span class="ed-ov">${escapeHtml(r.text)}</span>`;
     };
     const render = () => {
-      var _a, _b, _c;
+      var _a3, _b, _c;
       clearMount(lb);
       clearMount(notes);
       opts.length = 0;
@@ -9588,7 +9636,7 @@ ${opts.tip}` : text;
           lb.appendChild(h);
           for (const r of rows) {
             const col = vmCols.find((c) => c.id === r.collectionId);
-            const cell = r.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
+            const cell = r.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a3 = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a3.modeId) != null ? _c : ""];
             const other = !scopeFits(pk.selfScopes, r.scopes);
             lb.appendChild(option("", `${valHtml(cell)}${escapeHtml(leafName(r.name))}${other ? ` <span class="ed-ptag">${escapeHtml(t("edit.pickOtherScope"))}</span>` : ""}${r.id === curId ? '<span class="ck">\u2713</span>' : ""}`, r.name, () => edPick(f, r.id), r.id === curId));
             shown++;
@@ -9614,10 +9662,10 @@ ${opts.tip}` : text;
       link.focus();
     });
     link.addEventListener("keydown", (ev) => {
-      var _a;
+      var _a3;
       if (ev.key === "ArrowUp") {
         ev.preventDefault();
-        (_a = opts[opts.length - 1]) == null ? void 0 : _a.focus();
+        (_a3 = opts[opts.length - 1]) == null ? void 0 : _a3.focus();
       }
     });
     search.addEventListener("input", () => {
@@ -9625,10 +9673,10 @@ ${opts.tip}` : text;
       render();
     });
     search.addEventListener("keydown", (ev) => {
-      var _a;
+      var _a3;
       if (ev.key === "ArrowDown") {
         ev.preventDefault();
-        (_a = opts[0]) == null ? void 0 : _a.focus();
+        (_a3 = opts[0]) == null ? void 0 : _a3.focus();
       }
     });
     el.addEventListener("keydown", (ev) => {
@@ -9682,21 +9730,21 @@ ${opts.tip}` : text;
     f.figmaErr = null;
   }
   function edTitle(e) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     const col = vmCols.find((c) => c.id === e.v.collectionId);
-    const first = e.v.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a.modeId) != null ? _c : ""];
+    const first = e.v.values[(_c = (_b = col == null ? void 0 : col.defaultModeId) != null ? _b : (_a3 = col == null ? void 0 : col.modes[0]) == null ? void 0 : _a3.modeId) != null ? _c : ""];
     e.title.innerHTML = `${e.v.type === "COLOR" ? swatchHtml(edSwatch(first)) : ""}<span class="vm-val">${escapeHtml(e.v.name)}</span>`;
   }
   function openEditor(v, focusName, create) {
-    var _a;
+    var _a3;
     const col = vmCols.find((c) => c.id === v.collectionId);
     const titleWrap = document.createElement("span");
     titleWrap.className = "ed-titlewrap";
     const title = document.createElement("span");
     titleWrap.appendChild(title);
     if (!create) titleWrap.appendChild(copyBtn(t("vm.copyName"), () => {
-      var _a2, _b;
-      return (_b = (_a2 = vmVars.find((x) => x.id === v.id)) == null ? void 0 : _a2.name) != null ? _b : v.name;
+      var _a4, _b;
+      return (_b = (_a4 = vmVars.find((x) => x.id === v.id)) == null ? void 0 : _a4.name) != null ? _b : v.name;
     }, "ed-copyname"));
     const body = document.createElement("div");
     const dl = document.createElement("dl");
@@ -9746,7 +9794,7 @@ ${opts.tip}` : text;
       row(t("newVar.type"), typeSel);
     }
     const fields = [];
-    for (const m of (_a = col == null ? void 0 : col.modes) != null ? _a : []) {
+    for (const m of (_a3 = col == null ? void 0 : col.modes) != null ? _a3 : []) {
       const dd = row(m.name, "");
       const f = { modeId: m.modeId, modeName: m.name, base: void 0, mode: "value", text: "", bool: false, aliasId: null, touched: false, needValue: false, figmaErr: null, dd, ctl: null, ddBtn: null };
       edResetField(f, v.values[m.modeId], v.type);
@@ -9769,8 +9817,8 @@ ${opts.tip}` : text;
       const code = document.createElement("code");
       code.textContent = cssVarName(v.name);
       css.append(code, copyBtn(t("vm.copyCss"), () => {
-        var _a2, _b;
-        return cssVarName((_b = (_a2 = vmVars.find((x) => x.id === v.id)) == null ? void 0 : _a2.name) != null ? _b : v.name);
+        var _a4, _b;
+        return cssVarName((_b = (_a4 = vmVars.find((x) => x.id === v.id)) == null ? void 0 : _a4.name) != null ? _b : v.name);
       }, "ed-copycss", "\u29C9"));
       row("CSS", css, "ed-text");
       row(t("list.dUses"), uses.box, "ed-text");
@@ -9821,8 +9869,8 @@ ${opts.tip}` : text;
       btnSave,
       usesRun: uses.run
     }, create ? { create: __spreadProps(__spreadValues({}, create), { reqId: null }), newScopes: () => {
-      var _a2;
-      return (_a2 = scopesForNew(normalizeVarName(e.nameText), e.v.type)) != null ? _a2 : ["ALL_SCOPES"];
+      var _a4;
+      return (_a4 = scopesForNew(normalizeVarName(e.nameText), e.v.type)) != null ? _a4 : ["ALL_SCOPES"];
     } } : {});
     if (typeSel) {
       const ts = typeSel;
@@ -9895,18 +9943,18 @@ ${opts.tip}` : text;
     detailBox = null;
   }
   function edAfterClose(e) {
-    var _a, _b;
+    var _a3, _b;
     if (e.create) return e.create.opener && document.body.contains(e.create.opener) ? e.create.opener : $("btnAddVar");
     const { el: target, present } = focusAfterDetail(e.v.id);
     if (e.appliedAny) {
-      const name = (_b = (_a = vmVars.find((x) => x.id === e.v.id)) == null ? void 0 : _a.name) != null ? _b : e.v.name;
+      const name = (_b = (_a3 = vmVars.find((x) => x.id === e.v.id)) == null ? void 0 : _a3.name) != null ? _b : e.v.name;
       if (e.lastPartial) showStatusLine(present ? t("edit.partial") : t("edit.closedPartialMissing", { name }), { cls: "warn" });
       else if (!present) showStatusLine(t("edit.closedMissing", { name }));
     }
     return target;
   }
   function edSave() {
-    var _a;
+    var _a3;
     const e = ed;
     if (!e || e.saving || e.sticky) return;
     if (e.create) {
@@ -9925,7 +9973,7 @@ ${opts.tip}` : text;
       const d = edDraft(f, e.v.type);
       if (!d.changed || !d.value) continue;
       values[f.modeId] = d.value;
-      baseValues[f.modeId] = (_a = f.base) != null ? _a : null;
+      baseValues[f.modeId] = (_a3 = f.base) != null ? _a3 : null;
     }
     const reqId = ++bindReqSeq;
     e.saving = { reqId, awaitingTable: false };
@@ -9964,7 +10012,7 @@ ${opts.tip}` : text;
     return { text: t("edit.saveFailed"), tip: err.message };
   }
   function onVariableUpdated(msg) {
-    var _a, _b;
+    var _a3, _b;
     const e = ed;
     if (edDeadReqs.has(msg.reqId)) {
       edDeadReqs.delete(msg.reqId);
@@ -9986,7 +10034,7 @@ ${opts.tip}` : text;
       else if ((err == null ? void 0 : err.code) === "conflict") edSetSticky(e, "conflict");
       else {
         if ((err == null ? void 0 : err.code) === "name") {
-          e.nameFigmaErr = (_a = err.message) != null ? _a : "";
+          e.nameFigmaErr = (_a3 = err.message) != null ? _a3 : "";
           focus = e.nameInput;
         } else if ((err == null ? void 0 : err.code) === "value") {
           const f = e.fields.find((x) => x.modeId === err.modeId);
@@ -10010,9 +10058,9 @@ ${opts.tip}` : text;
     readScreen("work");
   }
   function edOnVarTable(msg) {
-    var _a, _b, _c, _d;
+    var _a3, _b, _c, _d;
     const e = ed;
-    if (!((_a = e == null ? void 0 : e.saving) == null ? void 0 : _a.awaitingTable) || !e.saving.res) return;
+    if (!((_a3 = e == null ? void 0 : e.saving) == null ? void 0 : _a3.awaitingTable) || !e.saving.res) return;
     const res = e.saving.res;
     edEndSaving(e);
     const row = msg.vars.find((x) => x.id === e.v.id);
@@ -10081,14 +10129,14 @@ ${opts.tip}` : text;
     requestCloseModal("button");
   }
   function varJump(id) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     const v = vmVars.find((x) => x.id === id);
     if (!v) {
       showStatusLine(t("list.libVar"));
       return;
     }
     const fromVars = activeTab === "variables";
-    const undo = fromVars ? { tab: "variables", sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey } : { tab: "select", usesOpen: selUsesOpen, scroll: window.scrollY, focusK: (_c = (_b = (_a = document.activeElement) == null ? void 0 : _a.closest("[data-k]")) == null ? void 0 : _b.dataset.k) != null ? _c : null };
+    const undo = fromVars ? { tab: "variables", sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey } : { tab: "select", usesOpen: selUsesOpen, scroll: window.scrollY, focusK: (_c = (_b = (_a3 = document.activeElement) == null ? void 0 : _a3.closest("[data-k]")) == null ? void 0 : _b.dataset.k) != null ? _c : null };
     showTab("variables");
     query = "";
     $("varSearch").value = "";
@@ -10108,7 +10156,7 @@ ${opts.tip}` : text;
       action: {
         label: t("list.undo"),
         run: () => {
-          var _a2, _b2;
+          var _a4, _b2;
           if (undo.tab === "variables") {
             sideSel = undo.sel;
             grpCollapsed.clear();
@@ -10118,7 +10166,7 @@ ${opts.tip}` : text;
             focusKey = undo.focusKey;
             renderVarList();
             window.scrollTo(0, undo.scroll);
-            (_a2 = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _a2.focus({ preventScroll: true });
+            (_a4 = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _a4.focus({ preventScroll: true });
           } else {
             showTab("select");
             selUsesOpen = undo.usesOpen;
@@ -10138,7 +10186,7 @@ ${opts.tip}` : text;
   }
   var afterTable = null;
   function runAfterTable() {
-    var _a;
+    var _a3;
     const job = afterTable;
     if (!job) return;
     if (job.openDetail) {
@@ -10159,7 +10207,7 @@ ${opts.tip}` : text;
         focusKey = job.focus;
         renderVarList();
       }
-      const item = (_a = gridItems().find((x) => x.dataset.key === job.focus)) != null ? _a : gridItems()[0];
+      const item = (_a3 = gridItems().find((x) => x.dataset.key === job.focus)) != null ? _a3 : gridItems()[0];
       if (item) {
         gridItems().forEach((x) => x.tabIndex = -1);
         item.tabIndex = 0;
@@ -10179,7 +10227,7 @@ ${opts.tip}` : text;
     renderVarList();
   }
   function openNewVar(opener) {
-    var _a, _b, _c, _d;
+    var _a3, _b, _c, _d;
     const lock = manualLimitReason();
     if (lock) {
       showStatusLine(lock, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
@@ -10187,20 +10235,20 @@ ${opts.tip}` : text;
     }
     const sel = currentSel();
     const col = sel.kind === "col" ? vmCols.find((c) => c.id === sel.id) : void 0;
-    const first = (_b = paletteGroups(vmCols, vmVars, (_a = col == null ? void 0 : col.id) != null ? _a : null, "")[0]) == null ? void 0 : _b.rows[0];
+    const first = (_b = paletteGroups(vmCols, vmVars, (_a3 = col == null ? void 0 : col.id) != null ? _a3 : null, "")[0]) == null ? void 0 : _b.rows[0];
     const type = (_c = first == null ? void 0 : first.type) != null ? _c : "FLOAT";
     const v = { id: "__new", name: "", collectionId: (_d = col == null ? void 0 : col.id) != null ? _d : "__new", type, values: {}, scopes: [], description: "" };
     const label = col ? `${tierBadge(col)} ${col.name}` : t("newVar.newCollection");
     openEditor(v, true, { collectionId: col == null ? void 0 : col.id, label, opener });
   }
   function edCreate(e) {
-    var _a, _b, _c;
+    var _a3, _b, _c;
     const c = e.create;
     if (c.reqId) return;
     const n = normalizeVarName(e.nameText);
     const ne = nameError(e.nameText, e.v, vmVars);
     const col = vmCols.find((x) => x.id === c.collectionId);
-    const defMode = col ? (_b = col.defaultModeId) != null ? _b : (_a = col.modes[0]) == null ? void 0 : _a.modeId : "*";
+    const defMode = col ? (_b = col.defaultModeId) != null ? _b : (_a3 = col.modes[0]) == null ? void 0 : _a3.modeId : "*";
     const values = {};
     let firstErr = ne ? e.nameInput : null;
     for (const f of e.fields) {
@@ -10245,8 +10293,8 @@ ${opts.tip}` : text;
   }
   var dupReq = 0;
   function duplicateVar(v) {
-    var _a;
-    const lock = (_a = writeLockReason()) != null ? _a : manualLimitReason();
+    var _a3;
+    const lock = (_a3 = writeLockReason()) != null ? _a3 : manualLimitReason();
     if (lock) {
       showStatusLine(lock, { cls: "warn" });
       return;
@@ -10261,7 +10309,7 @@ ${opts.tip}` : text;
   }
   var delReq = 0;
   function confirmDeleteVar(v, el) {
-    var _a;
+    var _a3;
     const lock = writeLockReason();
     if (lock) {
       showStatusLine(lock, { cls: "warn" });
@@ -10280,7 +10328,7 @@ ${opts.tip}` : text;
       return `${o.collectionId}|${c2 < 0 ? "" : o.name.slice(0, c2)}` === gKey;
     };
     const next = sameGroup(items[i + 1]) ? items[i + 1] : sameGroup(items[i - 1]) ? items[i - 1] : null;
-    const after = (_a = next == null ? void 0 : next.dataset.key) != null ? _a : `g:${gKey}`;
+    const after = (_a3 = next == null ? void 0 : next.dataset.key) != null ? _a3 : `g:${gKey}`;
     const title = document.createElement("span");
     title.textContent = t("del.title", { name: v.name });
     const body = document.createElement("div");
@@ -10340,13 +10388,13 @@ ${opts.tip}` : text;
     return false;
   }
   document.addEventListener("pointerdown", (ev) => {
-    var _a;
+    var _a3;
     const e = ed;
     if (!(e == null ? void 0 : e.picker)) return;
     const f = e.fields.find((x) => x.modeId === e.picker.modeId);
     const tg = ev.target;
     if (!f || f.dd.contains(tg)) return;
-    if ((_a = tg.classList) == null ? void 0 : _a.contains("modal-backdrop")) {
+    if ((_a3 = tg.classList) == null ? void 0 : _a3.contains("modal-backdrop")) {
       ev.stopPropagation();
       ev.preventDefault();
     }
@@ -10425,7 +10473,7 @@ ${opts.tip}` : text;
   }
   var readinessReturn = null;
   function openReadiness(btn) {
-    var _a;
+    var _a3;
     if (!$("readinessPop").hidden) {
       closeReadiness();
       return;
@@ -10440,7 +10488,7 @@ ${opts.tip}` : text;
     pop.style.top = `${Math.min(r.bottom + 2, window.innerHeight - pop.offsetHeight - 28)}px`;
     readinessReturn = btn;
     btn.setAttribute("aria-expanded", "true");
-    (_a = pop.querySelector(".pstep")) == null ? void 0 : _a.focus();
+    (_a3 = pop.querySelector(".pstep")) == null ? void 0 : _a3.focus();
   }
   function closeReadiness(returnFocus = false) {
     const pop = $("readinessPop");
@@ -10452,7 +10500,7 @@ ${opts.tip}` : text;
     reentry.release();
   }
   $("readinessPop").addEventListener("keydown", (e) => {
-    var _a, _b;
+    var _a3, _b;
     const rows = Array.from($("readinessPop").querySelectorAll(".pstep"));
     const i = rows.indexOf(document.activeElement);
     if (e.key === "Escape") {
@@ -10460,7 +10508,7 @@ ${opts.tip}` : text;
       closeReadiness(true);
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      (_a = rows[(i + 1) % rows.length]) == null ? void 0 : _a.focus();
+      (_a3 = rows[(i + 1) % rows.length]) == null ? void 0 : _a3.focus();
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       (_b = rows[(i - 1 + rows.length) % rows.length]) == null ? void 0 : _b.focus();
@@ -10542,7 +10590,7 @@ ${opts.tip}` : text;
     renderSelHome();
   }
   function selCard(opts) {
-    var _a, _b;
+    var _a3, _b;
     const d = document.createElement("div");
     d.className = `sel-card${opts.cls ? " " + opts.cls : ""}`;
     const g = document.createElement("div");
@@ -10551,7 +10599,7 @@ ${opts.tip}` : text;
     tt.className = "t";
     tt.textContent = opts.title;
     g.appendChild(tt);
-    for (const sub of (_a = opts.subs) != null ? _a : []) {
+    for (const sub of (_a3 = opts.subs) != null ? _a3 : []) {
       const sd = document.createElement("div");
       sd.className = "s";
       sd.append(sub);
@@ -10583,11 +10631,11 @@ ${opts.tip}` : text;
   }
   var kindLabel = (k) => KIND_HEAD[k];
   function renderSelHome() {
-    var _a;
+    var _a3;
     if (activeTab !== "select" || selSub !== "home" || !curSel) return;
     const head = $("selHead");
     const cards = $("selCards");
-    const hadFocus = cards.contains(document.activeElement) ? (_a = document.activeElement.dataset.k) != null ? _a : null : null;
+    const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : null : null;
     clearMount(head);
     clearMount(cards);
     const noSel = !baseline;
@@ -10646,8 +10694,8 @@ ${opts.tip}` : text;
         return finishSelFocus(hadFocus);
       }
       const libDirect = libVars.filter((l) => {
-        var _a2, _b;
-        return ((_b = (_a2 = usageMap == null ? void 0 : usageMap.get(l.id)) == null ? void 0 : _a2.places) != null ? _b : 0) > 0;
+        var _a4, _b;
+        return ((_b = (_a4 = usageMap == null ? void 0 : usageMap.get(l.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
       });
       if (libDirect.length) {
         const subs = [];
@@ -10675,9 +10723,9 @@ ${opts.tip}` : text;
     finishSelFocus(hadFocus);
   }
   function finishSelFocus(key) {
-    var _a;
+    var _a3;
     if (!key) return;
-    (_a = $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`)) == null ? void 0 : _a.focus({ preventScroll: true });
+    (_a3 = $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`)) == null ? void 0 : _a3.focus({ preventScroll: true });
   }
   function tsOnlyExtra(subs, actions) {
     const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
@@ -10743,18 +10791,18 @@ ${opts.tip}` : text;
     put(card);
   }
   function renderUsesCard(put) {
-    var _a;
+    var _a3;
     if (!usageMap) {
       put(selCard({ title: t("v4.usesTitle0"), subs: [t("v4.reading")] }));
       return;
     }
     const local = vmVars.filter((v) => {
-      var _a2, _b;
-      return ((_b = (_a2 = usageMap.get(v.id)) == null ? void 0 : _a2.places) != null ? _b : 0) > 0;
+      var _a4, _b;
+      return ((_b = (_a4 = usageMap.get(v.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
     });
     const lib = libVars.filter((l) => {
-      var _a2, _b;
-      return ((_b = (_a2 = usageMap.get(l.id)) == null ? void 0 : _a2.places) != null ? _b : 0) > 0;
+      var _a4, _b;
+      return ((_b = (_a4 = usageMap.get(l.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
     });
     const n = local.length + lib.length;
     if (!n) return;
@@ -10762,7 +10810,7 @@ ${opts.tip}` : text;
     for (const v of local) {
       const c = vmCols.find((x) => x.id === v.collectionId);
       const key = (c == null ? void 0 : c.tier) === 3 ? "Component" : (c == null ? void 0 : c.tier) === 2 ? "Semantic" : (c == null ? void 0 : c.tier) === 1 ? "Global" : t("v4.noTierName");
-      tierN.set(key, ((_a = tierN.get(key)) != null ? _a : 0) + 1);
+      tierN.set(key, ((_a3 = tierN.get(key)) != null ? _a3 : 0) + 1);
     }
     if (lib.length) tierN.set(t("v4.libName"), lib.length);
     const order = ["Component", "Semantic", "Global", t("v4.noTierName"), t("v4.libName")];
@@ -10784,15 +10832,15 @@ ${opts.tip}` : text;
     const tierRank = (tier) => tier === 3 ? 0 : tier === 2 ? 1 : tier === 1 ? 2 : 3;
     const rows = [];
     local.forEach((v) => {
-      var _a2, _b, _c;
+      var _a4, _b, _c;
       const c = vmCols.find((x) => x.id === v.collectionId);
       const cut = v.name.lastIndexOf("/");
-      rows.push({ path: `${tierBadge(c != null ? c : { tier: 0 })} ${(_a2 = c == null ? void 0 : c.name) != null ? _a2 : ""}${cut > 0 ? " \u203A " + v.name.slice(0, cut) : ""}`, name: cut >= 0 ? v.name.slice(cut + 1) : v.name, ref: { local: v }, cell: currentModeCell(v), places: (_c = (_b = usageMap.get(v.id)) == null ? void 0 : _b.places) != null ? _c : 0, rank: tierRank(c == null ? void 0 : c.tier), order: vmVars.indexOf(v) });
+      rows.push({ path: `${tierBadge(c != null ? c : { tier: 0 })} ${(_a4 = c == null ? void 0 : c.name) != null ? _a4 : ""}${cut > 0 ? " \u203A " + v.name.slice(0, cut) : ""}`, name: cut >= 0 ? v.name.slice(cut + 1) : v.name, ref: { local: v }, cell: currentModeCell(v), places: (_c = (_b = usageMap.get(v.id)) == null ? void 0 : _b.places) != null ? _c : 0, rank: tierRank(c == null ? void 0 : c.tier), order: vmVars.indexOf(v) });
     });
     lib.forEach((l, i) => {
-      var _a2, _b;
+      var _a4, _b;
       const cut = l.name.lastIndexOf("/");
-      rows.push({ path: `${t("v4.libName")} \u203A ${l.collection}`, name: cut >= 0 ? l.name.slice(cut + 1) : l.name, ref: { lib: l }, cell: l.value, places: (_b = (_a2 = usageMap.get(l.id)) == null ? void 0 : _a2.places) != null ? _b : 0, rank: 4, order: i });
+      rows.push({ path: `${t("v4.libName")} \u203A ${l.collection}`, name: cut >= 0 ? l.name.slice(cut + 1) : l.name, ref: { lib: l }, cell: l.value, places: (_b = (_a4 = usageMap.get(l.id)) == null ? void 0 : _a4.places) != null ? _b : 0, rank: 4, order: i });
     });
     rows.sort((a, b) => a.rank - b.rank || a.path.localeCompare(b.path) || a.order - b.order);
     let lastPath = "";
@@ -10849,7 +10897,7 @@ ${opts.tip}` : text;
     put(list);
   }
   function renderDeletedCard(put) {
-    var _a;
+    var _a3;
     if (!usageMap || !deletedUse.count) return;
     const sel = selBtn(t("v4.select"), () => {
       selectStatusTarget = "list";
@@ -10859,7 +10907,7 @@ ${opts.tip}` : text;
     const un = selBtn(t("v4.unbind"), () => unbindDeleted());
     un.id = "btnUnbindDeleted";
     un.dataset.k = "unbind";
-    const other = (_a = otherWriteOp()) != null ? _a : bindLinking ? t("op.bind") : null;
+    const other = (_a3 = otherWriteOp()) != null ? _a3 : bindLinking ? t("op.bind") : null;
     if (other) setWait(un, t("bind.waitOp", { op: other }));
     put(selCard({ title: t("v4.deletedN", { n: deletedUse.count }), cls: "warn", actions: [sel, un] }));
   }
@@ -10869,7 +10917,7 @@ ${opts.tip}` : text;
     send({ type: "UNBIND_DELETED", reqId: unbindReq, nodeIds: baseline.ids });
   }
   function onDeletedUnbound(msg) {
-    var _a;
+    var _a3;
     if (msg.reqId !== unbindReq) return;
     unbindReq = 0;
     let text = t("v4.unbound", { k: msg.unbound });
@@ -10877,7 +10925,7 @@ ${opts.tip}` : text;
     showStatusLine(text, { cls: msg.failed ? "warn" : "ok" });
     const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t("v4.unbindFail." + k)} ${n}`).join(" \xB7 ");
     if (tip) $("statusText").title = tip;
-    if (document.activeElement === document.body || !((_a = document.activeElement) == null ? void 0 : _a.isConnected)) $("btnGoMake").focus();
+    if (document.activeElement === document.body || !((_a3 = document.activeElement) == null ? void 0 : _a3.isConnected)) $("btnGoMake").focus();
     queueMicrotask(() => {
       if (!$("selCards").contains(document.activeElement)) $("btnGoMake").focus();
     });

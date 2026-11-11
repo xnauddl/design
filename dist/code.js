@@ -977,6 +977,11 @@
     const a = roundAlpha(alpha);
     return a === 1 ? hex.toLowerCase() : `${hex.toLowerCase()}@${a}`;
   }
+  function exportColorHex(c) {
+    var _a;
+    const a = Math.round(clamp01((_a = c.a) != null ? _a : 1) * 255);
+    return a >= 255 ? rgbToHex(c) : `${rgbToHex(c)}${a.toString(16).padStart(2, "0")}`;
+  }
   function alphaPct(alpha) {
     return Math.round(alpha * 100);
   }
@@ -10083,8 +10088,7 @@
               if (!target) continue;
               t2.aliasOf = target;
             } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-              const a = raw.a;
-              t2.value = roundAlpha(a) !== 1 ? `${rgbToHex(raw)}${Math.round(a * 255).toString(16).padStart(2, "0")}` : rgbToHex(raw);
+              t2.value = exportColorHex(raw);
             } else {
               t2.value = raw;
             }

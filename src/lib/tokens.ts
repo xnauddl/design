@@ -122,6 +122,13 @@ export function colorKey(hex: string, alpha?: number): string {
   return a === 1 ? hex.toLowerCase() : `${hex.toLowerCase()}@${a}`;
 }
 
+/** 코드 내보내기의 색 글(ia-v3 §2.11) — 변수 탭 `colorText`와 같은 기준(투명도를 0–255로 반올림해 255 미만이면 꼬리).
+    앞 6자리는 `rgbToHex`(소문자), 꼬리는 소문자 16진 2자리. 값 비교(`colorKey`, 1/100)와 기준이 다른 것은 일부러다. */
+export function exportColorHex(c: { r: number; g: number; b: number; a?: number }): string {
+  const a = Math.round(clamp01(c.a ?? 1) * 255);
+  return a >= 255 ? rgbToHex(c) : `${rgbToHex(c)}${a.toString(16).padStart(2, '0')}`;
+}
+
 /** 투명도 % 접미 숫자 — 0.08 → 8, 0.125 → 13. 이름 `-a{%}` · 값 칩 "8%"에 쓴다. */
 export function alphaPct(alpha: number): number {
   return Math.round(alpha * 100);

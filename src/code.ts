@@ -15,7 +15,7 @@ import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections,
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
-import { rgbToHex, roundAlpha } from './lib/tokens';
+import { rgbToHex, exportColorHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
@@ -1531,9 +1531,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (!target) continue; // 대상 불명 → 스킵
             t.aliasOf = target;
           } else if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
-            // 투명도가 1이 아니면 #rrggbbaa(ia-v3 §2.11 "반투명 색 토큰")
-            const a = (raw as RGBA).a;
-            t.value = roundAlpha(a) !== 1 ? `${rgbToHex(raw as RGB)}${Math.round((a as number) * 255).toString(16).padStart(2, '0')}` : rgbToHex(raw as RGB);
+            t.value = exportColorHex(raw as RGBA); // 투명도가 있으면 #rrggbbaa — 변수 탭과 같은 기준(ia-v3 §2.11)
           } else {
             t.value = raw as string | number;
           }

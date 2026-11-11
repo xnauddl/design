@@ -2944,3 +2944,37 @@ test('사이드바 — sidebarCollections 계층 순서 · 수(IA v4 §4.6)', as
   const side = sidebarCollections(cols, vars, null, new Set());
   assert.deepEqual(side.map((s) => [s.collection.id, s.total]), [['S', 3], ['G', 2]], '계층 순서(Semantic → Global) · 전체 수');
 });
+
+test('exportColorHex — 변수 탭 colorText와 같은 기준(1/255), 소문자 #rrggbbaa (ia-v3 §2.11)', async () => {
+  const { exportColorHex } = await import('../dist/pure.mjs');
+  assert.equal(exportColorHex({ r: 0, g: 0, b: 0, a: 1 }), '#000000');
+  assert.equal(exportColorHex({ r: 0, g: 0, b: 0 }), '#000000', 'a 없음 = 불투명');
+  assert.equal(exportColorHex({ r: 0, g: 0, b: 0, a: 0.996 }), '#000000fe', '2자리 반올림이면 1이지만 255 단위로는 254 — 투명도를 잃지 않는다');
+  assert.equal(exportColorHex({ r: 1, g: 1, b: 1, a: 0.5 }), '#ffffff80');
+  assert.equal(exportColorHex({ r: 0, g: 0, b: 0, a: 0.999 }), '#000000', '255로 반올림되면 꼬리 없음');
+});
+
+test('skipRowCounts — 줄 수 = 칩 수와 같은 셈: 스타일 후보 레이어의 글자 항목은 자리 단위 줄 · [선택 ›] 항목에서 뺀다 (ia-v4 §4.2)', async () => {
+  const { skipRowCounts } = await import('../dist/pure.mjs');
+  const ts = new Set(['T1']);
+  // 스타일 후보 레이어의 글자 fraction만 → 줄 없음(칩 숨김 · 건너뛴 곳 모습 아님)
+  let r = skipRowCounts({ fraction: 1 }, [{ nodeId: 'T1', name: 'Title', reason: 'fraction', field: 'fontSize' }], ts);
+  assert.deepEqual(r, { fix: [], keep: [] });
+  // 다른 레이어의 fraction은 남고, 뺀 레이어는 항목에서도 빠진다
+  r = skipRowCounts(
+    { fraction: 3, hidden: 2, styled: 1 },
+    [
+      { nodeId: 'T1', name: 'Title', reason: 'fraction', field: 'fontSize' },
+      { nodeId: 'F1', name: 'Box', reason: 'fraction', field: 'paddingLeft' },
+      { nodeId: 'T1', name: 'Title', reason: 'hidden' },
+      { nodeId: 'H2', name: 'Hid', reason: 'hidden' },
+      { nodeId: 'T1', name: 'Title', reason: 'styled', field: 'fontSize' },
+    ],
+    ts,
+  );
+  assert.deepEqual(r.fix.map((x) => [x.key, x.n, x.items.map((i) => i.nodeId)]), [['fraction', 2, ['F1']]]);
+  assert.deepEqual(r.keep.map((x) => [x.key, x.n, x.layer]), [['hidden', 2, true]], 'styled는 뺀 뒤 0이라 없음, 레이어 단위 줄은 빼지 않음');
+  assert.equal(r.keep[0].items.length, 2, '레이어 단위 줄의 항목은 그대로');
+  // 텍스트 스타일만 모습이면 변수 사유 줄 없음
+  assert.deepEqual(skipRowCounts({ fraction: 1 }, [], new Set(), true), { fix: [], keep: [] });
+});

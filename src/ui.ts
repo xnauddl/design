@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, LAYER_SKIP_REASONS, INFO_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -3461,10 +3461,12 @@ function renderBindEmpty(): void {
   clearMount(box);
   let text = '';
   let action: [string, () => void] | null = null;
-  box.classList.toggle('done', bindSkipMode());
+  const zero = bindZero();
+  box.classList.toggle('done', zero);
   if (bindLinking) text = '';
   else if (!bindPreviewed) text = bindFinding || bindFindFailed ? '' : t('v4.reading');
-  else if (bindSkipMode()) text = t('v4.allLinked'); // 건너뛴 곳 모습(§4.2) — 연결할 곳 · 새로 만들 값이 모두 0
+  // 건너뛴 곳 모습 · 모두 연결된 모습(§4.2) — 손볼 곳이 있으면 allLinked, 없으면 카드 1과 같은 allBound
+  else if (zero) text = bindSkipMode() && bindCardCounts().s > 0 ? t('v4.allLinked') : t('v4.allBound');
   else if (!hasBindPreview() || (bindTsOnly() && !bindTsRows.length)) {
     text = t('v4.nothingToLink');
     if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMakeScreen()];
@@ -3485,9 +3487,23 @@ function renderBindEmpty(): void {
   }
 }
 
-/** 건너뛴 곳 모습(§4.2) — 찾기를 마쳤고 연결할 곳(m)과 새로 만들 값(k)이 모두 0. */
-function bindSkipMode(): boolean {
+/** 찾기를 마쳤고 연결할 곳(m)과 새로 만들 값(k)이 모두 0(텍스트 스타일만 모습 제외) — 건너뛴 곳 모습 · 모두 연결된 모습(§4.2). */
+function bindZero(): boolean {
   return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+}
+/** 건너뛴 곳 목록의 줄(§4.2) — 변수 사유(스타일 후보 글자 자리를 뺀 셈, `skipRowCounts`) + 보이는 텍스트 스타일 사유. 칩 · 목록 · 모습이 함께 쓴다. */
+function skipListRows(): ReturnType<typeof skipRowCounts> & { ts: string[] } {
+  const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly());
+  const ts = Object.keys(bindTsSkips).filter((k) => (bindTsSkips[k] ?? 0) > 0 && tsSkipVisible(k));
+  return { ...r, ts };
+}
+function skipListAny(): boolean {
+  const r = skipListRows();
+  return r.fix.length + r.keep.length + r.ts.length > 0;
+}
+/** 건너뛴 곳 모습(§4.2) — m = k = 0이고 목록에 줄이 있다. */
+function bindSkipMode(): boolean {
+  return bindZero() && skipListAny();
 }
 /** 텍스트 스타일 사유 중 목록에 보일 것 — hasStyle은 styled와 같은 글자라 숨긴다(텍스트 스타일만 모습에서는 보인다). */
 function tsSkipVisible(key: string): boolean {
@@ -3497,12 +3513,9 @@ function tsSkipVisible(key: string): boolean {
 function renderBindBadges(): void {
   const c = bindCardCounts();
   const s = bindTsOnly() ? 0 : c.s;
-  const keep = bindTsOnly()
-    ? 0
-    : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && (INFO_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k))).length;
-  const ts = Object.entries(bindTsSkips).filter(([k, n]) => n > 0 && tsSkipVisible(k)).length;
-  const any = s > 0 || keep > 0 || ts > 0;
-  const skipMode = bindSkipMode();
+  const rows = skipListRows();
+  const any = rows.fix.length + rows.keep.length + rows.ts.length > 0; // 칩 조건 = 목록에 줄이 있음(§4.2 "줄 수 = 칩 수와 같은 셈")
+  const skipMode = bindZero() && any;
   const show = !bindLinking && bindPreviewed && any;
   $('bindBadges').hidden = !show;
   const skip = $('bindSkipToggle');
@@ -3593,6 +3606,38 @@ function renderBindChrome(): void {
   updateBindApply();
   if (activeTab === 'select' && selSub === 'bind') renderSubHead();
   renderSelHome();
+  restoreBindFocus();
+}
+/** 연결 화면에서 마지막으로 포커스를 받은 요소(다시 그릴 때의 포커스, §4.2). */
+let lastBindFocus: HTMLElement | null = null;
+document.querySelector('[data-apply-step="bind"]')?.addEventListener('focusin', (e) => {
+  lastBindFocus = e.target instanceof HTMLElement ? e.target : null;
+});
+// 사용자가 포커스를 화면 밖 다른 요소로 옮기면 잊는다(지워져서 빠진 포커스만 되돌린다).
+document.querySelector('[data-apply-step="bind"]')?.addEventListener('focusout', (e) => {
+  const to = (e as FocusEvent).relatedTarget;
+  if (to instanceof Node && !(e.currentTarget as HTMLElement).contains(to)) lastBindFocus = null;
+});
+const goneEl = (el: HTMLElement): boolean => !el.isConnected || el.closest('[hidden]') != null;
+/** 다시 그려 포커스가 있던 요소가 지워졌거나 숨었으면(포커스가 body로 빠짐) 규칙대로 옮긴다(§4.2 "목록을 다시 그릴 때의 포커스"). */
+function restoreBindFocus(): void {
+  const was = lastBindFocus;
+  if (!was || activeTab !== 'select' || selSub !== 'bind') return;
+  const active = document.activeElement;
+  if ((active && active !== document.body && !goneEl(active as HTMLElement)) || !goneEl(was)) return;
+  lastBindFocus = null;
+  const list = $('bindSkips');
+  const sels = list.hidden ? [] : Array.from(list.querySelectorAll<HTMLElement>('.skip-sel'));
+  const chip = $('bindSkipToggle');
+  const chipOn = !chip.hidden && !$('bindBadges').hidden;
+  const reason = was.classList.contains('skip-sel') ? was.dataset.reason : undefined;
+  let to: HTMLElement | null;
+  if (reason != null && sels.length) to = sels.find((b) => b.dataset.reason === reason) ?? sels[0];
+  else if (bindSkipMode()) to = sels[0] ?? null;
+  else if (bindZero()) to = null;
+  else if (reason != null) to = chipOn ? chip : null;
+  else to = $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
+  (to ?? $('btnSubBack')).focus({ preventScroll: true });
 }
 $('bindSkipToggle').addEventListener('click', () => {
   bindSkipsOpen = !bindSkipsOpen;
@@ -3614,7 +3659,7 @@ function updateBindApply(): void {
   const confirm = $('btnApplyConfirm');
   const n = bindOnCount();
   $('btnApplyConfirmLabel').textContent = bindPreviewed && hasBindPreview() ? t('bind.linkN', { n }) : t('bind.link');
-  $('bindFoot').hidden = !!bindLinking || bindSkipMode(); // 건너뛴 곳 모습은 연결할 곳이 0 — 버튼 줄 없음
+  $('bindFoot').hidden = !!bindLinking || bindZero(); // 건너뛴 곳 · 모두 연결된 모습은 연결할 곳이 0 — 버튼 줄 없음
   if (!curSel.count && !baseline) setLock(confirm, 'prereq', t('status.noSelection'));
   else if (!bindPreviewed) setLock(confirm, 'prereq', t('v4.reading'));
   else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
@@ -3790,9 +3835,9 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   const box = $('bindSkips');
   clearMount(box);
   const capNote = bindSkipsCapped ? t('bind.skipCappedTip', { shown: bindSkips.length }) : '';
-  const tsOnly = bindTsOnly();
   // 줄 하나 = 사유 하나(§4.2 건너뛴 곳 목록): 이름 · 수 · 한 줄 설명 · [선택 ›]
-  const row = (label: string, count: string, help: string, ids: string[], key?: string): HTMLElement => {
+  const row = (label: string, count: string, help: string, items: readonly SkipItem[], key?: string): HTMLElement => {
+    const ids = [...new Set(items.map((x) => x.nodeId))];
     const r = document.createElement('div');
     r.className = 'skip-row';
     const nm = document.createElement('span');
@@ -3815,8 +3860,9 @@ function renderSkipReasons(reasons: Record<string, number>): void {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'link link-btn skip-sel';
+      btn.dataset.reason = key; // 다시 그린 뒤 같은 줄로 포커스를 돌려줄 열쇠(§4.2)
       btn.textContent = t('bind.skipSelectBtn');
-      const names = bindSkips.filter((x) => x.reason === key).slice(0, 5).map((x) => x.name).join(', ');
+      const names = items.slice(0, 5).map((x) => x.name).join(', ');
       btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
       btn.addEventListener('click', () => {
         bindLayerSelectPending = true;
@@ -3827,11 +3873,10 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     }
     return r;
   };
-  const varRow = (key: string, n: number): HTMLElement => {
-    const ids = [...new Set(bindSkips.filter((x) => x.reason === key).map((x) => x.nodeId))];
-    const layer = LAYER_SKIP_REASONS.includes(key);
-    const count = layer ? t('v4.layerCount', { n: ids.length || n }) : t('bind.count', { k: n });
-    return row(t('reason.' + key), count, t('reasonHelp.' + key), ids, key);
+  const varRow = (r: SkipRow): HTMLElement => {
+    const layers = new Set(r.items.map((x) => x.nodeId)).size;
+    const count = r.layer ? t('v4.layerCount', { n: layers || r.n }) : t('bind.count', { k: r.n });
+    return row(t('reason.' + r.key), count, t('reasonHelp.' + r.key), r.items, r.key);
   };
   const head = (text: string): void => {
     const h = document.createElement('div');
@@ -3839,16 +3884,14 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     h.textContent = text;
     box.appendChild(h);
   };
-  const fix = tsOnly ? [] : FIX_SKIP_REASONS.filter((k) => (reasons[k] ?? 0) > 0);
-  const keep = tsOnly ? [] : [...INFO_SKIP_REASONS, ...LAYER_SKIP_REASONS].filter((k) => (reasons[k] ?? 0) > 0);
-  const tsKeys = Object.keys(bindTsSkips).filter((k) => (bindTsSkips[k] ?? 0) > 0 && tsSkipVisible(k));
+  const { fix, keep, ts: tsKeys } = skipListRows(); // 칩 · 모습과 같은 셈(§4.2 "줄 수 = 칩 수와 같은 셈")
   if (fix.length) {
     head(t('v4.skipFixHead'));
-    for (const k of fix) box.appendChild(varRow(k, reasons[k]));
+    for (const r of fix) box.appendChild(varRow(r));
   }
   if (keep.length || tsKeys.length) {
     head(t('v4.skipKeepHead'));
-    for (const k of keep) box.appendChild(varRow(k, reasons[k]));
+    for (const r of keep) box.appendChild(varRow(r));
     for (const k of tsKeys) box.appendChild(row(t('tsSkip.' + k), t('v4.layerCount', { n: bindTsSkips[k] }), '', []));
   }
 }
@@ -4652,8 +4695,8 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
 function bindFocusFirst(): void {
   if (!bindFocusPending || activeTab !== 'select' || selSub !== 'bind') return;
-  // 건너뛴 곳 모습은 첫 [선택 ›](없으면 ←) — §4.2
-  const row = bindSkipMode()
+  // 건너뛴 곳 모습은 첫 [선택 ›](없으면 ←), 모두 연결된 모습은 ← — §4.2
+  const row = bindZero()
     ? $('bindSkips').querySelector<HTMLElement>('.skip-sel') ?? $('btnSubBack')
     : $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
   if (!row) return;

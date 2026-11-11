@@ -299,7 +299,8 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 카드 2 — 직접만 2개(Semantic 1 · 라이브러리 1)', txt.includes('쓰는 변수 2개') && txt.includes('Semantic 1 · 라이브러리 1'), txt);
   check('9 카드 3 — 삭제된 변수 3곳 · [선택] · [연결 풀기]', txt.includes('삭제된 변수 3곳') && (await p.$('[data-k="delsel"]')) !== null && (await p.$('[data-k="unbind"]')) !== null);
   // 카드 1 완료 문구(§4.1, 사용자 결정 A) — n = 0 · s > 0이면 "✓ 연결할 곳은 모두 연결됐어요", styled는 s에 안 더함
-  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 } });
+  const skips9 = [{ nodeId: '1:2', name: 'Box', type: 'FRAME', reason: 'fraction', field: 'paddingLeft' }, { nodeId: '1:3', name: 'Label', type: 'TEXT', reason: 'styled', field: 'fills' }];
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 }, skips: skips9 });
   await p.waitForTimeout(30);
   const done1 = await p.textContent('#selCards');
   check('9 카드 1 완료 — n = 0 · s > 0 → "✓ 연결할 곳은 모두 연결됐어요 · 손볼 곳 2곳"(스타일 사용 중 3곳은 안 셈) · [보기]', done1.includes('✓ 연결할 곳은 모두 연결됐어요') && done1.includes('손볼 곳 2곳') && (await p.$('[data-k="skips"]')) !== null, done1);
@@ -308,6 +309,22 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.waitForTimeout(40);
   const heads9 = await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent));
   check('9 건너뛴 곳 모습 — 제목 "건너뛴 곳" · "✓ 연결할 곳은 모두 연결됐어요" · 손볼 곳 / 그대로 둬도 되는 곳 · [연결] 없음', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await p.textContent('#bindEmpty')).includes('✓ 연결할 곳은 모두 연결됐어요') && JSON.stringify(heads9) === JSON.stringify(['손볼 수 있는 곳', '그대로 둬도 되는 곳']) && !(await visible(p, '#bindFoot')) && !(await visible(p, '#bindSkipToggle')), JSON.stringify(heads9));
+  // 다시 그려도 포커스는 같은 사유의 [선택 ›](§4.2 "목록을 다시 그릴 때의 포커스")
+  await p.focus('#bindSkips .skip-sel[data-reason="styled"]');
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 }, skips: skips9 });
+  await p.waitForTimeout(40);
+  check('9 건너뛴 곳 모습 — 다시 읽어 목록을 다시 그려도 포커스는 같은 사유의 [선택 ›]', (await p.evaluate(() => document.activeElement?.dataset?.reason)) === 'styled', await p.evaluate(() => document.activeElement?.outerHTML?.slice(0, 80)));
+  // 손볼 곳 0(그대로 둬도 되는 곳만) → ✓ 줄은 카드 1과 같은 allBound
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { styled: { color: 3 } }, reasons: { styled: 3 }, skips: [skips9[1]] });
+  await p.waitForTimeout(40);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-skip-s0.png` : '/dev/null' }).catch(() => {});
+  check('9 건너뛴 곳 모습 s = 0 — 제목 "건너뛴 곳" · ✓ "찾은 값은 모두 연결돼 있어요" · 그대로 둬도 되는 곳만', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await emptyText(p)) === '✓ 찾은 값은 모두 연결돼 있어요' && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']), await emptyText(p));
+  // 목록까지 비면 모두 연결된 모습 — 제목 "연결" · allBound · 칩 · 목록 · 버튼 줄 없음, 지워진 [선택 ›]의 포커스는 ←
+  await p.focus('#bindSkips .skip-sel');
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: {}, reasons: {}, skips: [] });
+  await p.waitForTimeout(40);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-all-done.png` : '/dev/null' }).catch(() => {});
+  check('9 모두 연결된 모습 — 제목 "연결" · ✓ "찾은 값은 모두 연결돼 있어요" · 칩 · 목록 · [연결] 없음 · 포커스 ←', (await p.textContent('#subTitle')) === '연결' && (await emptyText(p)) === '✓ 찾은 값은 모두 연결돼 있어요' && !(await visible(p, '#bindBadges')) && !(await visible(p, '#bindFoot')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnSubBack', `${await p.textContent('#subTitle')} / ${await emptyText(p)} / ${await p.evaluate(() => document.activeElement?.id)}`);
   await p.click('#btnSubBack');
   await p.waitForTimeout(30);
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: { styled: { color: 3 } } });
