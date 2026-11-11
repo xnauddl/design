@@ -5520,7 +5520,7 @@ function renderSelBase(): void {
   if (!vmCols) return; // 첫 화면 전(초기화 순서)
   renderSelHome();
 }
-/** [기준 바꾸기](§2.5) — 지금 선택을 기준으로 삼고 읽는다. 버튼이 사라지면 첫 카드 버튼(없으면 [이름 정리])으로. */
+/** [기준 바꾸기](§2.5) — 지금 선택을 기준으로 삼고 읽는다. 버튼이 사라지면 카드 영역 첫 버튼(없으면 [변수 만들기])으로. */
 function doRebase(): void {
   rebaseToCurrent();
   ($('selCards').querySelector<HTMLElement>('button') ?? $('btnGoMake')).focus();
@@ -7682,7 +7682,8 @@ function renderSelHome(): void {
   if (activeTab !== 'select' || selSub !== 'home' || !curSel) return;
   const head = $('selHead');
   const cards = $('selCards');
-  const hadFocus = cards.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.k ?? null : null;
+  // 카드 영역 안 버튼에 포커스가 있었으면 그 data-k를 기억 — 없는 버튼(data-k 없음)은 ''로(대체 규칙만 탄다).
+  const hadFocus = cards.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.k ?? '' : null;
   clearMount(head);
   clearMount(cards);
   const noSel = !baseline;
@@ -7721,7 +7722,9 @@ function renderSelHome(): void {
   const findReady = selFindFor === baseKey() && !selFindInFlight;
   const usageReady = !!usageMap;
   if (baseline!.scanned > BIG_SELECTION && !findReady && !usageReady && !selFindInFlight) {
-    const c = selCard({ title: t('list.big'), actions: [selBtn(t('list.read'), () => { requestManagerUsage('user'); readSelFind(true, true); })] });
+    const rd = selBtn(t('list.read'), () => { requestManagerUsage('user'); readSelFind(true, true); });
+    rd.dataset.k = 'read';
+    const c = selCard({ title: t('list.big'), actions: [rd] });
     put(c);
     return finishSelFocus(hadFocus);
   }
@@ -7741,7 +7744,7 @@ function renderSelHome(): void {
       const subs: string[] = [];
       if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== 'other').map((x) => t('v4.kindPlaces', { kind: kindLabel(x.kind), n: x.n })).join(' · '));
       else if (!findReady) subs.push(t('v4.reading'));
-      const actions: HTMLElement[] = [selBtn(t('v4.makeArrow'), (b) => { showMakeScreen(b); }, true)];
+      const actions: HTMLElement[] = []; // 만들기 입구는 할 일 [변수 만들기] 하나(§4.1)
       const allSubs: (string | Node)[] = [...subs];
       tsOnlyExtra(allSubs, actions);
       put(selCard({ title: t('v4.noVarsFile'), subs: allSubs, actions }));
@@ -7755,9 +7758,14 @@ function renderSelHome(): void {
   renderDeletedCard(put);
   finishSelFocus(hadFocus);
 }
+/** 다시 그린 뒤 포커스(§4.1 할 일) — 같은 버튼, 없으면 카드 영역 첫 버튼, 그것도 없으면 할 일 [변수 만들기].
+    없어진 것이 [연결 풀기]면 바로 [변수 만들기]. */
 function finishSelFocus(key: string | null): void {
-  if (!key) return;
-  $('selCards').querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`)?.focus({ preventScroll: true });
+  if (key === null) return;
+  const cards = $('selCards');
+  const same = key ? cards.querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`) : null;
+  const target = same ?? (key === 'unbind' ? null : cards.querySelector<HTMLElement>('button')) ?? $('btnGoMake');
+  target.focus({ preventScroll: true });
 }
 /** 텍스트 스타일만 연결하기(§4.1) — 5 · 6번 카드와 noTier 카드 1 안에 "텍스트 스타일 {t}곳" + [{t}곳 연결]. */
 function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[]): void {
@@ -7772,10 +7780,8 @@ function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[]): void {
 function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | null): void {
   if (prereqKnown && !hasBindable) {
     // noTier — 계층 컬렉션에 변수가 없음
-    const b = selBtn(t('v4.makeArrow'), (el) => { showMakeScreen(el); });
-    b.dataset.k = 'make';
     const subs: (string | Node)[] = [t('bind.noTier')];
-    const actions: HTMLElement[] = [b];
+    const actions: HTMLElement[] = []; // 만들기 입구는 할 일 [변수 만들기] 하나(§4.1)
     tsOnlyExtra(subs, actions);
     put(selCard({ title: t('v4.find0'), subs, actions }));
     return;
@@ -7802,11 +7808,7 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     const go = selBtn(t('v4.linkN', { n: m }), (el) => { showSelSub('bind', el); }, true);
     go.dataset.k = 'link';
     actions.push(go);
-  } else {
-    const mk = selBtn(t('v4.makeArrow'), (el) => { showMakeScreen(el); }, true);
-    mk.dataset.k = 'make';
-    actions.push(mk);
-  }
+  } // m = 0이면 버튼 없음 — 만들기 입구는 할 일 [변수 만들기] 하나(§4.1, 2026-11-11 사용자 결정)
   const card = selCard({ title: t('v4.findN', { n }), subs: [sub], actions });
   (card.querySelector('.t') as HTMLElement).title = t('v4.findTip');
   put(card);
@@ -7860,7 +7862,7 @@ function onDeletedUnbound(msg: Extract<CodeToUi, { type: 'DELETED_UNBOUND' }>): 
   showStatusLine(text, { cls: msg.failed ? 'warn' : 'ok' });
   const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t('v4.unbindFail.' + k)} ${n}`).join(' · ');
   if (tip) $('statusText').title = tip;
-  // 카드가 사라지면 포커스는 [이름 정리](§4.1).
+  // 카드가 사라지면 포커스는 [변수 만들기](§4.1).
   if (document.activeElement === document.body || !document.activeElement?.isConnected) $('btnGoMake').focus();
   queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) $('btnGoMake').focus(); });
 }

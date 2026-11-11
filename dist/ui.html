@@ -11402,7 +11402,7 @@ ${opts.tip}` : text;
     if (activeTab !== "select" || selSub !== "home" || !curSel) return;
     const head = $("selHead");
     const cards = $("selCards");
-    const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : null : null;
+    const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : "" : null;
     clearMount(head);
     clearMount(cards);
     const noSel = !baseline;
@@ -11446,10 +11446,12 @@ ${opts.tip}` : text;
     const findReady = selFindFor === baseKey() && !selFindInFlight;
     const usageReady = !!usageMap;
     if (baseline.scanned > BIG_SELECTION && !findReady && !usageReady && !selFindInFlight) {
-      const c = selCard({ title: t("list.big"), actions: [selBtn(t("list.read"), () => {
+      const rd = selBtn(t("list.read"), () => {
         requestManagerUsage("user");
         readSelFind(true, true);
-      })] });
+      });
+      rd.dataset.k = "read";
+      const c = selCard({ title: t("list.big"), actions: [rd] });
       put(c);
       return finishSelFocus(hadFocus);
     }
@@ -11474,9 +11476,7 @@ ${opts.tip}` : text;
         const subs = [];
         if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== "other").map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
         else if (!findReady) subs.push(t("v4.reading"));
-        const actions = [selBtn(t("v4.makeArrow"), (b) => {
-          showMakeScreen(b);
-        }, true)];
+        const actions = [];
         const allSubs = [...subs];
         tsOnlyExtra(allSubs, actions);
         put(selCard({ title: t("v4.noVarsFile"), subs: allSubs, actions }));
@@ -11491,8 +11491,11 @@ ${opts.tip}` : text;
   }
   function finishSelFocus(key) {
     var _a3;
-    if (!key) return;
-    (_a3 = $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`)) == null ? void 0 : _a3.focus({ preventScroll: true });
+    if (key === null) return;
+    const cards = $("selCards");
+    const same = key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
+    const target = (_a3 = same != null ? same : key === "unbind" ? null : cards.querySelector("button")) != null ? _a3 : $("btnGoMake");
+    target.focus({ preventScroll: true });
   }
   function tsOnlyExtra(subs, actions) {
     const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
@@ -11506,12 +11509,8 @@ ${opts.tip}` : text;
   }
   function renderFindCard(put, counts) {
     if (prereqKnown && !hasBindable) {
-      const b = selBtn(t("v4.makeArrow"), (el) => {
-        showMakeScreen(el);
-      });
-      b.dataset.k = "make";
       const subs = [t("bind.noTier")];
-      const actions2 = [b];
+      const actions2 = [];
       tsOnlyExtra(subs, actions2);
       put(selCard({ title: t("v4.find0"), subs, actions: actions2 }));
       return;
@@ -11546,12 +11545,6 @@ ${opts.tip}` : text;
       }, true);
       go.dataset.k = "link";
       actions.push(go);
-    } else {
-      const mk = selBtn(t("v4.makeArrow"), (el) => {
-        showMakeScreen(el);
-      }, true);
-      mk.dataset.k = "make";
-      actions.push(mk);
     }
     const card = selCard({ title: t("v4.findN", { n }), subs: [sub], actions });
     card.querySelector(".t").title = t("v4.findTip");

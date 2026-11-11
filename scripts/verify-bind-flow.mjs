@@ -746,6 +746,7 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 noTier → 변수 찾기 없이 텍스트 스타일 미리보기만', (await sent(p, 'APPLY')).length === 0 && (await sent(p, 'PREVIEW_TEXT_STYLES')).length === 1);
   await recv(p, tsPrev((await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1).reqId, B2_TS, { hasStyle: 1 }));
   check('B2 noTier 카드 1 안에 "Text Style 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('Text Style 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
+  check('B11 noTier 카드 — [변수 만들기 →] 없음 · [2곳 연결]은 주 버튼', (await p.$('#selCards [data-k="make"]')) === null && (await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))));
   await p.click('[data-k="tsLink"]');
   check('B2 텍스트 스타일만 — 머리 오른쪽 "Card · Text Style 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === 'Card · Text Style 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['Text Style 2곳', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
   check('B2 텍스트 스타일만 — 칩 "건너뛴 곳 ▸" · 목록에 이미 스타일 있음(hasStyle 보임)', (await p.textContent('#bindSkipToggle')) === '건너뛴 곳 ▸' && (await p.$$eval('#bindSkips .skip-name', (e) => e.map((x) => x.textContent))).includes('이미 스타일 있음'), await p.textContent('#bindSkipToggle'));
@@ -1417,6 +1418,51 @@ async function saveAndGet(p) {
   check('19 상태 줄 — "2개 이름을 바꿨어요 · ⌘Z" + Semantic 변수 그대로 · warn', (await p.textContent('#statusText')).startsWith('텍스트 스타일 2개 이름을 바꿨어요 · ⌘Z로 되돌리기 · Semantic 변수 1개는'), await p.textContent('#statusText'));
   check('19 스캔 표 비움 · [왼쪽 글자로 이름 채우기] 잠김 · 다시 스캔 안내', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 0 && (await p.$eval('#btnTsRowLabels', (b) => b.disabled)) && (await p.textContent('#tsStatus')).endsWith('스캔 표를 비웠어요 — 다시 [스캔]해 주세요'));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/krds-after.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+
+/* ---------- 20 선택 탭 카드의 [변수 만들기 →] 없앰(IA v4 §4.1 · B.11) — 입구는 할 일 하나 ---------- */
+{
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, preview(ap.reqId));
+  await recv(p, tsPrev(ap.reqId));
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 } }));
+  await p.waitForTimeout(80);
+  await p.focus('#selCards [data-k="link"]');
+  // 다시 읽은 뒤 m = 0 — [n곳 연결]이 없어진다
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { color: 3, gap: 2 } } });
+  await recv(p, tsPrev(ap.reqId));
+  await p.waitForTimeout(80);
+  const first = '#selCards .sel-card >> nth=0';
+  check('20 (a) m = 0 · k > 0 카드 — "새로 만들 값 5곳" · 카드 안 버튼 0 · "변수 만들기 →" 없음', (await p.textContent(first)).includes('새로 만들 값 5곳') && (await p.locator(first).locator('button').count()) === 0 && !(await p.textContent('#selCards')).includes('변수 만들기 →'), await p.textContent(first));
+  check('20 (e) 포커스한 [n곳 연결]이 없어짐 → 카드 영역 첫 버튼(카드 2 [보기 →])', (await p.evaluate(() => document.activeElement?.dataset?.k)) === 'uses');
+  check('20 할 일 [변수 만들기]는 그대로', (await visible(p, '#btnGoMake')) && !(await locked(p, '#btnGoMake')));
+  await p.close();
+}
+{
+  // (c) 상태 6 — 로컬 변수 0개: 카드에 버튼 없음 · 텍스트 스타일 후보가 있으면 [{t}곳 연결]만(주 버튼)
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  await p.waitForTimeout(60);
+  const first = '#selCards .sel-card >> nth=0';
+  check('20 (c) 상태 6 카드 — "이 파일엔 아직 변수가 없어요" · 카드 안 버튼 없음', (await p.textContent(first)).includes('이 파일엔 아직 변수가 없어요') && (await p.locator(first).locator('button').count()) === 0, await p.textContent(first));
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  if (pt) {
+    const ap6 = (await sent(p, 'APPLY')).at(-1);
+    if (ap6) await recv(p, { ...preview(ap6.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2 } } });
+    await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
+    await p.waitForTimeout(60);
+    check('20 (c) 텍스트 스타일 후보 → [2곳 연결]만 · 주 버튼', JSON.stringify(await p.locator(first).locator('button').allTextContents()) === JSON.stringify(['2곳 연결']) && (await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))));
+  }
   await p.close();
 }
 
