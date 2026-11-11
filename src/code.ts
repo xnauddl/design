@@ -11,6 +11,7 @@ import { FREE_MANUAL_CREATE_LIMIT } from './lib/varKind';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
+import { deleteUnusedVariables, scanUnusedVariables } from './lib/unusedVars'; // 안 쓰는 변수 찾기(docs/unused-vars.md)
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
 import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
@@ -57,6 +58,7 @@ const SETTINGS_DEFAULT = { base: 16, maxDepth: 8, grid: 8 };
 let devTier: Tier = 'free'; // 개발용 강제 티어(검증 키가 없을 때만 적용)
 let cache: LicenseCache | null = null; // 검증된 라이선스 캐시(우선)
 let bindCancel = false; // UX6: 진행 중 바인딩 취소 플래그
+let unusedCancel = false; // 안 쓰는 변수 읽기 · 다시 확인 취소(docs/unused-vars.md §5 — bindCancel과 따로)
 let bindFindTurn = 0; // 찾기(preview) 요청 차례(IA v4 §7) — 더 새 찾기가 있을 때만 앞 찾기를 버린다
 /** 찾기 · 연결 요청 줄(IA v4 §7) — 앞 요청이 끝나야 다음이 돈다. 겹쳐 깨어나지 않는다. */
 let bindChain: Promise<void> = Promise.resolve();
@@ -1243,6 +1245,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CANCEL': {
+        if (msg.op === 'unused') {
+          unusedCancel = true; // 안 쓰는 변수 읽기 · 확인만 — 찾기(bindCancel)는 건드리지 않는다(docs/unused-vars.md §5)
+          break;
+        }
         if (bindLinkRunning) break; // 실제 연결은 취소하지 않는다(IA v4 §4.3 — 마법사 연결)
         bindCancel = true; // UX6: 다음 양보 지점에서 중단
         break;
@@ -2370,6 +2376,20 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'DUPLICATE_VARIABLE':
       case 'DELETE_VARIABLE': {
         await manualVariableOp(msg);
+        break;
+      }
+      case 'SCAN_UNUSED_VARS': {
+        unusedCancel = false; // 남은 플래그가 이 요청을 멈추지 않게
+        const r = await scanUnusedVariables({ onProgress: (done, total) => post({ type: 'PROGRESS', op: 'unused', done, total }), cancelled: () => unusedCancel });
+        post({ type: 'UNUSED_VARS', reqId: msg.reqId, items: r.items, pages: r.pages, layers: r.layers, ...(r.cancelled ? { cancelled: true as const } : {}) });
+        break;
+      }
+      case 'DELETE_VARIABLES': {
+        unusedCancel = false;
+        const r = await deleteUnusedVariables(msg.ids, { onProgress: (done, total) => post({ type: 'PROGRESS', op: 'unused-delete', done, total }), cancelled: () => unusedCancel });
+        if (r.deleted > 0) commitUndo(figma); // 지운 것이 있을 때만 ⌘Z 한 번
+        post({ type: 'VARIABLES_DELETED', reqId: msg.reqId, deleted: r.deleted, skipped: r.skipped, failed: r.failed, ...(r.cancelled ? { cancelled: true as const } : {}) });
+        if (r.deleted > 0) await postPrereq();
         break;
       }
       case 'SET_UI_SIZE': {
