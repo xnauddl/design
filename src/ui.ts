@@ -1877,7 +1877,7 @@ window.onmessage = (event: MessageEvent) => {
       if (isMini && msg.preview) bindPreviewMini = true; // 최소화 중에 끝난 미리보기 — 펼쳐도 다시 계산하지 않는다
       bindSkips = msg.skips ?? [];
       bindSkipLayers = msg.skipLayers ?? {};
-      // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘렸으면 칩 툴팁이 그렇다고 말한다.
+      // 스킵 목록은 상한에서 잘린다(bind.ts SKIP_PREVIEW_CAP) — 잘림 꼬리는 줄마다(renderSkipReasons, §4.2).
       if (msg.cancelled) {
         // 읽기 취소(§4.2 상태표) — "읽기를 취소했어요 · [다시 읽기]".
         clearBindPreview();
@@ -3840,7 +3840,6 @@ function refreshTreeEmptyStates(): void {
  * 사유 칩을 눌러 캔버스에서 선택할 수 있게 보관한다.
  */
 let bindSkips: BindSkip[] = [];
-/** 스킵 목록이 상한에서 잘렸는가 — 힌트 줄이 "목록은 N개까지"라고 밝힌다. */
 /** 사유별 건너뛴 레이어 수(상한 전) — 목록이 잘려도 "레이어 {n}개"가 실제 수(§4.2). */
 let bindSkipLayers: Record<string, number> = {};
 

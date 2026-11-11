@@ -756,5 +756,6 @@
 - [x] 쓰는 곳 없는 `bindExamples`(`bindGroups.ts`)와 그 테스트 2개 지움 — ia-v3 §2.11 줄 고침
 - [x] ia-v3 A.13 체크리스트 닫음(v4 B.3이 대체) · ia-v4 B.3 해당 항목 닫음
 - [x] 잘림 꼬리(`bind.skipCappedTip`)를 줄마다 — 그 사유의 실어 온 레이어 < `skipLayers`일 때만, shown = 그 줄 레이어 수
+- [x] 아무도 읽지 않게 된 `skipTotal`(APPLY_RESULT · `BindResult` · 연결 결과) 지움 — 잘림 판단은 줄마다 `skipLayers`로
 - [x] VAR_TABLE 뒤 `renderBindEmpty` 호출과 "찾기 전 예시" 주석 지움, ia-v3 §4.6 빈 상태 "찾기 전" 줄 대체 표시 · ia-v4 "없애는 것"에 찾기 전 예시 그림
 - [x] 테스트: figma `skipLayers`(상한 전 · 목록보다 큼), pure `skipRowCounts` `layers` 인자

@@ -78,8 +78,6 @@ export interface BindResult {
   nodes?: BindNode[];
   /** 사유별로 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지) — 늘 싣는다(연결 모드는 찾기 단계의 셈). */
   skips?: BindSkip[];
-  /** 상한 적용 전 실제 스킵 레이어 수(잘렸는지 알리려고) — 늘. */
-  skipTotal?: number;
   /** 사유별 건너뛴 레이어 수(상한 전, 레이어 × 사유 중복 제거 — 건너뛴 곳 목록의 "레이어 {n}개") — 늘. */
   skipLayers?: Record<string, number>;
   /** 적용 모드 — 새로 만든 역할 수(§2.12). */
@@ -468,7 +466,6 @@ export async function bindSelection(
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
     res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
     res.skips = skips;
-    res.skipTotal = preview.skips.length;
     const layers: Record<string, number> = {};
     for (const s of preview.skips) layers[s.reason] = (layers[s.reason] ?? 0) + 1; // skipSeen이 레이어 × 사유를 한 번만 남긴다
     res.skipLayers = layers;
@@ -1137,8 +1134,6 @@ export interface SelectedBindResult {
   reasons: Record<string, number>;
   /** 사유별 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지). */
   skips: BindSkip[];
-  /** 상한 전 실제 스킵 레이어 수. */
-  skipTotal: number;
   /** 새로 만든 역할 수(§2.12). */
   newRoles: number;
   /** 만든 역할 이름 → 변수 id. */
@@ -1369,7 +1364,7 @@ export async function bindSelectedItems(
     if (hooks.yieldToEvents) await hooks.yieldToEvents();
   }
   const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, skipTotal: preview.skips.length, newRoles: created.size, createdIds };
+  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds };
 }
 
 /**

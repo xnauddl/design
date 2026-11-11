@@ -1192,8 +1192,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           cancelled: r.cancelled,
           candidates: r.candidates, // #6: 미리보기 후보(dry-run만)
           nodes: r.nodes, // #13: 미리보기 트리 맥락
-          skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
-          skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
+          skips: r.skips, // 사유별 건너뛴 레이어(늘 · 상한까지)
           skipLayers: r.skipLayers, // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"(미리보기에서 쓴다)
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
           newRoles: r.newRoles,
@@ -1297,7 +1296,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             onBound: (n) => { written = (ts?.applied ?? 0) + n; },
             onCreated: (n) => { made = n; },
           });
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, skipTotal: r.skipTotal, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}) });
+          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}) });
           // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
           if (r.bound || r.newRoles || ts?.applied) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로

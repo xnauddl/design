@@ -1259,7 +1259,7 @@ test('bindSelection — 스킵 목록·미리보기 트리는 고른 레이어 �
 
   const dry = await bindSelection([hit, ...misses], false);
 
-  assert.ok(dry.skipTotal >= 500); // 실제 스킵 수(노드×사유)는 그대로 보고
+  assert.ok(Object.values(dry.skipLayers).reduce((a, b) => a + b, 0) >= 500); // 실제 스킵 수(노드×사유)는 상한 전 그대로 보고
   assert.equal(dry.skips.length, 200); // 실어 보내는 목록은 상한까지
   assert.ok(dry.reasons['size-free-layout'] >= 500); // 사유 집계는 상한과 무관 — 칩 숫자는 진짜 수
   assert.ok(dry.skipLayers['size-free-layout'] >= 500 && dry.skipLayers['size-free-layout'] > dry.skips.length, '사유별 레이어 수는 상한 전 — 건너뛴 곳 목록의 "레이어 {n}개"(ia-v4 §4.2)');
