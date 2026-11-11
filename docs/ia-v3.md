@@ -206,7 +206,7 @@
         - **이름:** 색 이름 짓기(`huefyTokenColors` → `nameColorsByHue`)에 넣는 목록은 불투명 · 반투명 토큰의 **고유 hex**(불투명 토큰의 hex 먼저 — 그래서 불투명 색 이름이 반투명 때문에 `-2`로 밀리지 않는다)이고, 이름을 정한 뒤 `alpha`가 있는 토큰은 `-a{round(alpha × 100)}`를 붙인다(8% 검정 → `color/gray/1000-a8`, 12.5% → 0.13 → `-a13`). 추출 단계 이름(이름 짓기 전)도 `colorTokenName(hex)` + `-a{%}`.
         - **만들기:** Global 변수 값은 RGBA(`a` = 투명도). Semantic 쓰임 역할은 위 값 키로 나뉘고, 별칭은 그 반투명 Global을 가리킨다.
         - **다크 짝**(`themeApply.ts` — `dark/…`)은 밝기만 바꾸고 투명도는 그대로 둔다(RGBA로 `setValueForMode`).
-        - **코드 내보내기**(EXPORT)는 투명도가 1이 아닌 색을 `#rrggbbaa`로 낸다(1이면 지금처럼 `#rrggbb`).
+        - **코드 내보내기**(EXPORT)는 투명도가 있는 색을 `#rrggbbaa`로 낸다(투명도 없으면 지금처럼 `#rrggbb`). 투명도가 있는지는 변수 탭 값 칸과 같은 기준(`varTable.ts` `colorText` — 투명도를 0–255로 반올림해 255 미만)으로 본다 — 변수 탭에 `#RRGGBBFE`로 보이는 색이 내보내기에서 `#rrggbb`로 투명도를 잃지 않게. 글자는 소문자.
         - **보이는 곳:** 값 칩은 "#000000 8%"(hex 뒤 회색 % — `valueChip(value, alpha?)`) — 만들기 화면 줄 · 연결 화면 줄(`BindCandidate`에 새 필드 `currentAlpha?` · `variableAlpha?`, 1이면 없음) · 값을 직접 고르기의 색 표(`renderColorTable` · `renderPaletteRow`). 변수 탭(목록 값 칸 · 상세 값 칸 `#RRGGBBAA`)은 이번에 바꾸지 않는다.
         - 찾기 전 예시(`bindGroups.ts` `bindExamples`)도 새 규칙대로 투명도가 1이 아닌 색 변수를 예시에 쓸 수 있다(주석을 고친다).
       - 클릭 연결(§4.7)은 사용자가 고른 변수를 그대로 붙이므로 이 비교를 하지 않는다(지금 그대로 — 붙이면 칠하기 불투명도가 변수 투명도가 된다).
