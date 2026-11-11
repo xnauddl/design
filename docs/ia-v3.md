@@ -201,7 +201,7 @@
         - 투명도: 칠하기는 `paint.opacity`(색 자체는 RGB), 그림자는 `effect.color.a`, 변수는 값의 `a`(없으면 1). 소수 둘째 자리까지 같으면 같다(숫자와 같은 규칙 — 0.0799 ↔ 0.08). 투명도 0인 칠하기 · 그림자는 보이지 않으므로 찾지도 세지도 않는다(숨긴 칠과 같다).
         - 만들기도 반투명 색을 **투명도를 담은 Global**로 만든다 — 아래 "반투명 색 토큰". 사유 "반투명"(`translucent`)은 없어진다(키 · 칩 · 명세 문구에서 지움).
       - **반투명 색 토큰 (2026-11-10):** 추출은 반투명 칠하기 · 그림자 색을 불투명 색과 **다른 토큰**으로 모은다.
-        - **값 키:** 색의 값 = #RRGGBB + 투명도(`DraftToken.alpha` — 소수 둘째 자리, 1이면 필드 없음). 값을 비교 · 합치는 모든 곳은 **색 값 키**(`#000000@0.08`, 투명도 1이면 hex만)를 쓴다: 추출 `keyOf` · UI `tokenKey` · 같은 이름 합치기(`treeState.ts` `mergeSameNameTokens` — 같은 이름 = 같은 hex · 같은 투명도, `alpha`는 그대로) · 만들기 `previewCreateTokens` · `pickReusable` · 직접 만든 변수 비교 · `createUsageRoles`(`keyOfValue` · `reqs.value` · `existing`) · 연결 찾기 색인(변수 값의 투명도를 `colorAlpha`로 함께 — 투명도가 1이 아닌 변수도 이제 색인에 든다) · 자리 값(`Slot.value`) · `colorSlotKey` · `assignNames` · `semNames` · 연결 직전 다시 확인. **밝기 판정**(subtle · strong · inverse · brand — `colorRoleBases`)은 지금처럼 **hex로만** 한다: 같은 hex · 다른 투명도는 같은 밝기 이름을 받고 값이 다르므로 번호가 붙는다(예: 테두리에 불투명 검정 30곳 · 8% 검정 12곳 → `color/border/default`(곳 수 많은 쪽) · `color/border/default-2`).
+        - **값 키:** 색의 값 = #RRGGBB + 투명도(`DraftToken.alpha` — 소수 둘째 자리, 1이면 필드 없음). 값을 비교 · 합치는 모든 곳은 **색 값 키**(`#000000@0.08`, 투명도 1이면 hex만)를 쓴다: 추출 `keyOf` · UI `tokenKey` · 같은 이름 합치기(`treeState.ts` `mergeSameNameTokens` — 같은 이름 = 같은 hex · 같은 투명도, `alpha`는 그대로) · 만들기 `previewCreateTokens` · `pickReusable` · 직접 만든 변수 비교 · `createUsageRoles`(`keyOfValue` · `reqs.value` · `existing`) · 연결 찾기 색인(변수 값의 투명도를 `colorAlpha`로 함께 — 투명도가 1이 아닌 변수도 이제 색인에 든다) · 자리 값(`Slot.value`) · `colorSlotKey` · `assignNames` · `semNames` · 연결 직전 다시 확인. **밝기 판정**(subtle · strong · inverse · brand — `colorRoleBases`)은 지금처럼 **hex로만** 한다: 같은 hex · 다른 투명도는 같은 밝기 이름을 받고 값이 다르므로 투명도 꼬리가 붙는다(12.5, 예: 테두리에 불투명 검정 30곳 · 8% 검정 12곳 → `color/border/default` · `color/border/default-a8`).
         - **투명도 0:** 소수 둘째 자리로 반올림한 투명도가 0이면(0 < a < 0.005 포함) 추출 · 찾기 모두 건너뛴다(사유 없음 — 보이지 않는 칠).
         - **이름:** 색 이름 짓기(`huefyTokenColors` → `nameColorsByHue`)에 넣는 목록은 불투명 · 반투명 토큰의 **고유 hex**(불투명 토큰의 hex 먼저 — 그래서 불투명 색 이름이 반투명 때문에 `-2`로 밀리지 않는다)이고, 이름을 정한 뒤 `alpha`가 있는 토큰은 `-a{round(alpha × 100)}`를 붙인다(8% 검정 → `color/gray/1000-a8`, 12.5% → 0.13 → `-a13`). 추출 단계 이름(이름 짓기 전)도 `colorTokenName(hex)` + `-a{%}`.
         - **만들기:** Global 변수 값은 RGBA(`a` = 투명도). Semantic 쓰임 역할은 위 값 키로 나뉘고, 별칭은 그 반투명 Global을 가리킨다.
@@ -251,7 +251,7 @@
       - 연결이 다루지 않는 필드(min/max 크기, 효과의 반경 · 퍼짐 · 위치, 글자 굵기, 문단 간격 · 들여쓰기, 레이아웃 그리드)는 역할도 만들지 않는다. 만들기가 그 값의 Global(예: `shadow-blur/…`)을 만드는 것은 지금 그대로다.
     - **12.2 붙이는 순서(연결 찾기 · 자리마다).** 같은 값(2.11) · 맞는 용도(12.6 "칠하기 용도")가 전제다.
       1. Component(계층 3) 변수 — 지금과 같다(여럿이면 지금 순서).
-      2. **쓰임이 맞는 Semantic 변수.** 숫자 · 색 묶음은 이름이 그 자리의 쓰임 이름(12.3 · 12.4)의 **가족**(12.5 — 그 이름 · 꼬리 붙은 이름 · `-n`)인 것. 글자 묶음은 같은 그룹(`font-size/` · `line-height/` · `letter-spacing/` · `font-family/`) 안의 아무 이름이나(글자 역할은 만들기 · 텍스트 스타일이 값 순위로 짓기 때문 — 이름으로 쓰임을 알 수 없다). 단 거울(12.7)은 빼고, 플러그인 표시 여부는 보지 않는다. 여럿이면 이름 순 첫 번째.
+      2. **쓰임이 맞는 Semantic 변수.** 숫자 · 색 묶음은 이름이 그 자리의 쓰임 이름(12.3 · 12.4)의 **가족**(12.5 — 그 이름 · 꼬리 붙은 이름 · `-n`)인 것. 글자 묶음은 같은 그룹(`font-size/` · `line-height/` · `letter-spacing/` · `font-family/`) 안의 아무 이름이나(글자 역할은 만들기 · 텍스트 스타일이 값 순위로 짓기 때문 — 이름으로 쓰임을 알 수 없다). 단 거울(12.7)은 빼고, 플러그인 표시 여부는 보지 않는다. 여럿이면 숫자 · 색 묶음은 12.5 "가족 순서"의 첫 번째, 글자 묶음은 이름 순 첫 번째(같은 이름이면 13.5 순서).
       3. **디자이너가 만든 Semantic 변수**(숫자 · 색 묶음만): 플러그인 표시(12.6)가 없고 옛 이름(12.7)도 아닌 것. 디자이너가 정한 역할을 먼저 존중한다. 여럿이면 이름 순 첫 번째.
       4. 없으면 **새 역할**을 쓰임 이름으로 만든다(12.5). 값은 같은 값 · 맞는 용도의 로컬 Global(계층 1) 변수의 별칭이다. 그런 Global이 여럿이면 사용자 컬렉션 것을 먼저, 그 안에서 이름 순 첫 번째(§2.13 13.5). 없으면 지금처럼 "매칭 없음"(`no-match`)으로 건너뛴다 — 연결은 Global을 만들지 않는다(Global은 만들기에서).
       - **보는 순서는 1 → 3 → 2 → 4다**(숫자 · 색 묶음). 디자이너가 만든 변수가 플러그인의 쓰임 이름보다 먼저다 — 색은 쓰임 이름(밝기)이 순서 3의 결과에 달려 있기도 하다(12.4 처리 순서). 글자 묶음은 순서 3이 없어 1 → 2 → 4다.
@@ -273,10 +273,10 @@
         | 크기 | `size/icon` 또는 `size/avatar`(아이콘 판정을 통과하면 icon — `extract.ts`가 `iconOrAvatarKind(node): 'icon' \| 'avatar' \| null`을 내보낸다) |
         | `opacity` | `opacity/{주인}` |
         | 글자 4필드 | `font-size/text` · `line-height/text` · `letter-spacing/text` · `font-family/text`. 주인은 쓰지 않는다 — 이름 정리는 TEXT에 역할을 남기지 않고(`rename.ts` `keep: 'text'`), 고신뢰 판정도 글자를 보지 않는다. 글자 역할은 대부분 만들기 · 텍스트 스타일이 이미 만든 것을 순서 2로 쓰고, 이 이름은 그것이 없을 때만 생긴다 |
-      - 모든 이름에 12.5의 번호(`-n`)가 붙을 수 있다.
+      - 모든 이름에 12.5의 꼬리가 붙을 수 있다.
     - **12.4 쓰임 이름 — 색.** `color/{쓰임}/{밝기}`.
       - **쓰임:** TEXT의 채움 → `text`(구간마다 색이 다른 글자는 지금처럼 연결하지 않는다 — `fills`가 `figma.mixed`). 벡터(VECTOR · BOOLEAN_OPERATION · STAR · POLYGON · LINE)의 채움 · 선, 그리고 아이콘 틀(`isIconOrAvatar`의 아이콘 판정을 통과한 레이어) 안의 도형(RECTANGLE · ELLIPSE)의 채움 · 선 → `icon`. 프레임류(아이콘 틀 자신 포함)의 채움은 언제나 `background`, 선은 `border`. 그 밖의 채움 → `background`, 그 밖의 선 → `border`. 효과 색 → `shadow`.
-      - **밝기 함수 하나**(`colorRoleBases(색 목록(hex · 배경 종류 · 곳 수), 이미 있는 default hex)`)를 만들기와 연결이 같이 쓴다.
+      - **밝기 함수 하나**(`colorRoleBases(색 목록(hex · 배경 종류 · 곳 수 · 투명도), 이미 있는 default 값, 쓰임)` — 결과는 키별 밝기 이름과 **기준색 hex**(12.5 사다리 · inverse의 기준))를 만들기와 연결이 같이 쓴다.
         - 기준색: `color/{쓰임}/default`가 이미 있으면 그 색. 없으면 목록에서 곳 수가 가장 많은 색(같으면 hex 순)이 `default`가 되고 기준색이 된다.
         - 나머지: 유채색(OKLCH 채도 ≥ `palette.ts` `LOW_CHROMA`)은 `brand`. 무채색 · 유채색과 상관없이 아래 **합친 판정**이 맞을 때만 `inverse`다(brand보다 먼저).
           - 대상 쓰임: `text` · `icon` · `border`(배경 위에 놓이는 색). `background` · `shadow`에는 inverse가 없다.
@@ -293,31 +293,62 @@
           - inverse가 아닌 무채색은 기준색보다 L이 크면 `subtle`, 작으면 `strong`. 같은 이름 후보가 여럿이면 12.5의 꼬리(`subtle` · `subtler` · `subtlest`, `strong` · `stronger` · `strongest`)로 나눈다.
         - 유채색은 뜻(오류 · 성공)을 모르므로 모두 `brand` 계열이다(빨간 오류 글자도 `color/text/brand-red`가 될 수 있다 — 디자이너가 이름을 고치면 다음부터 순서 3으로 그 변수를 쓴다).
         - "역할이 있다"는 `color/{쓰임}/default` 변수가 있다는 뜻이다. 디자이너가 만든 `color/text/primary`만 있으면 기준색은 목록에서 정한다(그 변수는 같은 값이면 순서 3으로 붙는다).
-      - **처리 순서(연결 · 자리 순서와 무관):** ① 순서 1(Component) · 순서 3(디자이너 변수)에 붙는 색 자리를 먼저 정한다. ② 남은 색 자리를 쓰임별로 모아(hex · 배경 종류 · 곳 수) 이 함수를 한 번 불러 이름을 정한다. ③ 그 이름(또는 `-n`)에 같은 값의 Semantic이 있으면 그것을 쓴다(순서 2). ④ 나머지는 순서 4로 그 이름의 새 역할. 만들기는 ①이 없고(레이어에 붙이지 않음) 선택의 색 쓰임 전체로 ②~④를 한다.
-    - **12.5 이름 꼬리 · 이미 있는 이름 (2026-11-11 사용자 결정 — QA #4 관찰 "`brand-2 · -3 · -4`는 뜻을 못 읽는다").** 같은 이름(12.3 · 12.4가 정한 번호 없는 이름 = **기본 이름**)에 값이 둘 이상이면, 전에는 `-2` · `-3`을 붙였다. 이제 **뜻이 읽히는 꼬리**를 먼저 쓰고, 꼬리가 모자랄 때만 `-n`을 쓴다.
-      - **가족:** 기본 이름의 가족 = 기본 이름 자신, 아래 "꼬리 말"을 붙인 이름, 그 이름들에 `-n`(n ≥ 2)을 붙인 이름. 꼬리 말 목록 밖의 이름은 가족이 아니다(예: `spacing/card/padding`의 가족에 `spacing/card/padding-x`는 없다 — 다른 속성이다. `radius/card`의 가족에 `radius/card-top-left`는 없다).
-      - **먼저 — 재사용:** 가족 안에 같은 값의 Semantic 변수가 있으면 그 변수를 쓴다(새로 만들지 않음 — 만들기에도 적용). 둘 이상이면 기본 이름 → 꼬리 이름(이름 순) → `-n`(번호 작은 순).
-      - **없으면 — 새 이름:** 값마다 아래 **후보 목록**을 앞에서부터 보고 비어 있는(파일에도 없고 이번에 정한 이름도 아닌) 첫 이름을 쓴다. 후보가 모두 차 있으면 지금처럼 기본 이름 + `-2`부터 비어 있는 첫 번호.
-      - **기준값:** 꼬리는 기준값과 견주어 정한다. 기준값 = 기본 이름이 이미 있으면 그 변수의 값, 없으면 이번에 새로 이름을 받는 값 중 기본 이름을 받는 값(아래 "처리 순서"의 첫 값).
-      - **처리 순서:** 한 기본 이름 안의 새 값들은 곳 수가 많은 순(같으면 값 오름차순 · hex 순)으로 이름을 받는다 — 첫 값이 기본 이름을 받는다(비어 있을 때). 단 밝기 사다리(아래 "색 — 무채색 밝기")는 기준색과 가까운 순이다.
-      - **숫자(12.3 — 간격 · 반경 · 선 두께 · 크기 · 투명도 · 글자 크기 · 줄 높이 · 자간):** 기준값보다 작으면 `[-sm, -xs, -2xs]`, 크면 `[-lg, -xl, -2xl]`. 같은 쪽의 값끼리는 기준값과 가까운 값부터 앞 후보를 받는다.
-        - 예: `spacing/card/gap`에 16(곳 수 많음) · 24 · 12 · 32 → `spacing/card/gap`(16) · `spacing/card/gap-lg`(24) · `spacing/card/gap-sm`(12) · `spacing/card/gap-xl`(32).
-        - 투명도(`opacity/…`)도 같은 말을 쓴다(작은 값 = 더 투명 → `-sm`).
-        - 글꼴 이름(`font-family/…`)처럼 크기가 없는 값은 꼬리 없이 지금처럼 `-n`.
-        - 꼬리는 기본 이름 끝에 붙는다 — 모서리 · 방향별 이름도 같다(`radius/card-top-left-lg`).
-      - **색 — 유채색(`brand`):** 기준색(= `brand` 기본 이름의 값)과 색 계열(`colorName.ts` `classifyColor`의 `family` — red · orange · yellow · green · teal · blue · indigo · purple · pink)을 견준다.
-        - 계열이 다르면 `[-{계열}]` — 그 계열의 첫 값(처리 순서)이 받는다. 같은 계열의 다음 값은 그 첫 값과 밝기를 견주어 `[-{계열}-subtle, -{계열}-subtler, -{계열}-subtlest]`(더 밝음) 또는 `[-{계열}-strong, -{계열}-stronger, -{계열}-strongest]`(더 어두움).
-        - 계열이 같으면 기준색과 밝기를 견주어 `[-subtle, -subtler, -subtlest]`(OKLCH L이 더 큼) 또는 `[-strong, -stronger, -strongest]`(더 작음). 같은 쪽끼리는 기준색과 L이 가까운 값부터.
-        - 예(QA #4 실기 파일의 배경 버튼 색): #3D5FDB(곳 수 많음) · #5576EE · #E68E6C · #2EDCF3 → `color/background/brand` · `brand-subtle`(같은 blue, 더 밝음) · `brand-orange` · `brand-teal`.
-      - **색 — 무채색 밝기(`subtle` · `strong`):** 12.4가 `subtle`로 정한 색들은 **사다리** `[subtle, subtler, subtlest]`, `strong`은 `[strong, stronger, strongest]`의 이름을 받는다 — 꼬리를 붙이는 게 아니라 마지막 마디가 바뀐다(`color/text/subtler`, Atlassian 디자인 토큰의 `subtle · subtler · subtlest` 관례). 기준색(12.4 기준색 = default)과 L이 가까운 값부터 앞 이름을 받는다. 셋을 넘으면 `subtlest-2` · `subtlest-3`(사다리 마지막 이름 + `-n`).
-        - 가족: `color/{쓰임}/subtle`의 가족은 `subtle` · `subtler` · `subtlest`와 그 `-n`(strong도 같다).
-        - 예: 흰 배경 위 회색 배경 #F3F3F3 · #E5E5E5 · #D4D4D4가 모두 `subtle`이면(기준이 더 어두운 색일 때) 기준과 가까운 순으로 `subtle` · `subtler` · `subtlest`.
-      - **색 — `inverse` · `default`:** inverse 후보가 둘 이상이면 유채색의 "계열이 같으면"과 같은 밝기 꼬리(`inverse-subtle` …). `default`는 기준색 하나라 투명도 꼬리만 생긴다.
-      - **투명도 꼬리(색):** 투명도가 있는 색(§2.11 "반투명 색 토큰")은 위에서 정한 이름 끝에 `-a{round(투명도 × 100)}`을 붙인다 — Global 이름 규칙과 같다(8% 검정 텍스트 → `color/text/default-a8`). 밝기 · 계열은 hex로만 보므로 같은 hex의 불투명 · 반투명은 같은 자리를 나눠 쓴다(불투명 `subtle`, 8% `subtle-a8`). 그 이름도 차 있으면 `-a8-2`부터.
-      - **이미 있는 이름은 옮기지 않는다.** 파일에 이미 있는 가족 이름(전에 만든 `brand-2` 등 포함)은 그대로 두고 재사용 · 차지된 이름으로만 본다. 그래서 사다리 순서가 어긋날 수 있다(예: 이미 `subtle`이 먼 회색을 갖고 있으면 새로 온 가까운 회색이 `subtler`가 된다) — 한계로 둔다.
+      - **처리 순서(연결 · 자리 순서와 무관):** ① 순서 1(Component) · 순서 3(디자이너 변수)에 붙는 색 자리를 먼저 정한다. ② 남은 색 자리를 쓰임별로 모아(hex · 배경 종류 · 곳 수) 이 함수를 한 번 불러 이름을 정한다. ③ 그 이름의 가족(12.5)에 같은 값 · 맞는 용도의 Semantic이 있으면 그것을 쓴다(순서 2). ④ 나머지는 순서 4로 그 이름의 새 역할. 만들기는 ①이 없고(레이어에 붙이지 않음) 선택의 색 쓰임 전체로 ②~④를 한다.
+    - **12.5 이름 꼬리 · 이미 있는 이름 (2026-11-11 사용자 결정 — QA #4 관찰 "`brand-2 · -3 · -4`는 뜻을 못 읽는다").** 12.3 · 12.4가 정한 번호 없는 이름을 **기본 이름**이라 한다. 기본 이름 하나에 값이 둘 이상이면 전에는 `-2` · `-3`을 붙였다. 이제 **뜻이 읽히는 꼬리**를 먼저 쓰고, 꼬리가 모자랄 때만 `-n`을 쓴다. 사용자 결정: 색은 "색 이름 + 단계 말", 숫자는 "크기 말".
+      - **이름 문법:** `{기본 이름}{-꼬리}{-a투명도}{-n}` — 이 순서로, 필요한 것만. 사다리(아래 "무채색 밝기")는 꼬리 대신 기본 이름의 마지막 마디를 바꾼다(`color/text/subtle` → `color/text/subtler`). `-n`은 언제나 맨 끝이다.
+      - **종류와 꼬리 말:** 기본 이름마다 종류가 하나다. 꼬리 말은 이 표에 있는 것뿐이다.
+
+        | 종류 | 기본 이름 | 꼬리 말(후보) | 비교 값 · 기준 |
+        |---|---|---|---|
+        | 숫자 `number` | 숫자 쓰임 이름(12.3 — 간격 · 반경 · 선 두께 · 크기 · 투명도 · 글자 크기 · 줄 높이 · 자간) | 작은 쪽 `-sm` · `-xs` · `-2xs`, 큰 쪽 `-lg` · `-xl` · `-2xl` | 숫자. 기준 = 기본 이름 값 |
+        | 그대로 `plain` | 크기가 없는 값(`font-family/…`) | 없음 | — |
+        | 유채색 `chroma` | `color/{쓰임}/brand` | `-{계열}`(red · orange · yellow · green · teal · blue · indigo · purple · pink — `colorName.ts` `classifyColor`의 `family`), 밝기 꼬리 `-subtle` · `-subtler` · `-subtlest` · `-strong` · `-stronger` · `-strongest`, 둘을 이은 `-{계열}-{밝기}` | hex. 기준 = 기본 이름 값, 계열마다 계열 기준(아래) |
+        | 사다리 `ladder` | `color/{쓰임}/subtle` · `color/{쓰임}/strong` | 마지막 마디 `subtle` · `subtler` · `subtlest`(또는 `strong` · `stronger` · `strongest`) | hex. 기준 = 12.4 기준색(default) |
+        | 반대 `inverse` | `color/{쓰임}/inverse` | 밝기 꼬리(유채색과 같은 6개) | hex. 기준 = 기본 이름 값 |
+        | 기본 `default` | `color/{쓰임}/default` | 없음(12.4가 기준색 하나만 default로 정한다) | — |
+
+        - 모든 색 종류에 투명도 꼬리 `-a{round(투명도 × 100)}`(아래)가 붙을 수 있다.
+      - **가족:** 기본 이름의 가족 = 위 문법으로 그 기본 이름에서 만들 수 있는 모든 이름(꼬리 말은 표에 있는 것만 · 투명도 꼬리 · `-n` 포함). 사다리는 세 마지막 마디 모두가 한 가족이다. 표 밖의 말이 붙은 이름은 가족이 아니다(예: `spacing/card/padding-x`는 `spacing/card/padding`의 가족이 아니다 — 다른 속성. `radius/card-top-left`는 `radius/card`의 가족이 아니다. 팔레트가 만든 `color/background/brand-bold`도 가족이 아니다).
+        - **가족 순서**(여럿 중 하나를 고를 때 — 12.2 순서 2 · 재사용): 기본 이름 → 꼬리 이름(이름 순) → `-n`이 붙은 이름(번호 작은 순). 같은 이름이 여러 컬렉션에 있으면 13.5 순서.
+      - **먼저 — 재사용:** 가족 안에 **같은 값 · 맞는 용도**(12.6)의 Semantic 변수가 있고 거울(12.7)이 아니면 그 변수를 쓴다(새로 만들지 않음). 여럿이면 가족 순서의 첫 번째.
+        - 연결: 이 재사용은 순서 2가 한다(용도로 거른 후보만 본다). 순서 4에서 이름을 정할 때는 다시 재사용하지 않는다 — 같은 값이지만 용도가 틀리거나 거울인 가족 이름은 **차지된 이름**으로만 본다(그래야 용도가 틀린 변수가 붙지 않는다).
+        - 만들기(`createUsageRoles`): 같은 값 · 맞는 용도 · 거울 아님일 때만 재사용한다. 아니면 차지된 이름이다.
+      - **없으면 — 새 이름:** 값마다 **후보 목록**을 앞에서부터 보고, 비어 있는(파일의 Semantic 계층에도 없고 이번에 정한 이름도 아닌) 첫 이름을 쓴다.
+      - **누가 기본 이름을 받나:** 기본 이름이 비어 있으면, 새 값 중 곳 수가 많은 값(같으면 숫자는 값 오름차순, 색은 hex 순)이 받는다 — 이 값이 기준이 된다. **곳 수는 이것만 정한다.** 꼬리는 아래처럼 기준과의 거리로 정한다.
+        - 기본 이름이 이미 있으면 그 변수의 값이 기준이다. 여러 컬렉션에 있어 값이 여럿이면 13.5 순서의 첫 값. 값을 읽을 수 없으면(별칭이 끊김 등) 기준이 없는 것으로 보고 위처럼 새 값 중 곳 수 첫 값이 기준이 된다(그 값은 기본 이름이 차 있으므로 아래 되돌림 이름을 받는다).
+        - 색의 곳 수는 hex별로 합한다(투명도가 달라도 같은 hex는 합침 — 12.4 기준색과 같다).
+      - **꼬리 받는 순서:** 기준의 양쪽(작은 쪽 · 큰 쪽, 밝은 쪽 · 어두운 쪽)마다 기준과 **가까운 값부터** 그쪽 후보를 앞에서부터 받는다. 거리가 같으면 숫자는 값 오름차순, 색은 hex 순. 색 밝기는 OKLCH L로 견주고, L이 기준과 같으면 어두운(strong) 쪽이다(12.4 `colorRoleBases`와 같다).
+      - **숫자:** 작은 쪽 후보 `[-sm, -xs, -2xs]`, 큰 쪽 `[-lg, -xl, -2xl]`.
+        - 예: `spacing/card/gap`에 16(10곳) · 24(4곳) · 12(3곳) · 32(2곳) · 20(1곳) → 16이 기준 `spacing/card/gap`. 큰 쪽은 가까운 순 20 · 24 · 32 → `gap-lg`(20) · `gap-xl`(24) · `gap-2xl`(32). 작은 쪽 12 → `gap-sm`.
+        - 투명도(`opacity/…`)도 같은 말을 쓴다(작은 값 = 더 투명 → `-sm`). 꼬리는 기본 이름 끝에 붙는다 — 모서리 · 방향별 이름도 같다(`radius/card-top-left-lg`).
+      - **유채색:** 기준색과 색 계열을 견준다.
+        - 기준과 계열이 같은 값: 밝으면 `[-subtle, -subtler, -subtlest]`, 어두우면 `[-strong, -stronger, -strongest]`(기준과 가까운 순).
+        - 계열이 다른 값: 계열마다 **계열 기준**을 정한다 — 파일에 `{기본 이름}-{계열}`이 이미 있으면 그 값(여럿이면 13.5 순서 첫 값), 없거나 값을 읽을 수 없으면 그 계열의 새 값 중 곳 수 첫 값(같으면 hex 순). 계열 기준이 될 새 값의 후보는 `[-{계열}]`. 그 계열의 나머지 값은 계열 기준과 밝기를 견주어 `[-{계열}-subtle, -{계열}-subtler, -{계열}-subtlest]` 또는 `[-{계열}-strong, -{계열}-stronger, -{계열}-strongest]`(계열 기준과 가까운 순). 계열 기준이 `-{계열}`을 받지 못하고 되돌림 이름으로 가도 그 값이 계열 기준이다.
+        - 예(QA #4 실기 파일 배경 버튼 색, `classifyColor`로 확인): #3D5FDB(indigo, L 0.53, 곳 수 가장 많음) · #5576EE(indigo, L 0.60) · #E68E6C(red) · #2EDCF3(teal) → `color/background/brand`(#3D5FDB) · `brand-subtle`(#5576EE — 같은 indigo, 더 밝음) · `brand-red`(#E68E6C) · `brand-teal`(#2EDCF3). 계열 이름은 OKLCH 색상 각도에서 가장 가까운 중심으로 정하므로 눈으로 본 이름과 다를 수 있다(#E68E6C는 주황빛이지만 각도 41.8°가 red 중심 25°에 더 가깝다).
+      - **무채색 밝기(사다리):** 12.4가 `subtle`로 정한 색들은 `[subtle, subtler, subtlest]`, `strong`은 `[strong, stronger, strongest]`를 기준색(default)과 L이 가까운 순으로 받는다(Atlassian 디자인 토큰의 `subtle · subtler · subtlest` 관례). 기본 이름(`subtle`)을 곳 수로 정하지 않는다 — 사다리는 언제나 가까운 순이다.
+        - 예: 글자색 기준 #000000(L 0) → 회색 글자 #4B5563(L 0.45) · #7A7A7A(L 0.58) · #9CA3AF(L 0.71)는 모두 더 밝아 `subtle` 쪽 → `color/text/subtle`(#4B5563) · `color/text/subtler`(#7A7A7A) · `color/text/subtlest`(#9CA3AF).
+      - **inverse:** 후보가 둘 이상이면 곳 수 첫 값이 `inverse`(기준), 나머지는 기준과 밝기를 견주어 밝기 꼬리(`inverse-subtle` …, 가까운 순).
+      - **되돌림(후보가 모두 차 있을 때):** 그 값의 후보 목록 **마지막 이름** + `-n`(2부터 비어 있는 첫 번호). 후보 목록이 없거나 기본 이름 하나뿐인 값(`plain` · `default`, 기본 이름이 차 있는 기준 값)은 기본 이름 + `-n`.
+
+        | 경우 | 되돌림 이름 예 |
+        |---|---|
+        | 숫자 큰 쪽 넷째 값 | `spacing/card/gap-2xl-2` |
+        | 사다리 넷째 값 | `color/text/subtlest-2` |
+        | 유채색 계열 기준 값(`brand-red`가 차 있음) | `color/background/brand-red-2` |
+        | 유채색 같은 계열 넷째 밝은 값 | `color/background/brand-red-subtlest-2` |
+        | 기본 이름이 차 있는데 기준이 된 값 · 글꼴 둘째 값 | `{기본 이름}-2` |
+
+      - **투명도 꼬리(색):** 투명도가 있는 색(§2.11 "반투명 색 토큰")은 위 규칙을 **hex로만** 적용해 자리 이름 N을 정한 뒤(같은 hex의 불투명 · 반투명은 한 자리를 나눠 쓴다) N 끝에 `-a{round(투명도 × 100)}`을 붙인다 — Global 이름 규칙과 같다. 이 이름이 차 있으면 `N-a{%}-2`부터.
+        - 반투명만 있는 hex도 자리를 차지한다 — 8% 검정만 있으면 그 자리 이름이 `default`라도 `default-a8`만 생기고 `default`는 만들지 않는다. 다음 회색은 그 자리를 건너뛰지 않고 자기 순서의 이름을 받는다(자리는 hex마다 하나).
+        - 파일의 기본 이름이 반투명 색이면(예: `color/border/default` = 8% 검정) 그 값이 기준이고, 같은 hex의 불투명 색은 기본 이름이 차 있으므로 `default-2`(되돌림)를 받는다.
+      - **이미 있는 이름은 옮기지 않는다.** 파일에 이미 있는 가족 이름(전에 만든 `brand-2` · 팔레트의 `brand-subtle` 포함)은 그대로 두고 재사용 · 차지된 이름으로만 본다. 그래서 뜻이 어긋날 수 있다 — 한계로 둔다. 예: 이미 `subtle`이 먼 회색을 갖고 있으면 새 가까운 회색이 `subtler`가 된다. 숫자도 옛 `gap-lg` = 24인데 새 기본 이름 값이 32면 24가 "큰 쪽" 이름을 계속 갖는다.
       - **이미 있는 역할의 값(별칭 대상)은 절대 바꾸지 않는다.** 만들기도 연결과 같은 규칙으로 이름을 고른다 — 지금 `createSemanticAliases`의 같은 이름 덮어쓰기(`upsertVariable`)는 이 경로에서 쓰지 않는다(덮어쓰면 이미 붙은 레이어의 화면 값이 바뀐다, 2.11).
-      - 연결은 찾기에서 정한 이름을 그대로 쓴다. 그 사이 그 이름이 다른 값으로 차지됐을 때만 후보 목록의 다음 이름을 쓴다(후보가 다 차면 `-n`). 스위치를 끈 카드의 이름은 비워 두지 않는다(켠 카드의 이름이 바뀌지 않게).
-      - **구현 자리:** 이름 정하기는 순수 함수 하나(`usageRoles.ts` `assignNames` — 요청에 `kind: 'number' | 'chroma' | 'ladder' | 'plain'`과 비교용 값(숫자 · hex · 투명도)을 더한다)가 하고, 만들기(`variables.ts` `createUsageRoles`)와 연결(`bind.ts` 순서 4)이 같이 쓴다. 가족 판정도 함수 하나(`familyRe(base, kind)`)를 순서 2(`bind.ts`의 `nameRe`)와 재사용이 같이 쓴다. 옛 이름(12.7)과는 겹치지 않는다 — 새 꼬리는 언제나 기본 이름 뒤에 붙어 `spacing/sm` 같은 단계 이름이 되지 않는다.
+      - **연결 직전:** 연결은 찾기에서 정한 이름을 그대로 쓴다(`createRole`). 그 사이 그 이름이 다른 값으로 차지됐으면 그 이름 + `-n`(지금 동작 — 후보 목록은 메시지에 싣지 않는다). `createRole`이 "같은 Global을 가리키는 이미 있는 역할"을 찾는 이름 범위는 그 이름과 그 `-n`(지금 정규식 그대로). 스위치를 끈 카드의 이름은 비워 두지 않는다(켠 카드의 이름이 바뀌지 않게).
+      - **구현 자리:**
+        - `usageRoles.ts`: `colorRoleBases`가 기준색 hex도 돌려준다. `assignNames(requests, existing, opts)` — 요청에 `kind`(위 표 6종) · 비교 값(숫자 또는 hex · 투명도) · 기준색 hex(사다리)를 싣고, `existing`은 이름 → 값 묶음(지금 그대로)과 재사용해도 되는지(같은 값 · 맞는 용도 · 거울 아님)를 함께 받는다. `opts.reuse = false`면 재사용하지 않는다(연결 순서 4).
+        - `familyRe(base, kind)`: 가족 판정 하나. `bind.ts` 순서 2의 `nameRe`를 이것으로 바꾸고 순서 2 정렬을 가족 순서로.
+        - 만들기(`variables.ts` `createUsageRoles`)와 연결(`bind.ts` 순서 4)이 같은 `assignNames`를 쓴다. `figma-lib.ts`가 `familyRe`도 내보낸다(테스트용).
+        - 옛 이름(12.7)과는 겹치지 않는다 — 새 꼬리는 언제나 기본 이름 뒤에 붙어 `spacing/sm` 같은 단계 이름이 되지 않는다(`OLD_LADDER`로 확인).
     - **12.6 역할 변수의 모양.**
       - 플러그인 Semantic(§2.13 13.2)에 만든다. 없으면 만든다(사용자 Semantic이 있어도). 컬렉션의 **모든 모드**에 같은 Global 별칭을 건다(다크 모드가 있으면 Dark 값도 같은 Global — 다크 짝은 다크 단계가 따로 정한다).
       - 용도(scope): spacing → GAP, radius → CORNER_RADIUS, stroke-width → STROKE_FLOAT, size → WIDTH_HEIGHT, opacity → OPACITY, `color/text` → TEXT_FILL, `color/background` → FRAME_FILL · SHAPE_FILL, `color/icon` → SHAPE_FILL · STROKE_COLOR, `color/border` → STROKE_COLOR, `color/shadow` → EFFECT_COLOR. 글자 묶음은 Global의 용도를 물려받는다(지금 동작 — `scopeForSemanticRole`이 모르는 이름). `scopeForSemanticRole`을 이 표로 넓힌다.
@@ -2401,13 +2432,16 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ## A.14 쓰임 역할 이름 꼬리 (§2.12 12.5, 2026-11-11 사용자 결정 — QA #4 관찰 `-N`)
 
-> 사용자 결정: 색은 "색 이름 + 단계 말"(`brand-orange` · `brand-subtle` · `subtler`), 숫자도 "크기 말"(`-sm` · `-lg`). 이미 있는 이름은 옮기지 않는다.
+> 사용자 결정: 색은 "색 이름 + 단계 말"(`brand-red` · `brand-subtle` · `subtler`), 숫자도 "크기 말"(`-sm` · `-lg`). 이미 있는 이름은 옮기지 않는다.
 
-- [ ] `usageRoles.ts`: `assignNames` 요청에 종류 · 비교 값, 후보 목록(숫자 크기 말 · 유채색 계열 + 밝기 · 무채색 사다리 · inverse 밝기 · 투명도 꼬리) · 처리 순서 · 기준값(이미 있는 기본 이름의 값 먼저) · 후보가 다 차면 `-n`
-- [ ] `familyRe(base, kind)` — 가족 판정(꼬리 말 목록만, `padding-x` · `-top-left`는 가족 아님), `bind.ts` 순서 2 `nameRe`를 이것으로
-- [ ] `bind.ts` 순서 4 · `variables.ts` `createUsageRoles`: 요청에 종류 · 값을 실음, 사다리(subtle · strong)는 마지막 마디를 바꿈
-- [ ] 단위 테스트(`test/pure.test.mjs`): 숫자 16 · 24 · 12 · 32 → 기본 · `-lg` · `-sm` · `-xl` / 이미 있는 기본 이름 값이 기준 / 후보가 다 차면 `-2` / 유채색 4색(QA 예) → `brand` · `brand-subtle` · `brand-orange` · `brand-teal` / 같은 계열 둘 → `-{계열}` · `-{계열}-subtle` / 무채색 subtle 넷 → `subtle` · `subtler` · `subtlest` · `subtlest-2` / 투명도 → `-a8` / 가족 재사용(옛 `brand-2`도 같은 값이면 재사용) / 글꼴은 `-n`
-- [ ] 기존 테스트 · fixture의 `-2` 기대값(`test/*.mjs` · `scripts/verify-bind-flow.mjs`)을 새 이름으로 — 의도(같은 이름 두 값)를 살려서
+- [ ] `usageRoles.ts`: `colorRoleBases`가 기준색 hex를 돌려줌 · `assignNames` 요청에 종류(6종) · 비교 값 · 기준색, `existing`에 재사용 가능 여부, `opts.reuse` · 후보 목록 · 기준(이미 있는 기본 이름 값 → 13.5 첫 값, 못 읽으면 새 값 곳 수 첫 값) · 계열 기준 · 가까운 순 · 동률(L 같으면 strong, 거리 같으면 값 · hex 순) · 되돌림 표 · 투명도 꼬리 자리
+- [ ] `familyRe(base, kind)` + `figma-lib.ts` 내보내기 · `bind.ts` 순서 2 `nameRe` 대체 · 순서 2 정렬을 가족 순서로
+- [ ] `bind.ts` 순서 4: 요청에 종류 · 값 · 기준색, `reuse: false`(차지 판정만) · `variables.ts` `createUsageRoles`: 같은 값 · 맞는 용도 · 거울 아님일 때만 재사용
+- [ ] `createRole`(`bind.ts`): 지금 정규식 · `-n` 되돌림 그대로임을 확인(명세 12.5 "연결 직전")
+- [ ] 문구 · 주석: §2.11 "값 키" 예(`default-a8`, 이번에 고침), `usageRoles.ts` · `variables.ts`의 "번호가 붙는다" 주석
+- [ ] 단위 테스트(`test/figma.test.mjs` — `figma-lib`를 거쳐): 숫자 16(10) · 24(4) · 12(3) · 32(2) · 20(1) → 기본 · `-xl` · `-sm` · `-2xl` · `-lg` / 이미 있는 기본 이름 값이 기준 · 못 읽으면 새 값 기준 + `{기본}-2` / 유채색 QA 4색 → `brand` · `brand-subtle` · `brand-red` · `brand-teal` / 계열 기준이 이미 있음 · 같은 계열 둘 → `-{계열}` · `-{계열}-subtle` / 사다리 글자 #4B5563 · #7A7A7A · #9CA3AF(+넷째) → `subtle` · `subtler` · `subtlest` · `subtlest-2` / L 같음 → strong 쪽 / 투명도: 불투명 + 8% → N · N-a8, 반투명만 → N-a8, 파일 기본 이름이 반투명 → 불투명은 `default-2` / 가족: 옛 `brand-2`도 같은 값이면 재사용, `padding-x` · `-top-left` · `brand-bold`는 가족 아님 / 같은 값 · 용도 틀린 가족은 재사용 안 함(연결 · 만들기) / 글꼴 `-n` / 되돌림 표 다섯 경우
+- [ ] 연결 경로 테스트: `bindSelection` 새 역할 이름이 꼬리 이름 · 순서 2가 가족 순서로 고름 · 그 사이 이름이 차지되면 `createRole`이 `-n`
+- [ ] 기존 기대값 고치기(의도를 살려 — 같은 이름 두 값): `test/figma.test.mjs` 5487–5500 · 5636 · 5662 · 5680대 · 6691–6727 근처(`-2` 기대값). `scripts/verify-bind-flow.mjs`는 `-2` 기대값 없음(확인만)
 - [ ] 화면 시안: 만들기 화면 Semantic 탭 · 연결 화면에 새 이름이 보이는 모습(이름만 바뀜, 화면 구조 그대로)
 - [ ] 4검사 · 스크린샷
-- [ ] 실기 확인(사용자, 피그마): 연결 전 원본 `163:1523` 새 복제본 → 만들기 → 연결 → 이름에 `-2` · `-3`이 없고(꼬리가 모자란 경우 제외) 위 예처럼 읽히는지
+- [ ] 실기 확인(사용자, 피그마): 연결 전 원본 `163:1523` 새 복제본 → 만들기 → 연결 → 이름에 `-2` · `-3`이 없고(되돌림 제외) 위 예처럼 읽히는지
