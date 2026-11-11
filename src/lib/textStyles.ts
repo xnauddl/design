@@ -48,7 +48,7 @@ export interface StyleCluster {
   /** 그중 UI 역할 안의 표본 수(`uiRole === true`) — label 분류(docs/text-style-krds.md §3.2-1). */
   uiCount: number;
   sample: string; // 대표 레이어 이름(명명 힌트)
-  /** 이 군집에 속한 텍스트 노드 id — ×N 배지에서 캔버스 선택으로 데려갈 때 쓴다(#17).
+  /** 이 군집에 속한 텍스트 노드 id — 지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지).
       손으로 만든 군집(테스트·기본 램프)에는 없을 수 있다. */
   nodeIds?: string[];
   /** 이 군집 노드들이 바인딩된 로컬 스타일 id(중복 제거, '' 제외). 정확히 1개면 rename 앵커. */
@@ -70,9 +70,9 @@ export interface TextStyleSpec {
   style: string;
   /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
   boundStyleId?: string;
-  /** 이 스타일로 묶인 화면 글자 수(#17 ×N 배지). 수동 추가 행은 없음. */
+  /** 이 스타일로 묶인 화면 글자 수 — 편집 가능 판정(isEditableTextRow) · 만들기 화면 "Layer {n}". 수동 추가 행은 없음. */
   count?: number;
-  /** 그 글자들의 노드 id — 배지를 누르면 캔버스에서 선택한다(1개면 이동). */
+  /** 그 글자들의 노드 id — 지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지). */
   nodeIds?: string[];
 }
 

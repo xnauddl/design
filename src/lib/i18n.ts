@@ -622,8 +622,6 @@ export const STRINGS: Record<string, string> = {
   'textStyle.nameBoundTip': '이미 등록된 스타일이에요. 이름을 바꾸면 이 스타일의 이름만 바뀌어요(새로 만들지 않음).',
   'textStyle.nameNewTip': '새 스타일로 등록돼요(아직 등록 안 된 글자).',
   // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
-  'textStyle.badgeGoTip': '이 글자로 이동',
-  'textStyle.badgeSelectTip': '이 스타일을 쓰는 글자 {count}개 전체 선택',
   // 적용(바인딩)
   'bind.nothing': '연결할 곳이 없어요',
   'bind.skipCappedTip': ' · 목록은 {shown}개까지',

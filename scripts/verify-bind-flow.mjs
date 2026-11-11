@@ -1368,13 +1368,14 @@ async function saveAndGet(p) {
   await recv(p, { type: 'TEXT_STYLE_CANDIDATES', ...(sc?.reqId != null ? { reqId: sc.reqId } : {}), warnings: [], existing: [], styles: [
     { name: 'heading/large', fontSize: 28, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, nodeIds: ['t1'] },
     { name: 'body/medium-14', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t2'] },
-    { name: 'body/small-13_5', fontSize: 13.5, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, nodeIds: ['t3'] },
+    { name: 'body/small-13_5', fontSize: 13.5, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 0 },
   ] });
   await p.waitForTimeout(60);
   const cards = await p.$$eval('#tsList .r-card', (e) => e.map((c) => { const cs = getComputedStyle(c); return { r: cs.borderTopLeftRadius, bt: cs.borderTopWidth, bb: cs.borderBottomWidth, mark: c.querySelector('.ts-off')?.textContent ?? '' }; }));
   check('19 타이포 목록 — 카드 안 카드 아님(둥근 모서리 0 · 위 테두리 0 · 아래 구분선)', cards.length === 3 && cards.every((c) => c.r === '0px' && c.bt === '0px' && c.bb !== '0px'), JSON.stringify(cards));
   check('19 표시 — 28 없음 · 14 "○ KRDS 밖" · 13.5 "⚠ 소수 크기"', cards[0]?.mark === '' && cards[1]?.mark === '○ KRDS 밖' && cards[2]?.mark === '⚠ 소수 크기', JSON.stringify(cards.map((c) => c.mark)));
-  check('19 표시 있는 줄도 ×n 배지가 같은 줄(다음 줄로 밀리지 않음)', await p.$eval('#tsList .r-card:nth-child(2)', (c) => { const a = c.querySelector('.ts-off').getBoundingClientRect(); const b = c.querySelector('.r-badge').getBoundingClientRect(); return Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 4 && b.width < 60; }));
+  check('19 ×n 배지 없음 · 스캔 줄에 has-off 없음', (await p.$$eval('#tsList .r-badge', (e) => e.length)) === 0 && (await p.$$eval('#tsList .r-card', (cs) => cs.slice(0, 2).filter((c) => c.querySelector('.r-top').classList.contains('has-off')).length)) === 0);
+  check('19 처음 그릴 때 [삭제] 줄 — 표시 ⚠와 [삭제]가 같은 줄 · has-off', await p.$eval('#tsList .r-card:nth-child(3)', (c) => { const top = c.querySelector('.r-top'); const a = c.querySelector('.ts-off')?.getBoundingClientRect(); const d = c.querySelector('.r-top .link')?.getBoundingClientRect(); return !!a && !!d && top.classList.contains('has-off') && Math.abs(a.top + a.height / 2 - (d.top + d.height / 2)) < 4 && d.left > a.right; }));
   check('19 상태 줄 꼬리 " · KRDS 밖 크기 2개(소수 1)"', (await p.textContent('#tsStatus')).endsWith(' · KRDS 밖 크기 2개(소수 1)'), await p.textContent('#tsStatus'));
   // [이름 다시 짓기] → 팝업 · 읽는 중 · 포커스 [닫기]
   await p.click('#btnTsRename');

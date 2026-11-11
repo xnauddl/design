@@ -987,18 +987,9 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
   if (editable) card.appendChild(textStyleEditRow(s));
 
-  putOffMark(card, s.fontSize);
-  const n = s.count ?? 0;
-  const ids = s.nodeIds ?? [];
-  if (n > 0 && ids.length) {
-    // 1개면 그 글자로 이동, 여러 개면 전부 선택 — 어느 쪽이든 캔버스가 답을 보여준다.
-    const badge = document.createElement('button');
-    badge.className = 'r-badge';
-    badge.textContent = `×${n}`;
-    badge.title = n === 1 ? t('textStyle.badgeGoTip') : t('textStyle.badgeSelectTip', { count: n });
-    badge.addEventListener('click', () => selectNodes(ids, 'tsStatus'));
-    (card.querySelector('.r-top') as HTMLElement).appendChild(badge);
-  } else {
+  // 스캔 줄(쓰는 글자가 있는 줄)은 줄 끝에 표시만 — ×n 배지는 없앴다(docs/text-style-krds.md §6, 2026-11-11 결정 B).
+  const scanned = (s.count ?? 0) > 0 && !!s.nodeIds?.length;
+  if (!scanned) {
     // 램프 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
     const del = document.createElement('button');
     del.className = 'link';
@@ -1009,6 +1000,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
     });
     (card.querySelector('.r-top') as HTMLElement).appendChild(del);
   }
+  putOffMark(card, s.fontSize); // [삭제]를 붙인 뒤에 — 격자 칸 수가 크기 칸을 고칠 때와 같게
   return card;
 }
 
@@ -1087,8 +1079,9 @@ function putOffMark(card: HTMLElement, size: number): void {
   card.querySelector('.ts-off')?.remove();
   const m = offMarkEl(size, true);
   const top = card.querySelector<HTMLElement>('.r-top');
-  top?.classList.toggle('has-off', !!m); // 격자 칸 하나 더 — 없으면 ×n 배지가 다음 줄로 밀린다
-  if (m && top) top.insertBefore(m, top.querySelector('.r-badge, .link'));
+  const del = top?.querySelector('.link') ?? null;
+  top?.classList.toggle('has-off', !!m && !!del); // 표시 뒤에 [삭제]가 있으면 칸 하나 더 — 없으면 [삭제]가 다음 줄로 밀린다
+  if (m && top) top.insertBefore(m, del);
 }
 /** 상태 줄 앞 문구와 종류 — 꼬리는 스캔 요약 · 램프 문구 뒤에만(§4). */
 let tsStatusBase: { kind: 'scan' | 'ramp' | 'other'; text: string; cls: 'ok' | 'warn' | '' } = { kind: 'other', text: '', cls: '' };

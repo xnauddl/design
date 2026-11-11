@@ -164,13 +164,6 @@
     /* 텍스트 스타일 카드의 이름 칸 — 파랑=이미 등록된 스타일(이름만 rename), 앰버=새로 만들 스타일. */
     .r-title input.ts-bound { color: var(--accent-strong); }
     .r-title input.ts-new { color: var(--warn); }
-    /* ×N 배지 — 누르면 그 글자들을 캔버스에서 선택(1개면 이동). */
-    .r-badge {
-      font: 600 10px/1 var(--mono); color: var(--accent-strong);
-      background: var(--accent-subtle); border: 1px solid var(--accent-border);
-      border-radius: 999px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
-    }
-    .r-badge:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -1956,8 +1949,6 @@
     "textStyle.nameBoundTip": "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB00C\uC5B4\uC694(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).",
     "textStyle.nameNewTip": "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB3FC\uC694(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).",
     // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
-    "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
-    "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
     "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
@@ -4883,17 +4874,8 @@
     const editable = isEditableTextRow(s);
     const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
     if (editable) card.appendChild(textStyleEditRow(s));
-    putOffMark(card, s.fontSize);
-    const n = (_a3 = s.count) != null ? _a3 : 0;
-    const ids = (_b = s.nodeIds) != null ? _b : [];
-    if (n > 0 && ids.length) {
-      const badge = document.createElement("button");
-      badge.className = "r-badge";
-      badge.textContent = `\xD7${n}`;
-      badge.title = n === 1 ? t("textStyle.badgeGoTip") : t("textStyle.badgeSelectTip", { count: n });
-      badge.addEventListener("click", () => selectNodes(ids, "tsStatus"));
-      card.querySelector(".r-top").appendChild(badge);
-    } else {
+    const scanned = ((_a3 = s.count) != null ? _a3 : 0) > 0 && !!((_b = s.nodeIds) == null ? void 0 : _b.length);
+    if (!scanned) {
       const del = document.createElement("button");
       del.className = "link";
       del.textContent = t("textStyle.rowDelete");
@@ -4903,6 +4885,7 @@
       });
       card.querySelector(".r-top").appendChild(del);
     }
+    putOffMark(card, s.fontSize);
     return card;
   }
   var tsScanNote = { namePart: "", warnings: [] };
@@ -4958,12 +4941,13 @@
     return el;
   }
   function putOffMark(card, size) {
-    var _a3;
+    var _a3, _b;
     (_a3 = card.querySelector(".ts-off")) == null ? void 0 : _a3.remove();
     const m = offMarkEl(size, true);
     const top = card.querySelector(".r-top");
-    top == null ? void 0 : top.classList.toggle("has-off", !!m);
-    if (m && top) top.insertBefore(m, top.querySelector(".r-badge, .link"));
+    const del = (_b = top == null ? void 0 : top.querySelector(".link")) != null ? _b : null;
+    top == null ? void 0 : top.classList.toggle("has-off", !!m && !!del);
+    if (m && top) top.insertBefore(m, del);
   }
   var tsStatusBase = { kind: "other", text: "", cls: "" };
   function offTail() {
