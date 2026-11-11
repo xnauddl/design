@@ -122,6 +122,29 @@ const VARS = [
   { id: 'tx', name: 'color/text/default', collectionId: 's', type: 'COLOR', values: { l: { kind: 'alias', aliasId: 'g9', aliasName: 'color/gray/900' }, d: { kind: 'alias', aliasId: 'g0', aliasName: 'color/gray/0' } }, scopes: [], description: '' },
 ];
 const usageResult = (reqId, usage, extra = {}) => ({ type: 'USAGE_RESULT', reqId, usage, libraryVars: [], deleted: { count: 0, nodeIds: [] }, scanned: 40, ...extra });
+/** 카드 안 카드 찾기(ia-v4 §2.8 · B.12) — 보이는 카드(.step · .sel-card · .modal) 안에서 테두리나 그림자 + 둥근 모서리 + 배경을 모두 가진 요소. */
+const nestedCards = (p) => p.evaluate(() => {
+  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker';
+  document.activeElement?.blur?.();
+  const clear = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
+  const isCard = (e) => {
+    const s = getComputedStyle(e);
+    const border = ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && !clear(s[`border${k}Color`]));
+    const shadow = s.boxShadow && s.boxShadow !== 'none';
+    const round = ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].some((k) => parseFloat(s[`border${k}Radius`]) > 0);
+    return (border || shadow) && round && !clear(s.backgroundColor);
+  };
+  const bad = [];
+  for (const card of document.querySelectorAll('.step, .sel-card, .modal')) {
+    if (!card.getClientRects().length) continue;
+    for (const e of card.querySelectorAll('*')) {
+      if (!e.getClientRects().length || e.closest(EX)) continue;
+      if (isCard(e)) bad.push(`${e.tagName.toLowerCase()}.${[...e.classList].join('.')}#${e.id}`);
+    }
+  }
+  return bad;
+});
+const rowShape = (p, s) => p.$eval(s, (e) => { const c = getComputedStyle(e); return { top: c.borderTopWidth, bottom: c.borderBottomWidth, radius: c.borderTopLeftRadius, bg: c.backgroundColor, minH: c.minHeight, pl: c.paddingLeft }; });
 const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset.id));
 /** 사이드바 항목 [이름, 숫자] (결정 B). */
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
@@ -654,6 +677,13 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 줄 이름 칩 — 종류 표시(● · #) 없음(값 칩과 중복)', (await p.$$eval('#bindTree .tr-row .bv-var .bv-mark', (e) => e.length)) === 0);
   check('B2 목록 treegrid · 접근성 이름 · 머리 줄 = 이름 · 개수 · 스위치만(미리보기 없음)', (await p.getAttribute('#bindTree', 'role')) === 'treegrid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수' && (await p.$$eval('#bindTree .tr-head', (e) => e.every((h) => !h.querySelector('.bv-chip') && !!h.querySelector('.bv-switch')))));
   // 스위치 — 줄 단위
+  check('B.12 트리 머리 줄 = 회색 머리 띠(.tr-group · --surface-2)', (await p.$$eval('#bindTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)'))));
+  await p.hover('#bindTree .tr-row >> nth=0');
+  const trHover = await p.$eval('#bindTree .tr-row', (e) => getComputedStyle(e).backgroundColor);
+  await p.hover('#bindTree .tr-head >> nth=0');
+  const headHover = await p.$eval('#bindTree .tr-head', (e) => getComputedStyle(e).backgroundColor);
+  check('B.12 마우스 올림 띠 — 트리 줄은 --surface-hover · 머리 줄은 그대로', trHover === 'rgb(236, 238, 240)' && headHover === 'rgb(244, 245, 246)', `${trHover} / ${headHover}`);
+  await p.mouse.move(0, 0);
   await p.click('#bindTree .tr-row >> nth=1 >> .bv-switch'); // 반경 줄
   check('B2 반경 줄만 끔 → 간격 줄은 켠 채 · [6곳 연결]', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]) && (await named(p, '#btnApplyConfirm', '6곳 연결')));
   // 스타일 줄을 끄면 t1 글자 크기가 글자 변수 후보로 되돌아온다
@@ -1041,6 +1071,8 @@ async function saveAndGet(p) {
   await p.click('.modal button[aria-label="Dark 별칭 고르기"]');
   const o3 = await names();
   check('12b 지금 대상이 용도 밖 → 처음부터 다른 용도도 보임 · 제자리에 ✓ + "용도 다름"(맨 위 ✓ 줄 없음)', (await p.textContent('.ed-plink')) === '용도가 맞는 변수만 보기' && o3.filter((x) => x.includes('✓')).length === 1 && o3.some((x) => x.includes('14') && x.includes('용도 다름') && x.includes('✓')) && !(await p.textContent('.ed-picker')).includes('규칙 밖'), JSON.stringify(o3));
+  const badPicker = await nestedCards(p);
+  check('B.12 카드 안 카드 0 — 상세 팝업(별칭 고르개 펼침 · 고르개 층은 뺌)', badPicker.length === 0, badPicker.join(' · '));
   // 배경 누름 → 고르개만 닫고 팝업은 그대로
   await p.mouse.click(5, 5);
   check('12b 배경 누름 → 고르개만 닫힘 · 팝업 그대로', (await p.$$('.ed-picker')).length === 0 && (await p.$('.modal')) !== null);
@@ -1185,6 +1217,7 @@ async function saveAndGet(p) {
   const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
   check('17 들어오면 추출 + 텍스트 스타일 후보(조용한 읽기 · 기준 nodeIds · reqId)', ex?.nodeIds?.[0] === 'w1' && typeof ex?.reqId === 'number' && sc?.nodeIds?.[0] === 'w1' && typeof sc?.reqId === 'number' && !(await visible(p, '#applyProgress')));
   check('17 읽는 중 — 위 줄 "선택을 읽는 중…" · 버튼 잠금', (await p.textContent('#makeTopText')) === '선택을 읽는 중…' && (await locked(p, '#btnMakeRun')));
+  check('B.12 읽는 중 자리 줄은 머리 띠 없음(배경 투명)', await p.$$eval('#makeTree .tr.tr-head', (e) => e.length > 0 && e.every((r) => !r.classList.contains('tr-group') && getComputedStyle(r).backgroundColor === 'rgba(0, 0, 0, 0)')));
   check('17 머리 "← 변수 만들기" · 오른쪽 "Card에서 찾은 값"', (await p.textContent('#subTitle')) === '변수 만들기' && (await p.textContent('#subRight')) === 'Card에서 찾은 값');
   await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
     { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 },
@@ -1193,6 +1226,7 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(50);
   const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  check('B.12 만들기 트리 머리 줄 = 회색 머리 띠', await p.$$eval('#makeTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)')));
   check('17 만들 수 미리보기 — preview · reqId · 켠 줄만(글자 종류는 기본 끔)', pv?.preview === true && typeof pv.reqId === 'number' && JSON.stringify(pv.tokens.map((x) => x.name)) === JSON.stringify(['spacing/16', 'spacing/8']), JSON.stringify(pv?.tokens?.map((x) => x.name)));
   await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 1, updated: 0, summary: '', roles: 1, skippedManual: 0,
     tokenStates: { 'spacing/16': { state: 'new' }, 'spacing/8': { state: 'update' } }, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
@@ -1343,6 +1377,7 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(30);
   const rows = await p.$$eval('#renameTree .tr', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+  check('B.12 이름 정리 트리 머리 줄 = 회색 머리 띠 · 맥락 머리 이름은 회색 그대로', await p.$$eval('#renameTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)') && e.filter((h) => h.querySelector('.tr-name.muted')).every((h) => getComputedStyle(h.querySelector('.tr-name.muted')).color === 'rgb(94, 99, 107)')));
   check('18 소속 트리 — 그대로 조상 머리 "Product card 2개" · 바꿀 줄 · 보존 줄 숨김', rows.length === 3 && rows[0].includes('Product card') && rows[0].includes('2개') && rows[1].includes('Frame 12') && rows[1].includes('card-header') && !rows.some((x) => x.includes('Title')), JSON.stringify(rows));
   check('18 머리 오른쪽 "Product card · 바꿀 이름 2개" · [2개 이름 바꾸기]', (await p.textContent('#subRight')) === 'Product card · 바꿀 이름 2개' && (await p.textContent('#btnRename')) === '2개 이름 바꾸기');
   await p.click('#renameTree [data-tkey="a1"] .bv-switch');
@@ -1463,6 +1498,248 @@ async function saveAndGet(p) {
     await p.waitForTimeout(60);
     check('20 (c) 텍스트 스타일 후보 → [2곳 연결]만 · 주 버튼', JSON.stringify(await p.locator(first).locator('button').allTextContents()) === JSON.stringify(['2곳 연결']) && (await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))));
   }
+  await p.close();
+}
+
+/* ---------- 21 선택 탭 할 일 버튼 강약(IA v4 §4.1 · B.13) — 한 화면에 주 버튼 하나 ---------- */
+const makeHot = (p) => p.$eval('#btnGoMake', (b) => b.classList.contains('primary'));
+const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards button.primary').length + (document.getElementById('btnGoMake').classList.contains('primary') ? 1 : 0));
+{
+  // 상태 7 — 카드 1 읽는 중 · m > 0이면 보조, m = 0 · k > 0이면 주 버튼, 찾은 값이 모두 연결되면 보조
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  await p.waitForTimeout(60);
+  check('21 상태 7 · 카드 1 읽는 중 → 보조', (await p.textContent('#selCards .sel-card >> nth=0')).includes('읽는 중') && !(await makeHot(p)), await p.textContent('#selCards'));
+  await recv(p, preview(ap.reqId));
+  await recv(p, tsPrev(ap.reqId));
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 } }));
+  await p.waitForTimeout(80);
+  check('21 상태 7 · [n곳 연결] 있음 → [변수 만들기] 보조 · 주 버튼 1개', !(await makeHot(p)) && (await primaries(p)) === 1);
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { color: 3, gap: 2 } } });
+  await recv(p, tsPrev(ap.reqId));
+  await p.waitForTimeout(80);
+  check('21 상태 7 · m = 0 · k > 0 → [변수 만들기] 주 버튼 · 주 버튼 1개', (await makeHot(p)) && (await primaries(p)) === 1);
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 2, counts: {} });
+  await recv(p, tsPrev(ap.reqId));
+  await p.waitForTimeout(80);
+  check('21 찾은 값이 모두 연결됨(만들 값 0) → 보조', !(await makeHot(p)));
+  await p.close();
+}
+{
+  // 상태 6 — 선택 없음 · 찾기 대기는 보조 → 만들 값 있음은 주 버튼 → [{t}곳 연결]이면 보조 → 카드 3이 있어도 주 버튼 → 찾은 값 0은 보조
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await p.waitForTimeout(60);
+  check('21 선택 없음 → [변수 만들기] 보조(잠금)', !(await makeHot(p)));
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const us = (await sent(p, 'SCAN_USAGE')).at(-1).reqId;
+  await recv(p, usageResult(us, {}));
+  await p.waitForTimeout(60);
+  check('21 상태 6 · 찾기 대기 → 보조', (await p.textContent('#selCards')).includes('이 파일엔 아직 변수가 없어요') && !(await makeHot(p)));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2, color: 1 } } });
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(80);
+  check('21 상태 6 · 만들 값 있음 → [변수 만들기] 주 버튼', (await makeHot(p)) && (await primaries(p)) === 1);
+  if (pt) {
+    await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
+    await p.waitForTimeout(80);
+    check('21 상태 6 + [{t}곳 연결] 주 버튼 → [변수 만들기] 보조 · 주 버튼 1개', !(await makeHot(p)) && (await primaries(p)) === 1);
+    await recv(p, tsPrev(pt.reqId));
+    await p.waitForTimeout(60);
+  }
+  await recv(p, usageResult(us, {}, { deleted: { count: 3, nodeIds: ['x'] } }));
+  await p.waitForTimeout(80);
+  check('21 상태 6 + 카드 3(삭제된 변수) → [변수 만들기] 주 버튼 · 카드 3 버튼은 보조', (await makeHot(p)) && (await p.$$eval('#selCards .sel-card', (e) => e.length)) >= 2 && (await primaries(p)) === 1);
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: {} });
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(80);
+  check('21 상태 6 · 찾은 값 0 → 보조', !(await makeHot(p)));
+  await p.close();
+}
+{
+  // 상태 5 — 라이브러리 변수만 씀: 만들 값이 있어도 보조
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { L1: { places: 1, layers: 1 } }, { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }] }));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  if (ap) await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2 } } });
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(80);
+  check('21 상태 5(라이브러리만) → 보조', (await p.textContent('#selCards')).includes('라이브러리') && !(await makeHot(p)), await p.textContent('#selCards'));
+  await p.close();
+}
+{
+  // noTier — 로컬 변수는 있지만 계층 컬렉션이 없음: 만들 값 있으면 주 버튼
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 3 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  if (ap) await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2 } } });
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(80);
+  check('21 noTier · 찾기 결과 뒤 → [변수 만들기] 주 버튼', (await p.textContent('#selCards')).includes('계층으로 쓸 컬렉션이 없어요') && (await makeHot(p)) && (await primaries(p)) === 1, await p.textContent('#selCards'));
+  if (pt) {
+    await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
+    await p.waitForTimeout(80);
+    check('21 noTier + 텍스트 스타일 후보 → [변수 만들기] 보조 · 주 버튼은 [{t}곳 연결] 하나', !(await makeHot(p)) && (await primaries(p)) === 1);
+  }
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b13-notier.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+
+/* ---------- 22 카드 안 카드 없애기(IA v4 §2.8 · B.12) ---------- */
+{
+  const p = await open(480, 'layer');
+  await goSub(p, 'structure');
+  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+    { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
+    { id: 'a', name: 'Item Button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Button', defaultOn: true },
+    { id: 'b', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
+  ] });
+  await p.waitForTimeout(60);
+  check('22 컴포넌트 트리 — 행 ≥1', (await p.$$eval('#compTree .r-card', (e) => e.length)) >= 1);
+  const row = await rowShape(p, '#compTree .r-card');
+  check('22 목록 행 = 아래 구분선 1px · 모서리 0 · 배경 투명 · 높이 30 · 들여쓰기는 안쪽 여백(2 + 12)', row.top === '0px' && row.bottom === '1px' && row.radius === '0px' && row.bg === 'rgba(0, 0, 0, 0)' && row.minH === '30px' && row.pl === '14px', JSON.stringify(row));
+  check('22 .results 행 사이 틈 0', (await p.$eval('#compTree', (e) => getComputedStyle(e).rowGap)) === '0px');
+  // 컴포넌트 트리는 맥락 줄을 늘 숨겨 그룹 머리가 없다 — 베리언트 리포트 구분줄(resultGroup과 같은 클래스)로 본다
+  await p.evaluate(() => { document.getElementById('variantReport').innerHTML = '<div class="r-group r-ghead">아주 긴 그룹 머리 이름이 패널 폭을 넘어도 말줄임으로 끝나야 한다 · 아주 긴 그룹 머리 이름</div>'; });
+  const gh = await p.$eval('#variantReport .r-ghead', (e) => { const s = getComputedStyle(e); return { bg: s.backgroundColor, h: e.getBoundingClientRect().height, fs: s.fontSize, ell: s.textOverflow, disp: s.display }; });
+  check('22 목록 그룹 머리 = 회색 머리 띠(--surface-2 · 높이 ≥ 32 · 12.5px · 말줄임 · 블록)', gh.bg === 'rgb(244, 245, 246)' && gh.h >= 32 && gh.fs === '12.5px' && gh.ell === 'ellipsis' && gh.disp === 'block', JSON.stringify(gh));
+  check('22 카드 안 목록 제목(정적 #compTreeGroup)은 작은 라벨 그대로(배경 투명)', (await p.$eval('#compTreeGroup', (e) => getComputedStyle(e).backgroundColor)) === 'rgba(0, 0, 0, 0)');
+  await p.hover('#compTree .r-card >> nth=0');
+  check('22 목록 행 마우스 올림 띠 --surface-hover', (await p.$eval('#compTree .r-card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(236, 238, 240)');
+  await p.mouse.move(0, 0);
+  // 오류 상자(실제 ERROR 흐름) — 빨강 띠 · 테두리 0 · ⚠ 아이콘
+  await recv(p, { type: 'ERROR', message: '테스트 실패', op: 'REGISTER_COMPONENTS' });
+  await p.waitForTimeout(40);
+  const err = await p.$eval('#structureStatus .ux.danger', (e) => { const s = getComputedStyle(e); const b = getComputedStyle(e.querySelector('.ux-h'), '::before'); return { bw: s.borderTopWidth, ic: b.content, w: b.width }; });
+  check('22 오류 상자 = 빨강 띠(테두리 0) · 앞에 14px 아이콘', err.bw === '0px' && !['none', 'normal'].includes(err.ic) && err.w === '14px', JSON.stringify(err));
+  // 안내 · 진행 띠, 색 · 토큰 · 닮은 · 리포트 목록 — 실제 클래스로 DOM을 채워 모양을 본다(데이터 흐름은 앞 검사들이 지킨다)
+  await p.evaluate(() => {
+    const row = (t) => `<div class="r-card"><div class="r-top no-check"><div class="r-main"><div class="r-title">${t}</div></div></div></div>`;
+    for (const id of ['similarList', 'variantReport', 'colorTable', 'tokenList']) document.getElementById(id).innerHTML = row('a') + row('b');
+    document.getElementById('applyProgress').style.display = '';
+    for (const id of ['tokenColorNote', 'numTidySummary']) document.getElementById(id).style.display = '';
+  });
+  for (const id of ['similarList', 'variantReport', 'colorTable', 'tokenList']) {
+    const r = await rowShape(p, `#${id} .r-card`);
+    check(`22 #${id} 행 = 아래 구분선 · 모서리 0 · 배경 투명`, r.top === '0px' && r.bottom === '1px' && r.radius === '0px' && r.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(r));
+  }
+  for (const s of ['#tokenColorNote', '#numTidySummary', '#applyProgress']) {
+    const b = await p.$eval(s, (e) => { const c = getComputedStyle(e); const target = e.id === 'applyProgress' ? e.querySelector('.row') : e; const bf = getComputedStyle(target, '::before'); return { bw: c.borderTopWidth, ic: bf.content, w: bf.width, anim: bf.animationName }; });
+    check(`22 ${s} 띠 — 테두리 0 · 14px 아이콘${s === '#applyProgress' ? ' · 도는 고리' : ''}`, b.bw === '0px' && !['none', 'normal'].includes(b.ic) && b.w === '14px' && (s !== '#applyProgress' || b.anim !== 'none'), JSON.stringify(b));
+  }
+  check('22 #tsList는 #139 행 크기 그대로(안쪽 여백 8px)', await p.evaluate(() => { const l = document.getElementById('tsList'); l.innerHTML = '<div class="r-card"><div class="r-top no-check"><div class="r-main"><div class="r-title">x</div></div></div></div>'; const s = getComputedStyle(l.firstElementChild); return s.paddingLeft === '8px' && s.minHeight !== '30px'; }));
+  const bad = await nestedCards(p);
+  check('22 카드 안 카드 0 — 컴포넌트 화면', bad.length === 0, bad.join(' · '));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b12-structure.png` : '/dev/null', fullPage: true }).catch(() => {});
+  await p.close();
+}
+{
+  // 선택 탭 첫 화면(카드 1~3) · 연결 화면 — 카드 안 카드 0
+  const p = await open(480, 'select');
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, preview(ap.reqId));
+  await recv(p, tsPrev(ap.reqId));
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 } }, { deleted: { count: 3, nodeIds: ['x'] } }));
+  await p.waitForTimeout(80);
+  check('22 선택 탭 카드가 보임', (await p.$$eval('#selCards .sel-card', (e) => e.length)) >= 2);
+  const bad1 = await nestedCards(p);
+  check('22 카드 안 카드 0 — 선택 탭 첫 화면', bad1.length === 0, bad1.join(' · '));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b13-select.png` : '/dev/null' }).catch(() => {});
+  await p.click('#selCards [data-k="link"]');
+  await p.waitForTimeout(80);
+  const bad2 = await nestedCards(p);
+  check('22 카드 안 카드 0 — 연결 화면', bad2.length === 0, bad2.join(' · '));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b12-bind.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+
+{
+  // 값을 직접 고르기 — 실제 흐름(추출 결과 · 토큰 미리보기)으로 색 · 토큰 목록과 격자 정리 띠를 채운다
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card' });
+  await goSub(p, 'pick');
+  await p.waitForTimeout(80);
+  await p.click('#colorCard .toolbar button >> nth=0');
+  await p.waitForTimeout(40);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', ...(ex?.reqId ? { reqId: ex.reqId } : {}), warnings: [], selection: 1, tokens: [
+    { name: 'color/blue-500', category: 'color', value: '#2563EB', sources: ['fill'], count: 6 },
+    { name: 'color/gray-900', category: 'color', value: '#111827', sources: ['fill'], count: 4 },
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 },
+    { name: 'spacing/15', category: 'gap', value: 15, sources: ['itemSpacing'], count: 1 },
+  ] });
+  await p.waitForTimeout(120);
+  check('22 색 목록(실제 흐름) — 행 ≥1 · 보이는 색 카드', (await p.$$eval('#colorTable .r-card', (e) => e.length)) >= 1 && (await p.$eval('#colorCard', (e) => e.getClientRects().length > 0)));
+  const cr = await rowShape(p, '#colorTable .r-card');
+  check('22 색 목록 행 = 아래 구분선 · 모서리 0 · 배경 투명', cr.top === '0px' && cr.bottom === '1px' && cr.radius === '0px' && cr.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(cr));
+  const badColor = await nestedCards(p);
+  check('22 카드 안 카드 0 — 값을 직접 고르기 › 색', badColor.length === 0, badColor.join(' · '));
+  await p.click('[data-make-step="token"].step-chip');
+  await p.waitForTimeout(60);
+  await p.click('#btnCreate');
+  await p.waitForTimeout(80);
+  // 색 안내 띠는 "색을 먼저 만든" 상태에서만 뜬다 — 표시만 켜서 모양을 본다
+  await p.evaluate(() => { const n = document.getElementById('tokenColorNote'); n.style.display = ''; n.textContent = '색 2개는 색 단계에서 만들었어요'; });
+  check('22 토큰 목록(실제 흐름) — 행 ≥1 · 격자 정리 띠가 보임', (await p.$$eval('#tokenList .r-card', (e) => e.length)) >= 1 && (await visible(p, '#numTidySummary')));
+  const tr = await rowShape(p, '#tokenList .r-card');
+  check('22 토큰 목록 행 = 아래 구분선 · 모서리 0 · 배경 투명 · 높이 30', tr.top === '0px' && tr.bottom === '1px' && tr.radius === '0px' && tr.bg === 'rgba(0, 0, 0, 0)' && tr.minH === '30px', JSON.stringify(tr));
+  for (const s2 of ['#tokenColorNote', '#numTidySummary']) {
+    const b = await p.$eval(s2, (e) => { const c = getComputedStyle(e); const bf = getComputedStyle(e, '::before'); return { bw: c.borderTopWidth, ic: bf.content, w: bf.width, shown: e.getClientRects().length > 0 }; });
+    check(`22 ${s2} 띠(보이는 화면) — 테두리 0 · 14px 아이콘`, b.shown && b.bw === '0px' && !['none', 'normal'].includes(b.ic) && b.w === '14px', JSON.stringify(b));
+  }
+  const badToken = await nestedCards(p);
+  check('22 카드 안 카드 0 — 값을 직접 고르기 › 토큰', badToken.length === 0, badToken.join(' · '));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b12-token.png` : '/dev/null', fullPage: true }).catch(() => {});
+  // 설정 › 라이선스 오류
+  await recv(p, { type: 'ERROR', message: '키를 확인하지 못했어요', op: 'SET_LICENSE' });
+  await p.click('#btnSettings');
+  await p.waitForTimeout(60);
+  const le = await p.$eval('#licenseStatus .ux.danger', (e) => ({ bw: getComputedStyle(e).borderTopWidth, w: getComputedStyle(e.querySelector('.ux-h'), '::before').width, shown: e.getClientRects().length > 0 }));
+  check('22 설정 › 라이선스 오류 = 빨강 띠(테두리 0) · ⚠', le.shown && le.bw === '0px' && le.w === '14px', JSON.stringify(le));
+  const badSet = await nestedCards(p);
+  check('22 카드 안 카드 0 — 설정', badSet.length === 0, badSet.join(' · '));
+  await p.close();
+}
+{
+  // 내보내기 팝업 오류 — 팝업(.modal) 안 빨강 띠
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button:has-text("코드로 내보내기")');
+  await p.waitForTimeout(60);
+  await recv(p, { type: 'ERROR', message: '내보내지 못했어요', op: 'EXPORT' });
+  await p.waitForTimeout(40);
+  const xe = await p.$eval('.modal #exportStatus .ux.danger', (e) => ({ bw: getComputedStyle(e).borderTopWidth, w: getComputedStyle(e.querySelector('.ux-h'), '::before').width }));
+  check('22 내보내기 팝업 오류 = 빨강 띠(테두리 0) · ⚠', xe.bw === '0px' && xe.w === '14px', JSON.stringify(xe));
+  const badX = await nestedCards(p);
+  check('22 카드 안 카드 0 — 내보내기 팝업', badX.length === 0, badX.join(' · '));
   await p.close();
 }
 

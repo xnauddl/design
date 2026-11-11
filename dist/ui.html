@@ -227,9 +227,6 @@
     .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: 40px 8px; text-align: center; }
     /* IA v4 §4.2 연결 화면 */
-    .bind-v4 .bv-kind { padding: 10px 2px 4px; font-size: 11px; font-weight: 600; color: var(--text-2); }
-    .bind-v4 .bv-card { border-width: 0 0 1px; border-radius: 0; margin: 0; }
-    .bind-v4 .bv-allrow { text-align: right; font-size: 11px; margin: 0 0 2px; }
     .sub-foot { position: sticky; bottom: 24px; display: flex; align-items: center; gap: 8px; min-height: 52px; background: var(--bg, #fff); border-top: 1px solid var(--border); margin-top: 8px; }
 
     /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
@@ -249,7 +246,7 @@
 
     /* ── 콜아웃(안내 노트) ── */
     .ux {
-      background: var(--accent-subtle); border: 1px solid var(--accent-border);
+      background: var(--accent-subtle);
       border-radius: var(--r); padding: 9px 10px;
     }
     .ux > * + * { margin-top: 5px; }
@@ -282,7 +279,7 @@
     .empty-state button { margin-top: 8px; }
 
     /* ── 에러 콜아웃(위험) ── */
-    .ux.danger { background: var(--danger-subtle); border-color: var(--danger-border); }
+    .ux.danger { background: var(--danger-subtle); }
     .ux.danger .ux-t { color: var(--danger); }
 
     /* ── 진행률 바 ── */
@@ -311,11 +308,11 @@
 
     /* ── 시스템화 마법사 스테퍼 ── */
 
-    /* ── 첫 실행 배너 — 카드가 아니라 한 줄(온보딩 흡수) ── */
+    /* ── 안내 띠 — 테두리 없는 옅은 띠(카드 안 카드 금지, ia-v4 §2.8) ── */
     .banner {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
       font-size: 10.5px; line-height: 1.35; padding: 7px 9px; margin-bottom: 10px;
-      border: 1px solid var(--accent-border); background: var(--accent-subtle);
+      background: var(--accent-subtle);
       border-radius: var(--r-sm); color: var(--accent-strong);
     }
     .banner .link { font-size: 10.5px; }
@@ -364,14 +361,21 @@
        흐름 레이아웃으로 두고 패널 body가 스크롤한다 — 잘릴 상한이 없으니 스냅도 필요 없다. */
     .results { margin-top: 8px; display: grid; gap: 5px; }
 
-    /* 결과 행 = 얇은 카드(#18). 목록마다 달랐던 행 문법(.tk · .crow · .tree-row · .simrow ·
-       .vr-row)을 하나로 모은다. 열은 [체크 | 본문 | 메타] 셋뿐이고, 본문은 제목 한 줄 +
-       요약 한 줄이다. 큰 그림자 금지 — 연한 테두리와 짧은 패딩으로 밀도를 지킨다. */
+    /* 결과 행(#18) — 목록마다 달랐던 행 문법(.tk · .crow · .tree-row · .simrow · .vr-row)을
+       하나로 모은다. 열은 [체크 | 본문 | 메타] 셋뿐이고, 본문은 제목 한 줄 + 요약 한 줄이다.
+       카드 안에서는 카드 모양을 쓰지 않는다 — 아래 구분선 한 줄(ia-v4 §2.8, 아래 .results 규칙). */
     .r-card {
       border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface);
       padding: 6px 8px; display: grid; gap: 3px;
     }
     .r-card.dim { opacity: .55; }
+    /* 카드 안 목록 행 = 아래 구분선 한 줄(ia-v4 §2.8). #tsList는 #139 덮어쓰기 그대로라 뺀다. */
+    .results:not(#tsList) { gap: 0; }
+    .results:not(#tsList) .r-card {
+      border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent;
+      padding: 6px 2px; min-height: 30px; align-content: center;
+    }
+    .results:not(#tsList) .r-card:hover { background: var(--surface-hover); }
     /* 연결 현황 대기 — 선택이 멎을 때까지 이전 목록을 흐리게 둔다(비웠다 채우는 깜빡임 대신). 누를 수 없음. */
     .results.stale { opacity: .45; pointer-events: none; transition: opacity .12s; }
     /* 컬렉션 계층 — 한 줄: 이름(변수 수) · 추천 · 선택 */
@@ -393,7 +397,7 @@
     .r-meta { font-size: 10px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
     .r-title.has-swatch { display: flex; align-items: center; gap: 6px; }
     .r-swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
-    /* 역할 입력처럼 메타 자리에 오는 편집 요소 — 카드 폭을 밀지 않게 고정 폭. */
+    /* 역할 입력처럼 메타 자리에 오는 편집 요소 — 행 폭을 밀지 않게 고정 폭. */
     /* 역할 드롭다운 — `한글 · role` 병기라 자유 입력칸보다 넓어야 잘리지 않는다. */
     .r-role { width: 126px; font-size: 10px; padding: 3px 4px; }
     /* 모아 놓은 색 한 줄 — 목록은 팔레트 한 벌이면 60행이 넘는다. 램프가 고른지, 빠진
@@ -404,7 +408,7 @@
     /* 값 입력 줄 — 스캔 행에는 없다. 캔버스에서 읽은 값은 사실이라 손대지 않고, 손으로 추가한
        행과 기본 램프 폴백만 고칠 수 있다(둘 다 근거로 삼을 글자가 없다). 칸 순서는 스캔 행의
        요약(`폰트 · 크기 / 행간 / 자간 · 굵기`)과 같게 둔다 — 같은 목록에서 눈이 옮겨 다닌다. */
-    /* min-width:0 — 카드가 grid라 이게 없으면 이 줄의 min-content가 카드 폭을 400px 밖으로 민다. */
+    /* min-width:0 — 행이 grid라 이게 없으면 이 줄의 min-content가 행 폭을 패널 밖으로 민다. */
     .ts-edit { display: flex; align-items: center; gap: 3px; font-size: 10px; min-width: 0; }
     .ts-edit input { font-family: var(--mono); font-size: 10px; padding: 2px 3px; min-width: 0; }
     .ts-edit .ts-family { flex: 1 1 auto; }
@@ -448,7 +452,7 @@
     /* ── 색 정리(ΔE 군집) 요약 ── */
     #colorSection { border-top: 1px solid var(--border); padding-top: 8px; }
     #colorSection > * + * { margin-top: 6px; }
-    .tidy { border: 1px solid var(--accent-border); background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
+    .tidy { background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
 
     /* ── diff / 선택형 미리보기 트리 ── */
@@ -485,6 +489,13 @@
     #variantReport { font-family: var(--mono); font-size: 11px; overflow-x: auto; }
     .r-group.warn, .r-title.warn { color: var(--warn); }
     .r-group.ctx { font-weight: 500; opacity: .75; }
+    /* 목록 안 그룹 머리 띠(ia-v4 §2.8 B안 ②) — resultGroup이 만든 줄만. 카드 안 목록 제목(정적 .r-group)은 작은 라벨 그대로.
+       .r-group과 특이도가 같아 이 뒤에 둔다. 블록이라 말줄임이 그대로 듣는다. */
+    .r-ghead {
+      display: block; min-height: 32px; line-height: 31px; margin: 0; padding-left: 2px;
+      background: var(--surface-2); border-bottom: 1px solid var(--border);
+      font-size: 12.5px; font-weight: 600; letter-spacing: 0; color: var(--text);
+    }
 
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
@@ -607,11 +618,7 @@
     .bind-empty.done { border: none; padding: 6px 2px; align-items: flex-start; text-align: left; }
     .bind-empty.done .be-text { color: var(--ok, #12805c); font-weight: 600; }
     .be-text { font-size: var(--fs); }
-    /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
-    .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }
-    .bind-list:empty { display: none; }
-    .bv-card { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-    .bv-head { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 2px 0 8px; }
+    /* "값 → 변수" 칩 — 연결 화면 트리 줄 · 빈 상태에서 쓴다 */
     .bv-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font: 500 10.5px/1 var(--mono); white-space: nowrap; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
     .bv-val { background: var(--surface); border: 1px solid var(--border-2); color: var(--text); }
     .bv-sw { width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); flex: 0 0 auto; }
@@ -620,10 +627,8 @@
     .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     /* 새 역할(§2.12) — 연결할 때 Semantic에 만든다 */
     .bv-new { font: 600 10px/14px var(--font); background: var(--accent-strong); color: #fff; border-radius: 3px; padding: 0 4px; flex: 0 0 auto; }
-    .bd-roles { font-size: 11px; color: var(--text-2); white-space: nowrap; }
     .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
     .bind-empty .bv-var { max-width: 140px; }
-    .bv-head .grow { flex: 1 1 auto; min-width: 4px; }
     button.bv-tw { height: 24px; min-height: 24px; padding: 0 4px; border: none; background: none; color: var(--text-2); font-weight: 500; font-size: 10.5px; flex: 0 0 auto; }
     button.bv-tw:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
     /* 스위치 — 보이는 트랙 28×16, 누를 수 있는 영역 32×24 */
@@ -641,6 +646,21 @@
     .tr:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); border-radius: 4px; }
     .tr-head { min-height: 32px; gap: 4px; }
     .tr-group { background: var(--surface-2); }
+    /* 마우스 올림 띠(ia-v4 §2.8 B안 ③) — 머리 모양 줄(.tr-head: 트리 머리 · 읽는 중 · 만들기 결과)은 뺀다 */
+    .tree .tr:not(.tr-head):hover { background: var(--surface-hover); }
+    /* 띠 앞 아이콘(ia-v4 §2.8 B안 ①) — 꾸밈(::before), 간격은 그 줄의 gap 그대로. 글자를 textContent로 바꿔도 남는다. */
+    .banner::before, .tidy::before, #applyProgress .row::before, .ux.danger .ux-h::before {
+      content: ""; flex: 0 0 14px; width: 14px; height: 14px; background-color: var(--accent-strong);
+      -webkit-mask: var(--band-ic) center / 14px 14px no-repeat; mask: var(--band-ic) center / 14px 14px no-repeat;
+    }
+    .banner { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6.25' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3Cpath d='M8 7.2v4' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='4.9' r='.95'/%3E%3C/svg%3E"); }
+    .tidy { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 6.5h6a3.5 3.5 0 0 1 0 7H6'/%3E%3Cpath d='M5.8 4 3.3 6.5 5.8 9'/%3E%3C/svg%3E"); }
+    #applyProgress { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6' stroke-opacity='.25'/%3E%3Cpath d='M8 2a6 6 0 0 1 6 6'/%3E%3C/svg%3E"); }
+    #applyProgress .row::before { animation: band-spin .9s linear infinite; }
+    @keyframes band-spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #applyProgress .row::before { animation: none; } }
+    .ux.danger { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.2 14.3 13.3H1.7Z' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M8 6.6v3.2' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.6' r='.9'/%3E%3C/svg%3E"); }
+    .ux.danger .ux-h::before { background-color: var(--danger); }
     button.tr-car { width: 22px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--text-2); font-size: 10px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
     button.tr-car:hover:not([aria-disabled="true"]) { background: none; color: var(--text); }
     .tr-name { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -691,17 +711,6 @@
     .tr-skel { height: 10px; border-radius: 5px; background: var(--surface-2); display: inline-block; }
     .tree-top { display: flex; align-items: center; gap: 6px; min-height: 28px; font-size: 11px; color: var(--text-2); padding: 2px 2px 4px; }
     .tree-top .grow { flex: 1 1 auto; }
-    /* 끈 카드 — 글자·칩을 회색으로(opacity 쓰지 않음) */
-    .bv-card.off .bv-val, .bv-card.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
-    .bv-card.off .bv-arrow, .bv-card.off .bv-tw, .bv-card.off .bv-place { color: var(--text-2); }
-    .bv-card.off .bv-sw { filter: grayscale(1); }
-    /* 자리 줄(보기만) — [속성 아이콘] 레이어 · 속성 */
-    .bv-places { border-top: 1px solid var(--border); padding: 3px 8px 5px; display: flex; flex-direction: column; }
-    .bv-place { display: flex; align-items: center; gap: 6px; min-height: 24px; color: var(--text); }
-    .bv-ic { width: 14px; height: 14px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); font: 600 9px/14px var(--font); text-align: center; flex: 0 0 auto; }
-    .bv-place .bv-layer { padding: 0 2px; min-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 0 1 auto; }
-    .bv-card.off .bv-place .bv-layer { color: var(--text-2); }
-    .bv-prop { color: var(--text-2); white-space: nowrap; flex: 0 0 auto; }
     /* 연결 후 결과 카드 */
     .bind-done { display: flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 6px 4px 10px; border-radius: 8px; background: var(--ok-subtle); color: var(--ok); font-weight: 600; }
     .bind-done .grow { flex: 1 1 auto; }
@@ -3053,7 +3062,7 @@
       for (const it of list) {
         flat.push({ item: it, parentKey, level });
         const row = document.createElement("div");
-        row.className = `tr ${it.head ? "tr-head" : "tr-row"}${it.group ? " tr-group" : ""}${it.off ? " off" : ""}${it.cls ? " " + it.cls : ""}`;
+        row.className = `tr ${it.head ? "tr-head" : "tr-row"}${it.head || it.group ? " tr-group" : ""}${it.off ? " off" : ""}${it.cls ? " " + it.cls : ""}`;
         row.setAttribute("role", "row");
         row.setAttribute("aria-level", String(level + 1));
         row.dataset.tkey = it.key;
@@ -4314,7 +4323,7 @@
   }
   function resultGroup(label) {
     const el = document.createElement("div");
-    el.className = "r-group";
+    el.className = "r-group r-ghead";
     el.textContent = label;
     el.title = label;
     return el;
@@ -6188,18 +6197,18 @@
   }
   function makeTreeRow(r, base, checked, onChange, readOnly = false) {
     var _a3, _b;
-    const indent = `${(r.depth - base) * 12}px`;
+    const indent = `${2 + (r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
       const title2 = document.createElement("span");
       title2.className = "tree-name";
       title2.textContent = r.name;
       const card2 = resultCard({ title: title2, titleMono: true, summary: r.keep.reason, meta: r.keep.meta, dim: true });
-      card2.style.marginLeft = indent;
+      card2.style.paddingLeft = indent;
       return card2;
     }
     if (r.change === void 0) {
       const group = resultGroup(r.name);
-      group.style.marginLeft = indent;
+      group.style.paddingLeft = indent;
       if (!r.header) group.classList.add("ctx");
       if (r.selectId) {
         const id = r.selectId;
@@ -6235,7 +6244,7 @@
       title2.innerHTML = `<span class="bf-label">${escapeHtml(b.label)}</span> ${swatch}<span class="bf-val">${escapeHtml(b.value)}</span> <span class="bf-op">${b.connected ? "=" : "\u2192"}</span> <span class="after">${escapeHtml(b.variable)}</span>`;
       title2.title = b.tip;
       const card2 = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title: title2, titleMono: true }));
-      card2.style.marginLeft = indent;
+      card2.style.paddingLeft = indent;
       return card2;
     }
     const title = document.createElement("span");
@@ -6247,7 +6256,7 @@
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
     }
-    card.style.marginLeft = indent;
+    card.style.paddingLeft = indent;
     return card;
   }
   function renderSelectableTree(mount, rows, checked, opts) {
@@ -11405,6 +11414,7 @@ ${opts.tip}` : text;
     const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : "" : null;
     clearMount(head);
     clearMount(cards);
+    selMakeHot = false;
     const noSel = !baseline;
     for (const id of ["btnGoMake", "btnGoRename", "btnGoComponents"]) setLock($(id), (baseline != null ? baseline : curSel).count ? null : "prereq", t("status.noSelection"));
     if (baseline) {
@@ -11474,7 +11484,9 @@ ${opts.tip}` : text;
         renderUsesCard(put);
       } else {
         const subs = [];
-        if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== "other").map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
+        const kinds = counts ? counts.noVarByKind.filter((x) => x.kind !== "other") : [];
+        if (counts && counts.noVarByKind.length) subs.push(kinds.map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
+        if (findReady && kinds.length) selMakeHot = true;
         else if (!findReady) subs.push(t("v4.reading"));
         const actions = [];
         const allSubs = [...subs];
@@ -11489,8 +11501,14 @@ ${opts.tip}` : text;
     renderDeletedCard(put);
     finishSelFocus(hadFocus);
   }
+  var selMakeHot = false;
+  function updateMakeEmphasis() {
+    const hot = selMakeHot && !!baseline && !$("selCards").querySelector("button.primary");
+    $("btnGoMake").classList.toggle("primary", hot);
+  }
   function finishSelFocus(key) {
     var _a3;
+    updateMakeEmphasis();
     if (key === null) return;
     const cards = $("selCards");
     const same = key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
@@ -11513,6 +11531,7 @@ ${opts.tip}` : text;
       const actions2 = [];
       tsOnlyExtra(subs, actions2);
       put(selCard({ title: t("v4.find0"), subs, actions: actions2 }));
+      if (selFindFor === baseKey() && !selFindInFlight) selMakeHot = true;
       return;
     }
     if (!counts) {
@@ -11545,7 +11564,7 @@ ${opts.tip}` : text;
       }, true);
       go.dataset.k = "link";
       actions.push(go);
-    }
+    } else if (k > 0) selMakeHot = true;
     const card = selCard({ title: t("v4.findN", { n }), subs: [sub], actions });
     card.querySelector(".t").title = t("v4.findTip");
     put(card);

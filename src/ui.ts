@@ -174,7 +174,7 @@ function clearMount(mount: HTMLElement): void {
   mount.innerHTML = '';
 }
 
-/* ---------- #18: 결과 행 = 얇은 카드 ----------
+/* ---------- #18: 결과 행 — 카드 안에서는 아래 구분선 한 줄(ia-v4 §2.8) ----------
    목록마다 제각각이던 행 문법을 하나로 모은다. 열은 [체크 | 본문(제목·요약) | 메타] 셋뿐이고,
    제목·메타는 문자열 대신 요소를 넘길 수 있다(이름 입력칸·역할 입력칸처럼 편집이 필요한 자리). */
 interface ResultCardSpec {
@@ -246,7 +246,7 @@ function addSwatch(card: HTMLElement, hex: string): void {
 /** 목록의 그룹 머리(트리 루트·리포트 구분줄) — 카드가 아니라 라벨이다. */
 function resultGroup(label: string): HTMLElement {
   const el = document.createElement('div');
-  el.className = 'r-group';
+  el.className = 'r-group r-ghead'; // 목록 안 그룹 머리 띠(ia-v4 §2.8 B안 ②)
   el.textContent = label;
   el.title = label;
   return el;
@@ -2585,24 +2585,25 @@ function baseDepth(rows: TreeRow[]): number {
 
 /** 선택형 트리 1행. base는 들여쓰기 기준 depth. */
 function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void, readOnly = false): HTMLElement {
-  const indent = `${(r.depth - base) * 12}px`;
+  // 들여쓰기는 왼쪽 안쪽 여백으로 — 구분선 · 머리 띠가 카드 안 폭 전체에 그어지게(ia-v4 §2.8). 2px = 행 기본 여백.
+  const indent = `${2 + (r.depth - base) * 12}px`;
 
-  // 손대지 않은 레이어는 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 카드 + 사유.
+  // 손대지 않은 레이어는 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 행 + 사유.
   // 그냥 빼 버리면 왜 그 레이어만 빠졌는지 알 길이 없어 버그로 읽힌다(#7b 보존 · #6 건너뜀).
   if (r.change === undefined && r.keep) {
     const title = document.createElement('span');
     title.className = 'tree-name';
     title.textContent = r.name;
     const card = resultCard({ title, titleMono: true, summary: r.keep.reason, meta: r.keep.meta, dim: true });
-    card.style.marginLeft = indent;
+    card.style.paddingLeft = indent;
     return card;
   }
 
-  // 맥락 노드·헤더는 카드가 아니라 그룹 머리다 — 고를 대상이 아니고, 어디에 속한
-  // 변경인지만 알려준다(#18: 트리 = 그룹 헤더 + 자식 카드).
+  // 맥락 노드·헤더는 행이 아니라 그룹 머리(띠)다 — 고를 대상이 아니고, 어디에 속한
+  // 변경인지만 알려준다(#18 · ia-v4 §2.8: 트리 = 그룹 머리 띠 + 구분선 행).
   if (r.change === undefined) {
     const group = resultGroup(r.name);
-    group.style.marginLeft = indent;
+    group.style.paddingLeft = indent;
     if (!r.header) group.classList.add('ctx');
     if (r.selectId) {
       // 어느 레이어인지 캔버스에서 바로 찾게 — 목록의 이름만으로는 같은 이름이 여럿일 때 모른다.
@@ -2638,7 +2639,7 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
       `<span class="bf-op">${b.connected ? '=' : '→'}</span> <span class="after">${escapeHtml(b.variable)}</span>`;
     title.title = b.tip;
     const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true });
-    card.style.marginLeft = indent;
+    card.style.paddingLeft = indent;
     return card;
   }
 
@@ -2653,7 +2654,7 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
     const meta = card.querySelector('.r-meta') as HTMLElement;
     meta.className = `tag tag-${r.badge.kind}`;
   }
-  card.style.marginLeft = indent;
+  card.style.paddingLeft = indent;
   return card;
 }
 
@@ -7686,6 +7687,7 @@ function renderSelHome(): void {
   const hadFocus = cards.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.k ?? '' : null;
   clearMount(head);
   clearMount(cards);
+  selMakeHot = false;
   const noSel = !baseline;
   // 할 일(§4.1) — 목록 기준이 없으면 잠금.
   for (const id of ['btnGoMake', 'btnGoRename', 'btnGoComponents']) setLock($(id), (baseline ?? curSel).count ? null : 'prereq', t('status.noSelection'));
@@ -7742,7 +7744,9 @@ function renderSelHome(): void {
       renderUsesCard(put);
     } else {
       const subs: string[] = [];
-      if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== 'other').map((x) => t('v4.kindPlaces', { kind: kindLabel(x.kind), n: x.n })).join(' · '));
+      const kinds = counts ? counts.noVarByKind.filter((x) => x.kind !== 'other') : [];
+      if (counts && counts.noVarByKind.length) subs.push(kinds.map((x) => t('v4.kindPlaces', { kind: kindLabel(x.kind), n: x.n })).join(' · '));
+      if (findReady && kinds.length) selMakeHot = true; // 상태 6 · 만들 값 있음 → [변수 만들기] 주 버튼(§4.1)
       else if (!findReady) subs.push(t('v4.reading'));
       const actions: HTMLElement[] = []; // 만들기 입구는 할 일 [변수 만들기] 하나(§4.1)
       const allSubs: (string | Node)[] = [...subs];
@@ -7758,9 +7762,18 @@ function renderSelHome(): void {
   renderDeletedCard(put);
   finishSelFocus(hadFocus);
 }
+/** 할 일 버튼 강약(§4.1) — 다음 할 일이 변수 만들기로 확실한 상태(상태 6 · 카드 1 m = 0 · k > 0 · noTier,
+    지금 기준의 찾기 결과가 왔고 k > 0)를 그리는 동안 켠다. renderSelHome이 그릴 때마다 처음에 끈다. */
+let selMakeHot = false;
+/** [변수 만들기]를 주 버튼으로 — 카드 영역에 이미 주 버튼이 있으면 보조(한 화면에 주 버튼 하나). */
+function updateMakeEmphasis(): void {
+  const hot = selMakeHot && !!baseline && !$('selCards').querySelector('button.primary');
+  $('btnGoMake').classList.toggle('primary', hot);
+}
 /** 다시 그린 뒤 포커스(§4.1 할 일) — 같은 버튼, 없으면 카드 영역 첫 버튼, 그것도 없으면 할 일 [변수 만들기].
-    없어진 것이 [연결 풀기]면 바로 [변수 만들기]. */
+    없어진 것이 [연결 풀기]면 바로 [변수 만들기]. 버튼 강약은 포커스와 상관없이 늘 먼저 정한다. */
 function finishSelFocus(key: string | null): void {
+  updateMakeEmphasis();
   if (key === null) return;
   const cards = $('selCards');
   const same = key ? cards.querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`) : null;
@@ -7784,6 +7797,8 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     const actions: HTMLElement[] = []; // 만들기 입구는 할 일 [변수 만들기] 하나(§4.1)
     tsOnlyExtra(subs, actions);
     put(selCard({ title: t('v4.find0'), subs, actions }));
+    // noTier · 찾기 결과 뒤 → [변수 만들기] 주 버튼(§4.1). noTier는 변수 찾기를 하지 않아 k를 모른다 — 다음 할 일은 계층 변수 만들기.
+    if (selFindFor === baseKey() && !selFindInFlight) selMakeHot = true;
     return;
   }
   if (!counts) {
@@ -7808,7 +7823,7 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     const go = selBtn(t('v4.linkN', { n: m }), (el) => { showSelSub('bind', el); }, true);
     go.dataset.k = 'link';
     actions.push(go);
-  } // m = 0이면 버튼 없음 — 만들기 입구는 할 일 [변수 만들기] 하나(§4.1, 2026-11-11 사용자 결정)
+  } else if (k > 0) selMakeHot = true; // m = 0 · k > 0 — 버튼 없음, 할 일 [변수 만들기]가 주 버튼(§4.1, 2026-11-11 사용자 결정)
   const card = selCard({ title: t('v4.findN', { n }), subs: [sub], actions });
   (card.querySelector('.t') as HTMLElement).title = t('v4.findTip');
   put(card);
