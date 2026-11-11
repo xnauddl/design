@@ -299,10 +299,34 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 카드 2 — 직접만 2개(Semantic 1 · 라이브러리 1)', txt.includes('쓰는 변수 2개') && txt.includes('Semantic 1 · 라이브러리 1'), txt);
   check('9 카드 3 — 삭제된 변수 3곳 · [선택] · [연결 풀기]', txt.includes('삭제된 변수 3곳') && (await p.$('[data-k="delsel"]')) !== null && (await p.$('[data-k="unbind"]')) !== null);
   // 카드 1 완료 문구(§4.1, 사용자 결정 A) — n = 0 · s > 0이면 "✓ 연결할 곳은 모두 연결됐어요", styled는 s에 안 더함
-  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } } });
+  const skips9 = [{ nodeId: '1:2', name: 'Box', type: 'FRAME', reason: 'fraction', field: 'paddingLeft' }, { nodeId: '1:3', name: 'Label', type: 'TEXT', reason: 'styled', field: 'fills' }];
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 }, skips: skips9 });
   await p.waitForTimeout(30);
   const done1 = await p.textContent('#selCards');
-  check('9 카드 1 완료 — n = 0 · s > 0 → "✓ 연결할 곳은 모두 연결됐어요 · 건너뜀 2곳"(스타일 사용 중 3곳은 안 셈) · [보기]', done1.includes('✓ 연결할 곳은 모두 연결됐어요') && done1.includes('건너뜀 2곳') && (await p.$('[data-k="skips"]')) !== null, done1);
+  check('9 카드 1 완료 — n = 0 · s > 0 → "✓ 연결할 곳은 모두 연결됐어요 · 손볼 곳 2곳"(스타일 사용 중 3곳은 안 셈) · [보기]', done1.includes('✓ 연결할 곳은 모두 연결됐어요') && done1.includes('손볼 곳 2곳') && (await p.$('[data-k="skips"]')) !== null, done1);
+  // [보기] → 건너뛴 곳 모습(§4.2 — m = k = 0): 제목 · ✓ 줄 · 목록 펼침 · 버튼 줄 없음
+  await p.click('[data-k="skips"]');
+  await p.waitForTimeout(40);
+  const heads9 = await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent));
+  check('9 건너뛴 곳 모습 — 제목 "건너뛴 곳" · "✓ 연결할 곳은 모두 연결됐어요" · 손볼 곳 / 그대로 둬도 되는 곳 · [연결] 없음', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await p.textContent('#bindEmpty')).includes('✓ 연결할 곳은 모두 연결됐어요') && JSON.stringify(heads9) === JSON.stringify(['손볼 수 있는 곳', '그대로 둬도 되는 곳']) && !(await visible(p, '#bindFoot')) && !(await visible(p, '#bindSkipToggle')), JSON.stringify(heads9));
+  // 다시 그려도 포커스는 같은 사유의 [선택 ›](§4.2 "목록을 다시 그릴 때의 포커스")
+  await p.focus('#bindSkips .skip-sel[data-reason="styled"]');
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 }, skips: skips9 });
+  await p.waitForTimeout(40);
+  check('9 건너뛴 곳 모습 — 다시 읽어 목록을 다시 그려도 포커스는 같은 사유의 [선택 ›]', (await p.evaluate(() => document.activeElement?.dataset?.reason)) === 'styled', await p.evaluate(() => document.activeElement?.outerHTML?.slice(0, 80)));
+  // 손볼 곳 0(그대로 둬도 되는 곳만) → ✓ 줄은 카드 1과 같은 allBound
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { styled: { color: 3 } }, reasons: { styled: 3 }, skips: [skips9[1]] });
+  await p.waitForTimeout(40);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-skip-s0.png` : '/dev/null' }).catch(() => {});
+  check('9 건너뛴 곳 모습 s = 0 — 제목 "건너뛴 곳" · ✓ "찾은 값은 모두 연결돼 있어요" · 그대로 둬도 되는 곳만', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await emptyText(p)) === '✓ 찾은 값은 모두 연결돼 있어요' && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']), await emptyText(p));
+  // 목록까지 비면 모두 연결된 모습 — 제목 "연결" · allBound · 칩 · 목록 · 버튼 줄 없음, 지워진 [선택 ›]의 포커스는 ←
+  await p.focus('#bindSkips .skip-sel');
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: {}, reasons: {}, skips: [] });
+  await p.waitForTimeout(40);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-all-done.png` : '/dev/null' }).catch(() => {});
+  check('9 모두 연결된 모습 — 제목 "연결" · ✓ "찾은 값은 모두 연결돼 있어요" · 칩 · 목록 · [연결] 없음 · 포커스 ←', (await p.textContent('#subTitle')) === '연결' && (await emptyText(p)) === '✓ 찾은 값은 모두 연결돼 있어요' && !(await visible(p, '#bindBadges')) && !(await visible(p, '#bindFoot')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnSubBack', `${await p.textContent('#subTitle')} / ${await emptyText(p)} / ${await p.evaluate(() => document.activeElement?.id)}`);
+  await p.click('#btnSubBack');
+  await p.waitForTimeout(30);
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: { styled: { color: 3 } } });
   await p.waitForTimeout(30);
   check('9 카드 1 완료 — 스타일 사용 중만 → "✓ 찾은 값은 모두 연결돼 있어요"(버튼 없음)', (await p.textContent('#selCards')).includes('✓ 찾은 값은 모두 연결돼 있어요') && (await p.$('[data-k="skips"]')) === null);
@@ -576,8 +600,8 @@ const reenter = (p) => p.evaluate(() => {
   // 건너뜀 칩 — s는 자리 단위(스타일 사용 중 1곳), 레이어 단위 · 텍스트 스타일 사유는 칩 안에만
   check('B2 건너뜀 칩 — s = 0이고 스타일 사용 중이 있으면 "건너뛴 곳 ▸"(styled는 s에 안 더함)', (await p.textContent('#bindSkipToggle')) === '건너뛴 곳 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#bindSkipToggle');
-  const chips = await p.$$eval('#bindSkips .skip-chip', (e) => e.map((x) => x.textContent));
-  check('B2 사유 칩 — 자리 "{사유} {n}곳" · 레이어 "{사유} 레이어 {n}개" · 텍스트 스타일 사유', JSON.stringify(chips) === JSON.stringify(['스타일 사용 중 1곳', '숨긴 레이어 레이어 2개 ›', '같은 스타일 없음 레이어 3개']) && (await p.$$eval('#bindSkips .skip-chip.info', (e) => e.length)) === 1, JSON.stringify(chips));
+  const chips = await p.$$eval('#bindSkips .skip-name', (e) => e.map((x) => x.textContent));
+  check('B2 건너뛴 곳 목록 — 그대로 둬도 되는 곳 한 묶음 · 줄(스타일 사용 중 · 숨긴 레이어 · 같은 스타일 없음) · [선택 ›]은 레이어 목록 있는 줄만', JSON.stringify(chips) === JSON.stringify(['스타일 사용 중', '숨긴 레이어', '같은 스타일 없음']) && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']) && (await p.$$eval('#bindSkips .skip-sel', (e) => e.length)) === 1, JSON.stringify(chips));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b2-bind.png` : '/dev/null' }).catch(() => {});
   // 연결 — 변수 자리 + 켠 스타일 줄을 한 번에
   await p.click('#btnApplyConfirm');
@@ -637,7 +661,7 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 noTier 카드 1 안에 "Text Style 2곳" + [2곳 연결]', (await p.textContent('#selCards')).includes('Text Style 2곳') && (await p.textContent('[data-k="tsLink"]')) === '2곳 연결');
   await p.click('[data-k="tsLink"]');
   check('B2 텍스트 스타일만 — 머리 오른쪽 "Card · Text Style 2곳" · 줄은 스타일 줄만 · [2곳 연결]', (await p.textContent('#subRight')) === 'Card · Text Style 2곳' && JSON.stringify(await bindList(p)) === JSON.stringify(['Text Style 2곳', ['body/medium', '2곳', true]]) && (await named(p, '#btnApplyConfirm', '2곳 연결')), await p.textContent('#subRight'));
-  check('B2 텍스트 스타일만 — 칩 "건너뛴 레이어 ▸"', (await p.textContent('#bindSkipToggle')) === '건너뛴 레이어 ▸', await p.textContent('#bindSkipToggle'));
+  check('B2 텍스트 스타일만 — 칩 "건너뛴 곳 ▸" · 목록에 이미 스타일 있음(hasStyle 보임)', (await p.textContent('#bindSkipToggle')) === '건너뛴 곳 ▸' && (await p.$$eval('#bindSkips .skip-name', (e) => e.map((x) => x.textContent))).includes('이미 스타일 있음'), await p.textContent('#bindSkipToggle'));
   await p.click('#btnApplyConfirm');
   const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
   check('B2 텍스트 스타일만 연결 — items 0 · textStyles 1줄', req?.items?.length === 0 && req.textStyles?.length === 1);
@@ -1143,14 +1167,15 @@ async function saveAndGet(p) {
   await p.waitForTimeout(80);
   const ts = (await sent(p, 'CREATE_TEXT_STYLES')).at(-1);
   check('17 텍스트 스타일 — 다시 스캔 없이 켠 줄(고친 이름) · applyTo = 시작 때 기준', ts?.styles?.[0]?.name === 'body/base' && ts.applyTo?.[0] === 'w1' && (await sent(p, 'SCAN_TEXT_STYLES')).length === scBefore, String((await sent(p, 'SCAN_TEXT_STYLES')).length));
-  await recv(p, { type: 'TEXT_STYLES_RESULT', reqId: ts.reqId, created: 1, updated: 0, bound: 1, missing: [], notes: [], applied: 3, applySkipped: 0 });
+  await recv(p, { type: 'TEXT_STYLES_RESULT', reqId: ts.reqId, created: 1, updated: 0, bound: 1, missing: ["title: 글꼴 'Gone Bold'을 불러오지 못해 값 · 변수 연결을 건너뛰었어요"], notes: [], applied: 3, applySkipped: 0 });
   await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   check('17 연결 — APPLY(preview 아님) · skipTextStyleNodes · 시작 때 기준 · reqId', !!ap && ap.skipTextStyleNodes === true && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
   check('17 실행 중 [연결] 잠금', await locked(p, '#btnApplyConfirm'));
   await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   await p.waitForTimeout(120);
-  check('17 다 됨 → 첫 화면 · 상태 줄 "Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 5곳 연결"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 5곳 연결', await p.textContent('#statusText'));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-make-done-missing.png` : '/dev/null' }).catch(() => {});
+  check('17 다 됨 → 첫 화면 · 상태 줄 "… 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결"(글꼴 알림이 있어도 연결까지 돈다) · 툴팁에 알림 글', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결' && (await p.getAttribute('#statusText', 'title')).includes("title: 글꼴 'Gone Bold'"), await p.textContent('#statusText'));
   check('17 실행 결과로 연결 화면 상태 줄 "🔗 …곳 연결"을 쓰지 않음', !(await p.textContent('#statusText')).startsWith('🔗'));
   await p.close();
 }

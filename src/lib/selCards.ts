@@ -29,12 +29,50 @@ export function fieldKind(field: string | undefined): SelKind {
 
 /** k = 변수가 없는 값(§4.1). */
 export const NO_VAR_REASONS: readonly string[] = ['no-match'];
-/** s = 자리 단위 건너뜀만(§4.1). 레이어 단위(instance-children · hidden · no-autolayout · size-free-layout · font)와 already-bound는 뺀다. */
-export const PLACE_SKIP_REASONS: readonly string[] = ['hug-fill', 'translucent', 'space-between', 'fraction', 'size-fraction', 'empty-text', 'deleted-var'];
-/** s에 넣지 않고 칩으로만 보이는 자리 단위 사유(§4.2) — 스타일이 붙은 자리는 이미 디자인 시스템에 연결된 것. */
-export const INFO_SKIP_REASONS: readonly string[] = ['styled'];
+/** s = 손볼 곳(§4.1) — 디자인을 고치면 연결할 수 있게 되는 자리 단위 사유만. */
+export const FIX_SKIP_REASONS: readonly string[] = ['fraction', 'size-fraction', 'deleted-var'];
+/** 그대로 둬도 되는 자리 단위 사유(§4.2) — s에 넣지 않고 건너뛴 곳 목록에만. 이 순서가 목록 줄 순서. */
+export const INFO_SKIP_REASONS: readonly string[] = ['styled', 'space-between', 'hug-fill', 'empty-text'];
 /** 레이어 단위 건너뜀(§4.2 — 건너뜀 칩 안에만 사유로 보인다). */
 export const LAYER_SKIP_REASONS: readonly string[] = ['instance-children', 'hidden', 'no-autolayout', 'size-free-layout', 'font'];
+
+/** 건너뜀 목록 항목(`BindSkip`의 필요한 부분). */
+export interface SkipItem {
+  nodeId: string;
+  name: string;
+  reason: string;
+  field?: string;
+}
+/** 건너뛴 곳 목록의 줄 하나(변수 사유). */
+export interface SkipRow {
+  key: string;
+  /** 자리 단위는 곳 수, 레이어 단위는 사유 수(표시는 `items` 레이어 수 우선). */
+  n: number;
+  layer: boolean;
+  /** [선택 ›] · 툴팁에 쓰는 항목 — 뺀 항목은 없다. */
+  items: SkipItem[];
+}
+/**
+ * 건너뛴 곳 목록의 변수 사유 줄(§4.2 "줄 수 = 칩 수와 같은 셈") — 칩 · 목록 · 건너뛴 곳 모습이 함께 쓴다.
+ * 자리 단위 사유(FIX · INFO)는 텍스트 스타일 후보 레이어의 글자 종류 항목을 뺀다(카드 1의 `ds`와 같은 근사 — 건너뜀 목록 기준).
+ * 레이어 단위 사유는 빼지 않는다. 0인 줄은 없다. 텍스트 스타일만 모습이면 변수 사유 줄은 없다.
+ */
+export function skipRowCounts(
+  reasons: Readonly<Record<string, number>>,
+  skips: readonly SkipItem[],
+  tsNodes: ReadonlySet<string>,
+  tsOnly = false,
+): { fix: SkipRow[]; keep: SkipRow[] } {
+  if (tsOnly) return { fix: [], keep: [] };
+  const rowOf = (key: string, layer: boolean): SkipRow | null => {
+    const all = skips.filter((x) => x.reason === key);
+    const items = layer ? all : all.filter((x) => !(tsNodes.has(x.nodeId) && fieldKind(x.field) === 'text'));
+    const n = Math.max(0, (reasons[key] ?? 0) - (all.length - items.length));
+    return n > 0 ? { key, n, layer, items } : null;
+  };
+  const pick = (keys: readonly string[], layer: boolean): SkipRow[] => keys.map((k) => rowOf(k, layer)).filter((r): r is SkipRow => r != null);
+  return { fix: pick(FIX_SKIP_REASONS, false), keep: [...pick(INFO_SKIP_REASONS, false), ...pick(LAYER_SKIP_REASONS, true)] };
+}
 
 /** 사유 × 종류별 자리 수(APPLY_RESULT.counts). */
 export type ReasonCounts = Record<string, Partial<Record<SelKind, number>>>;
@@ -71,7 +109,7 @@ export function cardCounts(candidateFields: readonly string[], counts: ReasonCou
     }
   }
   let s = 0;
-  for (const r of PLACE_SKIP_REASONS) s += sumKinds(counts?.[r]);
+  for (const r of FIX_SKIP_REASONS) s += sumKinds(counts?.[r]);
   const order = (map: Map<SelKind, number>): { kind: SelKind; n: number }[] =>
     [...SEL_KINDS, 'other' as const].map((kind) => ({ kind, n: map.get(kind) ?? 0 })).filter((x) => x.n > 0);
   const m = candidateFields.length;

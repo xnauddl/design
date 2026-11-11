@@ -2,7 +2,7 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig } from './shared/messages';
-import { type DraftToken, type Unit, tidyNumberTokens } from './lib/tokens';
+import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, SEL_KINDS, NO_VAR_REASONS, PLACE_SKIP_REASONS, LAYER_SKIP_REASONS, INFO_SKIP_REASONS, type CardCounts, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -262,8 +262,12 @@ const tokenChecked = new Set<string>();
 
 /** 체크 키 — 이름은 편집 대상이라 값으로 식별한다(추출의 dedup 키와 같은 규칙). */
 function tokenKey(t: DraftToken): string {
-  return `${t.category}|${t.value}|${t.unit ?? ''}`;
+  // 색은 투명도까지 값(ia-v3 §2.11 "반투명 색 토큰") — 같은 hex의 불투명 · 반투명이 체크를 함께 쓰지 않게.
+  const v = typeof t.value === 'string' && t.value.startsWith('#') ? colorKey(t.value, t.alpha) : t.value;
+  return `${t.category}|${v}|${t.unit ?? ''}`;
 }
+/** 투명도 꼬리(" 8%") — 1이면 빈 글. */
+const alphaTail = (alpha?: number): string => (alpha != null && alpha < 1 ? ` ${alphaPct(alpha)}%` : '');
 
 /** 이 카드가 고르는 대상(색 외 토큰). */
 function creatableTokens(): DraftToken[] {
@@ -521,11 +525,15 @@ function huefyTokenColors(toks: DraftToken[]): void {
   if (!idx.length) return;
   // 같은 hex는 같은 이름 — 채움색과 그림자색이 둘 다 #000000이면 `gray/950`·`gray/950-2` 두 변수가
   // 아니라 한 변수(스코프 합집합)가 돼야 한다. 고유 hex만 이름 짓고 되돌려 붙인다.
-  const uniq = [...new Set(hexes.map((h) => h.toLowerCase()))];
+  // 불투명 토큰의 hex를 먼저 — 반투명 때문에 불투명 색 이름이 `-2`로 밀리지 않게(ia-v3 §2.11 "반투명 색 토큰").
+  const opaqueFirst = [...idx.filter((ti) => toks[ti].alpha == null), ...idx.filter((ti) => toks[ti].alpha != null)];
+  const uniq = [...new Set(opaqueFirst.map((ti) => (toks[ti].value as string).toLowerCase()))];
   const names = nameColorsByHue(uniq);
   const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
   idx.forEach((ti, k) => {
-    toks[ti].name = nameOf.get(hexes[k].toLowerCase()) ?? toks[ti].name;
+    const base = nameOf.get(hexes[k].toLowerCase());
+    const a = toks[ti].alpha;
+    if (base) toks[ti].name = a != null && a < 1 ? `${base}-a${alphaPct(a)}` : base;
   });
 }
 
@@ -608,7 +616,7 @@ function renderColorTable(): void {
     const card = resultCard({
       title: tok.name,
       titleMono: true,
-      summary: `${tok.value}${used}`,
+      summary: `${tok.value}${alphaTail(tok.alpha)}${used}`,
       summaryMono: true,
       metaEl: role,
     });
@@ -626,7 +634,8 @@ function renderPaletteRow(colors: DraftToken[]): void {
   for (const c of colors) {
     const i = document.createElement('i');
     i.style.background = c.value as string;
-    i.title = `${c.name} · ${c.value}`;
+    if (c.alpha != null) i.style.opacity = String(c.alpha);
+    i.title = `${c.name} · ${c.value}${alphaTail(c.alpha)}`;
     row.appendChild(i);
   }
 }
@@ -1995,7 +2004,10 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
-    case 'TEXT_STYLES_RESULT':
+    case 'TEXT_STYLES_RESULT': {
+      // 툴팁: 못 붙인 글자 사유별 수 → 빈 줄 → 알림 목록(IA v4 §4.3 "결과")
+      const why = Object.entries(msg.applyReasons ?? {}).filter(([, n]) => (n ?? 0) > 0).map(([k, n]) => `${t('tsSkip.' + k)} ${t('v4.layerCount', { n })}`);
+      const tsTip = [why.join('\n'), msg.missing.join('\n')].filter(Boolean).join('\n\n');
       setStatus(
         'tsStatus',
         t('textStyle.registered', { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) +
@@ -2003,10 +2015,12 @@ window.onmessage = (event: MessageEvent) => {
           (msg.applySkipped ? t('textStyle.linkSkipped', { k: msg.applySkipped }) : '') +
           // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` · ${msg.notes.join(' · ')}` : '') +
-          (msg.missing.length ? t('textStyle.unlinked', { names: msg.missing.join(', ') }) : ''),
+          (msg.missing.length ? t('textStyle.missingN', { k: msg.missing.length }) : ''),
         msg.missing.length ? 'warn' : 'ok',
+        tsTip || undefined,
       );
       break;
+    }
     case 'TEXT_STYLES_PREVIEW': {
       // 텍스트 스타일 미리보기(§4.2) — 같은 찾기 차례의 응답만.
       if (msg.reqId !== bindTsReq || msg.reqId !== bindLatest) break;
@@ -2641,7 +2655,7 @@ let mkFocusPending = false;
 let mkRunning = false;
 let mkCancelReq = false;
 let mkProg: { steps: MakeStepId[]; i: number; done: MakeStepId[] } | null = null;
-let mkResults: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string }[] | null = null;
+let mkResults: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string; tip?: string }[] | null = null;
 let mkResultsCreated = false;
 let mkCancelNote = '';
 
@@ -2762,7 +2776,7 @@ function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): 
 
 function mkValueChip(tk: DraftToken): HTMLElement {
   const v = typeof tk.value === 'number' && tk.unit === 'percent' ? `${tk.value}%` : String(tk.value);
-  return valueChip(v);
+  return valueChip(v, tk.alpha);
 }
 function mkTag(text: string, tip: string, warn = false): HTMLElement {
   const s = document.createElement('span');
@@ -3079,6 +3093,7 @@ function renderMakeResults(): void {
     tx.className = 'tr-cnt';
     if (r.mark === 'warn') tx.style.color = 'var(--warn)';
     tx.textContent = r.text;
+    if (r.tip) row.title = r.tip; // 텍스트 스타일 알림 목록(§4.3 "글꼴")
     row.append(mark, nm, tx);
     box.appendChild(row);
   }
@@ -3159,7 +3174,7 @@ async function runMake(): Promise<void> {
   opWizardStart();
   renderMakeScreen();
   const totals: MakeTotals = {};
-  const results: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string }[] = [];
+  const results: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string; tip?: string }[] = [];
   let stay = false;
   let stopped = false;
   for (let i = 0; i < steps.length; i++) {
@@ -3189,8 +3204,8 @@ async function runMake(): Promise<void> {
       } else if (id === 'textStyles') {
         const rid = mkNextReq();
         const r = await wizardRequest({ type: 'CREATE_TEXT_STYLES', styles, reqId: rid, ...(link ? { applyTo: ids } : {}) }, ['TEXT_STYLES_RESULT'], rid);
-        totals.styles = { s: r.created + r.updated, a: r.applied ?? 0 };
-        results.push({ id, mark: 'ok', text: t('wizard.seq.textStyles', { created: r.created, updated: r.updated }) + (r.applied ? t('wizard.seq.textStylesLinked', { a: r.applied }) : '') + (r.missing.length ? t('wizard.seq.textStylesMissing', { k: r.missing.length }) : '') });
+        totals.styles = { s: r.created + r.updated, a: r.applied ?? 0, ...(r.missing.length ? { missing: r.missing } : {}) };
+        results.push({ id, mark: 'ok', text: t('wizard.seq.textStyles', { created: r.created, updated: r.updated }) + (r.applied ? t('wizard.seq.textStylesLinked', { a: r.applied }) : '') + (r.missing.length ? t('wizard.seq.textStylesMissing', { k: r.missing.length }) : ''), ...(r.missing.length ? { tip: r.missing.join('\n') } : {}) });
       } else if (id === 'bind') {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
@@ -3246,7 +3261,8 @@ async function runMake(): Promise<void> {
   // 다 됨 — 하위 화면을 첫 화면으로(탭은 바꾸지 않음) + 상태 줄.
   const linkOff = !link;
   if (selSub === 'make') showSelSub('home');
-  showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
+  const doneTip = totals.styles?.missing?.join('\n'); // 텍스트 스타일 알림 목록(§4.3 "글꼴")
+  showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(doneTip ? { tip: doneTip } : {}), ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
 }
 $('btnMakeRun').addEventListener('click', () => void runMake());
 $('btnMakeCancel').addEventListener('click', () => { mkCancelReq = true; send({ type: 'CANCEL' }); });
@@ -3366,7 +3382,7 @@ function bindCardCounts(): CardCounts & { t: number } {
   for (const s of bindSkips) {
     if (!ts.has(s.nodeId) || fieldKind(s.field) !== 'text') continue;
     if (NO_VAR_REASONS.includes(s.reason)) dk++;
-    else if (PLACE_SKIP_REASONS.includes(s.reason)) ds++;
+    else if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
   }
   const t = ts.size;
   const m = c.m + t;
@@ -3382,14 +3398,22 @@ function typeMark(value: string): string {
   return isHexColor(value) ? '●' : /^-?\d/.test(value) ? '#' : 'T';
 }
 /** 값 칩 — 색은 견본 + #RRGGBB, 숫자는 숫자. */
-function valueChip(value: string): HTMLElement {
+function valueChip(value: string, alpha?: number): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'bv-chip bv-val';
   if (isHexColor(value)) {
     const sw = document.createElement('span');
     sw.className = 'bv-sw';
     sw.style.background = value;
+    if (alpha != null && alpha < 1) sw.style.opacity = String(alpha);
     chip.append(sw, value.toUpperCase());
+    // 반투명 색 — hex 뒤 회색 "8%"(ia-v3 §2.11 "반투명 색 토큰")
+    if (alpha != null && alpha < 1) {
+      const a = document.createElement('span');
+      a.className = 'bv-alpha';
+      a.textContent = alphaTail(alpha);
+      chip.appendChild(a);
+    }
   } else chip.textContent = value;
   return chip;
 }
@@ -3444,8 +3468,12 @@ function renderBindEmpty(): void {
   clearMount(box);
   let text = '';
   let action: [string, () => void] | null = null;
+  const zero = bindZero();
+  box.classList.toggle('done', zero);
   if (bindLinking) text = '';
   else if (!bindPreviewed) text = bindFinding || bindFindFailed ? '' : t('v4.reading');
+  // 건너뛴 곳 모습 · 모두 연결된 모습(§4.2) — 손볼 곳이 있으면 allLinked, 없으면 카드 1과 같은 allBound
+  else if (zero) text = bindSkipMode() && bindCardCounts().s > 0 ? t('v4.allLinked') : t('v4.allBound');
   else if (!hasBindPreview() || (bindTsOnly() && !bindTsRows.length)) {
     text = t('v4.nothingToLink');
     if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMakeScreen()];
@@ -3466,19 +3494,42 @@ function renderBindEmpty(): void {
   }
 }
 
-/** 건너뜀 칩(§4.2) — s는 카드 1과 같은 정의(자리 단위 곳 수). 레이어 단위 · 텍스트 스타일 사유는 칩 안에만. */
+/** 찾기를 마쳤고 연결할 곳(m)과 새로 만들 값(k)이 모두 0(텍스트 스타일만 모습 제외) — 건너뛴 곳 모습 · 모두 연결된 모습(§4.2). */
+function bindZero(): boolean {
+  return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+}
+/** 건너뛴 곳 목록의 줄(§4.2) — 변수 사유(스타일 후보 글자 자리를 뺀 셈, `skipRowCounts`) + 보이는 텍스트 스타일 사유. 칩 · 목록 · 모습이 함께 쓴다. */
+function skipListRows(): ReturnType<typeof skipRowCounts> & { ts: string[] } {
+  const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly());
+  const ts = Object.keys(bindTsSkips).filter((k) => (bindTsSkips[k] ?? 0) > 0 && tsSkipVisible(k));
+  return { ...r, ts };
+}
+function skipListAny(): boolean {
+  const r = skipListRows();
+  return r.fix.length + r.keep.length + r.ts.length > 0;
+}
+/** 건너뛴 곳 모습(§4.2) — m = k = 0이고 목록에 줄이 있다. */
+function bindSkipMode(): boolean {
+  return bindZero() && skipListAny();
+}
+/** 텍스트 스타일 사유 중 목록에 보일 것 — hasStyle은 styled와 같은 글자라 숨긴다(텍스트 스타일만 모습에서는 보인다). */
+function tsSkipVisible(key: string): boolean {
+  return key !== 'hasStyle' || bindTsOnly();
+}
+/** 건너뛴 곳 칩(§4.2) — s(손볼 곳)가 있으면 "[손볼 곳 {s}곳 ▸]", 그대로 둬도 되는 곳만 있으면 "[건너뛴 곳 ▸]". 건너뛴 곳 모습에서는 칩 없이 목록을 펼친 채. */
 function renderBindBadges(): void {
   const c = bindCardCounts();
-  const layerReasons = Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && LAYER_SKIP_REASONS.includes(k)).length + Object.values(bindTsSkips).filter((n) => n > 0).length;
   const s = bindTsOnly() ? 0 : c.s;
-  // 스타일 사용 중(styled)은 s에 넣지 않고 칩으로만 — 텍스트 스타일만 모습에서는 보지 않는다(§4.2).
-  const info = bindTsOnly() ? 0 : Object.entries(bindSkipReasons).filter(([k, n]) => n > 0 && INFO_SKIP_REASONS.includes(k)).length;
-  const show = !bindLinking && bindPreviewed && (s > 0 || layerReasons > 0 || info > 0);
+  const rows = skipListRows();
+  const any = rows.fix.length + rows.keep.length + rows.ts.length > 0; // 칩 조건 = 목록에 줄이 있음(§4.2 "줄 수 = 칩 수와 같은 셈")
+  const skipMode = bindZero() && any;
+  const show = !bindLinking && bindPreviewed && any;
   $('bindBadges').hidden = !show;
   const skip = $('bindSkipToggle');
-  skip.textContent = `${s > 0 ? t('v4.skipPlaces', { s }) : info > 0 ? t('bind.skippedPlacesChip') : t('v4.skipLayers')} ${bindSkipsOpen ? '▾' : '▸'}`;
+  skip.hidden = skipMode;
+  skip.textContent = `${s > 0 ? t('v4.fixPlacesChip', { s }) : t('bind.skippedPlacesChip')} ${bindSkipsOpen ? '▾' : '▸'}`;
   skip.setAttribute('aria-expanded', String(show && bindSkipsOpen));
-  $('bindSkips').hidden = !(show && bindSkipsOpen);
+  $('bindSkips').hidden = !(show && (bindSkipsOpen || skipMode));
 }
 
 /** 연결 화면 그리기. */
@@ -3501,7 +3552,7 @@ function renderBindTree(): void {
           key: g.rowKey,
           indent: 24,
           off: !on,
-          cells: [valueChip(g.variableValue), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
+          cells: [valueChip(g.variableValue, g.variableAlpha), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
           right: [cnt],
           sw: { state: on, label: t('bind.switchAria', { name: g.variableName }), onToggle: () => { for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k); renderBindTree(); } },
         };
@@ -3562,6 +3613,38 @@ function renderBindChrome(): void {
   updateBindApply();
   if (activeTab === 'select' && selSub === 'bind') renderSubHead();
   renderSelHome();
+  restoreBindFocus();
+}
+/** 연결 화면에서 마지막으로 포커스를 받은 요소(다시 그릴 때의 포커스, §4.2). */
+let lastBindFocus: HTMLElement | null = null;
+document.querySelector('[data-apply-step="bind"]')?.addEventListener('focusin', (e) => {
+  lastBindFocus = e.target instanceof HTMLElement ? e.target : null;
+});
+// 사용자가 포커스를 화면 밖 다른 요소로 옮기면 잊는다(지워져서 빠진 포커스만 되돌린다).
+document.querySelector('[data-apply-step="bind"]')?.addEventListener('focusout', (e) => {
+  const to = (e as FocusEvent).relatedTarget;
+  if (to instanceof Node && !(e.currentTarget as HTMLElement).contains(to)) lastBindFocus = null;
+});
+const goneEl = (el: HTMLElement): boolean => !el.isConnected || el.closest('[hidden]') != null;
+/** 다시 그려 포커스가 있던 요소가 지워졌거나 숨었으면(포커스가 body로 빠짐) 규칙대로 옮긴다(§4.2 "목록을 다시 그릴 때의 포커스"). */
+function restoreBindFocus(): void {
+  const was = lastBindFocus;
+  if (!was || activeTab !== 'select' || selSub !== 'bind') return;
+  const active = document.activeElement;
+  if ((active && active !== document.body && !goneEl(active as HTMLElement)) || !goneEl(was)) return;
+  lastBindFocus = null;
+  const list = $('bindSkips');
+  const sels = list.hidden ? [] : Array.from(list.querySelectorAll<HTMLElement>('.skip-sel'));
+  const chip = $('bindSkipToggle');
+  const chipOn = !chip.hidden && !$('bindBadges').hidden;
+  const reason = was.classList.contains('skip-sel') ? was.dataset.reason : undefined;
+  let to: HTMLElement | null;
+  if (reason != null && sels.length) to = sels.find((b) => b.dataset.reason === reason) ?? sels[0];
+  else if (bindSkipMode()) to = sels[0] ?? null;
+  else if (bindZero()) to = null;
+  else if (reason != null) to = chipOn ? chip : null;
+  else to = $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
+  (to ?? $('btnSubBack')).focus({ preventScroll: true });
 }
 $('bindSkipToggle').addEventListener('click', () => {
   bindSkipsOpen = !bindSkipsOpen;
@@ -3583,7 +3666,7 @@ function updateBindApply(): void {
   const confirm = $('btnApplyConfirm');
   const n = bindOnCount();
   $('btnApplyConfirmLabel').textContent = bindPreviewed && hasBindPreview() ? t('bind.linkN', { n }) : t('bind.link');
-  $('bindFoot').hidden = !!bindLinking;
+  $('bindFoot').hidden = !!bindLinking || bindZero(); // 건너뛴 곳 · 모두 연결된 모습은 연결할 곳이 0 — 버튼 줄 없음
   if (!curSel.count && !baseline) setLock(confirm, 'prereq', t('status.noSelection'));
   else if (!bindPreviewed) setLock(confirm, 'prereq', t('v4.reading'));
   else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
@@ -3759,38 +3842,64 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   const box = $('bindSkips');
   clearMount(box);
   const capNote = bindSkipsCapped ? t('bind.skipCappedTip', { shown: bindSkips.length }) : '';
-  const varEntries = bindTsOnly() ? [] : Object.entries(reasons).filter(([k, n]) => n > 0 && (PLACE_SKIP_REASONS.includes(k) || LAYER_SKIP_REASONS.includes(k) || INFO_SKIP_REASONS.includes(k)));
-  for (const [key, n] of varEntries) {
-    const ids = [...new Set(bindSkips.filter((s) => s.reason === key).map((s) => s.nodeId))];
-    const layer = LAYER_SKIP_REASONS.includes(key);
-    const label = t(layer ? 'v4.reasonLayers' : 'v4.reasonPlaces', { reason: t('reason.' + key), n: layer && ids.length ? ids.length : n });
-    const info = INFO_SKIP_REASONS.includes(key) ? ' info' : ''; // 손볼 곳이 아님 — 글자 --text-2
-    if (!ids.length) {
-      const span = document.createElement('span');
-      span.className = `skip-chip static${info}`;
-      span.textContent = label;
-      box.appendChild(span);
-      continue;
+  // 줄 하나 = 사유 하나(§4.2 건너뛴 곳 목록): 이름 · 수 · 한 줄 설명 · [선택 ›]
+  const row = (label: string, count: string, help: string, items: readonly SkipItem[], key?: string): HTMLElement => {
+    const ids = [...new Set(items.map((x) => x.nodeId))];
+    const r = document.createElement('div');
+    r.className = 'skip-row';
+    const nm = document.createElement('span');
+    nm.className = 'skip-name';
+    nm.textContent = label;
+    const n = document.createElement('span');
+    n.className = 'skip-n';
+    n.textContent = count;
+    r.append(nm, n);
+    if (help) {
+      const h = document.createElement('span');
+      h.className = 'skip-help';
+      h.textContent = help;
+      r.appendChild(h);
     }
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `skip-chip${info}`;
-    btn.textContent = `${label} ›`;
-    const names = bindSkips.filter((s) => s.reason === key).slice(0, 5).map((s) => s.name).join(', ');
-    btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
-    btn.addEventListener('click', () => {
-      bindLayerSelectPending = true;
-      selectNodes(ids, 'applyStatus');
-      setStatus('applyStatus', t('bind.skipSelected', { reason: t('reason.' + key), n: ids.length }), '');
-    });
-    box.appendChild(btn);
+    const grow = document.createElement('span');
+    grow.className = 'grow';
+    r.appendChild(grow);
+    if (ids.length && key) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'link link-btn skip-sel';
+      btn.dataset.reason = key; // 다시 그린 뒤 같은 줄로 포커스를 돌려줄 열쇠(§4.2)
+      btn.textContent = t('bind.skipSelectBtn');
+      const names = items.slice(0, 5).map((x) => x.name).join(', ');
+      btn.title = t(ids.length > 5 ? 'bind.skipChipTipMore' : 'bind.skipChipTip', { count: ids.length, names }) + capNote;
+      btn.addEventListener('click', () => {
+        bindLayerSelectPending = true;
+        selectNodes(ids, 'applyStatus');
+        setStatus('applyStatus', t('bind.skipSelected', { reason: t('reason.' + key), n: ids.length }), '');
+      });
+      r.appendChild(btn);
+    }
+    return r;
+  };
+  const varRow = (r: SkipRow): HTMLElement => {
+    const layers = new Set(r.items.map((x) => x.nodeId)).size;
+    const count = r.layer ? t('v4.layerCount', { n: layers || r.n }) : t('bind.count', { k: r.n });
+    return row(t('reason.' + r.key), count, t('reasonHelp.' + r.key), r.items, r.key);
+  };
+  const head = (text: string): void => {
+    const h = document.createElement('div');
+    h.className = 'skip-head';
+    h.textContent = text;
+    box.appendChild(h);
+  };
+  const { fix, keep, ts: tsKeys } = skipListRows(); // 칩 · 모습과 같은 셈(§4.2 "줄 수 = 칩 수와 같은 셈")
+  if (fix.length) {
+    head(t('v4.skipFixHead'));
+    for (const r of fix) box.appendChild(varRow(r));
   }
-  for (const [key, n] of Object.entries(bindTsSkips)) {
-    if (!(n > 0)) continue;
-    const span = document.createElement('span');
-    span.className = 'skip-chip static';
-    span.textContent = t('v4.reasonLayers', { reason: t('tsSkip.' + key), n });
-    box.appendChild(span);
+  if (keep.length || tsKeys.length) {
+    head(t('v4.skipKeepHead'));
+    for (const r of keep) box.appendChild(varRow(r));
+    for (const k of tsKeys) box.appendChild(row(t('tsSkip.' + k), t('v4.layerCount', { n: bindTsSkips[k] }), '', []));
   }
 }
 
@@ -3904,12 +4013,13 @@ function hideApplyProgress(): void {
   if (curSel) renderBindChrome(); // 찾는 중 표시를 거둔다
 }
 
-function setStatus(id: string, text: string, cls: 'ok' | 'warn' | ''): void {
+function setStatus(id: string, text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
   const el = $(id);
   el.textContent = text;
   el.className = `status ${cls}`;
-  // 라이선스 줄의 원문 사유 툴팁(noteTip)이 다음 문구에 남지 않게 — 쓸 때마다 비운다.
-  if (id === 'licenseStatus') el.removeAttribute('title');
+  // 툴팁은 쓸 때마다 새로 — 옛 목록 · 라이선스 원문 사유(noteTip, 부른 쪽이 뒤에 단다)가 다음 문구에 남지 않게.
+  if (tip) el.title = tip;
+  else el.removeAttribute('title');
 }
 
 function escapeHtml(s: string): string {
@@ -4593,7 +4703,10 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
 function bindFocusFirst(): void {
   if (!bindFocusPending || activeTab !== 'select' || selSub !== 'bind') return;
-  const row = $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
+  // 건너뛴 곳 모습은 첫 [선택 ›](없으면 ←), 모두 연결된 모습은 ← — §4.2
+  const row = bindZero()
+    ? $('bindSkips').querySelector<HTMLElement>('.skip-sel') ?? $('btnSubBack')
+    : $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
   if (!row) return;
   bindFocusPending = false;
   row.focus({ preventScroll: true });
@@ -4603,6 +4716,7 @@ function bindHeadTail(): string {
   if (!bindPreviewed) return '';
   const c = bindCardCounts();
   if (bindTsOnly()) return c.t ? t('v4.tsPlaces', { t: c.t }) : '';
+  if (bindSkipMode()) return c.s ? t('v4.fixPlaces', { s: c.s }) : ''; // 건너뛴 곳 모습 — 손볼 곳 수
   return c.n ? t('v4.findN', { n: c.n }) : '';
 }
 /** 머리 오른쪽 = 이름(넘치면 이것만 줄임) + 꼬리(늘 보임, §4.2). */
@@ -4626,7 +4740,7 @@ function setSubRight(name: string, tail: string, sep: string): void {
 function renderSubHead(): void {
   const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'make.title', pick: 'v4.subMake' };
   if (selSub === 'home') return;
-  $('subTitle').textContent = t(titles[selSub]);
+  $('subTitle').textContent = selSub === 'bind' && bindSkipMode() ? t('v4.skippedTitle') : t(titles[selSub]);
   const name = baseline ? baseLabel() : '';
   if (selSub === 'make') setSubRight(name, name ? t('make.subRight') : '', '');
   else if (selSub === 'rename') setSubRight(name, renameFor === baseKey() ? t('rename.subRight', { n: renameRows().length }) : '', ' · ');
@@ -7260,7 +7374,7 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
   if (n === 0) {
     const v = selLink(t('v4.view'), (el) => { bindSkipsOpen = true; showSelSub('bind', el); renderBindTree(); });
     v.dataset.k = 'skips';
-    put(selCard({ title: t('v4.allLinked'), subs: [t('v4.skippedPlaces', { s })], actions: [v] }));
+    put(selCard({ title: t('v4.allLinked'), subs: [t('v4.fixPlaces', { s })], actions: [v] }));
     return;
   }
   // 둘째 줄: 종류별 연결할 곳(합 = m, Other 제외) + " · 새로 만들 값 {k}곳"(링크 없음 — 입구는 할 일 [변수 만들기]).

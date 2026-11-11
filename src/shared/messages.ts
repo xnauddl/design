@@ -87,6 +87,10 @@ export interface BindCandidate {
   tier: number;
   /** 변수 값(표시용 — 연결 목록의 변수 묶음 줄, §4.6). */
   variableValue?: string;
+  /** 색: 현재 칠하기 · 그림자의 투명도(소수 둘째 자리) — 1이면 없음. 값 칩 "#000000 8%"(ia-v3 §2.11). */
+  currentAlpha?: number;
+  /** 색: 변수 값의 투명도(소수 둘째 자리) — 1이면 없음. */
+  variableAlpha?: number;
   /** 새 역할(§2.12 12.9) — 연결할 때 만든다. 이때 variableId는 `new:{이름}`(카드 묶음 키). */
   newRole?: NewRoleRef;
   /** 새 역할이 가리킬 Global 이름(칩 툴팁 "…{Global}을 가리켜요"). */

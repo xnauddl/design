@@ -11,6 +11,8 @@ import {
   rgbToHex,
   colorTokenName,
   numberTokenName,
+  roundAlpha,
+  alphaPct,
 } from './tokens';
 import { bgKindOf, colorUse, composeName, paddingProp, radiusName, simpleNumericName, strokeName, type BgKind, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
 
@@ -53,8 +55,15 @@ function onScale(acc: Accumulator, v: number, step = 1): boolean {
   return ok;
 }
 
-function keyOf(category: TokenCategory, value: string | number, unit?: Unit): string {
-  return `${category}|${value}|${unit ?? ''}`;
+function keyOf(category: TokenCategory, value: string | number, unit?: Unit, alpha?: number): string {
+  return `${category}|${value}|${unit ?? ''}|${alpha ?? 1}`; // 같은 hex라도 투명도가 다르면 다른 토큰
+}
+
+/** 색 토큰 — 투명도 1이면 alpha 없음, 아니면 이름에 `-a{%}`(§2.11 "반투명 색 토큰"). */
+function colorToken(category: 'color' | 'effectColor', hex: string, alpha: number): Omit<DraftToken, 'sources'> {
+  return alpha < 1
+    ? { name: `${colorTokenName(hex)}-a${alphaPct(alpha)}`, category, value: hex, alpha }
+    : { name: colorTokenName(hex), category, value: hex };
 }
 
 function add(
@@ -67,7 +76,7 @@ function add(
   /** 색 쓰임의 배경 종류(12.4) — 같은 쓰임이라도 배경 종류가 다르면 따로 센다. */
   bg?: BgKind,
 ): void {
-  const k = keyOf(token.category, token.value, token.unit);
+  const k = keyOf(token.category, token.value, token.unit, token.alpha);
   let existing = acc.map.get(k);
   if (existing) {
     if (!existing.sources.includes(source)) existing.sources.push(source);
@@ -122,13 +131,14 @@ function collectPaints(
       acc.skipped.add(SKIP_GRADIENT); // GRADIENT / IMAGE / VIDEO — 변수 바인딩 불가, 조용히 스킵
       continue;
     }
+    const alpha = roundAlpha(p.opacity);
+    if (alpha === 0) continue; // 보이지 않는 칠 — 사유 없이 건너뜀
     const hex = rgbToHex(p.color);
     const cu = colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node));
     const bgHex = cu === 'text' || cu === 'icon' || cu === 'border' ? backgroundOf(node) : undefined;
-    add(acc, { name: colorTokenName(hex), category: 'color', value: hex }, source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined);
-    // 페인트 불투명도(p.opacity)는 토큰화하지 않는다 — Figma에는 페인트 opacity에 붙는 변수가 없다
-    // (OPACITY 스코프는 **레이어** 불투명도 전용, collectOpacity가 따로 모은다). 만들어 봐야
-    // 어디에도 연결되지 않는 `opacity/0.08` 변수만 남았다. 반투명 색 자체는 bind가 건너뛴다(bind.ts).
+    add(acc, colorToken('color', hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined);
+    // 페인트 불투명도(p.opacity)는 따로 `opacity/…` 토큰으로 만들지 않는다 — OPACITY 스코프는 **레이어** 불투명도 전용.
+    // 대신 색 토큰의 투명도(alpha)로 담는다: 색 변수를 붙이면 피그마가 칠 불투명도를 변수 alpha로 맞춘다(§2.11 "색").
   }
 }
 
@@ -398,8 +408,10 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
   for (const e of (node as { effects: readonly Effect[] }).effects) {
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
+      const alpha = roundAlpha(e.color.a);
+      if (alpha === 0) continue; // 보이지 않는 그림자 — 숨긴 효과처럼 건너뜀
       const hex = rgbToHex(e.color);
-      add(acc, { name: colorTokenName(hex), category: 'effectColor', value: hex }, 'effectColor', node.id, 'color/shadow');
+      add(acc, colorToken('effectColor', hex, alpha), 'effectColor', node.id, 'color/shadow');
       for (const [g, val] of [
         ['shadow-blur', e.radius],
         ['shadow-spread', e.spread ?? 0],

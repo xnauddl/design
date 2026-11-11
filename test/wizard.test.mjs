@@ -63,3 +63,11 @@ test('makeDoneText — 무료 꼬리', () => {
   assert.equal(makeDoneText({ bound: 4, renamed: 2 }, { isPaid: false, linkOff: false }), '4곳 연결 · 이름 2개 정리 · 변수는 만들지 않았어요');
   assert.equal(makeDoneText({ renamed: 2 }, { isPaid: false, linkOff: true }), '이름 2개 정리 · 변수는 만들지 않았어요 · 연결은 아직 안 했어요');
 });
+
+test('makeDoneText — 텍스트 스타일 알림은 "텍스트 스타일 {s}개" 바로 뒤 "알림 {k}개" (IA v4 §4.3 "글꼴")', () => {
+  assert.equal(
+    makeDoneText({ styles: { s: 2, a: 0, missing: ['a', 'b'] }, bound: 3 }, { isPaid: true, linkOff: false }),
+    '텍스트 스타일 2개 · 알림 2개 · 3곳 연결',
+  );
+  assert.equal(makeDoneText({ styles: { s: 1, a: 0, missing: [] } }, { isPaid: true, linkOff: false }), '텍스트 스타일 1개');
+});

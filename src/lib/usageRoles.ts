@@ -9,6 +9,7 @@
 import { hexToOklch } from './color';
 import { LOW_CHROMA } from './palette';
 import { VECTOR_TYPES } from './nodePaint';
+import { colorKey } from './tokens';
 
 /** 주인으로 쓰지 않는 구조 폴백 역할(12.3 ①). */
 const STRUCTURAL = new Set(['container', 'wrapper', 'shape', 'group', 'content', 'body']);
@@ -138,6 +139,8 @@ export interface ColorCount {
   count: number;
   /** 그 자리의 배경 종류(`backgroundOf`). 모르면 없음. */
   bg?: BgKind;
+  /** 색 투명도(소수 둘째 자리) — 1이면 없음. 밝기는 hex로만, 키는 투명도까지 나눈다. */
+  alpha?: number;
 }
 
 /** 색 하나의 배경 종류(유채색이면 chroma, 아니면 L 0.5 기준). */
@@ -147,9 +150,10 @@ export function bgKindOf(hex: string): BgKind {
   return o.l < 0.5 ? 'dark' : 'light';
 }
 
-/** colorRoleBases 결과의 찾기 키 — (hex, 배경 종류). 배경을 모르면 hex만. */
-export function colorSlotKey(hex: string, bg?: BgKind): string {
-  return bg ? `${hex.toLowerCase()}|${bg}` : hex.toLowerCase();
+/** colorRoleBases 결과의 찾기 키 — (색 값 키, 배경 종류). 배경을 모르면 색 값 키만. 투명도 1이면 키는 hex. */
+export function colorSlotKey(hex: string, bg?: BgKind, alpha?: number): string {
+  const k = colorKey(hex, alpha);
+  return bg ? `${k}|${bg}` : k;
 }
 
 /** inverse가 있는 쓰임(배경 위에 놓이는 색). */
@@ -159,7 +163,8 @@ const byCountThenHex = (a: { hex: string; count: number }, b: { hex: string; cou
   b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
 
 /**
- * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand), 키는 `colorSlotKey(hex, bg)`.
+ * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand), 키는 `colorSlotKey(hex, bg, alpha)`.
+ * 밝기 판정은 hex로만 — 같은 hex · 다른 투명도는 같은 이름을 받고 assignNames가 번호를 붙인다(§2.11 "반투명 색 토큰").
  * 기준색: `existingDefaultHex`(`color/{쓰임}/default`가 이미 있으면 그 색), 없으면 hex별 곳 수 합이 가장 많은 색
  * (같으면 hex 순). 판정 순서: default → inverse(합친 판정) → brand(유채) → subtle · strong.
  * inverse(12.4 합친 판정, `use`가 text · icon · border일 때만 — 없으면 판정한다):
@@ -171,7 +176,7 @@ export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex
   const totals = new Map<string, number>();
   for (const c of colors) totals.set(c.hex.toLowerCase(), (totals.get(c.hex.toLowerCase()) ?? 0) + c.count);
   const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-  const refHex = (existingDefaultHex ?? top?.hex)?.toLowerCase();
+  const refHex = (existingDefaultHex?.split('@')[0] ?? top?.hex)?.toLowerCase(); // 색 값 키가 와도 hex만
   if (!refHex) return out;
   const ref = hexToOklch(refHex);
   const refDark = ref.l < 0.35;
@@ -180,7 +185,7 @@ export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex
   const inverseUse = use == null || INVERSE_USES.has(use);
   for (const c of colors) {
     const hex = c.hex.toLowerCase();
-    const key = colorSlotKey(hex, c.bg);
+    const key = colorSlotKey(hex, c.bg, c.alpha);
     if (hex === refHex) {
       out.set(key, 'default');
       continue;
@@ -271,7 +276,7 @@ export function isOldPluginName(name: string): boolean {
   return OLD_LADDER.test(name) || OLD_COLOR.has(name);
 }
 
-/** 값 키 — 숫자는 소수 둘째 자리, 색은 소문자 hex. */
+/** 값 키 — 숫자는 소수 둘째 자리, 색은 소문자 hex(반투명은 색 값 키 `#rrggbb@0.08` 그대로). */
 export function valueKey(v: number | string): string {
   return typeof v === 'number' ? String(Math.round(v * 100) / 100) : v.toLowerCase();
 }

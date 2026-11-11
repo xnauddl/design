@@ -60,8 +60,8 @@ export interface MakeTotals {
   /** 만들기: g = created + updated, r = Semantic 수, m = 직접 만든 변수라 건너뜀. */
   created?: { g: number; r: number; m: number };
   darkFilled?: number;
-  /** 텍스트 스타일: s = created + updated, a = 붙인 글자 수. */
-  styles?: { s: number; a: number };
+  /** 텍스트 스타일: s = created + updated, a = 붙인 글자 수, missing = 알림 목록(§4.3 "글꼴"). */
+  styles?: { s: number; a: number; missing?: string[] };
   bound?: number;
   renamed?: number;
 }
@@ -75,6 +75,7 @@ export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOf
   if (totals.created) parts.push(t('make.done.create', { g: totals.created.g, r: totals.created.r }));
   if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
   if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
+  if (totals.styles?.missing?.length) parts.push(t('make.done.missing', { k: totals.styles.missing.length })); // 텍스트 스타일 바로 뒤(§4.3 "글꼴")
   if (totals.bound != null) parts.push(t('make.done.bind', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('make.done.rename', { c: totals.renamed }));
   if (totals.created && totals.created.m > 0) parts.push(t('make.done.manual', { m: totals.created.m }));

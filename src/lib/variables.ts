@@ -4,6 +4,7 @@
    성능: 로컬 변수를 1회만 페치해 인덱스(Map)로 O(1) upsert.
    ============================================================ */
 import { t } from './i18n';
+import { explainError } from './errors';
 import {
   DraftToken,
   PxConversion,
@@ -11,6 +12,7 @@ import {
   ScopeName,
   hexToRgb,
   rgbToHex,
+  colorKey,
   numberTokenName,
   pxConversions,
   resolvedTypeForToken,
@@ -77,7 +79,7 @@ export const REUSE_MAP_KEY = 'dsl.reuseMap';
 
 /** 토큰의 Global 리터럴 — 비교 · 쓰기가 같은 값을 쓴다(setGlobalLiteral과 같은 환산). */
 function literalOf(t: DraftToken, type: ResolvedType, base: number): string | number {
-  if (type === 'COLOR') return String(t.value).toLowerCase();
+  if (type === 'COLOR') return colorKey(String(t.value), t.alpha); // 색 값 키(hex + 투명도)
   if (type === 'STRING') return String(t.value);
   return t.unit && t.unit !== 'px' && typeof t.value === 'number' ? toPx(t.value, t.unit, { base, fontSize: t.fontSize ?? base }) : Number(t.value);
 }
@@ -93,8 +95,7 @@ function sameLiteral(raw: VariableValue | undefined, lit: string | number, type:
   if (raw == null) return false;
   if (type === 'COLOR') {
     if (typeof raw !== 'object' || !('r' in raw)) return false;
-    const a = (raw as RGBA).a;
-    return (typeof a !== 'number' || a === 1) && rgbToHex(raw as RGB).toLowerCase() === lit;
+    return colorKey(rgbToHex(raw as RGB), (raw as RGBA).a) === lit; // hex · 투명도(소수 둘째 자리) 모두 같아야
   }
   if (type === 'STRING') return typeof raw === 'string' && raw === lit;
   return typeof raw === 'number' && Math.round(raw * 100) === Math.round(Number(lit) * 100);
@@ -314,7 +315,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
   };
   const keyOfValue = (val: VariableValue | undefined): string => {
     if (val == null) return '';
-    if (typeof val === 'object' && 'r' in val) return valueKey(rgbToHex(val as RGB));
+    if (typeof val === 'object' && 'r' in val) return colorKey(rgbToHex(val as RGB), (val as RGBA).a); // 색 값 키
     return typeof val === 'number' || typeof val === 'string' ? valueKey(val) : '';
   };
   // 이미 있는 이름 = Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음. 같은 이름이면 사용자 컬렉션 먼저 · 목록 순(13.5).
@@ -351,13 +352,14 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
     const defKey = existing.get(`${use}/default`)?.[0];
     const bases = colorRoleBases(
-      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg })),
-      defKey || undefined,
+      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
+      defKey || undefined, // 색 값 키여도 colorRoleBases가 hex만 본다
       use.slice('color/'.length),
     );
     for (const x of list) {
       const hex = String(x.token.value).toLowerCase();
-      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg)) ?? 'default'}`, value: valueKey(hex), count: x.count, token: x.token });
+      // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 번호가 붙는다(default · default-2)
+      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
     }
   }
   const names = assignNames(reqs, existing);
@@ -398,7 +400,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
 function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {
   if (type === 'COLOR') {
     const { r, g, b } = hexToRgb(String(t.value));
-    v.setValueForMode(modeId, { r, g, b, a: 1 });
+    v.setValueForMode(modeId, { r, g, b, a: t.alpha ?? 1 }); // 반투명 색은 투명도를 담은 Global
   } else if (type === 'STRING') {
     v.setValueForMode(modeId, String(t.value)); // fontFamily 등
   } else {
@@ -979,23 +981,21 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
       continue; // 충돌 rename 보류 — 동명 스타일·잘못된 시맨틱 바인딩 방지
     }
-    let style = anchored;
-    if (!style) style = styleByName.get(spec.name);
+    let style: TextStyle | undefined = anchored ?? styleByName.get(spec.name);
     const created = !style;
     // 앵커 id로 실제 스타일을 찾았을 때만 rename. stale boundStyleId는 이름 폴백/신규처럼 타이포 기록.
     const isRename = !!anchored;
-    if (!style) style = figma.createTextStyle();
-    if (style.name !== spec.name) {
-      styleByName.delete(style.name); // 옛 이름 인덱스 제거 — 이후 동명 행이 rename된 스타일을 가로채지 않도록.
-      style.name = spec.name; // 신규=이름 지정 / 바인딩=rename
-    }
-    // 신규·수동 행: 타이포 전체 기록. rename: 이름만 바꾸되, 스캔이 %를 실어 오면
-    // 예전에 px(+변수)로 굳은 스타일을 %로 교정한다(바인딩은 px 강제 → 반드시 해제).
-    const lhPct = spec.lineHeightPercent ?? 0;
-    const lsPct = spec.letterSpacingPercent ?? 0;
+    const setName = (st: TextStyle): void => {
+      if (st.name === spec.name) return;
+      styleByName.delete(st.name); // 옛 이름 인덱스 제거 — 이후 동명 행이 rename된 스타일을 가로채지 않도록.
+      st.name = spec.name; // 신규=이름 지정 / 바인딩=rename (이름 쓰기는 글꼴 없이 된다)
+    };
+    // 스타일 하나의 오류로 단계가 멈추지 않게 — 그 행만 건너뛴다(IA v4 §4.3 "글꼴").
+    try {
+    // 피그마는 글꼴을 불러오지 않은 스타일에 값 쓰기를 막는다 — 쓰기 전에 글꼴부터(§4.3 "글꼴").
+    let loaded: FontName | null = null;
     if (!isRename) {
       const wanted: FontName = { family: spec.family, style: spec.style };
-      let loaded: FontName;
       try {
         await figma.loadFontAsync(wanted);
         loaded = wanted;
@@ -1007,9 +1007,28 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
           res.missing.push(t('textStyle.missStyle', { name: spec.name, style: spec.style }));
         } catch {
           res.missing.push(t('textStyle.missFamily', { name: spec.name, family: spec.family }));
-          continue;
+          continue; // 새 스타일은 아직 만들지 않았다 — 빈 스타일이 남지 않는다
         }
       }
+    } else {
+      // 이미 있는 스타일(앵커) — 지금 글꼴을 불러온다. Regular로 대신하지 않는다(타이포 보존).
+      const fn = (style as TextStyle).fontName;
+      try {
+        await figma.loadFontAsync(fn);
+      } catch {
+        setName(style as TextStyle);
+        res.missing.push(t('textStyle.missFontKeep', { name: spec.name, font: `${fn.family} ${fn.style}` }));
+        styleByName.set(spec.name, style as TextStyle);
+        continue; // 값 · 연결은 건너뛰고, updated · styleIds에도 넣지 않는다
+      }
+    }
+    if (!style) style = figma.createTextStyle();
+    setName(style);
+    // 신규·수동 행: 타이포 전체 기록. rename: 이름만 바꾸되, 스캔이 %를 실어 오면
+    // 예전에 px(+변수)로 굳은 스타일을 %로 교정한다(바인딩은 px 강제 → 반드시 해제).
+    const lhPct = spec.lineHeightPercent ?? 0;
+    const lsPct = spec.letterSpacingPercent ?? 0;
+    if (!isRename && loaded) {
       style.fontName = loaded;
       style.fontSize = spec.fontSize;
       // 순서 주의: 값을 먼저 쓰고 바인딩은 나중 — 나중에 대입하면 바인딩이 풀린다.
@@ -1046,7 +1065,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     if (fsVar) {
       style.setBoundVariable('fontSize', fsVar);
       res.bound++;
-    } else res.missing.push(`font-size/${bindRole}`);
+    } else res.missing.push(t('textStyle.missVar', { name: bindRole, var: `font-size/${bindRole}` }));
     if (spec.lineHeight > 0 || isRename) {
       // 지금 스타일에 들어 있는 단위가 기준 — 신규는 방금 쓴 값, rename은 교정 후 값.
       // Figma는 행간에 변수를 바인딩하면 단위를 PIXELS로 강제한다(실측). %를 지키려면 바인딩을 포기해야 하고,
@@ -1063,7 +1082,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         if (lhVar) {
           style.setBoundVariable('lineHeight', lhVar);
           res.bound++;
-        } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(`line-height/${bindRole}`); // 소수 px는 변수를 안 만드는 게 규칙이라 누락이 아니다
+        } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `line-height/${bindRole}` })); // 소수 px는 변수를 안 만드는 게 규칙이라 누락이 아니다
       }
     }
     if (spec.letterSpacing !== 0 || isRename) {
@@ -1077,7 +1096,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         if (lsVar) {
           style.setBoundVariable('letterSpacing', lsVar);
           res.bound++;
-        } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(`letter-spacing/${bindRole}`);
+        } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `letter-spacing/${bindRole}` }));
       }
     }
     // 글꼴 — 값이 같은 Global STRING 변수가 있으면 붙인다(IA v4 §4.3 "스타일의 글꼴 변수"). 없으면 만들지 않는다.
@@ -1089,6 +1108,11 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     res[created ? 'created' : 'updated']++;
     if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
     styleByName.set(style.name, style);
+    } catch (e) {
+      // 도중 오류 — 쓴 값은 그대로(⌘Z 한 번에 단계 전체), 세지 않는다. 만든 스타일은 같은 이름 뒤 행이 또 만들지 않게 기억.
+      res.missing.push(t('textStyle.missError', { name: spec.name, error: explainError(e instanceof Error ? e.message : String(e)).message }));
+      if (style) styleByName.set(style.name, style);
+    }
   }
 
   // 화면 연결 단계는 여기 없다 — 「기존만 연결」이 시그니처로 붙인다(위 주석 참고).

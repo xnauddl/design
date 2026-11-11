@@ -4,7 +4,7 @@
      새 Semantic 역할을 만들어(같은 값 Global의 별칭) 붙인다. 이미 붙은 연결은 바꾸지도 풀지도 않는다(§2.12 12.8).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
-import { rgbToHex, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
+import { rgbToHex, colorKey, roundAlpha, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
 import { collectionTiers, ensureOwnedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip, NewRoleRef } from '../shared/messages';
@@ -48,6 +48,10 @@ interface VarEntry {
   /** 기본 모드 값이 직접 값인가 — Global 계층의 별칭 변수는 새 역할의 별칭 대상이 아니다(13.3 · 13.5). */
   direct: boolean;
   colorHex?: string;
+  /** 색 변수 값의 투명도(소수 둘째 자리, `a` 없으면 1). */
+  colorAlpha?: number;
+  /** 색 값 키(colorKey — hex + 투명도). 비교 · 번호는 이것으로. */
+  colorKey?: string;
   num?: number;
   str?: string;
 }
@@ -512,9 +516,11 @@ async function buildIndex(): Promise<VarIndexAll> {
     };
     if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
     if (tier === 2 && readAutoRole(v)) e.auto = true;
-    // 투명도가 1이 아닌 색 변수는 연결 대상에서 뺀다(§2.11) — 붙이면 칠하기 불투명도가 변수 값으로 바뀐다.
+    // 색 변수는 투명도도 함께 색인한다(§2.11 "색") — 투명도까지 같은 칠하기 · 그림자에만 붙인다.
     if (v.resolvedType === 'COLOR' && isRGB(val)) {
-      if (isOpaqueColorValue(val)) e.colorHex = rgbToHex(val);
+      e.colorHex = rgbToHex(val);
+      e.colorAlpha = roundAlpha((val as RGBA).a);
+      e.colorKey = colorKey(e.colorHex, e.colorAlpha);
     } else if (v.resolvedType === 'FLOAT' && typeof val === 'number') e.num = val;
     else if (v.resolvedType === 'STRING' && typeof val === 'string') e.str = val;
     if (tier === 2) addSem(v.name, entryKey(e));
@@ -537,7 +543,7 @@ function readAutoRole(v: Variable): boolean {
 
 /** 변수의 값 키(번호 비교용). */
 function entryKey(e: VarEntry): string {
-  if (e.colorHex) return valueKey(e.colorHex);
+  if (e.colorKey) return valueKey(e.colorKey);
   if (e.num != null) return valueKey(e.num);
   if (e.str != null) return valueKey(e.str);
   return '';
@@ -560,20 +566,9 @@ async function resolveValue(
   return undefined;
 }
 
-/** 색 변수 값이 불투명한가(RGB이거나 alpha가 1). */
-function isOpaqueColorValue(v: RGB | RGBA): boolean {
-  const a = (v as RGBA).a;
-  return typeof a !== 'number' || a === 1;
-}
-
-/** 페인트가 반투명인가(opacity<1). 변수 alpha가 페인트 불투명도를 덮어쓰므로 바인딩 제외 기준. */
-function isTranslucentPaint(p: SolidPaint): boolean {
-  return typeof p.opacity === 'number' && p.opacity < 1;
-}
-/** 그림자 색의 alpha<1 인가(effect color는 RGBA). */
-function isTranslucentEffectColor(e: DropShadowEffect | InnerShadowEffect): boolean {
-  const a = (e.color as RGBA).a;
-  return typeof a === 'number' && a < 1;
+/** 칠하기 · 그림자의 투명도(소수 둘째 자리) — 칠하기는 `paint.opacity`, 그림자는 `effect.color.a`. */
+function itemAlpha(x: Paint | Effect): number {
+  return roundAlpha(x.type === 'SOLID' ? x.opacity : (x as DropShadowEffect).color?.a);
 }
 
 function isRGB(v: VariableValue): v is RGB | RGBA {
@@ -592,10 +587,12 @@ interface Slot {
   field: string;
   index?: number;
   kind: 'num' | 'color' | 'text';
-  /** 숫자 · 글꼴 이름 · 색(소문자 #rrggbb). */
+  /** 숫자 · 글꼴 이름 · 색(색 값 키 — `#rrggbb`, 반투명이면 `#rrggbb@0.08`). */
   value: number | string;
-  /** 표시용 현재 값. */
+  /** 표시용 현재 값(색은 hex). */
   display: string;
+  /** 색: 투명도(소수 둘째 자리) — 1이면 없음. */
+  alpha?: number;
   allowed: readonly VariableScope[];
   /** 숫자 · 글자: 쓰임 이름(12.3). 색: 쓰임(12.4). */
   usage: string;
@@ -625,7 +622,7 @@ interface Ctx {
 function sameValueEntries(ctx: Ctx, s: Slot): VarEntry[] {
   return ctx.index.entries.filter((e) => {
     if (!scopeOk(e.scopes, s.allowed)) return false;
-    if (s.kind === 'color') return e.colorHex === s.value;
+    if (s.kind === 'color') return e.colorKey === s.value; // hex · 투명도 모두
     if (typeof s.value === 'number') return e.num != null && sameNumber(e.num, s.value);
     return e.str != null && e.str === s.value;
   });
@@ -662,7 +659,7 @@ function resolveSlots(ctx: Ctx): void {
   const colorLeft: { slot: Slot; cands: VarEntry[] }[] = [];
   const emit = (s: Slot, e: VarEntry): void => {
     res.bound++;
-    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s)));
+    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e)));
   };
   const globalFor = (cands: VarEntry[]): VarEntry | null => {
     // 직접 값 Global만(별칭 변수는 사슬을 만든다 — 13.3), 사용자 컬렉션 먼저.
@@ -701,17 +698,18 @@ function resolveSlots(ctx: Ctx): void {
   }
   for (const [use, list] of byUse) {
     // 입력 = (hex · 배경 종류 · 곳 수). inverse 여부는 기준색을 정한 뒤 함수 안에서 판정한다(12.4).
-    const counts = new Map<string, { hex: string; count: number; bg?: BgKind }>();
+    // 키는 투명도까지 나누고 밝기는 hex로만 본다(§2.11 "반투명 색 토큰").
+    const counts = new Map<string, { hex: string; count: number; bg?: BgKind; alpha?: number }>();
     for (const x of list) {
-      const k = colorSlotKey(x.slot.value as string, x.slot.bg);
+      const k = colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha);
       const c = counts.get(k);
       if (c) c.count++;
-      else counts.set(k, { hex: x.slot.value as string, count: 1, bg: x.slot.bg });
+      else counts.set(k, { hex: x.slot.display, count: 1, bg: x.slot.bg, ...(x.slot.alpha != null ? { alpha: x.slot.alpha } : {}) });
     }
     const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
     const bases = colorRoleBases([...counts.values()], def?.colorHex, use);
     for (const x of list) {
-      const base = `color/${use}/${bases.get(colorSlotKey(x.slot.value as string, x.slot.bg)) ?? 'default'}`;
+      const base = `color/${use}/${bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha)) ?? 'default'}`;
       const re = nameRe(base);
       const two = x.cands.filter((e) => e.tier === 2 && re.test(e.variable.name)).sort(byName)[0];
       if (two) {
@@ -745,7 +743,7 @@ function resolveSlots(ctx: Ctx): void {
     res.bound++;
     const g = p.global as VarEntry;
     preview.candidates.push({
-      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot)),
+      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g)),
       newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
       newRoleGlobalName: spec.globalName,
     });
@@ -759,17 +757,24 @@ interface NewRoleSpec {
   globalName: string;
 }
 
-function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string): BindCandidate {
+function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number): BindCandidate {
   return {
     nodeId: s.node.id,
     field: s.field,
     ...(s.index != null ? { index: s.index } : {}),
     currentValue: s.display,
+    ...(s.alpha != null ? { currentAlpha: s.alpha } : {}),
     variableId,
     variableName,
     tier,
     variableValue,
+    ...(variableAlpha != null ? { variableAlpha } : {}),
   };
+}
+
+/** 색 변수 값의 투명도 — 1이거나 색이 아니면 없음(값 칩 "#000000 8%"). */
+function entryAlpha(e: VarEntry): number | undefined {
+  return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : undefined;
 }
 
 function entryDisplay(e: VarEntry, s: Slot): string {
@@ -858,12 +863,9 @@ function bindPaints(node: SceneNode, ctx: Ctx): void {
         note(res, st, node, preview, key);
         return;
       }
-      // 반투명 페인트(opacity<1)는 연결하지 않는다 — 색 변수가 붙으면 Figma가 페인트 불투명도를
-      // 변수의 alpha로 덮어써, 8% 검정 테두리가 100% 검정으로 바뀐다.
-      if (isTranslucentPaint(p)) {
-        skip(res, 'translucent', node, preview, key);
-        return;
-      }
+      // 색 변수를 붙이면 피그마가 칠 불투명도를 변수 alpha로 바꾼다 — 그래서 hex · 투명도까지 같은 변수만 찾는다(§2.11 "색").
+      const alpha = itemAlpha(p);
+      if (alpha === 0) return; // 투명도 0 — 보이지 않는 칠은 찾지 않는다(§4.1 k ③)
       const hex = rgbToHex(p.color);
       use ??= colorUse(node.type, key, isInsideIconFrame(node));
       if (bg === null) {
@@ -871,7 +873,7 @@ function bindPaints(node: SceneNode, ctx: Ctx): void {
         const bgHex = use === 'text' || use === 'icon' || use === 'border' ? backgroundOf(node) : undefined;
         bg = bgHex ? bgKindOf(bgHex) : undefined;
       }
-      ctx.slots.push({ node, field: key, index: i, kind: 'color', value: hex, display: hex, allowed, usage: use, ...(bg ? { bg } : {}), noMatchReason: 'no-match' });
+      ctx.slots.push({ node, field: key, index: i, kind: 'color', value: colorKey(hex, alpha), display: hex, ...(alpha !== 1 ? { alpha } : {}), allowed, usage: use, ...(bg ? { bg } : {}), noMatchReason: 'no-match' });
     });
   }
 }
@@ -1012,13 +1014,11 @@ function bindEffects(node: SceneNode, ctx: Ctx): void {
       note(res, st, node, preview, 'effects');
       return;
     }
-    // 그림자 색은 RGBA다 — 25% 그림자를 alpha 1 변수에 붙이면 100% 검정 그림자가 된다(위 페인트와 같은 이유).
-    if (isTranslucentEffectColor(e)) {
-      skip(res, 'translucent', node, preview, 'effects');
-      return;
-    }
+    // 그림자 색은 RGBA — 변수를 붙이면 alpha도 변수 값이 된다(위 칠하기와 같은 규칙).
+    const alpha = itemAlpha(e);
+    if (alpha === 0) return; // 투명도 0 — 보이지 않는 그림자는 찾지 않는다
     const hex = rgbToHex(e.color);
-    ctx.slots.push({ node, field: 'effects', index: i, kind: 'color', value: hex, display: hex, allowed: EFFECT_SCOPES, usage: 'shadow', noMatchReason: 'no-match' });
+    ctx.slots.push({ node, field: 'effects', index: i, kind: 'color', value: colorKey(hex, alpha), display: hex, ...(alpha !== 1 ? { alpha } : {}), allowed: EFFECT_SCOPES, usage: 'shadow', noMatchReason: 'no-match' });
   });
 }
 
@@ -1255,10 +1255,11 @@ export async function bindSelectedItems(
             fail(st, node, key);
             continue;
           }
-          const translucent = key === 'effects' ? isTranslucentEffectColor(x as DropShadowEffect) : isTranslucentPaint(x as SolidPaint);
           const hex = rgbToHex((x as SolidPaint | DropShadowEffect).color);
+          const alpha = itemAlpha(x);
           const allowed = key === 'fills' ? fillScopesFor(node.type) : key === 'strokes' ? STROKE_SCOPES : EFFECT_SCOPES;
-          if (translucent || vv.variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || !isOpaqueColorValue(value) || rgbToHex(value) !== hex || !scopeOk(scopesOf(), allowed)) {
+          // hex · 투명도(소수 둘째 자리)가 같아야 — 투명도 0(보이지 않게 바뀜)도 그 사이 바뀜
+          if (alpha === 0 || vv.variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha((value as RGBA).a) !== alpha || !scopeOk(scopesOf(), allowed)) {
             fail('changed', node, key); // 값 · 용도가 그 사이 달라짐(칠하기 용도는 레이어 종류 — §2.11)
             continue;
           }

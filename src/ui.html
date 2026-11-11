@@ -431,16 +431,14 @@
     }
     .r-group:first-child { margin-top: 0; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
-    .skip-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 6px; }
-    .skip-chip {
-      font: 500 10.5px/1.6 var(--font); color: var(--text-2);
-      background: var(--surface-2); border: 1px solid var(--border);
-      border-radius: 4px; padding: 1px 6px; white-space: nowrap; cursor: pointer;
-    }
-    .skip-chip:hover { border-color: var(--accent); color: var(--accent); }
-    .skip-chip.static { cursor: default; color: var(--muted); }
-    .skip-chip.static:hover { border-color: var(--border); color: var(--muted); }
-    .skip-chip.info { color: var(--text-2); }
+    .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
+    .skip-head { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; }
+    .skip-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .skip-row .skip-n { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
+    .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .skip-row .grow { flex: 1 1 auto; }
+    .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
+    .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
        상한이 사라져 함께 걷는다(표 자체는 #17에서 리스트로 대체). */
@@ -592,7 +590,7 @@
     .bd-found { background: var(--ok-subtle); color: var(--ok); cursor: default; }
     button.bd-skip { min-height: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
     button.bd-skip:hover:not([aria-disabled="true"]) { background: var(--surface-hover); }
-    .bind-badges .skip-row { order: 10; flex: 1 0 100%; margin-top: 0; }
+    .bind-badges .skip-list { order: 10; flex: 1 0 100%; margin-top: 0; }
     button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 10.5px; }
     button.bd-all:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
     .bind-filter-row input { width: 170px; }
@@ -604,6 +602,8 @@
     .be-art { display: flex; flex-direction: column; gap: 5px; align-items: flex-start; }
     .be-art.icon { font-size: 18px; line-height: 1; color: var(--muted); align-items: center; flex-direction: row; gap: 2px; }
     .be-row { display: flex; align-items: center; gap: 6px; }
+    .bind-empty.done { border: none; padding: 6px 2px; align-items: flex-start; text-align: left; }
+    .bind-empty.done .be-text { color: var(--ok, #12805c); font-weight: 600; }
     .be-text { font-size: var(--fs); }
     /* 변수 카드 "값 → 변수" — 카드 사이 6, 모서리 8, 머리 32 */
     .bind-list { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs); }
@@ -977,7 +977,7 @@
       <div id="bindTree" class="tree" role="treegrid" data-i18n-aria-label="v4.bindListAria" aria-label="연결할 변수"></div>
       <div class="bind-badges" id="bindBadges" hidden>
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
-        <div class="skip-row" id="bindSkips" hidden></div>
+        <div class="skip-list" id="bindSkips" hidden></div>
       </div>
       <div class="status" id="applyStatus"></div>
       <div class="sub-foot" id="bindFoot">
