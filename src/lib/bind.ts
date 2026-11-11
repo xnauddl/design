@@ -76,11 +76,11 @@ export interface BindResult {
   candidates?: BindCandidate[];
   /** #13: dry-run일 때만 — 미리보기 트리 맥락(영향 노드 + 조상 체인). */
   nodes?: BindNode[];
-  /** dry-run일 때만 — 사유별로 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지). */
+  /** 사유별로 건너뛴 레이어(노드×사유 중복 제거, SKIP_PREVIEW_CAP까지) — 늘 싣는다(연결 모드는 찾기 단계의 셈). */
   skips?: BindSkip[];
-  /** dry-run일 때만 — 상한 적용 전 실제 스킵 레이어 수(잘렸는지 알리려고). */
+  /** 상한 적용 전 실제 스킵 레이어 수(잘렸는지 알리려고) — 늘. */
   skipTotal?: number;
-  /** dry-run일 때만 — 사유별 건너뛴 레이어 수(상한 전, 레이어 × 사유 중복 제거 — 건너뛴 곳 목록의 "레이어 {n}개"). */
+  /** 사유별 건너뛴 레이어 수(상한 전, 레이어 × 사유 중복 제거 — 건너뛴 곳 목록의 "레이어 {n}개") — 늘. */
   skipLayers?: Record<string, number>;
   /** 적용 모드 — 새로 만든 역할 수(§2.12). */
   newRoles?: number;

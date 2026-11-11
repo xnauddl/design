@@ -9844,7 +9844,7 @@
               skipTotal: r.skipTotal,
               // 상한 전 실제 수 — 잘렸으면 UI가 알린다
               skipLayers: r.skipLayers,
-              // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"
+              // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"(미리보기에서 쓴다)
               reqId: msg.reqId,
               // UI가 낡은 응답을 가려낸다
               newRoles: r.newRoles,

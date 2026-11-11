@@ -1194,7 +1194,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           nodes: r.nodes, // #13: 미리보기 트리 맥락
           skips: r.skips, // 사유별 건너뛴 레이어(dry-run만 · 상한까지)
           skipTotal: r.skipTotal, // 상한 전 실제 수 — 잘렸으면 UI가 알린다
-          skipLayers: r.skipLayers, // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"
+          skipLayers: r.skipLayers, // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"(미리보기에서 쓴다)
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
           newRoles: r.newRoles,
           counts: r.counts as Record<string, Record<string, number>> | undefined, // 사유 × 종류(카드 숫자, IA v4 §4.1)
