@@ -25,10 +25,12 @@ import {
 import { paletteFamilyOf } from './palette';
 import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
-import { TextSample, TextStyleSpec, ExistingTextStyle } from './textStyles';
+import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig } from './textStyles';
+import { nameKrdsStyles, offScale, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
+import { dsRoleOwner } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
-import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow } from '../shared/messages';
+import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow, TsRenameRow, TsRenameItem } from '../shared/messages';
 
 export const GLOBAL = 'Global';
 export const SEMANTIC = 'Semantic';
@@ -644,6 +646,29 @@ async function percentFromNodeBinding(
   return percentFromVariableDescription(alias.id, cache);
 }
 
+/** label 분류의 UI 역할(docs/text-style-krds.md §3.2-1). */
+const UI_ROLES: ReadonlySet<string> = new Set(['button', 'chip', 'input', 'field']);
+
+/**
+ * 글자 레이어가 UI 역할 안에 있나(docs/text-style-krds.md §3.2-1) — 부모부터 위로 올라가며
+ * `dsRoleOwner`가 처음 값을 주는 조상에서 **멈추고**, 그 역할이 button · chip · input · field면 true.
+ * 다른 역할이면 false(더 올라가지 않는다). 글자 레이어 자신은 보지 않고, 인스턴스 경계는 넘는다.
+ */
+function inUiRole(node: SceneNode, cache: Map<BaseNode, string | undefined>): boolean {
+  let cur: BaseNode | null = node.parent;
+  while (cur && cur.type !== 'PAGE' && cur.type !== 'DOCUMENT') {
+    let role: string | undefined;
+    if (cache.has(cur)) role = cache.get(cur);
+    else {
+      role = dsRoleOwner(cur as SceneNode);
+      cache.set(cur, role);
+    }
+    if (role) return UI_ROLES.has(role);
+    cur = cur.parent;
+  }
+  return false;
+}
+
 /** 선택 트리의 TEXT 노드에서 타이포 시그니처 수집. 부분 서식(mixed)은 스킵+경고.
    단위 우선순위: (1) 노드 지정 % (2) 묶인 변수의 description % (3) 텍스트 스타일 정의 % (4) px. */
 export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextScanResult> {
@@ -660,6 +685,7 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
     styleCache.set(id, st);
     return st;
   };
+  const ownerCache = new Map<BaseNode, string | undefined>();
   for (const node of texts) {
     const typo = readNodeTypography(node);
     if (!typo) {
@@ -728,6 +754,7 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
     samples.push({
       fontSize, lineHeight, lineHeightPercent, letterSpacing, letterSpacingPercent, family, style,
       layerName: node.name, styleId, characters, id: node.id, rowId, indexInParent,
+      uiRole: inUiRole(node, ownerCache),
     });
   }
   return { samples, warnings: [...warnings] };
@@ -755,26 +782,27 @@ function lsPctOf(ls: LetterSpacing | typeof figma.mixed): number {
 
 /** 로컬 텍스트 스타일 → 시그니처 매칭용 목록(행간·자간 px 환산 + 원본 %). 스캔 후보의 '이미 등록' 인식에 사용. */
 export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
-  const out: ExistingTextStyle[] = [];
-  for (const s of await figma.getLocalTextStylesAsync()) {
-    const fontSize = roundN(s.fontSize);
-    const lineHeightPercent = lhPctOf(s.lineHeight);
-    const letterSpacingPercent = lsPctOf(s.letterSpacing);
-    out.push({
-      id: s.id,
-      name: s.name,
-      fontSize,
-      // 등록된 스타일은 사실이라 원값으로 잰다(applyExistingTextStyles의 인덱스와 같은 이유).
-      // 스캔이 %로 등록해 둔 스타일은 lhPxOf가 %→px로 환산하므로 클러스터 측정값과 그대로 만난다.
-      lineHeight: lhPxOf(fontSize, s.lineHeight),
-      letterSpacing: lsPxOf(fontSize, s.letterSpacing),
-      family: s.fontName.family,
-      style: s.fontName.style,
-      ...(lineHeightPercent ? { lineHeightPercent } : {}),
-      ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
-    });
-  }
-  return out;
+  return (await figma.getLocalTextStylesAsync()).map(existingOf);
+}
+
+/** 로컬 텍스트 스타일 하나 → 시그니처 매칭 모양(scanExistingTextStyles · 이름 다시 짓기의 `tsSig`가 같은 값을 쓴다). */
+function existingOf(s: TextStyle): ExistingTextStyle {
+  const fontSize = roundN(s.fontSize);
+  const lineHeightPercent = lhPctOf(s.lineHeight);
+  const letterSpacingPercent = lsPctOf(s.letterSpacing);
+  return {
+    id: s.id,
+    name: s.name,
+    fontSize,
+    // 등록된 스타일은 사실이라 원값으로 잰다(applyExistingTextStyles의 인덱스와 같은 이유).
+    // 스캔이 %로 등록해 둔 스타일은 lhPxOf가 %→px로 환산하므로 클러스터 측정값과 그대로 만난다.
+    lineHeight: lhPxOf(fontSize, s.lineHeight),
+    letterSpacing: lsPxOf(fontSize, s.letterSpacing),
+    family: s.fontName.family,
+    style: s.fontName.style,
+    ...(lineHeightPercent ? { lineHeightPercent } : {}),
+    ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
+  };
 }
 
 /**
@@ -833,6 +861,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   // 대상 이름을 다른 스타일이 이미 쓰면 rename 충돌 — 이름·시맨틱·바인딩을 건드리지 않고 보고만.
   const renameBlocked = new Set<string>(); // boundStyleId (또는 name) 키
   const roleRenames: Array<{ from: string; to: string }> = [];
+  const roleSpecs: TextStyleSpec[] = []; // roleRenames와 같은 순서 — 3단계 뒤 되돌림(§5.3)
   for (const spec of specs) {
     const st = anchoredStyle(spec);
     if (!st || st.name === spec.name) continue;
@@ -843,26 +872,12 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
       continue;
     }
     roleRenames.push({ from: st.name, to: spec.name });
+    roleSpecs.push(spec);
   }
-  if (roleRenames.length) {
-    const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId0 = ownedCollection(cols0, 'semantic')?.id;
-    if (semId0) {
-      const byName = new Map<string, Variable>();
-      for (const v of await figma.variables.getLocalVariablesAsync())
-        if (v.variableCollectionId === semId0) byName.set(v.name, v);
-      for (const { from, to } of roleRenames)
-        for (const cat of ['font-size', 'line-height', 'letter-spacing']) {
-          const v = byName.get(`${cat}/${from}`);
-          // 대상 역할 변수가 이미 있으면 이동 안 함 — 기존 역할 토큰을 스캔 값으로 덮지 않기 위함.
-          if (v && !byName.has(`${cat}/${to}`)) {
-            v.name = `${cat}/${to}`;
-            byName.set(`${cat}/${to}`, v);
-            byName.delete(`${cat}/${from}`);
-          }
-        }
-    }
-  }
+  // 역할 변수 이름을 **먼저** 바꾼다 — 3단계가 `font-size/{새 이름}`으로 변수를 찾아 붙이므로(docs/text-style-krds.md §5.3
+  // "두 경로의 순서가 다르다"). 이름 다시 짓기와 같은 공용 함수(직접 만든 변수 · 사용자 컬렉션은 건드리지 않음,
+  // 최종 집합 밖의 다른 변수와 이름이 겹치면 건너뜀 — 기존 역할 토큰을 스캔 값으로 덮지 않기 위함).
+  const roleMoved = roleRenames.length ? (await renameTextRoleVars(roleRenames)).moved : [];
 
   // 1) 변수 보장: 신규·수동 행만 스캔 스펙으로 Global/Semantic upsert.
   //    rename(유효 앵커)은 이름만 바꾸므로 aliasMap에 넣지 않음 — 기존 역할 시맨틱을 덮어쓰지 않음.
@@ -1115,7 +1130,302 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     }
   }
 
+  // 0단계에서 변수 이름을 바꿨는데 3단계에서 그 스타일 이름 바꾸기가 끝나지 않았으면(보류 · 이름을 쓰기 전 오류)
+  // 그 스타일의 변수를 되돌린다 — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게(docs/text-style-krds.md §5.3).
+  // missFontKeep은 이름을 바꾸므로 여기 걸리지 않는다.
+  for (let i = 0; i < roleSpecs.length; i++) {
+    const spec = roleSpecs[i];
+    const st = anchoredStyle(spec);
+    const ids = new Set(roleMoved.filter((m) => m.pair === i).map((m) => m.id));
+    if (!st || !ids.size || st.name === spec.name) continue;
+    const orig = roleRenames[i].from;
+    await renameTextRoleVars([{ from: spec.name, to: orig }], { onlyIds: ids });
+    const want = new Set(ROLE_VAR_CATS.map((c) => `${c}/${orig}`));
+    const stuck: string[] = [];
+    for (const id of ids) {
+      const v = await figma.variables.getVariableByIdAsync(id);
+      if (v && !want.has(v.name)) stuck.push(v.name);
+    }
+    if (stuck.length) res.missing.push(t('textStyle.missRoleStuck', { name: st.name, vars: stuck.join(', ') }));
+  }
+
   // 화면 연결 단계는 여기 없다 — 「기존만 연결」이 시그니처로 붙인다(위 주석 참고).
+  return res;
+}
+
+/* ============================================================
+   이름 바꾸기 공용 — 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림(docs/text-style-krds.md §5.3)
+   텍스트 스타일([이름 다시 짓기])과 역할 변수(renameTextRoleVars)가 같은 방식으로 바꾼다.
+   ============================================================ */
+
+/** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 3종(`{종류}/{스타일 이름}`). */
+const ROLE_VAR_CATS = ['font-size', 'line-height', 'letter-spacing'] as const;
+
+/**
+ * 최종 이름 집합으로 겹침 판정 — 이름을 하나라도 바꾸기 전에 끝낸다. (후보가 아닌 것의 지금 이름) ∪ (후보의 `to`)에서
+ * `to`가 겹치는 후보를 빼고, 빠진 후보는 지금 이름(`from`)이 남으므로 더 빠지는 후보가 없을 때까지 반복한다(고정점).
+ * 돌려주는 값 = 빠진 후보의 key.
+ */
+function finalNameTaken<K>(cands: readonly { key: K; from: string; to: string }[], others: readonly string[]): Set<K> {
+  const out = new Set<K>();
+  for (;;) {
+    const count = new Map<string, number>();
+    const add = (n: string): void => void count.set(n, (count.get(n) ?? 0) + 1);
+    for (const n of others) add(n);
+    for (const c of cands) add(out.has(c.key) ? c.from : c.to);
+    let grew = false;
+    for (const c of cands)
+      if (!out.has(c.key) && (count.get(c.to) ?? 0) > 1) {
+        out.add(c.key);
+        grew = true;
+      }
+    if (!grew) return out;
+  }
+}
+
+type RenameStatus = 'renamed' | 'error' | 'error-chain' | 'error-stuck';
+interface RenameJob<K> {
+  key: K;
+  from: string;
+  to: string;
+  tmp: string;
+  get(): string;
+  set(name: string): void;
+}
+
+/**
+ * 임시 이름 2단계로 바꾼다 — 모두 `tmp`로(1단계) → 모두 `to`로(2단계). 오류가 난 항목이 있으면 되돌릴 집합을
+ * 닫힘으로 계산하고(오류 항목 + 그 `from`을 `to`로 원하던 항목 …) 그 집합을 다시 `tmp` → `from` 2단계로 되돌린다.
+ * 직접 오류 = 'error', 함께 되돌림 = 'error-chain', 되돌리지 못함(끝난 뒤 이름이 `from`이 아님) = 'error-stuck'.
+ */
+function twoPhaseRename<K>(jobs: readonly RenameJob<K>[]): Map<K, RenameStatus> {
+  const trySet = (j: RenameJob<K>, name: string): boolean => {
+    try {
+      j.set(name);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  const status = new Map<K, RenameStatus>();
+  const failed = new Set<K>();
+  for (const j of jobs) if (!trySet(j, j.tmp)) failed.add(j.key);
+  for (const j of jobs) if (!failed.has(j.key) && !trySet(j, j.to)) failed.add(j.key);
+  for (const j of jobs) status.set(j.key, 'renamed');
+  if (!failed.size) return status;
+  // 되돌릴 집합(닫힘) — 되돌려질 항목의 `from`을 `to`로 가진 항목도 함께(같은 이름이 둘 생기지 않게).
+  const back = new Set(failed);
+  for (let grew = true; grew; ) {
+    grew = false;
+    const reclaim = new Set(jobs.filter((j) => back.has(j.key)).map((j) => j.from));
+    for (const j of jobs)
+      if (!back.has(j.key) && reclaim.has(j.to)) {
+        back.add(j.key);
+        grew = true;
+      }
+  }
+  const backJobs = jobs.filter((j) => back.has(j.key));
+  const cur = (j: RenameJob<K>): string => {
+    try {
+      return j.get();
+    } catch {
+      return '';
+    }
+  };
+  // 되돌림도 2단계 — 이미 `from`인 항목(1단계에서 실패해 그대로)은 옮기지 않는다.
+  for (const j of backJobs) if (cur(j) !== j.from) trySet(j, j.tmp);
+  for (const j of backJobs) if (cur(j) !== j.from) trySet(j, j.from);
+  for (const j of backJobs) status.set(j.key, cur(j) !== j.from ? 'error-stuck' : failed.has(j.key) ? 'error' : 'error-chain');
+  return status;
+}
+
+/** 변수 임시 이름 — 피그마 변수 이름에 못 쓰는 글자(`.` 등)가 id에 섞이지 않게 영숫자 · `_` · `-`만. */
+const varTmpName = (id: string): string => `__dsl_tmp_${id.replace(/[^A-Za-z0-9_-]/g, '_')}`;
+
+export interface RoleVarRenameResult {
+  /** 바꾼 변수 수. */
+  renamed: number;
+  /** 최종 집합 밖의 다른 변수와 이름이 겹쳐 건너뛴 변수 수(그 스타일은 옛 이름의 변수에 묶인 채로 남는다). */
+  taken: number;
+  /** 바꾸기 오류로 되돌린 변수 수(error · error-chain · error-stuck). */
+  error: number;
+  /** 되돌리지 못한 변수의 지금 이름. */
+  stuck: string[];
+  /** 바꾼 변수 id와 그 짝의 순번(pairs 안) — 등록 경로의 되돌림(§5.3)이 쓴다. */
+  moved: { id: string; pair: number }[];
+}
+
+/**
+ * 역할 변수 `font-size/{from}` · `line-height/{from}` · `letter-spacing/{from}`을 `{to}`로 바꾼다
+ * (docs/text-style-krds.md §5.3). 플러그인 Semantic 컬렉션 안에서만 — 사용자 컬렉션 · 직접 만든 변수(`isManualVar`)는
+ * 건드리지 않는다. 스타일과 같은 방식(최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 시 되돌림).
+ * `onlyIds`를 주면 그 변수만(등록 경로의 되돌림이 0단계에서 옮긴 변수만 되돌린다).
+ */
+export async function renameTextRoleVars(
+  pairs: readonly { from: string; to: string }[],
+  opts: { onlyIds?: ReadonlySet<string> } = {},
+): Promise<RoleVarRenameResult> {
+  const res: RoleVarRenameResult = { renamed: 0, taken: 0, error: 0, stuck: [], moved: [] };
+  if (!pairs.length) return res;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const semId = ownedCollection(cols, 'semantic')?.id;
+  if (!semId) return res;
+  const vars = (await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === semId);
+  const byName = new Map<string, Variable>();
+  for (const v of vars) if (!byName.has(v.name)) byName.set(v.name, v);
+  const cands: { key: string; from: string; to: string; v: Variable; pair: number }[] = [];
+  const picked = new Set<string>();
+  pairs.forEach((p, pair) => {
+    if (p.from === p.to) return;
+    for (const cat of ROLE_VAR_CATS) {
+      const v = byName.get(`${cat}/${p.from}`);
+      if (!v || picked.has(v.id) || isManualVar(v) || (opts.onlyIds && !opts.onlyIds.has(v.id))) continue;
+      picked.add(v.id);
+      cands.push({ key: v.id, from: v.name, to: `${cat}/${p.to}`, v, pair });
+    }
+  });
+  if (!cands.length) return res;
+  const taken = finalNameTaken(cands, vars.filter((v) => !picked.has(v.id)).map((v) => v.name));
+  res.taken = taken.size;
+  const live = cands.filter((c) => !taken.has(c.key));
+  const status = twoPhaseRename(
+    live.map((c) => ({
+      key: c.key,
+      from: c.from,
+      to: c.to,
+      tmp: varTmpName(c.v.id),
+      get: () => c.v.name,
+      set: (n: string) => {
+        c.v.name = n;
+      },
+    })),
+  );
+  for (const c of live) {
+    const st = status.get(c.key);
+    if (st === 'renamed') {
+      res.renamed++;
+      res.moved.push({ id: c.v.id, pair: c.pair });
+    } else {
+      res.error++;
+      if (st === 'error-stuck') res.stuck.push(c.v.name);
+    }
+  }
+  return res;
+}
+
+/** 이름 다시 짓기의 스타일 하나 → KRDS 입력(쓰인 횟수를 세지 않는다 — count · uiCount 0, §3.1). */
+function krdsInputOf(s: TextStyle): KrdsInput {
+  const e = existingOf(s);
+  return {
+    id: e.id,
+    name: e.name,
+    fontSize: e.fontSize,
+    lineHeight: e.lineHeight,
+    ...(e.lineHeightPercent ? { lineHeightPercent: e.lineHeightPercent } : {}),
+    letterSpacing: e.letterSpacing,
+    family: e.family,
+    style: e.style,
+    count: 0,
+    uiCount: 0,
+  };
+}
+
+/**
+ * [이름 다시 짓기] 미리보기(docs/text-style-krds.md §5.2) — 이 파일의 로컬 텍스트 스타일 전부에 §3을 한 번에 적용한다
+ * (앵커 없음, count 0). 대상이 파일의 모든 스타일이고 각자 자기 지금 이름은 예약하지 않으므로(§3.4) 예약 이름은 비어 있다 —
+ * 지금 이름끼리의 겹침은 바꾸기의 최종 이름 집합(§5.3)이 맡는다(맞바꿈 A↔B도 된다). 이름이 바뀌는 줄만 돌려준다.
+ * 읽기만 한다 — 글꼴을 불러오지 않는다.
+ */
+export async function planTsRename(): Promise<TsRenameRow[]> {
+  const styles = await figma.getLocalTextStylesAsync();
+  const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: new Set<string>(), path: 'rename' });
+  const rows: TsRenameRow[] = [];
+  styles.forEach((s, i) => {
+    const to = names[i];
+    if (!to || to === s.name) return;
+    const e = existingOf(s);
+    const off = offScale(e.fontSize);
+    rows.push({ id: s.id, from: s.name, to, sig: tsSig(e), fontSize: e.fontSize, offScale: off.kind, nearest: off.nearest });
+  });
+  return rows;
+}
+
+/** TS_RENAMED의 내용(type · reqId 제외). */
+export interface TsRenameResult {
+  results: { id: string; status: string; name: string }[];
+  renamed: number;
+  skipped: number;
+  skipReasons: Record<string, number>;
+  roleVarsRenamed: number;
+  roleVarsTaken: number;
+  roleVarsError: number;
+  roleVarsStuck: string[];
+}
+
+/**
+ * [이름 다시 짓기] 바꾸기(docs/text-style-krds.md §5.3). 이름만 쓴다 — 글꼴을 불러오지 않고 값을 쓰지 않는다(§5.1 "글꼴").
+ * 1) 다시 확인: 지금 이름 ≠ from → 'renamed-meanwhile'(스타일이 없어져도), 시그니처 ≠ sig → 'value-changed'.
+ * 2) 최종 이름 집합 고정점 → 'name-taken'. 3) 임시 이름 2단계 · 실패 되돌림(닫힘) → 'error' · 'error-chain' · 'error-stuck'.
+ * 4) 'renamed'인 항목의 역할 변수만 `renameTextRoleVars`로(변수 쪽 실패는 스타일 이름을 되돌리지 않는다).
+ */
+export async function applyTsRename(items: readonly TsRenameItem[]): Promise<TsRenameResult> {
+  const styles = await figma.getLocalTextStylesAsync();
+  const byId = new Map(styles.map((s) => [s.id, s]));
+  const status = new Map<string, string>();
+  const order: string[] = [];
+  const cands: { key: string; from: string; to: string; st: TextStyle }[] = [];
+  for (const it of items) {
+    if (status.has(it.id)) continue; // 같은 id가 두 번 오면 처음 것만
+    order.push(it.id);
+    const st = byId.get(it.id);
+    if (!st || st.name !== it.from) status.set(it.id, 'renamed-meanwhile');
+    else if (tsSig(existingOf(st)) !== it.sig) status.set(it.id, 'value-changed');
+    else {
+      status.set(it.id, 'pending');
+      cands.push({ key: it.id, from: it.from, to: it.to, st });
+    }
+  }
+  const candIds = new Set(cands.map((c) => c.key));
+  const taken = finalNameTaken(cands, styles.filter((s) => !candIds.has(s.id)).map((s) => s.name));
+  for (const k of taken) status.set(k, 'name-taken');
+  const live = cands.filter((c) => !taken.has(c.key));
+  const done = twoPhaseRename(
+    live.map((c) => ({
+      key: c.key,
+      from: c.from,
+      to: c.to,
+      tmp: `__dsl_tmp_${c.key}`,
+      get: () => c.st.name,
+      set: (n: string) => {
+        c.st.name = n; // 이름 쓰기는 글꼴 없이 된다(ia-v4 §4.3 "글꼴")
+      },
+    })),
+  );
+  for (const [k, v] of done) status.set(k, v);
+
+  const res: TsRenameResult = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [] };
+  for (const id of order) {
+    const st = status.get(id) as string;
+    res.results.push({ id, status: st, name: byId.get(id)?.name ?? '' });
+    if (st === 'renamed') res.renamed++;
+    else {
+      res.skipped++;
+      res.skipReasons[st] = (res.skipReasons[st] ?? 0) + 1;
+    }
+  }
+  const pairs = live.filter((c) => status.get(c.key) === 'renamed').map((c) => ({ from: c.from, to: c.to }));
+  if (pairs.length) {
+    try {
+      const rv = await renameTextRoleVars(pairs);
+      res.roleVarsRenamed = rv.renamed;
+      res.roleVarsTaken = rv.taken;
+      res.roleVarsError = rv.error;
+      res.roleVarsStuck = rv.stuck;
+    } catch {
+      // 변수 목록을 읽지 못함 — 스타일 이름은 그대로 두고(§5.3) 짝마다 하나씩 오류로 센다.
+      res.roleVarsError = pairs.length;
+    }
+  }
   return res;
 }
 
