@@ -309,7 +309,7 @@
         | 기본 `default` | `color/{쓰임}/default` | 없음(12.4가 기준색 하나만 default로 정한다) | — |
 
         - 모든 색 종류에 투명도 단계 꼬리(`-subtle` · `-subtler` · `-subtlest` · `-strong` · `-stronger` · `-strongest`, 아래)가 붙을 수 있다 — 같은 색의 투명도만 다른 값을 가른다. Semantic 이름에는 `-a{%}`를 쓰지 않는다(Global은 `-a{%}` 그대로 — 12.11).
-      - **가족:** 기본 이름의 가족 = 위 문법으로 그 기본 이름에서 만들 수 있는 모든 이름(꼬리 말은 표에 있는 것만 · 투명도 단계 꼬리 · `-n` 포함). 사다리는 세 마지막 마디 모두가 한 가족이다. 표 밖의 말이 붙은 이름은 가족이 아니다(예: `spacing/card/padding-x`는 `spacing/card/padding`의 가족이 아니다 — 다른 속성. `radius/card-top-left`는 `radius/card`의 가족이 아니다. 팔레트가 만든 `color/background/brand-bold`도 가족이 아니다).
+      - **가족:** 기본 이름의 가족 = 위 문법으로 그 기본 이름에서 만들 수 있는 모든 이름(꼬리 말은 표에 있는 것만 · 투명도 단계 꼬리 · `-n` 포함, 그리고 예전 구현이 만든 `-a{%}` 꼬리 — 재사용 · 차지 판정에만 쓰고 새로 만들지 않는다: 1edfadd로 실기한 파일의 `color/border/default-a8`이 같은 값이면 그것을 쓴다 — 같은 값 변수가 둘 생기지 않게). 사다리는 세 마지막 마디 모두가 한 가족이다. 표 밖의 말이 붙은 이름은 가족이 아니다(예: `spacing/card/padding-x`는 `spacing/card/padding`의 가족이 아니다 — 다른 속성. `radius/card-top-left`는 `radius/card`의 가족이 아니다. 팔레트가 만든 `color/background/brand-bold`도 가족이 아니다).
         - **가족 순서**(여럿 중 하나를 고를 때 — 12.2 순서 2 · 재사용): 기본 이름 → 꼬리 이름(사다리 마디 · 투명도 단계가 붙은 이름 포함, 이름 순) → `-n`이 붙은 이름(번호 작은 순). 같은 이름이 여러 컬렉션에 있으면 13.5 순서.
       - **먼저 — 재사용:** 가족 안에 **같은 값 · 맞는 용도**(12.6)의 Semantic 변수가 있고 거울(12.7)이 아니면 그 변수를 쓴다(새로 만들지 않음). 여럿이면 가족 순서의 첫 번째.
         - 연결: 이 재사용은 순서 2가 한다(용도로 거른 후보만 본다). 순서 4에서 이름을 정할 때는 다시 재사용하지 않는다 — 같은 값이지만 용도가 틀리거나 거울인 가족 이름은 **차지된 이름**으로만 본다(그래야 용도가 틀린 변수가 붙지 않는다).
@@ -339,10 +339,14 @@
         | 유채색 같은 계열 넷째 밝은 값 | `color/background/brand-red-subtlest-2` |
         | 기본 이름이 차 있는데 기준이 된 값 · 글꼴 둘째 값 | `{기본 이름}-2` |
         | 기준과 **같은 값**인데 재사용할 수 없는 값(용도가 틀리거나 거울인 변수가 그 값을 가짐 — 꼬리를 붙이지 않는다) | `{기본 이름}-2` |
+        | 투명도 단계 후보가 다 참(같은 색 · 더 투명 넷째) · 자리 기준과 같은 값 · 재사용 불가 | `color/shadow/default-subtlest-2` · `{자리 이름}-2` |
 
       - **투명도 단계(색, 2026-11-11 사용자 결정 "Semantic에도 단계 말" — 모든 Semantic 색):** 위 규칙은 **hex로만** 적용해 hex마다 **자리 이름** N을 정한다(같은 hex의 불투명 · 반투명은 한 자리를 나눠 쓴다). 한 자리에 투명도가 다른 값이 둘 이상이면:
         - **자리 기준:** 파일에 이름 N이 같은 hex의 값으로 있으면 그 값(여럿이면 13.5 순서 첫 값). 없으면 이번 새 값 중 곳 수가 많은 값(같으면 투명도가 큰 값 — 불투명이 먼저), 이 값이 N을 받는다.
-        - **나머지:** 투명도(불투명 = 1)가 자리 기준보다 작으면(더 투명) `[N-subtle, N-subtler, N-subtlest]`, 크면(덜 투명) `[N-strong, N-stronger, N-strongest]`. 같은 쪽끼리는 자리 기준과 투명도가 가까운 값부터(같으면 투명도 오름차순) 앞 후보를 받는다. 다 차면 마지막 후보 + `-n`.
+        - **나머지:** 투명도(불투명 = 1)가 자리 기준보다 작으면(더 투명) `[N-subtle, N-subtler, N-subtlest]`, 크면(덜 투명) `[N-strong, N-stronger, N-strongest]`. 같은 쪽끼리는 자리 기준과 투명도가 가까운 값부터(같으면 투명도 오름차순) 앞 후보를 받는다. 후보가 비었나는 이름 전체로 본다 — 파일에 있거나, 이번 실행의 다른 hex 자리 이름이거나, 이번에 다른 값이 받았으면 차 있다(다음 후보). 다 차면 마지막 후보 + `-n`.
+        - **다른 색 이름이 먼저(말 겹침):** 유채색 · inverse의 밝기 꼬리(`brand-subtle` = 더 밝은 같은 계열의 다른 색)와 투명도 단계(`brand-subtle` = 같은 색의 더 투명한 값)는 같은 말을 쓴다(사용자가 고른 말). 한 실행에서 둘이 같은 이름을 원하면 **hex 자리 이름이 먼저** 정해지고(위 규칙 — 자리는 값 이름보다 먼저 정한다), 투명도 단계는 차지된 이름을 건너뛰어 다음 후보를 받는다. 예: #3D5FDB(불투명, 기준) · #3D5FDB@50% · #5576EE(더 밝은 indigo) → `brand` · `brand-subtle`(#5576EE 자리) · `brand-subtler`(#3D5FDB@50%). 이름만으로는 "다른 색"과 "더 투명함"을 가를 수 없다 — 한계로 둔다(값 칩 · 견본으로 구별).
+        - **자리 기준과 같은 값인데 재사용할 수 없는 값**(파일의 N이 같은 hex · 같은 투명도지만 용도가 틀리거나 거울 — 연결 순서 4는 재사용하지 않는다): 꼬리 없이 `N-n`.
+        - **자리 이름이 되돌림일 때:** 자리가 후보를 다 못 받아 되돌림으로 가면 자리 이름은 `-n` 없는 마지막 후보로 두고(그 자리의 값들이 나눠 씀), 값 이름은 그 위에 투명도 단계를 붙인 뒤 맨 끝에 `-n`을 붙인다(이름 문법 그대로 — 예: 사다리 넷째 hex의 불투명 `color/text/subtlest-2`, 그 hex의 더 투명한 값 `color/text/subtlest-subtle-2`). 자리 기준은 위와 같다(그 자리 값들 중).
         - 예(그림자 검정 2% 1곳 · 4% 4곳 · 5% 3곳): 4%가 자리 기준 → `color/shadow/default`(4%) · `color/shadow/default-subtle`(2%) · `color/shadow/default-strong`(5%). 테두리 검정 100% 30곳 · 8% 12곳 → `color/border/default` · `color/border/default-subtle`.
         - 자리 이름에 이미 밝기 말이 있으면 그 뒤에 붙는다(드묾 — 예: `brand-subtle`의 반투명 → `brand-subtle-subtle`, 사다리 `color/text/subtler`의 덜 투명한 값 → `color/text/subtler-strong`). 한계로 둔다.
         - **자리가 비었나:** 자리 이름 N이 **다른 hex**의 값으로 파일에 있거나 이번에 다른 hex가 받았으면 그 자리는 차 있다(다음 후보로). N이 **같은 hex**(투명도만 다름)의 값으로 있으면 자리는 이 hex의 것이고 그 값이 자리 기준이다. N이 있지만 값을 읽을 수 없으면(별칭이 끊김 등) 다른 hex로 본다(다음 후보).
@@ -2478,7 +2482,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 ### A.14b Semantic 투명도 단계 (2026-11-11 사용자 결정 "Semantic에도 단계 말", 실기 중 — #142에 이어서)
 
 - [ ] `usageRoles.ts` `assignColors`: 자리(hex) 안 투명도 값들 — 자리 기준(파일의 N이 같은 hex면 그 값 · 아니면 곳 수 첫 값, 같으면 투명도 큰 값) · 더 투명 `-subtle…` · 덜 투명 `-strong…` · 가까운 순 · 다 차면 `-n`. `-a{%}`는 Semantic에서 쓰지 않음
-- [ ] `familyRe`: 투명도 단계 꼬리(밝기 꼬리 뒤 한 번 더) 허용, `-a\d+` 대신
-- [ ] 단위 테스트: 그림자 2% · 4% · 5% → `default` · `default-subtle` · `default-strong` / 테두리 100% · 8% → `default` · `default-subtle` / 반투명만 → `default` / 파일 `default` = 8% + 불투명 → `default-strong` / 파일 `subtle` = X@50% + 불투명 X → `subtle-strong` / 같은 쪽 넷 → `-subtlest-2` / `brand-subtle`의 반투명 → `brand-subtle-subtle` / 연결 경로 `bindSelection` 테두리 100% · 8% → `default` · `default-subtle`
-- [ ] 기존 기대값(`default-a8`) 고치기 · 화면 시안(만들기 Semantic 탭) · 4검사 · 스크린샷
+- [ ] `familyRe`: 투명도 단계 꼬리(밝기 꼬리 뒤 한 번 더) 허용, 예전 `-a\d+`는 새로 만들지 않되 가족에는 남김(재사용 · 차지) · `familyRank`가 투명도 단계 · `-a` 이름을 꼬리 이름(1순위)으로 다루는지 확인
+- [ ] 단위 테스트: 말 겹침 — #3D5FDB · #3D5FDB@50% · #5576EE → `brand` · `brand-subtler`(반투명) · `brand-subtle` / 자리 되돌림 + 투명도 → `subtlest-subtle-2` / 자리 기준과 같은 값 · 재사용 불가 → `N-2` / 옛 `default-a8` 같은 값 → 재사용 / inverse 반투명 → `inverse-subtle` / 만들기 경로 `createUsageRoles` 그림자 2% · 4% · 5% / 그림자 2% · 4% · 5% → `default` · `default-subtle` · `default-strong` / 테두리 100% · 8% → `default` · `default-subtle` / 반투명만 → `default` / 파일 `default` = 8% + 불투명 → `default-strong` / 파일 `subtle` = X@50% + 불투명 X → `subtle-strong` / 같은 쪽 넷 → `-subtlest-2` / `brand-subtle`의 반투명 → `brand-subtle-subtle` / 연결 경로 `bindSelection` 테두리 100% · 8% → `default` · `default-subtle`
+- [ ] 기존 기대값(`test/figma.test.mjs`의 `default-a8` 테스트들) 고치기 · 주석(`usageRoles.ts` 머리 · `familyRe` 문서의 `{-a%}` · `assignColors` 문서) · 화면 시안(만들기 Semantic 탭) · 4검사 · 스크린샷
 - [ ] 실기 확인(사용자, 피그마): 그림자가 `default-a2 · -a4 · -a5` 대신 단계 말
