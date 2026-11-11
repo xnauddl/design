@@ -156,6 +156,7 @@
 - `variables.ts`: `renameTextRoleVars(pairs)` 공용 함수(직접 만든 변수 거름) + 이름 다시 짓기 적용 함수 + 등록 경로의 되돌림(§5.3). `code.ts` · `messages.ts`: 메시지 2쌍(`SCAN_TS_RENAME` → `TS_RENAME_PLAN`, `APPLY_TS_RENAME` → `TS_RENAMED`).
 - `ui.ts` · `ui.html`: 변수 탭 ⋯ 메뉴 항목 · 타이포 카드 [이름 다시 짓기](`PAID_FIELDS`) · 이름 다시 짓기 팝업 · OPS `tsRename` · §4 표시(타이포 목록 · 만들기 Text Style 탭 · 팝업) · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움. `ui.html` `btnTsRowLabels`의 기본 `title`(지금 `rowLabelTip`과 같은 옛 글)도 고친다.
 - **타이포 목록 줄 모양(CLAUDE.md "카드 안에 카드")**: 지금 `tsList` 줄은 `resultCard` → `.r-card`(테두리 + 둥근 모서리 + 배경)가 `.step` 카드 안에 쌓인 모양이다. 이 목록의 줄을 구분선 줄(아래 테두리 한 줄, 둥근 모서리 · 배경 · 그림자 없음, 줄 사이 간격 0)로 바꾼다 — 타이포 목록에만(`#tsList .r-card`로 범위를 좁혀, 다른 화면의 `.r-card`는 UX 검수 C에서). 줄 안 내용 · 높이는 그대로.
+- **×n 배지 없앰 (2026-11-11 사용자 결정 B)**: 타이포 목록 줄 오른쪽의 `×{n}` 버튼(그 스타일 후보를 쓰는 글자 레이어 수 · 누르면 그 레이어 선택, `.r-badge`)을 없앤다 — 기호만으로는 뜻과 기능이 읽히지 않는다. 그 자리에 다른 것을 두지 않는다(줄 끝에는 §4 표시만). 함께 지우는 것: 키 `textStyle.badgeGoTip` · `textStyle.badgeSelectTip`, CSS `.r-badge`(타이포 목록 말고 쓰는 곳 없음). 잃는 것: 타이포 목록에서 쓰는 글자 수 · 바로 선택(만들기 화면 Text Style 탭의 "Layer {n}"은 그대로).
 - **문구(i18n, 해요체)**
 
 | 키 | 지금 | 바뀜 / 새 |
@@ -212,6 +213,7 @@
 - [x] 규칙 밖 표시(타이포 목록 · 상태 줄 꼬리 · 만들기 Text Style 탭 요약 끝 · 팝업)
 - [x] 행 라벨 이름의 예약 · `existing`을 reqId 없는 스캔에도 · `rampToSpecs(family, reserved)`
 - [x] 타이포 목록 줄 구분선 모양(`#tsList`) — 카드 안 카드 해소
+- [ ] 타이포 목록 ×n 배지 없앰(§6 — 2026-11-11 사용자 결정 B) · 키 2개 · `.r-badge`
 - [x] [이름 다시 짓기] — 변수 탭 ⋯ 메뉴 · 타이포 버튼 · 메시지(`SCAN_TS_RENAME` · `APPLY_TS_RENAME`, `tsSig`) · 팝업(구분선 줄 · 스위치 · 모두 켜기/끄기 · 포커스) · 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림 · 역할 변수(`renameTextRoleVars` — 직접 만든 변수 거름) · 등록 경로 되돌림 · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움 · ⌘Z · 공통 유료 잠금 · OPS · 다시 읽기
 - [x] ia-v4 반영(§2.6 [보기] 도착 · §4.3 · §4.6 ⋯ 메뉴 · §6 유료 · §7 작업 직후 · 부록 B.10)
 - [x] i18n(§6 표) · verify:i18n 0 · verify-bind-flow · 4검사 · 스크린샷
