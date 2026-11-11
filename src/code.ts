@@ -5,7 +5,7 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, planTsRename, applyTsRename, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
 import { FREE_MANUAL_CREATE_LIMIT } from './lib/varKind';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig } from './lib/textStyles';
@@ -1374,16 +1374,33 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
         if (!requirePaid('textStyles')) break;
-        // 이름은 언제나 크기 순(display/h1…) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
+        // 이름은 언제나 KRDS 규칙(heading/large… — docs/text-style-krds.md) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
         // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
         const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
         if (msg.reqId == null) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
         const styles = nameTextStyles(clusterTextStyles(samples), existing);
+        // existing은 reqId 없는 스캔에도 싣는다 — 기본 램프(rampToSpecs)의 예약 이름(docs/text-style-krds.md §6).
+        const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
         if (msg.reqId != null) {
-          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings, reqId: msg.reqId, existing: existing.map((e) => ({ name: e.name, sig: tsSig(e) })) });
-        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings });
+          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings, reqId: msg.reqId, existing: existingSigs });
+        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings, existing: existingSigs });
+        break;
+      }
+      case 'SCAN_TS_RENAME': {
+        // [이름 다시 짓기] 미리보기(docs/text-style-krds.md §5.2) — 읽기만. 텍스트 스타일 기능과 같은 유료 잠금.
+        if (!requireTextStyles()) break;
+        post({ type: 'TS_RENAME_PLAN', reqId: msg.reqId, rows: await planTsRename() });
+        break;
+      }
+      case 'APPLY_TS_RENAME': {
+        // [이름 다시 짓기] 바꾸기(§5.3) — 이름만 쓴다(글꼴 · 값 없음). 스타일 · 역할 변수 이름을 ⌘Z 한 번으로.
+        if (!requireTextStyles()) break;
+        const r = await applyTsRename(msg.items);
+        post({ type: 'TS_RENAMED', reqId: msg.reqId, ...r });
+        commitUndo(figma);
+        await postPrereq();
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
