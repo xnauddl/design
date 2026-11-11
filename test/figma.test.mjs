@@ -7062,7 +7062,7 @@ test('scanTextStyles — uiRole: 부모부터 올라가 처음 역할이 있는 
   assert.deepEqual(ui, { inBtn: true, inCard: false, selfRole: true, inChip: true });
 });
 
-test('planTsRename — 로컬 스타일 전부에 KRDS 이름 · 바뀌는 줄만 · sig · 규칙 밖 표시', async () => {
+test('planTsRename — 로컬 스타일 전부에 KRDS 이름 · 바뀌는 줄만 · sig', async () => {
   const figma = installFigma();
   const h1 = mkTs(figma, 'h1', 32, 'Bold');
   const body = mkTs(figma, 'body', 17);
@@ -7072,12 +7072,10 @@ test('planTsRename — 로컬 스타일 전부에 KRDS 이름 · 바뀌는 줄�
   const rows = await planTsRename();
   const by = Object.fromEntries(rows.map((r) => [r.from, r]));
   assert.deepEqual(Object.keys(by).sort(), ['body', 'h1', 'odd'], '이름이 같은 body/small은 없음');
-  assert.deepEqual(by.h1, { id: h1.id, from: 'h1', to: 'heading/large', sig: '32|48|0|Inter|Bold', fontSize: 32, offScale: null, nearest: 32 });
+  assert.deepEqual(by.h1, { id: h1.id, from: 'h1', to: 'heading/large', sig: '32|48|0|Inter|Bold' });
   assert.equal(by.body.to, 'body/medium');
   assert.equal(by.body.sig, tsSigOf(body));
   assert.equal(by.odd.to, 'heading/medium');
-  assert.equal(by.odd.offScale, 'decimal');
-  assert.equal(by.odd.nearest, 28);
   assert.equal(odd.name, 'odd', '읽기만');
 });
 

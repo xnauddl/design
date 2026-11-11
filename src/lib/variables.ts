@@ -26,7 +26,7 @@ import { paletteFamilyOf } from './palette';
 import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig } from './textStyles';
-import { nameKrdsStyles, offScale, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
+import { nameKrdsStyles, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
 import { dsRoleOwner } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
@@ -1343,9 +1343,7 @@ export async function planTsRename(): Promise<TsRenameRow[]> {
   styles.forEach((s, i) => {
     const to = names[i];
     if (!to || to === s.name) return;
-    const e = existingOf(s);
-    const off = offScale(e.fontSize);
-    rows.push({ id: s.id, from: s.name, to, sig: tsSig(e), fontSize: e.fontSize, offScale: off.kind, nearest: off.nearest });
+    rows.push({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)) });
   });
   return rows;
 }

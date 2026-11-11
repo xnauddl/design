@@ -9,9 +9,6 @@ import { splitWeightStyle } from './exporters';
 
 export type KrdsCategory = 'display' | 'heading' | 'body' | 'label';
 
-/** 규칙 밖 판정용 KRDS 크기 모음(PC + 모바일, §1). */
-export const KRDS_SIZES: readonly number[] = [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60];
-
 export interface KrdsStepDef {
   step: string;
   /** 기준값 = KRDS PC 값(§3.3). */
@@ -124,19 +121,6 @@ export function krdsStepDef(category: KrdsCategory, size: number): KrdsStepDef {
 /** 크기 → 단계 이름(§3.3). */
 export function krdsStep(category: KrdsCategory, size: number): string {
   return krdsStepDef(category, size).step;
-}
-
-/** 규칙 밖 판정(§4) — 소수 'decimal' · 모음 밖 정수 'off' · 안이면 null. nearest = 가장 가까운 KRDS 크기(같은 거리면 큰 값). */
-export function offScale(size: number): { kind: 'decimal' | 'off' | null; nearest: number } {
-  const d = round1(size);
-  let nearest = KRDS_SIZES[0];
-  for (const k of KRDS_SIZES) {
-    const dk = Math.abs(k - d);
-    const dn = Math.abs(nearest - d);
-    if (dk < dn || (dk === dn && k > nearest)) nearest = k;
-  }
-  const kind = !Number.isInteger(d) ? 'decimal' : KRDS_SIZES.includes(d) ? null : 'off';
-  return { kind, nearest };
 }
 
 /** 문자 코드 순 비교(§3.10 — localeCompare 아님). */

@@ -232,8 +232,8 @@
 - [x] ia-v4 반영(§2.6 [보기] 도착 · §4.3 · §4.6 ⋯ 메뉴 · §6 유료 · §7 작업 직후 · 부록 B.10)
 - [x] i18n(§6 표) · verify:i18n 0 · verify-bind-flow · 4검사 · 스크린샷
 - [ ] 실기 확인(사용자, 피그마): 옛 이름 스타일(`display` · `body` · `h1` …)과 역할 변수(`font-size/body` 등)가 있는 파일에서 새 폴더 이름(`body/medium` · `font-size/body/medium`)이 함께 생기고 바뀌는지 — 피그마가 같은 이름의 폴더와 스타일(`body` 스타일 · `body/` 폴더)을 함께 두는지 · 이름 다시 짓기 · ⌘Z 한 번
-- [ ] **UX 검수 C — KRDS 크기 표시 없앰**(2026-11-11 사용자 결정 · §4 · ia-v4 B.14): `ui.ts` `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail` · `offScale` import · 네 곳의 표시(타이포 목록 · 상태 줄 꼬리 · 팝업 · Text Style 탭), `setTsStatus` 종류 인자
-- [ ] `ui.html` `.r-top.has-off` · `.r-top.no-check.has-off` · `.ts-off*` 지움, i18n `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` 지움
-- [ ] `krdsType.ts` `offScale` · `KRDS_SIZES` 지움, `messages.ts` `TsRenameRow`에서 `fontSize` · `offScale` · `nearest` 지움, `variables.ts` `planTsRename` 정리
-- [ ] 테스트: pure `offScale` 테스트 · import 지움, figma `planTsRename` 기대값, verify 17(Text Style 탭 기호 없음) · 19(타이포 목록 · 팝업 · 상태 줄 표시 없음, `TS_RENAME_PLAN` 줄 필드)
-- [ ] 바뀌지 않음 확인: 이름 규칙 · 꼬리 · `_` 표기 테스트 그대로 통과, 연결 화면 소수 글자 크기 건너뜀 칩(`fraction`) 그대로
+- [x] **UX 검수 C — KRDS 크기 표시 없앰**(2026-11-11 사용자 결정 · §4 · ia-v4 B.14): `ui.ts` `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail` · `offScale` import · 네 곳의 표시(타이포 목록 · 상태 줄 꼬리 · 팝업 · Text Style 탭), `setTsStatus` 종류 인자
+- [x] `ui.html` `.r-top.has-off` · `.r-top.no-check.has-off` · `.ts-off*` 지움, i18n `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` 지움
+- [x] `krdsType.ts` `offScale` · `KRDS_SIZES` 지움, `messages.ts` `TsRenameRow`에서 `fontSize` · `offScale` · `nearest` 지움, `variables.ts` `planTsRename` 정리
+- [x] 테스트: pure `offScale` 테스트 · import 지움, figma `planTsRename` 기대값, verify 17(Text Style 탭 기호 없음) · 19(타이포 목록 · 팝업 · 상태 줄 표시 없음, `TS_RENAME_PLAN` 줄 필드)
+- [x] 바뀌지 않음 확인: 이름 규칙 · 꼬리 · `_` 표기 테스트 그대로 통과, 연결 화면 소수 글자 크기 건너뜀 칩(`fraction`) 그대로
