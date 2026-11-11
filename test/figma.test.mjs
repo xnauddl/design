@@ -3,13 +3,15 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles } from '../dist/pure.mjs';
+import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles, nameColorsByHue, resolveGlobalNames, isExtractOnlyColorName } from '../dist/pure.mjs';
 import {
   extractFromSelection,
   isIconOrAvatar,
   createTokens,
   createUsageRoles,
   assignNames,
+  familyRe,
+  colorRoleRef,
   colorRoleBases,
   colorSlotKey,
   bgKindOf,
@@ -33,6 +35,7 @@ import {
   applyRegisteredTextStyles,
   textStyleCandidateTest,
   bindSelection,
+  createRole,
   bindSelectedItems,
   countUsage,
   deletedBindings,
@@ -704,7 +707,8 @@ test('createTokens — Global 리터럴 + scopes/hidden + px 환산 (Semantic �
 
   // 토큰당 Global 1개(거울 없음). 색1 + 라인하이트1 + 간격1 = created 3
   // conversions: base(16px) 환산 대상은 비-px인 lineHeight(150%)뿐
-  const { globalOf, skippedManualNames, ...counts } = summary;
+  const { globalOf, skippedManualNames, finalName, ...counts } = summary;
+  assert.equal(finalName.size, 0, '쓰임 없는 토큰은 최종 이름을 정하지 않는다(12.11)');
   assert.deepEqual(counts, {
     created: 3,
     updated: 0,
@@ -5483,7 +5487,7 @@ test('usageRoles — 쓰임 이름 · 색 쓰임 · 번호 · 옛 이름(순수)
   assert.equal(colorUse('FRAME', 'fills', true), 'background'); // 프레임류는 아이콘 틀이어도 background
   assert.equal(colorUse('FRAME', 'strokes', false), 'border');
   assert.equal(colorUse('FRAME', 'effects', false), 'shadow');
-  // 번호: 곳 수 순 · 같은 값 재사용 · 다른 값이면 다음 번호
+  // 이름 꼬리(12.5): 기준 = 이미 있는 기본 이름 값(12), 쪽마다 가까운 순 · 같은 값 재사용
   const names = assignNames(
     [
       { base: 'spacing/gap', value: '24', count: 1 },
@@ -5493,9 +5497,9 @@ test('usageRoles — 쓰임 이름 · 색 쓰임 · 번호 · 옛 이름(순수)
     ],
     new Map([['radius/card', '8'], ['spacing/gap', '12']]),
   );
-  assert.equal(names.get('spacing/gap\u000052'), 'spacing/gap-2'); // 번호 없는 이름은 다른 값(12)이 차지
-  assert.equal(names.get('spacing/gap\u000010'), 'spacing/gap-3'); // 같은 곳 수면 값 오름차순
-  assert.equal(names.get('spacing/gap\u000024'), 'spacing/gap-4');
+  assert.equal(names.get('spacing/gap\u000024'), 'spacing/gap-lg'); // 12보다 크고 가장 가까움
+  assert.equal(names.get('spacing/gap\u000052'), 'spacing/gap-xl');
+  assert.equal(names.get('spacing/gap\u000010'), 'spacing/gap-sm'); // 작은 쪽
   assert.equal(names.get('radius/card\u00008'), 'radius/card'); // 같은 값이 있으면 재사용
   assert.equal(isOldPluginName('spacing/md'), true);
   assert.equal(isOldPluginName('color/text/default'), true);
@@ -5613,7 +5617,7 @@ test('보는 순서 1 → 3 → 2 → 4 — 같은 값이면 디자이너 변수
   assert.equal(dry2.candidates[0].variableId, auto.id);
 });
 
-test('새 역할 — 한 번의 찾기에서 번호는 곳 수 순, 모든 모드에 별칭, 역할을 만들면 다시 쓴다', async () => {
+test('새 역할 — 곳 수 많은 값이 기본 이름, 나머지는 크기 꼬리(12.5), 모든 모드에 별칭, 역할을 만들면 다시 쓴다', async () => {
   const figma = installFigma();
   await createTokens(
     [
@@ -5633,7 +5637,7 @@ test('새 역할 — 한 번의 찾기에서 번호는 곳 수 순, 모든 모�
   const dry = await bindSelection(frames, false);
   const nameOf = (id) => dry.candidates.find((c) => c.nodeId === id).variableName;
   assert.equal(nameOf('a'), 'spacing/gap'); // 52가 두 곳 — 번호 없는 이름
-  assert.equal(nameOf('c'), 'spacing/gap-2');
+  assert.equal(nameOf('c'), 'spacing/gap-sm'); // 52보다 작음(12.5 크기 꼬리)
   const r = await bindSelection(frames);
   assert.equal(r.newRoles, 2);
   const v = findVar(figma, 'Semantic', 'spacing/gap');
@@ -5646,7 +5650,7 @@ test('새 역할 — 한 번의 찾기에서 번호는 곳 수 순, 모든 모�
   assert.equal(dry3.candidates[0].variableId, v.id);
 });
 
-test('createUsageRoles — 만들기는 쓰임마다 역할, 같은 값이면 재사용, 다른 값이면 다음 번호(덮어쓰지 않음)', async () => {
+test('createUsageRoles — 만들기는 쓰임마다 역할, 같은 값이면 재사용, 다른 값이면 크기 꼬리(덮어쓰지 않음)', async () => {
   const figma = installFigma();
   const tokens = [
     { name: 'spacing/24', category: 'gap', sources: ['gap'], value: 24, uses: [{ name: 'spacing/card/gap', count: 3 }] },
@@ -5659,17 +5663,17 @@ test('createUsageRoles — 만들기는 쓰임마다 역할, 같은 값이면 �
   assert.equal(findVar(figma, 'Semantic', 'spacing/card/gap'), undefined);
   assert.equal(await createUsageRoles(tokens), 5);
   assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'spacing/card/gap').id), findVar(figma, 'Global', 'spacing/24').id);
-  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'spacing/card/gap-2').id), findVar(figma, 'Global', 'spacing/16').id);
+  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'spacing/card/gap-sm').id), findVar(figma, 'Global', 'spacing/16').id);
   assert.ok(findVar(figma, 'Semantic', 'spacing/padding'));
   assert.ok(findVar(figma, 'Semantic', 'color/text/default'));
   assert.ok(findVar(figma, 'Semantic', 'color/text/inverse'));
   // 다시 돌려도 같은 값은 재사용 — 새로 만들지 않고 값도 그대로
   assert.equal(await createUsageRoles(tokens), 0);
-  // 다른 선택에서 card/gap의 최빈값이 32로 바뀌어도 기존 역할은 덮지 않고 다음 번호
+  // 다른 선택에서 card/gap의 최빈값이 32로 바뀌어도 기존 역할은 덮지 않고 꼬리(기준 = 이미 있는 24 → 큰 쪽 -lg)
   await createTokens([{ name: 'spacing/32', category: 'gap', sources: ['gap'], value: 32 }], 16);
   assert.equal(await createUsageRoles([{ name: 'spacing/32', category: 'gap', sources: ['gap'], value: 32, uses: [{ name: 'spacing/card/gap', count: 9 }] }]), 1);
   assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'spacing/card/gap').id), findVar(figma, 'Global', 'spacing/24').id);
-  assert.ok(findVar(figma, 'Semantic', 'spacing/card/gap-3'));
+  assert.ok(findVar(figma, 'Semantic', 'spacing/card/gap-lg'));
 });
 
 test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리로 옮긴 값은 쓰임을 버린다', () => {
@@ -6200,7 +6204,7 @@ test('삭제 — 변수를 지우고, 다시 지우면 VarGoneError', async () =
   await assert.rejects(deleteVariable(v.id), VarGoneError);
 });
 
-test('직접 만든 변수 지키기 — createTokens: 같은 값이면 그 변수를 Global로 재사용, 다르면 건너뜀(skippedManual) · 값은 그대로', async () => {
+test('직접 만든 변수 지키기 — createTokens(쓰임 없는 토큰): 같은 값이면 그 변수를 Global로 재사용, 다르면 건너뜀(skippedManual) · 값은 그대로', async () => {
   const figma = installFigma();
   const gcol = figma.variables.createVariableCollection('Global');
   const same = figma.variables.createVariable('color/ff0000', gcol, 'COLOR');
@@ -6210,7 +6214,7 @@ test('직접 만든 변수 지키기 — createTokens: 같은 값이면 그 변�
   const diff = figma.variables.createVariable('color/00ff00', gcol, 'COLOR');
   diff.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
   diff.setPluginData('dsl.manual', '1');
-  const toks = [colorTok('#ff0000'), colorTok('#00ff00'), colorTok('#0000ff')];
+  const toks = [colorTok('#ff0000'), colorTok('#00ff00'), colorTok('#0000ff')].map(({ uses, ...t }) => t); // 쓰임 없음(팔레트 · 글자 경로) — 지금 규칙
   const pv = await previewCreateTokens(toks, 16);
   assert.equal(pv.skippedManual, 1);
   assert.equal(pv.created, 1);
@@ -6224,12 +6228,33 @@ test('직접 만든 변수 지키기 — createTokens: 같은 값이면 그 변�
   assert.equal(same.hiddenFromPublishing, false);
   assert.deepEqual(diff.valuesByMode[gcol.defaultModeId], { r: 0, g: 0, b: 1, a: 1 });
   assert.equal(figma._state.variables.filter((v) => v.name === 'color/00ff00').length, 1, '다른 이름으로 새로 만들지 않는다');
-  // 쓰임 역할: 건너뛴 토큰은 빼고 — 재사용한 manual은 별칭 대상으로
-  const roles = await createUsageRoles(toks.filter((x) => !s.skippedManualNames.has(x.name)), false, s.globalOf);
-  assert.equal(roles >= 1, true);
+});
+
+test('직접 만든 변수 지키기 — createTokens(쓰임 있는 토큰, 12.11): 같은 값이면 재사용 · 다르면 건너뛰지 않고 다음 이름 · 값은 그대로', async () => {
+  const figma = installFigma();
+  const gcol = figma.variables.createVariableCollection('Global');
+  const same = figma.variables.createVariable('color/ff0000', gcol, 'COLOR');
+  same.setValueForMode(gcol.defaultModeId, { r: 1, g: 0, b: 0, a: 1 });
+  same.setPluginData('dsl.manual', '1');
+  const diff = figma.variables.createVariable('color/00ff00', gcol, 'COLOR');
+  diff.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
+  diff.setPluginData('dsl.manual', '1');
+  const toks = [colorTok('#ff0000'), colorTok('#00ff00'), colorTok('#0000ff')];
+  const pv = await previewCreateTokens(toks, 16);
+  assert.equal(pv.skippedManual, 0);
+  assert.equal(pv.tokenStates.get('color/00ff00').varName, 'color/00ff00-2');
+  const s = await createTokens(toks, 16);
+  assert.equal(s.skippedManual, 0);
+  assert.equal(s.globalOf.get('color/ff0000'), same.id);
+  assert.equal(s.finalName.get('color/00ff00'), 'color/00ff00-2');
+  assert.equal(rgbToHex(findVar(figma, 'Global', 'color/00ff00-2').valuesByMode[gcol.defaultModeId]), '#00ff00');
+  assert.deepEqual(diff.valuesByMode[gcol.defaultModeId], { r: 0, g: 0, b: 1, a: 1 }, '직접 만든 변수 값은 그대로');
+  // 쓰임 역할은 최종 이름의 Global을 가리킨다
+  await createUsageRoles(toks, false, s.globalOf, undefined, s.finalName);
   const sem = figma._state.variables.filter((v) => figma._state.collections.find((c) => c.id === v.variableCollectionId)?.name === 'Semantic');
   const targets = sem.map((v) => Object.values(v.valuesByMode)[0].id);
   assert.ok(targets.includes(same.id));
+  assert.ok(targets.includes(findVar(figma, 'Global', 'color/00ff00-2').id));
   assert.equal(targets.includes(diff.id), false);
 });
 
@@ -6401,7 +6426,7 @@ test('applyRegisteredTextStyles — 방금 등록한 스타일만 붙임(글자 
   assert.equal(r2.applySkipped, 1);
 });
 
-test('createUsageRoles · previewCreateTokens — tokenStates(new · update · reuse · manual · 같은 값 직접 만든 변수는 reuse) · roleRows(길이 = 역할 수)', async () => {
+test('createUsageRoles · previewCreateTokens — tokenStates(쓰임 있는 토큰: new + varName · reuse, 12.11) · roleRows(길이 = 역할 수, 최종 이름)', async () => {
   const figma = installFigma();
   withRoot(figma);
   const gcol = figma.variables.createVariableCollection('Global');
@@ -6419,28 +6444,28 @@ test('createUsageRoles · previewCreateTokens — tokenStates(new · update · r
   const toks = [
     colorTok('#0066ff', 'color/text'), // 사용자 Global 재사용
     colorTok('#ff0000', 'color/border'), // 같은 이름 · 같은 값 직접 만든 변수
-    colorTok('#00ff00', 'color/icon'), // 같은 이름 · 값 다름 → manual
-    { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8, uses: [{ name: 'spacing/card/gap', count: 2 }] }, // 있음 → update
+    colorTok('#00ff00', 'color/icon'), // 같은 이름 · 값 다름 → 건너뛰지 않고 다음 이름(12.11)
+    { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8, uses: [{ name: 'spacing/card/gap', count: 2 }] }, // 같은 이름 · 같은 값 → 있는 변수(12.11 — update 없음)
     { name: 'spacing/12', category: 'gap', sources: ['gap'], value: 12, uses: [{ name: 'spacing/padding', count: 1 }] }, // 새로
   ];
   const s = await previewCreateTokens(toks, 16);
   assert.deepEqual(Object.fromEntries(s.tokenStates), {
     'color/0066ff': { state: 'reuse', varName: 'blue/500' },
     'color/ff0000': { state: 'reuse', varName: 'color/ff0000' },
-    'color/00ff00': { state: 'manual' },
-    'spacing/8': { state: 'update' },
+    'color/00ff00': { state: 'new', varName: 'color/00ff00-2' },
+    'spacing/8': { state: 'reuse', varName: 'spacing/8' },
     'spacing/12': { state: 'new' },
   });
-  assert.equal(s.created + s.updated, 2);
+  assert.equal(s.created + s.updated, 2); // spacing/12 · color/00ff00-2
   const rows = [];
   const roleToks = toks.filter((x) => !s.skippedManualNames.has(x.name));
-  const roles = await createUsageRoles(roleToks, true, s.globalOf, rows);
+  const roles = await createUsageRoles(roleToks, true, s.globalOf, rows, s.finalName);
   assert.equal(rows.length, roles);
   const byToken = Object.fromEntries(rows.map((r) => [r.token, r]));
   assert.equal(byToken['color/0066ff'].global, 'blue/500', 'globalOf의 변수 이름');
   assert.equal(byToken['spacing/12'].global, 'spacing/12', '없으면 토큰 이름');
   assert.equal(byToken['spacing/12'].name, 'spacing/padding');
-  assert.equal(byToken['color/00ff00'], undefined, '건너뛴 직접 만든 변수의 역할은 없다');
+  assert.equal(byToken['color/00ff00'].global, 'color/00ff00-2', '새 Global은 최종 이름(finalName)');
   // 실제 만들기에는 rowsOut을 채우지 않는다
   const rows2 = [];
   await createUsageRoles(roleToks, false, s.globalOf, rows2);
@@ -6524,7 +6549,7 @@ test('code.ts — reqId를 돌려준다: EXTRACT · CREATE_TOKENS(미리보기 �
   assert.equal(rr.applied, true);
 });
 
-test('code.ts — CREATE_TOKENS 미리보기: 값 다른 직접 만든 변수는 manual · 그 역할은 roleRows에 없다', async () => {
+test('code.ts — CREATE_TOKENS 미리보기: 쓰임 있는 토큰은 값 다른 직접 만든 변수를 피해 다음 이름(new + varName) · roleRows도 최종 이름', async () => {
   const figma = installFigma();
   const p = await loadPlugin(figma);
   const gcol = figma.variables.createVariableCollection('Global');
@@ -6533,10 +6558,10 @@ test('code.ts — CREATE_TOKENS 미리보기: 값 다른 직접 만든 변수는
   diff.setPluginData('dsl.manual', '1');
   const out = await p.send({ type: 'CREATE_TOKENS', tokens: [colorTok('#00ff00', 'color/icon'), colorTok('#123456', 'color/text')], base: 16, preview: true, reqId: 1 });
   const cr = ofType(out, 'CREATE_RESULT')[0];
-  assert.equal(cr.tokenStates['color/00ff00'].state, 'manual');
+  assert.deepEqual(cr.tokenStates['color/00ff00'], { state: 'new', varName: 'color/00ff00-2' });
   assert.equal(cr.tokenStates['color/123456'].state, 'new');
   assert.equal(cr.roleRows.length, cr.roles);
-  assert.equal(cr.roleRows.some((r) => r.token === 'color/00ff00'), false);
+  assert.equal(cr.roleRows.find((r) => r.token === 'color/00ff00').global, 'color/00ff00-2');
 });
 
 test('code.ts — SCAN_TEXT_STYLES: reqId 스캔은 기준 nodeIds를 읽고 lastTextSamples를 덮어쓰지 않는다 · existing은 두 스캔 모두', async () => {
@@ -6688,7 +6713,7 @@ test('createTokens · previewCreateTokens — 반투명 Global은 RGBA, 재사�
   assert.deepEqual([...s2.skippedManualNames], ['color/000000-a25']);
 });
 
-test('createUsageRoles — 같은 hex · 다른 투명도는 같은 밝기 이름에 번호(default · default-2), 별칭은 반투명 Global', async () => {
+test('createUsageRoles — 같은 hex · 다른 투명도는 투명도 단계(default · default-subtle, 12.5), 별칭은 반투명 Global', async () => {
   const figma = installFigma();
   const tokens = [
     { name: 'color/000000', category: 'color', sources: ['stroke'], value: '#000000', uses: [{ name: 'color/border', count: 30 }] },
@@ -6697,14 +6722,14 @@ test('createUsageRoles — 같은 hex · 다른 투명도는 같은 밝기 이�
   const s = await createTokens(tokens, 16);
   const rows = [];
   assert.equal(await createUsageRoles(tokens, true, s.globalOf, rows), 2);
-  assert.deepEqual(rows.map((r) => [r.name, r.token]).sort(), [['color/border/default', 'color/000000'], ['color/border/default-2', 'color/000000-a8']]);
+  assert.deepEqual(rows.map((r) => [r.name, r.token]).sort(), [['color/border/default', 'color/000000'], ['color/border/default-subtle', 'color/000000-a8']]);
   assert.equal(await createUsageRoles(tokens, false, s.globalOf), 2);
   assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default').id), findVar(figma, 'Global', 'color/000000').id);
-  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default-2').id), findVar(figma, 'Global', 'color/000000-a8').id);
+  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default-subtle').id), findVar(figma, 'Global', 'color/000000-a8').id);
   assert.equal(await createUsageRoles(tokens, false, s.globalOf), 0, '다시 돌리면 같은 값 재사용');
 });
 
-test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default · default-2(곳 수 많은 쪽이 번호 없음)', async () => {
+test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default · default-subtle(투명도 단계)', async () => {
   const figma = installFigma();
   await createTokens(
     [
@@ -6718,13 +6743,13 @@ test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default 
   const dry = await bindSelection(nodes, false);
   const nameOf = (id) => dry.candidates.find((c) => c.nodeId === id).variableName;
   assert.equal(nameOf('a'), 'color/border/default');
-  assert.equal(nameOf('t1'), 'color/border/default-2');
+  assert.equal(nameOf('t1'), 'color/border/default-subtle');
   await bindSelection(nodes);
   assert.equal(roleTarget(figma, nodes[3].strokes[0].boundVariables.color.id), findVar(figma, 'Global', 'color/000000-a8').id);
   assert.equal(nodes[3].strokes[0].opacity, 0.08);
   // 다음 찾기는 만든 반투명 역할을 쓴다
   const again = await bindSelection([mk('t3', 0.08)], false);
-  assert.equal(again.candidates[0].variableName, 'color/border/default-2');
+  assert.equal(again.candidates[0].variableName, 'color/border/default-subtle');
 });
 
 test('colorSlotKey · colorRoleBases — 키는 투명도까지, 밝기는 hex로만', () => {
@@ -7099,4 +7124,203 @@ test('code.ts — SCAN_TS_RENAME → TS_RENAME_PLAN · APPLY_TS_RENAME → TS_RE
   assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0]?.feature, 'textStyles');
   out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 7, items: [] });
   assert.equal(ofType(out, 'TS_RENAMED').length, 0);
+});
+
+/* ---------- ia-v3 A.14 — 쓰임 역할 이름 꼬리(12.5) · Global 색 이름(12.11) ---------- */
+
+const A = (reqs, ex = new Map(), o) => Object.fromEntries([...assignNames(reqs, ex, o)].map(([k, v]) => [k.split('\u0000')[1], v]));
+
+test('A.14 숫자 꼬리 — 곳 수 첫 값이 기본 이름, 쪽마다 가까운 순 -sm · -xs · -2xs / -lg · -xl · -2xl, 다 차면 마지막 + -n', () => {
+  const r = A([['16', 10], ['24', 4], ['12', 3], ['32', 2], ['20', 1]].map(([value, count]) => ({ base: 'spacing/card/gap', value, count })));
+  assert.deepEqual(r, { 16: 'spacing/card/gap', 12: 'spacing/card/gap-sm', 20: 'spacing/card/gap-lg', 24: 'spacing/card/gap-xl', 32: 'spacing/card/gap-2xl' });
+  const four = A([['10', 9], ['20', 1], ['30', 1], ['40', 1], ['50', 1]].map(([value, count]) => ({ base: 'radius/card', value, count })));
+  assert.equal(four[50], 'radius/card-2xl-2');
+  // 이미 있는 기본 이름 값이 기준 · 못 읽으면 새 값 곳 수 첫 값이 기준 + {기본}-2
+  assert.equal(A([{ base: 'spacing/gap', value: '8', count: 5 }], new Map([['spacing/gap', '12']]))[8], 'spacing/gap-sm');
+  const unread = A([{ base: 'spacing/gap', value: '8', count: 5 }, { base: 'spacing/gap', value: '16', count: 1 }], new Map([['spacing/gap', []]]));
+  assert.deepEqual(unread, { 8: 'spacing/gap-2', 16: 'spacing/gap-lg' });
+  // 기준과 같은 값인데 재사용 불가(용도 틀림) → {기본}-2
+  assert.equal(A([{ base: 'spacing/gap', value: '12', count: 1 }], new Map([['spacing/gap', '12']]), { canReuse: () => false })[12], 'spacing/gap-2');
+  // 글꼴은 -n
+  assert.deepEqual(A([{ base: 'font-family/text', value: 'Inter', count: 3 }, { base: 'font-family/text', value: 'Roboto', count: 1 }]), { Inter: 'font-family/text', Roboto: 'font-family/text-2' });
+});
+
+test('A.14 유채색 꼬리 — QA 4색 → brand · brand-subtle · brand-red · brand-teal, 계열 기준 · 같은 계열 둘', () => {
+  const B = 'color/background/brand';
+  assert.deepEqual(A([['#3d5fdb', 12], ['#5576ee', 4], ['#e68e6c', 3], ['#2edcf3', 2]].map(([value, count]) => ({ base: B, value, count }))), {
+    '#3d5fdb': B, '#5576ee': `${B}-subtle`, '#e68e6c': `${B}-red`, '#2edcf3': `${B}-teal`,
+  });
+  // 같은 다른 계열 둘 → -{계열} · -{계열}-subtle/strong
+  const two = A([['#3d5fdb', 9], ['#e68e6c', 3], ['#f2b8a0', 1]].map(([value, count]) => ({ base: B, value, count })));
+  assert.equal(two['#e68e6c'], `${B}-red`);
+  assert.equal(two['#f2b8a0'], `${B}-red-subtle`);
+  // 계열 기준 이름이 차 있어(다른 값) 되돌림으로 가도 그 값이 계열 기준
+  const held = A([['#e68e6c', 3], ['#f2b8a0', 1]].map(([value, count]) => ({ base: B, value, count })), new Map([[B, '#3d5fdb'], [`${B}-red`, '#cc0000']]));
+  assert.equal(held['#e68e6c'], `${B}-red-subtle`, '파일의 brand-red(#cc0000)가 계열 기준 — 더 밝으면 subtle');
+  // 옛 brand-2가 같은 값이면 재사용
+  assert.equal(A([{ base: B, value: '#5576ee', count: 1 }], new Map([[B, '#3d5fdb'], [`${B}-2`, '#5576ee']]))['#5576ee'], `${B}-2`);
+});
+
+test('A.14 사다리 · inverse · 투명도 — subtle · subtler · subtlest(-2), L 같으면 strong, -a8 자리', () => {
+  const lad = A([['#4b5563', 8], ['#7a7a7a', 5], ['#9ca3af', 2], ['#d1d5db', 1]].map(([value, count]) => ({ base: 'color/text/subtle', value, count, refHex: '#000000' })));
+  assert.deepEqual(lad, { '#4b5563': 'color/text/subtle', '#7a7a7a': 'color/text/subtler', '#9ca3af': 'color/text/subtlest', '#d1d5db': 'color/text/subtlest-2' });
+  // inverse 둘 — 이미 있는 inverse 값이 기준
+  const inv = A([{ base: 'color/text/inverse', value: '#f5f5f5', count: 5 }], new Map([['color/text/inverse', '#ffffff']]));
+  assert.equal(inv['#f5f5f5'], 'color/text/inverse-strong');
+  // 투명도 단계(A.14b): 불투명 + 8% → N · N-subtle, 반투명만 → N
+  assert.deepEqual(A([{ base: 'color/border/default', value: '#000000', count: 30 }, { base: 'color/border/default', value: '#000000@0.08', count: 12 }]), { '#000000': 'color/border/default', '#000000@0.08': 'color/border/default-subtle' });
+  assert.deepEqual(A([{ base: 'color/border/default', value: '#000000@0.08', count: 12 }]), { '#000000@0.08': 'color/border/default' });
+  // 파일 기본 이름이 반투명(같은 hex) → 불투명은 default-strong · 파일 subtle = X@50% + 새 불투명 X → subtle-strong
+  assert.equal(A([{ base: 'color/border/default', value: '#000000', count: 1 }], new Map([['color/border/default', '#000000@0.08']]))['#000000'], 'color/border/default-strong');
+  assert.equal(A([{ base: 'color/text/subtle', value: '#777777', count: 1, refHex: '#000000' }], new Map([['color/text/subtle', '#777777@0.5']]))['#777777'], 'color/text/subtle-strong');
+});
+
+test('A.14 가족 — 꼬리 말 표만, padding-x · -top-left · brand-bold는 가족 아님', () => {
+  assert.equal(familyRe('spacing/card/padding', 'number').test('spacing/card/padding-x'), false);
+  assert.equal(familyRe('spacing/card/padding', 'number').test('spacing/card/padding-lg'), true);
+  assert.equal(familyRe('radius/card', 'number').test('radius/card-top-left'), false);
+  assert.equal(familyRe('color/background/brand', 'chroma').test('color/background/brand-bold'), false);
+  assert.equal(familyRe('color/background/brand', 'chroma').test('color/background/brand-red-subtle-a8-2'), true);
+  assert.equal(familyRe('color/text/subtle', 'ladder').test('color/text/subtlest-2'), true);
+  assert.equal(familyRe('color/text/subtle', 'ladder').test('color/text/strong'), false);
+  assert.equal(colorRoleRef([{ hex: '#111111', count: 3 }, { hex: '#777777', count: 1 }]), '#111111');
+});
+
+test('A.14 연결 — 같은 값이어도 용도가 틀린 가족 변수는 쓰지 않고(순서 2) 새 이름은 차지를 피함 · createRole도 용도 확인', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
+  const g = findVar(figma, 'Global', 'spacing/16');
+  const sem = figma.variables.createVariableCollection('Semantic');
+  const wrong = figma.variables.createVariable('spacing/gap', sem, 'FLOAT');
+  wrong.setValueForMode(sem.defaultModeId, { type: 'VARIABLE_ALIAS', id: g.id });
+  wrong.scopes = ['CORNER_RADIUS']; // 용도 틀림
+  const frame = {
+    type: 'FRAME', id: 'card', name: 'card', fills: [], layoutMode: 'VERTICAL', itemSpacing: 16, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', boundVariables: {}, setBoundVariable(f, v) { this.boundVariables[f] = { type: 'VARIABLE_ALIAS', id: v.id }; },
+  };
+  const dry = await bindSelection([frame], false);
+  const c = dry.candidates.find((x) => x.field === 'itemSpacing');
+  assert.ok(c, '간격 자리가 찾아진다');
+  assert.notEqual(c.variableId, wrong.id, '용도 틀린 변수를 붙이지 않는다');
+  assert.equal(c.variableName, 'spacing/gap-2', '같은 값이어도 용도가 틀린 이름은 차 있음 → {기본}-2');
+  await bindSelection([frame]);
+  const made = findVar(figma, 'Semantic', 'spacing/gap-2');
+  assert.ok(made && made.scopes.includes('GAP'));
+  assert.equal(frame.boundVariables.itemSpacing.id, made.id);
+});
+
+test('A.14 Global — 반 단계(#3D5FDB · #5576EE → 500 · 450), 가운데 단계 다툼, 끝은 -2, 반투명은 불투명 다음', () => {
+  assert.deepEqual(nameColorsByHue(['#3d5fdb', '#5576ee']), ['color/indigo/500', 'color/indigo/450']);
+  assert.deepEqual(nameColorsByHue(['#ffffff', '#fefefe']), ['color/gray/0', 'color/gray/0-2']);
+  // 반투명만 있는 hex(뒤)는 불투명 hex가 단계 주인을 먼저 받는다
+  const n = nameColorsByHue(['#5576ee', '#3d5fdb'], 1);
+  assert.equal(n[0], 'color/indigo/500', '불투명 #5576EE가 주인');
+  assert.equal(n[1], 'color/indigo/550');
+  assert.equal(isExtractOnlyColorName('color/indigo/450'), true);
+  assert.equal(isExtractOnlyColorName('color/indigo/500-2-a8'), true);
+  assert.equal(isExtractOnlyColorName('color/indigo/400'), false);
+  assert.equal(isExtractOnlyColorName('color/indigo/400-a8'), false);
+});
+
+test('A.14 Global 파일과 견주기 — 다른 값이면 반 단계 · 이번 실행 이름과 겹치지 않음 · 같은 값 재사용 · 예전 -2 재사용 · 팔레트 정수 단계는 재사용 안 함', () => {
+  const R = (reqs, file) => Object.fromEntries([...resolveGlobalNames(reqs, new Map(file))].map(([k, v]) => [k, `${v.name}${v.reuse ? ' (reuse)' : ''}`]));
+  // 파일 indigo/500 = 다른 값(#3d5fdb) → 새 #5576ee는 450, 이번 실행의 다른 토큰 450과 겹치면 되돌림
+  assert.deepEqual(R([{ name: 'color/indigo/500', key: '#5576ee', hex: '#5576ee' }], [['color/indigo/500', { key: '#3d5fdb', hex: '#3d5fdb' }]]), { 'color/indigo/500': 'color/indigo/450' });
+  assert.deepEqual(
+    R([{ name: 'color/indigo/500', key: '#5576ee', hex: '#5576ee' }, { name: 'color/indigo/450', key: '#6a88f5', hex: '#6a88f5' }], [['color/indigo/500', { key: '#3d5fdb', hex: '#3d5fdb' }]]),
+    { 'color/indigo/500': 'color/indigo/500-2', 'color/indigo/450': 'color/indigo/450' },
+  );
+  // 같은 이름 · 같은 값 → 재사용, 예전 -2 = 같은 값 → 재사용, 팔레트 정수 단계(다른 이름) → 재사용 안 함
+  assert.deepEqual(R([{ name: 'color/indigo/500', key: '#3d5fdb', hex: '#3d5fdb' }], [['color/indigo/500', { key: '#3d5fdb', hex: '#3d5fdb' }]]), { 'color/indigo/500': 'color/indigo/500 (reuse)' });
+  assert.deepEqual(R([{ name: 'color/indigo/450', key: '#5576ee', hex: '#5576ee' }], [['color/indigo/500-2', { key: '#5576ee', hex: '#5576ee' }]]), { 'color/indigo/450': 'color/indigo/500-2 (reuse)' });
+  assert.deepEqual(R([{ name: 'color/indigo/450', key: '#5576ee', hex: '#5576ee' }], [['color/indigo/400', { key: '#5576ee', hex: '#5576ee' }]]), { 'color/indigo/450': 'color/indigo/450' });
+  // 반투명은 hex 이름을 따라감 — 불투명이 예전 -2를 재사용하면 반투명은 그 이름 + -a8
+  assert.deepEqual(
+    R([{ name: 'color/indigo/450', key: '#5576ee', hex: '#5576ee' }, { name: 'color/indigo/450-a8', key: '#5576ee@0.08', hex: '#5576ee', alphaPct: 8 }], [['color/indigo/500-2', { key: '#5576ee', hex: '#5576ee' }]]),
+    { 'color/indigo/450': 'color/indigo/500-2 (reuse)', 'color/indigo/450-a8': 'color/indigo/500-2-a8' },
+  );
+  // 이미 반 단계 이름이 파일에 다른 값 → 단계 이름 + -2 · 숫자는 이름 + -2
+  assert.deepEqual(R([{ name: 'color/indigo/450', key: '#5576ee', hex: '#5576ee' }], [['color/indigo/450', { key: '#6a88f5', hex: '#6a88f5' }]]), { 'color/indigo/450': 'color/indigo/500-2' });
+  assert.deepEqual(R([{ name: 'spacing/16', key: '16' }], [['spacing/16', { key: '15' }]]), { 'spacing/16': 'spacing/16-2' });
+});
+
+test('A.14 createTokens — 쓰임 있는 토큰은 같은 이름 · 다른 값을 덮지 않음(연결된 레이어 색 그대로) · 같은 값은 재사용 + 용도 합침 · 미리보기 = 실제', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'color/indigo/500', category: 'color', sources: ['fill'], value: '#3d5fdb', uses: [{ name: 'color/background', count: 1 }] }], 16);
+  const old = findVar(figma, 'Global', 'color/indigo/500');
+  const tok = { name: 'color/indigo/500', category: 'color', sources: ['stroke'], value: '#5576ee', uses: [{ name: 'color/border', count: 1 }] };
+  const pv = await previewCreateTokens([tok], 16);
+  assert.deepEqual(pv.tokenStates.get('color/indigo/500'), { state: 'new', varName: 'color/indigo/450' });
+  const s = await createTokens([tok], 16);
+  assert.equal(s.finalName.get('color/indigo/500'), 'color/indigo/450');
+  assert.equal(rgbToHex(old.valuesByMode['mode:Global']), '#3d5fdb', '덮지 않는다');
+  assert.equal(rgbToHex(findVar(figma, 'Global', 'color/indigo/450').valuesByMode['mode:Global']), '#5576ee');
+  // 같은 값 · 다른 용도 → 재사용 + 용도 합침
+  await createTokens([{ name: 'color/indigo/500', category: 'color', sources: ['stroke'], value: '#3d5fdb', uses: [{ name: 'color/border', count: 1 }] }], 16);
+  assert.ok(old.scopes.includes('STROKE_COLOR') && old.scopes.some((x) => x.includes('FILL')), JSON.stringify(old.scopes));
+  // 쓰임 없는 토큰(팔레트)은 지금처럼 이름으로 맞춤
+  await createTokens([{ name: 'color/indigo/500', category: 'color', sources: ['fill'], value: '#111188' }], 16);
+  assert.equal(rgbToHex(old.valuesByMode['mode:Global']), '#111188');
+});
+
+test('A.14 팔레트 정리 — 정수 단계만 지우고 추출 경로의 -n · 반 단계 · -a · gray 0은 남김', async () => {
+  const figma = installFigma();
+  await createTokens(['color/indigo/400', 'color/indigo/500', 'color/indigo/500-2', 'color/indigo/450', 'color/indigo/450-a8', 'color/gray/0'].map((name, i) => ({ name, category: 'color', sources: ['fill'], value: `#0000${(10 + i).toString(16).padStart(2, '0')}` })), 16);
+  const removed = await prunePaletteColors(['color/indigo/500', 'color/gray/50']);
+  assert.equal(removed, 1);
+  assert.equal(findVar(figma, 'Global', 'color/indigo/400'), undefined);
+  for (const n of ['color/indigo/500', 'color/indigo/500-2', 'color/indigo/450', 'color/indigo/450-a8', 'color/gray/0']) assert.ok(findVar(figma, 'Global', n), n);
+});
+
+test('A.14 createRole — 같은 Global을 가리켜도 용도가 새 역할 용도를 덮지 않으면 쓰지 않고 다음 -n', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
+  const g = findVar(figma, 'Global', 'spacing/16');
+  const sem = figma.variables.createVariableCollection('Semantic');
+  const wrong = figma.variables.createVariable('spacing/gap', sem, 'FLOAT');
+  wrong.setValueForMode(sem.defaultModeId, { type: 'VARIABLE_ALIAS', id: g.id });
+  wrong.scopes = ['CORNER_RADIUS'];
+  const v = await createRole({ name: 'spacing/gap', globalId: g.id, scopes: ['GAP'] }, g);
+  assert.notEqual(v.id, wrong.id);
+  assert.equal(v.name, 'spacing/gap-2');
+  wrong.scopes = ['ALL_SCOPES'];
+  const again = await createRole({ name: 'spacing/gap', globalId: g.id, scopes: ['GAP'] }, g);
+  assert.equal(again.id, wrong.id, 'ALL_SCOPES면 덮는 것으로 본다');
+});
+
+/* ---------- ia-v3 A.14b — Semantic 투명도 단계 ---------- */
+
+test('A.14b 투명도 단계 — 그림자 2% · 4% · 5% · 넷째는 -subtlest-2 · 말 겹침은 다른 색 자리 먼저 · 자리 되돌림 · 같은 값 · 옛 -a8 재사용 · inverse', () => {
+  const S = 'color/shadow/default';
+  assert.deepEqual(A([['#000000@0.02', 1], ['#000000@0.04', 4], ['#000000@0.05', 3]].map(([value, count]) => ({ base: S, value, count }))), {
+    '#000000@0.04': S, '#000000@0.02': `${S}-subtle`, '#000000@0.05': `${S}-strong`,
+  });
+  const many = A([['#000000@0.1', 9], ['#000000@0.08', 1], ['#000000@0.06', 1], ['#000000@0.04', 1], ['#000000@0.02', 1]].map(([value, count]) => ({ base: S, value, count })));
+  assert.equal(many['#000000@0.02'], `${S}-subtlest-2`);
+  const B = 'color/background/brand';
+  assert.deepEqual(A([['#3d5fdb', 9], ['#3d5fdb@0.5', 3], ['#5576ee', 2]].map(([value, count]) => ({ base: B, value, count }))), {
+    '#3d5fdb': B, '#5576ee': `${B}-subtle`, '#3d5fdb@0.5': `${B}-subtler`,
+  });
+  const fb = A([['#4b5563', 8], ['#7a7a7a', 5], ['#9ca3af', 2], ['#d1d5db', 1], ['#d1d5db@0.5', 1]].map(([value, count]) => ({ base: 'color/text/subtle', value, count, refHex: '#000000' })));
+  assert.equal(fb['#d1d5db'], 'color/text/subtlest-2');
+  assert.equal(fb['#d1d5db@0.5'], 'color/text/subtlest-subtle-2');
+  // 자리 기준과 같은 값 · 재사용 불가 → N-2
+  assert.equal(A([{ base: S, value: '#000000@0.04', count: 1 }], new Map([[S, '#000000@0.04']]), { canReuse: () => false })['#000000@0.04'], `${S}-2`);
+  // 예전 구현의 default-a8이 같은 값이면 재사용(가족)
+  assert.equal(A([{ base: 'color/border/default', value: '#000000@0.08', count: 1 }], new Map([['color/border/default', '#000000'], ['color/border/default-a8', '#000000@0.08']]))['#000000@0.08'], 'color/border/default-a8');
+  // inverse 반투명 → inverse-subtle
+  assert.deepEqual(A([{ base: 'color/text/inverse', value: '#ffffff', count: 5 }, { base: 'color/text/inverse', value: '#ffffff@0.6', count: 1 }]), { '#ffffff': 'color/text/inverse', '#ffffff@0.6': 'color/text/inverse-subtle' });
+  assert.equal(familyRe('color/border/default', 'default').test('color/border/default-subtle'), true);
+  assert.equal(familyRe('color/border/default', 'default').test('color/border/default-a8'), true);
+});
+
+test('A.14b 만들기 경로 — createUsageRoles 그림자 2% · 4% · 5% → default · default-subtle · default-strong', async () => {
+  const figma = installFigma();
+  const tok = (a, count) => ({ name: `color/000000-a${Math.round(a * 100)}`, category: 'effectColor', sources: ['effectColor'], value: '#000000', alpha: a, uses: [{ name: 'color/shadow', count }] });
+  const tokens = [tok(0.02, 1), tok(0.04, 4), tok(0.05, 3)];
+  const s = await createTokens(tokens, 16);
+  assert.equal(await createUsageRoles(tokens, false, s.globalOf, undefined, s.finalName), 3);
+  for (const [name, a] of [['color/shadow/default', 4], ['color/shadow/default-subtle', 2], ['color/shadow/default-strong', 5]]) {
+    assert.equal(roleTarget(figma, findVar(figma, 'Semantic', name).id), findVar(figma, 'Global', `color/000000-a${a}`).id, name);
+  }
 });

@@ -15,11 +15,15 @@ import {
   AUTO_ROLE_KEY,
   assignNames,
   bgKindOf,
+  byFamilyOrder,
   colorRoleBases,
+  colorRoleRef,
   colorSlotKey,
   colorUse,
   composeName,
+  familyRe,
   isOldPluginName,
+  nameKindOf,
   paddingProp,
   pickOwner,
   radiusName,
@@ -635,7 +639,11 @@ const byName = (a: VarEntry, b: VarEntry): number =>
   a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
 /** 별칭 대상 Global 순서 — 사용자 컬렉션 먼저, 그 안에서 이름 순(13.5 ②). */
 const byUserThenName = (a: VarEntry, b: VarEntry): number => Number(b.user) - Number(a.user) || byName(a, b);
-const nameRe = (base: string): RegExp => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:-\\d+)?$`);
+/** 가족(12.5) 첫 번째 — 가족 순서, 같은 이름이면 13.5 순서. */
+const firstInFamily = (list: VarEntry[], base: string): VarEntry | undefined => {
+  const ord = byFamilyOrder(base);
+  return [...list].sort((a, b) => ord(a.variable.name, b.variable.name) || Number(b.user) - Number(a.user) || a.colIdx - b.colIdx)[0];
+};
 
 /** 순서 1 → 3(디자이너 변수) — 숫자 · 색. 글자는 1만. */
 function pickDesigned(cands: VarEntry[], kind: Slot['kind']): VarEntry | null {
@@ -649,11 +657,13 @@ interface Pending {
   slot: Slot;
   base: string;
   global: VarEntry | null;
+  /** 색 사다리의 기준색(12.4 default — 12.5). */
+  refHex?: string;
 }
 
 /**
  * 자리마다 붙일 변수를 고른다(§2.12 12.2 보는 순서 1 → 3 → 2 → 4, 글자 1 → 2 → 4).
- * 새 역할의 색 밝기 이름(12.4)과 번호(12.5)는 찾기 전체를 보고 정한다.
+ * 새 역할의 색 밝기 이름(12.4)과 이름 꼬리(12.5)는 찾기 전체를 보고 정한다.
  */
 function resolveSlots(ctx: Ctx): void {
   const { res, preview } = ctx;
@@ -678,12 +688,12 @@ function resolveSlots(ctx: Ctx): void {
       colorLeft.push({ slot: s, cands });
       continue;
     }
-    // 순서 2 — 숫자: 쓰임 이름(+ -n), 글자: 같은 그룹 아무 이름(거울 제외).
+    // 순서 2 — 숫자: 쓰임 이름의 가족(12.5), 글자: 같은 그룹 아무 이름(거울 제외).
     const group = s.usage.split('/')[0];
-    const re = nameRe(s.usage);
-    const two = cands
-      .filter((e) => e.tier === 2 && (s.kind === 'text' ? !e.mirror && e.variable.name.startsWith(`${group}/`) : re.test(e.variable.name)))
-      .sort(byName)[0];
+    const two =
+      s.kind === 'text'
+        ? cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0]
+        : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
     if (two) {
       emit(s, two);
       continue;
@@ -710,15 +720,16 @@ function resolveSlots(ctx: Ctx): void {
     }
     const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
     const bases = colorRoleBases([...counts.values()], def?.colorHex, use);
+    const refHex = colorRoleRef([...counts.values()], def?.colorHex);
     for (const x of list) {
       const base = `color/${use}/${bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha)) ?? 'default'}`;
-      const re = nameRe(base);
-      const two = x.cands.filter((e) => e.tier === 2 && re.test(e.variable.name)).sort(byName)[0];
+      const fam = familyRe(base, nameKindOf(base, valueKey(x.slot.value)));
+      const two = firstInFamily(x.cands.filter((e) => e.tier === 2 && !e.mirror && fam.test(e.variable.name)), base);
       if (two) {
         emit(x.slot, two);
         continue;
       }
-      pending.push({ slot: x.slot, base, global: globalFor(x.cands) });
+      pending.push({ slot: x.slot, base, global: globalFor(x.cands), refHex });
     }
   }
 
@@ -728,9 +739,11 @@ function resolveSlots(ctx: Ctx): void {
     if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
     return false;
   });
+  // 재사용은 순서 2가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
   const names = assignNames(
-    live.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1 })),
+    live.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
     ctx.index.semNames,
+    { reuse: false },
   );
   const roleOf = new Map<string, NewRoleSpec>(); // 이름 → 역할(처음 본 Global)
   for (const p of live) {
@@ -1388,7 +1401,13 @@ export async function createRole(spec: NewRoleRef, global: Variable): Promise<Va
       return !!val && typeof val === 'object' && (val as VariableAlias).type === 'VARIABLE_ALIAS' && (val as VariableAlias).id === global.id;
     });
   const re = new RegExp(`^${spec.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:-\\d+)?$`);
-  const same = inCol.filter((v) => re.test(v.name) && pointsAtGlobal(v)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
+  // 이미 있는 역할을 쓰는 조건: 같은 Global · 용도가 새 역할 용도를 모두 덮거나 ALL_SCOPES · 거울 아님(12.5 "연결 직전").
+  const globalNames = new Set(all.filter((v) => tiers.get(v.variableCollectionId) === 1).map((v) => v.name));
+  const covers = (v: Variable): boolean => {
+    const sc = (v.scopes ?? []) as string[];
+    return sc.includes('ALL_SCOPES') || spec.scopes.every((x) => sc.includes(x));
+  };
+  const same = inCol.filter((v) => re.test(v.name) && pointsAtGlobal(v) && covers(v) && !globalNames.has(v.name)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
   if (same) return same;
   const names = new Set(inCol.map((v) => v.name));
   let name = spec.name;

@@ -534,7 +534,7 @@ function suggestSemMapFrom(toks: DraftToken[]): void {
   if (Object.keys(map).length) setSemMapText(map);
 }
 
-/** #3: 색 토큰 이름을 hue-Global(`color/blue/500`, 충돌 접미사)로 변환 — 추출 hex명 정규화. */
+/** #3: 색 토큰 이름을 hue-Global(`color/blue/500`, 겹치면 반 단계 `450` · `550` — §2.12 12.11)로 변환 — 추출 hex명 정규화. */
 function huefyTokenColors(toks: DraftToken[]): void {
   const idx: number[] = [];
   const hexes: string[] = [];
@@ -551,7 +551,8 @@ function huefyTokenColors(toks: DraftToken[]): void {
   // 불투명 토큰의 hex를 먼저 — 반투명 때문에 불투명 색 이름이 `-2`로 밀리지 않게(ia-v3 §2.11 "반투명 색 토큰").
   const opaqueFirst = [...idx.filter((ti) => toks[ti].alpha == null), ...idx.filter((ti) => toks[ti].alpha != null)];
   const uniq = [...new Set(opaqueFirst.map((ti) => (toks[ti].value as string).toLowerCase()))];
-  const names = nameColorsByHue(uniq);
+  const opaqueCount = new Set(idx.filter((ti) => toks[ti].alpha == null).map((ti) => (toks[ti].value as string).toLowerCase())).size;
+  const names = nameColorsByHue(uniq, opaqueCount); // 겹치면 반 단계(§2.12 12.11)
   const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
   idx.forEach((ti, k) => {
     const base = nameOf.get(hexes[k].toLowerCase());
@@ -3059,7 +3060,7 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
         const st = mkStates[tk.name];
         const locked = mkLocked(tk);
         const on = mkIsOn(tk);
-        const name = st?.state === 'reuse' && st.varName ? st.varName : tk.name;
+        const name = st?.varName ? st.varName : tk.name; // reuse = 그 변수 이름, new = 파일과 견줘 바뀐 최종 이름(ia-v3 §2.12 12.11)
         const cells: HTMLElement[] = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value), undefined, false)];
         if (st?.state === 'update') cells.push(mkTag(t('make.tagHas'), t('make.tagHasTip')));
         else if (st?.state === 'reuse') cells.push(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));

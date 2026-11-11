@@ -332,9 +332,9 @@
     - 기본: 모든 줄 켬, 단 글자 종류의 줄은 끔(그래서 글자 머리는 처음에 접힘 — §2.7 처음 접기).
   - **상태 태그**(미리보기 응답의 토큰별 상태 — 아래 메시지):
     - 새로 만듦: 태그 없음.
-    - 값만 맞춤(같은 이름의 Global이 있음 — `updated`로 세는 것): 회색 태그 "있음", 툴팁 "같은 이름 변수가 있어 값만 맞춰요".
-    - 있는 변수 씀(값이 같은 사용자 Global을 재사용 — `pickReusable`, 또는 같은 이름의 직접 만든 변수가 값도 같아 그것을 씀): 이름 칩을 **그 변수 이름**으로 바꾸고 회색 태그 "있는 변수", 툴팁 "값이 같은 변수가 있어 새로 만들지 않고 그것을 써요". 만들 수(g)에 세지 않는다.
-    - 직접 만든 변수(같은 이름의 직접 만든 변수가 값이 달라 건너뜀 — `skippedManual`): 주황 태그 "직접 만든 변수", 툴팁 "직접 만든 변수라 덮어쓰지 않아요". 스위치는 꺼진 채 잠금(`aria-disabled`), 머리 스위치 모습 · 동작에서 뺀다(개수에는 든다 — §2.7). 이 토큰은 꺼져 보여도 **미리보기 · 실행에 늘 함께 보낸다**(코드가 같은 판정으로 건너뛰고 `skippedManual`로 센다 — 그래서 " · 직접 만든 변수라 건너뜀 {m}" 꼬리가 맞게 나온다). 응답으로 잠그는 일은 다시 보내기를 일으키지 않는다. 다음 응답에서 상태가 manual이 아니게 되면(사용자가 값을 맞춤 등) 잠금을 풀고 켠다.
+    - 값만 맞춤(같은 이름의 Global이 있음 — `updated`로 세는 것): 회색 태그 "있음", 툴팁 "같은 이름 변수가 있어 값만 맞춰요". **2026-11-11부터 쓰임이 있는 토큰(선택에서 뽑은 값)에는 생기지 않는다** — 같은 이름 · 같은 값은 "있는 변수", 같은 이름 · 다른 값은 덮지 않고 다음 이름으로 새로 만든다(ia-v3 §2.12 12.11). 팔레트 · 텍스트 스타일 경로에서만 남는다.
+    - 있는 변수 씀(값이 같은 사용자 Global을 재사용 — `pickReusable`, 또는 같은 이름의 직접 만든 변수가 값도 같아 그것을 씀, 또는 쓰임 있는 토큰이 같은 이름 · 같은 값이나 같은 계열의 예전 `-n` · 반 단계 이름의 같은 값 플러그인 Global을 씀 — ia-v3 §2.12 12.11): 이름 칩을 **그 변수 이름**으로 바꾸고 회색 태그 "있는 변수", 툴팁 "값이 같은 변수가 있어 새로 만들지 않고 그것을 써요". 만들 수(g)에 세지 않는다.
+    - 직접 만든 변수(같은 이름의 직접 만든 변수가 값이 달라 건너뜀 — `skippedManual`. **쓰임 없는 토큰만** — 쓰임 있는 토큰은 건너뛰지 않고 다음 이름으로 만든다, ia-v3 12.11): 주황 태그 "직접 만든 변수", 툴팁 "직접 만든 변수라 덮어쓰지 않아요". 스위치는 꺼진 채 잠금(`aria-disabled`), 머리 스위치 모습 · 동작에서 뺀다(개수에는 든다 — §2.7). 이 토큰은 꺼져 보여도 **미리보기 · 실행에 늘 함께 보낸다**(코드가 같은 판정으로 건너뛰고 `skippedManual`로 센다 — 그래서 " · 직접 만든 변수라 건너뜀 {m}" 꼬리가 맞게 나온다). 응답으로 잠그는 일은 다시 보내기를 일으키지 않는다. 다음 응답에서 상태가 manual이 아니게 되면(사용자가 값을 맞춤 등) 잠금을 풀고 켠다.
     - 응답 전에는 태그 없이 보인다.
   - **Semantic 탭**(보기만, 2026-11-09 사용자 결정 A) — 스위치 없음. Semantic은 Global을 따라간다: 켠 Global의 Semantic만 만들고, Global을 끄면 그 Semantic도 빠진다(다음 미리보기에서 `roleRows`가 줄어듦). 따로 끄는 스위치를 두지 않는 이유 — "바로 연결"의 연결 단계는 레이어에 붙일 Semantic이 없으면 그 자리에서 새 Semantic을 만들기 때문에(§2.12 새 역할) 꺼 둔 Semantic이 실행 뒤 생겨 있게 된다.
     - 종류 머리(이름 · "{n}개", 스위치 없음) — 종류는 그 Semantic이 가리키는 Global 토큰의 종류(`roleRows.token`의 분류 → 위 종류 표). 처음엔 모두 펼침. 줄: Semantic 이름 칩(종류 표시를 그대로 둔다 — 지금 `varChip` · `typeMark` 그대로 색 ● · 숫자 # · 글자 T, 칩 글자색 — 이 줄에는 왼쪽 값 칩이 없어 이것이 유일한 종류 표시라 남긴다) · "= {Global 이름}"(회색), 스위치 없음 — 미리보기 응답의 `roleRows` 순서.
@@ -400,7 +400,7 @@
 **메시지** (reqId가 붙은 응답은 그 화면만 받고 메인 처리기 — 값을 직접 고르기의 `tokens` · `#createStatus` · `btnCreateApply` · 이름 정리 v3 트리 — 는 건드리지 않는다)
 - 추출: `EXTRACT{reqId, nodeIds}` → `EXTRACT_RESULT{reqId, …}`(지금 필드 그대로).
 - 만들 수: `CREATE_TOKENS{reqId, preview: true, tokens, …}` → `CREATE_RESULT{reqId, preview: true, created, updated, roles, skippedManual, tokenStates, roleRows}`.
-  - `tokenStates: Record<토큰 이름, {state: 'new' | 'update' | 'reuse' | 'manual', varName?}>`(새 필드, preview일 때만) — `previewCreateTokens`가 이미 가르는 것(`pickReusable` → reuse + 그 변수 이름, 같은 이름 직접 만든 변수 · 값 같음 → reuse + 그 이름, 값 다름(`skippedManualNames`) → manual, `existing` → update, 그 밖 new)을 토큰별로 돌려준다.
+  - `tokenStates: Record<토큰 이름, {state: 'new' | 'update' | 'reuse' | 'manual', varName?}>`(새 필드, preview일 때만) — `previewCreateTokens`가 이미 가르는 것(`pickReusable` → reuse + 그 변수 이름, 같은 이름 직접 만든 변수 · 값 같음 → reuse + 그 이름, 값 다름(`skippedManualNames`) → manual, `existing` → update, 그 밖 new)을 토큰별로 돌려준다. 쓰임(`uses`) 있는 토큰은 ia-v3 §2.12 12.11 — update · manual이 없고, 같은 이름 · 같은 값 · 같은 계열 재사용은 reuse + 그 이름, 이름이 바뀐 새 변수는 new + `varName`(최종 이름).
   - `roleRows: {name, global, token}[]`(새 필드, preview일 때만) — `createUsageRoles(preview)`가 셀 역할의 이름, 가리킬 Global 이름(`globalOf`에 id가 있으면 그 변수 이름, 없으면 토큰 이름), 그 역할을 만든 토큰 이름(`token` — Semantic 탭의 종류 머리를 정한다). 길이 = `roles`.
 - 실행: `CREATE_TOKENS{reqId, preview: false}` → `CREATE_RESULT{reqId}` · `GENERATE_DARK_MODE` → `DARK_MODE_RESULT` · `APPLY{reqId, preview: false, nodeIds, skipTextStyleNodes: true}` → `APPLY_RESULT{reqId}` · `RENAME{reqId, nodeIds, apply: true}` → `RENAME_RESULT{reqId, applied: true}`.
 - 텍스트 스타일 후보: `SCAN_TEXT_STYLES{reqId, nodeIds}` → `TEXT_STYLE_CANDIDATES{reqId, styles, existing}`(새 필드 reqId, 위 "텍스트 스타일 탭").
@@ -792,7 +792,7 @@
 - 타입 기본값: 지금 보이는 첫 그룹의 첫 변수 타입. 그룹이 없으면 숫자.
 - 로컬 컬렉션이 0개면 사용자 컬렉션 `Variables`를 새로 만들어 넣는다(플러그인 표시 없음 — 플러그인 자동 쓰기가 건드리지 않는 곳). 컬렉션 칸에 "Variables (새로 만듦)".
 - **직접 만든 변수 지키기:** 새 변수 · 복제로 만든 변수에는 플러그인 데이터 `dsl.manual = 1`을 단다. 플러그인 컬렉션 안에 있어도 자동 쓰기가 덮어쓰거나 지우지 않는다 — 빼는 곳(이름이 같으면 덮어쓰거나 지우는 경로): `createTokens` · `prunePaletteColors` · 역할 매핑 `createSemanticAliases`의 `upsertVariable` · 다크 `themeApply`(manual Semantic 변수의 Dark 값을 다시 걸지 않고, 쓸 `dark/{이름}` Global이 manual 변수면 그 값을 덮어쓰지도, 다른 이름으로 새로 만들지도 않고 그 역할의 Dark 값을 지금대로 둔다 — 건너뜀으로 센다. 다시 돌려도 같은 결과라 변수가 늘지 않는다). `createUsageRoles`는 지금도 같은 이름이면 `-n`으로 새로 만들어 덮어쓰지 않는다(같은 이름 · 같은 값 재사용 판정에는 manual 변수도 들어간다).
-  - `createTokens`가 같은 이름의 manual 변수를 만나면: 값이 같으면 그 변수를 그 토큰의 Global로 쓴다(`globalOf`가 가리킴 — 지금의 재사용과 같음). 값이 다르면 그 토큰과 그 토큰을 가리킬 역할을 만들지 않는다. 응답 `CREATE_RESULT`에 `skippedManual`(수)을 더하고 결과 문구 끝에 " · 직접 만든 변수라 건너뜀 {n}".
+  - `createTokens`가 같은 이름의 manual 변수를 만나면: 값이 같으면 그 변수를 그 토큰의 Global로 쓴다(`globalOf`가 가리킴 — 지금의 재사용과 같음). 값이 다르면 그 토큰과 그 토큰을 가리킬 역할을 만들지 않는다 — 쓰임(`uses`) 없는 토큰만. 쓰임 있는 토큰은 차지된 이름으로 보고 다음 이름으로 만든다(ia-v3 §2.12 12.11). 응답 `CREATE_RESULT`에 `skippedManual`(수)을 더하고 결과 문구 끝에 " · 직접 만든 변수라 건너뜀 {n}".
   - 역할 매핑 · 다크가 manual 변수를 건너뛰면 결과의 건너뜀 수에 더한다.
   - 사용자가 상세에서 고치는 것은 그대로 된다.
 - 이름은 비워 둔다. 이름 검사 · 값 검사는 고치기와 같다(새 변수용 가상 self로 `nameError` · `aliasCandidates`를 부른다). 기본 모드 값은 필수, 다른 모드는 비우면 기본 모드 값.

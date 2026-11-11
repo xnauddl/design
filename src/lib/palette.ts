@@ -182,13 +182,16 @@ function roleForStatusHue(scale: ColorScale): string {
   return scale.family; // statusScales는 family를 'success'… 역할명으로 둔다(여기서 역할로 사용)
 }
 
-/** 팔레트가 만든 색 변수 이름인지(재적용 시 이전 색 정리 대상 판별). hue 패밀리(`color/blue/500`, 충돌 `color/blue-2/500`). 추출 hex명(`color/0066ff`)은 제외. */
+/** 팔레트가 만든 색 변수 이름인지(재적용 시 이전 색 정리 대상 판별). hue 패밀리(`color/blue/500`, 충돌 `color/blue-2/500`)이고
+    마지막 마디가 팔레트 단계(STEPS)와 정확히 같은 정수일 때만 — 추출 경로의 `-n` · 반 단계(450) · `-a` · gray 0 · 1000은 아니다(ia-v3 §2.12 12.11 · 13.7).
+    추출 hex명(`color/0066ff`)도 제외. */
 export function isPaletteColorName(name: string): boolean {
   if (!name.startsWith('color/')) return false;
   const parts = name.split('/');
   if (parts.length !== 3) return false; // hex 평면명(parts 2) 제외
   const base = parts[1].replace(/-\d+$/, ''); // 'blue-2' → 'blue'
-  return HUE_FAMILIES.includes(base);
+  if (!HUE_FAMILIES.includes(base)) return false;
+  return /^\d+$/.test(parts[2]) && (STEPS as readonly number[]).includes(Number(parts[2]));
 }
 
 /** 이름에서 hue 패밀리 추출(`color/blue-2/500` → `blue-2`), 아니면 null. */
