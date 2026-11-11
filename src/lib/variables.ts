@@ -13,6 +13,7 @@ import {
   hexToRgb,
   rgbToHex,
   colorKey,
+  alphaPct,
   numberTokenName,
   pxConversions,
   resolvedTypeForToken,
@@ -23,7 +24,8 @@ import {
   unitDescription,
 } from './tokens';
 import { paletteFamilyOf } from './palette';
-import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
+import { resolveGlobalNames, type FileGlobal, type GlobalNameReq, type GlobalNameResult } from './colorName'; // Global 이름 · 덮지 않음(§2.12 12.11)
+import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig } from './textStyles';
 import { nameKrdsStyles, offScale, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
@@ -168,6 +170,41 @@ export interface CreateSummary {
   skippedManualNames: Set<string>;
   /** 토큰별 상태(미리보기만, IA v4 §4.3 상태 태그) — new · update(같은 이름 있음) · reuse(있는 변수 씀 + 그 이름) · manual(값 다른 직접 만든 변수). */
   tokenStates?: Map<string, TokenState>;
+  /** 쓰임 있는 토큰의 토큰 이름 → 최종 Global 이름(ia-v3 §2.12 12.11 — 파일과 견줘 바뀌었거나 재사용한 이름). */
+  finalName: Map<string, string>;
+}
+
+/** 플러그인 Global의 이름 → 값 키 · hex(12.11 파일과 견주기). */
+function fileGlobalsOf(col: VariableCollection | undefined, vars: readonly Variable[]): Map<string, FileGlobal> {
+  const out = new Map<string, FileGlobal>();
+  if (!col) return out;
+  const mode = col.defaultModeId;
+  for (const v of vars) {
+    if (v.variableCollectionId !== col.id) continue;
+    const raw = v.valuesByMode[mode];
+    if (raw && typeof raw === 'object' && 'r' in raw) {
+      const hex = rgbToHex(raw as RGB);
+      out.set(v.name, { key: colorKey(hex, (raw as RGBA).a), hex });
+    } else if (typeof raw === 'number') out.set(v.name, { key: valueKey(raw) });
+    else if (typeof raw === 'string') out.set(v.name, { key: raw });
+    else out.set(v.name, { key: null, hex: null }); // 별칭 · 못 읽음 → 차 있음
+  }
+  return out;
+}
+
+/** 쓰임 있는 토큰(사용자 Global 재사용 제외)의 최종 Global 이름(12.11) — createTokens · previewCreateTokens가 같이 쓴다. */
+function resolveUsesNames(tokens: readonly DraftToken[], skip: ReadonlyMap<string, unknown>, base: number, file: ReadonlyMap<string, FileGlobal>): Map<string, GlobalNameResult> {
+  const reqs: GlobalNameReq[] = [];
+  for (const t of tokens) {
+    if (!t.uses?.length || skip.has(t.name)) continue;
+    const type = resolvedTypeForToken(t);
+    const lit = literalOf(t, type, base);
+    if (type === 'COLOR') {
+      const hex = String(t.value).toLowerCase();
+      reqs.push({ name: t.name, key: String(lit), hex, ...(t.alpha != null && t.alpha < 1 ? { alphaPct: alphaPct(t.alpha) } : {}) });
+    } else reqs.push({ name: t.name, key: typeof lit === 'number' ? valueKey(lit) : String(lit) });
+  }
+  return resolveGlobalNames(reqs, file);
 }
 
 /**
@@ -179,7 +216,7 @@ export interface CreateSummary {
  */
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const reuse = await pickReusable(tokens, base);
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set() };
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), finalName: new Map() };
   const reuseMap = readReuseMap();
   const toCreate = tokens.filter((t) => !reuse.has(t.name));
   for (const [name, v] of reuse) {
@@ -191,10 +228,38 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
     const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), 'global');
     const gMode = globalCol.defaultModeId;
     const idx = await buildVarIndex();
+    // 쓰임 있는 토큰은 파일과 견줘 덮지 않는다(12.11) — 최종 이름 · 재사용.
+    const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
     // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
     const touched = new Set<string>();
     for (const t of toCreate) {
       const type = resolvedTypeForToken(t);
+      const nm = named.get(t.name);
+      if (nm) {
+        summary.finalName.set(t.name, nm.name);
+        const g = upsertVariable(nm.name, globalCol, type, idx);
+        const key = vkey(globalCol.id, nm.name);
+        const scopes = scopesForType(scopesForSources(t.sources), type);
+        summary.globalOf.set(t.name, g.variable.id);
+        delete reuseMap[t.name];
+        if (nm.reuse) {
+          // 값은 바꾸지 않고 용도는 합친다(12.11)
+          g.variable.scopes = scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type);
+          touched.add(key);
+          continue;
+        }
+        if (g.created) {
+          summary.created++;
+          summary.globals++;
+          setGlobalLiteral(g.variable, gMode, t, type, base);
+          g.variable.hiddenFromPublishing = true;
+          const desc = unitDescription(t);
+          if (desc) g.variable.description = desc;
+        }
+        g.variable.scopes = touched.has(key) ? scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type) : scopes;
+        touched.add(key);
+        continue;
+      }
       // 같은 이름의 직접 만든 변수(§4.9): 값이 같으면 그 변수를 이 토큰의 Global로 쓰고(재사용), 다르면 건너뛴다.
       const mine = idx.get(vkey(globalCol.id, t.name));
       if (mine && isManualVar(mine)) {
@@ -241,7 +306,7 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
 
   const states = new Map<string, TokenState>();
-  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), tokenStates: states };
+  const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), tokenStates: states, finalName: new Map() };
   // 같은 이름이 두 번 오면 첫 판정을 그대로 둔다(태그는 이름당 하나).
   const setState = (name: string, st: TokenState): void => {
     if (!states.has(name)) states.set(name, st);
@@ -262,12 +327,28 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   const gCol = cols.find((c) => c.id === gId);
   const manualByName = new Map<string, Variable>();
   if (gCol) for (const v of await figma.variables.getLocalVariablesAsync()) if (v.variableCollectionId === gId && isManualVar(v)) manualByName.set(v.name, v);
+  // 쓰임 있는 토큰은 파일과 견줘 최종 이름(12.11) — createTokens와 같은 함수.
+  const allVars = await figma.variables.getLocalVariablesAsync();
+  const named = resolveUsesNames(tokens, reuse, base, fileGlobalsOf(gCol, allVars));
   // 토큰당 Global 1개(거울 없음 — createTokens와 동일). 재사용하는 사용자 Global은 세지 않는다(13.6).
   for (const t of tokens) {
     const r = reuse.get(t.name);
     if (r) {
       summary.globalOf.set(t.name, r.id);
       setState(t.name, { state: 'reuse', varName: r.name });
+      continue;
+    }
+    const nm = named.get(t.name);
+    if (nm) {
+      summary.finalName.set(t.name, nm.name);
+      if (nm.reuse) {
+        const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
+        if (v) summary.globalOf.set(t.name, v.id);
+        setState(t.name, { state: 'reuse', varName: nm.name });
+        continue;
+      }
+      setState(t.name, nm.name !== t.name ? { state: 'new', varName: nm.name } : { state: 'new' });
+      tally(gId, nm.name, 'globals');
       continue;
     }
     const mine = manualByName.get(t.name);
@@ -292,12 +373,12 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
 
 /**
  * 쓰임 역할 만들기(§2.12 12.10) — 토큰의 쓰임(`uses`)마다 Semantic 역할을 만든다(같은 처리 · 같은 ⌘Z).
- * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 번호(12.5): 같은 값이 이미 있으면 그 이름을
- * 쓰고(만들지 않음), 다른 값이 차지했으면 다음 번호. 이미 있는 역할의 값은 바꾸지 않는다.
+ * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 이름 꼬리(12.5): 같은 값 · 맞는 용도가 이미 있으면 그 이름을
+ * 쓰고(만들지 않음), 다른 값이 차지했으면 후보 목록의 다음 꼬리. 이미 있는 역할의 값은 바꾸지 않는다.
  * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
  * rowsOut을 주면 preview일 때 셀 역할마다 {이름, 가리킬 Global 이름, 만든 토큰 이름}을 넣는다(IA v4 §4.3 `roleRows` — 길이 = 반환값).
  */
-export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[]): Promise<number> {
+export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[], finalName?: ReadonlyMap<string, string>): Promise<number> {
   const withUses = tokens.filter((t) => t.uses?.length);
   if (!withUses.length) return 0;
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
@@ -324,22 +405,36 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
   const colIdx = new Map(cols.map((c, i) => [c.id, i]));
   const rank = (id: string): number => (owned.has(id) ? 1e6 : 0) + (colIdx.get(id) ?? 0);
   const existing = new Map<string, string[]>();
+  const semByName = new Map<string, { key: string; v: Variable }[]>(); // 재사용 판정용(12.5 — 같은 값 · 맞는 용도 · 거울 아님)
   for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
     const k = keyOfValue(resolve(v));
     const arr = existing.get(v.name);
     if (!arr) existing.set(v.name, k ? [k] : []);
     else if (k && !arr.includes(k)) arr.push(k);
+    semByName.set(v.name, [...(semByName.get(v.name) ?? []), { key: k, v }]);
   }
+  const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+  const canReuse = (name: string, value: string, base: string): boolean => {
+    if (globalNames.has(name)) return false; // 거울(12.7)
+    const need = scopeForSemanticRole(base);
+    return (semByName.get(name) ?? []).some(({ key, v }) => {
+      if (key !== value) return false;
+      if (!need) return true;
+      const sc = (v.scopes ?? []) as string[];
+      return sc.includes('ALL_SCOPES') || need.every((x) => sc.includes(x));
+    });
+  };
   // 별칭 대상 — createTokens가 고른 Global(사용자 것일 수 있다). 없으면 플러그인 Global에서 이름으로.
   const pluginGlobal = ownedCollection(cols, 'global');
   const globalFor = (t: DraftToken): Variable | undefined => {
     const id = globalOf?.get(t.name);
     if (id) return byId.get(id);
-    return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === t.name) : undefined;
+    const nm = finalName?.get(t.name) ?? t.name; // 파일과 견줘 바뀐 최종 이름(12.11)
+    return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : undefined;
   };
 
   // 요청 — 숫자는 쓰임 이름, 색은 쓰임별 밝기 이름.
-  const reqs: { base: string; value: string; count: number; token: DraftToken }[] = [];
+  const reqs: { base: string; value: string; count: number; token: DraftToken; refHex?: string }[] = [];
   const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
   for (const t of withUses) {
     for (const u of t.uses ?? []) {
@@ -358,24 +453,28 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
       defKey || undefined, // 색 값 키여도 colorRoleBases가 hex만 본다
       use.slice('color/'.length),
     );
+    const refHex = colorRoleRef(
+      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
+      defKey || undefined,
+    );
     for (const x of list) {
       const hex = String(x.token.value).toLowerCase();
-      // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 번호가 붙는다(default · default-2)
-      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
+      // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 투명도 꼬리가 붙는다(default · default-a8, 12.5)
+      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token, ...(refHex ? { refHex } : {}) });
     }
   }
-  const names = assignNames(reqs, existing);
+  const names = assignNames(reqs, existing, { canReuse });
   const toMake = new Map<string, DraftToken>();
   for (const r of reqs) {
     const name = names.get(`${r.base}\u0000${r.value}`) ?? r.base;
-    if (existing.has(name) || toMake.has(name)) continue; // 같은 값이 이미 있음(재사용)
+    if (existing.has(name) || toMake.has(name)) continue; // 재사용(같은 값 · 맞는 용도) — 차지된 이름은 assignNames가 피했다
     toMake.set(name, r.token);
   }
   if (preview) {
     if (rowsOut) {
       for (const [name, t] of toMake) {
         const id = globalOf?.get(t.name);
-        rowsOut.push({ name, global: (id && byId.get(id)?.name) || t.name, token: t.name });
+        rowsOut.push({ name, global: (id && byId.get(id)?.name) || finalName?.get(t.name) || t.name, token: t.name });
       }
     }
     return toMake.size;
