@@ -1087,6 +1087,7 @@ function putOffMark(card: HTMLElement, size: number): void {
   card.querySelector('.ts-off')?.remove();
   const m = offMarkEl(size, true);
   const top = card.querySelector<HTMLElement>('.r-top');
+  top?.classList.toggle('has-off', !!m); // 격자 칸 하나 더 — 없으면 ×n 배지가 다음 줄로 밀린다
   if (m && top) top.insertBefore(m, top.querySelector('.r-badge, .link'));
 }
 /** 상태 줄 앞 문구와 종류 — 꼬리는 스캔 요약 · 램프 문구 뒤에만(§4). */

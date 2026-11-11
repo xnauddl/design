@@ -206,13 +206,13 @@
 | text-10 | 10/120 Regular | body/xsmall-10-120 (12가 기준 13에 더 가까움) | ○ |
 
 ## 부록 A. PR 체크리스트 (IA v4 B.9 병합 뒤 — 지금 main)
-- [ ] `krdsType.ts` + 단위 테스트
-- [ ] `nameTextStyles` · `rampToSpecs` · `LABEL_RAMP_RE` · 기존 테스트 기대값
-- [ ] 스캔 표본 `uiRole` · 군집 `uiCount`
-- [ ] 규칙 밖 표시(타이포 목록 · 상태 줄 꼬리 · 만들기 Text Style 탭 요약 끝 · 팝업)
-- [ ] 행 라벨 이름의 예약 · `existing`을 reqId 없는 스캔에도 · `rampToSpecs(family, reserved)`
-- [ ] 타이포 목록 줄 구분선 모양(`#tsList`) — 카드 안 카드 해소
-- [ ] [이름 다시 짓기] — 변수 탭 ⋯ 메뉴 · 타이포 버튼 · 메시지(`SCAN_TS_RENAME` · `APPLY_TS_RENAME`, `tsSig`) · 팝업(구분선 줄 · 스위치 · 모두 켜기/끄기 · 포커스) · 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림 · 역할 변수(`renameTextRoleVars` — 직접 만든 변수 거름) · 등록 경로 되돌림 · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움 · ⌘Z · 공통 유료 잠금 · OPS · 다시 읽기
-- [ ] ia-v4 반영(§2.6 [보기] 도착 · §4.3 · §4.6 ⋯ 메뉴 · §6 유료 · §7 작업 직후 · 부록 B.10)
-- [ ] i18n(§6 표) · verify:i18n 0 · verify-bind-flow · 4검사 · 스크린샷
+- [x] `krdsType.ts` + 단위 테스트
+- [x] `nameTextStyles` · `rampToSpecs` · `LABEL_RAMP_RE` · 기존 테스트 기대값
+- [x] 스캔 표본 `uiRole` · 군집 `uiCount`
+- [x] 규칙 밖 표시(타이포 목록 · 상태 줄 꼬리 · 만들기 Text Style 탭 요약 끝 · 팝업)
+- [x] 행 라벨 이름의 예약 · `existing`을 reqId 없는 스캔에도 · `rampToSpecs(family, reserved)`
+- [x] 타이포 목록 줄 구분선 모양(`#tsList`) — 카드 안 카드 해소
+- [x] [이름 다시 짓기] — 변수 탭 ⋯ 메뉴 · 타이포 버튼 · 메시지(`SCAN_TS_RENAME` · `APPLY_TS_RENAME`, `tsSig`) · 팝업(구분선 줄 · 스위치 · 모두 켜기/끄기 · 포커스) · 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림 · 역할 변수(`renameTextRoleVars` — 직접 만든 변수 거름) · 등록 경로 되돌림 · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움 · ⌘Z · 공통 유료 잠금 · OPS · 다시 읽기
+- [x] ia-v4 반영(§2.6 [보기] 도착 · §4.3 · §4.6 ⋯ 메뉴 · §6 유료 · §7 작업 직후 · 부록 B.10)
+- [x] i18n(§6 표) · verify:i18n 0 · verify-bind-flow · 4검사 · 스크린샷
 - [ ] 실기 확인(사용자, 피그마): 옛 이름 스타일(`display` · `body` · `h1` …)과 역할 변수(`font-size/body` 등)가 있는 파일에서 새 폴더 이름(`body/medium` · `font-size/body/medium`)이 함께 생기고 바뀌는지 — 피그마가 같은 이름의 폴더와 스타일(`body` 스타일 · `body/` 폴더)을 함께 두는지 · 이름 다시 짓기 · ⌘Z 한 번

@@ -212,7 +212,8 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   // ⋯ — 준비 현황 · 내보내기 · 색 격자 · 펼치기 · 접기
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴 5개(색 격자로 보기 포함)', more.length === 5 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기', more.join('|'));
+  check('9 ⋯ 메뉴 6개(색 격자로 보기 · 이름 다시 짓기 포함)', more.length === 6 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기' && more[5].startsWith('텍스트 스타일 이름 다시 짓기…'), more.join('|'));
+  check('9 ⋯ 이름 다시 짓기 — 무료면 잠김 · 앞에 구분선', (await p.$eval('.ctx-menu button:last-child', (b) => b.getAttribute('aria-disabled') === 'true' || b.disabled)) && (await p.$$eval('.ctx-menu [role="separator"], .ctx-menu hr, .ctx-menu .sep', (e) => e.length)) >= 1);
   await p.click('.ctx-menu button >> text=색 격자로 보기');
   check('9 색 격자 — 동그라미만(이름 없음)', (await p.$$('.vp-line.vp-dot .vp-item')).length === 2 && (await p.$('.vp-line.vp-dot .vp-name')) === null);
   // ＋ 메뉴
@@ -1197,6 +1198,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [{ name: 'body/medium', sig: '99|0|0|Inter|Regular' }],
     styles: [{ name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] }] });
   await p.waitForTimeout(50);
+  check('17 Text Style 탭 요약 끝 ○(14px — KRDS 밖) · 글 없이 기호만', await p.evaluate(() => { const m = [...document.querySelectorAll('#makeTabs [role="tab"]')].find((x) => x.textContent.startsWith('Text Style')); m?.click(); const o = document.querySelector('#makeTree .tr-sub .ts-off'); const ok = !!o && o.classList.contains('off') && o.textContent === '○' && /가까운 KRDS 크기 1[35]px/.test(o.title); document.getElementById('makeTab-global')?.click(); return ok; }));
   check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', 'Text Style1']), JSON.stringify(await tabsOf(p)));
   const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
   check('17 Global 탭 — 종류 머리만(묶음 머리 없음) · 글자(꺼져 접힘)', JSON.stringify(heads) === JSON.stringify(['Spacing 2개', 'Typography 1개']) && (await p.getAttribute('#makeTree [data-tkey="gk:text"]', 'aria-expanded')) === 'false', JSON.stringify(heads));
@@ -1350,6 +1352,70 @@ async function saveAndGet(p) {
   await recv(p, { type: 'RENAME_RESULT', reqId: ap.reqId, applied: true, changes: [{ id: 'a', before: 'Frame 12', after: 'card-header' }], nodes: [] });
   await p.waitForTimeout(60);
   check('18 끝 → 첫 화면 · 상태 줄 "이름 1개 바꿈 · ⌘Z로 되돌리기"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === '이름 1개 바꿈 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
+  await p.close();
+}
+
+/* ---------- 19 텍스트 스타일 KRDS(docs/text-style-krds.md §4 · §5) — 표시 · 구분선 줄 · [이름 다시 짓기] ---------- */
+{
+  const p = await open(480, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasTextStyles: true });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnAddVar');
+  await p.click('.ctx-menu button >> text=텍스트 스타일 만들기…');
+  await p.waitForTimeout(40);
+  const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', ...(sc?.reqId != null ? { reqId: sc.reqId } : {}), warnings: [], existing: [], styles: [
+    { name: 'heading/large', fontSize: 28, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, nodeIds: ['t1'] },
+    { name: 'body/medium-14', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t2'] },
+    { name: 'body/small-13_5', fontSize: 13.5, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, nodeIds: ['t3'] },
+  ] });
+  await p.waitForTimeout(60);
+  const cards = await p.$$eval('#tsList .r-card', (e) => e.map((c) => { const cs = getComputedStyle(c); return { r: cs.borderTopLeftRadius, bt: cs.borderTopWidth, bb: cs.borderBottomWidth, mark: c.querySelector('.ts-off')?.textContent ?? '' }; }));
+  check('19 타이포 목록 — 카드 안 카드 아님(둥근 모서리 0 · 위 테두리 0 · 아래 구분선)', cards.length === 3 && cards.every((c) => c.r === '0px' && c.bt === '0px' && c.bb !== '0px'), JSON.stringify(cards));
+  check('19 표시 — 28 없음 · 14 "○ KRDS 밖" · 13.5 "⚠ 소수 크기"', cards[0]?.mark === '' && cards[1]?.mark === '○ KRDS 밖' && cards[2]?.mark === '⚠ 소수 크기', JSON.stringify(cards.map((c) => c.mark)));
+  check('19 표시 있는 줄도 ×n 배지가 같은 줄(다음 줄로 밀리지 않음)', await p.$eval('#tsList .r-card:nth-child(2)', (c) => { const a = c.querySelector('.ts-off').getBoundingClientRect(); const b = c.querySelector('.r-badge').getBoundingClientRect(); return Math.abs(a.top + a.height / 2 - (b.top + b.height / 2)) < 4 && b.width < 60; }));
+  check('19 상태 줄 꼬리 " · KRDS 밖 크기 2개(소수 1)"', (await p.textContent('#tsStatus')).endsWith(' · KRDS 밖 크기 2개(소수 1)'), await p.textContent('#tsStatus'));
+  // [이름 다시 짓기] → 팝업 · 읽는 중 · 포커스 [닫기]
+  await p.click('#btnTsRename');
+  await p.waitForTimeout(30);
+  const sr = (await sent(p, 'SCAN_TS_RENAME')).at(-1);
+  check('19 팝업 — SCAN_TS_RENAME(reqId) · "스타일을 읽는 중…" · 버튼 잠금 · 포커스 [닫기]', typeof sr?.reqId === 'number' && (await p.textContent('.modal')).includes('스타일을 읽는 중…') && (await p.evaluate(() => document.activeElement?.textContent)) === '닫기');
+  const rows = [
+    { id: 's1', from: 'body', to: 'body/large', sig: 'a', fontSize: 17, offScale: null, nearest: 17 },
+    { id: 's2', from: 'h1', to: 'heading/xlarge', sig: 'b', fontSize: 40, offScale: null, nearest: 40 },
+    { id: 's3', from: 'caption', to: 'label/small-13_5', sig: 'c', fontSize: 13.5, offScale: 'decimal', nearest: 13 },
+  ];
+  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows });
+  await p.waitForTimeout(30);
+  const head = await p.textContent('.modal');
+  check('19 응답 — 제목 "바꿀 이름 3개" · 줄 3 · [3개 이름 바꾸기] · 첫 스위치 포커스', head.includes('이름 다시 짓기 · 바꿀 이름 3개') && (await p.$$eval('.modal .tsr-row', (e) => e.length)) === 3 && head.includes('3개 이름 바꾸기') && (await p.evaluate(() => document.activeElement?.dataset.id)) === 's1');
+  check('19 줄 — "body → body/large" · 소수 크기 줄 끝 ⚠(기호만)', (await p.textContent('.modal .tsr-row >> nth=0')).replace(/\s+/g, '').startsWith('body→body/large') && (await p.textContent('.modal .tsr-row >> nth=2 >> .ts-off')) === '⚠');
+  // ↓ 키로 다음 스위치 · 하나 끔 → [2개]
+  await p.keyboard.press('ArrowDown');
+  check('19 ↓ 키 — 다음 스위치로', (await p.evaluate(() => document.activeElement?.dataset.id)) === 's2');
+  await p.click('.modal .bv-switch[data-id="s2"]');
+  check('19 하나 끔 → [2개 이름 바꾸기] · 포커스 그대로', (await p.textContent('.modal')).includes('2개 이름 바꾸기') && (await p.getAttribute('.modal .bv-switch[data-id="s2"]', 'aria-checked')) === 'false');
+  // 모두 끄기 → 잠금 사유 · 모두 켜기 → [3개]
+  await p.click('.modal [data-all="off"]');
+  const applyBtn = p.locator('.modal button', { hasText: '이름 바꾸기' });
+  check('19 모두 끄기 → [0개 이름 바꾸기] 잠김', (await applyBtn.textContent()) === '0개 이름 바꾸기' && (await applyBtn.getAttribute('aria-disabled')) === 'true');
+  await p.click('.modal [data-all="on"]');
+  check('19 모두 켜기 → [3개 이름 바꾸기]', (await applyBtn.textContent()) === '3개 이름 바꾸기');
+  // 겹침 — 끈 줄의 지금 이름 = 켠 줄의 새 이름이면 그 줄은 빠진다
+  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows: [rows[0], { id: 's4', from: 'body/large', to: 'body/xlarge', sig: 'd', fontSize: 19, offScale: null, nearest: 19 }] });
+  await p.click('.modal .bv-switch[data-id="s4"]');
+  check('19 겹침 — "같은 이름이 남아요" · [0개]', (await p.textContent('.modal .tsr-row >> nth=0')).includes('같은 이름이 남아요') && (await applyBtn.textContent()) === '0개 이름 바꾸기');
+  await p.click('.modal .bv-switch[data-id="s4"]');
+  await applyBtn.click();
+  const ap = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
+  check('19 [바꾸기] → APPLY_TS_RENAME(켠 줄 · id · from · to · sig) · 실행 중 잠금', typeof ap?.reqId === 'number' && JSON.stringify(ap.items) === JSON.stringify([{ id: 's1', from: 'body', to: 'body/large', sig: 'a' }, { id: 's4', from: 'body/large', to: 'body/xlarge', sig: 'd' }]) && (await applyBtn.getAttribute('aria-disabled')) === 'true', JSON.stringify(ap?.items));
+  await recv(p, { type: 'TS_RENAMED', reqId: ap.reqId, renamed: 2, skipped: 0, skipReasons: {}, results: [], roleVarsRenamed: 2, roleVarsTaken: 1, roleVarsError: 0, roleVarsStuck: [] });
+  await p.waitForTimeout(60);
+  check('19 끝 — 팝업 닫힘 · 포커스 [이름 다시 짓기]로', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.id)) === 'btnTsRename');
+  check('19 상태 줄 — "2개 이름을 바꿨어요 · ⌘Z" + Semantic 변수 그대로 · warn', (await p.textContent('#statusText')).startsWith('텍스트 스타일 2개 이름을 바꿨어요 · ⌘Z로 되돌리기 · Semantic 변수 1개는'), await p.textContent('#statusText'));
+  check('19 스캔 표 비움 · [왼쪽 글자로 이름 채우기] 잠김 · 다시 스캔 안내', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 0 && (await p.$eval('#btnTsRowLabels', (b) => b.disabled)) && (await p.textContent('#tsStatus')).endsWith('스캔 표를 비웠어요 — 다시 [스캔]해 주세요'));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/krds-after.png` : '/dev/null' }).catch(() => {});
   await p.close();
 }
 

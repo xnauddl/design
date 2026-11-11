@@ -389,6 +389,8 @@
     .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
+    .r-top.has-off { grid-template-columns: 16px 1fr auto auto; }
+    .r-top.no-check.has-off { grid-template-columns: 1fr auto auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
     .r-title { font-size: var(--fs); font-weight: 600; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .r-title.mono, .r-sum.mono { font-family: var(--mono); }
