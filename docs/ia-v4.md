@@ -854,7 +854,7 @@
 
 ### B.13 선택 탭 할 일 버튼 강약 (2026-11-11 사용자 결정 · §4.1 "할 일 버튼 강약")
 
-- [ ] [변수 만들기](`btnGoMake`)의 `primary` 클래스를 `renderSelHome`이 끝나는 **모든 길**에서 정한다(중간 `return`이 모두 지나는 `finishSelFocus` 안 한 곳): 상태 6 · 상태 7의 카드 1 m = 0 · k > 0 · noTier 카드이고, 지금 기준의 찾기 결과가 왔고(`selFindFor === baseKey()` · 찾는 중 아님) k > 0이며(상태 6은 종류별 수가 있음), 카드 영역(`#selCards`)에 `button.primary`가 없을 때만 켠다. 그 밖(상태 1 · 2 · 3 · 4 · 5, 카드 1 읽는 중, m > 0, 모두 연결됨, 찾은 값 0)에는 끈다
+- [ ] [변수 만들기](`btnGoMake`)의 `primary` 클래스를 `renderSelHome`이 끝나는 **모든 길**에서 정한다(중간 `return`이 모두 지나는 `finishSelFocus`의 **맨 앞** — 포커스가 없을 때 바로 끝나는 `key === null` 검사보다 먼저. 판정은 따로 함수 `updateMakeEmphasis()`로 둔다): 상태 6 · 상태 7의 카드 1 m = 0 · k > 0 · noTier 카드이고, 지금 기준의 찾기 결과가 왔고(`selFindFor === baseKey()` · 찾는 중 아님) k > 0이며(상태 6은 종류별 수가 있음), 카드 영역(`#selCards`)에 `button.primary`가 없을 때만 켠다. 그 밖(상태 1 · 2 · 3 · 4 · 5, 카드 1 읽는 중, m > 0, 모두 연결됨, 찾은 값 0)에는 끈다. noTier 카드의 k는 그 갈래에서 아직 세지 않으므로 판정할 때 `bindCardCounts()`(같은 결과면 기억한 값 — B.9)로 센다
 - [ ] [이름 정리](`btnGoRename`) · [컴포넌트](`btnGoComponents`)는 그대로(보조). 잠금(`setLock`) · 클릭 가드 · 포커스 순서는 바꾸지 않는다
 - [ ] 테스트(verify): 상태 6 → `#btnGoMake.primary` · 상태 6 + 텍스트 스타일 후보([{t}곳 연결] 주 버튼) → `primary` 없음 · 상태 7 m > 0 → 없음 · m = 0 · k > 0 → 있음 · noTier → 있음(텍스트 스타일 후보가 있으면 없음) · 상태 5 → 없음 · 읽는 중 → 없음 · 선택 없음 → 없음 · 상태 6 · 찾기 대기 → 없음 → 결과(텍스트 스타일 후보 있음) 뒤에도 주 버튼 합 1 이하 · 상태 6 · 찾은 값 0 → 없음 · 상태 6 + 카드 3(삭제된 변수) → 있음(카드 3 버튼은 보조) · 화면마다 `#selCards button.primary`와 `#btnGoMake.primary`의 합이 1 이하
 - [x] 화면 시안 "버튼 강약 되살리기" A안 사용자 확인(2026-11-11)
