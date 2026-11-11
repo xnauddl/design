@@ -103,7 +103,7 @@
 - **떠 있는 층**은 카드 안 카드로 치지 않는다: 팝오버(`.popover`) · 우클릭 메뉴(`.ctx-menu`) · 툴팁(`#uiTip`) · 입력 칸에 붙어 아래 내용을 덮는 고르개 층(상세 팝업 별칭 고르개 `.ed-picker` — `position:absolute`). 내용 흐름에 끼어 행 · 상자로 놓이는 것이 아니라 잠깐 위에 떠서 덮는 층이라서다. 팝업 안에 떠도 된다.
 - **카드가 아닌 것**(카드 안에 있어도 된다):
   - 조작 요소: 입력 칸 · 고르개 · 버튼 · 스위치 · 체크박스 · 탭 고르개(`.tabs`).
-  - 글 줄 안의 작은 표시: 칩 · 배지 · 알약 · 태그 · 색 견본 · 진행 막대(예: `.r-badge` · `.tag` · `.r-swatch` · `.bv-chip` · `.bar`).
+  - 글 줄 안의 작은 표시: 칩 · 배지 · 알약 · 태그 · 색 견본 · 진행 막대(예: `.tag` · `.r-swatch` · `.bv-chip` · `.bar`).
   - 테두리가 없는 배경 띠: 배경만 있거나 배경과 둥근 모서리만 있는 것(지금 쓰는 예: 만들기 무료 안내 `.make-free` · 상세 팝업 알림 `.ed-alert` · 트리 머리 띠 `.tr-group`).
   - 배경이 없는 점선 빈 자리: 연결 · 이름 정리 · 만들기 화면의 빈 상태(`.bind-empty` — `#bindEmpty` · `#renameEmpty` · `#makeEmpty`). 정의의 "배경색이 따로 있는"에 들지 않는다.
 - **카드 안에서 쓰는 모양**
@@ -112,14 +112,13 @@
     - 들여쓴 행(컴포넌트 트리의 깊이): 구분선은 카드 안 폭 전체에 긋는다. 들여쓰기는 행의 왼쪽 안쪽 여백으로 준다(깊이 값은 지금과 같다).
     - 행의 내용(체크 · 제목 · 요약 · 메타)과 흐리게(`dim`) 규칙은 그대로다. 컴포넌트 트리의 그룹 머리 아래 행도 같은 모양이다.
   - **안내 · 진행 · 오류 상자**: 테두리를 없애고 **옅은 배경 띠**로 둔다. 배경색 · 글자색 · 둥근 모서리 · 안쪽 여백은 그대로다(파랑 안내는 파랑 띠, 오류는 빨강 띠).
-- **이미 지키는 곳**: 연결 · 만들기 · 이름 정리의 트리 줄(`.tree .tr` — 아래 구분선 한 줄, 둥근 모서리 없음, §2.7)과 트리 머리 띠(`.tr-group`). 모양은 바꾸지 않는다(아래 B안의 마우스 올림 띠만 더한다).
+- **이미 지키는 곳**: 연결 · 만들기 · 이름 정리의 트리 줄(`.tree .tr` — 아래 구분선 한 줄, 둥근 모서리 없음, §2.7)과 트리 머리 띠(`.tr-group`), 값을 직접 고르기 › 타이포의 텍스트 스타일 목록(`#tsList` — [`text-style-krds.md`](text-style-krds.md)(#139)에서 이미 구분선 줄로 바꿨다, 이 절의 범위 밖). 모양은 바꾸지 않는다(아래 B안의 마우스 올림 띠만 더한다).
 - **바뀌는 곳**(2026-11-11 코드 조사 — 지금 카드 안 카드는 이것뿐이다)
 
   | 화면 | 카드 | 카드 안 카드 → 바뀌는 모양 |
   |---|---|---|
   | 만들기 › 값을 직접 고르기 › 색 | 색 카드 | 색 목록 행 → 아래 구분선 |
   | 만들기 › 값을 직접 고르기 › 토큰 | 토큰 카드 | 토큰 목록 행 → 아래 구분선 · 색 안내 상자(`.banner`) → 파랑 띠 + ⓘ · 격자 정리 되돌리기 상자(`.tidy`) → 파랑 띠 + ↺ |
-  | 만들기 › 값을 직접 고르기 › 타이포 | 타이포 카드 | 텍스트 스타일 목록 행 → 아래 구분선 |
   | 컴포넌트 (베타) | 컴포넌트 카드 | 컴포넌트 트리 행 · 닮은 프레임 행 · 베리언트 리포트 행 → 아래 구분선 · 그룹 머리(`.r-group`) → 회색 머리 띠 |
   | 연결 화면 | 연결 카드 | 찾기 · 연결 진행 상자(`.ux` `#applyProgress`) → 파랑 띠 + 도는 고리 |
   | 연결 · 만들기 · 이름 정리 | 그 화면 카드 | (카드 안 카드는 없음) 트리 줄에 마우스 올림 띠만 더함 |
@@ -807,18 +806,18 @@
 - [x] VAR_TABLE 뒤 `renderBindEmpty` 호출과 "찾기 전 예시" 주석 지움, ia-v3 §4.6 빈 상태 "찾기 전" 줄 대체 표시 · ia-v4 "없애는 것"에 찾기 전 예시 그림
 - [x] 테스트: figma `skipLayers`(상한 전 · 목록보다 큼), pure `skipRowCounts` `layers` 인자
 
-### B.10 PR 10 — 카드 안 카드 없애기 (2026-11-10 사용자 결정 · §2.8)
+### B.11 PR 11 — 카드 안 카드 없애기 (2026-11-10 사용자 결정 · §2.8)
 
-- [ ] 목록 행(`.r-card` — `resultCard` 하나가 만든다): 테두리 · 둥근 모서리 · 배경을 없애고 아래 구분선 한 줄(1px `--border`), 최소 높이 30px, 안쪽 여백 `6px 2px 6px 2px`. `.results`의 행 사이 틈 0. 흐리게(`.r-card.dim`)와 행 안의 내용 · 배지(`.r-badge`)는 그대로
+- [ ] 목록 행(`.r-card` — `resultCard` 하나가 만든다): 테두리 · 둥근 모서리 · 배경을 없애고 아래 구분선 한 줄(1px `--border`), 최소 높이 30px, 안쪽 여백 `6px 2px 6px 2px`. `.results`의 행 사이 틈 0. 흐리게(`.r-card.dim`)와 행 안의 내용(체크 · 제목 · 요약 · 메타)은 그대로. 텍스트 스타일 목록의 ×n 배지(`.r-badge`)는 [`text-style-krds.md`](text-style-krds.md) §6(#139)에서 없앴다 — 이 PR에서 다루지 않는다
 - [ ] 컴포넌트 트리의 들여쓰기(`makeTreeRow` · 그룹 머리 — `ui.ts`의 `style.marginLeft = indent` 4곳)를 왼쪽 안쪽 여백으로 바꿔 구분선이 카드 안 폭 전체에 그어지게(깊이 값은 그대로 — 2px에 더한다)
 - [ ] 안내 · 진행 · 오류 상자(`.banner` · `.tidy` · `.ux` · `.ux.danger`): 테두리만 없앰(배경 · 글자색 · 둥근 모서리 · 여백 그대로). `.ux.danger`의 `border-color`도 지움
 - [ ] 쓰지 않는 CSS 지움(`ui.ts`가 만들지 않는다 — 이 규칙의 좋은 예로 오해되지 않게): `.bv-card` · `.bind-v4 .bv-card` · `.bv-card.off` 규칙들 · `.bind-list` · `.bv-head` · `.bv-places` · `.bv-place` · `.bv-ic` · `.bv-prop` · `.bv-layer` · `.bind-v4 .bv-kind` · `.bv-allrow` · `.bd-roles`
 - [ ] 주석 고침(§2.8에 맞게): `ui.html` "결과 행 = 얇은 카드(#18)" · "카드가 아니라 한 줄" · "카드 폭을 밀지 않게" · "카드가 grid라", `ui.ts` "#18: 결과 행 = 얇은 카드" · "흐린 카드 + 사유" · "#18: 트리 = 그룹 헤더 + 자식 카드"
 - [ ] 옛 기록에 한 줄: `REDESIGN.md` 281행 근처 · `ROADMAP.md` #18에 "행 모양은 ia-v4 §2.8이 대체(2026-11-10)"
 - [ ] 바꾸지 않는 것 확인: `.step` · `.sel-card` · `.modal` · 떠 있는 층(`.popover` · `.ctx-menu` · `#uiTip` · `.ed-picker`) · `.tree .tr` · `.tr-group` · `.bind-empty` · 조작 요소
-- [ ] 테스트(verify) — 화면을 먼저 채운다: 색 · 토큰(추출 결과 + 토큰 미리보기 `CREATE_RESULT`, 색 안내 `#tokenColorNote`, 격자 정리 요약 `#numTidySummary`) · 타이포(텍스트 스타일 후보) · 컴포넌트(`#compTree` · 닮은 스캔 결과 `#similarList` · 베리언트 리포트 `#variantReport`) · 연결(`#applyProgress`) · 설정 › 라이선스 오류 · 내보내기 팝업 오류(op별 `ERROR`) · 선택 탭 첫 화면(카드 1~3이 보이는 상태) · 상세 팝업(별칭 고르개를 펼친 상태). 행 · 상자가 있는 화면마다 "행 ≥1개 · 상자가 보임"을 먼저 확인한다
-- [ ] 테스트(verify) — 행 모양: 행이 있는 화면(색 · 토큰 · 타이포 · 컴포넌트)마다 첫 `.r-card`가 아래 테두리 1px · 모서리 0 · 배경 투명, `.results`의 `row-gap` 0. 상자(`.banner` · `.tidy` · `.ux` · `.ux.danger`)는 테두리 폭 0
-- [ ] 테스트(verify) — 카드 안 카드 0: 위 화면에서 포커스를 뺀 뒤(`document.activeElement.blur()`), 카드(`.step` · `.sel-card` · `.modal`) 안의 보이는 요소 중 "테두리(폭 > 0, 투명 아님)나 그림자 + 둥근 모서리 > 0 + 투명하지 않은 배경"을 모두 가진 것이 0개. 뺄 것(셀렉터): `button` · `input` · `select` · `textarea` · `.tabs` · `.r-badge` · `.tag` · `.r-swatch` · `.swatch` · `.palette-row i` · `.bv-chip` · `.bv-sw` · `.bv-track` · `.bar` · `.tr-skel` · `.alias-pill` · `.vp-item` · `.tier-chip` · `.chip` · `.ed-field` · `.bf-swatch` · `.ed-picker` — 각 셀렉터와 그 자손을 모두 뺀다
+- [ ] 테스트(verify) — 화면을 먼저 채운다: 색 · 토큰(추출 결과 + 토큰 미리보기 `CREATE_RESULT`, 색 안내 `#tokenColorNote`, 격자 정리 요약 `#numTidySummary`) · 컴포넌트(`#compTree` · 닮은 스캔 결과 `#similarList` · 베리언트 리포트 `#variantReport`) · 연결(`#applyProgress`) · 설정 › 라이선스 오류 · 내보내기 팝업 오류(op별 `ERROR`) · 선택 탭 첫 화면(카드 1~3이 보이는 상태) · 상세 팝업(별칭 고르개를 펼친 상태). 행 · 상자가 있는 화면마다 "행 ≥1개 · 상자가 보임"을 먼저 확인한다
+- [ ] 테스트(verify) — 행 모양: 행이 있는 화면(색 · 토큰 · 컴포넌트)마다 첫 `.r-card`가 아래 테두리 1px · 모서리 0 · 배경 투명, `.results`의 `row-gap` 0. 상자(`.banner` · `.tidy` · `.ux` · `.ux.danger`)는 테두리 폭 0
+- [ ] 테스트(verify) — 카드 안 카드 0: 위 화면에서 포커스를 뺀 뒤(`document.activeElement.blur()`), 카드(`.step` · `.sel-card` · `.modal`) 안의 보이는 요소 중 "테두리(폭 > 0, 투명 아님)나 그림자 + 둥근 모서리 > 0 + 투명하지 않은 배경"을 모두 가진 것이 0개. 뺄 것(셀렉터): `button` · `input` · `select` · `textarea` · `.tabs` · `.tag` · `.r-swatch` · `.swatch` · `.palette-row i` · `.bv-chip` · `.bv-sw` · `.bv-track` · `.bar` · `.tr-skel` · `.alias-pill` · `.vp-item` · `.tier-chip` · `.chip` · `.ed-field` · `.bf-swatch` · `.ed-picker` — 각 셀렉터와 그 자손을 모두 뺀다
 - [ ] B안 ① 띠 앞 아이콘: `.banner` · `.tidy` · `#applyProgress .row` · `.ux.danger .ux-h`에 `::before`(14×14, `mask` SVG + `background-color` — 글자를 `textContent`로 바꿔도 남는다), 글과 7px. 진행 고리는 회전 애니메이션 + `prefers-reduced-motion: reduce`면 멈춤
 - [ ] B안 ② 그룹 머리 띠: `.r-group` — `display:flex; align-items:center; min-height:32px; background:var(--surface-2); border-bottom:1px solid var(--border); font:600 12px; color:var(--text); margin:0; padding-left:2px`(들여쓰기는 왼쪽 안쪽 여백으로 — `makeTreeRow`의 그룹 머리 `marginLeft` 포함), `.ctx` · `.pick` · `.warn` 규칙은 그대로 둔다
 - [ ] B안 ③ 마우스 올림 띠: `.results .r-card:hover` · `.tree .tr:not(.tr-group):hover` → `background: var(--surface-hover)`
