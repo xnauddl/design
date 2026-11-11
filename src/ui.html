@@ -432,6 +432,19 @@
     .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .skip-row .grow { flex: 1 1 auto; }
     .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
+    /* 타이포 목록 — 구분선 줄(카드 안 카드 금지, CLAUDE.md · docs/text-style-krds.md §6) */
+    #tsList { gap: 0; }
+    #tsList .r-card { border: none; border-bottom: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; margin: 0; }
+    /* 규칙 밖 크기(docs/text-style-krds.md §4) */
+    .ts-off { font-size: 11px; white-space: nowrap; flex: 0 0 auto; }
+    .ts-off.decimal { color: var(--danger); }
+    .ts-off.off { color: var(--text-2); }
+    /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
+    .tsr-all { padding: 0 0 6px; }
+    .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
+    .tsr-row .tsr-from { color: var(--text-2); text-decoration: line-through; min-width: 60px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tsr-row .tsr-to { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tsr-row .tsr-clash { color: var(--warn); font-size: 11px; white-space: nowrap; }
     .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
@@ -1221,7 +1234,8 @@
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
            이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
       <div class="row">
-        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
+        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 KRDS 이름(heading/large…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
+        <button id="btnTsRename" type="button" data-i18n="textStyle.renameBtn">이름 다시 짓기</button>
       </div>
       <div id="tsList" class="results"></div>
       <div class="status" id="tsStatus"></div>

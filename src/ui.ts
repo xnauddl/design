@@ -1,12 +1,14 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
+import type { TsRenameRow } from './shared/messages';
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
 import { type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
+import { offScale } from './lib/krdsType';
 import { headState, headToggleTarget, mergeSameNameTokens, buildRenameTree, type RenameTreeItem } from './lib/treeState';
 import { renderTree, focusRow, type TreeItem } from './treeList';
 import { type Tier } from './lib/entitlements';
@@ -941,7 +943,14 @@ function textStyleEditRow(s: TextStyleSpec): HTMLElement {
 
   row.appendChild(text('ts-family', '', s.family, t('ts.family'), (v) => (s.family = v)));
   row.appendChild(sep('·'));
-  row.appendChild(num('40px', s.fontSize, t('ts.size'), '1', (n) => (s.fontSize = n)));
+  // 크기를 고치면 그 줄의 규칙 밖 표시를 바로, 상태 줄 꼬리는 change 때(docs/text-style-krds.md §4)
+  const sizeEl = num('40px', s.fontSize, t('ts.size'), '1', (n) => {
+    s.fontSize = n;
+    const card = row.closest<HTMLElement>('.r-card');
+    if (card) putOffMark(card, s.fontSize);
+  });
+  sizeEl.addEventListener('change', tsRefreshTail);
+  row.appendChild(sizeEl);
   row.appendChild(sep('/'));
   // 행간·자간을 손으로 넣으면 %가 아니라 px다 — 남아 있던 %는 지워야 요약과 등록이 어긋나지 않는다.
   row.appendChild(num('44px', s.lineHeight, t('ts.lineHeight'), '0', (n) => {
@@ -978,6 +987,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
   if (editable) card.appendChild(textStyleEditRow(s));
 
+  putOffMark(card, s.fontSize);
   const n = s.count ?? 0;
   const ids = s.nodeIds ?? [];
   if (n > 0 && ids.length) {
@@ -1008,14 +1018,14 @@ let tsScanNote = { namePart: '', warnings: [] as string[] };
 function renderTextStyles(): void {
   renderChunked($('tsList'), tsSpecs, textStyleCard);
   if (!tsSpecs.length) {
-    setStatus('tsStatus', '', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
+    setTsStatus('other', '', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
     return;
   }
   // 개수는 상태줄 한 곳에서만 — 제목 배지(#tsCount)는 걷었다(ui.html 주석 참고).
   // 표에서 세므로 줄 삭제가 바로 반영된다(스캔 시점 스냅샷이던 옛 상태줄의 문제).
   const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
-  setStatus(
-    'tsStatus',
+  setTsStatus(
+    'scan',
     t('textStyle.scanSummary', { a: fresh, b: tsSpecs.length - fresh }) +
       tsScanNote.namePart +
       t('textStyle.scanLhPct', { n: tsSpecs.filter((s) => s.lineHeightPercent).length }) +
@@ -1055,13 +1065,215 @@ function renderTsLink(): void {
 }
 // 스캔 후 액션 — 눌러야 생기는 이름이라, 스캔이 표를 채우기 전엔 잠가 둔다(TEXT_STYLE_CANDIDATES에서 해제).
 $('btnTsRowLabels').addEventListener('click', () => {
-  setStatus('tsStatus', t('textStyle.renaming'), 'ok');
+  setTsStatus('other', t('textStyle.renaming'), 'ok');
   send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
 });
+
+/* ---------- 규칙 밖 크기 표시 · 상태 줄 꼬리(docs/text-style-krds.md §4) ---------- */
+/** ⚠ 소수 크기 · ○ KRDS 밖 — withText면 기호 뒤에 글(타이포 목록), 아니면 기호만(만들기 탭 · 팝업). 규칙 안이면 null. */
+function offMarkEl(size: number, withText: boolean): HTMLElement | null {
+  const o = offScale(size);
+  if (!o.kind) return null;
+  const el = document.createElement('span');
+  el.className = `ts-off ${o.kind}`;
+  const label = t(o.kind === 'decimal' ? 'textStyle.offDecimal' : 'textStyle.offScale');
+  el.textContent = (o.kind === 'decimal' ? '⚠' : '○') + (withText ? ` ${label}` : '');
+  el.title = `${label} · ${t('textStyle.offTip', { n: o.nearest })}`;
+  el.setAttribute('aria-label', el.title);
+  return el;
+}
+/** 타이포 목록 줄의 표시를 (다시) 단다 — 머리 줄(.r-top) 끝. */
+function putOffMark(card: HTMLElement, size: number): void {
+  card.querySelector('.ts-off')?.remove();
+  const m = offMarkEl(size, true);
+  const top = card.querySelector<HTMLElement>('.r-top');
+  if (m && top) top.insertBefore(m, top.querySelector('.r-badge, .link'));
+}
+/** 상태 줄 앞 문구와 종류 — 꼬리는 스캔 요약 · 램프 문구 뒤에만(§4). */
+let tsStatusBase: { kind: 'scan' | 'ramp' | 'other'; text: string; cls: 'ok' | 'warn' | '' } = { kind: 'other', text: '', cls: '' };
+function offTail(): string {
+  const marks = tsSpecs.map((s) => offScale(s.fontSize).kind).filter((k) => k);
+  return marks.length ? t('textStyle.offSum', { k: marks.length, m: marks.filter((k) => k === 'decimal').length }) : '';
+}
+function setTsStatus(kind: 'scan' | 'ramp' | 'other', text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
+  tsStatusBase = { kind, text, cls };
+  setStatus('tsStatus', kind === 'other' || !text ? text : text + offTail(), cls, tip);
+}
+/** 이 파일의 로컬 텍스트 스타일 이름(TEXT_STYLE_CANDIDATES.existing) — 기본 램프의 예약 이름. */
+let tsExistingNames: string[] = [];
+
+/* ---------- [이름 다시 짓기] 팝업(docs/text-style-krds.md §5) ---------- */
+let tsrReq = 0;
+let tsrApplyReq = 0;
+/** 미리보기 줄 — null이면 읽는 중. */
+let tsrRows: TsRenameRow[] | null = null;
+const tsrOff = new Set<string>();
+let tsrBody: HTMLElement | null = null;
+let tsrTitle: HTMLElement | null = null;
+let tsrApplyBtn: HTMLButtonElement | null = null;
+let tsrOpener: HTMLElement | null = null;
+let tsrCloseBtn: HTMLElement | null = null;
+let tsrBusy = false;
+$('btnTsRename').addEventListener('click', (e) => {
+  const b = e.currentTarget as HTMLElement;
+  if (b.getAttribute('aria-disabled') === 'true') return;
+  openTsRename(b);
+});
+function openTsRename(opener: HTMLElement): void {
+  if (!isPaid) { showStatusLine(t('status.paid'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } }); return; }
+  const lock = writeLockReason();
+  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
+  tsrOpener = opener;
+  tsrRows = null;
+  tsrOff.clear();
+  tsrBusy = false;
+  const title = document.createElement('span');
+  tsrTitle = title;
+  const body = document.createElement('div');
+  body.className = 'tsr-body';
+  tsrBody = body;
+  const apply = modalButton(t('textStyle.renameApply', { k: 0 }), tsrApply, true);
+  tsrApplyBtn = apply;
+  const close = modalButton(t('common.close'), () => requestCloseModal('button'));
+  tsrCloseBtn = close;
+  openModal(title, body, [close, apply], () => tsrOpener, () => { tsrBody = null; tsrApplyBtn = null; tsrTitle = null; }, { focus: close });
+  tsrReq = ++bindReqSeq;
+  send({ type: 'SCAN_TS_RENAME', reqId: tsrReq });
+  tsrRender();
+}
+/** 켠 줄 중 바꿀 수 있는 것 — 끈 줄의 지금 이름과 새 이름이 겹치면 뺀다(§5.2). */
+function tsrClash(r: TsRenameRow): boolean {
+  return !!tsrRows?.some((x) => x !== r && tsrOff.has(x.id) && x.from === r.to);
+}
+function tsrApplicable(): TsRenameRow[] {
+  return (tsrRows ?? []).filter((r) => !tsrOff.has(r.id) && !tsrClash(r));
+}
+function tsrRender(): void {
+  const body = tsrBody;
+  if (!body || !tsrApplyBtn || !tsrTitle) return;
+  const rows = tsrRows;
+  tsrTitle.textContent = t('textStyle.renameHead', { n: rows?.length ?? 0 });
+  const k = tsrApplicable().length;
+  tsrApplyBtn.textContent = t('textStyle.renameApply', { k });
+  const lock = tsrBusy ? t('common.running') : writeLockReason();
+  setLock(tsrApplyBtn, lock ? 'prereq' : !rows || !k ? 'prereq' : null, lock ?? t('textStyle.renameNeedOn'));
+  const hadFocus = body.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.id ?? (document.activeElement as HTMLElement).dataset.all ?? null : null;
+  clearMount(body);
+  if (!rows) { body.textContent = t('textStyle.renameReading'); return; }
+  if (!rows.length) { body.textContent = t('textStyle.renameNone'); return; }
+  const all = document.createElement('div');
+  all.className = 'tsr-all';
+  const link = (label: string, key: string, on: boolean): HTMLButtonElement => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'link link-btn';
+    b.textContent = label;
+    b.dataset.all = key;
+    b.addEventListener('click', () => { for (const r of rows) on ? tsrOff.delete(r.id) : tsrOff.add(r.id); tsrRender(); });
+    return b;
+  };
+  all.append(link(t('bind.allOn'), 'on', true), ' · ', link(t('bind.allOff'), 'off', false));
+  body.appendChild(all);
+  const sws: HTMLButtonElement[] = [];
+  for (const r of rows) {
+    const row = document.createElement('div');
+    row.className = 'tsr-row';
+    row.title = `${r.from} → ${r.to}`;
+    const from = document.createElement('span');
+    from.className = 'tsr-from';
+    from.textContent = r.from;
+    const arrow = document.createElement('span');
+    arrow.textContent = '→';
+    arrow.setAttribute('aria-hidden', 'true');
+    const to = document.createElement('span');
+    to.className = 'tsr-to';
+    to.textContent = r.to;
+    row.append(from, arrow, to);
+    const om = offMarkEl(r.fontSize, false);
+    if (om) row.appendChild(om);
+    const on = !tsrOff.has(r.id);
+    if (on && tsrClash(r)) {
+      const c = document.createElement('span');
+      c.className = 'tsr-clash';
+      c.textContent = t('textStyle.renameClash');
+      row.appendChild(c);
+    }
+    const sw = document.createElement('button');
+    sw.type = 'button';
+    sw.className = 'bv-switch';
+    sw.dataset.id = r.id;
+    sw.setAttribute('role', 'switch');
+    sw.setAttribute('aria-checked', String(on));
+    sw.setAttribute('aria-label', t('textStyle.renameRowAria', { from: r.from, to: r.to }));
+    const tr = document.createElement('span');
+    tr.className = 'bv-track';
+    tr.setAttribute('aria-hidden', 'true');
+    sw.appendChild(tr);
+    sw.addEventListener('click', () => { on ? tsrOff.add(r.id) : tsrOff.delete(r.id); tsrRender(); });
+    sw.addEventListener('keydown', (e) => {
+      const i = sws.indexOf(sw);
+      const go = (j: number): void => { sws[Math.max(0, Math.min(sws.length - 1, j))]?.focus(); };
+      if (e.key === 'ArrowDown') go(i + 1);
+      else if (e.key === 'ArrowUp') go(i - 1);
+      else return;
+      e.preventDefault();
+    });
+    sws.push(sw);
+    row.appendChild(sw);
+    body.appendChild(row);
+  }
+  if (hadFocus) body.querySelector<HTMLElement>(`[data-id="${CSS.escape(hadFocus)}"], [data-all="${CSS.escape(hadFocus)}"]`)?.focus();
+}
+function onTsRenamePlan(msg: Extract<CodeToUi, { type: 'TS_RENAME_PLAN' }>): void {
+  if (msg.reqId !== tsrReq || !tsrBody) return;
+  const stayed = document.activeElement === tsrCloseBtn; // 열 때 포커스는 [닫기]
+  tsrRows = msg.rows;
+  tsrRender();
+  // 응답이 오면 첫 줄 스위치로 — 사용자가 그 사이 포커스를 옮겼으면 그대로(§5.2)
+  if (stayed) tsrBody?.querySelector<HTMLElement>('.bv-switch')?.focus();
+}
+function tsrApply(): void {
+  if (!tsrApplyBtn || tsrApplyBtn.getAttribute('aria-disabled') === 'true') return;
+  const items = tsrApplicable().map((r) => ({ id: r.id, from: r.from, to: r.to, sig: r.sig }));
+  if (!items.length) return;
+  tsrBusy = true;
+  tsrRender();
+  tsrApplyReq = ++bindReqSeq;
+  send({ type: 'APPLY_TS_RENAME', reqId: tsrApplyReq, items });
+}
+function onTsRenamed(msg: Extract<CodeToUi, { type: 'TS_RENAMED' }>): void {
+  if (msg.reqId !== tsrApplyReq) return;
+  tsrBusy = false;
+  if (tsrBody) closeModal(); // 팝업을 닫으면 연 버튼으로 포커스가 돌아간다
+  let text = t('textStyle.renamed', { n: msg.renamed });
+  if (msg.skipped) text += t('textStyle.renameSkipped', { m: msg.skipped });
+  if (msg.roleVarsTaken) text += t('textStyle.renameRoleSkipped', { n: msg.roleVarsTaken });
+  if (msg.roleVarsError) text += t('textStyle.renameRoleError', { n: msg.roleVarsError });
+  const stuck = msg.results.filter((r) => r.status === 'error-stuck');
+  const tip = [
+    ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => (k === 'error-stuck' ? `${t('textStyle.renameSkip.error-stuck', { name: stuck.map((x) => x.name).join(', ') })} ${n}` : `${t('textStyle.renameSkip.' + k)} ${n}`)),
+    ...(msg.roleVarsStuck.length ? [t('textStyle.renameRoleStuck', { names: msg.roleVarsStuck.join(', ') })] : []),
+  ].join('\n');
+  const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError);
+  showStatusLine(text, { cls: warn ? 'warn' : 'ok', ...(tip ? { tip } : {}) });
+  if (msg.renamed >= 1) {
+    mkTsNames.clear(); // 만들기 화면의 고친 이름 — 남기면 다음 실행이 옛 손 이름으로 되돌린다(§5.2b)
+    if (tsSpecs.length) {
+      tsSpecs = [];
+      renderTextStyles();
+      ($('btnTsRowLabels') as HTMLButtonElement).disabled = true;
+      setTsStatus('other', text + t('textStyle.renameClearedTable'), warn ? 'warn' : 'ok');
+    }
+  }
+}
+/** 램프 크기를 고친 뒤 — 앞 문구가 스캔 요약 · 램프 문구일 때만 꼬리를 다시 붙인다. */
+function tsRefreshTail(): void {
+  if (tsStatusBase.kind !== 'other') setTsStatus(tsStatusBase.kind, tsStatusBase.text, tsStatusBase.cls);
+}
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
   if (!styles.length) {
-    setStatus('tsStatus', t('textStyle.needSpecs'), 'warn');
+    setTsStatus('other', t('textStyle.needSpecs'), 'warn');
     return;
   }
   // 바로 연결(§4.3 "타이포 등록", 2026-11-10 A+C) — 켜져 있고 스캔 대상이 있으면 등록하면서 그 글자에 붙인다.
@@ -1363,6 +1575,7 @@ const PAID_FIELDS = [
   'btnPalette', 'btnColorVars',
   'btnCreate', 'btnCreateApply',
   'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
+  'btnTsRename', // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
 ];
 
@@ -1979,10 +2192,17 @@ window.onmessage = (event: MessageEvent) => {
       );
       semStatusPrefix = '';
       break;
+    case 'TS_RENAME_PLAN':
+      onTsRenamePlan(msg);
+      break;
+    case 'TS_RENAMED':
+      onTsRenamed(msg);
+      break;
     case 'TEXT_STYLE_CANDIDATES': {
       // 「왼쪽 글자로 이름 채우기」는 스캔이 실제 표본을 물어왔을 때만 누를 것이 있다.
       // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
+      tsExistingNames = (msg.existing ?? []).map((e) => e.name); // 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프)
       if (msg.styles.length) {
         tsSpecs = msg.styles.map((x) => ({ ...x }));
         // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
@@ -1993,13 +2213,13 @@ window.onmessage = (event: MessageEvent) => {
         };
         renderTextStyles(); // 상태줄까지 여기서 쓴다
       } else {
-        tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+        tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY, tsExistingNames);
         tsScanIds = null; // 기본 램프 — 붙일 글자가 없다
         renderTsLink();
         tsScanNote = { namePart: '', warnings: [] };
         renderTextStyles();
         // 램프는 스캔 결과가 아니라 폴백 — 개수 요약 대신 무슨 일이 있었는지를 덮어쓴다.
-        setStatus('tsStatus', t('textStyle.fallbackRamp'), 'warn');
+        setTsStatus('ramp', t('textStyle.fallbackRamp'), 'warn');
       }
       break;
     }
@@ -2007,8 +2227,8 @@ window.onmessage = (event: MessageEvent) => {
       // 툴팁: 못 붙인 글자 사유별 수 → 빈 줄 → 알림 목록(IA v4 §4.3 "결과")
       const why = Object.entries(msg.applyReasons ?? {}).filter(([, n]) => (n ?? 0) > 0).map(([k, n]) => `${t('tsSkip.' + k)} ${t('v4.layerCount', { n })}`);
       const tsTip = [why.join('\n'), msg.missing.join('\n')].filter(Boolean).join('\n\n');
-      setStatus(
-        'tsStatus',
+      setTsStatus(
+        'other',
         t('textStyle.registered', { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) +
           (msg.applied ? t('textStyle.linkedN', { a: msg.applied }) : '') +
           (msg.applySkipped ? t('textStyle.linkSkipped', { k: msg.applySkipped }) : '') +
@@ -2871,6 +3091,8 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       const sub = document.createElement('span');
       sub.className = 'tr-sub';
       sub.textContent = tsSummary(s);
+      const om = offMarkEl(s.fontSize, false); // 요약 끝에 기호만(docs/text-style-krds.md §4)
+      if (om) sub.append(' ', om);
       cells.push(sub);
       if (s.boundStyleId) cells.push(mkTag(t('make.tagHas'), t('make.tsHasTip')));
       items.push({
@@ -4395,6 +4617,7 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showPick('theme'), write: true },
   SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showPick('type'), write: false },
   CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showPick('type'), write: true },
+  APPLY_TS_RENAME: { results: ['TS_RENAMED'], label: 'op.tsRename', go: () => showTab('variables'), write: true },
   APPLY: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: false },
   APPLY_SELECTED: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: true },
   // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
@@ -4426,6 +4649,7 @@ const WAIT_LINK_IDS = [
   'btnSemantics', // CREATE_SEMANTICS
   'btnGenDark', // GENERATE_DARK_MODE
   'btnTextStyles', // CREATE_TEXT_STYLES
+  'btnTsRename', // APPLY_TS_RENAME
   'btnRename', // RENAME_APPLY
   'btnRegisterComp', // REGISTER_COMPONENTS
   'btnClassifyVariants', // CLASSIFY_VARIANTS
@@ -4448,6 +4672,7 @@ function renderWaitLocks(): void {
   const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
   const varLock = varOp ? t('bind.waitOp', { op: t(opPending.get(varOp)!.label) }) : null;
   for (const id of WAIT_LINK_IDS) setWait($(id), link ?? varLock);
+  tsrRender(); // 이름 다시 짓기 팝업의 [k개 이름 바꾸기] 잠금(§5.1)
   const other = link ? null : otherWriteOp();
   const wiz = opWizard || wizardRunning ? t('bind.waitOp', { op: t('op.wizard') }) : null;
   for (const id of WAIT_CARD_IDS) {
@@ -7264,6 +7489,8 @@ function openMoreMenu(): void {
     { label: colorView === 'grid' ? t('list.colorList') : t('list.colorGrid'), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t('v4.usesViewOff') : undefined, onSelect: () => setColorView(colorView === 'grid' ? 'list' : 'grid') },
     { label: t('list.menuExpandAll'), onSelect: () => setAllGroups(true) },
     { label: t('list.menuCollapseAll'), onSelect: () => setAllGroups(false) },
+    // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
+    { label: t('textStyle.renameMenu'), separatorBefore: true, disabled: !isPaid || !!writeLockReason(), note: !isPaid ? t('status.paid') : writeLockReason() ?? undefined, onSelect: () => openTsRename(btn), focusElsewhere: true },
   ], btn);
 }
 /** [＋] 메뉴(§4.6 ⑥) — 새 변수 · (구분선) · 선택에서 변수 만들기… · 다크 모드 만들기… · 텍스트 스타일 만들기…. */
