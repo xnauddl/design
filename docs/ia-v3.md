@@ -1267,7 +1267,7 @@
 왜: 256노드 웹페이지 1장에서 후보 618곳 → 결과 상한 600(`RESULT_CAP`)에 걸려 푸터 글자 6개(18곳)가 조용히 빠졌다. 사용자는 "(찾음 600)"만 보고 전부 연결된 줄 안다. 상한을 그냥 없애면 1만 곳일 때 자리 줄 1만 개, `setBoundVariable` 1만 번(≈10~20초 피그마 멈춤)이 된다. 그래서 찾기는 전부, 보여주기는 줄여서, 연결은 나눠서 한다.
 
 - **찾기:** 선택 안의 모든 자리를 센다. 상한 없음. (찾음 {n})의 n은 실제 전체 수다.
-  - `APPLY_RESULT`의 모양은 지금 그대로다. 자리마다 후보 하나(`candidates: BindCandidate[]` — 칠하기 · 선 · 효과의 배열 번호 `index` 포함), `nodes`는 지금의 `BindNode`(영향 레이어 + 조상), `skips` · `skipTotal` · `reasons` · `bound` · `skipped` · `preview` · `reqId`도 그대로다. 변수별 묶음은 지금처럼 UI가 만든다(`groupByVariable`). 상한만 없앤다.
+  - `APPLY_RESULT`의 모양은 지금 그대로다. 자리마다 후보 하나(`candidates: BindCandidate[]` — 칠하기 · 선 · 효과의 배열 번호 `index` 포함), `nodes`는 지금의 `BindNode`(영향 레이어 + 조상), `skips` · `reasons` · `bound` · `skipped` · `preview` · `reqId`도 그대로다(2026-11-11 `skipTotal`은 지우고 상한 전 사유별 레이어 수 `skipLayers`를 더함 — ia-v4 §4.2 · B.9). 변수별 묶음은 지금처럼 UI가 만든다(`groupByVariable`). 상한만 없앤다.
   - 크기: 후보 1곳 ≈ 150~250B라 1만 곳이면 메시지 ≈ 1.5~2.5MB다. 보통 페이지는 수백 곳이다. 지금은 이 크기를 받아들인다(줄이는 일은 아래 "하지 않는 것").
   - 지울 것: `bind.ts`의 `RESULT_CAP`과 잘라내기(`preview.candidates.slice(0, RESULT_CAP)`), `BindResult.candidateTotal`, `APPLY_RESULT.candidateTotal`(`shared/messages.ts`, `code.ts` `case 'APPLY'` 응답). UI는 `candidateTotal`을 읽지 않는다. 잘림 표시용 UI 상태나 i18n 키는 처음부터 없다.
 - **보여주기(카드):** 카드는 변수마다 하나, 전부 보인다(필터는 지금처럼 7개 이상일 때). 카드 머리의 "{k}곳"은 실제 수다.
