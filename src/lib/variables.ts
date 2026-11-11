@@ -459,7 +459,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     );
     for (const x of list) {
       const hex = String(x.token.value).toLowerCase();
-      // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 투명도 꼬리가 붙는다(default · default-a8, 12.5)
+      // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 투명도 단계로 갈린다(default · default-subtle, 12.5)
       reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token, ...(refHex ? { refHex } : {}) });
     }
   }

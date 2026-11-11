@@ -1558,8 +1558,8 @@
   var FAMILIES = ["red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple", "pink"];
   var esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   function familyRe(base, kind) {
-    const tail = "(?:-a\\d+)?(?:-\\d+)?$";
     const lad = LADDER_WORDS.join("|");
+    const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
     switch (kind) {
       case "number":
         return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join("|")}))?(?:-\\d+)?$`);
@@ -1670,8 +1670,9 @@
     side(rest.filter((v) => Number(v) > ref + 49e-4), SIZE_LARGE);
   }
   function assignColors(base, kind, refHex, counts, left, taken, assign, fallback) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const slotOf = /* @__PURE__ */ new Map();
+    const slotAssigned = /* @__PURE__ */ new Set();
     const slotOwner = /* @__PURE__ */ new Map();
     const slotFree = (name, hex) => {
       const own = slotOwner.get(name);
@@ -1690,8 +1691,10 @@
       var _a2, _b2;
       return ((_a2 = hexCount.get(b)) != null ? _a2 : 0) - ((_b2 = hexCount.get(a)) != null ? _b2 : 0) || cmpStr(a, b);
     });
+    const fellBack = /* @__PURE__ */ new Set();
     const pick = (hex, cands) => {
       const free = cands.find((n) => slotFree(n, hex));
+      if (!free) fellBack.add(hex);
       setSlot(hex, free != null ? free : cands[cands.length - 1]);
     };
     const ladderSide = (list, refL, prefix) => {
@@ -1744,12 +1747,47 @@
       }
       if (held && rest.includes(refH) && !slotOf.has(refH)) setSlot(refH, base);
     }
-    for (const v of sortByCount(left, counts)) {
-      const hex = hexOfKey(v);
-      const slot = (_d = slotOf.get(hex)) != null ? _d : base;
-      const a = alphaOfKey(v);
-      const want = a != null && a < 1 ? `${slot}-a${alphaPct(a)}` : slot;
-      assign(v, taken.has(want) ? fallback(want) : want);
+    const alphaOf = (v) => {
+      var _a2;
+      return (_a2 = alphaOfKey(v)) != null ? _a2 : 1;
+    };
+    const byHex = /* @__PURE__ */ new Map();
+    for (const v of left) byHex.set(hexOfKey(v), [...(_d = byHex.get(hexOfKey(v))) != null ? _d : [], v]);
+    const nameFree = (n, hex) => !taken.has(n) && (!slotOwner.has(n) || slotOwner.get(n) === hex);
+    for (const [hex, vals] of byHex) {
+      const slot = (_e = slotOf.get(hex)) != null ? _e : base;
+      const fb = fellBack.has(hex);
+      const order = [...vals].sort((a, b) => {
+        var _a2, _b2;
+        return ((_a2 = counts.get(b)) != null ? _a2 : 0) - ((_b2 = counts.get(a)) != null ? _b2 : 0) || alphaOf(b) - alphaOf(a) || cmpValue(a, b);
+      });
+      const fileVals = !fb ? taken.get(slot) : void 0;
+      const held = fileVals && fileVals.length && fileVals.every((x) => hexOfKey(x) === hex) && !slotAssigned.has(slot) ? fileVals[0] : void 0;
+      let refA;
+      let rest = order;
+      if (held != null) refA = alphaOf(held);
+      else {
+        const first = order[0];
+        rest = order.slice(1);
+        refA = alphaOf(first);
+        assign(first, fb || taken.has(slot) ? fallback(slot) : slot);
+        slotAssigned.add(slot);
+      }
+      const side = (list, words) => {
+        const sorted = [...list].sort((a, b) => Math.abs(alphaOf(a) - refA) - Math.abs(alphaOf(b) - refA) || alphaOf(a) - alphaOf(b));
+        sorted.forEach((v, i) => {
+          const cands = words.map((w) => `${slot}-${w}`);
+          if (fb) {
+            assign(v, fallback(cands[Math.min(i, cands.length - 1)]));
+            return;
+          }
+          const free = cands.find((n) => nameFree(n, hex));
+          assign(v, free != null ? free : fallback(cands[cands.length - 1]));
+        });
+      };
+      for (const v of rest.filter((x) => Math.abs(alphaOf(x) - refA) < 5e-3)) assign(v, fallback(slot));
+      side(rest.filter((x) => alphaOf(x) < refA - 49e-4), LIGHTER);
+      side(rest.filter((x) => alphaOf(x) > refA + 49e-4), DARKER);
     }
   }
   function cmpValue(a, b) {

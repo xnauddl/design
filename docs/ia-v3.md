@@ -2481,8 +2481,8 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 ### A.14b Semantic 투명도 단계 (2026-11-11 사용자 결정 "Semantic에도 단계 말", 실기 중 — #142에 이어서)
 
-- [ ] `usageRoles.ts` `assignColors`: 자리(hex) 안 투명도 값들 — 자리 기준(파일의 N이 같은 hex면 그 값 · 아니면 곳 수 첫 값, 같으면 투명도 큰 값) · 더 투명 `-subtle…` · 덜 투명 `-strong…` · 가까운 순 · 다 차면 `-n`. `-a{%}`는 Semantic에서 쓰지 않음
-- [ ] `familyRe`: 투명도 단계 꼬리(밝기 꼬리 뒤 한 번 더) 허용, 예전 `-a\d+`는 새로 만들지 않되 가족에는 남김(재사용 · 차지) · `familyRank`가 투명도 단계 · `-a` 이름을 꼬리 이름(1순위)으로 다루는지 확인
-- [ ] 단위 테스트: 말 겹침 — #3D5FDB · #3D5FDB@50% · #5576EE → `brand` · `brand-subtler`(반투명) · `brand-subtle` / 자리 되돌림 + 투명도 → `subtlest-subtle-2` / 자리 기준과 같은 값 · 재사용 불가 → `N-2` / 옛 `default-a8` 같은 값 → 재사용 / inverse 반투명 → `inverse-subtle` / 만들기 경로 `createUsageRoles` 그림자 2% · 4% · 5% / 그림자 2% · 4% · 5% → `default` · `default-subtle` · `default-strong` / 테두리 100% · 8% → `default` · `default-subtle` / 반투명만 → `default` / 파일 `default` = 8% + 불투명 → `default-strong` / 파일 `subtle` = X@50% + 불투명 X → `subtle-strong` / 같은 쪽 넷 → `-subtlest-2` / `brand-subtle`의 반투명 → `brand-subtle-subtle` / 연결 경로 `bindSelection` 테두리 100% · 8% → `default` · `default-subtle`
-- [ ] 기존 기대값(`test/figma.test.mjs`의 `default-a8` 테스트들) 고치기 · 주석(`usageRoles.ts` 머리 · `familyRe` 문서의 `{-a%}` · `assignColors` 문서) · 화면 시안(만들기 Semantic 탭) · 4검사 · 스크린샷
+- [x] `usageRoles.ts` `assignColors`: 자리(hex) 안 투명도 값들 — 자리 기준(파일의 N이 같은 hex면 그 값 · 아니면 곳 수 첫 값, 같으면 투명도 큰 값) · 더 투명 `-subtle…` · 덜 투명 `-strong…` · 가까운 순 · 다 차면 `-n`. `-a{%}`는 Semantic에서 쓰지 않음
+- [x] `familyRe`: 투명도 단계 꼬리(밝기 꼬리 뒤 한 번 더) 허용, 예전 `-a\d+`는 새로 만들지 않되 가족에는 남김(재사용 · 차지) · `familyRank`가 투명도 단계 · `-a` 이름을 꼬리 이름(1순위)으로 다루는지 확인
+- [x] 단위 테스트: 말 겹침 — #3D5FDB · #3D5FDB@50% · #5576EE → `brand` · `brand-subtler`(반투명) · `brand-subtle` / 자리 되돌림 + 투명도 → `subtlest-subtle-2` / 자리 기준과 같은 값 · 재사용 불가 → `N-2` / 옛 `default-a8` 같은 값 → 재사용 / inverse 반투명 → `inverse-subtle` / 만들기 경로 `createUsageRoles` 그림자 2% · 4% · 5% / 그림자 2% · 4% · 5% → `default` · `default-subtle` · `default-strong` / 테두리 100% · 8% → `default` · `default-subtle` / 반투명만 → `default` / 파일 `default` = 8% + 불투명 → `default-strong` / 파일 `subtle` = X@50% + 불투명 X → `subtle-strong` / 같은 쪽 넷 → `-subtlest-2` / `brand-subtle`의 반투명 → `brand-subtle-subtle` / 연결 경로 `bindSelection` 테두리 100% · 8% → `default` · `default-subtle`
+- [x] 기존 기대값(`test/figma.test.mjs`의 `default-a8` 테스트들) 고치기 · 주석(`usageRoles.ts` 머리 · `familyRe` 문서의 `{-a%}` · `assignColors` 문서) · 화면 시안(만들기 Semantic 탭) · 4검사 · 스크린샷
 - [ ] 실기 확인(사용자, 피그마): 그림자가 `default-a2 · -a4 · -a5` 대신 단계 말

@@ -3,13 +3,13 @@
    레이어에는 역할(Semantic)만 붙인다. 같은 값의 역할이 없으면 "어디에 쓰였나"로 이름을 짓는다.
    - 숫자 · 글자: `{그룹}/{주인}/{속성}` (12.3)
    - 색: `color/{쓰임}/{밝기}` (12.4)
-   - 꼬리: 같은 이름에 다른 값이 오면 뜻이 읽히는 꼬리(`-sm` · `-lg`, `brand-red` · `-subtle`, `subtler`, `-a8`), 모자라면 `-n` (12.5)
+   - 꼬리: 같은 이름에 다른 값이 오면 뜻이 읽히는 꼬리(`-sm` · `-lg`, `brand-red` · `-subtle`, `subtler`, 같은 색 투명도만 다르면 `-subtle` · `-strong`), 모자라면 `-n` (12.5)
    만들기(createUsageRoles)와 연결(bind.ts)이 같은 함수를 쓴다 — 두 경로의 이름이 어긋나지 않게.
    ============================================================ */
 import { hexToOklch } from './color';
 import { LOW_CHROMA } from './palette';
 import { VECTOR_TYPES } from './nodePaint';
-import { alphaPct, colorKey } from './tokens';
+import { colorKey } from './tokens';
 import { classifyColor } from './colorName';
 
 /** 주인으로 쓰지 않는 구조 폴백 역할(12.3 ①). */
@@ -165,7 +165,7 @@ const byCountThenHex = (a: { hex: string; count: number }, b: { hex: string; cou
 
 /**
  * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand), 키는 `colorSlotKey(hex, bg, alpha)`.
- * 밝기 판정은 hex로만 — 같은 hex · 다른 투명도는 같은 이름을 받고 assignNames가 투명도 꼬리(-a{%})를 붙인다(§2.11 "반투명 색 토큰").
+ * 밝기 판정은 hex로만 — 같은 hex · 다른 투명도는 같은 자리를 받고 assignNames가 투명도 단계(-subtle · -strong)로 가른다(§2.11 "반투명 색 토큰").
  * 기준색: `existingDefaultHex`(`color/{쓰임}/default`가 이미 있으면 그 색), 없으면 hex별 곳 수 합이 가장 많은 색
  * (같으면 hex 순). 판정 순서: default → inverse(합친 판정) → brand(유채) → subtle · strong.
  * inverse(12.4 합친 판정, `use`가 text · icon · border일 때만 — 없으면 판정한다):
@@ -241,12 +241,13 @@ const FAMILIES = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'indigo', 
 const esc = (x: string): string => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
- * 가족 판정(12.5 "가족") — 그 기본 이름에서 문법 `{기본}{-꼬리}{-a%}{-n}`으로 만들 수 있는 이름만.
+ * 가족 판정(12.5 "가족") — 그 기본 이름에서 문법 `{기본}{-꼬리}{-투명도 단계}{-n}`으로 만들 수 있는 이름만(예전 `-a{%}`도 포함 — 새로 만들지는 않음).
  * 표 밖의 말(`padding-x` · `-top-left` · `brand-bold`)은 가족이 아니다.
  */
 export function familyRe(base: string, kind: NameKind): RegExp {
-  const tail = '(?:-a\\d+)?(?:-\\d+)?$';
   const lad = LADDER_WORDS.join('|');
+  // 투명도 단계(12.5, 한 번) 또는 예전 구현의 -a{%}(재사용 · 차지 판정만), 그 뒤 -n
+  const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
   switch (kind) {
     case 'number':
       return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join('|')}))?(?:-\\d+)?$`);
@@ -391,11 +392,12 @@ function assignNumbers(base: string, counts: ReadonlyMap<string, number>, left: 
 }
 
 /**
- * 색 종류(chroma · ladder · inverse · default)의 이름 — hex마다 자리 이름을 정하고 투명도 꼬리를 붙인다(12.5).
+ * 색 종류(chroma · ladder · inverse · default)의 이름 — hex마다 자리 이름을 먼저 정하고, 한 자리의 투명도 값들은 투명도 단계(-subtle · -strong)로 가른다(12.5).
  * 자리 N이 비었나: N이 다른 hex의 값으로 있거나 값을 못 읽거나 이번에 다른 hex가 받았으면 차 있다.
  */
 function assignColors(base: string, kind: NameKind, refHex: string | undefined, counts: ReadonlyMap<string, number>, left: string[], taken: Taken, assign: (v: string, n: string) => void, fallback: (n: string) => string): void {
   const slotOf = new Map<string, string>(); // hex → 자리 이름
+  const slotAssigned = new Set<string>(); // 이번에 값 이름으로 실제 받은 자리 이름
   const slotOwner = new Map<string, string>(); // 자리 이름 → hex(이번에 정함)
   const slotFree = (name: string, hex: string): boolean => {
     const own = slotOwner.get(name);
@@ -412,8 +414,10 @@ function assignColors(base: string, kind: NameKind, refHex: string | undefined, 
   const hexCount = new Map<string, number>();
   for (const v of left) hexCount.set(hexOfKey(v), (hexCount.get(hexOfKey(v)) ?? 0) + (counts.get(v) ?? 0));
   const hexes = [...hexCount.keys()].sort((a, b) => (hexCount.get(b) ?? 0) - (hexCount.get(a) ?? 0) || cmpStr(a, b));
+  const fellBack = new Set<string>(); // 자리가 되돌림인 hex(후보가 다 차서 마지막 후보를 나눠 씀)
   const pick = (hex: string, cands: string[]): void => {
     const free = cands.find((n) => slotFree(n, hex));
+    if (!free) fellBack.add(hex);
     setSlot(hex, free ?? cands[cands.length - 1]); // 다 차면 마지막 후보(아래에서 -n)
   };
   const ladderSide = (list: string[], refL: number, prefix: string): void => {
@@ -468,13 +472,43 @@ function assignColors(base: string, kind: NameKind, refHex: string | undefined, 
     // 기준과 같은 hex인데 재사용 못 한 값: 자리는 기본 이름(같은 hex)
     if (held && rest.includes(refH) && !slotOf.has(refH)) setSlot(refH, base);
   }
-  // 값마다: 불투명 = 자리 이름, 반투명 = 자리 이름 + -a{%}. 차 있으면 -n.
-  for (const v of sortByCount(left, counts)) {
-    const hex = hexOfKey(v);
+  // 값마다(12.5 "투명도 단계"): 자리 기준이 자리 이름, 더 투명 -subtle…, 덜 투명 -strong…, 다 차면 -n.
+  const alphaOf = (v: string): number => alphaOfKey(v) ?? 1;
+  const byHex = new Map<string, string[]>();
+  for (const v of left) byHex.set(hexOfKey(v), [...(byHex.get(hexOfKey(v)) ?? []), v]);
+  const nameFree = (n: string, hex: string): boolean => !taken.has(n) && (!slotOwner.has(n) || slotOwner.get(n) === hex);
+  for (const [hex, vals] of byHex) {
     const slot = slotOf.get(hex) ?? base;
-    const a = alphaOfKey(v);
-    const want = a != null && a < 1 ? `${slot}-a${alphaPct(a)}` : slot;
-    assign(v, taken.has(want) ? fallback(want) : want);
+    const fb = fellBack.has(hex);
+    const order = [...vals].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || alphaOf(b) - alphaOf(a) || cmpValue(a, b));
+    // 자리 기준: 파일의 자리 이름이 같은 hex면 그 값(되돌림 자리는 보지 않음), 아니면 곳 수 첫 값
+    const fileVals = !fb ? taken.get(slot) : undefined;
+    const held = fileVals && fileVals.length && fileVals.every((x) => hexOfKey(x) === hex) && !slotAssigned.has(slot) ? fileVals[0] : undefined;
+    let refA: number;
+    let rest = order;
+    if (held != null) refA = alphaOf(held);
+    else {
+      const first = order[0];
+      rest = order.slice(1);
+      refA = alphaOf(first);
+      assign(first, fb || taken.has(slot) ? fallback(slot) : slot);
+      slotAssigned.add(slot);
+    }
+    const side = (list: string[], words: string[]): void => {
+      const sorted = [...list].sort((a, b) => Math.abs(alphaOf(a) - refA) - Math.abs(alphaOf(b) - refA) || alphaOf(a) - alphaOf(b));
+      sorted.forEach((v, i) => {
+        const cands = words.map((w) => `${slot}-${w}`);
+        if (fb) {
+          assign(v, fallback(cands[Math.min(i, cands.length - 1)]));
+          return;
+        }
+        const free = cands.find((n) => nameFree(n, hex));
+        assign(v, free ?? fallback(cands[cands.length - 1]));
+      });
+    };
+    for (const v of rest.filter((x) => Math.abs(alphaOf(x) - refA) < 0.005)) assign(v, fallback(slot)); // 자리 기준과 같은 값 · 재사용 불가 → N-n
+    side(rest.filter((x) => alphaOf(x) < refA - 0.0049), LIGHTER);
+    side(rest.filter((x) => alphaOf(x) > refA + 0.0049), DARKER);
   }
 }
 

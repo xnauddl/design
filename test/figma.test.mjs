@@ -6713,7 +6713,7 @@ test('createTokens · previewCreateTokens — 반투명 Global은 RGBA, 재사�
   assert.deepEqual([...s2.skippedManualNames], ['color/000000-a25']);
 });
 
-test('createUsageRoles — 같은 hex · 다른 투명도는 같은 밝기 이름에 투명도 꼬리(default · default-a8), 별칭은 반투명 Global', async () => {
+test('createUsageRoles — 같은 hex · 다른 투명도는 투명도 단계(default · default-subtle, 12.5), 별칭은 반투명 Global', async () => {
   const figma = installFigma();
   const tokens = [
     { name: 'color/000000', category: 'color', sources: ['stroke'], value: '#000000', uses: [{ name: 'color/border', count: 30 }] },
@@ -6722,14 +6722,14 @@ test('createUsageRoles — 같은 hex · 다른 투명도는 같은 밝기 이�
   const s = await createTokens(tokens, 16);
   const rows = [];
   assert.equal(await createUsageRoles(tokens, true, s.globalOf, rows), 2);
-  assert.deepEqual(rows.map((r) => [r.name, r.token]).sort(), [['color/border/default', 'color/000000'], ['color/border/default-a8', 'color/000000-a8']]);
+  assert.deepEqual(rows.map((r) => [r.name, r.token]).sort(), [['color/border/default', 'color/000000'], ['color/border/default-subtle', 'color/000000-a8']]);
   assert.equal(await createUsageRoles(tokens, false, s.globalOf), 2);
   assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default').id), findVar(figma, 'Global', 'color/000000').id);
-  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default-a8').id), findVar(figma, 'Global', 'color/000000-a8').id);
+  assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/border/default-subtle').id), findVar(figma, 'Global', 'color/000000-a8').id);
   assert.equal(await createUsageRoles(tokens, false, s.globalOf), 0, '다시 돌리면 같은 값 재사용');
 });
 
-test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default · default-a8(투명도 꼬리)', async () => {
+test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default · default-subtle(투명도 단계)', async () => {
   const figma = installFigma();
   await createTokens(
     [
@@ -6743,13 +6743,13 @@ test('bindSelection — 새 역할도 같은 hex · 다른 투명도는 default 
   const dry = await bindSelection(nodes, false);
   const nameOf = (id) => dry.candidates.find((c) => c.nodeId === id).variableName;
   assert.equal(nameOf('a'), 'color/border/default');
-  assert.equal(nameOf('t1'), 'color/border/default-a8');
+  assert.equal(nameOf('t1'), 'color/border/default-subtle');
   await bindSelection(nodes);
   assert.equal(roleTarget(figma, nodes[3].strokes[0].boundVariables.color.id), findVar(figma, 'Global', 'color/000000-a8').id);
   assert.equal(nodes[3].strokes[0].opacity, 0.08);
   // 다음 찾기는 만든 반투명 역할을 쓴다
   const again = await bindSelection([mk('t3', 0.08)], false);
-  assert.equal(again.candidates[0].variableName, 'color/border/default-a8');
+  assert.equal(again.candidates[0].variableName, 'color/border/default-subtle');
 });
 
 test('colorSlotKey · colorRoleBases — 키는 투명도까지, 밝기는 hex로만', () => {
@@ -7169,12 +7169,12 @@ test('A.14 사다리 · inverse · 투명도 — subtle · subtler · subtlest(-
   // inverse 둘 — 이미 있는 inverse 값이 기준
   const inv = A([{ base: 'color/text/inverse', value: '#f5f5f5', count: 5 }], new Map([['color/text/inverse', '#ffffff']]));
   assert.equal(inv['#f5f5f5'], 'color/text/inverse-strong');
-  // 투명도: 불투명 + 8% → N · N-a8, 반투명만 → N-a8
-  assert.deepEqual(A([{ base: 'color/border/default', value: '#000000', count: 30 }, { base: 'color/border/default', value: '#000000@0.08', count: 12 }]), { '#000000': 'color/border/default', '#000000@0.08': 'color/border/default-a8' });
-  assert.deepEqual(A([{ base: 'color/border/default', value: '#000000@0.08', count: 12 }]), { '#000000@0.08': 'color/border/default-a8' });
-  // 파일 기본 이름이 반투명(같은 hex) → 불투명은 default-2 · 파일 subtle = X@50% + 새 불투명 X → subtle-2
-  assert.equal(A([{ base: 'color/border/default', value: '#000000', count: 1 }], new Map([['color/border/default', '#000000@0.08']]))['#000000'], 'color/border/default-2');
-  assert.equal(A([{ base: 'color/text/subtle', value: '#777777', count: 1, refHex: '#000000' }], new Map([['color/text/subtle', '#777777@0.5']]))['#777777'], 'color/text/subtle-2');
+  // 투명도 단계(A.14b): 불투명 + 8% → N · N-subtle, 반투명만 → N
+  assert.deepEqual(A([{ base: 'color/border/default', value: '#000000', count: 30 }, { base: 'color/border/default', value: '#000000@0.08', count: 12 }]), { '#000000': 'color/border/default', '#000000@0.08': 'color/border/default-subtle' });
+  assert.deepEqual(A([{ base: 'color/border/default', value: '#000000@0.08', count: 12 }]), { '#000000@0.08': 'color/border/default' });
+  // 파일 기본 이름이 반투명(같은 hex) → 불투명은 default-strong · 파일 subtle = X@50% + 새 불투명 X → subtle-strong
+  assert.equal(A([{ base: 'color/border/default', value: '#000000', count: 1 }], new Map([['color/border/default', '#000000@0.08']]))['#000000'], 'color/border/default-strong');
+  assert.equal(A([{ base: 'color/text/subtle', value: '#777777', count: 1, refHex: '#000000' }], new Map([['color/text/subtle', '#777777@0.5']]))['#777777'], 'color/text/subtle-strong');
 });
 
 test('A.14 가족 — 꼬리 말 표만, padding-x · -top-left · brand-bold는 가족 아님', () => {
@@ -7288,4 +7288,41 @@ test('A.14 createRole — 같은 Global을 가리켜도 용도가 새 역할 용
   wrong.scopes = ['ALL_SCOPES'];
   const again = await createRole({ name: 'spacing/gap', globalId: g.id, scopes: ['GAP'] }, g);
   assert.equal(again.id, wrong.id, 'ALL_SCOPES면 덮는 것으로 본다');
+});
+
+/* ---------- ia-v3 A.14b — Semantic 투명도 단계 ---------- */
+
+test('A.14b 투명도 단계 — 그림자 2% · 4% · 5% · 넷째는 -subtlest-2 · 말 겹침은 다른 색 자리 먼저 · 자리 되돌림 · 같은 값 · 옛 -a8 재사용 · inverse', () => {
+  const S = 'color/shadow/default';
+  assert.deepEqual(A([['#000000@0.02', 1], ['#000000@0.04', 4], ['#000000@0.05', 3]].map(([value, count]) => ({ base: S, value, count }))), {
+    '#000000@0.04': S, '#000000@0.02': `${S}-subtle`, '#000000@0.05': `${S}-strong`,
+  });
+  const many = A([['#000000@0.1', 9], ['#000000@0.08', 1], ['#000000@0.06', 1], ['#000000@0.04', 1], ['#000000@0.02', 1]].map(([value, count]) => ({ base: S, value, count })));
+  assert.equal(many['#000000@0.02'], `${S}-subtlest-2`);
+  const B = 'color/background/brand';
+  assert.deepEqual(A([['#3d5fdb', 9], ['#3d5fdb@0.5', 3], ['#5576ee', 2]].map(([value, count]) => ({ base: B, value, count }))), {
+    '#3d5fdb': B, '#5576ee': `${B}-subtle`, '#3d5fdb@0.5': `${B}-subtler`,
+  });
+  const fb = A([['#4b5563', 8], ['#7a7a7a', 5], ['#9ca3af', 2], ['#d1d5db', 1], ['#d1d5db@0.5', 1]].map(([value, count]) => ({ base: 'color/text/subtle', value, count, refHex: '#000000' })));
+  assert.equal(fb['#d1d5db'], 'color/text/subtlest-2');
+  assert.equal(fb['#d1d5db@0.5'], 'color/text/subtlest-subtle-2');
+  // 자리 기준과 같은 값 · 재사용 불가 → N-2
+  assert.equal(A([{ base: S, value: '#000000@0.04', count: 1 }], new Map([[S, '#000000@0.04']]), { canReuse: () => false })['#000000@0.04'], `${S}-2`);
+  // 예전 구현의 default-a8이 같은 값이면 재사용(가족)
+  assert.equal(A([{ base: 'color/border/default', value: '#000000@0.08', count: 1 }], new Map([['color/border/default', '#000000'], ['color/border/default-a8', '#000000@0.08']]))['#000000@0.08'], 'color/border/default-a8');
+  // inverse 반투명 → inverse-subtle
+  assert.deepEqual(A([{ base: 'color/text/inverse', value: '#ffffff', count: 5 }, { base: 'color/text/inverse', value: '#ffffff@0.6', count: 1 }]), { '#ffffff': 'color/text/inverse', '#ffffff@0.6': 'color/text/inverse-subtle' });
+  assert.equal(familyRe('color/border/default', 'default').test('color/border/default-subtle'), true);
+  assert.equal(familyRe('color/border/default', 'default').test('color/border/default-a8'), true);
+});
+
+test('A.14b 만들기 경로 — createUsageRoles 그림자 2% · 4% · 5% → default · default-subtle · default-strong', async () => {
+  const figma = installFigma();
+  const tok = (a, count) => ({ name: `color/000000-a${Math.round(a * 100)}`, category: 'effectColor', sources: ['effectColor'], value: '#000000', alpha: a, uses: [{ name: 'color/shadow', count }] });
+  const tokens = [tok(0.02, 1), tok(0.04, 4), tok(0.05, 3)];
+  const s = await createTokens(tokens, 16);
+  assert.equal(await createUsageRoles(tokens, false, s.globalOf, undefined, s.finalName), 3);
+  for (const [name, a] of [['color/shadow/default', 4], ['color/shadow/default-subtle', 2], ['color/shadow/default-strong', 5]]) {
+    assert.equal(roleTarget(figma, findVar(figma, 'Semantic', name).id), findVar(figma, 'Global', `color/000000-a${a}`).id, name);
+  }
 });
