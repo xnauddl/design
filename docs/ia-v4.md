@@ -104,7 +104,7 @@
 - **카드가 아닌 것**(카드 안에 있어도 된다):
   - 조작 요소: 입력 칸 · 고르개 · 버튼 · 스위치 · 체크박스 · 탭 고르개(`.tabs`).
   - 글 줄 안의 작은 표시: 칩 · 배지 · 알약 · 태그 · 색 견본 · 진행 막대(예: `.r-badge` · `.tag` · `.r-swatch` · `.bv-chip` · `.bar`).
-  - 테두리가 없는 배경 띠: 배경과 둥근 모서리만 있는 것(지금 쓰는 예: 만들기 무료 안내 `.make-free` · 상세 팝업 알림 `.ed-alert` · 트리 머리 띠 `.tr-group`).
+  - 테두리가 없는 배경 띠: 배경만 있거나 배경과 둥근 모서리만 있는 것(지금 쓰는 예: 만들기 무료 안내 `.make-free` · 상세 팝업 알림 `.ed-alert` · 트리 머리 띠 `.tr-group`).
   - 배경이 없는 점선 빈 자리: 연결 · 이름 정리 · 만들기 화면의 빈 상태(`.bind-empty` — `#bindEmpty` · `#renameEmpty` · `#makeEmpty`). 정의의 "배경색이 따로 있는"에 들지 않는다.
 - **카드 안에서 쓰는 모양**
   - **목록 행**: 카드 모양 대신 **아래 구분선 한 줄**로 나눈다(§2.7 트리 줄과 같은 문법). 테두리 · 둥근 모서리 · 행 배경은 없고, 행 사이 틈도 없다. 마지막 행도 구분선을 둔다.
@@ -803,11 +803,11 @@
 - [ ] 목록 행(`.r-card` — `resultCard` 하나가 만든다): 테두리 · 둥근 모서리 · 배경을 없애고 아래 구분선 한 줄(1px `--border`), 최소 높이 30px, 안쪽 여백 `6px 2px 6px 2px`. `.results`의 행 사이 틈 0. 흐리게(`.r-card.dim`)와 행 안의 내용 · 배지(`.r-badge`)는 그대로
 - [ ] 컴포넌트 트리의 들여쓰기(`makeTreeRow` · 그룹 머리 — `ui.ts`의 `style.marginLeft = indent` 4곳)를 왼쪽 안쪽 여백으로 바꿔 구분선이 카드 안 폭 전체에 그어지게(깊이 값은 그대로 — 2px에 더한다)
 - [ ] 안내 · 진행 · 오류 상자(`.banner` · `.tidy` · `.ux` · `.ux.danger`): 테두리만 없앰(배경 · 글자색 · 둥근 모서리 · 여백 그대로). `.ux.danger`의 `border-color`도 지움
-- [ ] 쓰지 않는 CSS 지움: `.bv-card` 계열(`.bv-card` · `.bind-v4 .bv-card` · `.bv-card.off …` — `ui.ts`가 만들지 않는다). 이 규칙의 좋은 예로 오해되지 않게
+- [ ] 쓰지 않는 CSS 지움(`ui.ts`가 만들지 않는다 — 이 규칙의 좋은 예로 오해되지 않게): `.bv-card` · `.bind-v4 .bv-card` · `.bv-card.off` 규칙들 · `.bind-list` · `.bv-head` · `.bv-places` · `.bv-place` · `.bv-ic` · `.bv-prop` · `.bv-layer` · `.bind-v4 .bv-kind` · `.bv-allrow` · `.bd-roles`
 - [ ] 주석 고침(§2.8에 맞게): `ui.html` "결과 행 = 얇은 카드(#18)" · "카드가 아니라 한 줄" · "카드 폭을 밀지 않게" · "카드가 grid라", `ui.ts` "#18: 결과 행 = 얇은 카드" · "흐린 카드 + 사유" · "#18: 트리 = 그룹 헤더 + 자식 카드"
 - [ ] 옛 기록에 한 줄: `REDESIGN.md` 281행 근처 · `ROADMAP.md` #18에 "행 모양은 ia-v4 §2.8이 대체(2026-11-10)"
 - [ ] 바꾸지 않는 것 확인: `.step` · `.sel-card` · `.modal` · 떠 있는 층(`.popover` · `.ctx-menu` · `#uiTip` · `.ed-picker`) · `.tree .tr` · `.tr-group` · `.bind-empty` · 조작 요소
-- [ ] 테스트(verify) — 화면을 먼저 채운다: 색 · 토큰(추출 결과 + 토큰 미리보기 `CREATE_RESULT`, 색 안내 `#tokenColorNote`, 격자 정리 요약 `#numTidySummary`) · 타이포(텍스트 스타일 후보) · 컴포넌트(`#compTree` · 닮은 스캔 결과 `#similarList` · 베리언트 리포트 `#variantReport`) · 연결(`#applyProgress`) · 설정 › 라이선스 오류 · 내보내기 팝업 오류(op별 `ERROR`). 화면마다 "행 ≥1개 · 상자가 보임"을 먼저 확인한다
+- [ ] 테스트(verify) — 화면을 먼저 채운다: 색 · 토큰(추출 결과 + 토큰 미리보기 `CREATE_RESULT`, 색 안내 `#tokenColorNote`, 격자 정리 요약 `#numTidySummary`) · 타이포(텍스트 스타일 후보) · 컴포넌트(`#compTree` · 닮은 스캔 결과 `#similarList` · 베리언트 리포트 `#variantReport`) · 연결(`#applyProgress`) · 설정 › 라이선스 오류 · 내보내기 팝업 오류(op별 `ERROR`) · 선택 탭 첫 화면(카드 1~3이 보이는 상태) · 상세 팝업(별칭 고르개를 펼친 상태). 화면마다 "행 ≥1개 · 상자가 보임"을 먼저 확인한다
 - [ ] 테스트(verify) — 행 모양: 화면마다 첫 `.r-card`가 아래 테두리 1px · 모서리 0 · 배경 투명, `.results`의 `row-gap` 0. 상자(`.banner` · `.tidy` · `.ux` · `.ux.danger`)는 테두리 폭 0
-- [ ] 테스트(verify) — 카드 안 카드 0: 위 화면에서 포커스를 뺀 뒤(`document.activeElement.blur()`), 카드(`.step` · `.sel-card` · `.modal`) 안의 보이는 요소 중 "테두리(폭 > 0, 투명 아님)나 그림자 + 둥근 모서리 > 0 + 투명하지 않은 배경"을 모두 가진 것이 0개. 뺄 것(셀렉터): `button` · `input` · `select` · `textarea` · `.tabs` · `.r-badge` · `.tag` · `.r-swatch` · `.swatch` · `.palette-row i` · `.bv-chip` · `.bv-sw` · `.bv-track` · `.bar` · `.tr-skel` · `.alias-pill` · `.vp-item` · `.tier-chip` · `.chip` · `.ed-field` · `.ed-picker` 와 그 안
+- [ ] 테스트(verify) — 카드 안 카드 0: 위 화면에서 포커스를 뺀 뒤(`document.activeElement.blur()`), 카드(`.step` · `.sel-card` · `.modal`) 안의 보이는 요소 중 "테두리(폭 > 0, 투명 아님)나 그림자 + 둥근 모서리 > 0 + 투명하지 않은 배경"을 모두 가진 것이 0개. 뺄 것(셀렉터): `button` · `input` · `select` · `textarea` · `.tabs` · `.r-badge` · `.tag` · `.r-swatch` · `.swatch` · `.palette-row i` · `.bv-chip` · `.bv-sw` · `.bv-track` · `.bar` · `.tr-skel` · `.alias-pill` · `.vp-item` · `.tier-chip` · `.chip` · `.ed-field` · `.bf-swatch` · `.ed-picker` — 각 셀렉터와 그 자손을 모두 뺀다
 - [ ] 화면 시안(바뀌는 화면 전 · 후)을 사용자에게 확인받은 뒤 구현 · 실제 화면 스크린샷 대조 · Figma 실기 확인
