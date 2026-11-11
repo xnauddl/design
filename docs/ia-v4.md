@@ -343,7 +343,7 @@
     - **후보 읽기:** 추출과 같은 때(들어올 때 · 기준이 바뀌어 250ms 뒤 · 창에 다시 들어올 때, 조용한 읽기 · 300개 규칙 — §2.6) `SCAN_TEXT_STYLES{reqId, nodeIds(기준)}` → `TEXT_STYLE_CANDIDATES{reqId, styles}`. reqId 응답은 이 화면만 받는다(타이포 표 `tsSpecs` · `#tsStatus` · 마지막 스캔 nodeIds 기억을 바꾸지 않고, 코드는 reqId 스캔으로 `lastTextSamples`를 덮어쓰지 않는다). 후보가 0개면 텍스트 스타일 탭을 숨긴다. 응답 전에는 탭 개수 자리에 "…", 탭 안에는 "세는 중…".
     - **이름 고치기:** 이름을 더블클릭하거나 그 줄에서 Enter · F2를 누르면 그 자리에서 글자 칸이 된다(칸 폭 = 이름 자리, 값 요약은 그대로). Enter · 칸 밖 클릭 = 저장, Esc = 취소. 앞뒤 공백은 지운다. 빈 이름이면 저장하지 않고 원래 이름으로 되돌린다. 켠 줄끼리 이름이 같으면 두 줄 이름을 주황 테두리로 보이고 실행 버튼은 `aria-disabled`(사유 "스타일 이름이 겹쳐요"). 켠 줄의 이름이 **값이 다른 기존 로컬 스타일**의 이름과 같아도 같은 모습으로 잠근다(사유 "이미 있는 스타일 이름이에요") — 등록이 그 스타일의 값을 덮어써 그 스타일을 쓰는 다른 레이어 모습이 바뀌기 때문이다(`createSemanticTextStyles`의 이름 찾기). 이를 위해 reqId 스캔 응답에 기존 로컬 스타일 목록을 싣는다: `TEXT_STYLE_CANDIDATES{reqId, styles, existing: {name, sig}[]}`(새 필드, sig = `tsSig`와 같은 값 열쇠 — 공용 함수로 뺀다). 그 줄의 `boundStyleId` 스타일 이름과 같은 경우("있음" 줄이 원래 이름을 쓸 때)는 잠그지 않는다. 이 두 사유(겹침 · 이미 있는 이름) 중 하나로 잠겼고 사용자가 다른 만들기 탭(Global · Semantic)을 보고 있으면 텍스트 스타일 탭 이름 뒤에 주황 점(6px, `aria-label` = 그 잠금 사유 문구 — `make.tsDup` · `make.tsExists`)을 붙인다 — 잠금 사유를 탭을 열지 않아도 알 수 있게.
     - **이름 고치기와 실행 · 다시 읽기:** 실행 중에는 이름 고치기도 잠근다. 실행 버튼을 누를 때 칸이 열려 있으면 먼저 저장(위 규칙)한 뒤 잠금 조건을 다시 보고 실행한다. 고치는 동안 후보 응답이 오면 칸을 닫을 때까지 미뤄 두고, 닫은 뒤 `tsSig`로 이어받아 다시 그린다. 고친 이름은 같은 후보(값이 같음 — `tsSig`)면 다시 읽어도 이어받는다. 스위치 이어받기도 같은 열쇠. 더 세밀한 이름 작업(왼쪽 글자로 이름 채우기)은 값을 직접 고르기 › 타이포에서.
-  - 탭 패널 아래 한 줄(트리 밖, 모든 만들기 탭에 공통): "팔레트 생성 · 격자 정리 · Semantic 직접 지정 · 왼쪽 글자로 이름 짓기는 [값을 직접 고르기 →]"(`make.more` — 2026-11-11 UX 검수 C: 테마(다크)는 "만든 뒤 › 다크 모드", 타이포(스타일 등록)는 Text Style 탭이 이미 하므로, 이 화면에 없는 일만 적는다. 480px에서 두 줄이 될 수 있다 — 흐름 안의 줄이라 받아들임).
+  - 탭 패널 아래 한 줄(트리 밖, 모든 만들기 탭에 공통): "팔레트 생성 · 격자 정리 · Semantic 직접 지정 · 왼쪽 글자로 이름 짓기는 [값을 직접 고르기 →]"(`make.more` — 2026-11-11 UX 검수 C: 테마(다크)는 "만든 뒤 › 다크 모드", 타이포(스타일 등록)는 Text Style 탭이 이미 하므로, 이 화면에 없는 일만 적는다. 480px에서 두 줄이 될 수 있다 — 흐름 안의 줄이라 받아들임, 2026-11-11 사용자 확인).
 
 | 종류 머리(보이는 이름 — §2.7) | 추출 분류(TokenCategory) |
 |---|---|
@@ -505,7 +505,7 @@
 
 **3. 카드 접기 화살표 숨김**
 - 값을 직접 고르기 안 카드(`#varMake .step`)는 접지 않는다. `applyCardChrome`은 이 카드들에도 머리(`.step-head` — sticky 고정 · 높이 재기에 쓴다)를 만들되 ›(`.chev`)를 넣지 않고 머리 누름 토글도 걸지 않는다(커서 기본 — `cursor: pointer`를 빼는 클래스, 예 `.step-head.no-fold`). `.collapsed`가 붙을 길이 없다.
-- 다른 화면의 카드(컴포넌트 · ⚙ 설정)의 접기는 그대로다(이번 범위 밖).
+- 다른 화면의 카드(컴포넌트 · ⚙ 설정)의 접기는 그대로다(이번 범위 밖 — 2026-11-11 사용자 확인).
 
 **4. ×n 표기 없앰 — "Layer {n}"**
 - **색 목록** 줄 요약 "#2563EB · 6× 사용" → "#2563EB · Layer 6". 만들기 화면 줄 숫자와 같은 키 `make.layers` "Layer {n}"을 쓴다(같은 뜻 — 그 값을 쓰는 레이어 수, 토큰 `count`). `color.usedCount`는 지운다. `count`가 없으면(팔레트 색) 꼬리 없음 — 지금 그대로.
@@ -564,7 +564,8 @@
 
 빈 상태(후보 · 닮은 프레임 없음): [컴포넌트 후보 찾기]가 주 버튼, [등록] · [하나의 컴포넌트로 합치기]는 잠금. 머리 띠 · 목록은 숨김(지금 그대로).
 
-- **문구(i18n, 지금 → 바뀜).** 해요체. 결과 줄 `component.registered`("컴포넌트 {total} (세트 {sets} · 단일 {singles})")와 진단 `component.fail.*`(결정 ⑨ — 내부 말 그대로)은 이번에 바꾸지 않는다.
+- **문구(i18n, 지금 → 바뀜).** 해요체. 결과 줄 · 닮은 프레임 문구도 배지와 같은 말로 맞춘다(2026-11-11 사용자 결정 "같이 맞춤" — "세트 · 단일" → "변형 세트 · 컴포넌트", 닮은 프레임의 "마스터" → "원본"). 진단 `component.fail.*`(결정 ⑨ — 내부 말 그대로)과 [등록]의 툴팁 `component.registerHelp`("원본의 연결과 값은 마스터를 따라요" — 여기 "원본"은 등록 전 레이어라 "마스터"를 바꾸면 뜻이 겹친다), `extract.skipInstance`는 그대로다.
+- **버튼 배치**는 지금 두 줄 그대로다(찾기 둘 / 실행 둘 — 2026-11-11 사용자 확인, 화면 재구성은 다음 PR).
 
 | 키 | 지금 | 바뀜 |
 |---|---|---|
@@ -592,6 +593,11 @@
 | `component.headMissing` | 빈 조합(미생성): | 빈 변형 |
 | `component.headIssue` | 처리 중 문제 {n}건: | 처리 중 문제 |
 | `component.noChecked` | 체크한 후보가 없어요 — 묶을 항목을 체크하세요 | 등록할 후보를 체크해 주세요 |
+| `component.registered` | 컴포넌트 {total} (세트 {sets} · 단일 {singles}){extraPart} | 컴포넌트 {total} (변형 세트 {sets} · 컴포넌트 {singles}){extraPart} |
+| `component.extraSingles` | · 단일 {n} | · 컴포넌트 {n} |
+| `similar.componentizeHelp` | 마스터를 컴포넌트로, 나머지는 인스턴스로 바꿔요. 원본의 연결과 값은 마스터를 따라요. | 고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요. |
+| `similar.resMaster` | 마스터 {name} | 원본 {name} |
+| `similar.noMaster` | 마스터 프레임을 찾을 수 없어요. | 원본 프레임을 찾을 수 없어요. |
 | `similar.needScan` | 먼저 ‘닮은 스캔’으로 묶을 프레임과 마스터를 고르세요. | 먼저 ‘닮은 프레임 찾기’를 눌러 주세요 |
 | `component.needScan` (새) | — | 먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요 |
 | `component.fromName` (새) | — | 원래 이름 {name} |
@@ -1035,7 +1041,7 @@
 - [ ] "Layer {n}"(§4.3a-4): `renderColorTable` 요약 꼬리 → `' · ' + t('make.layers')`, `makeTokenRow` meta → `t('make.layers')`, 흐린 줄 요약 끝 `create.onceTail`(새 " · 한 곳에만 쓰임"). 키: `color.usedCount` 지움, `create.dropOnce` · `create.dropOnceTip` · `create.onceOff` · `create.onceNone` 글 바꿈, `ui.html` `btnTokenDropOnce`의 기본 글 · `title`도
 - [ ] 빈 상태 잠금 · 주 버튼(§4.3a-5): 판정 함수(`updateEmptyLocks` 같은 이름) — `btnColorVars` · `btnTextStyles` · `btnRegisterComp` · `btnComponentize`에 `setLock(…, 'prereq', 사유)`(무료면 `'paid'`가 먼저), `primary` 옮김(색: `btnExtract` ↔ `btnColorVars`, 토큰: `btnCreate` ↔ `btnCreateApply`, 타이포: `btnScanText` ↔ `btnTextStyles`, 컴포넌트: `btnScanComp` → `btnRegisterComp` → `btnComponentize` 순 판정 — `ui.html`의 고정 `class="primary"`는 판정이 덮음). 부르는 곳: `updateGates` 끝 · 추출 결과 · 팔레트 만들기 · 색 표 · 타이포 표 · 후보 트리 · 체크 바꿈 · `clearCompPreview` · `renderSimilar` · 합친 뒤 비움. 닮은 프레임을 찾은 적 있는지(사유 `similar.needTwo` ↔ `needScan`) 기억 변수
 - [ ] 클릭 처리기 정리: `btnColorVars`의 `needColors` 경고 · `btnRegisterComp`의 `noChecked` 경고와 **`nodeIds` 없이 보내는 else 갈래** · `btnComponentize`의 `needScan` · `needScanAfterComp` 경고 지움(`btnTextStyles`의 `needSpecs` 검사는 남김). 플러그인 쪽 `REGISTER_COMPONENTS`(nodeIds 없음) 처리 · figma 테스트는 그대로. 새 키 `component.needScan`, 글 바꿈 `color.needColors` · `component.noChecked` · `similar.needScan`, 지움 `similar.needScanAfterComp`
-- [ ] 컴포넌트 문구(§4.3a-6 표) — `i18n.ts` · `ui.html` 기본 글(`btnScanComp` · `btnScanSimilar` · `btnComponentize` · `btnClassifyVariants` · `btnGenMissing` · `component.hint` 줄)
+- [ ] 컴포넌트 문구(§4.3a-6 표) — `i18n.ts` · `ui.html` 기본 글(`btnScanComp` · `btnScanSimilar` · `btnComponentize` · `btnClassifyVariants` · `btnGenMissing` · `component.hint` 줄 · `btnComponentize`의 `data-tip` = `similar.componentizeHelp`). 결과 줄 `component.registered` · `component.extraSingles`, 닮은 프레임 `similar.componentizeHelp` · `similar.resMaster` · `similar.noMaster`(2026-11-11 사용자 결정 "같이 맞춤"). 코드 주석의 "(세트 · 단일)"도 맞춘다
 - [ ] 컴포넌트 제목 줄 · 머리 띠(§4.3a-6): `ui.html` h2의 `#compCount` · `#similarCount` · `#componentCount` · `structure.scope` span 지움, `#compTreeGroup` · `#similarGroup` → `r-group r-ghead` + 이름 span + 개수 span(`tree.count`), `updateCompRegister` · `clearCompPreview` · `renderSimilar` · 합친 뒤 비움이 개수 span을 씀. `renderVariantReport` — `VariantReportSection.tag` 지움, `head`는 이름 + 개수, 구분줄 = 머리 띠 + 개수 span. CSS: 머리 띠 안 개수(`.tr-cnt`와 같은 값), `#variantReport .r-ghead` 본문 글꼴, `#variantReport .r-title` 굵기 400. 키 지움: `component.count` · `similar.count` · `component.tagMissing` · `component.tagIssue` · `component.tagAdded` · `component.tagCount` · `structure.scope` · `component.changeProps`
 - [ ] 후보 줄 이름(§4.3a-6): `compRows` → 제목(세트 이름 + 회색 변형 · 단일 이름 · 재사용 이름) · 둘째 줄 `component.fromName`(레이어 이름이 다를 때만) · 툴팁 "{레이어} → {제목}", `makeTreeRow`의 `replace === false` 갈래만(`TreeRow`에 필드가 필요하면 더함)
 - [ ] 입구 문구 `make.more`(§4.3 "탭 패널 아래 한 줄") — `i18n.ts` · `ui.html` `#makeMore` 기본 글
@@ -1046,6 +1052,8 @@
   - 블록 7("‘다음 →’ 오른쪽 끝" · 가로 스크롤 없음) → 지움. 가로 스크롤 검사는 아래 새 탭 검사로 옮김
   - 블록 10 516행 `#makeRail [data-make-step="theme"]` — 선택자는 그대로 동작(id · 속성을 남김). 610–614행 무료 `btnColorVars` 유료 사유 — 그대로(유료 잠금이 먼저)
   - 블록 13 1148행 배지 `'단독'` → `'컴포넌트'`
+  - 블록 13 결과 줄 정확 문구(2026-11-11 "같이 맞춤"): 1115행 주석 "(세트 · 단일)" → "(변형 세트 · 컴포넌트)", 1119–1120행 `'컴포넌트 1 (세트 0 · 단일 1) · '` → `'컴포넌트 1 (변형 세트 0 · 컴포넌트 1) · '`, 단일 꼬리 없음 검사 `split('단일').length === 2` → 괄호 뒤에 " · 컴포넌트 1" 꼬리가 없음(`!s1.text.includes(') · 컴포넌트 ')`), 1126행 `'컴포넌트 11 (세트 7 · 단일 4) · 속성 3'` → `'컴포넌트 11 (변형 세트 7 · 컴포넌트 4) · 속성 3'`, 1129행 `'컴포넌트 0 (세트 0 · 단일 0) · 기존 컴포넌트 재사용 1: ItemButton'` → `'컴포넌트 0 (변형 세트 0 · 컴포넌트 0) · 기존 컴포넌트 재사용 1: ItemButton'`. 13의 [합치기] 결과 검사(1111 · 1114)는 "마스터"를 보지 않아 그대로
+  - 새: `VARIANTS_RESULT`(단일 1) 상태 줄 꼬리 " · 컴포넌트 1" · `COMPONENTIZE_RESULT` 상태 줄 "원본 Card · …" · [하나의 컴포넌트로 합치기] 툴팁에 "마스터" 없음
   - 블록 17 1236행 "Text Style 탭 요약 끝 ○" → "Text Style 탭 줄에 `.ts-off` 없음 · 요약은 `tsSummary` 글 그대로"
   - 블록 19 1410–1415행(표시 "○ KRDS 밖" · "⚠ 소수 크기" · `has-off` · 상태 줄 꼬리) → `#tsList .ts-off` 0개 · `.r-top.has-off` 0개 · 13.5 줄에도 [삭제]가 같은 줄(크기 칸 뒤 정렬 그대로) · `#tsStatus`가 " · KRDS 밖"을 담지 않음. 1422–1424 · 1443행 `TS_RENAME_PLAN` 줄에서 `fontSize` · `offScale` · `nearest` 지움, 1430행 "소수 크기 줄 끝 ⚠" → 팝업 `.ts-off` 0개
   - 블록 22 1625행 "`#compTreeGroup`은 작은 라벨(배경 투명)" → 머리 띠(`--surface-2` · 높이 ≥ 32) + "컴포넌트 후보" · "2개". 1703행 `[data-make-step="token"].step-chip` → `#makeRail [data-make-step="token"]`
