@@ -143,7 +143,7 @@
 - **역할 변수도 함께:** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 `font-size/{이름}` · `line-height/{이름}` · `letter-spacing/{이름}`(3종 — `variables.ts createSemanticTextStyles`)를 플러그인 Semantic 컬렉션(`ownedCollection('semantic')`) 안에서 `{from}` → `{to}`로 바꾼다. 사용자 컬렉션 · 직접 만든 변수(`dsl.manual` — `isManualVar`, variables.ts)는 건드리지 않는다. 지금 등록 경로의 `roleRenames`는 직접 만든 변수를 거르지 않으므로, 이번에 함께 걸러지게 바뀐다(동작 변경). 역할 변수도 스타일과 **같은 방식**(최종 이름 집합 · 고정점 · 임시 이름 2단계 · 실패 시 되돌림)으로 바꾼다 — 최종 집합 밖의 다른 변수와 이름이 겹치는 변수만 건너뛰고 `roleVarsTaken`에 센다(그 스타일은 옛 이름의 변수에 묶인 채로 남는다). 지금 `createSemanticTextStyles` 안의 `roleRenames` 처리를 이 방식의 공용 함수 `renameTextRoleVars(pairs)`로 바꿔 두 경로가 함께 쓴다.
 - **두 경로의 순서가 다르다:**
   - 이름 다시 짓기: 스타일 이름을 모두 바꾼 **뒤** `status: 'renamed'`인 항목의 변수만 바꾼다(위).
-  - 등록(`createSemanticTextStyles` — 앵커 rename): 지금처럼 0단계에서 변수 이름을 **먼저** 바꾼다 — 3단계 루프가 `font-size/{style.name}`(새 이름)으로 변수를 찾아 붙이므로. 그 뒤 3단계에서 그 스타일의 이름 바꾸기가 끝나지 않으면(`missRename`으로 보류 · 행이 `missError`로 이름을 쓰기 전에 빠짐) 그 스타일의 변수를 `renameTextRoleVars`로 **되돌린다**(`to` → `from`) — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게. 되돌림이 실패한 변수는 missing에 `textStyle.missRoleStuck`(새 키 "{name}: 역할 변수 이름을 되돌리지 못했어요 — {vars}")로 남긴다. `missFontKeep`은 이름은 바꾸므로 되돌리지 않는다.
+  - 등록(`createSemanticTextStyles` — 앵커 rename): 지금처럼 0단계에서 변수 이름을 **먼저** 바꾼다 — 3단계 루프가 `font-size/{style.name}`(새 이름)으로 변수를 찾아 붙이므로. 그 뒤 3단계에서 그 스타일의 이름 바꾸기가 끝나지 않으면(`missRename`으로 보류 · 행이 `missError`로 이름을 쓰기 전에 빠짐) 그 스타일의 변수를 `renameTextRoleVars`로 **되돌린다**(`to` → `from`) — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게. 되돌림이 실패한 변수는 missing에 `textStyle.missRoleStuck`(새 키 "{name}: Semantic 변수 이름을 되돌리지 못했어요 — {vars}")로 남긴다. `missFontKeep`은 이름은 바꾸므로 되돌리지 않는다.
 - ⌘Z 한 번(스타일 · 변수 이름을 한 묶음 — `commitUndo`).
 - 결과(상태 줄): "텍스트 스타일 {renamed}개 이름을 바꿨어요 · ⌘Z로 되돌리기" + 건너뛴 것이 있으면 " · 건너뜀 {skipped}"(툴팁에 사유별 수) + " · 역할 변수 {roleVarsTaken}개는 같은 이름이 있어 그대로 뒀어요"(있을 때) + " · 역할 변수 {roleVarsError}개는 바꾸지 못했어요"(있을 때, 툴팁에 되돌리지 못한 변수의 지금 이름).
 
@@ -166,7 +166,7 @@
 | `textStyle.renameMenu` (새) | — | "텍스트 스타일 이름 다시 짓기…" |
 | `textStyle.renameReading` (새) | — | "스타일을 읽는 중…" |
 | `op.tsRename` (새) | — | "텍스트 스타일 이름 바꾸기" |
-| `textStyle.missRoleStuck` (새) | — | "{name}: 역할 변수 이름을 되돌리지 못했어요 — {vars}" |
+| `textStyle.missRoleStuck` (새) | — | "{name}: Semantic 변수 이름을 되돌리지 못했어요 — {vars}" |
 | `textStyle.renameHead` (새) | — | "이름 다시 짓기 · 바꿀 이름 {n}개" |
 | `textStyle.renameNone` (새) | — | "바꿀 이름이 없어요" |
 | `textStyle.renameApply` (새) | — | "{k}개 이름 바꾸기" |
@@ -174,8 +174,8 @@
 | `textStyle.renameClash` (새) | — | "같은 이름이 남아요" |
 | `textStyle.renamed` (새) | — | "텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기" |
 | `textStyle.renameSkipped` (새) | — | " · 건너뜀 {m}" |
-| `textStyle.renameRoleSkipped` (새) | — | " · 역할 변수 {n}개는 같은 이름이 있어 그대로 뒀어요" |
-| `textStyle.renameRoleError` · `renameRoleStuck` (새) | — | " · 역할 변수 {n}개는 바꾸지 못했어요" · "되돌리지 못한 변수: {names}" |
+| `textStyle.renameRoleSkipped` (새) | — | " · Semantic 변수 {n}개는 같은 이름이 있어 그대로 뒀어요" |
+| `textStyle.renameRoleError` · `renameRoleStuck` (새) | — | " · Semantic 변수 {n}개는 바꾸지 못했어요" · "되돌리지 못한 변수: {names}" |
 | `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` · `error-chain` · `error-stuck` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" · "연결된 항목 오류로 되돌림" · "되돌리지 못함 · 지금 이름 {name}" |
 | `textStyle.renameClearedTable` (새) | — | " · 스캔 표를 비웠어요 — 다시 [스캔]해 주세요" |
 | `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` (새) | — | "소수 크기" · "KRDS 밖" · "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · " · KRDS 밖 크기 {k}개(소수 {m})" |
