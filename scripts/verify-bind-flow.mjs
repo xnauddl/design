@@ -122,6 +122,29 @@ const VARS = [
   { id: 'tx', name: 'color/text/default', collectionId: 's', type: 'COLOR', values: { l: { kind: 'alias', aliasId: 'g9', aliasName: 'color/gray/900' }, d: { kind: 'alias', aliasId: 'g0', aliasName: 'color/gray/0' } }, scopes: [], description: '' },
 ];
 const usageResult = (reqId, usage, extra = {}) => ({ type: 'USAGE_RESULT', reqId, usage, libraryVars: [], deleted: { count: 0, nodeIds: [] }, scanned: 40, ...extra });
+/** 카드 안 카드 찾기(ia-v4 §2.8 · B.12) — 보이는 카드(.step · .sel-card · .modal) 안에서 테두리나 그림자 + 둥근 모서리 + 배경을 모두 가진 요소. */
+const nestedCards = (p) => p.evaluate(() => {
+  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker';
+  document.activeElement?.blur?.();
+  const clear = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
+  const isCard = (e) => {
+    const s = getComputedStyle(e);
+    const border = ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && !clear(s[`border${k}Color`]));
+    const shadow = s.boxShadow && s.boxShadow !== 'none';
+    const round = ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].some((k) => parseFloat(s[`border${k}Radius`]) > 0);
+    return (border || shadow) && round && !clear(s.backgroundColor);
+  };
+  const bad = [];
+  for (const card of document.querySelectorAll('.step, .sel-card, .modal')) {
+    if (!card.getClientRects().length) continue;
+    for (const e of card.querySelectorAll('*')) {
+      if (!e.getClientRects().length || e.closest(EX)) continue;
+      if (isCard(e)) bad.push(`${e.tagName.toLowerCase()}.${[...e.classList].join('.')}#${e.id}`);
+    }
+  }
+  return bad;
+});
+const rowShape = (p, s) => p.$eval(s, (e) => { const c = getComputedStyle(e); return { top: c.borderTopWidth, bottom: c.borderBottomWidth, radius: c.borderTopLeftRadius, bg: c.backgroundColor, minH: c.minHeight, pl: c.paddingLeft }; });
 const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset.id));
 /** 사이드바 항목 [이름, 숫자] (결정 B). */
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
@@ -1048,6 +1071,8 @@ async function saveAndGet(p) {
   await p.click('.modal button[aria-label="Dark 별칭 고르기"]');
   const o3 = await names();
   check('12b 지금 대상이 용도 밖 → 처음부터 다른 용도도 보임 · 제자리에 ✓ + "용도 다름"(맨 위 ✓ 줄 없음)', (await p.textContent('.ed-plink')) === '용도가 맞는 변수만 보기' && o3.filter((x) => x.includes('✓')).length === 1 && o3.some((x) => x.includes('14') && x.includes('용도 다름') && x.includes('✓')) && !(await p.textContent('.ed-picker')).includes('규칙 밖'), JSON.stringify(o3));
+  const badPicker = await nestedCards(p);
+  check('B.12 카드 안 카드 0 — 상세 팝업(별칭 고르개 펼침 · 고르개 층은 뺌)', badPicker.length === 0, badPicker.join(' · '));
   // 배경 누름 → 고르개만 닫고 팝업은 그대로
   await p.mouse.click(5, 5);
   check('12b 배경 누름 → 고르개만 닫힘 · 팝업 그대로', (await p.$$('.ed-picker')).length === 0 && (await p.$('.modal')) !== null);
@@ -1192,6 +1217,7 @@ async function saveAndGet(p) {
   const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
   check('17 들어오면 추출 + 텍스트 스타일 후보(조용한 읽기 · 기준 nodeIds · reqId)', ex?.nodeIds?.[0] === 'w1' && typeof ex?.reqId === 'number' && sc?.nodeIds?.[0] === 'w1' && typeof sc?.reqId === 'number' && !(await visible(p, '#applyProgress')));
   check('17 읽는 중 — 위 줄 "선택을 읽는 중…" · 버튼 잠금', (await p.textContent('#makeTopText')) === '선택을 읽는 중…' && (await locked(p, '#btnMakeRun')));
+  check('B.12 읽는 중 자리 줄은 머리 띠 없음(배경 투명)', await p.$$eval('#makeTree .tr.tr-head', (e) => e.length > 0 && e.every((r) => !r.classList.contains('tr-group') && getComputedStyle(r).backgroundColor === 'rgba(0, 0, 0, 0)')));
   check('17 머리 "← 변수 만들기" · 오른쪽 "Card에서 찾은 값"', (await p.textContent('#subTitle')) === '변수 만들기' && (await p.textContent('#subRight')) === 'Card에서 찾은 값');
   await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
     { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 },
@@ -1200,6 +1226,7 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(50);
   const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  check('B.12 만들기 트리 머리 줄 = 회색 머리 띠', await p.$$eval('#makeTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)')));
   check('17 만들 수 미리보기 — preview · reqId · 켠 줄만(글자 종류는 기본 끔)', pv?.preview === true && typeof pv.reqId === 'number' && JSON.stringify(pv.tokens.map((x) => x.name)) === JSON.stringify(['spacing/16', 'spacing/8']), JSON.stringify(pv?.tokens?.map((x) => x.name)));
   await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 1, updated: 0, summary: '', roles: 1, skippedManual: 0,
     tokenStates: { 'spacing/16': { state: 'new' }, 'spacing/8': { state: 'update' } }, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
@@ -1350,6 +1377,7 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(30);
   const rows = await p.$$eval('#renameTree .tr', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+  check('B.12 이름 정리 트리 머리 줄 = 회색 머리 띠 · 맥락 머리 이름은 회색 그대로', await p.$$eval('#renameTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)') && e.filter((h) => h.querySelector('.tr-name.muted')).every((h) => getComputedStyle(h.querySelector('.tr-name.muted')).color === 'rgb(94, 99, 107)')));
   check('18 소속 트리 — 그대로 조상 머리 "Product card 2개" · 바꿀 줄 · 보존 줄 숨김', rows.length === 3 && rows[0].includes('Product card') && rows[0].includes('2개') && rows[1].includes('Frame 12') && rows[1].includes('card-header') && !rows.some((x) => x.includes('Title')), JSON.stringify(rows));
   check('18 머리 오른쪽 "Product card · 바꿀 이름 2개" · [2개 이름 바꾸기]', (await p.textContent('#subRight')) === 'Product card · 바꿀 이름 2개' && (await p.textContent('#btnRename')) === '2개 이름 바꾸기');
   await p.click('#renameTree [data-tkey="a1"] .bv-switch');
@@ -1477,13 +1505,16 @@ async function saveAndGet(p) {
 const makeHot = (p) => p.$eval('#btnGoMake', (b) => b.classList.contains('primary'));
 const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards button.primary').length + (document.getElementById('btnGoMake').classList.contains('primary') ? 1 : 0));
 {
-  // 상태 7 — m > 0이면 보조, m = 0 · k > 0이면 주 버튼, 찾은 값이 모두 연결되면 보조
+  // 상태 7 — 카드 1 읽는 중 · m > 0이면 보조, m = 0 · k > 0이면 주 버튼, 찾은 값이 모두 연결되면 보조
   const p = await open(480, 'select');
   await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
   await p.waitForTimeout(450);
   const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  await p.waitForTimeout(60);
+  check('21 상태 7 · 카드 1 읽는 중 → 보조', (await p.textContent('#selCards .sel-card >> nth=0')).includes('읽는 중') && !(await makeHot(p)), await p.textContent('#selCards'));
   await recv(p, preview(ap.reqId));
   await recv(p, tsPrev(ap.reqId));
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 } }));
@@ -1564,33 +1595,16 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
   if (pt) await recv(p, tsPrev(pt.reqId));
   await p.waitForTimeout(80);
   check('21 noTier · 찾기 결과 뒤 → [변수 만들기] 주 버튼', (await p.textContent('#selCards')).includes('계층으로 쓸 컬렉션이 없어요') && (await makeHot(p)) && (await primaries(p)) === 1, await p.textContent('#selCards'));
+  if (pt) {
+    await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
+    await p.waitForTimeout(80);
+    check('21 noTier + 텍스트 스타일 후보 → [변수 만들기] 보조 · 주 버튼은 [{t}곳 연결] 하나', !(await makeHot(p)) && (await primaries(p)) === 1);
+  }
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b13-notier.png` : '/dev/null' }).catch(() => {});
   await p.close();
 }
 
 /* ---------- 22 카드 안 카드 없애기(IA v4 §2.8 · B.12) ---------- */
-const nestedCards = (p) => p.evaluate(() => {
-  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker';
-  document.activeElement?.blur?.();
-  const clear = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
-  const isCard = (e) => {
-    const s = getComputedStyle(e);
-    const border = ['Top', 'Right', 'Bottom', 'Left'].some((k) => parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' && !clear(s[`border${k}Color`]));
-    const shadow = s.boxShadow && s.boxShadow !== 'none';
-    const round = ['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight'].some((k) => parseFloat(s[`border${k}Radius`]) > 0);
-    return (border || shadow) && round && !clear(s.backgroundColor);
-  };
-  const bad = [];
-  for (const card of document.querySelectorAll('.step, .sel-card, .modal')) {
-    if (!card.getClientRects().length) continue;
-    for (const e of card.querySelectorAll('*')) {
-      if (!e.getClientRects().length || e.closest(EX)) continue;
-      if (isCard(e)) bad.push(`${e.tagName.toLowerCase()}.${[...e.classList].join('.')}#${e.id}`);
-    }
-  }
-  return bad;
-});
-const rowShape = (p, s) => p.$eval(s, (e) => { const c = getComputedStyle(e); return { top: c.borderTopWidth, bottom: c.borderBottomWidth, radius: c.borderTopLeftRadius, bg: c.backgroundColor, minH: c.minHeight, pl: c.paddingLeft }; });
 {
   const p = await open(480, 'layer');
   await goSub(p, 'structure');
@@ -1659,6 +1673,73 @@ const rowShape = (p, s) => p.$eval(s, (e) => { const c = getComputedStyle(e); re
   const bad2 = await nestedCards(p);
   check('22 카드 안 카드 0 — 연결 화면', bad2.length === 0, bad2.join(' · '));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b12-bind.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+
+{
+  // 값을 직접 고르기 — 실제 흐름(추출 결과 · 토큰 미리보기)으로 색 · 토큰 목록과 격자 정리 띠를 채운다
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card' });
+  await goSub(p, 'pick');
+  await p.waitForTimeout(80);
+  await p.click('#colorCard .toolbar button >> nth=0');
+  await p.waitForTimeout(40);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', ...(ex?.reqId ? { reqId: ex.reqId } : {}), warnings: [], selection: 1, tokens: [
+    { name: 'color/blue-500', category: 'color', value: '#2563EB', sources: ['fill'], count: 6 },
+    { name: 'color/gray-900', category: 'color', value: '#111827', sources: ['fill'], count: 4 },
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 },
+    { name: 'spacing/15', category: 'gap', value: 15, sources: ['itemSpacing'], count: 1 },
+  ] });
+  await p.waitForTimeout(120);
+  check('22 색 목록(실제 흐름) — 행 ≥1 · 보이는 색 카드', (await p.$$eval('#colorTable .r-card', (e) => e.length)) >= 1 && (await p.$eval('#colorCard', (e) => e.getClientRects().length > 0)));
+  const cr = await rowShape(p, '#colorTable .r-card');
+  check('22 색 목록 행 = 아래 구분선 · 모서리 0 · 배경 투명', cr.top === '0px' && cr.bottom === '1px' && cr.radius === '0px' && cr.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(cr));
+  const badColor = await nestedCards(p);
+  check('22 카드 안 카드 0 — 값을 직접 고르기 › 색', badColor.length === 0, badColor.join(' · '));
+  await p.click('[data-make-step="token"].step-chip');
+  await p.waitForTimeout(60);
+  await p.click('#btnCreate');
+  await p.waitForTimeout(80);
+  // 색 안내 띠는 "색을 먼저 만든" 상태에서만 뜬다 — 표시만 켜서 모양을 본다
+  await p.evaluate(() => { const n = document.getElementById('tokenColorNote'); n.style.display = ''; n.textContent = '색 2개는 색 단계에서 만들었어요'; });
+  check('22 토큰 목록(실제 흐름) — 행 ≥1 · 격자 정리 띠가 보임', (await p.$$eval('#tokenList .r-card', (e) => e.length)) >= 1 && (await visible(p, '#numTidySummary')));
+  const tr = await rowShape(p, '#tokenList .r-card');
+  check('22 토큰 목록 행 = 아래 구분선 · 모서리 0 · 배경 투명 · 높이 30', tr.top === '0px' && tr.bottom === '1px' && tr.radius === '0px' && tr.bg === 'rgba(0, 0, 0, 0)' && tr.minH === '30px', JSON.stringify(tr));
+  for (const s2 of ['#tokenColorNote', '#numTidySummary']) {
+    const b = await p.$eval(s2, (e) => { const c = getComputedStyle(e); const bf = getComputedStyle(e, '::before'); return { bw: c.borderTopWidth, ic: bf.content, w: bf.width, shown: e.getClientRects().length > 0 }; });
+    check(`22 ${s2} 띠(보이는 화면) — 테두리 0 · 14px 아이콘`, b.shown && b.bw === '0px' && !['none', 'normal'].includes(b.ic) && b.w === '14px', JSON.stringify(b));
+  }
+  const badToken = await nestedCards(p);
+  check('22 카드 안 카드 0 — 값을 직접 고르기 › 토큰', badToken.length === 0, badToken.join(' · '));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b12-token.png` : '/dev/null', fullPage: true }).catch(() => {});
+  // 설정 › 라이선스 오류
+  await recv(p, { type: 'ERROR', message: '키를 확인하지 못했어요', op: 'SET_LICENSE' });
+  await p.click('#btnSettings');
+  await p.waitForTimeout(60);
+  const le = await p.$eval('#licenseStatus .ux.danger', (e) => ({ bw: getComputedStyle(e).borderTopWidth, w: getComputedStyle(e.querySelector('.ux-h'), '::before').width, shown: e.getClientRects().length > 0 }));
+  check('22 설정 › 라이선스 오류 = 빨강 띠(테두리 0) · ⚠', le.shown && le.bw === '0px' && le.w === '14px', JSON.stringify(le));
+  const badSet = await nestedCards(p);
+  check('22 카드 안 카드 0 — 설정', badSet.length === 0, badSet.join(' · '));
+  await p.close();
+}
+{
+  // 내보내기 팝업 오류 — 팝업(.modal) 안 빨강 띠
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button:has-text("코드로 내보내기")');
+  await p.waitForTimeout(60);
+  await recv(p, { type: 'ERROR', message: '내보내지 못했어요', op: 'EXPORT' });
+  await p.waitForTimeout(40);
+  const xe = await p.$eval('.modal #exportStatus .ux.danger', (e) => ({ bw: getComputedStyle(e).borderTopWidth, w: getComputedStyle(e.querySelector('.ux-h'), '::before').width }));
+  check('22 내보내기 팝업 오류 = 빨강 띠(테두리 0) · ⚠', xe.bw === '0px' && xe.w === '14px', JSON.stringify(xe));
+  const badX = await nestedCards(p);
+  check('22 카드 안 카드 0 — 내보내기 팝업', badX.length === 0, badX.join(' · '));
   await p.close();
 }
 
