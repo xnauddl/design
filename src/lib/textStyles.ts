@@ -1,7 +1,9 @@
 /* ============================================================
    textStyles.ts — 텍스트 스타일(타이포) 순수 로직
-   화면 텍스트 시그니처 군집 → 크기 랭킹 명명 → 스펙. Figma 호출은 variables.ts.
+   화면 텍스트 시그니처 군집 → KRDS 이름(krdsType.ts, docs/text-style-krds.md) → 스펙. Figma 호출은 variables.ts.
    ============================================================ */
+
+import { nameKrdsStyles, type KrdsInput } from './krdsType';
 
 /** 스캔으로 모은 텍스트 노드의 타이포 시그니처(1개 노드 = 1개 샘플). */
 export interface TextSample {
@@ -27,6 +29,8 @@ export interface TextSample {
   rowId?: string;
   /** 부모 children 내 인덱스(왼쪽이 작음). */
   indexInParent?: number;
+  /** UI 역할(button · chip · input · field) 안의 글자인지 — label 분류(docs/text-style-krds.md §3.2-1). */
+  uiRole?: boolean;
 }
 
 /** 동일 시그니처를 묶은 후보(빈도 포함). */
@@ -41,8 +45,10 @@ export interface StyleCluster {
   family: string;
   style: string;
   count: number; // 같은 시그니처 노드 수
+  /** 그중 UI 역할 안의 표본 수(`uiRole === true`) — label 분류(docs/text-style-krds.md §3.2-1). */
+  uiCount: number;
   sample: string; // 대표 레이어 이름(명명 힌트)
-  /** 이 군집에 속한 텍스트 노드 id — ×N 배지에서 캔버스 선택으로 데려갈 때 쓴다(#17).
+  /** 이 군집에 속한 텍스트 노드 id — 지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지).
       손으로 만든 군집(테스트·기본 램프)에는 없을 수 있다. */
   nodeIds?: string[];
   /** 이 군집 노드들이 바인딩된 로컬 스타일 id(중복 제거, '' 제외). 정확히 1개면 rename 앵커. */
@@ -64,9 +70,9 @@ export interface TextStyleSpec {
   style: string;
   /** 재스캔 시 이미 바인딩된 기존 스타일 id. 있으면 등록=이 스타일 rename(신규 생성 아님). */
   boundStyleId?: string;
-  /** 이 스타일로 묶인 화면 글자 수(#17 ×N 배지). 수동 추가 행은 없음. */
+  /** 이 스타일로 묶인 화면 글자 수 — 편집 가능 판정(isEditableTextRow) · 만들기 화면 "Layer {n}". 수동 추가 행은 없음. */
   count?: number;
-  /** 그 글자들의 노드 id — 배지를 누르면 캔버스에서 선택한다(1개면 이동). */
+  /** 그 글자들의 노드 id — 지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지). */
   nodeIds?: string[];
 }
 
@@ -85,9 +91,6 @@ export interface ExistingTextStyle {
   /** 스타일 정의상 자간이 %일 때(2 = 2%, 음수 가능). 0/없으면 px. */
   letterSpacingPercent?: number;
 }
-
-/** 크기 랭킹 순으로 부여하는 기본 역할명. 초과분은 text-N. */
-export const RAMP_NAMES = ['display', 'h1', 'h2', 'h3', 'title', 'body', 'caption', 'overline'] as const;
 
 /**
  * 텍스트 스타일 값 열쇠(px 환산 행간 · 자간 + 글꼴) — 스캔 군집 · UI 이어받기(`tsSig`) ·
@@ -110,6 +113,7 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
     const ex = map.get(k);
     if (ex) {
       ex.count++;
+      if (s.uiRole === true) ex.uiCount++;
       if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent; // % 우선
       // 자간 %는 음수 가능(-2%) — 0만 "px 원본"으로 본다.
       if (!ex.letterSpacingPercent && s.letterSpacingPercent) ex.letterSpacingPercent = s.letterSpacingPercent;
@@ -123,6 +127,7 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
         family: s.family,
         style: s.style,
         count: 1,
+        uiCount: s.uiRole === true ? 1 : 0,
         sample: s.layerName,
         nodeIds: [],
         styleIds: [],
@@ -136,24 +141,17 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
   return [...map.values()];
 }
 
-/** 이름 조각 정규화(소문자·영숫자 외→'-'). 예: 'SemiBold'→'semibold', 'Noto Sans KR'→'noto-sans-kr'. */
-const slug = (s: string): string =>
-  s
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-
-/** 군집 → 스펙. **고유 크기**를 내림차순으로 RAMP_NAMES(초과분 text-N) 배정 →
-   같은 크기에 스타일이 여럿이면 `base/weight`로 분기(굵기도 겹치면 `base/family-weight`).
-   그 크기에 하나뿐이면 base 그대로(예: body). 끝으로 이름 유일성 보강(겹치면 -2,-3…).
+/** 군집 → 스펙. 이름은 KRDS 규칙(`nameKrdsStyles`, docs/text-style-krds.md §3) —
+   `{분류}/{단계}` + 구분이 필요할 때만 꼬리(`-{크기}` · `-w{굵기}` · `-{줄 높이 %}` · 마지막 수단).
    같은 크기·굵기·패밀리라도 행간/자간이 다르면 별도 군집이므로 분리 유지(병합 금지).
 
    existing(이미 존재하는 로컬 텍스트 스타일들)을 주면, 군집을 기존 스타일에 **앵커**한다:
    (1) 노드가 그 스타일에 바인딩되고 **시그니처도 일치**하거나 (2) **시그니처가 같은 기존 스타일이 정확히 1개**.
    스타일 바인딩만 있고 로컬 오버라이드(크기·행간 등)로 시그니처가 어긋나면 앵커하지 않는다.
    앵커되면 자동 이름 대신 **기존 이름을 유지**하고 spec.boundStyleId를 채운다 — 재스캔/타프레임에서
-   같은 타이포가 또 잡혀도 중복 생성 없이 그 스타일로 인식되고, 이름을 바꾸면 rename된다. */
+   같은 타이포가 또 잡혀도 중복 생성 없이 그 스타일로 인식되고, 이름을 바꾸면 rename된다.
+   앵커되지 않은 군집은 기존 스타일 이름 전부를 예약 이름으로 피한다(§3.4 — 겹치면 강제 꼬리).
+   스펙 순서는 크기 내림차순 → 쓰인 곳 많은 순 → 행간 큰 순. */
 export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingTextStyle[]): TextStyleSpec[] {
   // 기존 스타일 인덱스: id→이름·시그니처, 시그니처→id(중복 시그니처는 모호 → 제외).
   const nameById = new Map<string, string>();
@@ -177,66 +175,54 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
     return sigId && nameById.has(sigId) ? sigId : undefined;
   };
 
-  const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
-  const baseBySize = new Map<number, string>();
-  sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
+  const ordered = [...clusters].sort(
+    (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight,
+  );
+  const boundIds = ordered.map(boundIdOf);
+  const anchored = new Map<number, string>();
+  boundIds.forEach((id, i) => {
+    if (id) anchored.set(i, nameById.get(id) as string);
+  });
+  // 예약 = 앵커되지 않은 모든 기존 스타일 이름(앵커 이름은 nameKrdsStyles가 사용 중으로 둔다).
+  const anchoredNames = new Set(anchored.values());
+  const reserved = new Set((existing ?? []).map((e) => e.name).filter((n) => !anchoredNames.has(n)));
+  const inputs: KrdsInput[] = ordered.map((c) => ({
+    fontSize: c.fontSize,
+    lineHeight: c.lineHeight,
+    lineHeightPercent: c.lineHeightPercent,
+    letterSpacing: c.letterSpacing,
+    family: c.family,
+    style: c.style,
+    count: c.count,
+    uiCount: c.uiCount ?? 0,
+  }));
+  const names = nameKrdsStyles(inputs, { reserved, anchored, path: 'scan' });
 
-  const used = new Set<string>();
-  const unique = (n: string): string => {
-    if (!used.has(n)) {
-      used.add(n);
-      return n;
-    }
-    let k = 2;
-    while (used.has(`${n}-${k}`)) k++;
-    const u = `${n}-${k}`;
-    used.add(u);
-    return u;
-  };
-
-  // 앵커 군집의 기존 이름을 먼저 예약 — 자동 이름이 이를 침범하지 않도록.
-  for (const c of clusters) {
-    const id = boundIdOf(c);
-    if (id) used.add(nameById.get(id) as string);
-  }
-
-  const specs: TextStyleSpec[] = [];
-  for (const sz of sizesDesc) {
-    const base = baseBySize.get(sz) as string;
-    const group = clusters
-      .filter((c) => c.fontSize === sz)
-      .sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
-    const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
-    for (const c of group) {
-      const boundId = boundIdOf(c);
-      const name = boundId
-        ? (nameById.get(boundId) as string) // 기존 이름 유지(예약됨 → unique 불필요)
-        : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
-      // 노드가 px로 해석돼도, 앵커된 기존 스타일 정의가 %면 그 단위를 스펙에 살린다.
-      const ex = boundId ? existingById.get(boundId) : undefined;
-      const lineHeightPercent = c.lineHeightPercent || ex?.lineHeightPercent || 0;
-      const letterSpacingPercent =
-        (c.letterSpacingPercent ?? 0) !== 0 ? c.letterSpacingPercent! : (ex?.letterSpacingPercent ?? 0);
-      specs.push({
-        name,
-        fontSize: c.fontSize,
-        lineHeight: c.lineHeight,
-        letterSpacing: c.letterSpacing,
-        family: c.family,
-        style: c.style,
-        ...(lineHeightPercent ? { lineHeightPercent } : {}),
-        ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
-        ...(boundId ? { boundStyleId: boundId } : {}),
-        count: c.count,
-        ...(c.nodeIds?.length ? { nodeIds: c.nodeIds } : {}),
-      });
-    }
-  }
-  return specs;
+  return ordered.map((c, i) => {
+    const boundId = boundIds[i];
+    // 노드가 px로 해석돼도, 앵커된 기존 스타일 정의가 %면 그 단위를 스펙에 살린다.
+    const ex = boundId ? existingById.get(boundId) : undefined;
+    const lineHeightPercent = c.lineHeightPercent || ex?.lineHeightPercent || 0;
+    const letterSpacingPercent =
+      (c.letterSpacingPercent ?? 0) !== 0 ? c.letterSpacingPercent! : (ex?.letterSpacingPercent ?? 0);
+    return {
+      name: names[i],
+      fontSize: c.fontSize,
+      lineHeight: c.lineHeight,
+      letterSpacing: c.letterSpacing,
+      family: c.family,
+      style: c.style,
+      ...(lineHeightPercent ? { lineHeightPercent } : {}),
+      ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
+      ...(boundId ? { boundStyleId: boundId } : {}),
+      count: c.count,
+      ...(c.nodeIds?.length ? { nodeIds: c.nodeIds } : {}),
+    };
+  });
 }
 
-/** 램프/역할형 라벨 패턴(긴 문자열용). 짧은 글자(≤24)는 패턴 없이도 이름성. */
-const LABEL_RAMP_RE = /^(display|h[1-6]|title|body|caption|overline)(\/\S+)?$/i;
+/** 램프/역할형 라벨 패턴(긴 문자열용) — KRDS 분류 · 옛 램프 이름 모두(docs/text-style-krds.md §3.9). 짧은 글자(≤24)는 패턴 없이도 이름성. */
+const LABEL_RAMP_RE = /^(display|heading|body|label|h[1-6]|title|caption|overline)(\/\S+)?$/i;
 
 /** 라벨 이름성 — trim ≤24·개행 없음, 또는 램프 패턴. */
 export function isRowLabelNameLike(characters: string): boolean {
@@ -248,7 +234,7 @@ export function isRowLabelNameLike(characters: string): boolean {
 
 /**
  * 한 HORIZONTAL 행의 TEXT 샘플에서 라벨↔표본 짝.
- * 실패(모호·조건 미달) 시 null — 호출측이 랭킹 폴백.
+ * 실패(모호·조건 미달) 시 null — 호출측이 KRDS 이름 폴백.
  */
 export function pairHorizontalRowLabel(
   row: readonly TextSample[],
@@ -298,13 +284,15 @@ export interface RowLabelNameResult {
   styles: TextStyleSpec[];
   /** 라벨 characters로 이름 붙인 스펙 수(앵커 제외). */
   labeled: number;
-  /** 랭킹 이름을 쓴 스펙 수. */
+  /** KRDS 이름(라벨 짝 없음)을 쓴 스펙 수. */
   fallback: number;
 }
 
 /**
  * 가로 행 라벨 → 스타일 이름. 확정 행의 라벨·표본 우측(및 미채택 형제)은 후보에서 제외.
  * 앵커(`boundStyleId`) 이름은 유지. 라벨 이름은 characters 그대로(trim) + unique().
+ * unique()는 앵커 이름만이 아니라 기존 로컬 스타일 이름 전부를 "사용 중"으로 시작한다
+ * (docs/text-style-krds.md §3.9 — 등록이 이름으로 찾아 남의 스타일 값을 덮어쓰지 않게).
  */
 export function nameTextStylesWithRowLabels(
   samples: readonly TextSample[],
@@ -350,6 +338,7 @@ export function nameTextStylesWithRowLabels(
     return u;
   };
 
+  for (const e of existing ?? []) used.add(e.name); // 예약 이름(§3.4 · §3.9)
   for (const s of styles) {
     if (s.boundStyleId) used.add(s.name);
   }
@@ -396,30 +385,41 @@ export function fontStyleForWeight(weight: number, italic = false): string {
 interface RampEntry {
   name: string;
   fontSize: number;
-  lineHeight: number;
   weight: number;
 }
 
-/** 선택이 없을 때 쓰는 기본 타입 램프(폰트 패밀리는 호출자가 주입). */
-export const DEFAULT_TYPE_RAMP: RampEntry[] = [
-  { name: 'display', fontSize: 48, lineHeight: 56, weight: 700 },
-  { name: 'h1', fontSize: 32, lineHeight: 40, weight: 700 },
-  { name: 'h2', fontSize: 24, lineHeight: 32, weight: 600 },
-  { name: 'h3', fontSize: 20, lineHeight: 28, weight: 600 },
-  { name: 'title', fontSize: 18, lineHeight: 24, weight: 600 },
-  { name: 'body', fontSize: 16, lineHeight: 24, weight: 400 },
-  { name: 'caption', fontSize: 13, lineHeight: 18, weight: 400 },
-  { name: 'overline', fontSize: 11, lineHeight: 16, weight: 500 },
+/** 선택이 없을 때 쓰는 기본 타입 램프 — KRDS PC 값(docs/text-style-krds.md §6). label 줄은 넣지 않는다
+   (body/medium과 값이 같아 앵커 · 기존 스타일 연결이 모호해지므로). 줄 높이 150% · 자간 0. */
+export const DEFAULT_TYPE_RAMP: readonly RampEntry[] = [
+  { name: 'display/large', fontSize: 60, weight: 700 },
+  { name: 'heading/large', fontSize: 32, weight: 700 },
+  { name: 'heading/medium', fontSize: 24, weight: 700 },
+  { name: 'heading/small', fontSize: 19, weight: 700 },
+  { name: 'body/medium', fontSize: 17, weight: 400 },
+  { name: 'body/small', fontSize: 15, weight: 400 },
 ];
 
-/** 기본 램프 → 스펙(주어진 패밀리로). */
-export function rampToSpecs(family: string): TextStyleSpec[] {
-  return DEFAULT_TYPE_RAMP.map((r) => ({
-    name: r.name,
+/** 기본 램프 → 스펙(주어진 패밀리로). reserved(이 파일의 로컬 텍스트 스타일 이름)와 같은 이름은
+   §3.4 강제 꼬리(`{분류}/{단계}-{크기}-w{굵기}-{줄높이}`, 그래도 겹치면 -2 · -3)로 피한다. */
+export function rampToSpecs(family: string, reserved?: ReadonlySet<string> | readonly string[]): TextStyleSpec[] {
+  const inputs: KrdsInput[] = DEFAULT_TYPE_RAMP.map((r) => ({
     fontSize: r.fontSize,
-    lineHeight: r.lineHeight,
+    lineHeight: r.fontSize * 1.5,
+    lineHeightPercent: 150,
     letterSpacing: 0,
     family,
     style: fontStyleForWeight(r.weight, false),
+    count: 0,
+    uiCount: 0,
+  }));
+  const names = nameKrdsStyles(inputs, { reserved: new Set(reserved ?? []), path: 'scan' });
+  return inputs.map((x, i) => ({
+    name: names[i],
+    fontSize: x.fontSize,
+    lineHeight: x.lineHeight,
+    lineHeightPercent: 150,
+    letterSpacing: 0,
+    family,
+    style: x.style,
   }));
 }

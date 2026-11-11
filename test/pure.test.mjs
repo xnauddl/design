@@ -83,7 +83,13 @@ import {
   isRowLabelNameLike,
   fontStyleForWeight,
   rampToSpecs,
-  RAMP_NAMES,
+  DEFAULT_TYPE_RAMP,
+  KRDS_SIZES,
+  weightOf,
+  krdsCategory,
+  krdsStep,
+  offScale,
+  nameKrdsStyles,
   commitUndo,
   explainError,
   nextTabIndex,
@@ -1835,56 +1841,82 @@ test('clusterTextStyles — 동일 시그니처 dedupe + 빈도', () => {
   assert.equal(clusterTextStyles(samples2).length, 2);
 });
 
-test('nameTextStyles — 크기 내림차순 램프 명명 + 초과분 text-N', () => {
+test('nameTextStyles — KRDS 이름({분류}/{단계}) · 크기 내림차순 스펙 순서', () => {
   const clusters = [
-    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: 'b' },
-    { fontSize: 48, lineHeight: 56, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: 'd' },
-    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: 'h' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: 'b', styleIds: [] },
+    { fontSize: 48, lineHeight: 72, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: 'd', styleIds: [] },
+    { fontSize: 32, lineHeight: 48, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: 'h', styleIds: [] },
   ];
   const specs = nameTextStyles(clusters);
   assert.deepEqual(specs.map((s) => [s.name, s.fontSize]), [
-    ['display', 48],
-    ['h1', 32],
-    ['h2', 16],
+    ['display/medium', 48],
+    ['heading/large', 32],
+    ['body/medium', 16],
   ]);
-  // 램프 길이 초과 → text-N
+  // 분류 · 단계는 값만으로 정해진다 — 크기가 많아도 text-N 같은 순위 이름이 없다.
   const many = Array.from({ length: 9 }, (_, i) => ({
-    fontSize: 100 - i,
-    lineHeight: 120,
-    letterSpacing: 0,
-    family: 'Inter',
-    style: 'Regular',
-    count: 1,
-    sample: '',
+    fontSize: 20 - i, lineHeight: (20 - i) * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '', styleIds: [],
   }));
   const names = nameTextStyles(many).map((s) => s.name);
-  assert.equal(names[RAMP_NAMES.length], 'text-9');
+  assert.equal(new Set(names).size, names.length);
+  assert.ok(names.every((n) => n.startsWith('body/')));
 });
 
-test('nameTextStyles — 같은 크기 다중 스타일은 base/weight로 분기(병합 금지)', () => {
-  // 크기 2종(32,16) → 32=display, 16=h1. 16px에 Regular/Bold 둘 → h1/regular, h1/bold
+test('nameTextStyles — 같은 단계 다중 스타일은 꼬리로 분기(병합 금지)', () => {
   const byWeight = nameTextStyles([
-    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: '' },
-    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '' },
-    { fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, sample: '' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 5, sample: '', styleIds: [] },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Medium', count: 2, sample: '', styleIds: [] },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '', styleIds: [] },
   ]).map((s) => s.name);
-  assert.equal(new Set(byWeight).size, byWeight.length); // 전부 유일
-  assert.ok(byWeight.includes('display')); // 32px 단독
-  assert.ok(byWeight.includes('h1/regular') && byWeight.includes('h1/bold'));
+  assert.deepEqual(byWeight, ['body/medium', 'body/medium-w500', 'heading/xsmall']);
 
-  // 같은 16px·같은 굵기, 패밀리만 다름 → base/family-weight (크기 1종 → base=display)
+  // 같은 16px·같은 굵기, 패밀리만 다름 → 쓰인 곳 많은 글꼴이 그대로, 나머지 글꼴 slug
   const byFamily = nameTextStyles([
-    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, sample: '' },
-    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Roboto', style: 'Bold', count: 1, sample: '' },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 2, sample: '', styleIds: [] },
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Noto Sans KR', style: 'Regular', count: 1, sample: '', styleIds: [] },
   ]).map((s) => s.name);
-  assert.ok(byFamily.includes('display/inter-bold') && byFamily.includes('display/roboto-bold'));
+  assert.deepEqual(byFamily, ['body/medium', 'body/medium-noto-sans-kr']);
 
-  // 같은 크기·굵기·패밀리, 행간만 다름(별도 군집) → 유일성 보강으로 둘 다 보존
+  // 같은 크기·굵기·패밀리, 행간만 다름(별도 군집) → 줄 높이 꼬리
   const byLh = nameTextStyles([
-    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '' },
-    { fontSize: 16, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '' },
-  ]).map((s) => s.name);
-  assert.equal(new Set(byLh).size, 2);
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '', styleIds: [] },
+    { fontSize: 16, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1, sample: '', styleIds: [] },
+  ]).map((s) => s.name).sort();
+  assert.deepEqual(byLh, ['body/medium', 'body/medium-175']);
+});
+
+test('nameTextStyles — UI 역할 표본이 절반 이상이면 label(uiCount)', () => {
+  const cl = clusterTextStyles([
+    { fontSize: 15, lineHeight: 22.5, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'a', styleId: '', uiRole: true },
+    { fontSize: 15, lineHeight: 22.5, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'b', styleId: '' },
+    { fontSize: 17, lineHeight: 25.5, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'c', styleId: '', uiRole: true },
+    { fontSize: 17, lineHeight: 25.5, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'd', styleId: '', uiRole: false },
+    { fontSize: 17, lineHeight: 25.5, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'e', styleId: '' },
+  ]);
+  assert.equal(cl.find((c) => c.fontSize === 15).uiCount, 1);
+  assert.equal(cl.find((c) => c.fontSize === 17).uiCount, 1);
+  const names = nameTextStyles(cl).map((s) => s.name);
+  // 15 Bold: 1/2 → label(굵은 버튼 글자만 → 굵기 꼬리), 17 Regular: 1/3 → body
+  assert.deepEqual(names, ['body/medium', 'label/small-w700']);
+});
+
+test('nameTextStyles — 앵커 안 된 군집은 기존 스타일 이름을 피한다(예약 · 강제 꼬리)', () => {
+  const clusters = clusterTextStyles([
+    { fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 'p', styleId: '' },
+    { fontSize: 32, lineHeight: 48, letterSpacing: 0, family: 'Inter', style: 'Bold', layerName: 'h', styleId: '' },
+  ]);
+  // body/medium은 값이 다른 관계없는 스타일 · heading/large는 시그니처가 같아 앵커
+  const existing = [
+    { id: 'S:x', name: 'body/medium', fontSize: 17, lineHeight: 26, letterSpacing: 0, family: 'Inter', style: 'Regular' },
+    { id: 'S:h', name: 'heading/large', fontSize: 32, lineHeight: 48, letterSpacing: 0, family: 'Inter', style: 'Bold' },
+  ];
+  const specs = nameTextStyles(clusters, existing);
+  const s16 = specs.find((s) => s.fontSize === 16);
+  const s32 = specs.find((s) => s.fontSize === 32);
+  assert.equal(s16.name, 'body/medium-16-w400-150');
+  assert.equal(s16.boundStyleId, undefined);
+  assert.equal(s32.name, 'heading/large');
+  assert.equal(s32.boundStyleId, 'S:h');
 });
 
 test('clusterTextStyles — 바인딩된 styleId를 군집별로 수집(중복 제거)', () => {
@@ -1991,6 +2023,11 @@ test('isRowLabelNameLike / pairHorizontalRowLabel — 왼쪽 라벨·크기 역�
   assert.equal(isRowLabelNameLike('H1'), true);
   assert.equal(isRowLabelNameLike('a'.repeat(25)), false);
   assert.equal(isRowLabelNameLike('body/bold'), true);
+  // 긴 이름도 KRDS 분류 · 옛 램프 이름 패턴이면 이름성(§3.9)
+  assert.equal(isRowLabelNameLike('heading/medium-26_7-w600-120-ls0_5'), true);
+  assert.equal(isRowLabelNameLike('label/medium-w700-noto-sans-kr-2'), true);
+  assert.equal(isRowLabelNameLike('h1/inter-semi-bold-extra-long-x'), true);
+  assert.equal(isRowLabelNameLike('subtitle/inter-semi-bold-extra-long'), false);
   assert.equal(isRowLabelNameLike('line1\nline2'), false);
 
   const row = (items) =>
@@ -2081,6 +2118,20 @@ test('nameTextStylesWithRowLabels — 라벨 이름·우측 제외·unique·앵�
   assert.equal(anchored.styles[0].name, 'body');
 });
 
+test('nameTextStylesWithRowLabels — 라벨 이름도 예약 이름(관계없는 기존 스타일)을 피한다', () => {
+  const base = (o) => ({ lineHeight: o.fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular', layerName: 't', styleId: '', ...o });
+  const r = nameTextStylesWithRowLabels(
+    [
+      base({ id: 'l', rowId: 'r', indexInParent: 0, characters: 'Body', fontSize: 12 }),
+      base({ id: 's', rowId: 'r', indexInParent: 1, characters: 'Ag', fontSize: 16 }),
+    ],
+    [{ id: 'S:o', name: 'Body', fontSize: 40, lineHeight: 60, letterSpacing: 0, family: 'Inter', style: 'Bold' }],
+  );
+  assert.equal(r.labeled, 1);
+  assert.equal(r.styles[0].boundStyleId, undefined);
+  assert.equal(r.styles[0].name, 'Body-2'); // 'Body'는 남의 스타일 이름 — 덮어쓰지 않게
+});
+
 test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(400), 'Regular');
   assert.equal(fontStyleForWeight(700), 'Bold');
@@ -2090,11 +2141,35 @@ test('fontStyleForWeight — 굵기/italic → Figma style', () => {
   assert.equal(fontStyleForWeight(123), 'Regular'); // 미지정 → Regular
 });
 
-test('rampToSpecs — 기본 램프에 패밀리 주입', () => {
+test('rampToSpecs — KRDS 기본 램프(값 · 이름) + 패밀리 주입', () => {
   const specs = rampToSpecs('Pretendard');
-  assert.ok(specs.length >= 6);
+  assert.deepEqual(specs.map((s) => [s.name, s.fontSize, s.style]), [
+    ['display/large', 60, 'Bold'],
+    ['heading/large', 32, 'Bold'],
+    ['heading/medium', 24, 'Bold'],
+    ['heading/small', 19, 'Bold'],
+    ['body/medium', 17, 'Regular'],
+    ['body/small', 15, 'Regular'],
+  ]);
+  assert.deepEqual(specs.map((s) => s.name), DEFAULT_TYPE_RAMP.map((r) => r.name)); // 표의 이름 = 규칙이 짓는 이름
   assert.ok(specs.every((s) => s.family === 'Pretendard'));
-  assert.ok(specs.some((s) => s.name === 'body' && s.fontSize === 16));
+  assert.ok(specs.every((s) => s.lineHeightPercent === 150 && s.lineHeight === s.fontSize * 1.5 && s.letterSpacing === 0));
+  assert.ok(!specs.some((s) => s.name.startsWith('label/'))); // label 줄은 넣지 않는다
+});
+
+test('rampToSpecs — 예약 이름(로컬 스타일)과 같은 줄은 강제 꼬리', () => {
+  const specs = rampToSpecs('Inter', ['body/medium', 'heading/large', 'heading/large-32-w700-150']);
+  const names = specs.map((s) => s.name);
+  assert.deepEqual(names, [
+    'display/large',
+    'heading/large-32-w700-150-2',
+    'heading/medium',
+    'heading/small',
+    'body/medium-17-w400-150',
+    'body/small',
+  ]);
+  // Set도 받는다
+  assert.equal(rampToSpecs('Inter', new Set(['body/small']))[5].name, 'body/small-15-w400-150');
 });
 
 /* ================= tidyNumberTokens (스케일 사다리) ================= */
@@ -2951,4 +3026,250 @@ test('skipRowCounts — 줄 수 = 칩 수와 같은 셈: 스타일 후보 레이
   const big = skipRowCounts({ hidden: 300 }, [{ nodeId: 'h1', name: 'H', reason: 'hidden' }], new Set(), false, { hidden: 300 });
   assert.equal(big.keep[0].n, 300);
   assert.equal(big.keep[0].items.length, 1, '[선택 ›] 항목은 실어 온 목록 그대로');
+});
+
+/* ---------- krdsType.ts — KRDS 텍스트 스타일 이름(docs/text-style-krds.md) ---------- */
+
+const kin = (o) => ({
+  fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 0, uiCount: 0, ...o,
+});
+/** 크기 · 줄 높이 % → 입력(px 줄 높이). */
+const kpx = (size, pct, style, o = {}) => kin({ fontSize: size, lineHeight: (size * pct) / 100, style, ...o });
+
+test('krdsType — weightOf: 폭 · 광학 수식어를 떼고 읽는다, 모르는 이름은 400', () => {
+  assert.deepEqual(weightOf('SemiBold Condensed'), { weight: 600, italic: false });
+  assert.deepEqual(weightOf('Book'), { weight: 400, italic: false });
+  assert.deepEqual(weightOf('Bold Italic'), { weight: 700, italic: true });
+  assert.deepEqual(weightOf('SemiCondensed Bold'), { weight: 700, italic: false }); // semi가 굵기로 읽히지 않음
+  assert.deepEqual(weightOf('Display Medium'), { weight: 500, italic: false });
+  assert.deepEqual(weightOf('Text Light Italic'), { weight: 300, italic: true });
+  assert.deepEqual(weightOf('ExtraBold Extended'), { weight: 800, italic: false });
+  assert.deepEqual(weightOf('Condensed'), { weight: 400, italic: false });
+  assert.deepEqual(weightOf('Regular'), { weight: 400, italic: false });
+});
+
+test('krdsType — 분류: label(경로별) → display(600↑ · 42↑) → heading(600↑) → body', () => {
+  assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 42 })), 'display');
+  assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 41.96 })), 'display'); // 표기값 42.0
+  assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 41.94 })), 'heading'); // 표기값 41.9
+  assert.equal(krdsCategory(kin({ style: 'SemiBold', fontSize: 36 })), 'heading'); // display small(36)은 나오지 않음
+  assert.equal(krdsCategory(kin({ style: 'Medium', fontSize: 60 })), 'body');
+  // 스캔: uiCount × 2 ≥ count
+  assert.equal(krdsCategory(kin({ count: 4, uiCount: 2 }), 'scan'), 'label');
+  assert.equal(krdsCategory(kin({ count: 5, uiCount: 2 }), 'scan'), 'body');
+  assert.equal(krdsCategory(kin({ count: 0, uiCount: 0 }), 'scan'), 'body'); // 쓰인 곳 0은 label 아님
+  assert.equal(krdsCategory(kin({ count: 2, uiCount: 2, style: 'Bold', fontSize: 60 }), 'scan'), 'label');
+  // 이름 다시 짓기: 이름 조각이 정확히 같을 때(대소문자 무시)
+  assert.equal(krdsCategory(kin({ name: 'Button/Primary' }), 'rename'), 'label');
+  assert.equal(krdsCategory(kin({ name: 'btn_text' }), 'rename'), 'label');
+  assert.equal(krdsCategory(kin({ name: 'form input-sm' }), 'rename'), 'label');
+  assert.equal(krdsCategory(kin({ name: 'table/body' }), 'rename'), 'body');
+  assert.equal(krdsCategory(kin({ name: 'tablet' }), 'rename'), 'body');
+  assert.equal(krdsCategory(kin({ name: 'labels', uiCount: 9, count: 9 }), 'rename'), 'body'); // uiCount는 보지 않음
+});
+
+test('krdsType — 단계 경계(중간점 · 표기값)', () => {
+  assert.equal(krdsStep('display', 52), 'large');
+  assert.equal(krdsStep('display', 51.99), 'large'); // 표기값 52.0
+  assert.equal(krdsStep('display', 51.9), 'medium');
+  assert.equal(krdsStep('display', 42), 'medium');
+  const h = [[40, 'xlarge'], [36, 'xlarge'], [35.9, 'large'], [28, 'large'], [27.9, 'medium'], [21.5, 'medium'],
+    [21.4, 'small'], [18, 'small'], [17.9, 'xsmall'], [16, 'xsmall'], [15.9, 'xxsmall'], [10, 'xxsmall']];
+  for (const [sz, st] of h) assert.equal(krdsStep('heading', sz), st, `heading ${sz}`);
+  const b = [[60, 'large'], [18, 'large'], [17.9, 'medium'], [16, 'medium'], [15.9, 'small'], [14, 'small'], [13.9, 'xsmall'], [8, 'xsmall']];
+  for (const [sz, st] of b) {
+    assert.equal(krdsStep('body', sz), st, `body ${sz}`);
+    assert.equal(krdsStep('label', sz), st, `label ${sz}`);
+  }
+});
+
+test('krdsType — offScale: 소수 · 모음 밖 · 가까운 크기(같은 거리면 큰 값)', () => {
+  assert.deepEqual([...KRDS_SIZES], [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60]);
+  assert.deepEqual(offScale(26.67), { kind: 'decimal', nearest: 28 });
+  assert.deepEqual(offScale(20), { kind: 'off', nearest: 19 });
+  assert.deepEqual(offScale(18), { kind: 'off', nearest: 19 });
+  assert.deepEqual(offScale(16), { kind: 'off', nearest: 17 });
+  assert.deepEqual(offScale(52), { kind: 'off', nearest: 60 });
+  assert.deepEqual(offScale(10), { kind: 'off', nearest: 13 });
+  assert.deepEqual(offScale(13), { kind: null, nearest: 13 });
+  assert.deepEqual(offScale(14.96), { kind: null, nearest: 15 }); // 표기값 15
+  assert.deepEqual(offScale(28), { kind: null, nearest: 28 });
+});
+
+test('krdsType — 크기 꼬리: 기준값 거리 → 쓰인 곳 → 큰 크기', () => {
+  // 20 · 18은 기준 19와 같은 거리 → 큰 20이 그대로
+  assert.deepEqual(nameKrdsStyles([kpx(18, 150, 'Regular'), kpx(20, 150, 'Regular')]), ['body/large-18', 'body/large']);
+  // 쓰인 곳이 많으면 18이 그대로
+  assert.deepEqual(
+    nameKrdsStyles([kpx(18, 150, 'Regular', { count: 3 }), kpx(20, 150, 'Regular', { count: 1 })]),
+    ['body/large', 'body/large-20'],
+  );
+  // 거리가 먼저 — 19는 쓰인 곳이 적어도 그대로
+  assert.deepEqual(
+    nameKrdsStyles([kpx(19, 150, 'Regular'), kpx(24, 150, 'Regular', { count: 9 })]),
+    ['body/large', 'body/large-24'],
+  );
+  // 크기별 쓰인 곳은 그 크기 스타일들의 합
+  assert.deepEqual(
+    nameKrdsStyles([
+      kpx(18, 150, 'Regular', { count: 2 }), kpx(18, 120, 'Regular', { count: 2 }), kpx(20, 150, 'Regular', { count: 3 }),
+    ]),
+    ['body/large', 'body/large-120', 'body/large-20'],
+  );
+  // 소수 크기 표기
+  assert.deepEqual(nameKrdsStyles([kpx(24, 150, 'Bold'), kpx(26.67, 150, 'Bold')]), ['heading/medium', 'heading/medium-26_7']);
+});
+
+test('krdsType — 굵기 꼬리: 기본 묶음 1등만 꼬리 없이 · 정렬 동점', () => {
+  // 쓰인 곳 0 → 기본값(700)에 가까운 순: 600 · 800 같은 거리 → 작은 숫자 600
+  assert.deepEqual(
+    nameKrdsStyles([kpx(24, 150, 'ExtraBold'), kpx(24, 150, 'SemiBold')]),
+    ['heading/medium-w800', 'heading/medium'],
+  );
+  // 기울임 아님 먼저
+  assert.deepEqual(
+    nameKrdsStyles([kpx(24, 150, 'Bold Italic'), kpx(24, 150, 'Bold')]),
+    ['heading/medium-w700i', 'heading/medium'],
+  );
+  // 쓰인 곳이 먼저
+  assert.deepEqual(
+    nameKrdsStyles([kpx(17, 150, 'Regular', { count: 1 }), kpx(17, 150, 'Medium', { count: 5 })]),
+    ['body/medium-w400', 'body/medium'],
+  );
+  // 400과 400 기울임은 다른 굵기
+  assert.deepEqual(nameKrdsStyles([kpx(17, 150, 'Regular'), kpx(17, 150, 'Italic')]), ['body/medium', 'body/medium-w400i']);
+  // 기본 묶음 밖(body 300)은 꼬리
+  assert.deepEqual(nameKrdsStyles([kpx(17, 150, 'Light'), kpx(17, 150, 'Regular')]), ['body/medium-w300', 'body/medium']);
+  // 기본 묶음에 드는 굵기가 없으면 전부 꼬리
+  assert.deepEqual(nameKrdsStyles([kpx(17, 150, 'Bold', { count: 2, uiCount: 2 })]), ['label/medium-w700']);
+});
+
+test('krdsType — 줄 높이 꼬리 · 꼬리 순서(크기 → 굵기 → 줄 높이)', () => {
+  assert.deepEqual(nameKrdsStyles([kin({ fontSize: 17, lineHeight: 0 })]), ['body/medium-auto']);
+  assert.deepEqual(nameKrdsStyles([kin({ fontSize: 17, lineHeight: 25.43 })]), ['body/medium']); // 149.6 → 150
+  assert.deepEqual(nameKrdsStyles([kin({ fontSize: 17, lineHeight: 20, lineHeightPercent: 120 })]), ['body/medium-120']); // %가 있으면 그 값
+  assert.deepEqual(
+    nameKrdsStyles([kpx(17, 150, 'Regular'), kpx(16, 130, 'Medium'), kpx(16, 150, 'Regular')]),
+    ['body/medium', 'body/medium-16-w500-130', 'body/medium-16'],
+  );
+});
+
+test('krdsType — 마지막 수단: 자간 → 글꼴 → -2 · -3 (§3.8, 문자 코드 순)', () => {
+  // 자간 0이 그대로, 음수 · 소수 표기
+  assert.deepEqual(
+    nameKrdsStyles([kin({ letterSpacing: -0.3 }), kin({ letterSpacing: 0 }), kin({ letterSpacing: 0.5 })]),
+    ['body/medium-lsm0_3', 'body/medium', 'body/medium-ls0_5'],
+  );
+  // 0이 없으면 쓰인 곳 → 절댓값 작은 순 → 작은 값
+  assert.deepEqual(nameKrdsStyles([kin({ letterSpacing: 0.5 }), kin({ letterSpacing: -0.3 })]), ['body/medium-ls0_5', 'body/medium']);
+  assert.deepEqual(nameKrdsStyles([kin({ letterSpacing: 0.3 }), kin({ letterSpacing: -0.3 })]), ['body/medium-ls0_3', 'body/medium']);
+  assert.deepEqual(
+    nameKrdsStyles([kin({ letterSpacing: 0.5, count: 3 }), kin({ letterSpacing: -0.3, count: 1 })]),
+    ['body/medium', 'body/medium-lsm0_3'],
+  );
+  // 표기가 같아지는 자간(-0.04 → 0)은 같은 것 → 다음 단계(-2)
+  // 시그니처 문자열 순: '16|24|-0.04|…' < '16|24|0|…'('-' 45 < '0' 48) → -0.04가 1등
+  assert.deepEqual(
+    nameKrdsStyles([kin({ id: 'b', letterSpacing: -0.04 }), kin({ id: 'a', letterSpacing: 0 })]),
+    ['body/medium', 'body/medium-2'],
+  );
+  // 글꼴: 쓰인 곳 많은 글꼴 → 같으면 글꼴 이름 순(문자 코드 — 대문자가 앞)
+  assert.deepEqual(nameKrdsStyles([kin({ family: 'Inter' }), kin({ family: 'Arial' })]), ['body/medium-inter', 'body/medium']);
+  assert.deepEqual(nameKrdsStyles([kin({ family: 'alpha' }), kin({ family: 'Zeta' })]), ['body/medium-alpha', 'body/medium']);
+  assert.deepEqual(
+    nameKrdsStyles([kin({ family: 'Arial', count: 1 }), kin({ family: 'Noto Sans KR', count: 2 })]),
+    ['body/medium-arial', 'body/medium'],
+  );
+  // 자간 꼬리와 글꼴 꼬리가 함께
+  assert.deepEqual(
+    nameKrdsStyles([kin({ family: 'Inter', letterSpacing: 0.5 }), kin({ family: 'Arial', letterSpacing: 0.5 }), kin({ family: 'Inter' })]),
+    ['body/medium-ls0_5-inter', 'body/medium-ls0_5', 'body/medium'],
+  );
+  // 값이 완전히 같으면 쓰인 곳 → 지금 이름 순 → id 순
+  assert.deepEqual(
+    nameKrdsStyles([kin({ name: 'b', id: '1' }), kin({ name: 'a', id: '2' }), kin({ name: 'a', id: '0' })]),
+    ['body/medium-3', 'body/medium-2', 'body/medium'],
+  );
+  assert.deepEqual(nameKrdsStyles([kin({ name: 'z' }), kin({ name: 'a', count: 0 }), kin({ name: 'q', count: 4 })]),
+    ['body/medium-3', 'body/medium-2', 'body/medium']);
+});
+
+test('krdsType — 앵커는 그대로 · 꼬리 계산에서 빠짐 · 예약 이름은 강제 꼬리(§3.4)', () => {
+  // 앵커된 18은 계산에서 빠져 20이 꼬리 없이
+  assert.deepEqual(
+    nameKrdsStyles([kpx(18, 150, 'Regular'), kpx(20, 150, 'Regular')], { anchored: new Map([[0, 'old/name']]) }),
+    ['old/name', 'body/large'],
+  );
+  // 앵커 이름과 겹치면 강제 꼬리
+  assert.deepEqual(
+    nameKrdsStyles([kpx(18, 150, 'Regular'), kpx(20, 150, 'Regular')], { anchored: new Map([[0, 'body/large']]) }),
+    ['body/large', 'body/large-20-w400-150'],
+  );
+  // 예약 → 강제 꼬리(크기 · 굵기 · 줄 높이를 생략 없이, 자동 · 기울임)
+  const reserved = new Set(['body/medium', 'body/medium-auto', 'heading/medium-w700i']);
+  assert.deepEqual(nameKrdsStyles([kin({})], { reserved }), ['body/medium-16-w400-150']);
+  assert.deepEqual(
+    nameKrdsStyles([kin({}), kin({ fontSize: 17, lineHeight: 0 })], { reserved }),
+    ['body/medium-16', 'body/medium-17-w400-auto'], // body/medium-16은 예약이 아님
+  );
+  assert.deepEqual(
+    nameKrdsStyles([kpx(24, 150, 'Bold'), kpx(24, 150, 'Bold Italic')], { reserved }),
+    ['heading/medium', 'heading/medium-24-w700i-150'],
+  );
+  // §3.8 자간 · 글꼴 꼬리는 강제 꼬리 뒤에 그대로
+  assert.deepEqual(
+    nameKrdsStyles([kin({}), kin({ letterSpacing: 0.5 })], { reserved: new Set(['body/medium-ls0_5']) }),
+    ['body/medium', 'body/medium-16-w400-150-ls0_5'],
+  );
+  // §3.8-3 -2가 예약과 겹치면 -2를 떼고 강제 꼬리
+  assert.deepEqual(
+    nameKrdsStyles([kin({ name: 'a' }), kin({ name: 'b' })], { reserved: new Set(['body/medium-2']) }),
+    ['body/medium', 'body/medium-16-w400-150'],
+  );
+  // 강제 이름끼리 · 예약과 또 겹치면 §3.8-3 순서대로 -2 · -3
+  assert.deepEqual(
+    nameKrdsStyles([kin({ name: 'b' }), kin({ name: 'a' })], {
+      reserved: new Set(['body/medium', 'body/medium-2', 'body/medium-16-w400-150']),
+    }),
+    ['body/medium-16-w400-150-3', 'body/medium-16-w400-150-2'],
+  );
+});
+
+test('krdsType — §7 예(이름 다시 짓기 경로 · 쓰인 곳 0)', () => {
+  const rows = [
+    ['display/inter-semi-bold', 52, 150, 'SemiBold', 'display/large'],
+    ['display/inter-semi-bold-2', 52, 120, 'SemiBold', 'display/large-120'],
+    ['display/inter-semi-bold-3', 52, 125, 'SemiBold', 'display/large-125'],
+    ['h1', 28, 120, 'SemiBold', 'heading/large-120'],
+    ['h3/inter-semi-bold', 24, 150, 'SemiBold', 'heading/medium'],
+    ['h3/inter-semi-bold-2', 24, 120, 'SemiBold', 'heading/medium-120'],
+    ['h2', 26.67, 150, 'SemiBold', 'heading/medium-26_7'],
+    ['title/semi-bold', 20, 120, 'SemiBold', 'heading/small-120'],
+    ['body/inter-semi-bold', 18, 125, 'SemiBold', 'heading/small-18-125'],
+    ['body/inter-semi-bold-2', 18, 120, 'SemiBold', 'heading/small-18-120'],
+    ['title/regular', 20, 150, 'Regular', 'body/large'],
+    ['body/inter-regular', 18, 180, 'Regular', 'body/large-18-180'],
+    ['body/inter-regular-2', 18, 150, 'Regular', 'body/large-18'],
+    ['body/inter-regular-3', 18, 120, 'Regular', 'body/large-18-120'],
+    ['body/inter-regular-4', 18, 120, 'Regular', 'body/large-18-120-2'],
+    ['body/inter-medium', 18, 120, 'Medium', 'body/large-18-w500-120'],
+    ['body/inter-medium-2', 18, 120, 'Medium', 'body/large-18-w500-120-2'],
+    ['body/inter-medium-3', 18, 125, 'Medium', 'body/large-18-w500-125'],
+    ['caption/inter-regular', 16, 125, 'Regular', 'body/medium-125'],
+    ['caption/inter-medium', 16, 125, 'Medium', 'body/medium-w500-125'],
+    ['caption/inter-medium-2', 16, 120, 'Medium', 'body/medium-w500-120'],
+    ['caption/inter-semi-bold', 16, 120, 'SemiBold', 'heading/xsmall-120'],
+    ['caption/inter-semi-bold-2', 16, 125, 'SemiBold', 'heading/xsmall-125'],
+    ['overline', 14, 120, 'Regular', 'body/small-120'],
+    ['text-9', 12, 120, 'Regular', 'body/xsmall-120'],
+    ['text-9-2', 12, 120, 'Regular', 'body/xsmall-120-ls0_5', { letterSpacing: 0.5 }],
+    ['text-10', 10, 120, 'Regular', 'body/xsmall-10-120'],
+  ];
+  // 입력 순서를 뒤집어도 결과는 같다(순서 무관)
+  for (const order of [rows, [...rows].reverse()]) {
+    const inputs = order.map(([name, size, pct, style, , extra], i) =>
+      kpx(size, pct, style, { name, id: `S:${i}`, ...(extra ?? {}) }));
+    const names = nameKrdsStyles(inputs, { path: 'rename' });
+    assert.deepEqual(names, order.map((r) => r[4]));
+  }
 });

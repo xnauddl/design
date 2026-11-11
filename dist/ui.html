@@ -164,13 +164,6 @@
     /* 텍스트 스타일 카드의 이름 칸 — 파랑=이미 등록된 스타일(이름만 rename), 앰버=새로 만들 스타일. */
     .r-title input.ts-bound { color: var(--accent-strong); }
     .r-title input.ts-new { color: var(--warn); }
-    /* ×N 배지 — 누르면 그 글자들을 캔버스에서 선택(1개면 이동). */
-    .r-badge {
-      font: 600 10px/1 var(--mono); color: var(--accent-strong);
-      background: var(--accent-subtle); border: 1px solid var(--accent-border);
-      border-radius: 999px; padding: 4px 8px; cursor: pointer; white-space: nowrap;
-    }
-    .r-badge:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
     input[type="color"] {
       width: 30px; height: 26px; padding: 0; border: 1px solid var(--border-2);
       border-radius: var(--r-sm); background: var(--surface); cursor: pointer;
@@ -389,6 +382,8 @@
     .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
+    .r-top.has-off { grid-template-columns: 16px 1fr auto auto; }
+    .r-top.no-check.has-off { grid-template-columns: 1fr auto auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
     .r-title { font-size: var(--fs); font-weight: 600; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .r-title.mono, .r-sum.mono { font-family: var(--mono); }
@@ -432,6 +427,19 @@
     .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .skip-row .grow { flex: 1 1 auto; }
     .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
+    /* 타이포 목록 — 구분선 줄(카드 안 카드 금지, CLAUDE.md · docs/text-style-krds.md §6) */
+    #tsList { gap: 0; }
+    #tsList .r-card { border: none; border-bottom: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; margin: 0; }
+    /* 규칙 밖 크기(docs/text-style-krds.md §4) */
+    .ts-off { font-size: 11px; white-space: nowrap; flex: 0 0 auto; }
+    .ts-off.decimal { color: var(--danger); }
+    .ts-off.off { color: var(--text-2); }
+    /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
+    .tsr-all { padding: 0 0 6px; }
+    .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
+    .tsr-row .tsr-from { color: var(--text-2); text-decoration: line-through; min-width: 60px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tsr-row .tsr-to { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tsr-row .tsr-clash { color: var(--warn); font-size: 11px; white-space: nowrap; }
     .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
@@ -1221,7 +1229,8 @@
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
            이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
       <div class="row">
-        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 크기 순 이름(display/h1…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
+        <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 KRDS 이름(heading/large…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
+        <button id="btnTsRename" type="button" data-i18n="textStyle.renameBtn">이름 다시 짓기</button>
       </div>
       <div id="tsList" class="results"></div>
       <div class="status" id="tsStatus"></div>
@@ -1551,6 +1560,7 @@
     "op.createVar": "\uC0C8 \uBCC0\uC218",
     "op.dupVar": "\uBCF5\uC81C",
     "op.delVar": "\uC0AD\uC81C",
+    "op.tsRename": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uBC14\uAFB8\uAE30",
     "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
@@ -1932,15 +1942,13 @@
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
-    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
+    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 KRDS \uC774\uB984(heading/large\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
     "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
     "textStyle.nameBoundTip": "\uC774\uBBF8 \uB4F1\uB85D\uB41C \uC2A4\uD0C0\uC77C\uC774\uC5D0\uC694. \uC774\uB984\uC744 \uBC14\uAFB8\uBA74 \uC774 \uC2A4\uD0C0\uC77C\uC758 \uC774\uB984\uB9CC \uBC14\uB00C\uC5B4\uC694(\uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uC74C).",
     "textStyle.nameNewTip": "\uC0C8 \uC2A4\uD0C0\uC77C\uB85C \uB4F1\uB85D\uB3FC\uC694(\uC544\uC9C1 \uB4F1\uB85D \uC548 \uB41C \uAE00\uC790).",
     // ×N 배지 — 1개면 그 글자로 이동, 여럿이면 전부 선택.
-    "textStyle.badgeGoTip": "\uC774 \uAE00\uC790\uB85C \uC774\uB3D9",
-    "textStyle.badgeSelectTip": "\uC774 \uC2A4\uD0C0\uC77C\uC744 \uC4F0\uB294 \uAE00\uC790 {count}\uAC1C \uC804\uCCB4 \uC120\uD0DD",
     // 적용(바인딩)
     "bind.nothing": "\uC5F0\uACB0\uD560 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "bind.skipCappedTip": " \xB7 \uBAA9\uB85D\uC740 {shown}\uAC1C\uAE4C\uC9C0",
@@ -2182,7 +2190,33 @@
     "textStyle.scanLsPct": " \xB7 \uC790\uAC04% {n}",
     "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
     "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
-    "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
+    "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 KRDS \uC774\uB984 {b}",
+    "textStyle.renameBtn": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30",
+    "textStyle.renameMenu": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30\u2026",
+    "textStyle.renameReading": "\uC2A4\uD0C0\uC77C\uC744 \uC77D\uB294 \uC911\u2026",
+    "textStyle.renameHead": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30 \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
+    "textStyle.renameNone": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
+    "textStyle.renameApply": "{k}\uAC1C \uC774\uB984 \uBC14\uAFB8\uAE30",
+    "textStyle.renameNeedOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "textStyle.renameClash": "\uAC19\uC740 \uC774\uB984\uC774 \uB0A8\uC544\uC694",
+    "textStyle.renameRowAria": "{from} \u2192 {to}",
+    "textStyle.renamed": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "textStyle.renameSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
+    "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
+    "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
+    "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
+    "textStyle.renameSkip.error": "\uC624\uB958",
+    "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
+    "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
+    "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
+    "textStyle.offDecimal": "\uC18C\uC218 \uD06C\uAE30",
+    "textStyle.offScale": "KRDS \uBC16",
+    "textStyle.offTip": "KRDS \uD06C\uAE30\uAC00 \uC544\uB2C8\uC5D0\uC694 \xB7 \uAC00\uAE4C\uC6B4 KRDS \uD06C\uAE30 {n}px",
+    "textStyle.offSum": " \xB7 KRDS \uBC16 \uD06C\uAE30 {k}\uAC1C(\uC18C\uC218 {m})",
+    "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
     "textStyle.missingN": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -2549,6 +2583,320 @@
     return { checked, added, removed };
   }
 
+  // src/lib/naming.ts
+  var EMITTED_ROLES = [
+    // 구조 폴백(역할을 못 정했을 때)
+    "container",
+    "wrapper",
+    "shape",
+    // HTML 랜드마크
+    "header",
+    "footer",
+    "main",
+    "aside",
+    "nav",
+    "section",
+    "hero",
+    // 본문 첫 블록(큰 제목 + 이미지) — section보다 구체적
+    "logo",
+    // 헤더 첫 자리의 작은 묶음(마크·워드마크)
+    "actions",
+    // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
+    "article",
+    "figure",
+    // 컴포넌트
+    "button",
+    "chip",
+    "card",
+    "table",
+    "list",
+    "item",
+    "field",
+    "input",
+    "modal",
+    "overlay",
+    "progress",
+    "indicator",
+    // 요소
+    "icon",
+    "image",
+    "thumbnail",
+    "background",
+    "swatch",
+    "border",
+    "divider",
+    "badge",
+    "status",
+    "avatar"
+  ];
+  var RECOGNIZED_ROLES = [
+    "content",
+    "group",
+    "body",
+    "leading",
+    "trailing",
+    "sidebar",
+    "sheet",
+    "drawer",
+    "dialog",
+    "popup",
+    "tab",
+    "label",
+    "title"
+  ];
+  var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
+  var ROLE_SET = new Set(ROLE_VOCAB);
+  function kebab(input) {
+    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s/]+/g, "-").replace(/_/g, (_m, i, s) => /\d/.test(s[i - 1] || "") && /\d/.test(s[i + 1] || "") ? "_" : "-").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+  }
+
+  // src/lib/exporters.ts
+  var WEIGHT_NAMES = {
+    thin: 100,
+    hairline: 100,
+    extralight: 200,
+    ultralight: 200,
+    light: 300,
+    regular: 400,
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    demibold: 600,
+    bold: 700,
+    extrabold: 800,
+    ultrabold: 800,
+    black: 900,
+    heavy: 900
+  };
+  function splitWeightStyle(value) {
+    var _a3;
+    if (typeof value === "number") return { weight: value, italic: false };
+    const s = String(value);
+    const italic = /italic|oblique/i.test(s);
+    const cleaned = s.replace(/italic|oblique/gi, "").replace(/[\s_-]/g, "").toLowerCase();
+    const weight = (_a3 = WEIGHT_NAMES[cleaned]) != null ? _a3 : Number(cleaned) || 400;
+    return { weight, italic };
+  }
+  var cssVar = (name) => `--${kebab(name)}`;
+  function cssVarName(name) {
+    return cssVar(name);
+  }
+  function exportHasTokens(content, format) {
+    if (format === "css") return /--[\w-]+\s*:/.test(content);
+    try {
+      const root = JSON.parse(content);
+      return !!root && typeof root === "object" && Object.keys(root).length > 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // src/lib/krdsType.ts
+  var KRDS_SIZES = [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60];
+  var KRDS_STEPS = {
+    display: [
+      { step: "large", ref: 60, min: 52 },
+      { step: "medium", ref: 44, min: -Infinity }
+    ],
+    heading: [
+      { step: "xlarge", ref: 40, min: 36 },
+      { step: "large", ref: 32, min: 28 },
+      { step: "medium", ref: 24, min: 21.5 },
+      { step: "small", ref: 19, min: 18 },
+      { step: "xsmall", ref: 17, min: 16 },
+      { step: "xxsmall", ref: 15, min: -Infinity }
+    ],
+    body: [
+      { step: "large", ref: 19, min: 18 },
+      { step: "medium", ref: 17, min: 16 },
+      { step: "small", ref: 15, min: 14 },
+      { step: "xsmall", ref: 13, min: -Infinity }
+    ],
+    label: [
+      { step: "large", ref: 19, min: 18 },
+      { step: "medium", ref: 17, min: 16 },
+      { step: "small", ref: 15, min: 14 },
+      { step: "xsmall", ref: 13, min: -Infinity }
+    ]
+  };
+  function round1(n) {
+    const r = Math.sign(n) * Math.round(Math.abs(n) * 10) / 10;
+    return r === 0 ? 0 : r;
+  }
+  function krdsNum(n) {
+    return String(round1(n)).replace("-", "m").replace(".", "_");
+  }
+  var WIDTH_OPTICAL_RE = /(?:semi|extra|ultra)?[\s_-]*(?:condensed|narrow|compressed|expanded|extended|wide|display|text|caption|micro)/gi;
+  function weightOf(style) {
+    const stripped = String(style != null ? style : "").replace(WIDTH_OPTICAL_RE, " ");
+    const r = splitWeightStyle(stripped);
+    const weight = Number.isFinite(r.weight) && r.weight >= 1 && r.weight <= 1e3 ? r.weight : 400;
+    return { weight, italic: r.italic };
+  }
+  function lineHeightPct(i) {
+    if (!i.lineHeight) return "auto";
+    const p = i.lineHeightPercent ? i.lineHeightPercent : i.fontSize ? i.lineHeight / i.fontSize * 100 : 0;
+    return Math.round(p);
+  }
+  var LABEL_TOKENS = /* @__PURE__ */ new Set(["label", "button", "btn", "chip", "input", "field"]);
+  function krdsCategory(input, path = "scan") {
+    var _a3, _b, _c;
+    if (path === "scan") {
+      const ui = (_a3 = input.uiCount) != null ? _a3 : 0;
+      if (ui > 0 && ui * 2 >= ((_b = input.count) != null ? _b : 0)) return "label";
+    } else {
+      const tokens2 = String((_c = input.name) != null ? _c : "").split(/[/\-_\s]+/).map((t2) => t2.toLowerCase());
+      if (tokens2.some((t2) => LABEL_TOKENS.has(t2))) return "label";
+    }
+    const { weight } = weightOf(input.style);
+    const size = round1(input.fontSize);
+    if (weight >= 600 && size >= 42) return "display";
+    if (weight >= 600) return "heading";
+    return "body";
+  }
+  function krdsStepDef(category, size) {
+    var _a3;
+    const d = round1(size);
+    const steps = KRDS_STEPS[category];
+    return (_a3 = steps.find((s) => d >= s.min)) != null ? _a3 : steps[steps.length - 1];
+  }
+  function offScale(size) {
+    const d = round1(size);
+    let nearest = KRDS_SIZES[0];
+    for (const k of KRDS_SIZES) {
+      const dk = Math.abs(k - d);
+      const dn = Math.abs(nearest - d);
+      if (dk < dn || dk === dn && k > nearest) nearest = k;
+    }
+    const kind = !Number.isInteger(d) ? "decimal" : KRDS_SIZES.includes(d) ? null : "off";
+    return { kind, nearest };
+  }
+  var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  var sigOf = (i) => `${i.fontSize}|${i.lineHeight}|${i.letterSpacing}|${i.family}|${i.style}`;
+  function groupBy(items, key) {
+    const m = /* @__PURE__ */ new Map();
+    for (const it of items) {
+      const k = key(it);
+      const l = m.get(k);
+      if (l) l.push(it);
+      else m.set(k, [it]);
+    }
+    return [...m.values()];
+  }
+  var cmpLast = (a, b) => {
+    var _a3, _b, _c, _d;
+    return b.count - a.count || cmpStr(sigOf(a.input), sigOf(b.input)) || cmpStr((_a3 = a.input.name) != null ? _a3 : "", (_b = b.input.name) != null ? _b : "") || cmpStr((_c = a.input.id) != null ? _c : "", (_d = b.input.id) != null ? _d : "") || a.idx - b.idx;
+  };
+  var weightKey = (w) => `${w.weight}${w.italic ? "i" : ""}`;
+  var lhTail = (lh) => lh === "auto" ? "-auto" : lh === 150 ? "" : `-${lh}`;
+  function nameKrdsStyles(inputs, opts = {}) {
+    var _a3, _b, _c;
+    const path = (_a3 = opts.path) != null ? _a3 : "scan";
+    const anchored = (_b = opts.anchored) != null ? _b : /* @__PURE__ */ new Map();
+    const out = inputs.map((_, i) => {
+      var _a4;
+      return (_a4 = anchored.get(i)) != null ? _a4 : "";
+    });
+    const works = [];
+    inputs.forEach((input, idx) => {
+      if (anchored.has(idx)) return;
+      const cat = krdsCategory(input, path);
+      const size = round1(input.fontSize);
+      const w = weightOf(input.style);
+      works.push({
+        idx,
+        input,
+        cat,
+        step: krdsStepDef(cat, size),
+        size,
+        weight: w.weight,
+        italic: w.italic,
+        lh: lineHeightPct(input),
+        ls: round1(input.letterSpacing || 0),
+        count: input.count || 0,
+        base: "",
+        lastTail: "",
+        name: ""
+      });
+    });
+    const sizeKey = /* @__PURE__ */ new Map();
+    for (const g of groupBy(works, (w) => `${w.cat}/${w.step.step}`)) {
+      const sizes = groupBy(g, (w) => String(w.size));
+      const ref = g[0].step.ref;
+      const ranked = sizes.map((ws) => ({ size: ws[0].size, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => Math.abs(a.size - ref) - Math.abs(b.size - ref) || b.used - a.used || b.size - a.size);
+      ranked.forEach((r, i) => {
+        for (const w of r.ws) sizeKey.set(w, `${w.cat}/${w.step.step}${i === 0 ? "" : `-${krdsNum(w.size)}`}`);
+      });
+    }
+    for (const g of groupBy(works, (w) => sizeKey.get(w))) {
+      const heavy = g[0].cat === "display" || g[0].cat === "heading";
+      const def = heavy ? 700 : 400;
+      const inDefault = (w) => heavy ? w.weight >= 600 : w.weight <= 500;
+      const weights = groupBy(g, weightKey).filter((ws) => inDefault(ws[0])).map((ws) => ({ w: ws[0], used: ws.reduce((s, x) => s + x.count, 0) })).sort(
+        (a, b) => b.used - a.used || Math.abs(a.w.weight - def) - Math.abs(b.w.weight - def) || Number(a.w.italic) - Number(b.w.italic) || a.w.weight - b.w.weight
+      );
+      const winner = weights.length ? weightKey(weights[0].w) : null;
+      for (const w of g) {
+        const wt = weightKey(w) === winner ? "" : `-w${weightKey(w)}`;
+        w.base = `${sizeKey.get(w)}${wt}${lhTail(w.lh)}`;
+        w.name = w.base;
+      }
+    }
+    for (const g of groupBy(works, (w) => w.name)) {
+      const byLs = groupBy(g, (w) => String(w.ls));
+      if (byLs.length < 2) continue;
+      const ranked = byLs.map((ws) => ({ ls: ws[0].ls, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort(
+        (a, b) => Number(b.ls === 0) - Number(a.ls === 0) || b.used - a.used || Math.abs(a.ls) - Math.abs(b.ls) || a.ls - b.ls
+      );
+      ranked.forEach((r, i) => {
+        if (i === 0) return;
+        for (const w of r.ws) {
+          w.lastTail += `-ls${krdsNum(w.ls)}`;
+          w.name = w.base + w.lastTail;
+        }
+      });
+    }
+    for (const g of groupBy(works, (w) => w.name)) {
+      const byFam = groupBy(g, (w) => w.input.family);
+      if (byFam.length < 2) continue;
+      const ranked = byFam.map((ws) => ({ fam: ws[0].input.family, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => b.used - a.used || cmpStr(a.fam, b.fam));
+      ranked.forEach((r, i) => {
+        if (i === 0) return;
+        for (const w of r.ws) {
+          w.lastTail += `-${slug(w.input.family) || "font"}`;
+          w.name = w.base + w.lastTail;
+        }
+      });
+    }
+    for (const g of groupBy(works, (w) => w.name)) {
+      if (g.length < 2) continue;
+      [...g].sort(cmpLast).forEach((w, i) => {
+        if (i > 0) w.name = `${w.name}-${i + 1}`;
+      });
+    }
+    const taken = new Set((_c = opts.reserved) != null ? _c : []);
+    for (const n of anchored.values()) taken.add(n);
+    const forced = [];
+    const claimed = /* @__PURE__ */ new Set();
+    for (const w of works) {
+      if (taken.has(w.name) || claimed.has(w.name)) forced.push(w);
+      else claimed.add(w.name);
+    }
+    for (const n of claimed) taken.add(n);
+    for (const w of [...forced].sort(cmpLast)) {
+      const wt = `-w${weightKey(w)}`;
+      const lh = w.lh === "auto" ? "-auto" : `-${w.lh}`;
+      const name = `${w.cat}/${w.step.step}-${krdsNum(w.size)}${wt}${lh}${w.lastTail}`;
+      let final = name;
+      for (let k = 2; taken.has(final); k++) final = `${name}-${k}`;
+      taken.add(final);
+      w.name = final;
+    }
+    for (const w of works) out[w.idx] = w.name;
+    return out;
+  }
+
   // src/lib/textStyles.ts
   function tsSig(s) {
     return `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
@@ -2571,23 +2919,33 @@
     return base === "Regular" ? "Italic" : `${base} Italic`;
   }
   var DEFAULT_TYPE_RAMP = [
-    { name: "display", fontSize: 48, lineHeight: 56, weight: 700 },
-    { name: "h1", fontSize: 32, lineHeight: 40, weight: 700 },
-    { name: "h2", fontSize: 24, lineHeight: 32, weight: 600 },
-    { name: "h3", fontSize: 20, lineHeight: 28, weight: 600 },
-    { name: "title", fontSize: 18, lineHeight: 24, weight: 600 },
-    { name: "body", fontSize: 16, lineHeight: 24, weight: 400 },
-    { name: "caption", fontSize: 13, lineHeight: 18, weight: 400 },
-    { name: "overline", fontSize: 11, lineHeight: 16, weight: 500 }
+    { name: "display/large", fontSize: 60, weight: 700 },
+    { name: "heading/large", fontSize: 32, weight: 700 },
+    { name: "heading/medium", fontSize: 24, weight: 700 },
+    { name: "heading/small", fontSize: 19, weight: 700 },
+    { name: "body/medium", fontSize: 17, weight: 400 },
+    { name: "body/small", fontSize: 15, weight: 400 }
   ];
-  function rampToSpecs(family) {
-    return DEFAULT_TYPE_RAMP.map((r) => ({
-      name: r.name,
+  function rampToSpecs(family, reserved) {
+    const inputs = DEFAULT_TYPE_RAMP.map((r) => ({
       fontSize: r.fontSize,
-      lineHeight: r.lineHeight,
+      lineHeight: r.fontSize * 1.5,
+      lineHeightPercent: 150,
       letterSpacing: 0,
       family,
-      style: fontStyleForWeight(r.weight, false)
+      style: fontStyleForWeight(r.weight, false),
+      count: 0,
+      uiCount: 0
+    }));
+    const names = nameKrdsStyles(inputs, { reserved: new Set(reserved != null ? reserved : []), path: "scan" });
+    return inputs.map((x, i) => ({
+      name: names[i],
+      fontSize: x.fontSize,
+      lineHeight: x.lineHeight,
+      lineHeightPercent: 150,
+      letterSpacing: 0,
+      family,
+      style: x.style
     }));
   }
 
@@ -2952,88 +3310,6 @@
   }
   function licenseVerifyConfigured() {
     return !VERIFY_URL.includes("example.") && LICENSE_PUBLIC_JWK.x !== "PLACEHOLDER";
-  }
-
-  // src/lib/naming.ts
-  var EMITTED_ROLES = [
-    // 구조 폴백(역할을 못 정했을 때)
-    "container",
-    "wrapper",
-    "shape",
-    // HTML 랜드마크
-    "header",
-    "footer",
-    "main",
-    "aside",
-    "nav",
-    "section",
-    "hero",
-    // 본문 첫 블록(큰 제목 + 이미지) — section보다 구체적
-    "logo",
-    // 헤더 첫 자리의 작은 묶음(마크·워드마크)
-    "actions",
-    // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
-    "article",
-    "figure",
-    // 컴포넌트
-    "button",
-    "chip",
-    "card",
-    "table",
-    "list",
-    "item",
-    "field",
-    "input",
-    "modal",
-    "overlay",
-    "progress",
-    "indicator",
-    // 요소
-    "icon",
-    "image",
-    "thumbnail",
-    "background",
-    "swatch",
-    "border",
-    "divider",
-    "badge",
-    "status",
-    "avatar"
-  ];
-  var RECOGNIZED_ROLES = [
-    "content",
-    "group",
-    "body",
-    "leading",
-    "trailing",
-    "sidebar",
-    "sheet",
-    "drawer",
-    "dialog",
-    "popup",
-    "tab",
-    "label",
-    "title"
-  ];
-  var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
-  var ROLE_SET = new Set(ROLE_VOCAB);
-  function kebab(input) {
-    return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s/]+/g, "-").replace(/_/g, (_m, i, s) => /\d/.test(s[i - 1] || "") && /\d/.test(s[i + 1] || "") ? "_" : "-").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
-  }
-
-  // src/lib/exporters.ts
-  var cssVar = (name) => `--${kebab(name)}`;
-  function cssVarName(name) {
-    return cssVar(name);
-  }
-  function exportHasTokens(content, format) {
-    if (format === "css") return /--[\w-]+\s*:/.test(content);
-    try {
-      const root = JSON.parse(content);
-      return !!root && typeof root === "object" && Object.keys(root).length > 0;
-    } catch (e) {
-      return false;
-    }
   }
 
   // src/lib/varKind.ts
@@ -4559,7 +4835,13 @@
     };
     row.appendChild(text("ts-family", "", s.family, t("ts.family"), (v) => s.family = v));
     row.appendChild(sep("\xB7"));
-    row.appendChild(num("40px", s.fontSize, t("ts.size"), "1", (n) => s.fontSize = n));
+    const sizeEl = num("40px", s.fontSize, t("ts.size"), "1", (n) => {
+      s.fontSize = n;
+      const card = row.closest(".r-card");
+      if (card) putOffMark(card, s.fontSize);
+    });
+    sizeEl.addEventListener("change", tsRefreshTail);
+    row.appendChild(sizeEl);
     row.appendChild(sep("/"));
     row.appendChild(num("44px", s.lineHeight, t("ts.lineHeight"), "0", (n) => {
       s.lineHeight = n;
@@ -4592,16 +4874,8 @@
     const editable = isEditableTextRow(s);
     const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
     if (editable) card.appendChild(textStyleEditRow(s));
-    const n = (_a3 = s.count) != null ? _a3 : 0;
-    const ids = (_b = s.nodeIds) != null ? _b : [];
-    if (n > 0 && ids.length) {
-      const badge = document.createElement("button");
-      badge.className = "r-badge";
-      badge.textContent = `\xD7${n}`;
-      badge.title = n === 1 ? t("textStyle.badgeGoTip") : t("textStyle.badgeSelectTip", { count: n });
-      badge.addEventListener("click", () => selectNodes(ids, "tsStatus"));
-      card.querySelector(".r-top").appendChild(badge);
-    } else {
+    const scanned = ((_a3 = s.count) != null ? _a3 : 0) > 0 && !!((_b = s.nodeIds) == null ? void 0 : _b.length);
+    if (!scanned) {
       const del = document.createElement("button");
       del.className = "link";
       del.textContent = t("textStyle.rowDelete");
@@ -4611,18 +4885,19 @@
       });
       card.querySelector(".r-top").appendChild(del);
     }
+    putOffMark(card, s.fontSize);
     return card;
   }
   var tsScanNote = { namePart: "", warnings: [] };
   function renderTextStyles() {
     renderChunked($("tsList"), tsSpecs, textStyleCard);
     if (!tsSpecs.length) {
-      setStatus("tsStatus", "", "");
+      setTsStatus("other", "", "");
       return;
     }
     const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
-    setStatus(
-      "tsStatus",
+    setTsStatus(
+      "scan",
       t("textStyle.scanSummary", { a: fresh, b: tsSpecs.length - fresh }) + tsScanNote.namePart + t("textStyle.scanLhPct", { n: tsSpecs.filter((s) => s.lineHeightPercent).length }) + t("textStyle.scanLsPct", { n: tsSpecs.filter((s) => {
         var _a3;
         return ((_a3 = s.letterSpacingPercent) != null ? _a3 : 0) !== 0;
@@ -4651,13 +4926,233 @@
     setLock($("tsLinkNow"), tsScanIds ? null : "prereq", t("textStyle.linkNeedScan"));
   }
   $("btnTsRowLabels").addEventListener("click", () => {
-    setStatus("tsStatus", t("textStyle.renaming"), "ok");
+    setTsStatus("other", t("textStyle.renaming"), "ok");
     send({ type: "NAME_TEXT_STYLES_BY_ROW" });
   });
+  function offMarkEl(size, withText) {
+    const o = offScale(size);
+    if (!o.kind) return null;
+    const el = document.createElement("span");
+    el.className = `ts-off ${o.kind}`;
+    const label = t(o.kind === "decimal" ? "textStyle.offDecimal" : "textStyle.offScale");
+    el.textContent = (o.kind === "decimal" ? "\u26A0" : "\u25CB") + (withText ? ` ${label}` : "");
+    el.title = `${label} \xB7 ${t("textStyle.offTip", { n: o.nearest })}`;
+    el.setAttribute("aria-label", el.title);
+    return el;
+  }
+  function putOffMark(card, size) {
+    var _a3, _b;
+    (_a3 = card.querySelector(".ts-off")) == null ? void 0 : _a3.remove();
+    const m = offMarkEl(size, true);
+    const top = card.querySelector(".r-top");
+    const del = (_b = top == null ? void 0 : top.querySelector(".link")) != null ? _b : null;
+    top == null ? void 0 : top.classList.toggle("has-off", !!m && !!del);
+    if (m && top) top.insertBefore(m, del);
+  }
+  var tsStatusBase = { kind: "other", text: "", cls: "" };
+  function offTail() {
+    const marks = tsSpecs.map((s) => offScale(s.fontSize).kind).filter((k) => k);
+    return marks.length ? t("textStyle.offSum", { k: marks.length, m: marks.filter((k) => k === "decimal").length }) : "";
+  }
+  function setTsStatus(kind, text, cls, tip) {
+    tsStatusBase = { kind, text, cls };
+    setStatus("tsStatus", kind === "other" || !text ? text : text + offTail(), cls, tip);
+  }
+  var tsExistingNames = [];
+  var tsrReq = 0;
+  var tsrApplyReq = 0;
+  var tsrRows = null;
+  var tsrOff = /* @__PURE__ */ new Set();
+  var tsrBody = null;
+  var tsrTitle = null;
+  var tsrApplyBtn = null;
+  var tsrOpener = null;
+  var tsrCloseBtn = null;
+  var tsrBusy = false;
+  $("btnTsRename").addEventListener("click", (e) => {
+    const b = e.currentTarget;
+    if (b.getAttribute("aria-disabled") === "true") return;
+    openTsRename(b);
+  });
+  function openTsRename(opener) {
+    if (!isPaid) {
+      showStatusLine(t("status.paid"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+      return;
+    }
+    const lock = writeLockReason();
+    if (lock) {
+      showStatusLine(lock, { cls: "warn" });
+      return;
+    }
+    tsrOpener = opener;
+    tsrRows = null;
+    tsrOff.clear();
+    tsrBusy = false;
+    const title = document.createElement("span");
+    tsrTitle = title;
+    const body = document.createElement("div");
+    body.className = "tsr-body";
+    tsrBody = body;
+    const apply = modalButton(t("textStyle.renameApply", { k: 0 }), tsrApply, true);
+    tsrApplyBtn = apply;
+    const close = modalButton(t("common.close"), () => requestCloseModal("button"));
+    tsrCloseBtn = close;
+    openModal(title, body, [close, apply], () => tsrOpener, () => {
+      tsrBody = null;
+      tsrApplyBtn = null;
+      tsrTitle = null;
+    }, { focus: close });
+    tsrReq = ++bindReqSeq;
+    send({ type: "SCAN_TS_RENAME", reqId: tsrReq });
+    tsrRender();
+  }
+  function tsrClash(r) {
+    return !!(tsrRows == null ? void 0 : tsrRows.some((x) => x !== r && tsrOff.has(x.id) && x.from === r.to));
+  }
+  function tsrApplicable() {
+    return (tsrRows != null ? tsrRows : []).filter((r) => !tsrOff.has(r.id) && !tsrClash(r));
+  }
+  function tsrRender() {
+    var _a3, _b, _c, _d;
+    const body = tsrBody;
+    if (!body || !tsrApplyBtn || !tsrTitle) return;
+    const rows = tsrRows;
+    tsrTitle.textContent = t("textStyle.renameHead", { n: (_a3 = rows == null ? void 0 : rows.length) != null ? _a3 : 0 });
+    const k = tsrApplicable().length;
+    tsrApplyBtn.textContent = t("textStyle.renameApply", { k });
+    const lock = tsrBusy ? t("common.running") : writeLockReason();
+    setLock(tsrApplyBtn, lock ? "prereq" : !rows || !k ? "prereq" : null, lock != null ? lock : t("textStyle.renameNeedOn"));
+    const hadFocus = body.contains(document.activeElement) ? (_c = (_b = document.activeElement.dataset.id) != null ? _b : document.activeElement.dataset.all) != null ? _c : null : null;
+    clearMount(body);
+    if (!rows) {
+      body.textContent = t("textStyle.renameReading");
+      return;
+    }
+    if (!rows.length) {
+      body.textContent = t("textStyle.renameNone");
+      return;
+    }
+    const all = document.createElement("div");
+    all.className = "tsr-all";
+    const link = (label, key, on) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "link link-btn";
+      b.textContent = label;
+      b.dataset.all = key;
+      b.addEventListener("click", () => {
+        for (const r of rows) on ? tsrOff.delete(r.id) : tsrOff.add(r.id);
+        tsrRender();
+      });
+      return b;
+    };
+    all.append(link(t("bind.allOn"), "on", true), " \xB7 ", link(t("bind.allOff"), "off", false));
+    body.appendChild(all);
+    const sws = [];
+    for (const r of rows) {
+      const row = document.createElement("div");
+      row.className = "tsr-row";
+      row.title = `${r.from} \u2192 ${r.to}`;
+      const from = document.createElement("span");
+      from.className = "tsr-from";
+      from.textContent = r.from;
+      const arrow = document.createElement("span");
+      arrow.textContent = "\u2192";
+      arrow.setAttribute("aria-hidden", "true");
+      const to = document.createElement("span");
+      to.className = "tsr-to";
+      to.textContent = r.to;
+      row.append(from, arrow, to);
+      const om = offMarkEl(r.fontSize, false);
+      if (om) row.appendChild(om);
+      const on = !tsrOff.has(r.id);
+      if (on && tsrClash(r)) {
+        const c = document.createElement("span");
+        c.className = "tsr-clash";
+        c.textContent = t("textStyle.renameClash");
+        row.appendChild(c);
+      }
+      const sw = document.createElement("button");
+      sw.type = "button";
+      sw.className = "bv-switch";
+      sw.dataset.id = r.id;
+      sw.setAttribute("role", "switch");
+      sw.setAttribute("aria-checked", String(on));
+      sw.setAttribute("aria-label", t("textStyle.renameRowAria", { from: r.from, to: r.to }));
+      const tr = document.createElement("span");
+      tr.className = "bv-track";
+      tr.setAttribute("aria-hidden", "true");
+      sw.appendChild(tr);
+      sw.addEventListener("click", () => {
+        on ? tsrOff.add(r.id) : tsrOff.delete(r.id);
+        tsrRender();
+      });
+      sw.addEventListener("keydown", (e) => {
+        const i = sws.indexOf(sw);
+        const go = (j) => {
+          var _a4;
+          (_a4 = sws[Math.max(0, Math.min(sws.length - 1, j))]) == null ? void 0 : _a4.focus();
+        };
+        if (e.key === "ArrowDown") go(i + 1);
+        else if (e.key === "ArrowUp") go(i - 1);
+        else return;
+        e.preventDefault();
+      });
+      sws.push(sw);
+      row.appendChild(sw);
+      body.appendChild(row);
+    }
+    if (hadFocus) (_d = body.querySelector(`[data-id="${CSS.escape(hadFocus)}"], [data-all="${CSS.escape(hadFocus)}"]`)) == null ? void 0 : _d.focus();
+  }
+  function onTsRenamePlan(msg) {
+    var _a3;
+    if (msg.reqId !== tsrReq || !tsrBody) return;
+    const stayed = document.activeElement === tsrCloseBtn;
+    tsrRows = msg.rows;
+    tsrRender();
+    if (stayed) (_a3 = tsrBody == null ? void 0 : tsrBody.querySelector(".bv-switch")) == null ? void 0 : _a3.focus();
+  }
+  function tsrApply() {
+    if (!tsrApplyBtn || tsrApplyBtn.getAttribute("aria-disabled") === "true") return;
+    const items = tsrApplicable().map((r) => ({ id: r.id, from: r.from, to: r.to, sig: r.sig }));
+    if (!items.length) return;
+    tsrBusy = true;
+    tsrRender();
+    tsrApplyReq = ++bindReqSeq;
+    send({ type: "APPLY_TS_RENAME", reqId: tsrApplyReq, items });
+  }
+  function onTsRenamed(msg) {
+    if (msg.reqId !== tsrApplyReq) return;
+    tsrBusy = false;
+    if (tsrBody) closeModal();
+    let text = t("textStyle.renamed", { n: msg.renamed });
+    if (msg.skipped) text += t("textStyle.renameSkipped", { m: msg.skipped });
+    if (msg.roleVarsTaken) text += t("textStyle.renameRoleSkipped", { n: msg.roleVarsTaken });
+    if (msg.roleVarsError) text += t("textStyle.renameRoleError", { n: msg.roleVarsError });
+    const stuck = msg.results.filter((r) => r.status === "error-stuck");
+    const tip = [
+      ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => k === "error-stuck" ? `${t("textStyle.renameSkip.error-stuck", { name: stuck.map((x) => x.name).join(", ") })} ${n}` : `${t("textStyle.renameSkip." + k)} ${n}`),
+      ...msg.roleVarsStuck.length ? [t("textStyle.renameRoleStuck", { names: msg.roleVarsStuck.join(", ") })] : []
+    ].join("\n");
+    const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError);
+    showStatusLine(text, __spreadValues({ cls: warn ? "warn" : "ok" }, tip ? { tip } : {}));
+    if (msg.renamed >= 1) {
+      mkTsNames.clear();
+      if (tsSpecs.length) {
+        tsSpecs = [];
+        renderTextStyles();
+        $("btnTsRowLabels").disabled = true;
+        setTsStatus("other", text + t("textStyle.renameClearedTable"), warn ? "warn" : "ok");
+      }
+    }
+  }
+  function tsRefreshTail() {
+    if (tsStatusBase.kind !== "other") setTsStatus(tsStatusBase.kind, tsStatusBase.text, tsStatusBase.cls);
+  }
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
     if (!styles.length) {
-      setStatus("tsStatus", t("textStyle.needSpecs"), "warn");
+      setTsStatus("other", t("textStyle.needSpecs"), "warn");
       return;
     }
     const link = $("tsLinkNow").checked && !!tsScanIds;
@@ -4887,6 +5382,8 @@
     "btnScanText",
     "btnTextStyles",
     // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
+    "btnTsRename",
+    // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
     "btnGenDark"
     // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
   ];
@@ -5180,7 +5677,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -5379,30 +5876,37 @@
         );
         semStatusPrefix = "";
         break;
+      case "TS_RENAME_PLAN":
+        onTsRenamePlan(msg);
+        break;
+      case "TS_RENAMED":
+        onTsRenamed(msg);
+        break;
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
+        tsExistingNames = ((_g = msg.existing) != null ? _g : []).map((e) => e.name);
         if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
-            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_g = msg.fallback) != null ? _g : 0 }) : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_h = msg.fallback) != null ? _h : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
         } else {
-          tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY);
+          tsSpecs = rampToSpecs(DEFAULT_TS_FAMILY, tsExistingNames);
           tsScanIds = null;
           renderTsLink();
           tsScanNote = { namePart: "", warnings: [] };
           renderTextStyles();
-          setStatus("tsStatus", t("textStyle.fallbackRamp"), "warn");
+          setTsStatus("ramp", t("textStyle.fallbackRamp"), "warn");
         }
         break;
       }
       case "TEXT_STYLES_RESULT": {
-        const why = Object.entries((_h = msg.applyReasons) != null ? _h : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const why = Object.entries((_i = msg.applyReasons) != null ? _i : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
-        setStatus(
-          "tsStatus",
+        setTsStatus(
+          "other",
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? t("textStyle.missingN", { k: msg.missing.length }) : ""),
           msg.missing.length ? "warn" : "ok",
@@ -5432,7 +5936,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_i = msg.tierVars) != null ? _i : 0) + ((_j = msg.otherVars) != null ? _j : 0);
+        prereqLocalVars = ((_j = msg.tierVars) != null ? _j : 0) + ((_k = msg.otherVars) != null ? _k : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -5447,7 +5951,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_k = msg.noteKind) != null ? _k : "ok");
+          setStatus("licenseStatus", msg.note, (_l = msg.noteKind) != null ? _l : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -5479,12 +5983,12 @@
       }
       case "COMPONENTS_RESULT": {
         clearCompPreview();
-        const misplaced = (_l = msg.placeFailed) != null ? _l : [];
-        const cloned = (_m = msg.placeCloned) != null ? _m : [];
-        const propFailed = (_n = msg.propFailed) != null ? _n : [];
-        const fillKept = (_o = msg.fillKept) != null ? _o : [];
-        const reused = (_p = msg.reused) != null ? _p : [];
-        const reuseKept = (_q = msg.reuseKept) != null ? _q : [];
+        const misplaced = (_m = msg.placeFailed) != null ? _m : [];
+        const cloned = (_n = msg.placeCloned) != null ? _n : [];
+        const propFailed = (_o = msg.propFailed) != null ? _o : [];
+        const fillKept = (_p = msg.fillKept) != null ? _p : [];
+        const reused = (_q = msg.reused) != null ? _q : [];
+        const reuseKept = (_r = msg.reuseKept) != null ? _r : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -5548,7 +6052,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_r = msg.placeFailed) != null ? _r : [];
+          const misplaced0 = (_s = msg.placeFailed) != null ? _s : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -5557,7 +6061,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_s = msg.placeFailed) != null ? _s : [];
+        const misplaced = (_t = msg.placeFailed) != null ? _t : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -6259,6 +6763,8 @@
         const sub = document.createElement("span");
         sub.className = "tr-sub";
         sub.textContent = tsSummary(s);
+        const om = offMarkEl(s.fontSize, false);
+        if (om) sub.append(" ", om);
         cells.push(sub);
         if (s.boundStyleId) cells.push(mkTag(t("make.tagHas"), t("make.tsHasTip")));
         items.push({
@@ -7703,6 +8209,7 @@ ${opts.tip}` : text;
     GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showPick("theme"), write: true },
     SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showPick("type"), write: false },
     CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showPick("type"), write: true },
+    APPLY_TS_RENAME: { results: ["TS_RENAMED"], label: "op.tsRename", go: () => showTab("variables"), write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
     APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
     // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
@@ -7737,6 +8244,8 @@ ${opts.tip}` : text;
     // GENERATE_DARK_MODE
     "btnTextStyles",
     // CREATE_TEXT_STYLES
+    "btnTsRename",
+    // APPLY_TS_RENAME
     "btnRename",
     // RENAME_APPLY
     "btnRegisterComp",
@@ -7762,6 +8271,7 @@ ${opts.tip}` : text;
     const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
     const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
     for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
+    tsrRender();
     const other = link ? null : otherWriteOp();
     const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
@@ -10675,6 +11185,7 @@ ${opts.tip}` : text;
     openPopupFrom("exportPopBody", t("export.title"), returnFocus);
   }
   function openMoreMenu() {
+    var _a3;
     const btn = $("btnVarMore");
     const r = btn.getBoundingClientRect();
     openMenu(r.left, r.bottom + 2, [
@@ -10682,7 +11193,9 @@ ${opts.tip}` : text;
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
       { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t("v4.usesViewOff") : void 0, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
       { label: t("list.menuExpandAll"), onSelect: () => setAllGroups(true) },
-      { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) }
+      { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) },
+      // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
+      { label: t("textStyle.renameMenu"), separatorBefore: true, disabled: !isPaid || !!writeLockReason(), note: !isPaid ? t("status.paid") : (_a3 = writeLockReason()) != null ? _a3 : void 0, onSelect: () => openTsRename(btn), focusElsewhere: true }
     ], btn);
   }
   function openAddMenu() {
@@ -10889,7 +11402,7 @@ ${opts.tip}` : text;
     if (activeTab !== "select" || selSub !== "home" || !curSel) return;
     const head = $("selHead");
     const cards = $("selCards");
-    const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : null : null;
+    const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : "" : null;
     clearMount(head);
     clearMount(cards);
     const noSel = !baseline;
@@ -10933,10 +11446,12 @@ ${opts.tip}` : text;
     const findReady = selFindFor === baseKey() && !selFindInFlight;
     const usageReady = !!usageMap;
     if (baseline.scanned > BIG_SELECTION && !findReady && !usageReady && !selFindInFlight) {
-      const c = selCard({ title: t("list.big"), actions: [selBtn(t("list.read"), () => {
+      const rd = selBtn(t("list.read"), () => {
         requestManagerUsage("user");
         readSelFind(true, true);
-      })] });
+      });
+      rd.dataset.k = "read";
+      const c = selCard({ title: t("list.big"), actions: [rd] });
       put(c);
       return finishSelFocus(hadFocus);
     }
@@ -10961,9 +11476,7 @@ ${opts.tip}` : text;
         const subs = [];
         if (counts && counts.noVarByKind.length) subs.push(counts.noVarByKind.filter((x) => x.kind !== "other").map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
         else if (!findReady) subs.push(t("v4.reading"));
-        const actions = [selBtn(t("v4.makeArrow"), (b) => {
-          showMakeScreen(b);
-        }, true)];
+        const actions = [];
         const allSubs = [...subs];
         tsOnlyExtra(allSubs, actions);
         put(selCard({ title: t("v4.noVarsFile"), subs: allSubs, actions }));
@@ -10978,8 +11491,11 @@ ${opts.tip}` : text;
   }
   function finishSelFocus(key) {
     var _a3;
-    if (!key) return;
-    (_a3 = $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`)) == null ? void 0 : _a3.focus({ preventScroll: true });
+    if (key === null) return;
+    const cards = $("selCards");
+    const same = key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
+    const target = (_a3 = same != null ? same : key === "unbind" ? null : cards.querySelector("button")) != null ? _a3 : $("btnGoMake");
+    target.focus({ preventScroll: true });
   }
   function tsOnlyExtra(subs, actions) {
     const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
@@ -10993,12 +11509,8 @@ ${opts.tip}` : text;
   }
   function renderFindCard(put, counts) {
     if (prereqKnown && !hasBindable) {
-      const b = selBtn(t("v4.makeArrow"), (el) => {
-        showMakeScreen(el);
-      });
-      b.dataset.k = "make";
       const subs = [t("bind.noTier")];
-      const actions2 = [b];
+      const actions2 = [];
       tsOnlyExtra(subs, actions2);
       put(selCard({ title: t("v4.find0"), subs, actions: actions2 }));
       return;
@@ -11033,12 +11545,6 @@ ${opts.tip}` : text;
       }, true);
       go.dataset.k = "link";
       actions.push(go);
-    } else {
-      const mk = selBtn(t("v4.makeArrow"), (el) => {
-        showMakeScreen(el);
-      }, true);
-      mk.dataset.k = "make";
-      actions.push(mk);
     }
     const card = selCard({ title: t("v4.findN", { n }), subs: [sub], actions });
     card.querySelector(".t").title = t("v4.findTip");
