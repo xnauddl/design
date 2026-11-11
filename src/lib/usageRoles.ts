@@ -3,13 +3,14 @@
    레이어에는 역할(Semantic)만 붙인다. 같은 값의 역할이 없으면 "어디에 쓰였나"로 이름을 짓는다.
    - 숫자 · 글자: `{그룹}/{주인}/{속성}` (12.3)
    - 색: `color/{쓰임}/{밝기}` (12.4)
-   - 번호: 같은 이름에 다른 값이 오면 `-2` · `-3` (12.5)
+   - 꼬리: 같은 이름에 다른 값이 오면 뜻이 읽히는 꼬리(`-sm` · `-lg`, `brand-red` · `-subtle`, `subtler`, 같은 색 투명도만 다르면 `-subtle` · `-strong`), 모자라면 `-n` (12.5)
    만들기(createUsageRoles)와 연결(bind.ts)이 같은 함수를 쓴다 — 두 경로의 이름이 어긋나지 않게.
    ============================================================ */
 import { hexToOklch } from './color';
 import { LOW_CHROMA } from './palette';
 import { VECTOR_TYPES } from './nodePaint';
 import { colorKey } from './tokens';
+import { classifyColor } from './colorName';
 
 /** 주인으로 쓰지 않는 구조 폴백 역할(12.3 ①). */
 const STRUCTURAL = new Set(['container', 'wrapper', 'shape', 'group', 'content', 'body']);
@@ -164,19 +165,24 @@ const byCountThenHex = (a: { hex: string; count: number }, b: { hex: string; cou
 
 /**
  * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand), 키는 `colorSlotKey(hex, bg, alpha)`.
- * 밝기 판정은 hex로만 — 같은 hex · 다른 투명도는 같은 이름을 받고 assignNames가 번호를 붙인다(§2.11 "반투명 색 토큰").
+ * 밝기 판정은 hex로만 — 같은 hex · 다른 투명도는 같은 자리를 받고 assignNames가 투명도 단계(-subtle · -strong)로 가른다(§2.11 "반투명 색 토큰").
  * 기준색: `existingDefaultHex`(`color/{쓰임}/default`가 이미 있으면 그 색), 없으면 hex별 곳 수 합이 가장 많은 색
  * (같으면 hex 순). 판정 순서: default → inverse(합친 판정) → brand(유채) → subtle · strong.
  * inverse(12.4 합친 판정, `use`가 text · icon · border일 때만 — 없으면 판정한다):
  *   1. 기준색이 극단(L < 0.35 또는 ≥ 0.85) 2. 그 색이 반대쪽 극단 3. 배경 종류가 있고 chroma이거나 기준과 같은 쪽.
  * 같은 이름 후보가 여럿이면 번호는 assignNames가 붙인다.
  */
-export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex?: string, use?: string): Map<string, string> {
-  const out = new Map<string, string>();
+/** 12.4 기준색 hex — 이미 있는 default 값(색 값 키여도 hex만), 없으면 hex별 곳 수 합이 가장 많은 색(같으면 hex 순). 12.5 사다리의 기준. */
+export function colorRoleRef(colors: readonly ColorCount[], existingDefaultHex?: string): string | undefined {
   const totals = new Map<string, number>();
   for (const c of colors) totals.set(c.hex.toLowerCase(), (totals.get(c.hex.toLowerCase()) ?? 0) + c.count);
   const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-  const refHex = (existingDefaultHex?.split('@')[0] ?? top?.hex)?.toLowerCase(); // 색 값 키가 와도 hex만
+  return (existingDefaultHex?.split('@')[0] ?? top?.hex)?.toLowerCase();
+}
+
+export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex?: string, use?: string): Map<string, string> {
+  const out = new Map<string, string>();
+  const refHex = colorRoleRef(colors, existingDefaultHex);
   if (!refHex) return out;
   const ref = hexToOklch(refHex);
   const refDark = ref.l < 0.35;
@@ -205,58 +211,305 @@ export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex
   return out;
 }
 
-/* ---------- 번호 (12.5) ---------- */
-
-export interface NameRequest {
-  /** 번호 없는 이름(예: spacing/card/gap). */
-  base: string;
-  /** 값 비교 키(숫자는 소수 둘째 자리 문자열, 색은 소문자 hex, 글꼴은 이름). */
-  value: string;
-  /** 곳 수 — 같은 이름 안에서 번호 없는 이름을 갖는 순서. */
-  count: number;
-}
-
-const suffixRe = (base: string): RegExp => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:-(\\d+))?$`);
+/* ---------- 이름 꼬리 (12.5) ---------- */
 
 /**
- * 요청마다 최종 이름을 정한다. `existing`: 이미 있는 Semantic 이름 → 값 키.
- * - 번호 없는 이름이나 그 `-n` 중 같은 값이 있으면 그 이름(재사용).
- * - 없으면 번호 없는 이름이 비어 있으면 그것, 아니면 `-2`부터 비어 있는 첫 번호.
- * - 같은 이름에 새 값이 둘 이상이면 곳 수가 많은 값부터(같으면 값 오름차순).
+ * 기본 이름의 종류(12.5 표). number = 숫자 쓰임, plain = 크기 없는 값(글꼴), chroma = `…/brand`,
+ * ladder = `…/subtle` · `…/strong`, inverse = `…/inverse`, default = `…/default`.
+ */
+export type NameKind = 'number' | 'plain' | 'chroma' | 'ladder' | 'inverse' | 'default';
+
+/** 기본 이름 · 값 모양으로 종류를 정한다. */
+export function nameKindOf(base: string, value: string): NameKind {
+  if (base.startsWith('color/')) {
+    const last = base.slice(base.lastIndexOf('/') + 1);
+    if (last === 'brand') return 'chroma';
+    if (last === 'subtle' || last === 'strong') return 'ladder';
+    if (last === 'inverse') return 'inverse';
+    return 'default';
+  }
+  return value !== '' && !Number.isNaN(Number(value)) ? 'number' : 'plain';
+}
+
+const SIZE_SMALL = ['sm', 'xs', '2xs'];
+const SIZE_LARGE = ['lg', 'xl', '2xl'];
+const LIGHTER = ['subtle', 'subtler', 'subtlest'];
+const DARKER = ['strong', 'stronger', 'strongest'];
+const LADDER_WORDS = [...LIGHTER, ...DARKER];
+const FAMILIES = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'indigo', 'purple', 'pink'];
+
+const esc = (x: string): string => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * 가족 판정(12.5 "가족") — 그 기본 이름에서 문법 `{기본}{-꼬리}{-투명도 단계}{-n}`으로 만들 수 있는 이름만(예전 `-a{%}`도 포함 — 새로 만들지는 않음).
+ * 표 밖의 말(`padding-x` · `-top-left` · `brand-bold`)은 가족이 아니다.
+ */
+export function familyRe(base: string, kind: NameKind): RegExp {
+  const lad = LADDER_WORDS.join('|');
+  // 투명도 단계(12.5, 한 번) 또는 예전 구현의 -a{%}(재사용 · 차지 판정만), 그 뒤 -n
+  const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
+  switch (kind) {
+    case 'number':
+      return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join('|')}))?(?:-\\d+)?$`);
+    case 'plain':
+      return new RegExp(`^${esc(base)}(?:-\\d+)?$`);
+    case 'default':
+      return new RegExp(`^${esc(base)}${tail}`);
+    case 'inverse':
+      return new RegExp(`^${esc(base)}(?:-(?:${lad}))?${tail}`);
+    case 'chroma':
+      return new RegExp(`^${esc(base)}(?:-(?:${FAMILIES.join('|')})(?:-(?:${lad}))?|-(?:${lad}))?${tail}`);
+    case 'ladder': {
+      const i = base.lastIndexOf('/');
+      const words = base.slice(i + 1) === 'strong' ? DARKER : LIGHTER;
+      return new RegExp(`^${esc(base.slice(0, i))}/(?:${words.join('|')})${tail}`);
+    }
+  }
+}
+
+/** 가족 순서(12.5) — 기본 이름 → 꼬리 이름(이름 순) → `-n` 이름(번호 작은 순). */
+export function familyRank(name: string, base: string): [number, number, string] {
+  if (name === base) return [0, 0, ''];
+  const m = /-(\d+)$/.exec(name);
+  return m ? [2, Number(m[1]), name] : [1, 0, name];
+}
+export function byFamilyOrder(base: string): (a: string, b: string) => number {
+  return (a, b) => {
+    const x = familyRank(a, base);
+    const y = familyRank(b, base);
+    return x[0] - y[0] || x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0);
+  };
+}
+
+export interface NameRequest {
+  /** 기본 이름(예: spacing/card/gap). */
+  base: string;
+  /** 값 키(숫자는 소수 둘째 자리 문자열, 색은 색 값 키 `#rrggbb` · `#rrggbb@0.08`, 글꼴은 이름). */
+  value: string;
+  /** 곳 수 — 누가 기본 이름(기준)을 받나만 정한다. */
+  count: number;
+  /** 종류(없으면 nameKindOf). */
+  kind?: NameKind;
+  /** 사다리의 기준색 hex(12.4 default). */
+  refHex?: string;
+}
+
+export interface AssignOptions {
+  /** false면 재사용하지 않는다(연결 순서 4 — 차지 판정만). 기본 true. */
+  reuse?: boolean;
+  /** 이 이름의 같은 값 변수를 재사용해도 되나(같은 값 · 맞는 용도 · 거울 아님). 없으면 된다. */
+  canReuse?: (name: string, value: string, base: string) => boolean;
+}
+
+const hexOfKey = (v: string): string => v.split('@')[0].toLowerCase();
+const alphaOfKey = (v: string): number | undefined => (v.includes('@') ? Number(v.split('@')[1]) : undefined);
+const lOf = (hex: string): number => hexToOklch(hex).l;
+const famOf = (hex: string): string => classifyColor(hex).family;
+const cmpStr = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * 요청마다 최종 이름을 정한다(§2.12 12.5). `existing`: 이미 있는 Semantic 이름 → 값 키(못 읽으면 빈 배열, 13.5 순서).
+ * - 먼저 재사용: 가족 안 같은 값(canReuse) → 가족 순서 첫 이름.
+ * - 없으면 후보 목록의 비어 있는 첫 이름, 다 차면 되돌림(마지막 후보 + `-n`).
  * 반환 키는 `${base}\u0000${value}`.
  */
-export function assignNames(requests: readonly NameRequest[], existing: ReadonlyMap<string, string | readonly string[]>): Map<string, string> {
+export function assignNames(requests: readonly NameRequest[], existing: ReadonlyMap<string, string | readonly string[]>, opts: AssignOptions = {}): Map<string, string> {
   const out = new Map<string, string>();
-  const byBase = new Map<string, Map<string, number>>();
+  const groups = new Map<string, { kind: NameKind; refHex?: string; values: Map<string, number> }>();
   for (const r of requests) {
-    let m = byBase.get(r.base);
-    if (!m) byBase.set(r.base, (m = new Map()));
-    m.set(r.value, (m.get(r.value) ?? 0) + r.count);
+    let g = groups.get(r.base);
+    if (!g) groups.set(r.base, (g = { kind: r.kind ?? nameKindOf(r.base, r.value), refHex: r.refHex, values: new Map() }));
+    if (r.refHex && !g.refHex) g.refHex = r.refHex;
+    g.values.set(r.value, (g.values.get(r.value) ?? 0) + r.count);
   }
-  // 이름 → 값 묶음(같은 이름이 여러 컬렉션에 있으면 값이 여럿 — §2.13 13.5). 이번에 정한 이름도 더한다.
   const taken = new Map<string, readonly string[]>([...existing].map(([n, v]) => [n, typeof v === 'string' ? (v ? [v] : []) : v]));
-  for (const [base, values] of byBase) {
-    const re = suffixRe(base);
-    const order = [...values.entries()].sort((a, b) => b[1] - a[1] || cmpValue(a[0], b[0]));
-    for (const [value] of order) {
-      let name: string | undefined;
-      for (const [n, v] of taken) if (v.includes(value) && re.test(n)) { name = pick(name, n, base); }
-      if (!name) {
-        if (!taken.has(base)) name = base;
-        else for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) { name = `${base}-${i}`; break; }
-        taken.set(name, [value]);
+  const canReuse = opts.canReuse ?? ((): boolean => true);
+  for (const [base, g] of groups) {
+    const fam = familyRe(base, g.kind);
+    const left: string[] = [];
+    // 재사용(12.5 "먼저")
+    for (const value of g.values.keys()) {
+      if (opts.reuse !== false) {
+        const names = [...taken].filter(([n, v]) => fam.test(n) && v.includes(value) && canReuse(n, value, base)).map(([n]) => n).sort(byFamilyOrder(base));
+        if (names.length) {
+          out.set(`${base}\u0000${value}`, names[0]);
+          continue;
+        }
       }
-      out.set(`${base}\u0000${value}`, name);
+      left.push(value);
     }
+    if (!left.length) continue;
+    const assign = (value: string, name: string): void => {
+      out.set(`${base}\u0000${value}`, name);
+      const arr = taken.get(name);
+      taken.set(name, arr ? [...arr, value] : [value]);
+    };
+    const fallback = (name: string): string => {
+      for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
+    };
+    if (g.kind === 'number') assignNumbers(base, g.values, left, taken, assign, fallback);
+    else if (g.kind === 'plain') {
+      for (const value of sortByCount(left, g.values)) assign(value, taken.has(base) ? fallback(base) : base);
+    } else assignColors(base, g.kind, g.refHex, g.values, left, taken, assign, fallback);
   }
   return out;
 }
 
-/** 같은 값의 이름이 여럿이면 번호가 작은 쪽(번호 없는 이름이 가장 먼저). */
-function pick(cur: string | undefined, next: string, base: string): string {
-  if (!cur) return next;
-  const num = (n: string): number => (n === base ? 1 : Number(n.slice(base.length + 1)) || Infinity);
-  return num(next) < num(cur) ? next : cur;
+function sortByCount(values: readonly string[], counts: ReadonlyMap<string, number>): string[] {
+  return [...values].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || cmpValue(a, b));
+}
+
+type Taken = Map<string, readonly string[]>;
+
+/** 기본 이름의 읽을 수 있는 첫 값(13.5 순서) — 없으면 undefined. */
+function holderValue(taken: Taken, name: string): string | undefined {
+  const v = taken.get(name);
+  return v && v.length ? v[0] : undefined;
+}
+
+function assignNumbers(base: string, counts: ReadonlyMap<string, number>, left: string[], taken: Taken, assign: (v: string, n: string) => void, fallback: (n: string) => string): void {
+  let rest = sortByCount(left, counts);
+  let ref: number;
+  const held = holderValue(taken, base);
+  if (held != null && !Number.isNaN(Number(held))) ref = Number(held);
+  else {
+    const first = rest[0];
+    rest = rest.slice(1);
+    ref = Number(first);
+    assign(first, taken.has(base) ? fallback(base) : base);
+  }
+  const side = (vals: string[], words: string[]): void => {
+    const sorted = [...vals].sort((a, b) => Math.abs(Number(a) - ref) - Math.abs(Number(b) - ref) || Number(a) - Number(b));
+    for (const v of sorted) {
+      const free = words.map((w) => `${base}-${w}`).find((n) => !taken.has(n));
+      assign(v, free ?? fallback(`${base}-${words[words.length - 1]}`));
+    }
+  };
+  const same = rest.filter((v) => Math.abs(Number(v) - ref) < 0.005);
+  for (const v of same) assign(v, fallback(base)); // 기준과 같은 값 · 재사용 불가 → {기본}-n
+  side(rest.filter((v) => Number(v) < ref - 0.0049), SIZE_SMALL);
+  side(rest.filter((v) => Number(v) > ref + 0.0049), SIZE_LARGE);
+}
+
+/**
+ * 색 종류(chroma · ladder · inverse · default)의 이름 — hex마다 자리 이름을 먼저 정하고, 한 자리의 투명도 값들은 투명도 단계(-subtle · -strong)로 가른다(12.5).
+ * 자리 N이 비었나: N이 다른 hex의 값으로 있거나 값을 못 읽거나 이번에 다른 hex가 받았으면 차 있다.
+ */
+function assignColors(base: string, kind: NameKind, refHex: string | undefined, counts: ReadonlyMap<string, number>, left: string[], taken: Taken, assign: (v: string, n: string) => void, fallback: (n: string) => string): void {
+  const slotOf = new Map<string, string>(); // hex → 자리 이름
+  const slotAssigned = new Set<string>(); // 이번에 값 이름으로 실제 받은 자리 이름
+  const slotOwner = new Map<string, string>(); // 자리 이름 → hex(이번에 정함)
+  const slotFree = (name: string, hex: string): boolean => {
+    const own = slotOwner.get(name);
+    if (own) return own === hex;
+    const v = taken.get(name);
+    if (!v) return true;
+    return v.length > 0 && v.every((x) => hexOfKey(x) === hex);
+  };
+  const setSlot = (hex: string, name: string): void => {
+    slotOf.set(hex, name);
+    slotOwner.set(name, hex);
+  };
+  // hex별 곳 수(투명도 합침)
+  const hexCount = new Map<string, number>();
+  for (const v of left) hexCount.set(hexOfKey(v), (hexCount.get(hexOfKey(v)) ?? 0) + (counts.get(v) ?? 0));
+  const hexes = [...hexCount.keys()].sort((a, b) => (hexCount.get(b) ?? 0) - (hexCount.get(a) ?? 0) || cmpStr(a, b));
+  const fellBack = new Set<string>(); // 자리가 되돌림인 hex(후보가 다 차서 마지막 후보를 나눠 씀)
+  const pick = (hex: string, cands: string[]): void => {
+    const free = cands.find((n) => slotFree(n, hex));
+    if (!free) fellBack.add(hex);
+    setSlot(hex, free ?? cands[cands.length - 1]); // 다 차면 마지막 후보(아래에서 -n)
+  };
+  const ladderSide = (list: string[], refL: number, prefix: string): void => {
+    const lighter = list.filter((h) => lOf(h) > refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
+    const darker = list.filter((h) => lOf(h) <= refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
+    for (const h of lighter) pick(h, LIGHTER.map((w) => `${prefix}-${w}`));
+    for (const h of darker) pick(h, DARKER.map((w) => `${prefix}-${w}`));
+  };
+  if (kind === 'ladder') {
+    const i = base.lastIndexOf('/');
+    const words = base.slice(i + 1) === 'strong' ? DARKER : LIGHTER;
+    const refL = refHex ? lOf(refHex) : 0;
+    const sorted = [...hexes].sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
+    for (const h of sorted) pick(h, words.map((w) => `${base.slice(0, i)}/${w}`));
+  } else if (kind === 'default') {
+    for (const h of hexes) pick(h, [base]);
+  } else {
+    // 기준(chroma · inverse): 기본 이름의 값 → 없으면 곳 수 첫 hex
+    const held = holderValue(taken, base);
+    let rest = hexes;
+    let refH: string;
+    if (held) refH = hexOfKey(held);
+    else {
+      refH = hexes[0];
+      rest = hexes.slice(1);
+      pick(refH, [base]);
+    }
+    if (kind === 'inverse') ladderSide(rest.filter((h) => h !== refH), lOf(refH), base);
+    else {
+      const refFam = famOf(refH);
+      ladderSide(rest.filter((h) => h !== refH && famOf(h) === refFam), lOf(refH), base);
+      const byFam = new Map<string, string[]>();
+      for (const h of rest) {
+        if (h === refH || famOf(h) === refFam) continue;
+        const f = famOf(h);
+        byFam.set(f, [...(byFam.get(f) ?? []), h]);
+      }
+      for (const [f, list] of byFam) {
+        const famName = `${base}-${f}`;
+        const famHeld = holderValue(taken, famName);
+        let famRef: string;
+        let others = list;
+        if (famHeld) famRef = hexOfKey(famHeld);
+        else {
+          famRef = list[0]; // hexes가 곳 수 순이라 첫 값
+          others = list.slice(1);
+          pick(famRef, [famName]);
+        }
+        ladderSide(others.filter((h) => h !== famRef), lOf(famRef), famName);
+      }
+    }
+    // 기준과 같은 hex인데 재사용 못 한 값: 자리는 기본 이름(같은 hex)
+    if (held && rest.includes(refH) && !slotOf.has(refH)) setSlot(refH, base);
+  }
+  // 값마다(12.5 "투명도 단계"): 자리 기준이 자리 이름, 더 투명 -subtle…, 덜 투명 -strong…, 다 차면 -n.
+  const alphaOf = (v: string): number => alphaOfKey(v) ?? 1;
+  const byHex = new Map<string, string[]>();
+  for (const v of left) byHex.set(hexOfKey(v), [...(byHex.get(hexOfKey(v)) ?? []), v]);
+  const nameFree = (n: string, hex: string): boolean => !taken.has(n) && (!slotOwner.has(n) || slotOwner.get(n) === hex);
+  for (const [hex, vals] of byHex) {
+    const slot = slotOf.get(hex) ?? base;
+    const fb = fellBack.has(hex);
+    const order = [...vals].sort((a, b) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) || alphaOf(b) - alphaOf(a) || cmpValue(a, b));
+    // 자리 기준: 파일의 자리 이름이 같은 hex면 그 값(되돌림 자리는 보지 않음), 아니면 곳 수 첫 값
+    const fileVals = !fb ? taken.get(slot) : undefined;
+    const held = fileVals && fileVals.length && fileVals.every((x) => hexOfKey(x) === hex) && !slotAssigned.has(slot) ? fileVals[0] : undefined;
+    let refA: number;
+    let rest = order;
+    if (held != null) refA = alphaOf(held);
+    else {
+      const first = order[0];
+      rest = order.slice(1);
+      refA = alphaOf(first);
+      assign(first, fb || taken.has(slot) ? fallback(slot) : slot);
+      slotAssigned.add(slot);
+    }
+    const side = (list: string[], words: string[]): void => {
+      const sorted = [...list].sort((a, b) => Math.abs(alphaOf(a) - refA) - Math.abs(alphaOf(b) - refA) || alphaOf(a) - alphaOf(b));
+      sorted.forEach((v, i) => {
+        const cands = words.map((w) => `${slot}-${w}`);
+        if (fb) {
+          assign(v, fallback(cands[Math.min(i, cands.length - 1)]));
+          return;
+        }
+        const free = cands.find((n) => nameFree(n, hex));
+        assign(v, free ?? fallback(cands[cands.length - 1]));
+      });
+    };
+    for (const v of rest.filter((x) => Math.abs(alphaOf(x) - refA) < 0.005)) assign(v, fallback(slot)); // 자리 기준과 같은 값 · 재사용 불가 → N-n
+    side(rest.filter((x) => alphaOf(x) < refA - 0.0049), LIGHTER);
+    side(rest.filter((x) => alphaOf(x) > refA + 0.0049), DARKER);
+  }
 }
 
 function cmpValue(a: string, b: string): number {

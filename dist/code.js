@@ -1296,15 +1296,115 @@
     if (achromatic && o.l <= 0.05) return { family: "gray", step: 1e3, achromatic };
     return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
   }
+  function stepRefL(step) {
+    if (step === 0) return 1;
+    if (step === 1e3) return 0;
+    const i = STEP_LIST.indexOf(step);
+    if (i >= 0) return STEP_L[i];
+    for (let k = 0; k < STEP_LIST.length - 1; k++) if ((STEP_LIST[k] + STEP_LIST[k + 1]) / 2 === step) return (STEP_L[k] + STEP_L[k + 1]) / 2;
+    return NaN;
+  }
+  function midSteps(step) {
+    const i = STEP_LIST.indexOf(step);
+    if (i < 0) return { lighter: null, darker: null };
+    return { lighter: i > 0 ? (STEP_LIST[i - 1] + step) / 2 : null, darker: i < STEP_LIST.length - 1 ? (step + STEP_LIST[i + 1]) / 2 : null };
+  }
+  var STEP_SET = /* @__PURE__ */ new Set([0, 1e3, ...STEP_LIST]);
+  var COLOR_NAME_RE = /^color\/([a-z]+)\/(\d+)((?:-[a-z0-9]+)*)$/;
+  function isExtractOnlyColorName(name) {
+    const m = COLOR_NAME_RE.exec(name);
+    if (!m) return false;
+    if (!STEP_SET.has(Number(m[2]))) return true;
+    return m[3].split("-").filter(Boolean).some((p) => /^\d+$/.test(p));
+  }
+  function resolveGlobalNames(reqs, file) {
+    var _a, _b;
+    const out = /* @__PURE__ */ new Map();
+    const memo = /* @__PURE__ */ new Map();
+    const reserved = /* @__PURE__ */ new Map();
+    for (const r of reqs) reserved.set(r.name, /* @__PURE__ */ new Set([...(_a = reserved.get(r.name)) != null ? _a : [], r.key]));
+    const assigned = /* @__PURE__ */ new Map();
+    const hexBase = /* @__PURE__ */ new Map();
+    const free = (name, key) => {
+      if (file.has(name)) return false;
+      const a = assigned.get(name);
+      if (a != null && a !== key) return false;
+      const rs = reserved.get(name);
+      return !rs || rs.size === 1 && rs.has(key) || [...rs].every((k) => k === key);
+    };
+    const nextN = (base, key) => {
+      for (let i = 2; ; i++) if (free(`${base}-${i}`, key)) return `${base}-${i}`;
+    };
+    const fileNames = [...file.keys()].sort();
+    for (const r of reqs) {
+      const mk = `${r.name}\0${r.key}`;
+      const hit = memo.get(mk);
+      if (hit) {
+        out.set(r.name, hit);
+        continue;
+      }
+      let res;
+      if (((_b = file.get(r.name)) == null ? void 0 : _b.key) === r.key) res = { name: r.name, reuse: true };
+      else if (r.hex) {
+        const fam = classifyColor(r.hex).family;
+        const n = fileNames.find((x) => {
+          var _a2, _b2;
+          return ((_a2 = file.get(x)) == null ? void 0 : _a2.key) === r.key && ((_b2 = COLOR_NAME_RE.exec(x)) == null ? void 0 : _b2[1]) === fam && isExtractOnlyColorName(x);
+        });
+        if (n) res = { name: n, reuse: true };
+      }
+      if (!res) {
+        if (!r.hex) res = { name: free(r.name, r.key) ? r.name : nextN(r.name, r.key), reuse: false };
+        else {
+          const hex = r.hex;
+          const a = r.alphaPct != null && r.alphaPct < 100 ? r.alphaPct : void 0;
+          let base = hexBase.get(hex);
+          if (!base) {
+            const orig = r.name.replace(/-a\d+(-\d+)?$/, "");
+            base = baseFor(orig, hex, r.key, file, free, nextN, a != null);
+            hexBase.set(hex, base);
+          }
+          const want = a != null ? `${base}-a${a}` : base;
+          res = { name: free(want, r.key) ? want : nextN(want, r.key), reuse: false };
+        }
+      }
+      if (!res.reuse) assigned.set(res.name, r.key);
+      if (res.reuse && r.hex && !(r.alphaPct != null && r.alphaPct < 100)) hexBase.set(r.hex, res.name);
+      memo.set(mk, res);
+      out.set(r.name, res);
+    }
+    return out;
+  }
+  function baseFor(orig, hex, key, file, free, nextN, translucent) {
+    const f = file.get(orig);
+    if (f ? !!f.hex && f.hex === hex : free(orig, key) || translucent) return orig;
+    const m = COLOR_NAME_RE.exec(orig);
+    if (!m) return orig;
+    const fam = m[1];
+    const step = Number(m[2]);
+    const stepName = `color/${fam}/${step}`;
+    const plain = m[3] === "";
+    if (plain && STEP_LIST.includes(step)) {
+      const ownerL = (f == null ? void 0 : f.hex) ? hexToOklch(f.hex).l : stepRefL(step);
+      const side = hexToOklch(hex).l > ownerL ? "lighter" : "darker";
+      const mid = midSteps(step)[side];
+      if (mid != null && !file.has(`color/${fam}/${mid}`) && free(`color/${fam}/${mid}`, key)) return `color/${fam}/${mid}`;
+    }
+    if (plain && STEP_SET.has(step)) return nextN(stepName, key);
+    const c = classifyColor(hex);
+    return nextN(`color/${c.family}/${c.step}`, key);
+  }
 
   // src/lib/palette.ts
+  var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
   var LOW_CHROMA = 0.03;
   function isPaletteColorName(name) {
     if (!name.startsWith("color/")) return false;
     const parts = name.split("/");
     if (parts.length !== 3) return false;
     const base = parts[1].replace(/-\d+$/, "");
-    return HUE_FAMILIES.includes(base);
+    if (!HUE_FAMILIES.includes(base)) return false;
+    return /^\d+$/.test(parts[2]) && STEPS.includes(Number(parts[2]));
   }
   function paletteFamilyOf(name) {
     if (!isPaletteColorName(name)) return null;
@@ -1403,13 +1503,16 @@
   }
   var INVERSE_USES = /* @__PURE__ */ new Set(["text", "icon", "border"]);
   var byCountThenHex = (a, b) => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
-  function colorRoleBases(colors, existingDefaultHex, use) {
+  function colorRoleRef(colors, existingDefaultHex) {
     var _a, _b, _c;
-    const out = /* @__PURE__ */ new Map();
     const totals = /* @__PURE__ */ new Map();
     for (const c of colors) totals.set(c.hex.toLowerCase(), ((_a = totals.get(c.hex.toLowerCase())) != null ? _a : 0) + c.count);
     const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-    const refHex = (_c = (_b = existingDefaultHex == null ? void 0 : existingDefaultHex.split("@")[0]) != null ? _b : top == null ? void 0 : top.hex) == null ? void 0 : _c.toLowerCase();
+    return (_c = (_b = existingDefaultHex == null ? void 0 : existingDefaultHex.split("@")[0]) != null ? _b : top == null ? void 0 : top.hex) == null ? void 0 : _c.toLowerCase();
+  }
+  function colorRoleBases(colors, existingDefaultHex, use) {
+    const out = /* @__PURE__ */ new Map();
+    const refHex = colorRoleRef(colors, existingDefaultHex);
     if (!refHex) return out;
     const ref = hexToOklch(refHex);
     const refDark = ref.l < 0.35;
@@ -1437,42 +1540,255 @@
     }
     return out;
   }
-  var suffixRe = (base) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:-(\\d+))?$`);
-  function assignNames(requests, existing) {
-    var _a;
+  function nameKindOf(base, value) {
+    if (base.startsWith("color/")) {
+      const last = base.slice(base.lastIndexOf("/") + 1);
+      if (last === "brand") return "chroma";
+      if (last === "subtle" || last === "strong") return "ladder";
+      if (last === "inverse") return "inverse";
+      return "default";
+    }
+    return value !== "" && !Number.isNaN(Number(value)) ? "number" : "plain";
+  }
+  var SIZE_SMALL = ["sm", "xs", "2xs"];
+  var SIZE_LARGE = ["lg", "xl", "2xl"];
+  var LIGHTER = ["subtle", "subtler", "subtlest"];
+  var DARKER = ["strong", "stronger", "strongest"];
+  var LADDER_WORDS = [...LIGHTER, ...DARKER];
+  var FAMILIES = ["red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple", "pink"];
+  var esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  function familyRe(base, kind) {
+    const lad = LADDER_WORDS.join("|");
+    const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
+    switch (kind) {
+      case "number":
+        return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join("|")}))?(?:-\\d+)?$`);
+      case "plain":
+        return new RegExp(`^${esc(base)}(?:-\\d+)?$`);
+      case "default":
+        return new RegExp(`^${esc(base)}${tail}`);
+      case "inverse":
+        return new RegExp(`^${esc(base)}(?:-(?:${lad}))?${tail}`);
+      case "chroma":
+        return new RegExp(`^${esc(base)}(?:-(?:${FAMILIES.join("|")})(?:-(?:${lad}))?|-(?:${lad}))?${tail}`);
+      case "ladder": {
+        const i = base.lastIndexOf("/");
+        const words = base.slice(i + 1) === "strong" ? DARKER : LIGHTER;
+        return new RegExp(`^${esc(base.slice(0, i))}/(?:${words.join("|")})${tail}`);
+      }
+    }
+  }
+  function familyRank(name, base) {
+    if (name === base) return [0, 0, ""];
+    const m = /-(\d+)$/.exec(name);
+    return m ? [2, Number(m[1]), name] : [1, 0, name];
+  }
+  function byFamilyOrder(base) {
+    return (a, b) => {
+      const x = familyRank(a, base);
+      const y = familyRank(b, base);
+      return x[0] - y[0] || x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0);
+    };
+  }
+  var hexOfKey = (v) => v.split("@")[0].toLowerCase();
+  var alphaOfKey = (v) => v.includes("@") ? Number(v.split("@")[1]) : void 0;
+  var lOf = (hex) => hexToOklch(hex).l;
+  var famOf = (hex) => classifyColor(hex).family;
+  var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function assignNames(requests, existing, opts = {}) {
+    var _a, _b, _c;
     const out = /* @__PURE__ */ new Map();
-    const byBase = /* @__PURE__ */ new Map();
+    const groups = /* @__PURE__ */ new Map();
     for (const r of requests) {
-      let m = byBase.get(r.base);
-      if (!m) byBase.set(r.base, m = /* @__PURE__ */ new Map());
-      m.set(r.value, ((_a = m.get(r.value)) != null ? _a : 0) + r.count);
+      let g = groups.get(r.base);
+      if (!g) groups.set(r.base, g = { kind: (_a = r.kind) != null ? _a : nameKindOf(r.base, r.value), refHex: r.refHex, values: /* @__PURE__ */ new Map() });
+      if (r.refHex && !g.refHex) g.refHex = r.refHex;
+      g.values.set(r.value, ((_b = g.values.get(r.value)) != null ? _b : 0) + r.count);
     }
     const taken = new Map([...existing].map(([n, v]) => [n, typeof v === "string" ? v ? [v] : [] : v]));
-    for (const [base, values] of byBase) {
-      const re = suffixRe(base);
-      const order = [...values.entries()].sort((a, b) => b[1] - a[1] || cmpValue(a[0], b[0]));
-      for (const [value] of order) {
-        let name;
-        for (const [n, v] of taken) if (v.includes(value) && re.test(n)) {
-          name = pick(name, n, base);
-        }
-        if (!name) {
-          if (!taken.has(base)) name = base;
-          else for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) {
-            name = `${base}-${i}`;
-            break;
+    const canReuse = (_c = opts.canReuse) != null ? _c : () => true;
+    for (const [base, g] of groups) {
+      const fam = familyRe(base, g.kind);
+      const left = [];
+      for (const value of g.values.keys()) {
+        if (opts.reuse !== false) {
+          const names = [...taken].filter(([n, v]) => fam.test(n) && v.includes(value) && canReuse(n, value, base)).map(([n]) => n).sort(byFamilyOrder(base));
+          if (names.length) {
+            out.set(`${base}\0${value}`, names[0]);
+            continue;
           }
-          taken.set(name, [value]);
         }
-        out.set(`${base}\0${value}`, name);
+        left.push(value);
       }
+      if (!left.length) continue;
+      const assign = (value, name) => {
+        out.set(`${base}\0${value}`, name);
+        const arr = taken.get(name);
+        taken.set(name, arr ? [...arr, value] : [value]);
+      };
+      const fallback = (name) => {
+        for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
+      };
+      if (g.kind === "number") assignNumbers(base, g.values, left, taken, assign, fallback);
+      else if (g.kind === "plain") {
+        for (const value of sortByCount(left, g.values)) assign(value, taken.has(base) ? fallback(base) : base);
+      } else assignColors(base, g.kind, g.refHex, g.values, left, taken, assign, fallback);
     }
     return out;
   }
-  function pick(cur, next, base) {
-    if (!cur) return next;
-    const num = (n) => n === base ? 1 : Number(n.slice(base.length + 1)) || Infinity;
-    return num(next) < num(cur) ? next : cur;
+  function sortByCount(values, counts) {
+    return [...values].sort((a, b) => {
+      var _a, _b;
+      return ((_a = counts.get(b)) != null ? _a : 0) - ((_b = counts.get(a)) != null ? _b : 0) || cmpValue(a, b);
+    });
+  }
+  function holderValue(taken, name) {
+    const v = taken.get(name);
+    return v && v.length ? v[0] : void 0;
+  }
+  function assignNumbers(base, counts, left, taken, assign, fallback) {
+    let rest = sortByCount(left, counts);
+    let ref;
+    const held = holderValue(taken, base);
+    if (held != null && !Number.isNaN(Number(held))) ref = Number(held);
+    else {
+      const first = rest[0];
+      rest = rest.slice(1);
+      ref = Number(first);
+      assign(first, taken.has(base) ? fallback(base) : base);
+    }
+    const side = (vals, words) => {
+      const sorted = [...vals].sort((a, b) => Math.abs(Number(a) - ref) - Math.abs(Number(b) - ref) || Number(a) - Number(b));
+      for (const v of sorted) {
+        const free = words.map((w) => `${base}-${w}`).find((n) => !taken.has(n));
+        assign(v, free != null ? free : fallback(`${base}-${words[words.length - 1]}`));
+      }
+    };
+    const same = rest.filter((v) => Math.abs(Number(v) - ref) < 5e-3);
+    for (const v of same) assign(v, fallback(base));
+    side(rest.filter((v) => Number(v) < ref - 49e-4), SIZE_SMALL);
+    side(rest.filter((v) => Number(v) > ref + 49e-4), SIZE_LARGE);
+  }
+  function assignColors(base, kind, refHex, counts, left, taken, assign, fallback) {
+    var _a, _b, _c, _d, _e;
+    const slotOf = /* @__PURE__ */ new Map();
+    const slotAssigned = /* @__PURE__ */ new Set();
+    const slotOwner = /* @__PURE__ */ new Map();
+    const slotFree = (name, hex) => {
+      const own = slotOwner.get(name);
+      if (own) return own === hex;
+      const v = taken.get(name);
+      if (!v) return true;
+      return v.length > 0 && v.every((x) => hexOfKey(x) === hex);
+    };
+    const setSlot = (hex, name) => {
+      slotOf.set(hex, name);
+      slotOwner.set(name, hex);
+    };
+    const hexCount = /* @__PURE__ */ new Map();
+    for (const v of left) hexCount.set(hexOfKey(v), ((_a = hexCount.get(hexOfKey(v))) != null ? _a : 0) + ((_b = counts.get(v)) != null ? _b : 0));
+    const hexes = [...hexCount.keys()].sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = hexCount.get(b)) != null ? _a2 : 0) - ((_b2 = hexCount.get(a)) != null ? _b2 : 0) || cmpStr(a, b);
+    });
+    const fellBack = /* @__PURE__ */ new Set();
+    const pick = (hex, cands) => {
+      const free = cands.find((n) => slotFree(n, hex));
+      if (!free) fellBack.add(hex);
+      setSlot(hex, free != null ? free : cands[cands.length - 1]);
+    };
+    const ladderSide = (list, refL, prefix) => {
+      const lighter = list.filter((h) => lOf(h) > refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
+      const darker = list.filter((h) => lOf(h) <= refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
+      for (const h of lighter) pick(h, LIGHTER.map((w) => `${prefix}-${w}`));
+      for (const h of darker) pick(h, DARKER.map((w) => `${prefix}-${w}`));
+    };
+    if (kind === "ladder") {
+      const i = base.lastIndexOf("/");
+      const words = base.slice(i + 1) === "strong" ? DARKER : LIGHTER;
+      const refL = refHex ? lOf(refHex) : 0;
+      const sorted = [...hexes].sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
+      for (const h of sorted) pick(h, words.map((w) => `${base.slice(0, i)}/${w}`));
+    } else if (kind === "default") {
+      for (const h of hexes) pick(h, [base]);
+    } else {
+      const held = holderValue(taken, base);
+      let rest = hexes;
+      let refH;
+      if (held) refH = hexOfKey(held);
+      else {
+        refH = hexes[0];
+        rest = hexes.slice(1);
+        pick(refH, [base]);
+      }
+      if (kind === "inverse") ladderSide(rest.filter((h) => h !== refH), lOf(refH), base);
+      else {
+        const refFam = famOf(refH);
+        ladderSide(rest.filter((h) => h !== refH && famOf(h) === refFam), lOf(refH), base);
+        const byFam = /* @__PURE__ */ new Map();
+        for (const h of rest) {
+          if (h === refH || famOf(h) === refFam) continue;
+          const f = famOf(h);
+          byFam.set(f, [...(_c = byFam.get(f)) != null ? _c : [], h]);
+        }
+        for (const [f, list] of byFam) {
+          const famName = `${base}-${f}`;
+          const famHeld = holderValue(taken, famName);
+          let famRef;
+          let others = list;
+          if (famHeld) famRef = hexOfKey(famHeld);
+          else {
+            famRef = list[0];
+            others = list.slice(1);
+            pick(famRef, [famName]);
+          }
+          ladderSide(others.filter((h) => h !== famRef), lOf(famRef), famName);
+        }
+      }
+      if (held && rest.includes(refH) && !slotOf.has(refH)) setSlot(refH, base);
+    }
+    const alphaOf = (v) => {
+      var _a2;
+      return (_a2 = alphaOfKey(v)) != null ? _a2 : 1;
+    };
+    const byHex = /* @__PURE__ */ new Map();
+    for (const v of left) byHex.set(hexOfKey(v), [...(_d = byHex.get(hexOfKey(v))) != null ? _d : [], v]);
+    const nameFree = (n, hex) => !taken.has(n) && (!slotOwner.has(n) || slotOwner.get(n) === hex);
+    for (const [hex, vals] of byHex) {
+      const slot = (_e = slotOf.get(hex)) != null ? _e : base;
+      const fb = fellBack.has(hex);
+      const order = [...vals].sort((a, b) => {
+        var _a2, _b2;
+        return ((_a2 = counts.get(b)) != null ? _a2 : 0) - ((_b2 = counts.get(a)) != null ? _b2 : 0) || alphaOf(b) - alphaOf(a) || cmpValue(a, b);
+      });
+      const fileVals = !fb ? taken.get(slot) : void 0;
+      const held = fileVals && fileVals.length && fileVals.every((x) => hexOfKey(x) === hex) && !slotAssigned.has(slot) ? fileVals[0] : void 0;
+      let refA;
+      let rest = order;
+      if (held != null) refA = alphaOf(held);
+      else {
+        const first = order[0];
+        rest = order.slice(1);
+        refA = alphaOf(first);
+        assign(first, fb || taken.has(slot) ? fallback(slot) : slot);
+        slotAssigned.add(slot);
+      }
+      const side = (list, words) => {
+        const sorted = [...list].sort((a, b) => Math.abs(alphaOf(a) - refA) - Math.abs(alphaOf(b) - refA) || alphaOf(a) - alphaOf(b));
+        sorted.forEach((v, i) => {
+          const cands = words.map((w) => `${slot}-${w}`);
+          if (fb) {
+            assign(v, fallback(cands[Math.min(i, cands.length - 1)]));
+            return;
+          }
+          const free = cands.find((n) => nameFree(n, hex));
+          assign(v, free != null ? free : fallback(cands[cands.length - 1]));
+        });
+      };
+      for (const v of rest.filter((x) => Math.abs(alphaOf(x) - refA) < 5e-3)) assign(v, fallback(slot));
+      side(rest.filter((x) => alphaOf(x) < refA - 49e-4), LIGHTER);
+      side(rest.filter((x) => alphaOf(x) > refA + 49e-4), DARKER);
+    }
   }
   function cmpValue(a, b) {
     const na = Number(a);
@@ -2373,7 +2689,7 @@
     const kind = !Number.isInteger(d) ? "decimal" : KRDS_SIZES.includes(d) ? null : "off";
     return { kind, nearest };
   }
-  var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  var cmpStr2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   var sigOf = (i) => `${i.fontSize}|${i.lineHeight}|${i.letterSpacing}|${i.family}|${i.style}`;
   function groupBy(items, key) {
@@ -2388,7 +2704,7 @@
   }
   var cmpLast = (a, b) => {
     var _a, _b, _c, _d;
-    return b.count - a.count || cmpStr(sigOf(a.input), sigOf(b.input)) || cmpStr((_a = a.input.name) != null ? _a : "", (_b = b.input.name) != null ? _b : "") || cmpStr((_c = a.input.id) != null ? _c : "", (_d = b.input.id) != null ? _d : "") || a.idx - b.idx;
+    return b.count - a.count || cmpStr2(sigOf(a.input), sigOf(b.input)) || cmpStr2((_a = a.input.name) != null ? _a : "", (_b = b.input.name) != null ? _b : "") || cmpStr2((_c = a.input.id) != null ? _c : "", (_d = b.input.id) != null ? _d : "") || a.idx - b.idx;
   };
   var weightKey = (w) => `${w.weight}${w.italic ? "i" : ""}`;
   var lhTail = (lh) => lh === "auto" ? "-auto" : lh === 150 ? "" : `-${lh}`;
@@ -2462,7 +2778,7 @@
     for (const g of groupBy(works, (w) => w.name)) {
       const byFam = groupBy(g, (w) => w.input.family);
       if (byFam.length < 2) continue;
-      const ranked = byFam.map((ws) => ({ fam: ws[0].input.family, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => b.used - a.used || cmpStr(a.fam, b.fam));
+      const ranked = byFam.map((ws) => ({ fam: ws[0].input.family, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => b.used - a.used || cmpStr2(a.fam, b.fam));
       ranked.forEach((r, i) => {
         if (i === 0) return;
         for (const w of r.ws) {
@@ -3107,7 +3423,10 @@
   }
   var byName = (a, b) => a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
   var byUserThenName = (a, b) => Number(b.user) - Number(a.user) || byName(a, b);
-  var nameRe = (base) => new RegExp(`^${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:-\\d+)?$`);
+  var firstInFamily = (list, base) => {
+    const ord = byFamilyOrder(base);
+    return [...list].sort((a, b) => ord(a.variable.name, b.variable.name) || Number(b.user) - Number(a.user) || a.colIdx - b.colIdx)[0];
+  };
   function pickDesigned(cands, kind) {
     var _a;
     const comp = cands.find((e) => e.tier === 3);
@@ -3140,8 +3459,7 @@
         continue;
       }
       const group = s.usage.split("/")[0];
-      const re = nameRe(s.usage);
-      const two = cands.filter((e) => e.tier === 2 && (s.kind === "text" ? !e.mirror && e.variable.name.startsWith(`${group}/`) : re.test(e.variable.name))).sort(byName)[0];
+      const two = s.kind === "text" ? cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0] : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
       if (two) {
         emit(s, two);
         continue;
@@ -3164,15 +3482,16 @@
       }
       const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
+      const refHex = colorRoleRef([...counts.values()], def == null ? void 0 : def.colorHex);
       for (const x of list) {
         const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha))) != null ? _a : "default"}`;
-        const re = nameRe(base);
-        const two = x.cands.filter((e) => e.tier === 2 && re.test(e.variable.name)).sort(byName)[0];
+        const fam = familyRe(base, nameKindOf(base, valueKey(x.slot.value)));
+        const two = firstInFamily(x.cands.filter((e) => e.tier === 2 && !e.mirror && fam.test(e.variable.name)), base);
         if (two) {
           emit(x.slot, two);
           continue;
         }
-        pending.push({ slot: x.slot, base, global: globalFor(x.cands) });
+        pending.push({ slot: x.slot, base, global: globalFor(x.cands), refHex });
       }
     }
     const live = pending.filter((p) => {
@@ -3181,8 +3500,9 @@
       return false;
     });
     const names = assignNames(
-      live.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1 })),
-      ctx.index.semNames
+      live.map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
+      ctx.index.semNames,
+      { reuse: false }
     );
     const roleOf = /* @__PURE__ */ new Map();
     for (const p of live) {
@@ -3690,7 +4010,13 @@
       });
     };
     const re = new RegExp(`^${spec.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:-\\d+)?$`);
-    const same = inCol.filter((v2) => re.test(v2.name) && pointsAtGlobal(v2)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
+    const globalNames = new Set(all.filter((v2) => tiers.get(v2.variableCollectionId) === 1).map((v2) => v2.name));
+    const covers = (v2) => {
+      var _a2;
+      const sc = (_a2 = v2.scopes) != null ? _a2 : [];
+      return sc.includes("ALL_SCOPES") || spec.scopes.every((x) => sc.includes(x));
+    };
+    const same = inCol.filter((v2) => re.test(v2.name) && pointsAtGlobal(v2) && covers(v2) && !globalNames.has(v2.name)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
     if (same) return same;
     const names = new Set(inCol.map((v2) => v2.name));
     let name = spec.name;
@@ -4115,9 +4441,39 @@
     } catch (e) {
     }
   }
+  function fileGlobalsOf(col, vars) {
+    const out = /* @__PURE__ */ new Map();
+    if (!col) return out;
+    const mode = col.defaultModeId;
+    for (const v of vars) {
+      if (v.variableCollectionId !== col.id) continue;
+      const raw = v.valuesByMode[mode];
+      if (raw && typeof raw === "object" && "r" in raw) {
+        const hex = rgbToHex(raw);
+        out.set(v.name, { key: colorKey(hex, raw.a), hex });
+      } else if (typeof raw === "number") out.set(v.name, { key: valueKey(raw) });
+      else if (typeof raw === "string") out.set(v.name, { key: raw });
+      else out.set(v.name, { key: null, hex: null });
+    }
+    return out;
+  }
+  function resolveUsesNames(tokens, skip2, base, file) {
+    var _a;
+    const reqs = [];
+    for (const t2 of tokens) {
+      if (!((_a = t2.uses) == null ? void 0 : _a.length) || skip2.has(t2.name)) continue;
+      const type = resolvedTypeForToken(t2);
+      const lit = literalOf(t2, type, base);
+      if (type === "COLOR") {
+        const hex = String(t2.value).toLowerCase();
+        reqs.push(__spreadValues({ name: t2.name, key: String(lit), hex }, t2.alpha != null && t2.alpha < 1 ? { alphaPct: alphaPct(t2.alpha) } : {}));
+      } else reqs.push({ name: t2.name, key: typeof lit === "number" ? valueKey(lit) : String(lit) });
+    }
+    return resolveGlobalNames(reqs, file);
+  }
   async function createTokens(tokens, base) {
     const reuse = await pickReusable(tokens, base);
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set() };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), finalName: /* @__PURE__ */ new Map() };
     const reuseMap = readReuseMap();
     const toCreate = tokens.filter((t2) => !reuse.has(t2.name));
     for (const [name, v] of reuse) {
@@ -4128,9 +4484,35 @@
       const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), "global");
       const gMode = globalCol.defaultModeId;
       const idx = await buildVarIndex();
+      const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
       const touched = /* @__PURE__ */ new Set();
       for (const t2 of toCreate) {
         const type = resolvedTypeForToken(t2);
+        const nm = named.get(t2.name);
+        if (nm) {
+          summary.finalName.set(t2.name, nm.name);
+          const g2 = upsertVariable(nm.name, globalCol, type, idx);
+          const key2 = vkey(globalCol.id, nm.name);
+          const scopes2 = scopesForType(scopesForSources(t2.sources), type);
+          summary.globalOf.set(t2.name, g2.variable.id);
+          delete reuseMap[t2.name];
+          if (nm.reuse) {
+            g2.variable.scopes = scopesForType([.../* @__PURE__ */ new Set([...g2.variable.scopes, ...scopes2])], type);
+            touched.add(key2);
+            continue;
+          }
+          if (g2.created) {
+            summary.created++;
+            summary.globals++;
+            setGlobalLiteral(g2.variable, gMode, t2, type, base);
+            g2.variable.hiddenFromPublishing = true;
+            const desc2 = unitDescription(t2);
+            if (desc2) g2.variable.description = desc2;
+          }
+          g2.variable.scopes = touched.has(key2) ? scopesForType([.../* @__PURE__ */ new Set([...g2.variable.scopes, ...scopes2])], type) : scopes2;
+          touched.add(key2);
+          continue;
+        }
         const mine = idx.get(vkey(globalCol.id, t2.name));
         if (mine && isManualVar(mine)) {
           if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gMode], literalOf(t2, type, base), type)) {
@@ -4170,7 +4552,7 @@
     const existing = /* @__PURE__ */ new Set();
     for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
     const states = /* @__PURE__ */ new Map();
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), tokenStates: states };
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), tokenStates: states, finalName: /* @__PURE__ */ new Map() };
     const setState = (name, st) => {
       if (!states.has(name)) states.set(name, st);
     };
@@ -4190,11 +4572,26 @@
     if (gCol) {
       for (const v of await figma.variables.getLocalVariablesAsync()) if (v.variableCollectionId === gId && isManualVar(v)) manualByName.set(v.name, v);
     }
+    const allVars = await figma.variables.getLocalVariablesAsync();
+    const named = resolveUsesNames(tokens, reuse, base, fileGlobalsOf(gCol, allVars));
     for (const t2 of tokens) {
       const r = reuse.get(t2.name);
       if (r) {
         summary.globalOf.set(t2.name, r.id);
         setState(t2.name, { state: "reuse", varName: r.name });
+        continue;
+      }
+      const nm = named.get(t2.name);
+      if (nm) {
+        summary.finalName.set(t2.name, nm.name);
+        if (nm.reuse) {
+          const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
+          if (v) summary.globalOf.set(t2.name, v.id);
+          setState(t2.name, { state: "reuse", varName: nm.name });
+          continue;
+        }
+        setState(t2.name, nm.name !== t2.name ? { state: "new", varName: nm.name } : { state: "new" });
+        tally(gId, nm.name, "globals");
         continue;
       }
       const mine = manualByName.get(t2.name);
@@ -4216,8 +4613,8 @@
     }
     return summary;
   }
-  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
+  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const withUses = tokens.filter((t2) => {
       var _a2;
       return (_a2 = t2.uses) == null ? void 0 : _a2.length;
@@ -4250,46 +4647,67 @@
       return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
     };
     const existing = /* @__PURE__ */ new Map();
+    const semByName = /* @__PURE__ */ new Map();
     for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
       const k = keyOfValue(resolve(v));
       const arr = existing.get(v.name);
       if (!arr) existing.set(v.name, k ? [k] : []);
       else if (k && !arr.includes(k)) arr.push(k);
+      semByName.set(v.name, [...(_a = semByName.get(v.name)) != null ? _a : [], { key: k, v }]);
     }
+    const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+    const canReuse = (name, value, base) => {
+      var _a2;
+      if (globalNames.has(name)) return false;
+      const need = scopeForSemanticRole(base);
+      return ((_a2 = semByName.get(name)) != null ? _a2 : []).some(({ key, v }) => {
+        var _a3;
+        if (key !== value) return false;
+        if (!need) return true;
+        const sc = (_a3 = v.scopes) != null ? _a3 : [];
+        return sc.includes("ALL_SCOPES") || need.every((x) => sc.includes(x));
+      });
+    };
     const pluginGlobal = ownedCollection(cols, "global");
     const globalFor = (t2) => {
+      var _a2;
       const id = globalOf == null ? void 0 : globalOf.get(t2.name);
       if (id) return byId.get(id);
-      return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === t2.name) : void 0;
+      const nm = (_a2 = finalName == null ? void 0 : finalName.get(t2.name)) != null ? _a2 : t2.name;
+      return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : void 0;
     };
     const reqs = [];
     const colorUses = /* @__PURE__ */ new Map();
     for (const t2 of withUses) {
-      for (const u of (_a = t2.uses) != null ? _a : []) {
+      for (const u of (_b = t2.uses) != null ? _b : []) {
         if (u.name.startsWith("color/")) {
-          const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
+          const arr = (_c = colorUses.get(u.name)) != null ? _c : [];
           arr.push({ token: t2, count: u.count, bg: u.bg });
           colorUses.set(u.name, arr);
         } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
       }
     }
     for (const [use, list] of colorUses) {
-      const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
+      const defKey = (_d = existing.get(`${use}/default`)) == null ? void 0 : _d[0];
       const bases = colorRoleBases(
         list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
         defKey || void 0,
         // 색 값 키여도 colorRoleBases가 hex만 본다
         use.slice("color/".length)
       );
+      const refHex = colorRoleRef(
+        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
+        defKey || void 0
+      );
       for (const x of list) {
         const hex = String(x.token.value).toLowerCase();
-        reqs.push({ base: `${use}/${(_d = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _d : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
+        reqs.push(__spreadValues({ base: `${use}/${(_e = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _e : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
       }
     }
-    const names = assignNames(reqs, existing);
+    const names = assignNames(reqs, existing, { canReuse });
     const toMake = /* @__PURE__ */ new Map();
     for (const r of reqs) {
-      const name = (_e = names.get(`${r.base}\0${r.value}`)) != null ? _e : r.base;
+      const name = (_f = names.get(`${r.base}\0${r.value}`)) != null ? _f : r.base;
       if (existing.has(name) || toMake.has(name)) continue;
       toMake.set(name, r.token);
     }
@@ -4297,7 +4715,7 @@
       if (rowsOut) {
         for (const [name, t2] of toMake) {
           const id = globalOf == null ? void 0 : globalOf.get(t2.name);
-          rowsOut.push({ name, global: id && ((_f = byId.get(id)) == null ? void 0 : _f.name) || t2.name, token: t2.name });
+          rowsOut.push({ name, global: id && ((_g = byId.get(id)) == null ? void 0 : _g.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
         }
       }
       return toMake.size;
@@ -4310,9 +4728,9 @@
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_g = scopeForSemanticRole(name)) != null ? _g : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_h = scopeForSemanticRole(name)) != null ? _h : g.scopes, g.resolvedType);
       try {
-        (_h = v.setPluginData) == null ? void 0 : _h.call(v, AUTO_ROLE_KEY, "1");
+        (_i = v.setPluginData) == null ? void 0 : _i.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -8031,12 +8449,12 @@
     for (let i = 0; i < Math.min(as.length, bs.length); i++) if (as[i] !== bs[i]) return as[i] - bs[i];
     return as.length - bs.length;
   }
-  function innerSig(root, pick2) {
+  function innerSig(root, pick) {
     const out = [];
     const walk3 = (n, isRoot) => {
       var _a;
       if (!isRoot && (n.type === "TEXT" || n.type === "INSTANCE" || n.iconFrame || VECTOR_TYPES.has(n.type))) return;
-      if (!isRoot) out.push(pick2(n));
+      if (!isRoot) out.push(pick(n));
       for (const c of (_a = n.children) != null ? _a : []) walk3(c, false);
     };
     walk3(root, true);
@@ -8181,8 +8599,8 @@
   function tabSubfamilies(members) {
     var _a, _b, _c, _d;
     const fams = splitFamilies(members);
-    const famOf = /* @__PURE__ */ new Map();
-    fams.forEach((f, i) => f.forEach((m) => famOf.set(m.id, i)));
+    const famOf2 = /* @__PURE__ */ new Map();
+    fams.forEach((f, i) => f.forEach((m) => famOf2.set(m.id, i)));
     const info = new Map(members.map((m) => [m.id, tabInfo(m)]));
     const rootVaries = new Set(members.map((m) => {
       var _a2;
@@ -8196,7 +8614,7 @@
     const key = (m) => {
       var _a2, _b2;
       const t2 = info.get(m.id);
-      const fi = famOf.get(m.id);
+      const fi = famOf2.get(m.id);
       const content = famContent[fi];
       return [
         fi,
@@ -8215,7 +8633,7 @@
     const subs = subfamiliesBy(members, key);
     if (subs.length >= 2) {
       const head = (s) => s.members[s.master];
-      const famStyle = (s) => `${famOf.get(head(s).id)}#${info.get(head(s).id).style}`;
+      const famStyle = (s) => `${famOf2.get(head(s).id)}#${info.get(head(s).id).style}`;
       assignAxis(subs, "Style", (s) => info.get(head(s).id).style);
       const posBy = /* @__PURE__ */ new Map();
       for (const s of subs) {
@@ -8233,7 +8651,7 @@
       if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, "Color", (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
       const sizeBy = /* @__PURE__ */ new Map();
       for (const s of subs) {
-        const fi = famOf.get(head(s).id);
+        const fi = famOf2.get(head(s).id);
         if (famContent[fi]) continue;
         const k = famStyle(s);
         if (!sizeBy.has(k)) sizeBy.set(k, /* @__PURE__ */ new Set());
@@ -8245,7 +8663,7 @@
       };
       for (const [k, v] of sizeBy) {
         if (v.size < 2) continue;
-        const inGroup = subs.filter((s) => !famContent[famOf.get(head(s).id)] && famStyle(s) === k);
+        const inGroup = subs.filter((s) => !famContent[famOf2.get(head(s).id)] && famStyle(s) === k);
         const labels = sizeLabel([...new Set(inGroup.map((s) => String(area(s))))]);
         const byArea = new Map([...new Set(inGroup.map((s) => String(area(s))))].map((a, i) => [a, labels[i]]));
         for (const s of inGroup) s.props.Size = byArea.get(String(area(s)));
@@ -10217,7 +10635,7 @@
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
-          const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0);
+          const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
@@ -10320,14 +10738,14 @@
         }
         case "SELECT_VAR_USERS": {
           const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
-          const pick2 = r.nodes.slice(0, SELECT_CAP);
-          if (pick2.length) {
+          const pick = r.nodes.slice(0, SELECT_CAP);
+          if (pick.length) {
             const cur = figma.currentPage.selection;
-            if (pick2.length !== cur.length || pick2.some((n, i) => cur[i] !== n)) selfSelect = true;
-            figma.currentPage.selection = pick2;
-            figma.viewport.scrollAndZoomIntoView(pick2);
+            if (pick.length !== cur.length || pick.some((n, i) => cur[i] !== n)) selfSelect = true;
+            figma.currentPage.selection = pick;
+            figma.viewport.scrollAndZoomIntoView(pick);
           }
-          post({ type: "SELECT_RESULT", found: pick2.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
+          post({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
           break;
         }
         case "CANCEL": {

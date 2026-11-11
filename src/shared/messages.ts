@@ -164,7 +164,7 @@ export type TextStyleSkipReason = 'hasStyle' | 'noStyle' | 'ambiguous' | 'mixed'
 /** 타이포 등록 · 바로 연결(IA v4 §4.3 "타이포 등록")에서 못 붙인 글자의 사유 — 값이 방금 스타일과 같은 글자만 센다. */
 export type TextStyleApplySkipReason = 'hasStyle' | 'instance' | 'ambiguous';
 
-/** 만들기 미리보기의 토큰별 상태(IA v4 §4.3 상태 태그). varName: reuse일 때 쓸 기존 변수 이름. */
+/** 만들기 미리보기의 토큰별 상태(IA v4 §4.3 상태 태그). varName: reuse일 때 쓸 기존 변수 이름, new일 때는 파일과 견줘 바뀐 최종 이름(ia-v3 §2.12 12.11 — 없으면 토큰 이름). */
 export interface TokenState {
   state: 'new' | 'update' | 'reuse' | 'manual';
   varName?: string;

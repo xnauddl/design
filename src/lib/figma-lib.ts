@@ -32,8 +32,8 @@ export {
   COMPONENT,
 } from './variables';
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult, RoleVarRenameResult, TsRenameResult } from './variables';
-export { bindSelection, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
-export { assignNames, bgKindOf, colorRoleBases, colorSlotKey, colorUse, paddingProp, radiusName, strokeName, isOldPluginName } from './usageRoles';
+export { bindSelection, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
+export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName } from './usageRoles';
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName } from './rename';
 export type { RenameOutcome } from './rename';

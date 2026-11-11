@@ -3838,17 +3838,104 @@
     if (achromatic && o.l <= 0.05) return { family: "gray", step: 1e3, achromatic };
     return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
   }
-  function nameColorsByHue(hexes) {
-    const seen = /* @__PURE__ */ new Map();
-    return hexes.map((hex) => {
-      var _a3;
-      const { family, step } = classifyColor(hex);
-      const base = `${family}/${step}`;
-      const n = ((_a3 = seen.get(base)) != null ? _a3 : 0) + 1;
-      seen.set(base, n);
-      return n === 1 ? `color/${base}` : `color/${family}/${step}-${n}`;
-    });
+  function stepRefL(step) {
+    if (step === 0) return 1;
+    if (step === 1e3) return 0;
+    const i = STEP_LIST.indexOf(step);
+    if (i >= 0) return STEP_L[i];
+    for (let k = 0; k < STEP_LIST.length - 1; k++) if ((STEP_LIST[k] + STEP_LIST[k + 1]) / 2 === step) return (STEP_L[k] + STEP_L[k + 1]) / 2;
+    return NaN;
   }
+  function midSteps(step) {
+    const i = STEP_LIST.indexOf(step);
+    if (i < 0) return { lighter: null, darker: null };
+    return { lighter: i > 0 ? (STEP_LIST[i - 1] + step) / 2 : null, darker: i < STEP_LIST.length - 1 ? (step + STEP_LIST[i + 1]) / 2 : null };
+  }
+  var cmpHex = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function nameColorsByHue(hexes, opaqueCount = hexes.length, taken = /* @__PURE__ */ new Set()) {
+    const used = new Set(taken);
+    const out = /* @__PURE__ */ new Map();
+    const info = new Map(hexes.map((h) => [h, __spreadProps(__spreadValues({}, classifyColor(h)), { l: hexToOklch(h).l })]));
+    const nameOf = (fam, step) => `color/${fam}/${step}`;
+    const fallback = (base) => {
+      for (let i = 2; ; i++) if (!used.has(`${base}-${i}`)) return `${base}-${i}`;
+    };
+    const phase = (list) => {
+      var _a3, _b, _c, _d;
+      const groups = /* @__PURE__ */ new Map();
+      for (const h of list) {
+        const c = info.get(h);
+        const k = nameOf(c.family, c.step);
+        groups.set(k, [...(_a3 = groups.get(k)) != null ? _a3 : [], h]);
+      }
+      const owners = /* @__PURE__ */ new Map();
+      const losers = [];
+      for (const [k, hs] of groups) {
+        const c = info.get(hs[0]);
+        const ref = stepRefL(c.step);
+        const sorted = [...hs].sort((a, b) => Math.abs(info.get(a).l - ref) - Math.abs(info.get(b).l - ref) || cmpHex(a, b));
+        let ownerL;
+        let rest = sorted;
+        if (!used.has(k)) {
+          owners.set(k, sorted[0]);
+          out.set(sorted[0], k);
+          used.add(k);
+          ownerL = info.get(sorted[0]).l;
+          rest = sorted.slice(1);
+        } else {
+          ownerL = (_b = ownerLOf.get(k)) != null ? _b : ref;
+        }
+        for (const h of rest) losers.push({ hex: h, stepName: k, ownerL, step: c.step, fam: c.family });
+        if (owners.has(k)) ownerLOf.set(k, ownerL);
+      }
+      const wants = /* @__PURE__ */ new Map();
+      const fallbackers = [];
+      const byKeySide = /* @__PURE__ */ new Map();
+      for (const x of losers) {
+        const side = info.get(x.hex).l > x.ownerL ? "lighter" : "darker";
+        const key = `${x.stepName}|${side}`;
+        byKeySide.set(key, [...(_c = byKeySide.get(key)) != null ? _c : [], x]);
+      }
+      for (const [key, xs] of byKeySide) {
+        const side = key.endsWith("|lighter") ? "lighter" : "darker";
+        const sorted = [...xs].sort((a, b) => Math.abs(info.get(a.hex).l - a.ownerL) - Math.abs(info.get(b.hex).l - b.ownerL) || cmpHex(a.hex, b.hex));
+        const first = sorted[0];
+        const mid = midSteps(first.step)[side];
+        if (mid != null) {
+          const m = nameOf(first.fam, mid);
+          wants.set(m, [...(_d = wants.get(m)) != null ? _d : [], { hex: first.hex, refL: stepRefL(mid) }]);
+        } else fallbackers.push({ hex: first.hex, stepName: first.stepName, refL: stepRefL(first.step) });
+        for (const x of sorted.slice(1)) fallbackers.push({ hex: x.hex, stepName: x.stepName, refL: stepRefL(x.step) });
+      }
+      const stepOfHex = new Map(losers.map((x) => [x.hex, x]));
+      for (const [m, ws] of wants) {
+        const sorted = [...ws].sort((a, b) => Math.abs(info.get(a.hex).l - a.refL) - Math.abs(info.get(b.hex).l - b.refL) || cmpHex(a.hex, b.hex));
+        let i = 0;
+        if (!used.has(m)) {
+          out.set(sorted[0].hex, m);
+          used.add(m);
+          i = 1;
+        }
+        for (const w of sorted.slice(i)) {
+          const x = stepOfHex.get(w.hex);
+          fallbackers.push({ hex: w.hex, stepName: x.stepName, refL: stepRefL(x.step) });
+        }
+      }
+      fallbackers.sort((a, b) => cmpHex(a.stepName, b.stepName) || Math.abs(info.get(a.hex).l - a.refL) - Math.abs(info.get(b.hex).l - b.refL) || cmpHex(a.hex, b.hex));
+      for (const f of fallbackers) {
+        const n = fallback(f.stepName);
+        out.set(f.hex, n);
+        used.add(n);
+      }
+    };
+    const ownerLOf = /* @__PURE__ */ new Map();
+    const uniq = [...new Set(hexes)];
+    const opaque = uniq.filter((h) => hexes.indexOf(h) < opaqueCount);
+    phase(opaque);
+    phase(uniq.filter((h) => !out.has(h)));
+    return hexes.map((h) => out.get(h));
+  }
+  var STEP_SET = /* @__PURE__ */ new Set([0, 1e3, ...STEP_LIST]);
 
   // src/lib/palette.ts
   var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
@@ -4525,7 +4612,8 @@
     if (!idx.length) return;
     const opaqueFirst = [...idx.filter((ti) => toks[ti].alpha == null), ...idx.filter((ti) => toks[ti].alpha != null)];
     const uniq = [...new Set(opaqueFirst.map((ti) => toks[ti].value.toLowerCase()))];
-    const names = nameColorsByHue(uniq);
+    const opaqueCount = new Set(idx.filter((ti) => toks[ti].alpha == null).map((ti) => toks[ti].value.toLowerCase())).size;
+    const names = nameColorsByHue(uniq, opaqueCount);
     const nameOf = new Map(uniq.map((h, i) => [h, names[i]]));
     idx.forEach((ti, k) => {
       const base = nameOf.get(hexes[k].toLowerCase());
@@ -6688,7 +6776,7 @@
           const st = mkStates[tk.name];
           const locked = mkLocked(tk);
           const on = mkIsOn(tk);
-          const name = (st == null ? void 0 : st.state) === "reuse" && st.varName ? st.varName : tk.name;
+          const name = (st == null ? void 0 : st.varName) ? st.varName : tk.name;
           const cells = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value), void 0, false)];
           if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
           else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));

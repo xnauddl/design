@@ -1122,7 +1122,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 같은 이름의 직접 만든 변수라 건너뛴 토큰은 그 토큰을 가리킬 역할도 만들지 않는다(§4.9).
         const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
         const roleRows: RoleRow[] = [];
-        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined);
+        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined, s.finalName);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });

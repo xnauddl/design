@@ -215,16 +215,18 @@ test('suggestSemanticMap(#10) — 임의 색에서 역할 추천(실제 이름 �
   assert.equal(map['color/border/default'], 'color/888888');
 });
 
-test('nameColorsByHue(#3) — hue-Global 이름 + 동일 (hue,step) 충돌 접미사', () => {
-  // 같은 파랑 두 개(거의 같은 명도) → blue/500, blue/500-2. 빨강·무채는 독립.
+test('nameColorsByHue(#3) — hue-Global 이름 + 같은 (hue,step)은 반 단계(ia-v3 §2.12 12.11)', () => {
+  // 같은 파랑 두 개(거의 같은 명도) → 하나는 단계, 다른 하나는 반 단계. 빨강·무채는 독립.
   const names = nameColorsByHue(['#3366ff', '#3366fe', '#ff0000', '#808080']);
-  assert.equal(names[0], `color/${classifyColor('#3366ff').family}/${classifyColor('#3366ff').step}`);
-  assert.match(names[1], /-2$/); // 충돌 → 접미사
-  assert.equal(names[0].replace(/\/\d+$/, ''), names[1].replace(/\/\d+(-\d+)?$/, '')); // 같은 hue 패밀리
+  const step = classifyColor('#3366ff').step;
+  assert.deepEqual(new Set(names.slice(0, 2).map((n) => Number(n.split('/')[2]))).has(step), true); // 하나는 단계 주인
+  assert.equal(names[0] === names[1], false);
+  assert.equal(names[0].split('/')[1], names[1].split('/')[1]); // 같은 hue 패밀리
+  assert.ok(!names[1].endsWith('-2') && !names[0].endsWith('-2'), '반 단계를 쓰고 -2를 붙이지 않는다');
   assert.equal(names[2], `color/red/${classifyColor('#ff0000').step}`);
   assert.equal(names[3].startsWith('color/gray/'), true);
-  // 모든 결과는 팔레트(hue) 이름으로 인식
-  for (const n of names) assert.equal(isPaletteColorName(n), true);
+  // 정수 단계 이름만 팔레트 이름(정리 대상) — 반 단계는 추출 경로의 것
+  for (const n of names) assert.equal(isPaletteColorName(n), [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950].includes(Number(n.split('/')[2])));
 });
 
 test('isPaletteColorName — hue 패밀리(+충돌 접미사)만 정리 대상', () => {
