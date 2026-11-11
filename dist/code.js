@@ -861,6 +861,31 @@
     "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 KRDS \uC774\uB984 {b}",
     "textStyle.renameBtn": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30",
+    // 안 쓰는 변수 찾기(docs/unused-vars.md)
+    "unused.menu": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uCC3E\uAE30\u2026",
+    "unused.noVars": "\uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "unused.title": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uCC3E\uAE30",
+    "unused.titleN": "\uC548 \uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
+    "unused.loading": "\uD398\uC774\uC9C0\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "unused.reading": "\uD30C\uC77C\uC744 \uC77D\uB294 \uC911\u2026 {done} / {total} \uD398\uC774\uC9C0",
+    "unused.checking": "\uC9C0\uC6B0\uAE30 \uC804\uC5D0 \uD655\uC778\uD558\uB294 \uC911\u2026 {done} / {total} \uD398\uC774\uC9C0",
+    "unused.summary": "\uD398\uC774\uC9C0 {p}\uAC1C \xB7 \uB808\uC774\uC5B4 {l}\uAC1C\uB97C \uC77D\uC5C8\uC5B4\uC694",
+    "unused.libNote": "\uB2E4\uB978 \uD30C\uC77C\uC5D0\uC11C \uC4F0\uB294 \uBCC0\uC218\uB294 \uD655\uC778\uD558\uC9C0 \uBABB\uD574\uC694",
+    "unused.none": "\uC548 \uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "unused.top": "\uCF20 \uBCC0\uC218\uB9CC \uC9C0\uC6CC\uC694",
+    "unused.chainTag": "\uC548 \uC4F0\uB294 \uBCC0\uC218\uB9CC \uAC00\uB9AC\uD0B4",
+    "unused.chainTip": "\uC774\uAC83\uC744 \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 {m}\uAC1C\uB3C4 \uC548 \uC4F0\uC5EC\uC694 \u2014 \uADF8 \uBCC0\uC218\uB97C \uB0A8\uAE30\uACE0 \uC774\uAC83\uB9CC \uC9C0\uC6B0\uBA74 \uADF8 \uBCC0\uC218\uB294 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uB97C \uAC00\uB9AC\uCF1C\uC694",
+    "unused.keepWarn": "\uB0A8\uAE30\uB294 \uBCC0\uC218 {m}\uAC1C\uAC00 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uB97C \uAC00\uB9AC\uD0A4\uAC8C \uB3FC\uC694",
+    "unused.deleteBtn": "\uC120\uD0DD\uD55C {k}\uAC1C \uC9C0\uC6B0\uAE30",
+    "unused.deleteNeed": "\uC9C0\uC6B8 \uBCC0\uC218\uB97C \uCF1C \uC8FC\uC138\uC694",
+    "unused.readFail": "\uD30C\uC77C\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "unused.deleted": "\uBCC0\uC218 {d}\uAC1C\uB97C \uC9C0\uC6E0\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "unused.deletedNone": "\uC9C0\uC6B4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
+    "unused.skippedTail": " \xB7 \uAC74\uB108\uB700 {s}",
+    "unused.skippedTip": "\uC77D\uC740 \uB4A4 \uC4F0\uC774\uAE30 \uC2DC\uC791\uD588\uAC70\uB098(\uC4F0\uB294 \uBCC0\uC218\uAC00 \uAC00\uB9AC\uD0A4\uB294 \uACBD\uC6B0 \uD3EC\uD568) \uC774\uBBF8 \uC9C0\uC6CC\uC84C\uC5B4\uC694",
+    "unused.failedTail": " \xB7 \uBABB \uC9C0\uC6C0 {f}",
+    "unused.deleteFail": "\uC548 \uC4F0\uB294 \uBCC0\uC218\uB97C \uC9C0\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "op.deleteUnused": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uC9C0\uC6B0\uAE30",
     "textStyle.renameMenu": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30\u2026",
     "textStyle.renameReading": "\uC2A4\uD0C0\uC77C\uC744 \uC77D\uB294 \uC911\u2026",
     "textStyle.renameHead": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30 \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
@@ -6125,6 +6150,140 @@
     return res;
   }
 
+  // src/lib/unusedVars.ts
+  function judgeUnused(vars, roots) {
+    var _a, _b;
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const used = /* @__PURE__ */ new Set();
+    const stack = [...roots].filter((id) => byId.has(id));
+    while (stack.length) {
+      const id = stack.pop();
+      if (used.has(id)) continue;
+      used.add(id);
+      for (const t2 of (_b = (_a = byId.get(id)) == null ? void 0 : _a.targets) != null ? _b : []) if (byId.has(t2) && !used.has(t2)) stack.push(t2);
+    }
+    const pointed = /* @__PURE__ */ new Set();
+    for (const v of vars) for (const t2 of v.targets) if (t2 !== v.id) pointed.add(t2);
+    const out = /* @__PURE__ */ new Map();
+    for (const v of vars) if (!used.has(v.id)) out.set(v.id, pointed.has(v.id) ? "chain" : "none");
+    return out;
+  }
+  function collectAliasIds(value, into, seen = /* @__PURE__ */ new Set()) {
+    if (!value || typeof value !== "object") return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const x of value) collectAliasIds(x, into, seen);
+      return;
+    }
+    const o = value;
+    if (o.type === "VARIABLE_ALIAS" && typeof o.id === "string") into.add(o.id);
+    if (typeof o.variableId === "string") into.add(o.variableId);
+    for (const k of Object.keys(o)) {
+      let v;
+      try {
+        v = o[k];
+      } catch (e) {
+        continue;
+      }
+      if (v && typeof v === "object") collectAliasIds(v, into, seen);
+    }
+  }
+  var NODE_PROPS = ["boundVariables", "fills", "strokes", "effects", "layoutGrids", "reactions", "componentProperties"];
+  function readProp(node, key) {
+    try {
+      const v = node[key];
+      return typeof v === "symbol" ? void 0 : v;
+    } catch (e) {
+      return void 0;
+    }
+  }
+  function collectNodeIds(node, into) {
+    var _a;
+    for (const k of NODE_PROPS) collectAliasIds(readProp(node, k), into);
+    const isSet = node.type === "COMPONENT_SET";
+    const isLoneComp = node.type === "COMPONENT" && ((_a = node.parent) == null ? void 0 : _a.type) !== "COMPONENT_SET";
+    if (isSet || isLoneComp) collectAliasIds(readProp(node, "componentPropertyDefinitions"), into);
+  }
+  var YIELD_EVERY = 2e3;
+  var yieldNow = () => new Promise((r) => setTimeout(r, 0));
+  function varNodesOf(vars) {
+    return vars.map((v) => {
+      const t2 = /* @__PURE__ */ new Set();
+      collectAliasIds(v.valuesByMode, t2);
+      return { id: v.id, targets: [...t2] };
+    });
+  }
+  async function scanUnusedVariables(hooks = {}) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    (_a = hooks.onProgress) == null ? void 0 : _a.call(hooks, 0, 0);
+    await figma.loadAllPagesAsync();
+    if ((_b = hooks.cancelled) == null ? void 0 : _b.call(hooks)) return { items: [], pages: 0, layers: 0, cancelled: true };
+    const roots = /* @__PURE__ */ new Set();
+    const pages = figma.root.children;
+    let layers = 0;
+    let sinceYield = 0;
+    for (let i = 0; i < pages.length; i++) {
+      const stack = [...pages[i].children];
+      while (stack.length) {
+        const n = stack.pop();
+        layers++;
+        collectNodeIds(n, roots);
+        const kids = readProp(n, "children");
+        if (Array.isArray(kids)) for (const c of kids) stack.push(c);
+        if (++sinceYield >= YIELD_EVERY) {
+          sinceYield = 0;
+          await yieldNow();
+          if ((_c = hooks.cancelled) == null ? void 0 : _c.call(hooks)) return { items: [], pages: i, layers, cancelled: true };
+        }
+      }
+      (_d = hooks.onProgress) == null ? void 0 : _d.call(hooks, i + 1, pages.length);
+      await yieldNow();
+      if ((_e = hooks.cancelled) == null ? void 0 : _e.call(hooks)) return { items: [], pages: i + 1, layers, cancelled: true };
+    }
+    const styleLists = await Promise.all([
+      (_g = (_f = figma.getLocalPaintStylesAsync) == null ? void 0 : _f.call(figma)) != null ? _g : [],
+      (_i = (_h = figma.getLocalTextStylesAsync) == null ? void 0 : _h.call(figma)) != null ? _i : [],
+      (_k = (_j = figma.getLocalEffectStylesAsync) == null ? void 0 : _j.call(figma)) != null ? _k : [],
+      (_m = (_l = figma.getLocalGridStylesAsync) == null ? void 0 : _l.call(figma)) != null ? _m : []
+    ]);
+    for (const list of styleLists) {
+      for (const st of list) {
+        for (const k of ["boundVariables", "paints", "effects", "layoutGrids"]) collectAliasIds(readProp(st, k), roots);
+      }
+    }
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const kinds = judgeUnused(varNodesOf(vars), roots);
+    const items = vars.filter((v) => kinds.has(v.id)).map((v) => ({ id: v.id, kind: kinds.get(v.id) }));
+    return { items, pages: pages.length, layers, cancelled: false };
+  }
+  async function deleteUnusedVariables(ids, hooks = {}) {
+    const again = await scanUnusedVariables(hooks);
+    if (again.cancelled) return { deleted: 0, skipped: 0, failed: 0, cancelled: true };
+    const still = new Set(again.items.map((x) => x.id));
+    let deleted = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const id of new Set(ids)) {
+      if (!still.has(id)) {
+        skipped++;
+        continue;
+      }
+      try {
+        const v = await figma.variables.getVariableByIdAsync(id);
+        if (!v) {
+          skipped++;
+          continue;
+        }
+        v.remove();
+        deleted++;
+      } catch (e) {
+        failed++;
+      }
+    }
+    return { deleted, skipped, failed, cancelled: false };
+  }
+
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
@@ -9744,6 +9903,7 @@
   var devTier = "free";
   var cache = null;
   var bindCancel = false;
+  var unusedCancel = false;
   var bindFindTurn = 0;
   var bindChain = Promise.resolve();
   function acquireBind() {
@@ -10749,6 +10909,10 @@
           break;
         }
         case "CANCEL": {
+          if (msg.op === "unused") {
+            unusedCancel = true;
+            break;
+          }
           if (bindLinkRunning) break;
           bindCancel = true;
           break;
@@ -11778,6 +11942,20 @@
         case "DUPLICATE_VARIABLE":
         case "DELETE_VARIABLE": {
           await manualVariableOp(msg);
+          break;
+        }
+        case "SCAN_UNUSED_VARS": {
+          unusedCancel = false;
+          const r = await scanUnusedVariables({ onProgress: (done, total) => post({ type: "PROGRESS", op: "unused", done, total }), cancelled: () => unusedCancel });
+          post(__spreadValues({ type: "UNUSED_VARS", reqId: msg.reqId, items: r.items, pages: r.pages, layers: r.layers }, r.cancelled ? { cancelled: true } : {}));
+          break;
+        }
+        case "DELETE_VARIABLES": {
+          unusedCancel = false;
+          const r = await deleteUnusedVariables(msg.ids, { onProgress: (done, total) => post({ type: "PROGRESS", op: "unused-delete", done, total }), cancelled: () => unusedCancel });
+          if (r.deleted > 0) commitUndo(figma);
+          post(__spreadValues({ type: "VARIABLES_DELETED", reqId: msg.reqId, deleted: r.deleted, skipped: r.skipped, failed: r.failed }, r.cancelled ? { cancelled: true } : {}));
+          if (r.deleted > 0) await postPrereq();
           break;
         }
         case "SET_UI_SIZE": {

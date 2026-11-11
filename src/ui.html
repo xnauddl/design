@@ -316,6 +316,11 @@
       border-radius: var(--r-sm); color: var(--accent-strong);
     }
     .banner .link { font-size: 10.5px; }
+    /* 주의 띠(안 쓰는 변수 — docs/unused-vars.md §3): 안내 띠 모양 + 주황 */
+    .banner.caution { background: var(--warn-subtle); color: var(--warn); margin-bottom: 0; }
+    .unused-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+    .unused-sum { font-size: 10.5px; }
+    .unused-none { padding: 20px 0; text-align: center; color: var(--text-2); }
 
     /* ── 마법사 미니 파이프 — 세로 목록 대신 칩 4개로 진행만 ── */
     .pipe-mini { display: flex; flex-wrap: wrap; gap: 4px; }
@@ -649,16 +654,18 @@
     /* 마우스 올림 띠(ia-v4 §2.8 B안 ③) — 머리 모양 줄(.tr-head: 트리 머리 · 읽는 중 · 만들기 결과)은 뺀다 */
     .tree .tr:not(.tr-head):hover { background: var(--surface-hover); }
     /* 띠 앞 아이콘(ia-v4 §2.8 B안 ①) — 꾸밈(::before), 간격은 그 줄의 gap 그대로. 글자를 textContent로 바꿔도 남는다. */
-    .banner::before, .tidy::before, #applyProgress .row::before, .ux.danger .ux-h::before {
+    .banner::before, .tidy::before, #applyProgress .row::before, .unused-prog .row::before, .ux.danger .ux-h::before {
       content: ""; flex: 0 0 14px; width: 14px; height: 14px; background-color: var(--accent-strong);
       -webkit-mask: var(--band-ic) center / 14px 14px no-repeat; mask: var(--band-ic) center / 14px 14px no-repeat;
     }
     .banner { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6.25' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3Cpath d='M8 7.2v4' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='4.9' r='.95'/%3E%3C/svg%3E"); }
     .tidy { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 6.5h6a3.5 3.5 0 0 1 0 7H6'/%3E%3Cpath d='M5.8 4 3.3 6.5 5.8 9'/%3E%3C/svg%3E"); }
-    #applyProgress { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6' stroke-opacity='.25'/%3E%3Cpath d='M8 2a6 6 0 0 1 6 6'/%3E%3C/svg%3E"); }
-    #applyProgress .row::before { animation: band-spin .9s linear infinite; }
+    #applyProgress, .unused-prog { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='6' stroke-opacity='.25'/%3E%3Cpath d='M8 2a6 6 0 0 1 6 6'/%3E%3C/svg%3E"); }
+    #applyProgress .row::before, .unused-prog .row::before { animation: band-spin .9s linear infinite; }
+    .banner.caution { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.2 14.3 13.3H1.7Z' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M8 6.6v3.2' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.6' r='.9'/%3E%3C/svg%3E"); }
+    .banner.caution::before { background-color: var(--warn); }
     @keyframes band-spin { to { transform: rotate(360deg); } }
-    @media (prefers-reduced-motion: reduce) { #applyProgress .row::before { animation: none; } }
+    @media (prefers-reduced-motion: reduce) { #applyProgress .row::before, .unused-prog .row::before { animation: none; } }
     .ux.danger { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.2 14.3 13.3H1.7Z' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M8 6.6v3.2' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.6' r='.9'/%3E%3C/svg%3E"); }
     .ux.danger .ux-h::before { background-color: var(--danger); }
     button.tr-car { width: 22px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--text-2); font-size: 10px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }

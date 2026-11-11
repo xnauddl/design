@@ -219,7 +219,10 @@ export type UiToCode =
   | { type: 'FIND_VAR_USERS'; reqId: number; varIds: string[]; nodeIds: string[]; limit: number }
   // 사용 레이어 선택 / 별칭으로 쓰는 레이어 선택 — 그때 새로 찾아 최대 200개 선택(응답은 SELECT_RESULT).
   | { type: 'SELECT_VAR_USERS'; varIds: string[]; nodeIds: string[] }
-  | { type: 'CANCEL' } // UX6: 진행 중 작업 취소 요청
+  | { type: 'CANCEL'; op?: 'unused' } // UX6: 진행 중 작업 취소 요청. op 'unused' = 안 쓰는 변수 읽기 · 확인만(docs/unused-vars.md §5)
+  // 안 쓰는 변수 찾기(docs/unused-vars.md) — 파일 전체 읽기 · 다시 확인 뒤 지우기
+  | { type: 'SCAN_UNUSED_VARS'; reqId: number }
+  | { type: 'DELETE_VARIABLES'; reqId: number; ids: string[] }
   | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[]; reqId?: number }
   | { type: 'UNBIND_DELETED'; reqId: number; nodeIds?: string[] } // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3)
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
@@ -281,7 +284,9 @@ export type CodeToUi =
   // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10). tokenStates · roleRows: 미리보기만(IA v4 §4.3 — roleRows.length = roles).
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number; reqId?: number; tokenStates?: Record<string, TokenState>; roleRows?: RoleRow[] }
   | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
-  | { type: 'PROGRESS'; op: 'bind' | 'link'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩)
+  | { type: 'PROGRESS'; op: 'bind' | 'link' | 'unused' | 'unused-delete'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩), 'unused' · 'unused-delete' = 안 쓰는 변수 읽기 · 다시 확인(페이지 단위, total 0 = 불러오는 중)
+  | { type: 'UNUSED_VARS'; reqId: number; items: { id: string; kind: 'none' | 'chain' }[]; pages: number; layers: number; cancelled?: true }
+  | { type: 'VARIABLES_DELETED'; reqId: number; deleted: number; skipped: number; failed: number; cancelled?: true }
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean; reqId?: number } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[]; skippedManual?: number } // skippedManual: 직접 만든 변수라 건너뛴 역할 수(§4.9)
   // labeled/fallback은 「왼쪽 글자로 이름 채우기」를 눌렀을 때만 온다 — 맨 스캔은 전부 크기 순이라

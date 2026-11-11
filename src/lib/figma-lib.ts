@@ -32,6 +32,7 @@ export {
   COMPONENT,
 } from './variables';
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult, RoleVarRenameResult, TsRenameResult } from './variables';
+export { judgeUnused, collectAliasIds, scanUnusedVariables, deleteUnusedVariables } from './unusedVars';
 export { bindSelection, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
 export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName } from './usageRoles';
 export type { BindResult } from './bind';

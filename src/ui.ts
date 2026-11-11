@@ -1136,6 +1136,276 @@ function openTsRename(opener: HTMLElement): void {
   send({ type: 'SCAN_TS_RENAME', reqId: tsrReq });
   tsrRender();
 }
+/* ---------- 안 쓰는 변수 찾기(docs/unused-vars.md) — 변수 탭 ⋯ 메뉴 · 팝업 하나 ---------- */
+type UnusedState = 'loading' | 'reading' | 'result' | 'checking' | 'error';
+let unusedState: UnusedState | null = null;
+let unusedReq = 0;
+let unusedDelReq = 0;
+let unusedItems: { id: string; kind: 'none' | 'chain' }[] = [];
+let unusedMeta = { pages: 0, layers: 0 };
+let unusedProg = { done: 0, total: 0 };
+let unusedErr = '';
+let unusedLastIds: string[] = [];
+const unusedOn = new Set<string>();
+const unusedCollapsed = new Set<string>();
+let unusedTitle: HTMLElement | null = null;
+let unusedBody: HTMLElement | null = null;
+let unusedFoot: HTMLElement | null = null;
+let unusedWarn: HTMLElement | null = null;
+/** 읽기 · 다시 확인 중(닫힘 = 취소 — §1). */
+const unusedBusy = (): boolean => unusedState === 'loading' || unusedState === 'reading' || unusedState === 'checking';
+function openUnused(opener: HTMLElement): void {
+  const lock = writeLockReason();
+  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
+  unusedItems = [];
+  unusedOn.clear();
+  unusedCollapsed.clear();
+  unusedProg = { done: 0, total: 0 };
+  unusedState = 'loading';
+  unusedTitle = document.createElement('span');
+  unusedBody = document.createElement('div');
+  unusedBody.className = 'unused-body';
+  unusedWarn = document.createElement('div');
+  unusedWarn.className = 'ux danger';
+  unusedWarn.hidden = true;
+  const cancel = modalButton(t('common.cancel'), () => requestCloseModal('button'));
+  cancel.dataset.unused = 'cancel';
+  const box = openModal(unusedTitle, unusedBody, [cancel], () => opener, () => {
+    if (unusedBusy()) send({ type: 'CANCEL', op: 'unused' }); // ①②④에서 닫힘 = 취소(Esc · 바깥 · 최소화 포함)
+    unusedState = null;
+    unusedTitle = unusedBody = unusedFoot = unusedWarn = null;
+  }, { focus: cancel, footTop: [unusedWarn] });
+  unusedFoot = box.querySelector('.m-foot');
+  unusedReq = ++bindReqSeq;
+  send({ type: 'SCAN_UNUSED_VARS', reqId: unusedReq });
+  unusedRender();
+}
+/** 아래 고정 줄 단추를 바꿔 끼운다 — [취소]에 포커스가 있었으면 정한 자리로(§3 구현 메모). */
+function unusedSetFoot(btns: HTMLButtonElement[], focusTo: () => HTMLElement | null): void {
+  const foot = unusedFoot;
+  if (!foot) return;
+  const hadCancel = (document.activeElement as HTMLElement | null)?.dataset.unused === 'cancel';
+  foot.replaceChildren(...btns);
+  if (hadCancel) (focusTo() ?? btns[btns.length - 1])?.focus();
+}
+function unusedProgressBand(text: string): HTMLElement {
+  const u = document.createElement('div');
+  u.className = 'ux unused-prog';
+  u.setAttribute('role', 'status');
+  u.setAttribute('aria-live', 'polite');
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  const fill = document.createElement('div');
+  fill.className = 'bar-fill';
+  fill.style.width = unusedProg.total ? `${Math.round((unusedProg.done / unusedProg.total) * 100)}%` : '0%';
+  bar.appendChild(fill);
+  const row = document.createElement('div');
+  row.className = 'row';
+  const sp = document.createElement('span');
+  sp.className = 'muted';
+  sp.textContent = text;
+  row.appendChild(sp);
+  u.append(bar, row);
+  return u;
+}
+/** 그릴 줄 — 지금 변수 표에 있는 것만(§3), 컬렉션은 사이드바 순서 · 이름 순. */
+function unusedRows(): { col: VarCollection; rows: { v: VarRow; kind: 'none' | 'chain' }[] }[] {
+  const byId = new Map(vmVars.map((v) => [v.id, v]));
+  const out: { col: VarCollection; rows: { v: VarRow; kind: 'none' | 'chain' }[] }[] = [];
+  for (const col of vmCols) {
+    const rows = unusedItems
+      .map((x) => ({ v: byId.get(x.id), kind: x.kind }))
+      .filter((x): x is { v: VarRow; kind: 'none' | 'chain' } => !!x.v && x.v.collectionId === col.id)
+      .sort((a, b) => (a.v.name < b.v.name ? -1 : a.v.name > b.v.name ? 1 : 0));
+    if (rows.length) out.push({ col, rows });
+  }
+  return out;
+}
+/** 변수를 직접 가리키는 서로 다른 로컬 변수 id(어느 모드든). */
+function unusedPointers(id: string): Set<string> {
+  const out = new Set<string>();
+  for (const v of vmVars) for (const c of Object.values(v.values)) if (c.kind === 'alias' && c.aliasId === id && v.id !== id) out.add(v.id);
+  return out;
+}
+function unusedRender(): void {
+  const body = unusedBody;
+  if (!body || !unusedTitle || !unusedState) return;
+  const st = unusedState;
+  const groups = st === 'result' || st === 'checking' ? unusedRows() : [];
+  const n = groups.reduce((a, g) => a + g.rows.length, 0);
+  unusedTitle.textContent = (st === 'result' || st === 'checking') && n ? t('unused.titleN', { n }) : t('unused.title');
+  clearMount(body);
+  const cancelBtn = (): HTMLButtonElement => { const b = modalButton(t('common.cancel'), () => requestCloseModal('button')); b.dataset.unused = 'cancel'; return b; };
+  if (unusedWarn) unusedWarn.hidden = true;
+  if (st === 'loading' || st === 'reading') {
+    body.appendChild(unusedProgressBand(st === 'loading' ? t('unused.loading') : t('unused.reading', { done: unusedProg.done, total: unusedProg.total })));
+    return;
+  }
+  if (st === 'error') {
+    const box = document.createElement('div');
+    box.className = 'ux danger';
+    const h = document.createElement('div');
+    h.className = 'ux-h';
+    const ttl = document.createElement('span');
+    ttl.className = 'ux-t';
+    ttl.textContent = t('unused.readFail');
+    h.appendChild(ttl);
+    box.appendChild(h);
+    if (unusedErr) { const g = document.createElement('div'); g.className = 'hint'; g.textContent = unusedErr; box.appendChild(g); }
+    body.appendChild(box);
+    const retry = modalButton(t('common.retry'), () => {
+      if (unusedLastIds.length) unusedStartDelete(unusedLastIds);
+      else { unusedState = 'loading'; unusedProg = { done: 0, total: 0 }; unusedReq = ++bindReqSeq; send({ type: 'SCAN_UNUSED_VARS', reqId: unusedReq }); unusedRender(); }
+    }, true);
+    unusedSetFoot([modalButton(t('common.close'), () => requestCloseModal('button')), retry], () => retry);
+    return;
+  }
+  const summary = document.createElement('div');
+  summary.className = 'muted unused-sum';
+  summary.textContent = t('unused.summary', { p: unusedMeta.pages, l: unusedMeta.layers.toLocaleString('en-US') });
+  if (!n) {
+    body.appendChild(summary);
+    const z = document.createElement('div');
+    z.className = 'unused-none';
+    z.textContent = t('unused.none');
+    body.appendChild(z);
+    const close = modalButton(t('common.close'), () => requestCloseModal('button'));
+    unusedSetFoot([close], () => close);
+    return;
+  }
+  const locked = st === 'checking';
+  if (locked) body.appendChild(unusedProgressBand(t('unused.checking', { done: unusedProg.done, total: unusedProg.total })));
+  const note = document.createElement('div');
+  note.className = 'banner caution';
+  note.textContent = t('unused.libNote');
+  body.append(note, summary);
+  // 목록 위 줄(§2.7)
+  const top = document.createElement('div');
+  top.className = 'tree-top';
+  const lbl = document.createElement('span');
+  lbl.textContent = t('unused.top');
+  const grow = document.createElement('span');
+  grow.className = 'grow';
+  const links = document.createElement('span');
+  const all = groups.flatMap((g) => g.rows.map((r) => r.v.id));
+  const link = (label: string, on: boolean, key: string): HTMLButtonElement => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'link link-btn';
+    b.textContent = label;
+    b.dataset.unusedAll = key;
+    if (locked) b.setAttribute('aria-disabled', 'true');
+    b.addEventListener('click', () => { if (locked) return; for (const id of all) on ? unusedOn.add(id) : unusedOn.delete(id); unusedRender(); });
+    return b;
+  };
+  links.append(link(t('bind.allOn'), true, 'on'), ' · ', link(t('bind.allOff'), false, 'off'));
+  top.append(lbl, grow, links);
+  body.appendChild(top);
+  const tree = document.createElement('div');
+  tree.className = 'tree unused-tree';
+  tree.setAttribute('aria-label', t('unused.title'));
+  body.appendChild(tree);
+  const items: TreeItem[] = groups.map((g) => {
+    const hs = headState(g.rows.map((r) => ({ on: unusedOn.has(r.v.id) })));
+    return {
+      key: `uc:${g.col.id}`, head: true, group: true, name: g.col.name, countText: t('tree.count', { n: g.rows.length }), indent: 0,
+      sw: { state: hs, label: t('tree.headAria', { name: g.col.name }), onToggle: () => { const to = headToggleTarget(hs); for (const r of g.rows) to ? unusedOn.add(r.v.id) : unusedOn.delete(r.v.id); unusedRender(); } },
+      children: g.rows.map((r) => {
+        const cell = r.v.values[g.col.defaultModeId ?? g.col.modes[0]?.modeId ?? ''];
+        const val = cell?.kind === 'color' ? cell.hex : cell ? cellText(cell) : '';
+        const markVal = r.v.type === 'COLOR' ? '#000000' : r.v.type === 'FLOAT' ? '0' : 'a'; // 종류 표시는 변수 타입으로(별칭도 ● · #)
+        const cells: HTMLElement[] = [varChip(r.v.name, markVal), cell?.kind === 'alias' ? Object.assign(document.createElement('span'), { className: 'tr-sub', textContent: cellText(cell) }) : valueChip(val, cell?.kind === 'color' ? cell.alpha : undefined)];
+        const right: HTMLElement[] = [];
+        if (r.kind === 'chain') {
+          const tag = mkTag(t('unused.chainTag'), t('unused.chainTip', { m: unusedPointers(r.v.id).size }));
+          tag.setAttribute('aria-label', `${t('unused.chainTag')} — ${tag.title}`);
+          right.push(tag);
+        }
+        const on = unusedOn.has(r.v.id);
+        return { key: `uv:${r.v.id}`, indent: 24, cells, right, off: !on, sw: { state: on, label: r.v.name, onToggle: () => { on ? unusedOn.delete(r.v.id) : unusedOn.add(r.v.id); unusedRender(); } } } as TreeItem;
+      }),
+    } as TreeItem;
+  });
+  const hadTree = document.activeElement?.closest?.('.unused-tree') ? (document.activeElement as HTMLElement).dataset.tkey : null;
+  renderTree(tree, items, { collapsed: unusedCollapsed, rerender: unusedRender, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), locked });
+  if (hadTree) focusRow(tree, hadTree);
+  // 빨강 띠 — 켠 변수를 가리키는데 켜지 않은 로컬 변수 수(§3 {m})
+  const keep = new Set<string>();
+  for (const id of unusedOn) for (const p of unusedPointers(id)) if (!unusedOn.has(p)) keep.add(p);
+  if (unusedWarn) {
+    unusedWarn.hidden = !keep.size || locked;
+    unusedWarn.replaceChildren();
+    const h = document.createElement('div');
+    h.className = 'ux-h';
+    const tt = document.createElement('span');
+    tt.className = 'ux-t';
+    tt.textContent = t('unused.keepWarn', { m: keep.size });
+    h.appendChild(tt);
+    unusedWarn.appendChild(h);
+  }
+  if (locked) { unusedSetFoot([cancelBtn()], () => null); return; }
+  const k = [...unusedOn].filter((id) => all.includes(id)).length;
+  const del = modalButton(t('unused.deleteBtn', { k }), () => {
+    if (del.getAttribute('aria-disabled') === 'true') return;
+    unusedStartDelete([...unusedOn].filter((id) => all.includes(id)));
+  });
+  del.className = 'danger';
+  del.dataset.unused = 'delete';
+  const lock = writeLockReason();
+  setLock(del, lock || !k ? 'prereq' : null, lock ?? t('unused.deleteNeed'));
+  const close = modalButton(t('common.close'), () => requestCloseModal('button'));
+  if (!unusedFoot?.querySelector('[data-unused="delete"]') || unusedFoot.children.length !== 2) unusedSetFoot([close, del], () => tree.querySelector<HTMLElement>('.tr') ?? close);
+  else {
+    // 단추만 새로(포커스 유지) — 지우기 단추 글 · 잠금
+    const old = unusedFoot.querySelector<HTMLButtonElement>('[data-unused="delete"]')!;
+    const wasFocus = document.activeElement === old;
+    old.replaceWith(del);
+    if (wasFocus) del.focus();
+  }
+}
+function unusedStartDelete(ids: string[]): void {
+  if (!ids.length) return;
+  unusedLastIds = ids;
+  unusedState = 'checking';
+  unusedProg = { done: 0, total: 0 };
+  unusedDelReq = ++bindReqSeq;
+  send({ type: 'DELETE_VARIABLES', reqId: unusedDelReq, ids });
+  unusedRender();
+}
+function onUnusedProgress(op: 'unused' | 'unused-delete', done: number, total: number): void {
+  if (!unusedState) return;
+  if (op === 'unused' && (unusedState === 'loading' || unusedState === 'reading')) unusedState = total ? 'reading' : 'loading';
+  unusedProg = { done, total };
+  unusedRender();
+}
+function onUnusedVars(msg: Extract<CodeToUi, { type: 'UNUSED_VARS' }>): void {
+  if (msg.reqId !== unusedReq || !unusedState || msg.cancelled) return;
+  unusedItems = msg.items;
+  unusedMeta = { pages: msg.pages, layers: msg.layers };
+  unusedLastIds = [];
+  unusedState = 'result';
+  send({ type: 'GET_VAR_TABLE' }); // 낡은 표 대비 — 새 표가 오면 다시 그린다(onVarTable)
+  unusedRender();
+}
+function onVariablesDeleted(msg: Extract<CodeToUi, { type: 'VARIABLES_DELETED' }>): void {
+  if (msg.reqId !== unusedDelReq || msg.cancelled) return;
+  if (unusedState) { unusedState = null; closeModal(); }
+  const tail = (msg.skipped ? t('unused.skippedTail', { s: msg.skipped }) : '') + (msg.failed ? t('unused.failedTail', { f: msg.failed }) : '');
+  const text = (msg.deleted ? t('unused.deleted', { d: msg.deleted }) : t('unused.deletedNone')) + tail;
+  showStatusLine(text, { cls: msg.failed ? 'warn' : msg.deleted ? 'ok' : '', tip: msg.skipped ? t('unused.skippedTip') : undefined });
+}
+/** 읽기 · 지우기 오류(§1) — 팝업이 열려 있으면 ⑤, 닫힌 뒤면 상태 줄(최소화는 쓰기 작업 규칙). true = 처리함. */
+function onUnusedError(msg: Extract<CodeToUi, { type: 'ERROR' }>): boolean {
+  if (msg.op !== 'SCAN_UNUSED_VARS' && msg.op !== 'DELETE_VARIABLES') return false;
+  if (unusedState) {
+    unusedState = 'error';
+    unusedErr = explainError(msg.message).message;
+    unusedRender();
+    return true;
+  }
+  if (msg.op === 'DELETE_VARIABLES' && !isMini) showStatusLine(t('unused.deleteFail'), { cls: 'warn', tip: explainError(msg.message).message });
+  return true;
+}
 /** 켠 줄 중 바꿀 수 있는 것 — 끈 줄의 지금 이름과 새 이름이 겹치면 뺀다(§5.2). */
 function tsrClash(r: TsRenameRow): boolean {
   return !!tsrRows?.some((x) => x !== r && tsrOff.has(x.id) && x.from === r.to);
@@ -2065,6 +2335,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'PROGRESS':
+      if (msg.op === 'unused' || msg.op === 'unused-delete') { onUnusedProgress(msg.op, msg.done, msg.total); break; }
       if (msg.op === 'bind' && !wizBindPending) updateApplyProgress(msg.done, msg.total); // UX6 — 마법사 연결의 진행은 연결 화면에 띄우지 않는다(§4.3)
       else if (msg.op === 'link' && bindLinking) updateLinkProgress(msg.done, msg.total);
       break;
@@ -2154,6 +2425,12 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'VARIABLE_DELETED':
       onVariableDeleted(msg);
+      break;
+    case 'UNUSED_VARS':
+      onUnusedVars(msg);
+      break;
+    case 'VARIABLES_DELETED':
+      onVariablesDeleted(msg);
       break;
     case 'SELECT_RESULT':
       // 변수 탭에서 고른 레이어 선택 — 결과는 공통 상태 줄(§4.4: 한 번에 최대 200개).
@@ -2449,6 +2726,7 @@ window.onmessage = (event: MessageEvent) => {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
       if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       if (msg.op === 'UPDATE_VARIABLE') break;
+      if (onUnusedError(msg)) break;
       if (onVarOpError(msg)) break;
       if (msg.op === 'PREVIEW_TEXT_STYLES') {
         // 텍스트 스타일 미리보기 실패 — 변수 연결은 막지 않는다(스타일 줄 없이 그린다).
@@ -4621,6 +4899,8 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   CREATE_VARIABLE: { results: ['VARIABLE_CREATED'], label: 'op.createVar', go: () => showTab('variables'), write: true },
   DUPLICATE_VARIABLE: { results: ['VARIABLE_DUPLICATED'], label: 'op.dupVar', go: () => showTab('variables'), write: true },
   DELETE_VARIABLE: { results: ['VARIABLE_DELETED'], label: 'op.delVar', go: () => showTab('variables'), write: true },
+  // 안 쓰는 변수 지우기(docs/unused-vars.md §5) — 읽기(SCAN_UNUSED_VARS)는 팝업이 진행을 보이므로 OPS가 아니다
+  DELETE_VARIABLES: { results: ['VARIABLES_DELETED'], label: 'op.deleteUnused', go: () => showTab('variables'), write: true },
   RENAME: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: false },
   RENAME_APPLY: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: true },
   SCAN_COMPONENT_CANDIDATES: { results: ['COMPONENT_CANDIDATES'], label: 'op.components', go: goLayer('structure'), write: false },
@@ -4662,7 +4942,7 @@ function otherWriteOp(): string | null {
   return null;
 }
 /** 변수 탭 쓰기 작업(§4.6 쓰기 잠금) — 진행 중이면 다른 쓰기 버튼을 잠근다. */
-const VAR_WRITE_OPS: readonly UiToCode['type'][] = ['APPLY_VARIABLE', 'CREATE_VARIABLE', 'DUPLICATE_VARIABLE', 'DELETE_VARIABLE'];
+const VAR_WRITE_OPS: readonly UiToCode['type'][] = ['APPLY_VARIABLE', 'CREATE_VARIABLE', 'DUPLICATE_VARIABLE', 'DELETE_VARIABLE', 'DELETE_VARIABLES'];
 function renderWaitLocks(): void {
   const link = bindLinking ? t('bind.waitLink') : null;
   const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
@@ -4702,6 +4982,7 @@ function opSent(msg: UiToCode): void {
  *  컴포넌트 실패 1건 이상. 취소는 표시 없음. */
 function opReceived(m: CodeToUi): void {
   if (m.type === 'PROGRESS') {
+    if (m.op === 'unused') return; // 안 쓰는 변수 읽기는 팝업 안에서 — 전역 진행을 덮지 않는다(docs/unused-vars.md §5)
     opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
     if (isMini) renderMiniMark();
     return;
@@ -4739,12 +5020,13 @@ function opReceived(m: CodeToUi): void {
     // [묶기]에서 제자리에 못 둔 것도 실패로(§4.7 "인스턴스 자리" 5번 — 최소화 중이면 ⚠).
     if (m.type === 'COMPONENTIZE_RESULT' && (m.placeFailed?.length ?? 0) > 0) failed = true;
     if (m.type === 'APPLY_RESULT' && m.cancelled) cancelled = true;
+    if (m.type === 'VARIABLES_DELETED') { if (m.cancelled) cancelled = true; if (m.failed > 0) failed = true; }
     if (cancelled) { if (isMini) renderMiniMark(); }
     else opFinished(!failed, def);
     // 작업 직후 다시 읽기(§4.1) — 파일을 바꾼 작업만. 준비 상태 + 변수 표 + 지금 화면의 표.
     // 실패(⚠)로 끝나도 파일을 바꿨으면 읽는다(컴포넌트 등록·묶기·분류 — §4.1 표).
     // [묶기]는 마스터가 있을 때만 — 실패 여부와 무관(이른 반환 = 마스터 없음 = 아무것도 안 바꿈).
-    const reread = m.type === 'COMPONENTIZE_RESULT' ? changedFile(m) : !failed || changedFile(m);
+    const reread = m.type === 'VARIABLES_DELETED' ? m.deleted > 0 : m.type === 'COMPONENTIZE_RESULT' ? changedFile(m) : !failed || changedFile(m);
     if (def.write && reread) readScreen('work');
     return;
   }
@@ -5508,6 +5790,7 @@ function onVarTable(msg: Extract<CodeToUi, { type: 'VAR_TABLE' }>): void {
   vmCols = msg.collections;
   vmVars = msg.vars;
   if (vmOpen || first) renderVarScreen();
+  if (unusedState === 'result') unusedRender(); // 안 쓰는 변수 팝업 — 새 표로 다시(낡은 줄 빼기, docs/unused-vars.md §3)
   if (edRebase) edOnVarTable(msg); // 목록을 새 표로 그린 뒤(이름 검사 · 후보도 새 표로)
   runAfterTable(); // 새 변수 · 복제 · 삭제 뒤 포커스 · 상세(§4.9)
 }
@@ -7485,8 +7768,10 @@ function openMoreMenu(): void {
     { label: colorView === 'grid' ? t('list.colorList') : t('list.colorGrid'), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t('v4.usesViewOff') : undefined, onSelect: () => setColorView(colorView === 'grid' ? 'list' : 'grid') },
     { label: t('list.menuExpandAll'), onSelect: () => setAllGroups(true) },
     { label: t('list.menuCollapseAll'), onSelect: () => setAllGroups(false) },
+    // 안 쓰는 변수 찾기(docs/unused-vars.md) — 파일 전체, 무료 · 로컬 0개 · 쓰기 잠금
+    { label: t('unused.menu'), separatorBefore: true, disabled: !vmVars.length || !!writeLockReason(), note: !vmVars.length ? t('unused.noVars') : writeLockReason() ?? undefined, onSelect: () => openUnused(btn), focusElsewhere: true },
     // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
-    { label: t('textStyle.renameMenu'), separatorBefore: true, disabled: !isPaid || !!writeLockReason(), note: !isPaid ? t('status.paid') : writeLockReason() ?? undefined, onSelect: () => openTsRename(btn), focusElsewhere: true },
+    { label: t('textStyle.renameMenu'), disabled: !isPaid || !!writeLockReason(), note: !isPaid ? t('status.paid') : writeLockReason() ?? undefined, onSelect: () => openTsRename(btn), focusElsewhere: true },
   ], btn);
 }
 /** [＋] 메뉴(§4.6 ⑥) — 새 변수 · (구분선) · 선택에서 변수 만들기… · 다크 모드 만들기… · 텍스트 스타일 만들기…. */

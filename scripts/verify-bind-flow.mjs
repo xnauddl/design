@@ -235,7 +235,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   // ⋯ — 준비 현황 · 내보내기 · 색 격자 · 펼치기 · 접기
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴 6개(색 격자로 보기 · 이름 다시 짓기 포함)', more.length === 6 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기' && more[5].startsWith('텍스트 스타일 이름 다시 짓기…'), more.join('|'));
+  check('9 ⋯ 메뉴 7개(색 격자로 보기 · 안 쓰는 변수 찾기 · 이름 다시 짓기 포함)', more.length === 7 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기' && more[5] === '안 쓰는 변수 찾기…' && more[6].startsWith('텍스트 스타일 이름 다시 짓기…'), more.join('|'));
   check('9 ⋯ 이름 다시 짓기 — 무료면 잠김 · 앞에 구분선', (await p.$eval('.ctx-menu button:last-child', (b) => b.getAttribute('aria-disabled') === 'true' || b.disabled)) && (await p.$$eval('.ctx-menu [role="separator"], .ctx-menu hr, .ctx-menu .sep', (e) => e.length)) >= 1);
   await p.click('.ctx-menu button >> text=색 격자로 보기');
   check('9 색 격자 — 동그라미만(이름 없음)', (await p.$$('.vp-line.vp-dot .vp-item')).length === 2 && (await p.$('.vp-line.vp-dot .vp-name')) === null);
@@ -1740,6 +1740,53 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
   check('22 내보내기 팝업 오류 = 빨강 띠(테두리 0) · ⚠', xe.bw === '0px' && xe.w === '14px', JSON.stringify(xe));
   const badX = await nestedCards(p);
   check('22 카드 안 카드 0 — 내보내기 팝업', badX.length === 0, badX.join(' · '));
+  await p.close();
+}
+
+/* ---------- 24 안 쓰는 변수 찾기(docs/unused-vars.md) ---------- */
+{
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnVarMore');
+  const item = await p.$('.ctx-menu button:has-text("안 쓰는 변수 찾기")');
+  check('24 ⋯ 메뉴에 "안 쓰는 변수 찾기…"', !!item);
+  await item.click();
+  await p.waitForTimeout(40);
+  const scan = (await sent(p, 'SCAN_UNUSED_VARS')).at(-1);
+  check('24 누르면 SCAN_UNUSED_VARS(reqId) · 팝업 · 처음 포커스 [취소]', typeof scan?.reqId === 'number' && (await p.$$('.modal')).length === 1 && (await p.evaluate(() => document.activeElement?.textContent)) === '취소');
+  await recv(p, { type: 'PROGRESS', op: 'unused', done: 0, total: 0 });
+  check('24 불러오는 중 띠(role=status)', (await p.textContent('.modal .unused-prog')).includes('페이지를 불러오는 중') && (await p.getAttribute('.modal .unused-prog', 'role')) === 'status');
+  await recv(p, { type: 'PROGRESS', op: 'unused', done: 3, total: 12 });
+  check('24 읽는 중 "3 / 12 페이지"', (await p.textContent('.modal .unused-prog')).includes('3 / 12 페이지'));
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(30);
+  const cx = (await sent(p, 'CANCEL')).at(-1);
+  check('24 읽는 중 Esc → CANCEL{op:"unused"} · 팝업 닫힘', cx?.op === 'unused' && (await p.$$('.modal')).length === 0);
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button:has-text("안 쓰는 변수 찾기")');
+  await p.waitForTimeout(40);
+  const scan2 = (await sent(p, 'SCAN_UNUSED_VARS')).at(-1);
+  await recv(p, { type: 'UNUSED_VARS', reqId: scan.reqId, items: [{ id: 'g0', kind: 'none' }], pages: 1, layers: 1 });
+  check('24 지난 요청의 결과는 버림', (await p.$$('.modal .unused-tree')).length === 0);
+  await recv(p, { type: 'UNUSED_VARS', reqId: scan2.reqId, items: [{ id: 'g0', kind: 'chain' }, { id: 'sp8', kind: 'none' }, { id: 'nope', kind: 'none' }], pages: 12, layers: 8240 });
+  await p.waitForTimeout(40);
+  check('24 결과 — 제목은 그린 줄 수(표에 없는 id 뺌) · 요약 · 주의 띠(주황)', (await p.textContent('.modal h3')) === '안 쓰는 변수 2개' && (await p.textContent('.modal .unused-sum')).includes('8,240') && (await p.textContent('.modal .banner.caution')) === '다른 파일에서 쓰는 변수는 확인하지 못해요', await p.textContent('.modal h3'));
+  check('24 트리 — 머리 띠 · 처음 모두 끔', (await p.$$eval('.modal .unused-tree .tr-head', (e) => e.length)) === 1 && (await p.$$eval('.modal .unused-tree .tr-row .bv-switch', (e) => e.every((x) => x.getAttribute('aria-checked') === 'false'))));
+  check('24 chain 태그', (await p.$$eval('.modal .unused-tree .tr-tag', (e) => e.map((x) => x.textContent))).includes('안 쓰는 변수만 가리킴'));
+  check('24 k = 0 → [선택한 0개 지우기] aria-disabled', (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) === 'true');
+  await p.click('.modal .unused-tree .tr-row .bv-switch');
+  await p.waitForTimeout(30);
+  check('24 하나 켜면 [선택한 1개 지우기] 풀림', (await p.textContent('.modal [data-unused="delete"]')) === '선택한 1개 지우기' && (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) !== 'true');
+  const badU = await nestedCards(p);
+  check('24 카드 안 카드 0 — 안 쓰는 변수 팝업', badU.length === 0, badU.join(' · '));
+  await p.click('.modal [data-unused="delete"]');
+  await p.waitForTimeout(30);
+  const del = (await sent(p, 'DELETE_VARIABLES')).at(-1);
+  check('24 지우기 → DELETE_VARIABLES(켠 id) · 확인하는 중 잠금', del?.ids?.length === 1 && (await p.textContent('.modal .unused-prog')).includes('확인하는 중') && (await p.$$eval('.modal .unused-tree .bv-switch', (e) => e.every((x) => x.getAttribute('aria-disabled') === 'true'))));
+  await recv(p, { type: 'VARIABLES_DELETED', reqId: del.reqId, deleted: 1, skipped: 1, failed: 0 });
+  await p.waitForTimeout(40);
+  check('24 지운 뒤 팝업 닫힘 · 상태 줄 문구', (await p.$$('.modal')).length === 0 && (await p.textContent('#statusText')) === '변수 1개를 지웠어요 · ⌘Z로 되돌리기 · 건너뜀 1', await p.textContent('#statusText'));
   await p.close();
 }
 

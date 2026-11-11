@@ -109,16 +109,17 @@
 
 ## 부록 A. 체크리스트
 
-- [ ] 이 명세 코드 대조 검토 결함 0
-- [ ] 화면 시안(① · ② · ③ · ③' · ④ · ⑤, chain 태그 · 빨강 띠) 사용자 확인
-- [ ] `shared/messages.ts`: `SCAN_UNUSED_VARS` · `UNUSED_VARS` · `DELETE_VARIABLES` · `VARIABLES_DELETED`, `PROGRESS.op` 'unused' · 'unused-delete', `CANCEL.op?`
-- [ ] 판정 순수 함수(뿌리 집합 + 별칭 그래프(모든 모드) → none · chain) + 단위 테스트(직접 · 따라가기 · 순환 · 모드별 별칭 · 원격 대상 무시 · chain)
-- [ ] 수집(`collectUsedVariableIds` — 깊이 훑기: 별칭 객체 · `variableId`, 레이어 속성 · 스타일 · reactions(`actions` · `action` · conditionalBlocks · 식) · 컴포넌트 속성 정의(세트 · 세트 밖 컴포넌트만)) + 목 테스트(숨긴 레이어 · 숨긴 칠하기 · 그라디언트 · 효과 숫자 · 격자 · componentProperties · 인스턴스 안쪽)
-- [ ] `code.ts`: 직접 스택 순회 · 2,000개마다 양보 · 취소 플래그(`unusedCancel`, `bindCancel`과 분리) · 다시 확인(전체 다시 읽기 → K = S − U′) · 지우기 시작 뒤 취소 무시 · 하나씩 지우기 · 실패 수 · d > 0일 때만 `commitUndo` + 단위 테스트(읽은 뒤 쓰이기 시작한 변수 · 쓰이게 된 변수가 가리키는 켠 변수 건너뜀 · 일부 실패 · d = 0)
-- [ ] UI `opReceived`: `PROGRESS{op:'unused'}` 무시 · `VARIABLES_DELETED` cancelled = 표시 없음 · failed > 0 = ⚠ · 다시 읽기는 deleted > 0
-- [ ] UI: ⋯ 메뉴 항목(로컬 0개 · 쓰기 잠금) · 팝업 다섯 상태 · 트리(§2.7, 처음 모두 끔 · 모두 펼침) · 칩 · 별칭 "→" · chain 태그 · 빨강 띠 {m} · 버튼 잠금 사유 · 진행 띠 role=status · 포커스 규칙 · 닫힘 = 취소(Esc · 바깥 · 최소화) · 결과 받으면 변수 표 다시 읽기 · 상태 줄 문구 · `OPS` 지우기 · `VAR_WRITE_OPS`
-- [ ] i18n 키: `vars.unusedMenu` · `unused.title` · `unused.loading` · `unused.reading` · `unused.checking` · `unused.summary` · `unused.libNote` · `unused.none` · `unused.top` · `unused.chainTag` · `unused.chainTip` · `unused.keepWarn` · `unused.deleteBtn` · `unused.deleteNeed` · `unused.readFail` · `unused.deleted` · `unused.deletedNone` · `unused.skippedTail` · `unused.skippedTip` · `unused.failedTail` · `unused.deleteFail` · `op.deleteUnused` · `vars.unusedNoVars`(이름은 구현 때 기존 키 규칙에 맞춘다)
-- [ ] `docs/ia-v4.md`: §2.6 진행 · 취소 예외와 [보기] 도착 · §4.9 확인 팝업 예외 · §6 무료 칸 · §7 작업 직후 목록 (§4.6 ⋯ 메뉴 한 줄은 했음)
-- [ ] verify-bind-flow 블록: 메뉴 항목 → `SCAN_UNUSED_VARS` 보냄 · 진행 → 결과 트리 · 처음 모두 끔 · k = 0 잠금 · 켜면 [선택한 k개 지우기] · chain 태그 · 빨강 띠 · Esc = `CANCEL{op:'unused'}` · `cancelled` 응답으로 닫힘 · 지우기 → `DELETE_VARIABLES` · 결과 문구 · 카드 안 카드 0
-- [ ] 4검사 · 스크린샷
+- [x] 이 명세 코드 대조 검토 결함 0
+- [x] 화면 시안(① · ② · ③ · ③' · ④ · ⑤, chain 태그 · 빨강 띠) 사용자 확인
+- [x] `shared/messages.ts`: `SCAN_UNUSED_VARS` · `UNUSED_VARS` · `DELETE_VARIABLES` · `VARIABLES_DELETED`, `PROGRESS.op` 'unused' · 'unused-delete', `CANCEL.op?`
+- [x] 판정 순수 함수(뿌리 집합 + 별칭 그래프(모든 모드) → none · chain) + 단위 테스트(직접 · 따라가기 · 순환 · 모드별 별칭 · 원격 대상 무시 · chain)
+- [x] 수집(`collectUsedVariableIds` — 깊이 훑기: 별칭 객체 · `variableId`, 레이어 속성 · 스타일 · reactions(`actions` · `action` · conditionalBlocks · 식) · 컴포넌트 속성 정의(세트 · 세트 밖 컴포넌트만)) + 목 테스트(숨긴 레이어 · 숨긴 칠하기 · 그라디언트 · 효과 숫자 · 격자 · componentProperties · 인스턴스 안쪽)
+- [x] `code.ts`: 직접 스택 순회 · 2,000개마다 양보 · 취소 플래그(`unusedCancel`, `bindCancel`과 분리) · 다시 확인(전체 다시 읽기 → K = S − U′) · 지우기 시작 뒤 취소 무시 · 하나씩 지우기 · 실패 수 · d > 0일 때만 `commitUndo` + 단위 테스트(읽은 뒤 쓰이기 시작한 변수 · 쓰이게 된 변수가 가리키는 켠 변수 건너뜀 · 일부 실패 · d = 0)
+- [x] UI `opReceived`: `PROGRESS{op:'unused'}` 무시 · `VARIABLES_DELETED` cancelled = 표시 없음 · failed > 0 = ⚠ · 다시 읽기는 deleted > 0
+- [x] UI: ⋯ 메뉴 항목(로컬 0개 · 쓰기 잠금) · 팝업 다섯 상태 · 트리(§2.7, 처음 모두 끔 · 모두 펼침) · 칩 · 별칭 "→" · chain 태그 · 빨강 띠 {m} · 버튼 잠금 사유 · 진행 띠 role=status · 포커스 규칙 · 닫힘 = 취소(Esc · 바깥 · 최소화) · 결과 받으면 변수 표 다시 읽기 · 상태 줄 문구 · `OPS` 지우기 · `VAR_WRITE_OPS`
+- [x] i18n 키: `vars.unusedMenu` · `unused.title` · `unused.loading` · `unused.reading` · `unused.checking` · `unused.summary` · `unused.libNote` · `unused.none` · `unused.top` · `unused.chainTag` · `unused.chainTip` · `unused.keepWarn` · `unused.deleteBtn` · `unused.deleteNeed` · `unused.readFail` · `unused.deleted` · `unused.deletedNone` · `unused.skippedTail` · `unused.skippedTip` · `unused.failedTail` · `unused.deleteFail` · `op.deleteUnused` · `vars.unusedNoVars`(이름은 구현 때 기존 키 규칙에 맞춘다)
+- [x] `docs/ia-v4.md`: §2.6 진행 · 취소 예외와 [보기] 도착 · §4.9 확인 팝업 예외 · §6 무료 칸 · §7 작업 직후 목록 (§4.6 ⋯ 메뉴 한 줄은 했음)
+- [x] verify-bind-flow 블록: 메뉴 항목 → `SCAN_UNUSED_VARS` 보냄 · 진행 → 결과 트리 · 처음 모두 끔 · k = 0 잠금 · 켜면 [선택한 k개 지우기] · chain 태그 · 빨강 띠 · Esc = `CANCEL{op:'unused'}` · `cancelled` 응답으로 닫힘 · 지우기 → `DELETE_VARIABLES` · 결과 문구 · 카드 안 카드 0
+- [x] 4검사 · 스크린샷
 - [ ] 실기 확인(사용자, 피그마): 큰 파일 읽는 시간 · 취소 · 숨긴 레이어 변수는 안 나옴 · 지우기 · ⌘Z 한 번
+- 구현 중 정한 것(명세 범위 안): 판정 · 수집은 새 모듈 `src/lib/unusedVars.ts`(`judgeUnused` · `collectAliasIds` · `scanUnusedVariables` · `deleteUnusedVariables`). 변수 칩의 종류 표시는 변수 타입으로 정한다(별칭 변수도 색이면 ● — 값 글로 정하면 별칭이 T가 됨). 주의 띠 아이콘은 오류 띠의 ⚠ 모양을 주황으로.

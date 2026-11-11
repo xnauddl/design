@@ -36,6 +36,10 @@ import {
   textStyleCandidateTest,
   bindSelection,
   createRole,
+  judgeUnused,
+  collectAliasIds,
+  scanUnusedVariables,
+  deleteUnusedVariables,
   bindSelectedItems,
   countUsage,
   deletedBindings,
@@ -7325,4 +7329,112 @@ test('A.14b 만들기 경로 — createUsageRoles 그림자 2% · 4% · 5% → d
   for (const [name, a] of [['color/shadow/default', 4], ['color/shadow/default-subtle', 2], ['color/shadow/default-strong', 5]]) {
     assert.equal(roleTarget(figma, findVar(figma, 'Semantic', name).id), findVar(figma, 'Global', `color/000000-a${a}`).id, name);
   }
+});
+
+/* ---------- docs/unused-vars.md — 안 쓰는 변수 찾기 ---------- */
+
+test('unused 판정 — 직접 · 따라가기 · 순환 · 모드별 별칭 · 원격 대상 무시 · none / chain', () => {
+  const vars = [
+    { id: 'S1', targets: ['G1'] }, // 레이어가 씀 → G1도 쓰임
+    { id: 'G1', targets: [] },
+    { id: 'S2', targets: ['G2'] }, // 안 씀 → S2 none, G2 chain
+    { id: 'G2', targets: [] },
+    { id: 'D1', targets: ['G3', 'G4'] }, // 모드별로 다른 대상 — 쓰이면 둘 다 쓰임
+    { id: 'G3', targets: [] },
+    { id: 'G4', targets: [] },
+    { id: 'A', targets: ['B'] }, // 순환
+    { id: 'B', targets: ['A'] },
+    { id: 'R', targets: ['remote:x'] }, // 원격 대상은 그래프 밖
+    { id: 'Z', targets: [] },
+  ];
+  const k = judgeUnused(vars, new Set(['S1', 'D1', 'remote:y']));
+  assert.deepEqual(Object.fromEntries(k), { S2: 'none', G2: 'chain', A: 'chain', B: 'chain', R: 'none', Z: 'none' });
+});
+
+test('unused 깊이 훑기 — 별칭 객체 · variableId · 그라디언트 · 효과 숫자 · componentProperties · 게터 예외', () => {
+  const ids = new Set();
+  const throwing = {};
+  Object.defineProperty(throwing, 'bad', { enumerable: true, get() { throw new Error('nope'); } });
+  collectAliasIds({
+    fills: [{ type: 'GRADIENT_LINEAR', gradientStops: [{ boundVariables: { color: { type: 'VARIABLE_ALIAS', id: 'g1' } } }] }],
+    effects: [{ boundVariables: { radius: { type: 'VARIABLE_ALIAS', id: 'e1' }, offsetX: { type: 'VARIABLE_ALIAS', id: 'e2' } } }],
+    componentProperties: { 'Label#1': { boundVariables: { value: { type: 'VARIABLE_ALIAS', id: 'cp1' } } } },
+    reactions: [{ actions: [{ type: 'CONDITIONAL', conditionalBlocks: [{ actions: [{ type: 'SET_VARIABLE', variableId: 'r1' }] }] }] }],
+    throwing,
+  }, ids);
+  assert.deepEqual([...ids].sort(), ['cp1', 'e1', 'e2', 'g1', 'r1']);
+});
+
+function unusedFile(figma) {
+  const g = figma.variables.createVariableCollection('Global');
+  const s = figma.variables.createVariableCollection('Semantic');
+  const mk = (col, name, val) => { const v = figma.variables.createVariable(name, col, 'COLOR'); v.setValueForMode(col.defaultModeId, val); return v; };
+  const g1 = mk(g, 'color/gray/900', { r: 0, g: 0, b: 0, a: 1 });
+  const g2 = mk(g, 'color/gray/300', { r: 0.8, g: 0.8, b: 0.8, a: 1 });
+  const g3 = mk(g, 'color/gray/100', { r: 0.95, g: 0.95, b: 0.95, a: 1 });
+  const s1 = mk(s, 'color/text/default', { type: 'VARIABLE_ALIAS', id: g1.id });
+  const s2 = mk(s, 'color/text/subtlest', { type: 'VARIABLE_ALIAS', id: g2.id });
+  const hidden = { type: 'RECTANGLE', id: 'h', name: 'h', visible: false, fills: [{ type: 'SOLID', visible: false, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: g3.id } } }] };
+  const text = { type: 'TEXT', id: 't', name: 't', fills: [{ type: 'SOLID', boundVariables: { color: { type: 'VARIABLE_ALIAS', id: s1.id } } }] };
+  const frame = { type: 'FRAME', id: 'f', name: 'f', children: [text, hidden] };
+  figma.root = { children: [{ type: 'PAGE', id: 'p1', name: 'Page 1', children: [frame] }, { type: 'PAGE', id: 'p2', name: 'Page 2', children: [] }] };
+  figma.loadAllPagesAsync = async () => {};
+  return { g1, g2, g3, s1, s2, text };
+}
+
+test('unused 읽기 — 숨긴 레이어의 숨긴 칠하기도 쓰임, 안 쓰는 Semantic이 가리키는 Global은 chain, 진행 · 취소', async () => {
+  const figma = installFigma();
+  const f = unusedFile(figma);
+  const prog = [];
+  const r = await scanUnusedVariables({ onProgress: (d, t) => prog.push([d, t]) });
+  assert.deepEqual(r.items.map((x) => [x.id, x.kind]).sort(), [[f.g2.id, 'chain'], [f.s2.id, 'none']].sort());
+  assert.equal(r.pages, 2);
+  assert.equal(r.layers, 3);
+  assert.deepEqual(prog, [[0, 0], [1, 2], [2, 2]]);
+  const c = await scanUnusedVariables({ cancelled: () => true });
+  assert.equal(c.cancelled, true);
+});
+
+test('unused 지우기 — 다시 읽어 그 사이 쓰이기 시작한 변수 · 쓰이게 된 변수가 가리키는 켠 변수는 건너뜀, 이미 지워진 것도 건너뜀', async () => {
+  const figma = installFigma();
+  const f = unusedFile(figma);
+  // 읽은 뒤 사용자가 s2를 레이어에 붙였다 → s2와 그것이 가리키는 g2 둘 다 건너뜀
+  f.text.fills = [...f.text.fills, { type: 'SOLID', boundVariables: { color: { type: 'VARIABLE_ALIAS', id: f.s2.id } } }];
+  const r = await deleteUnusedVariables([f.s2.id, f.g2.id, 'gone']);
+  assert.deepEqual(r, { deleted: 0, skipped: 3, failed: 0, cancelled: false });
+  // 다시 떼면 지워진다
+  f.text.fills = f.text.fills.slice(0, 1);
+  const r2 = await deleteUnusedVariables([f.s2.id, f.g2.id]);
+  assert.equal(r2.deleted, 2);
+  assert.equal(figma._state.variables.some((v) => v.id === f.s2.id), false);
+  // 다시 확인 중 취소 → 지우지 않음
+  const r3 = await deleteUnusedVariables([f.g3.id], { cancelled: () => true });
+  assert.equal(r3.cancelled, true);
+});
+
+test('unused 지우기 — remove 실패는 못 지움으로 세고 나머지는 지운다', async () => {
+  const figma = installFigma();
+  const f = unusedFile(figma);
+  f.s2.remove = () => { throw new Error('locked'); };
+  const r = await deleteUnusedVariables([f.s2.id, f.g2.id]);
+  assert.deepEqual(r, { deleted: 1, skipped: 0, failed: 1, cancelled: false });
+});
+
+test('code.ts — SCAN_UNUSED_VARS → 진행 · UNUSED_VARS, DELETE_VARIABLES → 지운 것 있을 때만 ⌘Z 한 번, CANCEL op unused는 찾기 플래그와 따로', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const f = unusedFile(figma);
+  let out = await p.send({ type: 'SCAN_UNUSED_VARS', reqId: 4 });
+  const u = ofType(out, 'UNUSED_VARS')[0];
+  assert.equal(u.reqId, 4);
+  assert.deepEqual(u.items.map((x) => x.id).sort(), [f.g2.id, f.s2.id].sort());
+  assert.ok(ofType(out, 'PROGRESS').every((x) => x.op === 'unused'));
+  const before = figma._undo ?? 0;
+  out = await p.send({ type: 'DELETE_VARIABLES', reqId: 5, ids: ['gone'] });
+  assert.deepEqual(ofType(out, 'VARIABLES_DELETED')[0], { type: 'VARIABLES_DELETED', reqId: 5, deleted: 0, skipped: 1, failed: 0 });
+  assert.equal(figma._undo ?? 0, before, '지운 것이 없으면 commitUndo 안 함');
+  await p.send({ type: 'CANCEL', op: 'unused' }); // 남은 플래그는 다음 요청이 지운다
+  out = await p.send({ type: 'DELETE_VARIABLES', reqId: 6, ids: [f.s2.id] });
+  assert.equal(ofType(out, 'VARIABLES_DELETED')[0].deleted, 1);
+  assert.equal((figma._undo ?? 0) - before, 1);
 });
