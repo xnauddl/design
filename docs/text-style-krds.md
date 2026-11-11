@@ -158,12 +158,12 @@
 - **타이포 목록 줄 모양(CLAUDE.md "카드 안에 카드")**: 지금 `tsList` 줄은 `resultCard` → `.r-card`(테두리 + 둥근 모서리 + 배경)가 `.step` 카드 안에 쌓인 모양이다. 이 목록의 줄을 구분선 줄(아래 테두리 한 줄, 둥근 모서리 · 배경 · 그림자 없음, 줄 사이 간격 0)로 바꾼다 — 타이포 목록에만(`#tsList .r-card`로 범위를 좁혀, 다른 화면의 `.r-card`는 UX 검수 C에서). 줄 안 내용 · 높이는 그대로.
 - **×n 배지 없앰 (2026-11-11 사용자 결정 B)**: 타이포 목록 스캔 줄 오른쪽의 `×{n}` 버튼(그 스타일 후보를 쓰는 글자 레이어 수 · 누르면 그 레이어 선택, `.r-badge`)을 없앤다 — 기호만으로는 뜻과 기능이 읽히지 않는다. 그 자리에 다른 것을 두지 않는다.
   - 줄 끝: 스캔 줄(배지가 있던 줄 — `count > 0`이고 `nodeIds`가 있음)은 §4 표시만. 그 밖의 줄(기본 램프 줄 등)은 지금처럼 §4 표시 + [삭제](`textStyle.rowDelete`) — [삭제]가 붙는 조건은 그대로(배지 분기의 else).
-  - 격자: `putOffMark`는 표시를 [삭제](`.link`) 앞에 넣는다(선택자에서 `.r-badge`를 뺌). `.r-top`의 칸을 하나 늘리는 `has-off`는 표시 **뒤에 [삭제]가 있을 때만** 붙인다 — 스캔 줄에 붙이면 빈 셋째 칸의 간격만큼 표시가 왼쪽으로 밀린다.
+  - 격자: `putOffMark`는 표시를 [삭제](`.link`) 앞에 넣는다(선택자에서 `.r-badge`를 뺌). `.r-top`의 칸을 하나 늘리는 `has-off`는 표시가 있고 **같은 `.r-top`에 [삭제]가 있을 때만** 붙인다 — 스캔 줄에 붙이면 빈 셋째 칸의 간격만큼 표시가 왼쪽으로 밀린다. 그래서 `textStyleCard`는 `putOffMark`를 [삭제]를 붙인 **뒤에** 부른다(크기 칸을 고칠 때 다시 부르는 경로와 결과가 같게).
   - 함께 지우는 것: 키 `textStyle.badgeGoTip` · `textStyle.badgeSelectTip`, CSS `.r-badge`(타이포 목록 말고 쓰는 곳 없음). `selectNodes`는 다른 곳에서 쓰므로 남긴다.
-  - 데이터는 남긴다: `TextStyleSpec.count` · `nodeIds`, `StyleCluster.nodeIds`(편집 가능 판정 · 만들기 화면 "Layer {n}" · 바로 연결 대상). `textStyles.ts`의 "×N 배지" 주석만 지금 쓰임으로 고친다.
+  - 데이터는 남긴다: `TextStyleSpec.count`(편집 가능 판정 `isEditableTextRow` · 만들기 화면 "Layer {n}"). `TextStyleSpec.nodeIds` · `StyleCluster.nodeIds`는 배지를 지우면 읽는 곳이 없지만 남긴다 — 메시지 모양(`TEXT_STYLE_CANDIDATES`)과 플러그인 테스트를 이번에 바꾸지 않기 위해서다. `textStyles.ts`의 "×N 배지" 주석은 `count`는 지금 쓰임으로, `nodeIds`는 "지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지)"으로 고친다.
   - 잃는 것: 타이포 목록에서 쓰는 글자 수와 바로 선택. 글자 수는 만들기 화면 Text Style 탭의 "Layer {n}"(누를 수 없음)에서만 보이고, 바로 선택은 대신할 곳이 없다.
   - 옛 와이어프레임(`docs/wireframe-plugin-ia.html` #17 "×N")은 역사 기록으로 그대로 둔다 — 이 결정이 앞선다.
-  - 테스트: verify-bind-flow 19의 "×n 배지가 같은 줄" 검사를 바꾼다 — `#tsList .r-badge` 0개 · 스캔 줄에 `has-off` 없음 · 램프 줄(크기 소수)에서 표시와 [삭제]가 같은 줄.
+  - 테스트: verify-bind-flow 19의 "×n 배지가 같은 줄" 검사를 바꾼다 — `#tsList .r-badge` 0개 · 스캔 줄에 `has-off` 없음 · **처음 그릴 때** [삭제]가 있는 줄(스캔 응답의 `count: 0` · 크기 13.5 줄 — 기본 램프 크기에는 소수가 없다)에서 표시와 [삭제]가 같은 줄.
 - **문구(i18n, 해요체)**
 
 | 키 | 지금 | 바뀜 / 새 |
