@@ -8,7 +8,6 @@ import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
 import { type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
-import { offScale } from './lib/krdsType';
 import { headState, headToggleTarget, mergeSameNameTokens, buildRenameTree, type RenameTreeItem } from './lib/treeState';
 import { renderTree, focusRow, type TreeItem } from './treeList';
 import { type Tier } from './lib/entitlements';
@@ -243,12 +242,22 @@ function addSwatch(card: HTMLElement, hex: string): void {
   title.classList.add('has-swatch');
 }
 
-/** 목록의 그룹 머리(트리 루트·리포트 구분줄) — 카드가 아니라 라벨이다. */
-function resultGroup(label: string): HTMLElement {
+/** 목록의 그룹 머리(트리 루트·리포트 구분줄) — 카드가 아니라 라벨이다.
+ *  count가 있으면 이름 뒤에 개수 "{n}개"(베리언트 결과 구분줄만 — ia-v4 §2.8 ② 예외 · §4.3a-3). */
+function resultGroup(label: string, count?: number): HTMLElement {
   const el = document.createElement('div');
   el.className = 'r-group r-ghead'; // 목록 안 그룹 머리 띠(ia-v4 §2.8 B안 ②)
-  el.textContent = label;
   el.title = label;
+  if (count === undefined) {
+    el.textContent = label;
+    return el;
+  }
+  const name = document.createElement('span');
+  name.textContent = label;
+  const cnt = document.createElement('span');
+  cnt.className = 'r-gcnt';
+  cnt.textContent = t('tree.count', { n: count });
+  el.append(name, cnt);
   return el;
 }
 
@@ -460,7 +469,19 @@ brand2Hex.addEventListener('input', () => {
   if (HEX6.test(brand2Hex.value)) brand2Color.value = brand2Hex.value.toLowerCase();
 });
 
+/* [팔레트 생성] = 팔레트 띠를 여는 단추(ia-v4 §4.3a-4). 유료 잠금이면 공통 잠금이 클릭을 가로채 띠를 열지 않는다.
+   열고 닫아도 포커스는 단추에 남는다. 연 상태는 DOM에 남아 하위 화면을 나갔다 와도 그대로다(§2.1). */
+function setPaletteBand(open: boolean): void {
+  $('paletteBand').hidden = !open;
+  $('btnPalette').setAttribute('aria-expanded', String(open));
+  $('paletteCaret').textContent = open ? '▾' : '▸';
+}
 $('btnPalette').addEventListener('click', () => {
+  setPaletteBand($('paletteBand').hidden);
+});
+
+// [팔레트 만들기] — 띠 안의 생성 동작(보조 버튼). 만든 뒤에도 띠는 열린 채다(값을 고쳐 다시 만들 수 있게).
+$('btnPaletteRun').addEventListener('click', () => {
   const primary = brandHex.value.trim();
   if (!HEX6.test(primary)) {
     setStatus('colorStatus', t('palette.invalidHex'), 'warn');
@@ -591,6 +612,7 @@ function renderColorTable(): void {
     // 옛 행을 남겨 두면 다음 추출이 색 0개일 때 테두리·‘총 n개’ 줄이 실제와 어긋난 채 되살아난다.
     $('colorTable').innerHTML = '';
     $('paletteRow').innerHTML = '';
+    updateEmptyLocks();
     return;
   }
   card.style.display = '';
@@ -614,8 +636,8 @@ function renderColorTable(): void {
     const role = roleSelect(roleByName.get(tok.name) ?? '');
     role.dataset.name = tok.name;
     // 값과 쓰임새 — 스와치는 색만 보여 주고 hue 이름은 계열만 말한다. 정확한 hex와
-    // ‘몇 군데서 쓰나’가 어느 색에 역할을 줄지 고르는 근거다(와이어 `주색 · 12× 사용`).
-    const used = tok.count ? t('color.usedCount', { n: tok.count }) : '';
+    // 그 값을 쓰는 레이어 수가 어느 색에 역할을 줄지 고르는 근거다(만들기 화면과 같은 "Layer {n}" — ia-v4 §4.3a-1).
+    const used = tok.count ? ' · ' + t('make.layers', { n: tok.count }) : '';
     const card = resultCard({
       title: tok.name,
       titleMono: true,
@@ -628,6 +650,7 @@ function renderColorTable(): void {
     return card;
   });
   updateColorSummary();
+  updateEmptyLocks();
 }
 
 /** 모아 놓은 색을 한 줄 스와치로 — 팔레트 한 벌이면 목록이 60행을 넘어 램프가 안 보인다. */
@@ -848,10 +871,7 @@ function saveSettings(): void {
    팔레트로 만든 색이면 이전 팔레트 색을 함께 정리한다(replacePalette). */
 $('btnColorVars').addEventListener('click', () => {
   const colors = tokens.filter((t) => t.category === 'color');
-  if (!colors.length) {
-    setStatus('colorStatus', t('color.needColors'), 'warn');
-    return;
-  }
+  if (!colors.length) return; // 빈 상태는 잠금(updateEmptyLocks)이 사유를 띄운다 — 여기 오지 않는다
   // 색 목록이 정한 역할을 매핑에 싣는다(2.5 카드는 숨김이라 이 textarea가 단일 출처).
   // 통째로 갈아끼우면 추출 때 채워 둔 간격·크기·타이포 역할이 같이 날아간다 — 색만 덮어쓴다.
   setSemMapText(colorAuthoritativeRoles(Number(($('base') as HTMLInputElement).value) || 16));
@@ -944,14 +964,7 @@ function textStyleEditRow(s: TextStyleSpec): HTMLElement {
 
   row.appendChild(text('ts-family', '', s.family, t('ts.family'), (v) => (s.family = v)));
   row.appendChild(sep('·'));
-  // 크기를 고치면 그 줄의 규칙 밖 표시를 바로, 상태 줄 꼬리는 change 때(docs/text-style-krds.md §4)
-  const sizeEl = num('40px', s.fontSize, t('ts.size'), '1', (n) => {
-    s.fontSize = n;
-    const card = row.closest<HTMLElement>('.r-card');
-    if (card) putOffMark(card, s.fontSize);
-  });
-  sizeEl.addEventListener('change', tsRefreshTail);
-  row.appendChild(sizeEl);
+  row.appendChild(num('40px', s.fontSize, t('ts.size'), '1', (n) => (s.fontSize = n)));
   row.appendChild(sep('/'));
   // 행간·자간을 손으로 넣으면 %가 아니라 px다 — 남아 있던 %는 지워야 요약과 등록이 어긋나지 않는다.
   row.appendChild(num('44px', s.lineHeight, t('ts.lineHeight'), '0', (n) => {
@@ -988,7 +1001,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   const card = resultCard(editable ? { title: name } : { title: name, summary: tsSummary(s), summaryMono: true });
   if (editable) card.appendChild(textStyleEditRow(s));
 
-  // 스캔 줄(쓰는 글자가 있는 줄)은 줄 끝에 표시만 — ×n 배지는 없앴다(docs/text-style-krds.md §6, 2026-11-11 결정 B).
+  // 스캔 줄(쓰는 글자가 있는 줄)은 줄 끝에 아무것도 없다 — ×n 배지(§6 결정 B)와 KRDS 크기 표시(§4)를 없앴다.
   const scanned = (s.count ?? 0) > 0 && !!s.nodeIds?.length;
   if (!scanned) {
     // 램프 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
@@ -1001,7 +1014,6 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
     });
     (card.querySelector('.r-top') as HTMLElement).appendChild(del);
   }
-  putOffMark(card, s.fontSize); // [삭제]를 붙인 뒤에 — 격자 칸 수가 크기 칸을 고칠 때와 같게
   return card;
 }
 
@@ -1011,14 +1023,13 @@ let tsScanNote = { namePart: '', warnings: [] as string[] };
 function renderTextStyles(): void {
   renderChunked($('tsList'), tsSpecs, textStyleCard);
   if (!tsSpecs.length) {
-    setTsStatus('other', '', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
+    setTsStatus('', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
     return;
   }
   // 개수는 상태줄 한 곳에서만 — 제목 배지(#tsCount)는 걷었다(ui.html 주석 참고).
   // 표에서 세므로 줄 삭제가 바로 반영된다(스캔 시점 스냅샷이던 옛 상태줄의 문제).
   const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
   setTsStatus(
-    'scan',
     t('textStyle.scanSummary', { a: fresh, b: tsSpecs.length - fresh }) +
       tsScanNote.namePart +
       t('textStyle.scanLhPct', { n: tsSpecs.filter((s) => s.lineHeightPercent).length }) +
@@ -1058,41 +1069,13 @@ function renderTsLink(): void {
 }
 // 스캔 후 액션 — 눌러야 생기는 이름이라, 스캔이 표를 채우기 전엔 잠가 둔다(TEXT_STYLE_CANDIDATES에서 해제).
 $('btnTsRowLabels').addEventListener('click', () => {
-  setTsStatus('other', t('textStyle.renaming'), 'ok');
+  setTsStatus(t('textStyle.renaming'), 'ok');
   send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
 });
 
-/* ---------- 규칙 밖 크기 표시 · 상태 줄 꼬리(docs/text-style-krds.md §4) ---------- */
-/** ⚠ 소수 크기 · ○ KRDS 밖 — withText면 기호 뒤에 글(타이포 목록), 아니면 기호만(만들기 탭 · 팝업). 규칙 안이면 null. */
-function offMarkEl(size: number, withText: boolean): HTMLElement | null {
-  const o = offScale(size);
-  if (!o.kind) return null;
-  const el = document.createElement('span');
-  el.className = `ts-off ${o.kind}`;
-  const label = t(o.kind === 'decimal' ? 'textStyle.offDecimal' : 'textStyle.offScale');
-  el.textContent = (o.kind === 'decimal' ? '⚠' : '○') + (withText ? ` ${label}` : '');
-  el.title = `${label} · ${t('textStyle.offTip', { n: o.nearest })}`;
-  el.setAttribute('aria-label', el.title);
-  return el;
-}
-/** 타이포 목록 줄의 표시를 (다시) 단다 — 머리 줄(.r-top) 끝. */
-function putOffMark(card: HTMLElement, size: number): void {
-  card.querySelector('.ts-off')?.remove();
-  const m = offMarkEl(size, true);
-  const top = card.querySelector<HTMLElement>('.r-top');
-  const del = top?.querySelector('.link') ?? null;
-  top?.classList.toggle('has-off', !!m && !!del); // 표시 뒤에 [삭제]가 있으면 칸 하나 더 — 없으면 [삭제]가 다음 줄로 밀린다
-  if (m && top) top.insertBefore(m, del);
-}
-/** 상태 줄 앞 문구와 종류 — 꼬리는 스캔 요약 · 램프 문구 뒤에만(§4). */
-let tsStatusBase: { kind: 'scan' | 'ramp' | 'other'; text: string; cls: 'ok' | 'warn' | '' } = { kind: 'other', text: '', cls: '' };
-function offTail(): string {
-  const marks = tsSpecs.map((s) => offScale(s.fontSize).kind).filter((k) => k);
-  return marks.length ? t('textStyle.offSum', { k: marks.length, m: marks.filter((k) => k === 'decimal').length }) : '';
-}
-function setTsStatus(kind: 'scan' | 'ramp' | 'other', text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
-  tsStatusBase = { kind, text, cls };
-  setStatus('tsStatus', kind === 'other' || !text ? text : text + offTail(), cls, tip);
+/** 타이포 상태 줄(#tsStatus) — KRDS 크기 꼬리는 없앴다(docs/text-style-krds.md §4). tip = 알림 목록 툴팁. */
+function setTsStatus(text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
+  setStatus('tsStatus', text, cls, tip);
 }
 /** 이 파일의 로컬 텍스트 스타일 이름(TEXT_STYLE_CANDIDATES.existing) — 기본 램프의 예약 이름. */
 let tsExistingNames: string[] = [];
@@ -1454,8 +1437,6 @@ function tsrRender(): void {
     to.className = 'tsr-to';
     to.textContent = r.to;
     row.append(from, arrow, to);
-    const om = offMarkEl(r.fontSize, false);
-    if (om) row.appendChild(om);
     const on = !tsrOff.has(r.id);
     if (on && tsrClash(r)) {
       const c = document.createElement('span');
@@ -1527,18 +1508,14 @@ function onTsRenamed(msg: Extract<CodeToUi, { type: 'TS_RENAMED' }>): void {
       tsSpecs = [];
       renderTextStyles();
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = true;
-      setTsStatus('other', text + t('textStyle.renameClearedTable'), warn ? 'warn' : 'ok');
+      setTsStatus(text + t('textStyle.renameClearedTable'), warn ? 'warn' : 'ok');
     }
   }
-}
-/** 램프 크기를 고친 뒤 — 앞 문구가 스캔 요약 · 램프 문구일 때만 꼬리를 다시 붙인다. */
-function tsRefreshTail(): void {
-  if (tsStatusBase.kind !== 'other') setTsStatus(tsStatusBase.kind, tsStatusBase.text, tsStatusBase.cls);
 }
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
   if (!styles.length) {
-    setTsStatus('other', t('textStyle.needSpecs'), 'warn');
+    setTsStatus(t('textStyle.needSpecs'), 'warn');
     return;
   }
   // 바로 연결(§4.3 "타이포 등록", 2026-11-10 A+C) — 켜져 있고 스캔 대상이 있으면 등록하면서 그 글자에 붙인다.
@@ -1837,7 +1814,7 @@ const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants
 // 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
 const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
-  'btnPalette', 'btnColorVars',
+  'btnPalette', 'btnPaletteRun', 'btnColorVars',
   'btnCreate', 'btnCreateApply',
   'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
   'btnTsRename', // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
@@ -1870,6 +1847,53 @@ function updateGates(): void {
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, t('semantic.needGlobal'));
   if (!isPaid) setLock($('btnSemantics'), 'paid'); // 유료 잠금이 전제보다 우선(§2.3)
   renderBindPrereq();
+  updateEmptyLocks(); // 빈 상태 잠금 · 주 버튼 — 유료 잠금 뒤에(유료가 먼저, ia-v4 §4.3a-2)
+}
+
+/* ---------- 빈 상태 잠금 · 주 버튼(ia-v4 §4.3a-2 — 색 · 컴포넌트 카드만) ----------
+   할 것이 없을 때 누르면 아무 일도 없던 실행 버튼을 전제 잠금으로 두고, 그때는 찾기 · 추출 버튼을 주 버튼으로.
+   유료 잠금이 먼저다(무료는 PAID_FIELDS 루프의 'paid' 그대로). 잠긴 버튼에는 primary를 두지 않는다 —
+   판정은 dataset.baseLock(유료 · 전제)만 본다. 대기 잠금(setWait)은 잠깐이라 주 버튼을 옮기지 않는다. */
+/** 닮은 프레임을 찾은 적 있는지 — [합치기] 잠금 사유 similar.needTwo ↔ needScan(합친 뒤엔 다시 false). */
+let similarScanned = false;
+const baseLocked = (el: HTMLElement): boolean => !!el.dataset.baseLock;
+/** 유료 잠금이 아니면 전제 잠금을 걸거나 푼다. */
+function setEmptyLock(el: HTMLElement, msg: string | null): void {
+  if (!isPaid) return; // 'paid'가 이미 걸려 있다(updateGates)
+  setLock(el, msg ? 'prereq' : null, msg ?? '');
+}
+/** 후보 가운데 처음으로 잠기지 않은 버튼 하나에 primary — 나머지는 끈다. */
+function setCardPrimary(all: HTMLElement[], order: HTMLElement[]): void {
+  const pick = order.find((el) => !baseLocked(el)) ?? null;
+  for (const el of all) el.classList.toggle('primary', el === pick);
+}
+/** 색 단계의 보이는 색이 있는지 — 색 목록이 숨어 있으면(토큰 단계 [미리보기]만으로 추출) 보지 못한 색이다. */
+const colorsVisible = (): boolean => colorRevealed && tokens.some((tk) => tk.category === 'color' && typeof tk.value === 'string');
+function updateEmptyLocks(): void {
+  // 색
+  const extract = $('btnExtract');
+  const colorVars = $('btnColorVars');
+  setEmptyLock(colorVars, colorsVisible() ? null : t('color.needColors'));
+  setCardPrimary([extract, colorVars], baseLocked(colorVars) ? [extract] : [colorVars, extract]);
+  // 컴포넌트
+  const scan = $('btnScanComp');
+  const similar = $('btnScanSimilar');
+  const reg = $('btnRegisterComp');
+  const merge = $('btnComponentize');
+  const eligible = compEligibleCount();
+  const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
+  setEmptyLock(reg,
+    !compCandidates.length ? t('component.needScan')
+      : !eligible ? t('component.noEligibleShort')
+        : !checked ? t('component.noChecked') : null);
+  const canMerge = similarMemberIds.length >= 2 && !!similarMasterId;
+  setEmptyLock(merge, canMerge ? null : t(similarScanned ? 'similar.needTwo' : 'similar.needScan'));
+  // 판정: 등록할 후보 1개 이상 → [등록], 합칠 닮은 프레임 → [합치기], 아니면 [컴포넌트 후보 찾기].
+  // 고른 버튼이 잠겼으면 누를 수 있는 버튼(무료 = [닮은 프레임 찾기]). [닮은 프레임 찾기]는 유료에서 늘 보조.
+  const first = eligible > 0 ? reg : canMerge ? merge : scan;
+  // 유료에서 고른 버튼이 잠겼으면(후보는 있는데 체크 0) 누를 수 있는 다음 버튼으로 — [합치기] · [컴포넌트 후보 찾기].
+  const order = isPaid ? [first, merge, scan] : [first, similar];
+  setCardPrimary([scan, similar, reg, merge], order);
 }
 
 /** 유료 잠금 사유를 툴팁으로. 원래 문구(기능 설명)는 dataset에 1회 백업해 보존·복원한다.
@@ -1935,7 +1959,9 @@ function gotoStep(id: PipelineStep['id']): void {
   } else {
     showPick(target.make, 'vars');
   }
-  const b = $(target.btn) as HTMLButtonElement;
+  // 색: [색 변수 만들기]가 빈 상태 잠금이면 할 수 있는 첫 일 [선택에서 추출]로(유료 잠금이면 그대로 — ia-v4 §4.3a-2).
+  const btnId = id === 'colors' && $('btnColorVars').dataset.baseLock === 'prereq' ? 'btnExtract' : target.btn;
+  const b = $(btnId) as HTMLButtonElement;
   b.scrollIntoView({ behavior: 'smooth', block: 'center' });
   b.focus();
 }
@@ -2120,39 +2146,28 @@ $('btnScanSimilar').addEventListener('click', () => {
 });
 
 $('btnComponentize').addEventListener('click', () => {
-  if (similarMemberIds.length < 2 || !similarMasterId) {
-    // '후보 스캔'을 하고 '묶기'를 누르는 경우가 잦다 — 묶기는 '닮은 스캔' 결과만 받는다는 걸 말해 준다.
-    setStatus('structureStatus', t(compCandidates.length ? 'similar.needScanAfterComp' : 'similar.needScan'), 'warn');
-    return;
-  }
+  if (similarMemberIds.length < 2 || !similarMasterId) return; // 빈 상태는 잠금(updateEmptyLocks)이 사유를 띄운다
   setStatus('structureStatus', t('similar.componentizing'), '');
   send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
 $('btnRegisterComp').addEventListener('click', () => {
-  // #1: 스캔 후보가 있으면 체크한 노드만, 없으면 최상위 선택(폴백).
-  if (compCandidates.length) {
-    const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
-    if (!nodeIds.length) {
-      setStatus('structureStatus', t('component.noChecked'), 'warn'); // 무반응 방지: 체크 0이면 안내
-      return;
-    }
-    setStatus('structureStatus', t('component.registering'), '');
-    // 트리에 보여 준 이름을 그대로 보낸다(WYSIWYG). 이름 충돌은 **후보 전체**를 보고 풀리므로,
-    // 일부만 체크해 보내면 code 쪽에서 충돌이 사라져 `ProfileAvatar`가 `Avatar`로 등록됐다.
-    const names: Record<string, string> = {};
-    for (const c of compCandidates) {
-      // [재사용] 줄의 이름은 기존 컴포넌트 것이다 — 보내지 않는다. [등록] 판정이 재사용이 아니면 code 쪽이
-      // 숫자 접미사 규칙으로 새 이름을 정한다(§4.7 "재사용" 7번 — 같은 이름이 둘 생기지 않게).
-      if (c.reuse) continue;
-      const shown = c.group ?? c.single;
-      if (shown && compChecked.has(c.id)) names[c.id] = shown;
-    }
-    send({ type: 'REGISTER_COMPONENTS', nodeIds, names });
-  } else {
-    setStatus('structureStatus', t('component.registering'), '');
-    send({ type: 'REGISTER_COMPONENTS' });
+  // #1: 늘 후보를 보고 체크한 노드만 보낸다 — 후보 없이 선택 전체를 등록하던 길은 닫았다(ia-v4 §4.3a-2).
+  // 후보 없음 · 등록할 후보 0 · 체크 0은 잠금(updateEmptyLocks)이 사유를 띄운다.
+  const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
+  if (!nodeIds.length) return;
+  setStatus('structureStatus', t('component.registering'), '');
+  // 트리에 보여 준 이름을 그대로 보낸다(WYSIWYG). 이름 충돌은 **후보 전체**를 보고 풀리므로,
+  // 일부만 체크해 보내면 code 쪽에서 충돌이 사라져 `ProfileAvatar`가 `Avatar`로 등록됐다.
+  const names: Record<string, string> = {};
+  for (const c of compCandidates) {
+    // [재사용] 줄의 이름은 기존 컴포넌트 것이다 — 보내지 않는다. [등록] 판정이 재사용이 아니면 code 쪽이
+    // 숫자 접미사 규칙으로 새 이름을 정한다(§4.7 "재사용" 7번 — 같은 이름이 둘 생기지 않게).
+    if (c.reuse) continue;
+    const shown = c.group ?? c.single;
+    if (shown && compChecked.has(c.id)) names[c.id] = shown;
   }
+  send({ type: 'REGISTER_COMPONENTS', nodeIds, names });
 });
 
 $('compAll').addEventListener('change', (e) => {
@@ -2491,7 +2506,7 @@ window.onmessage = (event: MessageEvent) => {
         tsScanNote = { namePart: '', warnings: [] };
         renderTextStyles();
         // 램프는 스캔 결과가 아니라 폴백 — 개수 요약 대신 무슨 일이 있었는지를 덮어쓴다.
-        setTsStatus('ramp', t('textStyle.fallbackRamp'), 'warn');
+        setTsStatus(t('textStyle.fallbackRamp'), 'warn');
       }
       break;
     }
@@ -2500,7 +2515,6 @@ window.onmessage = (event: MessageEvent) => {
       const why = Object.entries(msg.applyReasons ?? {}).filter(([, n]) => (n ?? 0) > 0).map(([k, n]) => `${t('tsSkip.' + k)} ${t('v4.layerCount', { n })}`);
       const tsTip = [why.join('\n'), msg.missing.join('\n')].filter(Boolean).join('\n\n');
       setTsStatus(
-        'other',
         t('textStyle.registered', { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) +
           (msg.applied ? t('textStyle.linkedN', { a: msg.applied }) : '') +
           (msg.applySkipped ? t('textStyle.linkSkipped', { k: msg.applySkipped }) : '') +
@@ -2603,7 +2617,7 @@ window.onmessage = (event: MessageEvent) => {
       const fillKept = msg.fillKept ?? [];
       const reused = msg.reused ?? [];
       const reuseKept = msg.reuseKept ?? [];
-      // 컴포넌트 수 = 새로 만든 맨 위 단위(세트 + 단일, §4.7 6번 "세는 단위"). 단일은 괄호 안에만 쓴다.
+      // 컴포넌트 수 = 새로 만든 맨 위 단위(변형 세트 + 컴포넌트, §4.7 6번 "세는 단위"). 컴포넌트(단일)는 괄호 안에만 쓴다.
       // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
       const extraPart =
         (msg.skipped ? t('component.extraSkipped', { n: msg.skipped }) : '') +
@@ -2629,7 +2643,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'GENERATE_RESULT': {
-      renderVariantReport([{ tag: t('component.tagAdded'), items: msg.combos, marker: 'added' }]);
+      renderVariantReport([{ items: msg.combos, marker: 'added' }]);
       setStatus('structureStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
       break;
     }
@@ -2702,9 +2716,11 @@ window.onmessage = (event: MessageEvent) => {
       // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
       similarMemberIds = [];
       similarMasterId = null;
+      similarScanned = false; // 합친 뒤 — 다시 ‘닮은 프레임 찾기’부터(잠금 사유 similar.needScan)
       $('similarList').innerHTML = '';
-      $('similarCount').textContent = '';
+      $('similarGroupCount').textContent = '';
       $('similarGroup').style.display = 'none';
+      updateEmptyLocks();
       break;
     }
     case 'PREMIUM_REQUIRED': {
@@ -2844,7 +2860,9 @@ interface TreeRow {
   header?: boolean;
   /** false면 name을 교체(취소선)가 아니라 그대로 유지(예: 컴포넌트 등록은 이름 보존). 기본 true. */
   replace?: boolean;
-  /** 행 앞 종류 배지(예: 세트/단독). text=라벨, kind=색 클래스(set|single). */
+  /** 컴포넌트 후보의 변형 세트 줄 — 제목을 세트 이름(굵게) + 회색 변형 이름으로 나눠 그린다(replace === false 갈래만). */
+  variant?: { set: string; name: string };
+  /** 행 앞 종류 배지(예: 변형 세트/컴포넌트). text=라벨, kind=색 클래스(set|single). */
   badge?: { text: string; kind: 'set' | 'single' | 'reuse' };
   /** 대상이 아닌 이유. 있으면 흐린 행 + 사유(reason) + 꼬리표(meta), 체크 불가.
    *  리네임=보존(잠금) · 바인딩=건너뜀(스킵). */
@@ -2922,13 +2940,22 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
     return card;
   }
 
-  // 이름 보존(컴포넌트 등록)은 취소선 없이 그대로, 교체(리네임·바인딩)는 before → after.
   const title = document.createElement('span');
-  const nameCls = r.replace === false ? 'tree-name' : 'before';
-  title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change)}</span>`;
   title.title = `${r.name} → ${r.change}`;
+  let fromLine: string | undefined;
+  if (r.replace === false) {
+    // 이름 보존(컴포넌트 등록) — 등록할 이름이 제목, 레이어 이름은 다를 때만 둘째 줄 "원래 이름 …"(ia-v4 §4.3a-3).
+    title.innerHTML = r.variant
+      ? `<span class="tree-name">${escapeHtml(r.variant.set)}</span> <span class="r-var">${escapeHtml(r.variant.name)}</span>`
+      : `<span class="tree-name">${escapeHtml(r.change)}</span>`;
+    if (r.name !== r.change) fromLine = t('component.fromName', { name: r.name });
+  } else {
+    // 교체(리네임·바인딩)는 before → after.
+    title.innerHTML = `<span class="before">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change)}</span>`;
+  }
 
-  const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true, meta: r.badge?.text });
+  const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true, ...(fromLine ? { summary: fromLine, summaryMono: true } : {}), meta: r.badge?.text });
+  if (fromLine) (card.querySelector('.r-sum') as HTMLElement).title = title.title;
   if (r.badge) {
     const meta = card.querySelector('.r-meta') as HTMLElement;
     meta.className = `tag tag-${r.badge.kind}`;
@@ -3364,9 +3391,7 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       }
       const sub = document.createElement('span');
       sub.className = 'tr-sub';
-      sub.textContent = tsSummary(s);
-      const om = offMarkEl(s.fontSize, false); // 요약 끝에 기호만(docs/text-style-krds.md §4)
-      if (om) sub.append(' ', om);
+      sub.textContent = tsSummary(s); // KRDS 크기 표시 없음(docs/text-style-krds.md §4)
       cells.push(sub);
       if (s.boundStyleId) cells.push(mkTag(t('make.tagHas'), t('make.tsHasTip')));
       items.push({
@@ -4209,16 +4234,18 @@ function compEligibleCount(): number {
 function compRows(): TreeRow[] {
   return compCandidates.map((n) => {
     if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-    // 세트: [세트] · 속성접힘: [속성] · 단독: [단독] · 재사용: [재사용] + 기존 컴포넌트 이름(§4.7 "재사용" 7번)
+    // 변형 세트: [변형 세트] · 속성접힘: [속성 컴포넌트] · 단독: [컴포넌트] · 재사용: [재사용] + 기존 컴포넌트 이름(§4.7 "재사용" 7번).
+    // 제목 = 등록할 이름(세트는 이름 + 회색 변형), 레이어 이름은 다를 때만 둘째 줄(ia-v4 §4.3a-3).
     const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
     if (n.reuse) {
       return { ...base, change: n.reuse.name, badge: { text: t('component.badgeReuse'), kind: 'reuse' as const } };
     }
     if (n.group) {
-      return { ...base, change: `${n.group} · ${n.variant || t('component.variantFallback')}`, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
+      const variant = n.variant || t('component.variantFallback');
+      return { ...base, change: `${n.group} · ${variant}`, variant: { set: n.group, name: variant }, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
     }
     if (n.propsOnly) {
-      return { ...base, change: t('component.changeProps', { name: n.single || t('component.nameFallback') }), badge: { text: t('component.badgeProps'), kind: 'single' as const } };
+      return { ...base, change: n.single || t('component.nameFallback'), badge: { text: t('component.badgeProps'), kind: 'single' as const } };
     }
     return { ...base, change: n.single || t('component.nameFallback'), badge: { text: t('component.badgeSingle'), kind: 'single' as const } };
   });
@@ -4238,8 +4265,8 @@ function renderCompTree(): void {
 function updateCompRegister(): void {
   const total = compEligibleCount();
   const sel = compChecked.size;
-  // 카드 제목의 개수 — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
-  $('compCount').textContent = total ? t('component.count', { total }) : '';
+  // 머리 띠의 개수(ia-v4 §4.3a-3) — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
+  $('compTreeCount').textContent = total ? t('tree.count', { n: total }) : '';
   $('compTreeGroup').style.display = total ? '' : 'none';
   if (compCandidates.length) {
     const all = $('compAll') as HTMLInputElement;
@@ -4247,15 +4274,17 @@ function updateCompRegister(): void {
     all.indeterminate = sel > 0 && sel < total;
     setStatus('structureStatus', total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
   }
+  updateEmptyLocks(); // 체크 바꿈 · 후보 트리 — [등록] 잠금 · 주 버튼
 }
 
 function clearCompPreview(): void {
   compCandidates = [];
   compChecked.clear();
   clearMount($('compTree'));
-  $('compCount').textContent = '';
+  $('compTreeCount').textContent = '';
   $('compTreeGroup').style.display = 'none';
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
+  updateEmptyLocks();
 }
 
 /* ---------- 등록/분류 결과 리포트(#variantReport) ----------
@@ -4267,9 +4296,7 @@ function clearCompPreview(): void {
 type VariantReportMarker = 'bullet' | 'added';
 
 interface VariantReportSection {
-  /** 카드 제목 개수 span에 쓸 짧은 이름 */
-  tag: string;
-  /** 목록 안 머리줄. 종류가 하나뿐이면(생성 결과) 생략 */
+  /** 목록 안 머리줄(머리 띠 — 이름 뒤에 항목 수). 종류가 하나뿐이면(생성 결과) 생략 */
   head?: string;
   items: string[];
   /** 진단(실패)은 경고색 */
@@ -4279,14 +4306,15 @@ interface VariantReportSection {
 
 interface VariantReportLine {
   text: string;
-  /** 구분줄(‘빈 조합(미생성):’)인가 — 항목 카드와 달리 그룹 머리로 그린다. */
+  /** 구분줄(‘빈 변형’)인가 — 항목 줄과 달리 그룹 머리 띠로 그린다(count = 그 아래 항목 수). */
   head?: boolean;
+  count?: number;
   warn?: boolean;
 }
 
 function makeVariantReportRow(l: VariantReportLine): HTMLElement {
   if (l.head) {
-    const g = resultGroup(l.text);
+    const g = resultGroup(l.text, l.count);
     if (l.warn) g.classList.add('warn');
     return g;
   }
@@ -4299,19 +4327,17 @@ function makeVariantReportRow(l: VariantReportLine): HTMLElement {
 function variantIssueSections(missing: string[], failures?: string[]): VariantReportSection[] {
   const f = failures || [];
   return [
-    { tag: t('component.tagMissing'), head: t('component.headMissing'), items: missing },
-    { tag: t('component.tagIssue'), head: t('component.headIssue', { n: f.length }), items: f, warn: true, marker: 'bullet' },
+    { head: t('component.headMissing'), items: missing },
+    { head: t('component.headIssue'), items: f, warn: true, marker: 'bullet' },
   ];
 }
 
 function renderVariantReport(sections: VariantReportSection[]): void {
   const filled = sections.filter((s) => s.items.length);
-  // 카드 제목의 개수(#tokenList의 createCount와 같은 패턴) — 리포트가 상한에 걸리거나
-  // 카드가 접혀 있어도 무엇이 몇 건인지 먼저 알린다.
-  $('componentCount').textContent = filled.map((s) => t('component.tagCount', { tag: s.tag, n: s.items.length })).join(' · ');
+  // 개수는 카드 제목이 아니라 각 구분줄 머리 띠에(ia-v4 §4.3a-3).
   const lines: VariantReportLine[] = [];
   for (const s of filled) {
-    if (s.head) lines.push({ text: s.head, head: true, warn: s.warn });
+    if (s.head) lines.push({ text: s.head, head: true, count: s.items.length, warn: s.warn });
     for (const it of s.items) lines.push({ text: it, warn: s.warn });
   }
   // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
@@ -4475,8 +4501,10 @@ function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement
 function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
   similarMemberIds = msg.metas.map((m) => m.id);
   similarMasterId = msg.recommendedMasterId;
-  $('similarCount').textContent = msg.metas.length ? t('similar.count', { n: msg.metas.length }) : '';
+  similarScanned = true;
+  $('similarGroupCount').textContent = msg.metas.length ? t('tree.count', { n: msg.metas.length }) : '';
   $('similarGroup').style.display = msg.metas.length ? '' : 'none';
+  updateEmptyLocks();
 
   const box = $('similarList');
   renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));

@@ -366,10 +366,6 @@ export interface TsRenameRow {
   from: string;
   to: string;
   sig: string;
-  fontSize: number;
-  /** 규칙 밖 크기(§4) — 소수 · KRDS 모음 밖 정수 · 안이면 null. */
-  offScale: 'decimal' | 'off' | null;
-  nearest: number;
 }
 /** [이름 다시 짓기] 바꾸기 항목. */
 export interface TsRenameItem {

@@ -2,7 +2,7 @@
 
 > 대상: 이름을 짓는 두 화면 — **만들기 화면 Text Style 탭**(ia-v4 §4.3, `SCAN_TEXT_STYLES{reqId}` → `nameTextStyles`)과 **값을 직접 고르기 › 타이포**(스캔 · 기본 램프) — 그리고 새 기능 [이름 다시 짓기]. v3 마법사는 IA v4 B.4에서 지워졌다(그 텍스트 스타일 단계는 만들기 화면 Text Style 탭이 이어받았다).
 > 근거: KRDS 공식 저장소 토큰(`KRDS-uiux/krds-uiux` — `tokens/transformed_tokens.json`, `resources/css/token/krds_tokens.css`, rem = 10px). 공식 페이지 krds.go.kr › 스타일 › 타이포그래피.
-> 사용자 결정: ① 이름 구조는 수정안대로 ② 이미 등록된 스타일은 [이름 다시 짓기]로 바꾼다(b) ③ 규칙 밖 크기는 표시한다. 2026-11-11: ④ [이름 다시 짓기]는 **변수 탭 ⋯ 메뉴**에 두고 타이포 카드에도 같은 버튼을 남긴다 ⑤ 규칙 밖 표시는 만들기 화면 Text Style 탭 줄에도 붙인다(요약 끝에 작게) ⑥ 타이포 카드 목록의 "카드 안 카드"(CLAUDE.md)도 이번에 고친다.
+> 사용자 결정: ① 이름 구조는 수정안대로 ② 이미 등록된 스타일은 [이름 다시 짓기]로 바꾼다(b) ③ 규칙 밖 크기는 표시한다. 2026-11-11: ④ [이름 다시 짓기]는 **변수 탭 ⋯ 메뉴**에 두고 타이포 카드에도 같은 버튼을 남긴다 ⑤ 규칙 밖 표시는 만들기 화면 Text Style 탭 줄에도 붙인다(요약 끝에 작게) ⑥ 타이포 카드 목록의 "카드 안 카드"(CLAUDE.md)도 이번에 고친다. 2026-11-11(UX 검수 C): ⑦ ③ · ⑤의 규칙 밖 표시를 모두 없앤다 — "KRDS 기준은 말 그대로 예제이며 기준이다"(§4).
 > 순서: 이 명세 다시 검토 0 → 시안 → IA v4 B.9 병합 뒤(지금 main) 별도 PR로 구현.
 
 ## 0. 결정 요약
@@ -15,7 +15,7 @@
 | 폴더 | 언제나 `{분류}/` 폴더 안 |
 | 소수 · 음수 표기 | 소수점은 `_`(예 `26_7`), 음수는 `m`(예 `-lsm0_3`) — 스타일 이름이 역할 변수 이름이 되고, 피그마 변수 이름은 `.`을 받지 않기 때문 |
 | 기존 스타일 | [이름 다시 짓기](변수 탭 ⋯ 메뉴 · 타이포 카드) — 팝업에서 미리보기 → 스위치 → 바꾸기(연결 유지, ⌘Z 한 번) |
-| 규칙 밖 크기 | 표시 — 소수 크기 ⚠, KRDS 크기 모음에 없는 정수 크기 ○(만들기 화면 Text Style 탭 · 타이포 목록 · 이름 다시 짓기 팝업) |
+| 규칙 밖 크기 | **표시 없음**(2026-11-11 사용자 결정 — KRDS는 이름 짓기의 예시 · 기준이다, §4). 크기는 그대로 두고 이름만 짓는다 |
 
 ## 1. KRDS 규칙 (확인된 사실)
 
@@ -28,7 +28,7 @@
 
 - 굵기 2종(Regular · Bold), 줄 높이 기본 1.5(150%), 자간 0 또는 0.1rem, 글꼴 Pretendard GOV.
 - **display small(36)은 이름으로 나오지 않는다:** 36 – 41.99의 굵은 글자는 heading xlarge(40)와 같은 크기대라, 둘 중 하나로만 나와야 이름이 겹치지 않는다. 제목 크기대는 heading이 더 흔하므로 heading/xlarge로 보낸다(§3.2 display = 42 이상).
-- **KRDS 크기 모음**(규칙 밖 판정용, PC + 모바일): 13 · 15 · 17 · 19 · 22 · 24 · 28 · 32 · 36 · 40 · 44 · 60.
+- **KRDS 크기**(PC + 모바일): 13 · 15 · 17 · 19 · 22 · 24 · 28 · 32 · 36 · 40 · 44 · 60. 이름 짓기의 **예시 · 기준**이다 — 단계 경계 · 기준값(§3.3)이 이 값에서 나온다. 이 모음에 없는 크기(14 · 20 · 26.7 등)도 같은 규칙으로 이름을 짓고, 따로 표시하지 않는다(§4).
 - 모바일 크기를 모드로 만드는 일은 범위 밖이다.
 
 ## 2. 원칙
@@ -45,7 +45,7 @@
   - 이름 다시 짓기 경로: 로컬 스타일 정의. `count` = 0, `uiCount` = 0(쓰인 횟수를 세지 않는다 — 동점은 다음 정렬 키로 간다).
 - **굵기:** `weightOf(style) → { weight, italic }` — `exporters.ts splitWeightStyle`을 **감싸는 새 함수**(내보내기 결과는 그대로)로, 이름에서 폭 · 광학 수식어(condensed · narrow · compressed · expanded · extended · wide · display · text · caption · micro)를 뗀 뒤 읽는다. 표에 없는 이름은 400. (예: "SemiBold Condensed" → 600, "Book" → 400, "Bold Italic" → 700 · 기울임)
 - **줄 높이 %:** `lineHeight`가 0이면 'auto'. `lineHeightPercent`가 있으면 그 값, 아니면 `lineHeight / fontSize × 100`. 정수 반올림해 비교 · 표기한다(149.6 → 150은 150%와 같다).
-- **크기 표기값:** 소수 첫째 자리 반올림(26.67 → 26.7, 정수면 정수). **분류 · 단계 경계 · 기준값 거리 · 크기 꼬리 · 규칙 밖 판정은 모두 이 표기값으로 한다.** 원래 크기는 달라도 표기값이 같은 스타일은 같은 크기로 보고, 이름이 겹치면 §3.8로 간다.
+- **크기 표기값:** 소수 첫째 자리 반올림(26.67 → 26.7, 정수면 정수). **분류 · 단계 경계 · 기준값 거리 · 크기 꼬리는 모두 이 표기값으로 한다.** 원래 크기는 달라도 표기값이 같은 스타일은 같은 크기로 보고, 이름이 겹치면 §3.8로 간다.
 
 ### 3.2 분류 (위에서부터 처음 맞는 것)
 1. **label**
@@ -97,17 +97,24 @@
 ### 3.10 문자열 비교
 - "이름 순" · "시그니처 문자열 순" · "글꼴 이름 순" · "id 순"은 모두 **문자 코드 순**(JS `a < b`, 대소문자 구분, `localeCompare` 쓰지 않음)이다.
 
-## 4. 규칙 밖 크기 표시
+## 4. KRDS 크기 표시 — 없음 (2026-11-11 사용자 결정)
 
-- 판정(크기는 §3.1 표기 기준): 소수 → `'decimal'`, §1 KRDS 크기 모음에 없는 정수 → `'off'`, 있으면 `null`. **가까운 KRDS 크기** `nearest` = §1 모음에서 가장 가까운 값, 같은 거리면 큰 값.
-- **타이포 목록 · 이름 다시 짓기 팝업** 줄 끝:
-  - `'decimal'`: ⚠ `--danger` "소수 크기", 툴팁 "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {nearest}px".
-  - `'off'`: ○ `--text-2` "KRDS 밖", 같은 툴팁.
-- **만들기 화면 Text Style 탭 줄**(480px — 견본 Aa · 이름 칩 · 요약 · 상태 · Layer n · 스위치가 이미 있음): 글자 없이 기호만 요약 글(`tsSummary` — 예 "Inter · 16 / 24px / 0 · Regular") 끝에 붙인다(예 "Inter · 26.7 / 40px / 0 · SemiBold ⚠"). 기호는 요약 칸(`tr-sub`) 안의 별도 `span`(툴팁 · 접근성 이름을 따로 가짐 — 지금 요약은 `textContent` 하나라 이 `span`을 덧붙이는 모양으로 바꾼다) — ⚠ `--danger` · ○ `--text-2`, 툴팁은 위와 같은 글(앞에 "소수 크기" · "KRDS 밖"을 붙여 "소수 크기 · KRDS 크기가 아니에요 · …"), 접근성 이름에도 같은 글.
-- 타이포 목록의 표시는 **그릴 때** 계산한다 — 기본 램프 줄에서 크기를 고치면(`isEditableTextRow`의 크기 칸) 그 줄의 표시와 상태 줄 꼬리를 다시 계산한다(크기 칸 `input` 때 그 줄 표시만 바꾸고, 꼬리는 `change` 때). 스캔 줄은 크기를 고칠 수 없다.
-- **꼬리를 다시 붙이는 법:** 상태 줄에 쓴 앞 문구와 그 종류(스캔 요약 · 램프 문구 · 등록 결과 · 그 밖)를 기억해 둔다(`tsStatusBase = { kind, text }`). 꼬리를 다시 계산할 때 종류가 스캔 요약 · 램프 문구면 그 문구 + 새 꼬리로 다시 쓰고, 등록 결과 · 그 밖(이름 다시 짓기 결과 등)이 떠 있으면 줄 표시만 바꾸고 상태 줄은 그대로 둔다.
-- 타이포 상태 줄(`#tsStatus`, 목록 **아래**) 끝에 " · KRDS 밖 크기 {k}개(소수 {m})" — k = 표시가 붙은 **스타일(줄) 수**, m = 그중 소수, 0이면 붙이지 않는다. 이 꼬리는 스캔 · 램프 결과 문구(`renderTextStyles`의 스캔 요약 · 기본 램프 문구) 뒤에만 붙이고, 등록 결과(`TEXT_STYLES_RESULT`)가 상태 줄을 덮으면 붙이지 않는다.
-- 표시만 한다 — 값을 바꾸거나 등록을 막지 않는다.
+- 사용자 결정(UX 검수 C): **"KRDS 기준은 말 그대로 예제이며 기준이다."** KRDS 크기에 없는 정수 크기(예 14 · 20)와 소수 크기(예 26.7)에 붙이던 표시를 모두 없앤다 — ⚠ "소수 크기" · ○ "KRDS 밖" · 툴팁 "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · 상태 줄 꼬리 " · KRDS 밖 크기 {k}개(소수 {m})". 크기가 KRDS 값이 아닌 것은 고칠 일이 아니라 그 파일의 선택이고, 표시는 경고처럼 읽혀 "고쳐야 하나"를 묻게 했다.
+- **없애는 곳:** 값을 직접 고르기 › 타이포 목록(`#tsList`) 줄 끝 · 타이포 상태 줄(`#tsStatus`) 꼬리 · [이름 다시 짓기] 팝업 줄 끝 · 만들기 화면 Text Style 탭 요약 끝(ia-v4 §4.3).
+- **그대로인 것:** 이름 규칙 `{분류}/{단계}` + 꼬리(§3 — 크기 꼬리 `-{크기}`도 그대로), 소수 · 음수 표기(`_` · `m` — §0), 값은 바꾸지 않음(§2), 연결이 소수 글자 크기를 건너뛰는 일과 그 건너뜀 칩(연결 화면 — 사유 `fraction`, ia-v4 §4.2).
+- **바뀐 모습:**
+  - 타이포 목록 줄 끝: 스캔 줄(`count > 0`이고 `nodeIds`가 있음)은 아무것도 없다. 그 밖의 줄(기본 램프 · `count` 0)은 [삭제](`textStyle.rowDelete`)만 — 붙는 조건은 그대로.
+  - 타이포 상태 줄: 스캔 요약 · 램프 문구 · 등록 결과 등 앞 문구만 쓴다(꼬리 없음).
+  - 팝업 줄: 옛 이름(취소선) → 새 이름 · ("같은 이름이 남아요" — 있을 때) · 스위치.
+  - Text Style 탭 줄: 요약 칸(`tr-sub`)은 `tsSummary` 글 하나(기호 `span` 없음).
+- **코드에서 지우는 것**
+  - `src/ui.ts`: `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail`, `import { offScale } from './lib/krdsType'`. `textStyleCard`의 `putOffMark` 호출, `textStyleEditRow` 크기 칸의 `putOffMark`(입력 때) · `change` 리스너(`tsRefreshTail`), 팝업 줄의 `offMarkEl(r.fontSize, false)`, 만들기 Text Style 탭 줄의 기호(`sub.textContent = tsSummary(s)`만 남김). `setTsStatus(kind, text, cls, tip)`는 꼬리를 붙이지 않으므로 종류 인자가 필요 없다 — `setTsStatus(text, cls, tip)`로 줄이거나 `setStatus('tsStatus', …)`를 바로 쓴다(부르는 곳: `renderTextStyles` · 행 라벨 · 이름 다시 짓기 뒤 · `btnTextStyles` · 램프 · 스캔 결과 · 등록 결과 `TEXT_STYLES_RESULT` — 이 곳은 툴팁 `tip` 인자(알림 목록)를 넘기므로 줄인 함수도 `tip`을 받는다).
+  - `src/ui.html`: `.r-top.has-off` · `.r-top.no-check.has-off` · `.ts-off` · `.ts-off.decimal` · `.ts-off.off`.
+  - `src/lib/i18n.ts`: `textStyle.offDecimal` · `textStyle.offScale` · `textStyle.offTip` · `textStyle.offSum`.
+  - `src/lib/krdsType.ts`: `offScale`, 그리고 `offScale`만 쓰던 `KRDS_SIZES`(크기 모음은 이 문서 §1에만 남긴다). 이름 짓기 함수(`round1` · `krdsStep` · `nameKrdsStyles` 등)는 그대로.
+  - `src/shared/messages.ts`: `TsRenameRow`의 `fontSize` · `offScale` · `nearest`(UI가 표시에만 썼다) → `TsRenameRow = {id, from, to, sig}`. 그 주석의 "규칙 밖 크기(§4)"도 지운다.
+  - `src/lib/variables.ts` `planTsRename`: `offScale` import · `off` 계산 · 세 필드를 지운다(`existingOf(s)`는 `sig`에 그대로 쓴다). 함수 주석은 그대로.
+  - 테스트: `test/pure.test.mjs` `krdsType — offScale …` 테스트와 import(`KRDS_SIZES` · `offScale`) 지움, `test/figma.test.mjs` `planTsRename …` — 이름의 "· 규칙 밖 표시" 빼고, `by.h1` 기대값에서 세 필드 빼고, `by.odd.offScale` · `by.odd.nearest` 확인 지움(`by.odd.to`는 남김). verify-bind-flow 17 · 19는 ia-v4 B.14.
 
 ## 5. [이름 다시 짓기] (사용자 결정 b)
 
@@ -119,9 +126,9 @@
 - 글꼴: 이 기능은 스타일의 **이름만** 쓴다 — 피그마는 이름 쓰기에 글꼴을 요구하지 않으므로(ia-v4 §4.3 "글꼴") 글꼴을 불러오지 않는다. 글꼴이 없는 스타일도 이름은 바뀐다(`missFontKeep`과 무관).
 
 ### 5.2 팝업(미리보기)
-- 메시지: `SCAN_TS_RENAME{reqId}` → `TS_RENAME_PLAN{reqId, rows:[{id, from, to, sig, fontSize, offScale, nearest}]}`(연결 화면의 `PREVIEW_TEXT_STYLES`와 헷갈리지 않는 이름). `sig` = `tsSig`(textStyles.ts — 크기 · 줄 높이 px · 자간 · 글꼴 · 스타일)의 문자열, 바꾸기 때 그대로 돌려보낸다.
+- 메시지: `SCAN_TS_RENAME{reqId}` → `TS_RENAME_PLAN{reqId, rows:[{id, from, to, sig}]}`(2026-11-11 `fontSize` · `offScale` · `nearest`를 지움 — §4)(연결 화면의 `PREVIEW_TEXT_STYLES`와 헷갈리지 않는 이름). `sig` = `tsSig`(textStyles.ts — 크기 · 줄 높이 px · 자간 · 글꼴 · 스타일)의 문자열, 바꾸기 때 그대로 돌려보낸다.
 - 대상: 이 파일의 로컬 텍스트 스타일 전부(선택과 무관). 이름 = §3을 그 전체에 한 번에 적용한 결과(앵커 없음, count 0).
-- **모양:** 상세 팝업과 같은 틀(`openModal`) — 제목 "이름 다시 짓기 · 바꿀 이름 {n}개"(`textStyle.renameHead`). 몸통 맨 위 "모두 켜기 · 모두 끄기"(`bind.allOn` · `bind.allOff`), 그 아래 줄 목록. 줄 = **구분선 줄**(아래 테두리 한 줄 — 테두리 · 둥근 모서리 · 배경 없음, CLAUDE.md "카드 안에 카드") 높이 30: 옛 이름(취소선, `--text-2`) → 새 이름 + §4 표시(**기호만** ⚠ · ○ — 글은 툴팁) + 오른쪽 스위치. 넘치면 **옛 이름부터 말줄임**(최소 60px), 그다음 새 이름 말줄임 — 기호 · 스위치는 늘 보인다, 줄 툴팁 = "{옛 전체 이름} → {새 전체 이름}"(ia-v4 §2.7 스위치와 같은 모양, `aria-label` "{옛 이름} → {새 이름}"). 이름이 같은 스타일은 보이지 않는다. 기본 모두 켬. 0개면 "바꿀 이름이 없어요"(`textStyle.renameNone`).
+- **모양:** 상세 팝업과 같은 틀(`openModal`) — 제목 "이름 다시 짓기 · 바꿀 이름 {n}개"(`textStyle.renameHead`). 몸통 맨 위 "모두 켜기 · 모두 끄기"(`bind.allOn` · `bind.allOff`), 그 아래 줄 목록. 줄 = **구분선 줄**(아래 테두리 한 줄 — 테두리 · 둥근 모서리 · 배경 없음, CLAUDE.md "카드 안에 카드") 높이 30: 옛 이름(취소선, `--text-2`) → 새 이름 + 오른쪽 스위치(크기 표시 없음 — §4). 넘치면 **옛 이름부터 말줄임**(최소 60px), 그다음 새 이름 말줄임 — 스위치는 늘 보인다, 줄 툴팁 = "{옛 전체 이름} → {새 전체 이름}"(ia-v4 §2.7 스위치와 같은 모양, `aria-label` "{옛 이름} → {새 이름}"). 이름이 같은 스타일은 보이지 않는다. 기본 모두 켬. 0개면 "바꿀 이름이 없어요"(`textStyle.renameNone`).
 - 응답 전: 몸통에 "스타일을 읽는 중…"(새 키 `textStyle.renameReading` — 선택이 아니라 파일 전체를 읽으므로 `v4.reading` "선택을 읽는 중…"을 쓰지 않는다), 진행 테두리 없음(목록만 읽는 짧은 작업). 팝업 아래: [{k}개 이름 바꾸기](`textStyle.renameApply`, k = 켠 수, 0이면 `aria-disabled` · 사유 `textStyle.renameNeedOn` "바꿀 이름을 켜 주세요") · [닫기].
 - 끈 줄은 지금 이름을 유지한다 — 그 이름과 켠 줄의 새 이름이 겹치면 켠 줄에 "같은 이름이 남아요"(`textStyle.renameClash`) 표시 + 그 줄은 바꾸기에서 빠진다(k에도 세지 않는다).
 - **포커스:** 열면 [닫기]; 응답이 와서 줄이 있으면 첫 줄 스위치로 옮긴다(사용자가 그 사이 포커스를 옮겼으면 그대로). 팝업 안 순서: 모두 켜기 · 모두 끄기 → 줄 스위치(↑↓) → [{k}개 이름 바꾸기] → [닫기]. [닫기] · Esc · 바꾸기 뒤에는 팝업을 연 버튼 · 메뉴 버튼(⋯ 또는 타이포 [이름 다시 짓기])으로 돌아간다.
@@ -149,21 +156,21 @@
 
 ## 6. 코드에서 바뀌는 곳
 
-- 새 `src/lib/krdsType.ts`(순수): `KRDS_SIZES`, `KRDS_STEPS`, `weightOf(style)`, `krdsCategory(input, path)`, `krdsStep(category, size)`, `offScale(size) → { kind: 'decimal' | 'off' | null, nearest }`, `nameKrdsStyles(inputs, { reserved, anchored })`.
+- 새 `src/lib/krdsType.ts`(순수): `KRDS_STEPS`, `weightOf(style)`, `krdsCategory(input, path)`, `krdsStep(category, size)`, `nameKrdsStyles(inputs, { reserved, anchored })`.
 - `textStyles.ts`: `nameTextStyles`가 RAMP_NAMES 순위 대신 `nameKrdsStyles`를 쓴다(앵커 조건은 유지, 행 라벨은 예약을 따름 — §3.9). `StyleCluster`에 `uiCount`, `TextSample`에 `uiRole?: boolean`. `LABEL_RAMP_RE` 넓힘(§3.9). `RAMP_NAMES` · 옛 램프는 지운다. 주석 "크기 순(display/h1…)"(code.ts · messages.ts)도 KRDS 이름으로 고친다.
 - `rampToSpecs`(스캔 결과가 없을 때의 기본 램프): display/large 60 · heading/large 32 · heading/medium 24 · heading/small 19 = Bold, body/medium 17 · body/small 15 = Regular, 줄 높이 `lineHeightPercent: 150` · `lineHeight = 크기 × 1.5`, 자간 0. 글꼴은 지금처럼 `DEFAULT_TS_FAMILY`(Inter — Pretendard GOV는 설치되지 않았을 수 있다). label 줄은 넣지 않는다(body/medium과 값이 같아 앵커 · 기존 스타일 연결이 모호해지므로). 램프 이름도 §3.4 예약을 따른다 — 같은 이름의 로컬 스타일이 있으면 그 줄은 강제 꼬리를 붙인다(등록이 이름으로 찾아 남의 스타일 값을 덮어쓰지 않게). 이를 위해 이미 있는 `TEXT_STYLE_CANDIDATES.existing:{name, sig}[]`(지금은 reqId 스캔에서만 보냄)를 reqId 없는 스캔에도 싣고, 그 `name`을 예약 이름으로 쓴다. 순수 함수 `rampToSpecs(family, reserved)`(textStyles.ts)가 예약을 적용한다(램프 폴백 판정 · 문구는 지금 그대로).
 - `variables.ts scanTextStyles`: 표본에 `uiRole`(§3.2-1 조상 탐색). `scanExistingTextStyles`는 그대로.
 - `variables.ts`: `renameTextRoleVars(pairs)` 공용 함수(직접 만든 변수 거름) + 이름 다시 짓기 적용 함수 + 등록 경로의 되돌림(§5.3). `code.ts` · `messages.ts`: 메시지 2쌍(`SCAN_TS_RENAME` → `TS_RENAME_PLAN`, `APPLY_TS_RENAME` → `TS_RENAMED`).
-- `ui.ts` · `ui.html`: 변수 탭 ⋯ 메뉴 항목 · 타이포 카드 [이름 다시 짓기](`PAID_FIELDS`) · 이름 다시 짓기 팝업 · OPS `tsRename` · §4 표시(타이포 목록 · 만들기 Text Style 탭 · 팝업) · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움. `ui.html` `btnTsRowLabels`의 기본 `title`(지금 `rowLabelTip`과 같은 옛 글)도 고친다.
-- **타이포 목록 줄 모양(CLAUDE.md "카드 안에 카드")**: 지금 `tsList` 줄은 `resultCard` → `.r-card`(테두리 + 둥근 모서리 + 배경)가 `.step` 카드 안에 쌓인 모양이다. 이 목록의 줄을 구분선 줄(아래 테두리 한 줄, 둥근 모서리 · 배경 · 그림자 없음, 줄 사이 간격 0)로 바꾼다 — 타이포 목록에만(`#tsList .r-card`로 범위를 좁혀, 다른 화면의 `.r-card`는 UX 검수 C에서). 줄 안 내용 · 높이는 그대로.
+- `ui.ts` · `ui.html`: 변수 탭 ⋯ 메뉴 항목 · 타이포 카드 [이름 다시 짓기](`PAID_FIELDS`) · 이름 다시 짓기 팝업 · OPS `tsRename` · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움. `ui.html` `btnTsRowLabels`의 기본 `title`(지금 `rowLabelTip`과 같은 옛 글)도 고친다.
+- **타이포 목록 줄 모양(CLAUDE.md "카드 안에 카드")**: 지금 `tsList` 줄은 `resultCard` → `.r-card`(테두리 + 둥근 모서리 + 배경)가 `.step` 카드 안에 쌓인 모양이다. 이 목록의 줄을 구분선 줄(아래 테두리 한 줄, 둥근 모서리 · 배경 · 그림자 없음, 줄 사이 간격 0)로 바꾼다 — 타이포 목록에만(`#tsList .r-card`로 범위를 좁혀, 다른 화면의 `.r-card`는 ia-v4 §2.8 · B.12에서(완료)). 줄 안 내용 · 높이는 그대로.
 - **×n 배지 없앰 (2026-11-11 사용자 결정 B)**: 타이포 목록 스캔 줄 오른쪽의 `×{n}` 버튼(그 스타일 후보를 쓰는 글자 레이어 수 · 누르면 그 레이어 선택, `.r-badge`)을 없앤다 — 기호만으로는 뜻과 기능이 읽히지 않는다. 그 자리에 다른 것을 두지 않는다.
-  - 줄 끝: 스캔 줄(배지가 있던 줄 — `count > 0`이고 `nodeIds`가 있음)은 §4 표시만. 그 밖의 줄(기본 램프 줄 등)은 지금처럼 §4 표시 + [삭제](`textStyle.rowDelete`) — [삭제]가 붙는 조건은 그대로(배지 분기의 else).
-  - 격자: `putOffMark`는 표시를 [삭제](`.link`) 앞에 넣는다(선택자에서 `.r-badge`를 뺌). `.r-top`의 칸을 하나 늘리는 `has-off`는 표시가 있고 **같은 `.r-top`에 [삭제]가 있을 때만** 붙인다 — 스캔 줄에 붙이면 빈 셋째 칸의 간격만큼 표시가 왼쪽으로 밀린다. 그래서 `textStyleCard`는 `putOffMark`를 [삭제]를 붙인 **뒤에** 부른다(크기 칸을 고칠 때 다시 부르는 경로와 결과가 같게).
+  - 줄 끝: 스캔 줄(배지가 있던 줄 — `count > 0`이고 `nodeIds`가 있음)은 아무것도 없다. 그 밖의 줄(기본 램프 줄 등)은 [삭제](`textStyle.rowDelete`)만 — [삭제]가 붙는 조건은 그대로(배지 분기의 else). (2026-11-11 §4 — 그전에는 둘 다 끝에 크기 표시가 붙었다.)
+  - 격자: 크기 표시가 없어져(§4) `putOffMark` · `has-off`(표시 칸을 하나 늘리던 격자)도 지운다 — `.r-top`은 체크 · 본문 · 끝(없음 또는 [삭제]) 세 칸 그대로.
   - 함께 지우는 것: 키 `textStyle.badgeGoTip` · `textStyle.badgeSelectTip`, CSS `.r-badge`(타이포 목록 말고 쓰는 곳 없음). `selectNodes`는 다른 곳에서 쓰므로 남긴다.
   - 데이터는 남긴다: `TextStyleSpec.count`(편집 가능 판정 `isEditableTextRow` · 만들기 화면 "Layer {n}"). `TextStyleSpec.nodeIds` · `StyleCluster.nodeIds`는 배지를 지우면 읽는 곳이 없지만 남긴다 — 메시지 모양(`TEXT_STYLE_CANDIDATES`)과 플러그인 테스트를 이번에 바꾸지 않기 위해서다. `textStyles.ts`의 "×N 배지" 주석은 `count`는 지금 쓰임으로, `nodeIds`는 "지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지)"으로 고친다.
   - 잃는 것: 타이포 목록에서 쓰는 글자 수와 바로 선택. 글자 수는 만들기 화면 Text Style 탭의 "Layer {n}"(누를 수 없음)에서만 보이고, 바로 선택은 대신할 곳이 없다.
   - 옛 와이어프레임(`docs/wireframe-plugin-ia.html` #17 "×N")은 역사 기록으로 그대로 둔다 — 이 결정이 앞선다.
-  - 테스트: verify-bind-flow 19의 "×n 배지가 같은 줄" 검사를 바꾼다 — `#tsList .r-badge` 0개 · 스캔 줄에 `has-off` 없음 · **처음 그릴 때** [삭제]가 있는 줄(스캔 응답의 `count: 0` · 크기 13.5 줄 — 기본 램프 크기에는 소수가 없다)에서 표시와 [삭제]가 같은 줄.
+  - 테스트: verify-bind-flow 19 — `#tsList .r-badge` 0개 · `.ts-off` 0개 · `has-off` 0개 · [삭제]가 있는 줄(스캔 응답의 `count: 0` 줄)에서 [삭제]가 그 줄 끝(같은 `.r-top`).
 - **문구(i18n, 해요체)**
 
 | 키 | 지금 | 바뀜 / 새 |
@@ -186,38 +193,38 @@
 | `textStyle.renameRoleError` · `renameRoleStuck` (새) | — | " · Semantic 변수 {n}개는 바꾸지 못했어요" · "되돌리지 못한 변수: {names}" |
 | `textStyle.renameSkip.renamed-meanwhile` · `value-changed` · `name-taken` · `error` · `error-chain` · `error-stuck` (새) | — | "그 사이 이름이 바뀜" · "그 사이 값이 바뀜" · "같은 이름이 있음" · "오류" · "연결된 항목 오류로 되돌림" · "되돌리지 못함 · 지금 이름 {name}" |
 | `textStyle.renameClearedTable` (새) | — | " · 스캔 표를 비웠어요 — 다시 [스캔]해 주세요" |
-| `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` (새) | — | "소수 크기" · "KRDS 밖" · "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · " · KRDS 밖 크기 {k}개(소수 {m})" |
+| `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` | "소수 크기" · "KRDS 밖" · "KRDS 크기가 아니에요 · 가까운 KRDS 크기 {n}px" · " · KRDS 밖 크기 {k}개(소수 {m})" | **지움**(2026-11-11 — §4) |
 
-- 테스트: `krdsType` 단위(분류 · 단계 경계 · 꼬리 순서 · 정렬 동점 · 강제 꼬리 · 마지막 수단 · 소수 · 음수 표기 · 규칙 밖 · weightOf · UI 역할 조상에서 멈춤), `nameTextStyles` · `rampToSpecs`(예약) · 행 라벨 예약 바뀐 기대값, 이름 다시 짓기(figma 목: 연쇄 · 맞바꿈 · 임시 이름 · 역할 변수 · 사용자 컬렉션 · 직접 만든 변수 제외 · 겹침 건너뜀 · 값 바뀜 · **값을 쓰지 않음** — `loadFontAsync`가 던지고 값 쓰기를 막는 목에서도 이름이 바뀜), 등록 경로 되돌림(스타일 이름 보류 · 행 오류 시 변수 이름 되돌림), verify-bind-flow(⋯ 메뉴 · 타이포 버튼 → 팝업 · 스위치 · 모두 켜기/끄기 · 바꾸기 · 표 비움 · 포커스 복귀, 만들기 Text Style 탭 ⚠ · ○, 타이포 목록 구분선 줄).
+- 테스트: `krdsType` 단위(분류 · 단계 경계 · 꼬리 순서 · 정렬 동점 · 강제 꼬리 · 마지막 수단 · 소수 · 음수 표기 · weightOf · UI 역할 조상에서 멈춤 — 규칙 밖 판정 테스트는 2026-11-11 지움), `nameTextStyles` · `rampToSpecs`(예약) · 행 라벨 예약 바뀐 기대값, 이름 다시 짓기(figma 목: 연쇄 · 맞바꿈 · 임시 이름 · 역할 변수 · 사용자 컬렉션 · 직접 만든 변수 제외 · 겹침 건너뜀 · 값 바뀜 · **값을 쓰지 않음** — `loadFontAsync`가 던지고 값 쓰기를 막는 목에서도 이름이 바뀜), 등록 경로 되돌림(스타일 이름 보류 · 행 오류 시 변수 이름 되돌림), verify-bind-flow(⋯ 메뉴 · 타이포 버튼 → 팝업 · 스위치 · 모두 켜기/끄기 · 바꾸기 · 표 비움 · 포커스 복귀, 타이포 목록 구분선 줄 — 크기 표시 검사는 2026-11-11 "표시 없음" 검사로 바뀜, ia-v4 B.14).
 - 동적 키 `textStyle.renameSkip.*`는 `verify:i18n`이 잡지 못하므로 손으로 확인한다.
 
 ## 7. 예 — 2026-11-09 사용자 파일(스크린샷)에 [이름 다시 짓기]를 적용
 
-이미 등록된 스타일이라 스캔은 앵커로 옛 이름을 그대로 둔다 — 새 이름은 [이름 다시 짓기]에서 나온다. 이 경로는 쓰인 곳이 0이라 동점은 다음 정렬 키로 정해진다(크기: 큰 크기, 굵기: 분류 기본값에 가까운 굵기).
+이미 등록된 스타일이라 스캔은 앵커로 옛 이름을 그대로 둔다 — 새 이름은 [이름 다시 짓기]에서 나온다. 이 경로는 쓰인 곳이 0이라 동점은 다음 정렬 키로 정해진다(크기: 큰 크기, 굵기: 분류 기본값에 가까운 굵기). (옛 표의 "표시" 칸 ⚠ · ○는 2026-11-11 없앴다 — §4.)
 
-| 지금 | 값(크기/줄 높이 · 굵기) | 새 이름 | 표시 |
-|---|---|---|---|
-| display/inter-semi-bold · -2 · -3 | 52/150 · 52/120 · 52/125 SemiBold | display/large · display/large-120 · display/large-125 | ○ |
-| h1 | 28/120 SemiBold | heading/large-120 | — (28은 KRDS 모바일 값) |
-| h3/inter-semi-bold · -2 | 24/150 · 24/120 SemiBold | heading/medium · heading/medium-120 | — |
-| h2 | 26.7/150 SemiBold | heading/medium-26_7 (24가 기준 24에 더 가까움) | ⚠ |
-| title/semi-bold | 20/120 SemiBold | heading/small-120 (20 · 18이 기준 19와 같은 거리 → 큰 크기 20이 꼬리 없음) | ○ |
-| body/inter-semi-bold · -2 | 18/125 · 18/120 SemiBold | heading/small-18-125 · heading/small-18-120 | ○ |
-| title/regular | 20/150 Regular | body/large (20이 꼬리 없음) | ○ |
-| body/inter-regular · -2 · -3 · -4 | 18/180 · 18/150 · 18/120 · 18/120 Regular | body/large-18-180 · body/large-18 · body/large-18-120 · body/large-18-120-2 (셋째 · 넷째가 값이 같으면 지금 이름 순 — §3.8-3) | ○ |
-| body/inter-medium · -2 · -3 | 18/120 · 18/120 · 18/125 Medium | body/large-18-w500-120 · body/large-18-w500-120-2 (값이 같으면 §3.8-3) · body/large-18-w500-125 | ○ |
-| caption/inter-regular | 16/125 Regular | body/medium-125 (Regular가 기본값 400에 가까움) | ○ |
-| caption/inter-medium · -2 | 16/125 · 16/120 Medium | body/medium-w500-125 · body/medium-w500-120 | ○ |
-| caption/inter-semi-bold · -2 | 16/120 · 16/125 SemiBold | heading/xsmall-120 · heading/xsmall-125 | ○ |
-| overline | 14/120 Regular | body/small-120 | ○ |
-| text-9 · -2 | 12/120 Regular (화면으로는 차이를 알 수 없음 — 자간 · 글꼴 중 하나) | body/xsmall-120 · body/xsmall-120-ls{자간}(자간이 다를 때) | ○ |
-| text-10 | 10/120 Regular | body/xsmall-10-120 (12가 기준 13에 더 가까움) | ○ |
+| 지금 | 값(크기/줄 높이 · 굵기) | 새 이름 |
+|---|---|---|
+| display/inter-semi-bold · -2 · -3 | 52/150 · 52/120 · 52/125 SemiBold | display/large · display/large-120 · display/large-125 |
+| h1 | 28/120 SemiBold | heading/large-120 |
+| h3/inter-semi-bold · -2 | 24/150 · 24/120 SemiBold | heading/medium · heading/medium-120 |
+| h2 | 26.7/150 SemiBold | heading/medium-26_7 (24가 기준 24에 더 가까움) |
+| title/semi-bold | 20/120 SemiBold | heading/small-120 (20 · 18이 기준 19와 같은 거리 → 큰 크기 20이 꼬리 없음) |
+| body/inter-semi-bold · -2 | 18/125 · 18/120 SemiBold | heading/small-18-125 · heading/small-18-120 |
+| title/regular | 20/150 Regular | body/large (20이 꼬리 없음) |
+| body/inter-regular · -2 · -3 · -4 | 18/180 · 18/150 · 18/120 · 18/120 Regular | body/large-18-180 · body/large-18 · body/large-18-120 · body/large-18-120-2 (셋째 · 넷째가 값이 같으면 지금 이름 순 — §3.8-3) |
+| body/inter-medium · -2 · -3 | 18/120 · 18/120 · 18/125 Medium | body/large-18-w500-120 · body/large-18-w500-120-2 (값이 같으면 §3.8-3) · body/large-18-w500-125 |
+| caption/inter-regular | 16/125 Regular | body/medium-125 (Regular가 기본값 400에 가까움) |
+| caption/inter-medium · -2 | 16/125 · 16/120 Medium | body/medium-w500-125 · body/medium-w500-120 |
+| caption/inter-semi-bold · -2 | 16/120 · 16/125 SemiBold | heading/xsmall-120 · heading/xsmall-125 |
+| overline | 14/120 Regular | body/small-120 |
+| text-9 · -2 | 12/120 Regular (화면으로는 차이를 알 수 없음 — 자간 · 글꼴 중 하나) | body/xsmall-120 · body/xsmall-120-ls{자간}(자간이 다를 때) |
+| text-10 | 10/120 Regular | body/xsmall-10-120 (12가 기준 13에 더 가까움) |
 
 ## 부록 A. PR 체크리스트 (IA v4 B.9 병합 뒤 — 지금 main)
 - [x] `krdsType.ts` + 단위 테스트
 - [x] `nameTextStyles` · `rampToSpecs` · `LABEL_RAMP_RE` · 기존 테스트 기대값
 - [x] 스캔 표본 `uiRole` · 군집 `uiCount`
-- [x] 규칙 밖 표시(타이포 목록 · 상태 줄 꼬리 · 만들기 Text Style 탭 요약 끝 · 팝업)
+- [x] 규칙 밖 표시(타이포 목록 · 상태 줄 꼬리 · 만들기 Text Style 탭 요약 끝 · 팝업) — 2026-11-11 UX 검수 C에서 없앰(아래)
 - [x] 행 라벨 이름의 예약 · `existing`을 reqId 없는 스캔에도 · `rampToSpecs(family, reserved)`
 - [x] 타이포 목록 줄 구분선 모양(`#tsList`) — 카드 안 카드 해소
 - [x] 타이포 목록 ×n 배지 없앰(§6 — 2026-11-11 사용자 결정 B) · 키 2개 · `.r-badge`
@@ -225,3 +232,8 @@
 - [x] ia-v4 반영(§2.6 [보기] 도착 · §4.3 · §4.6 ⋯ 메뉴 · §6 유료 · §7 작업 직후 · 부록 B.10)
 - [x] i18n(§6 표) · verify:i18n 0 · verify-bind-flow · 4검사 · 스크린샷
 - [ ] 실기 확인(사용자, 피그마): 옛 이름 스타일(`display` · `body` · `h1` …)과 역할 변수(`font-size/body` 등)가 있는 파일에서 새 폴더 이름(`body/medium` · `font-size/body/medium`)이 함께 생기고 바뀌는지 — 피그마가 같은 이름의 폴더와 스타일(`body` 스타일 · `body/` 폴더)을 함께 두는지 · 이름 다시 짓기 · ⌘Z 한 번
+- [x] **UX 검수 C — KRDS 크기 표시 없앰**(2026-11-11 사용자 결정 · §4 · ia-v4 B.14): `ui.ts` `offMarkEl` · `putOffMark` · `offTail` · `tsStatusBase` · `tsRefreshTail` · `offScale` import · 네 곳의 표시(타이포 목록 · 상태 줄 꼬리 · 팝업 · Text Style 탭), `setTsStatus` 종류 인자
+- [x] `ui.html` `.r-top.has-off` · `.r-top.no-check.has-off` · `.ts-off*` 지움, i18n `textStyle.offDecimal` · `offScale` · `offTip` · `offSum` 지움
+- [x] `krdsType.ts` `offScale` · `KRDS_SIZES` 지움, `messages.ts` `TsRenameRow`에서 `fontSize` · `offScale` · `nearest` 지움, `variables.ts` `planTsRename` 정리
+- [x] 테스트: pure `offScale` 테스트 · import 지움, figma `planTsRename` 기대값, verify 17(Text Style 탭 기호 없음) · 19(타이포 목록 · 팝업 · 상태 줄 표시 없음, `TS_RENAME_PLAN` 줄 필드)
+- [x] 바뀌지 않음 확인: 이름 규칙 · 꼬리 · `_` 표기 테스트 그대로 통과, 연결 화면 소수 글자 크기 건너뜀 칩(`fraction`) 그대로

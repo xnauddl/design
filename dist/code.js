@@ -40,7 +40,7 @@
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
     "color.summary": "\uC0C9 {count}\uAC1C \xB7 Semantic \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
-    "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
+    "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC774\uB098 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC544 \uC8FC\uC138\uC694",
     "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 Semantic {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
     "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC5B4\uC694",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
@@ -57,17 +57,17 @@
     // 리네임
     "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
     // 컴포넌트 / 베리언트
-    "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
+    "component.scanning": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4\uB97C \uCC3E\uB294 \uC911\u2026",
     "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
-    "component.classifying": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026",
-    "component.generating": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131 \uC911\u2026",
+    "component.classifying": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uB294 \uC911\u2026",
+    "component.generating": "\uBE60\uC9C4 \uBCC0\uD615\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
     "component.noEligible": "\uC120\uD0DD \uC544\uB798\uC5D0 \uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
-    "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
-    "component.noChecked": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBB36\uC744 \uD56D\uBAA9\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
+    "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694",
+    "component.noChecked": "\uB4F1\uB85D\uD560 \uD6C4\uBCF4\uB97C \uCCB4\uD06C\uD574 \uC8FC\uC138\uC694",
     "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uCCB4\uD06C",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {total} (\uC138\uD2B8 {sets} \xB7 \uB2E8\uC77C {singles}){extraPart}",
-    "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extraPart}",
-    "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {total} (\uBCC0\uD615 \uC138\uD2B8 {sets} \xB7 \uCEF4\uD3EC\uB10C\uD2B8 {singles}){extraPart}",
+    "component.variants": "\uBCC0\uD615 \uC138\uD2B8 {sets}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694{extraPart}",
+    "component.generated": "\uBE60\uC9C4 \uBCC0\uD615 {generated}\uAC1C\uB97C \uCC44\uC6E0\uC5B4\uC694(\uBCC0\uD615 \uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
     "common.beta": "\uBCA0\uD0C0",
@@ -91,8 +91,8 @@
     // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 닮은 프레임 컴포넌트화
-    "similar.scanBtn": "\uB2EE\uC740 \uC2A4\uCE94",
-    "similar.componentizeBtn": "\uBB36\uAE30",
+    "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
+    "similar.componentizeBtn": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -578,6 +578,8 @@
     "palette.neutral": "\uC911\uB9BD",
     "palette.status": "\uC0C1\uD0DC",
     "palette.gen": "\uD314\uB808\uD2B8 \uC0DD\uC131",
+    "palette.run": "\uD314\uB808\uD2B8 \uB9CC\uB4E4\uAE30",
+    "palette.harmonyTip": "\uBCF4\uC870\uC0C9\uC744 \uCF1C\uBA74 \uACE0\uB97C \uC218 \uC788\uC5B4\uC694",
     // 하모니 선택지 — 보조색을 브랜드색에서 몇 도 돌려 뽑을지.
     "harmony.complementary": "\uBCF4\uC0C9",
     "harmony.analogous": "\uC720\uC0AC",
@@ -587,7 +589,7 @@
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C Semantic\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hint": "\uC0C9\uC744 \uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4 Semantic\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC4F0\uC784 \uC774\uB984\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
@@ -668,23 +670,23 @@
     // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
     "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
-    "component.hint": "\uC704\uB294 \uD6C4\uBCF4 \uB4F1\uB85D, \uC544\uB798\uB294 \uB2EE\uC740 \uD504\uB808\uC784 \uBB36\uAE30. \uB2EE\uC740 \uC2A4\uCE94\uC740 \uBB34\uB8CC",
-    "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
+    "component.hint": "\uD6C4\uBCF4\uB97C \uCC3E\uC544 \uB4F1\uB85D\uD558\uAC70\uB098, \uB2EE\uC740 \uD504\uB808\uC784\uC744 \uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCCD0\uC694 \xB7 \uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\uB294 \uBB34\uB8CC",
+    "component.scanBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30",
     "component.registerBtn": "\uB4F1\uB85D",
-    "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
-    "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
+    "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
+    "component.genMissingBtn": "\uBE60\uC9C4 \uBCC0\uD615 \uCC44\uC6B0\uAE30",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
     "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
-    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC5B4\uC694.",
-    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6CC\uC694.",
-    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC5B4\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
-    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
-    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
-    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC368\uC694. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
+    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
+    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
+    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
+    "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
+    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
     "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB3FC\uC694",
@@ -729,24 +731,18 @@
     // 레이어 › 이름
     // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
     "component.extraSkipped": " \xB7 \uAC74\uB108\uB700 {n}",
-    "component.extraSingles": " \xB7 \uB2E8\uC77C {n}",
+    "component.extraSingles": " \xB7 \uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "component.extraProps": " \xB7 \uC18D\uC131 {n}",
     "component.extraIcons": " \xB7 \uC544\uC774\uCF58 {n}",
-    "component.extraMissing": " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C",
-    "component.tagAdded": "\uC0DD\uC131",
-    "component.variantFallback": "\uBCA0\uB9AC\uC5B8\uD2B8",
-    "component.badgeSet": "\uC138\uD2B8",
-    "component.changeProps": "{name} \xB7 \uC18D\uC131",
-    "component.badgeProps": "\uC18D\uC131",
+    "component.extraMissing": " \xB7 \uBE48 \uBCC0\uD615 \uC788\uC74C",
+    "component.variantFallback": "\uBCC0\uD615",
+    "component.badgeSet": "\uBCC0\uD615 \uC138\uD2B8",
+    "component.badgeProps": "\uC18D\uC131 \uCEF4\uD3EC\uB10C\uD2B8",
     "component.nameFallback": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "component.badgeSingle": "\uB2E8\uB3C5",
+    "component.badgeSingle": "\uCEF4\uD3EC\uB10C\uD2B8",
     "component.badgeReuse": "\uC7AC\uC0AC\uC6A9",
-    "component.count": "\uD6C4\uBCF4 {total}",
-    "component.tagMissing": "\uBE48 \uC870\uD569",
-    "component.headMissing": "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):",
-    "component.tagIssue": "\uBB38\uC81C",
-    "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C {n}\uAC74:",
-    "component.tagCount": "{tag} {n}\uAC1C",
+    "component.headMissing": "\uBE48 \uBCC0\uD615",
+    "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C",
     // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
     "component.fail.copyPlaced": "\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694({label} \u2192 {name}){causePart}",
     "component.fail.nothingPlaced": "\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694({label} \u2192 {name}){causePart}",
@@ -780,10 +776,10 @@
     "component.fail.photo": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}): {error}",
     // 레이어 › 컴포넌트 — 닮은 프레임 묶기
     "similar.scanning": "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026",
-    "similar.componentizing": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026",
-    "similar.failed": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
+    "similar.componentizing": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uB294 \uC911\u2026",
+    "similar.failed": "\uD569\uCE58\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
     "similar.failedWarn": " \u2014 {warning}",
-    "similar.resMaster": "\uB9C8\uC2A4\uD130 {name}",
+    "similar.resMaster": "\uC6D0\uBCF8 {name}",
     "similar.resInstances": "\uC778\uC2A4\uD134\uC2A4 {n}\uAC1C",
     "similar.resProps": "\uC18D\uC131 {n}\uAC1C",
     "similar.resImages": "\uC774\uBBF8\uC9C0 {n}\uAC1C",
@@ -791,10 +787,9 @@
     "similar.metaText": "\uD14D\uC2A4\uD2B8 {filled}/{total}",
     "similar.metaImages": "\uC774\uBBF8\uC9C0 {n}",
     "similar.metaEmpty": "\uBE48 \uCE78 {n}",
-    "similar.recommended": "\uCD94\uCC9C",
-    "similar.count": "\uB2EE\uC740 {n}\uAC1C",
-    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.",
-    "similar.none": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
+    "similar.recommended": "\uC6D0\uBCF8 \uCD94\uCC9C",
+    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uC788\uC5B4\uC57C \uD574\uC694",
+    "similar.none": "\uD569\uCE60 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
     "similar.openText": "\uD14D\uC2A4\uD2B8 {n}",
     "similar.openSwap": "\uC544\uC774\uCF58 \uAD50\uCCB4 {n}",
     "similar.openImage": "\uC774\uBBF8\uC9C0 {n}",
@@ -802,8 +797,8 @@
     "similar.noVarying": "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
     "similar.excluded": " \xB7 \uC81C\uC678 {n}\uAC1C({why})",
     "similar.scanned": "\uB300\uC0C1 {n}\uAC1C \xB7 {openPart}{skipPart}",
-    "similar.noMaster": "\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \uC2A4\uCE94\uD558\uC138\uC694.",
+    "similar.noMaster": "\uC6D0\uBCF8 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "similar.overrideFail": "{name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
     "similar.placeFail": "{name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
     "similar.why.needTwo": "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694",
@@ -815,7 +810,6 @@
     "create.hintReveal": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uB9CC\uB4E4 \uD1A0\uD070\uC774 \uBCF4\uC5EC\uC694",
     "create.onlyColors": "\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694(\uC0C9\uB9CC \uBF51\uC558\uC5B4\uC694)",
     "create.count": "\uD6C4\uBCF4 {sel}/{total}",
-    "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
     // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
     "create.sumRoles": " \xB7 Semantic {n}\uAC1C",
@@ -906,10 +900,6 @@
     "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
     "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
     "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
-    "textStyle.offDecimal": "\uC18C\uC218 \uD06C\uAE30",
-    "textStyle.offScale": "KRDS \uBC16",
-    "textStyle.offTip": "KRDS \uD06C\uAE30\uAC00 \uC544\uB2C8\uC5D0\uC694 \xB7 \uAC00\uAE4C\uC6B4 KRDS \uD06C\uAE30 {n}px",
-    "textStyle.offSum": " \xB7 KRDS \uBC16 \uD06C\uAE30 {k}\uAC1C(\uC18C\uC218 {m})",
     "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
@@ -2635,7 +2625,6 @@
   }
 
   // src/lib/krdsType.ts
-  var KRDS_SIZES = [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60];
   var KRDS_STEPS = {
     display: [
       { step: "large", ref: 60, min: 52 },
@@ -2702,17 +2691,6 @@
     const d = round1(size);
     const steps = KRDS_STEPS[category];
     return (_a = steps.find((s) => d >= s.min)) != null ? _a : steps[steps.length - 1];
-  }
-  function offScale(size) {
-    const d = round1(size);
-    let nearest = KRDS_SIZES[0];
-    for (const k of KRDS_SIZES) {
-      const dk = Math.abs(k - d);
-      const dn = Math.abs(nearest - d);
-      if (dk < dn || dk === dn && k > nearest) nearest = k;
-    }
-    const kind = !Number.isInteger(d) ? "decimal" : KRDS_SIZES.includes(d) ? null : "off";
-    return { kind, nearest };
   }
   var cmpStr2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -5436,9 +5414,7 @@
     styles.forEach((s, i) => {
       const to = names[i];
       if (!to || to === s.name) return;
-      const e = existingOf(s);
-      const off = offScale(e.fontSize);
-      rows.push({ id: s.id, from: s.name, to, sig: tsSig(e), fontSize: e.fontSize, offScale: off.kind, nearest: off.nearest });
+      rows.push({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)) });
     });
     return rows;
   }
