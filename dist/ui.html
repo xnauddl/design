@@ -222,12 +222,6 @@
     .sel-card.warn { background: var(--danger-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--danger); }
     .sel-card .acts { display: flex; gap: 6px; flex: 0 0 auto; }
-    .sel-list { margin: -4px 0 8px; border: 1px solid var(--border); border-radius: var(--r); padding: 4px 0; }
-    .sel-list .sl-path { padding: 4px 10px; font-size: 10.5px; color: var(--text-2); }
-    .sel-list .sl-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px 4px 18px; min-height: 28px; cursor: pointer; }
-    .sel-list .sl-row:hover, .sel-list .sl-row:focus { background: var(--surface-hover); outline: none; }
-    .sel-list .sl-row .nm { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .sel-list .sl-row .num { color: var(--text-2); }
     .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: 6px; min-height: 48px; border-top: 1px solid var(--border); background: var(--bg, #fff); color: var(--text-2); margin-top: 8px; }
     .sub-head { display: flex; align-items: center; gap: 8px; min-height: 40px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
     .sub-head[hidden] { display: none; }
@@ -725,7 +719,18 @@
     .icon-btn.spinning svg { animation: mini-spin 1s linear infinite; }
     @media (prefers-reduced-motion: reduce) { .icon-btn.spinning svg { animation: none; } }
     /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
-    .list-head { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; }
+    .list-head { margin: 0 0 6px; }
+    .list-head .lh-row { display: flex; align-items: center; gap: 4px; }
+    /* 쓰는 변수 필터 줄 — 옅은 배경 띠 + 아래 구분선(카드 모양 아님, CLAUDE.md) */
+    .uses-bar { display: flex; align-items: center; gap: 6px; height: 28px; margin-top: 6px; padding: 0 4px 0 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; min-width: 0; }
+    .uses-bar[hidden] { display: none; }
+    .uses-bar .ub-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .uses-bar .ub-diff { color: var(--warn); white-space: nowrap; flex: 0 0 auto; }
+    .uses-bar .ub-rebase { flex: 0 0 auto; white-space: nowrap; }
+    .uses-bar .grow { flex: 1 1 auto; }
+    /* 필터 중 줄: 이름 · 값 140 · "{n}곳" */
+    .vt-row.vt-row.uses { grid-template-columns: minmax(0, 1fr) 140px 38px; }
+    .vt-row .vr-n { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
     .chip-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; min-width: 0; }
     .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
     .chip-row::-webkit-scrollbar { display: none; }
@@ -922,10 +927,20 @@
    <div id="varList" style="display:none">
     <!-- IA v4 §4.6 머리 줄(고정): [🔍 변수 검색] · [모드 ▾] · [＋] · [⋯] -->
     <div class="list-head" id="listHead">
+     <div class="lh-row">
       <span class="search-box" id="searchBox"><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" data-i18n-aria-label="vm.search" aria-label="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기" hidden>✕</button></span>
       <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
       <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
+     </div>
+     <!-- 쓰는 변수 필터 줄(IA v4 §4.6) — 선택 탭 카드 2 [보기 →]로 켬, 필터 중에만 보임 -->
+     <div class="uses-bar" id="usesFilterBar" hidden>
+      <span class="ub-name" id="usesFilterName"></span>
+      <span class="ub-diff" id="usesFilterDiff" hidden></span>
+      <button class="link link-btn ub-rebase" id="usesFilterRebase" type="button" hidden></button>
+      <span class="grow"></span>
+      <button class="icon-btn" id="usesFilterX" type="button">✕</button>
+     </div>
     </div>
     <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
     <div class="vl-split">
@@ -1706,8 +1721,13 @@
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
     "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
-    "v4.expand": "\uBCF4\uAE30 \u25BE",
-    "v4.collapse": "\uC811\uAE30 \u25B4",
+    "v4.viewArrow": "\uBCF4\uAE30 \u2192",
+    "v4.usesFilter": "\uC4F0\uB294 \uBCC0\uC218 \xB7 {name}",
+    "v4.usesFilterClear": "\uD544\uD130 \uC9C0\uC6B0\uAE30",
+    "v4.usesSideAria": "{name}, {badge}, \uC4F0\uB294 \uBCC0\uC218 {num}\uAC1C",
+    "v4.libBadgeTip": "\uB2E4\uB978 \uD30C\uC77C\uC758 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218",
+    "v4.usesViewOff": "\uC4F0\uB294 \uBCC0\uC218 \uD544\uD130\uC5D0\uC11C\uB294 \uC904\uB85C\uB9CC \uBCF4\uC5EC\uC694",
+    "v4.usesNone": "\uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
     "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
     "v4.places": "{n}\uACF3",
@@ -7910,6 +7930,7 @@ ${opts.tip}` : text;
   var screenKey = () => activeTab === "select" ? `select:${selSub}` : activeTab;
   function showTab(name) {
     var _a3;
+    if (usesFilter && name === "select") usesFilter = false;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
     if (changed && activeTab === "select" && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
@@ -8419,6 +8440,7 @@ ${opts.tip}` : text;
   var localVarCount = () => vmVars.length;
   function varScreen() {
     if (!vmTableKnown) return "loading";
+    if (usesFilter) return "list";
     if (localVarCount() === 0) return "empty";
     return "list";
   }
@@ -8486,6 +8508,7 @@ ${opts.tip}` : text;
       else renderMakeScreen();
     }
     if (!b) {
+      usesFilter = false;
       usageMap = null;
       libVars = [];
       deletedUse = { count: 0, nodeIds: [] };
@@ -8502,6 +8525,7 @@ ${opts.tip}` : text;
       return;
     }
     usageMap = null;
+    if (vmOpen && usesFilter) renderVarScreen();
     renderSelHome();
     if (!usageVisible() || isMini) return;
     vmUsageTimer = setTimeout(() => {
@@ -8595,8 +8619,106 @@ ${opts.tip}` : text;
     return sideSel;
   }
   var focusSideKey = null;
+  var usesFilter = false;
+  var usesSel = null;
+  var usesCollapsed = /* @__PURE__ */ new Set();
+  var usesPlaces = (id) => {
+    var _a3, _b;
+    return (_b = (_a3 = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a3.places) != null ? _b : 0;
+  };
+  var usedLocal = () => usageMap ? vmVars.filter((v) => usesPlaces(v.id) > 0) : [];
+  var usedLib = () => usageMap ? libVars.filter((l) => usesPlaces(l.id) > 0) : [];
+  var listVars = () => usesFilter ? usedLocal() : vmVars;
+  var collapsedSet = () => usesFilter ? usesCollapsed : grpCollapsed;
+  function usesSides() {
+    const sides = sidebarCollections(vmCols, usedLocal(), null, /* @__PURE__ */ new Set()).filter((x) => x.total > 0);
+    return { sides, lib: usedLib().length };
+  }
+  function usesCurrentSel() {
+    const { sides, lib } = usesSides();
+    const cur = usesSel;
+    const ok = cur && (cur.kind === "col" && sides.some((x) => x.collection.id === cur.id) || cur.kind === "lib" && lib > 0);
+    if (!ok) usesSel = sides[0] ? { kind: "col", id: sides[0].collection.id } : lib > 0 ? { kind: "lib" } : null;
+    return usesSel != null ? usesSel : { kind: "lib" };
+  }
+  var listSel = () => usesFilter ? usesCurrentSel() : currentSel();
+  function libGroups() {
+    const by = /* @__PURE__ */ new Map();
+    for (const l of usedLib()) {
+      const cut = l.name.lastIndexOf("/");
+      const path = cut < 0 ? "" : l.name.slice(0, cut);
+      const key = `lib|${l.collection}|${path}`;
+      let g = by.get(key);
+      if (!g) {
+        g = { key, label: path ? `${l.collection} \u203A ${path}` : l.collection, col: l.collection, path, rows: [] };
+        by.set(key, g);
+      }
+      g.rows.push(l);
+    }
+    return [...by.values()].sort((a, b) => a.col.localeCompare(b.col) || a.path.localeCompare(b.path));
+  }
+  function openUsesFilter() {
+    if (!baseline) return;
+    usesFilter = true;
+    usesSel = null;
+    usesCollapsed.clear();
+    query = "";
+    $("varSearch").value = "";
+    focusKey = null;
+    showTab("variables");
+    renderVarScreen();
+    requestAnimationFrame(() => window.scrollTo(0, 0));
+    usesFocusFirst();
+  }
+  function usesFocusFirst() {
+    var _a3, _b, _c;
+    const items = gridItems();
+    const el = (_b = (_a3 = items[0]) != null ? _a3 : $("varTree").querySelector("button")) != null ? _b : $("usesFilterX");
+    if (items[0]) {
+      items.forEach((x) => x.tabIndex = -1);
+      items[0].tabIndex = 0;
+      focusKey = (_c = items[0].dataset.key) != null ? _c : null;
+    }
+    el.focus({ preventScroll: true });
+  }
+  function closeUsesFilter() {
+    usesFilter = false;
+    usesSel = null;
+    focusKey = null;
+    if (varScreen() === "list") focusSideKey = `side:${sideSelKey(currentSel())}`;
+    renderVarScreen();
+    if (varScreen() === "empty") $("btnVarEmptyMake").focus();
+  }
+  $("usesFilterX").addEventListener("click", closeUsesFilter);
+  $("usesFilterRebase").addEventListener("click", () => {
+    rebaseToCurrent();
+    if (usesFilter) $("usesFilterX").focus();
+  });
+  function renderUsesBar() {
+    const bar = $("usesFilterBar");
+    bar.hidden = !usesFilter;
+    if (!usesFilter) return;
+    const nm = $("usesFilterName");
+    nm.textContent = t("v4.usesFilter", { name: baseLabel() });
+    nm.title = nm.textContent;
+    const diff = baseDiffers();
+    $("usesFilterDiff").hidden = !diff;
+    $("usesFilterDiff").textContent = `\xB7 ${t("v4.baseDiff")}`;
+    $("usesFilterRebase").hidden = !diff;
+    $("usesFilterRebase").textContent = t("list.rebase");
+    const x = $("usesFilterX");
+    x.setAttribute("aria-label", t("v4.usesFilterClear"));
+    x.title = t("v4.usesFilterClear");
+  }
   function pickSide(sel, focus = true) {
     if (query) clearSearch(false);
+    if (usesFilter) {
+      usesSel = sel;
+      focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
+      focusKey = null;
+      renderVarList();
+      return;
+    }
     sideSel = sel;
     focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
     focusKey = null;
@@ -8608,7 +8730,8 @@ ${opts.tip}` : text;
     nav.setAttribute("role", "listbox");
     const hadFocus = nav.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.key) != null ? _a3 : null : null;
     clearMount(nav);
-    const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
+    const uf = usesFilter ? usesSides() : null;
+    const sides = uf ? uf.sides : sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
     const selKey = query.trim() ? "" : sideSelKey(sel);
     for (const side of sides) {
       const c = side.collection;
@@ -8620,7 +8743,7 @@ ${opts.tip}` : text;
       d.setAttribute("aria-selected", String(selKey === key));
       const badge = tierBadge(c);
       const why = tierWhyText(c);
-      d.setAttribute("aria-label", t("list.sideColAria", { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ""));
+      d.setAttribute("aria-label", (uf ? t("v4.usesSideAria", { name: c.name, badge, num: String(side.total) }) : t("list.sideColAria", { name: c.name, badge, num: String(side.total) })) + (why ? `, ${why}` : ""));
       d.tabIndex = -1;
       const b = document.createElement("span");
       b.className = "vs-badge";
@@ -8636,6 +8759,31 @@ ${opts.tip}` : text;
       n.textContent = String(side.total);
       d.append(b, nm, n);
       const pick = () => pickSide({ kind: "col", id: c.id });
+      d.addEventListener("click", pick);
+      d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
+      nav.appendChild(d);
+    }
+    if (uf && uf.lib > 0) {
+      const d = document.createElement("div");
+      d.className = "vs-item lv1";
+      d.dataset.key = "side:lib";
+      d.setAttribute("role", "option");
+      d.setAttribute("aria-selected", String(selKey === "lib"));
+      d.setAttribute("aria-label", t("v4.usesSideAria", { name: t("v4.libName"), badge: "L", num: String(uf.lib) }));
+      d.tabIndex = -1;
+      const b = document.createElement("span");
+      b.className = "vs-badge";
+      b.setAttribute("aria-hidden", "true");
+      b.textContent = "L";
+      b.title = t("v4.libBadgeTip");
+      const nm = document.createElement("span");
+      nm.className = "vs-name";
+      nm.textContent = t("v4.libName");
+      const n = document.createElement("span");
+      n.className = "vs-num";
+      n.textContent = String(uf.lib);
+      d.append(b, nm, n);
+      const pick = () => pickSide({ kind: "lib" });
       d.addEventListener("click", pick);
       d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
       nav.appendChild(d);
@@ -8765,7 +8913,8 @@ ${opts.tip}` : text;
   }
   function renderVarList() {
     if (!vmOpen || varScreen() !== "list") return;
-    const sel = currentSel();
+    renderUsesBar();
+    const sel = listSel();
     renderSidebar(sel);
     const tree = $("varTree");
     const prevScroll = window.scrollY;
@@ -8775,25 +8924,52 @@ ${opts.tip}` : text;
     $("varSide").classList.toggle("dim", searching);
     $("btnSearchClear").hidden = !query;
     const colId = sel.kind === "col" ? sel.id : null;
-    const groups = paletteGroups(vmCols, vmVars, colId, query);
+    const uf = usesFilter;
+    const groups = uf && !usageMap ? [] : paletteGroups(vmCols, listVars(), colId, query);
     lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
     const lines = [];
+    const set = collapsedSet();
+    if (uf && usageMap && sel.kind === "lib" && !searching) {
+      for (const g of libGroups()) {
+        const open = !set.has(g.key);
+        lines.push(groupHeadEl({ key: g.key, label: g.label, collectionId: "", head: true, kind: "other", rows: [] }, open));
+        if (open) for (const l of g.rows) lines.push(libRowEl(l));
+      }
+    }
     for (const g of groups) {
       const col = vmCols.find((c) => c.id === g.collectionId);
-      const open = !grpCollapsed.has(g.key);
+      const open = !set.has(g.key);
       if (g.head) lines.push(groupHeadEl(g, open));
       if (!open) continue;
-      if ((col == null ? void 0 : col.tier) === 1) {
+      if (uf) for (const v of g.rows) lines.push(varRowEl(v, usesPlaces(v.id)));
+      else if ((col == null ? void 0 : col.tier) === 1) {
         const colors = g.rows.filter((v) => v.type === "COLOR");
         const others = g.rows.filter((v) => v.type !== "COLOR");
         if (others.length) lines.push(paletteLineEl(others, "pill"));
         if (colors.length) lines.push(paletteLineEl(colors, colorView === "grid" ? "dot" : "swatch"));
       } else for (const v of g.rows) lines.push(varRowEl(v));
     }
-    if (!groups.length) {
+    if (!lines.length) {
       const d = document.createElement("div");
       d.className = "vt-empty";
-      if (searching) {
+      const btn = (label, run) => {
+        const b = document.createElement("button");
+        b.className = "link link-btn";
+        b.type = "button";
+        b.textContent = label;
+        b.addEventListener("click", run);
+        return b;
+      };
+      if (uf && !usageMap) {
+        if (baseline && baseline.scanned > BIG_SELECTION && !vmUsageInFlight) d.append(t("list.big"), " \xB7 ", btn(t("list.read"), () => {
+          requestManagerUsage("user");
+          renderVarList();
+          $("usesFilterX").focus();
+        }));
+        else d.textContent = t("v4.reading");
+      } else if (uf && !searching && !usedLocal().length && !usedLib().length) {
+        d.append(t("v4.usesNone"), " \xB7 ", btn(t("v4.usesFilterClear"), closeUsesFilter));
+      } else if (searching) {
         d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
         const b = document.createElement("button");
         b.className = "link link-btn";
@@ -8834,8 +9010,9 @@ ${opts.tip}` : text;
     d.append(tw, lb);
     const toggle = () => {
       var _a3, _b;
-      if (open) grpCollapsed.add(g.key);
-      else grpCollapsed.delete(g.key);
+      const set = collapsedSet();
+      if (open) set.add(g.key);
+      else set.delete(g.key);
       focusKey = (_a3 = d.dataset.key) != null ? _a3 : null;
       renderVarList();
       (_b = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _b.focus();
@@ -8884,9 +9061,9 @@ ${opts.tip}` : text;
     }
     return line;
   }
-  function varRowEl(v) {
+  function varRowEl(v, places) {
     const d = document.createElement("div");
-    d.className = "vt-row";
+    d.className = places != null ? "vt-row uses" : "vt-row";
     d.dataset.key = `v:${v.id}`;
     d.dataset.id = v.id;
     d.setAttribute("role", "row");
@@ -8903,7 +9080,65 @@ ${opts.tip}` : text;
     d.title = `${v.name} / ${cellTipText(cell)}`;
     d.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
     d.append(nm, val);
+    if (places != null) d.appendChild(placesEl(places));
     wireItem(d, v);
+    return d;
+  }
+  function placesEl(n) {
+    const c = document.createElement("span");
+    c.className = "vr-n";
+    c.textContent = t("v4.places", { n });
+    return c;
+  }
+  function libRowEl(l) {
+    var _a3;
+    const d = document.createElement("div");
+    d.className = "vt-row uses";
+    d.dataset.key = `v:${l.id}`;
+    d.setAttribute("role", "row");
+    const nm = document.createElement("span");
+    nm.className = "nm";
+    nm.textContent = leafName(l.name);
+    const val = document.createElement("span");
+    val.className = "vr-val";
+    const pill = document.createElement("span");
+    pill.className = `vr-pill${((_a3 = l.value) == null ? void 0 : _a3.kind) === "alias" ? " alias" : ""}`;
+    pill.innerHTML = `${l.type === "COLOR" ? swatchHtml(resolveSwatch(l.value)) : ""}${escapeHtml(cellText(l.value))}`;
+    val.appendChild(pill);
+    d.title = `${l.name} / ${cellTipText(l.value)}`;
+    d.setAttribute("aria-label", `${l.name}, ${cellTipText(l.value)}`);
+    d.append(nm, val, placesEl(usesPlaces(l.id)));
+    const open = () => openDetail({ lib: l }, d);
+    d.addEventListener("click", (e) => {
+      var _a4;
+      focusKey = (_a4 = d.dataset.key) != null ? _a4 : null;
+      gridItems().forEach((x) => x.tabIndex = -1);
+      d.tabIndex = 0;
+      if (e.detail > 1) return;
+      open();
+    });
+    d.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      openMenu(e.clientX, e.clientY, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], d);
+    });
+    d.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter" || ev.key === " ") {
+        ev.preventDefault();
+        open();
+        return;
+      }
+      if (ev.key === "ContextMenu" || ev.key === "F10" && ev.shiftKey) {
+        ev.preventDefault();
+        const r = d.getBoundingClientRect();
+        openMenu(r.left + 16, r.bottom, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], d);
+        return;
+      }
+      gridKey(ev, d);
+    });
+    d.addEventListener("focus", () => {
+      if (d.matches(":focus-visible")) showItemTip(d);
+    });
+    d.addEventListener("blur", hideItemTip);
     return d;
   }
   function wireItem(el, v) {
@@ -9077,21 +9312,14 @@ ${opts.tip}` : text;
   var detailReq = 0;
   var detailBox = null;
   var detailUsesEl = null;
-  var detailReturn = null;
-  var detailFromVars = true;
   function focusAfterDetail(id) {
-    var _a3, _b, _c;
-    const ret = detailReturn;
-    if (ret && !detailFromVars) {
-      if (document.body.contains(ret) && ret.offsetParent) return { el: ret, present: true };
-      return { el: (_a3 = $("selCards").querySelector("button")) != null ? _a3 : $("btnGoMake"), present: false };
-    }
+    var _a3, _b;
     const items = gridItems();
     const hit = items.find((x) => x.dataset.key === `v:${id}`);
-    const el = (_b = hit != null ? hit : items[0]) != null ? _b : $("varSearch");
+    const el = (_a3 = hit != null ? hit : items[0]) != null ? _a3 : $("varSearch");
     items.forEach((x) => x.tabIndex = -1);
     el.tabIndex = 0;
-    focusKey = (_c = el.dataset.key) != null ? _c : null;
+    focusKey = (_b = el.dataset.key) != null ? _b : null;
     return { el, present: !!hit };
   }
   var detailVarId = null;
@@ -9123,8 +9351,6 @@ ${opts.tip}` : text;
     return { box: usesBox, list: usesList, run };
   }
   function openDetail(ref, returnEl, focusName = false) {
-    detailReturn = returnEl;
-    detailFromVars = $("varTree").contains(returnEl);
     if (ref.local) {
       openEditor(ref.local, focusName);
       return;
@@ -10142,14 +10368,13 @@ ${opts.tip}` : text;
     requestCloseModal("button");
   }
   function varJump(id) {
-    var _a3, _b, _c;
     const v = vmVars.find((x) => x.id === id);
     if (!v) {
       showStatusLine(t("list.libVar"));
       return;
     }
-    const fromVars = activeTab === "variables";
-    const undo = fromVars ? { tab: "variables", sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey } : { tab: "select", usesOpen: selUsesOpen, scroll: window.scrollY, focusK: (_c = (_b = (_a3 = document.activeElement) == null ? void 0 : _a3.closest("[data-k]")) == null ? void 0 : _b.dataset.k) != null ? _c : null };
+    const undo = { sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey, uses: usesFilter ? { sel: usesSel, collapsed: new Set(usesCollapsed) } : null };
+    usesFilter = false;
     showTab("variables");
     query = "";
     $("varSearch").value = "";
@@ -10169,25 +10394,23 @@ ${opts.tip}` : text;
       action: {
         label: t("list.undo"),
         run: () => {
-          var _a4, _b2;
-          if (undo.tab === "variables") {
-            sideSel = undo.sel;
-            grpCollapsed.clear();
-            undo.collapsed.forEach((k) => grpCollapsed.add(k));
-            query = undo.query;
-            $("varSearch").value = query;
-            focusKey = undo.focusKey;
-            renderVarList();
-            window.scrollTo(0, undo.scroll);
-            (_a4 = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _a4.focus({ preventScroll: true });
-          } else {
-            showTab("select");
-            selUsesOpen = undo.usesOpen;
-            renderSelHome();
-            window.scrollTo(0, undo.scroll);
-            const back = undo.focusK ? $("selCards").querySelector(`[data-k="${CSS.escape(undo.focusK)}"]`) : null;
-            (_b2 = back != null ? back : $("selCards").querySelector("button")) == null ? void 0 : _b2.focus({ preventScroll: true });
+          var _a3;
+          if (activeTab !== "variables") showTab("variables");
+          sideSel = undo.sel;
+          grpCollapsed.clear();
+          undo.collapsed.forEach((k) => grpCollapsed.add(k));
+          if (undo.uses && baseline) {
+            usesFilter = true;
+            usesSel = undo.uses.sel;
+            usesCollapsed.clear();
+            undo.uses.collapsed.forEach((k) => usesCollapsed.add(k));
           }
+          query = undo.query;
+          $("varSearch").value = query;
+          focusKey = undo.focusKey;
+          renderVarScreen();
+          window.scrollTo(0, undo.scroll);
+          (_a3 = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _a3.focus({ preventScroll: true });
         }
       }
     });
@@ -10233,9 +10456,15 @@ ${opts.tip}` : text;
     if (activeTab !== "variables") showTab("variables");
     query = "";
     $("varSearch").value = "";
-    sideSel = { kind: "col", id: v.collectionId };
     const cut = v.name.lastIndexOf("/");
-    grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`);
+    const gk = `${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`;
+    if (usesFilter) {
+      usesSel = { kind: "col", id: v.collectionId };
+      usesCollapsed.delete(gk);
+    } else {
+      sideSel = { kind: "col", id: v.collectionId };
+      grpCollapsed.delete(gk);
+    }
     focusKey = `v:${v.id}`;
     renderVarList();
   }
@@ -10246,7 +10475,8 @@ ${opts.tip}` : text;
       showStatusLine(lock, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
       return;
     }
-    const sel = currentSel();
+    const fsel = usesFilter ? usesCurrentSel() : null;
+    const sel = (fsel == null ? void 0 : fsel.kind) === "col" ? fsel : currentSel();
     const col = sel.kind === "col" ? vmCols.find((c) => c.id === sel.id) : void 0;
     const first = (_b = paletteGroups(vmCols, vmVars, (_a3 = col == null ? void 0 : col.id) != null ? _a3 : null, "")[0]) == null ? void 0 : _b.rows[0];
     const type = (_c = first == null ? void 0 : first.type) != null ? _c : "FLOAT";
@@ -10299,6 +10529,7 @@ ${opts.tip}` : text;
     manualUsed = msg.manualUsed;
     const e = ed;
     if (!(e == null ? void 0 : e.create) || e.create.reqId !== msg.reqId) return;
+    usesFilter = false;
     afterTable = { focus: `v:${msg.id}` };
     e.create.opener = null;
     closeModal();
@@ -10318,6 +10549,7 @@ ${opts.tip}` : text;
   function onVariableDuplicated(msg) {
     manualUsed = msg.manualUsed;
     if (msg.reqId !== dupReq) return;
+    usesFilter = false;
     afterTable = { openDetail: msg.newId };
   }
   var delReq = 0;
@@ -10440,7 +10672,7 @@ ${opts.tip}` : text;
     openMenu(r.left, r.bottom + 2, [
       { label: t("list.readiness", { n: readinessDone(), total: 7 }) + "\u2026", onSelect: () => openReadiness(btn), focusElsewhere: true },
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
-      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
+      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t("v4.usesViewOff") : void 0, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
       { label: t("list.menuExpandAll"), onSelect: () => setAllGroups(true) },
       { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) }
     ], btn);
@@ -10457,10 +10689,12 @@ ${opts.tip}` : text;
     ], btn);
   }
   function setAllGroups(open) {
-    const sel = currentSel();
-    for (const g of paletteGroups(vmCols, vmVars, sel.kind === "col" ? sel.id : null, query)) {
-      if (open) grpCollapsed.delete(g.key);
-      else grpCollapsed.add(g.key);
+    const sel = listSel();
+    const set = collapsedSet();
+    const keys = sel.kind === "lib" && !query.trim() ? libGroups().map((g) => g.key) : paletteGroups(vmCols, listVars(), sel.kind === "col" ? sel.id : null, query).map((g) => g.key);
+    for (const k of keys) {
+      if (open) set.delete(k);
+      else set.add(k);
     }
     renderVarList();
   }
@@ -10568,7 +10802,6 @@ ${opts.tip}` : text;
   var selFindFor = null;
   var selFindInFlight = false;
   var selFindDeferred = false;
-  var selUsesOpen = false;
   var unbindReq = 0;
   var baseKey = () => baseline ? baseline.ids.join(",") : "";
   function baseLabel() {
@@ -10828,86 +11061,11 @@ ${opts.tip}` : text;
     if (lib.length) tierN.set(t("v4.libName"), lib.length);
     const order = ["Component", "Semantic", "Global", t("v4.noTierName"), t("v4.libName")];
     const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(" \xB7 ");
-    const tog = selLink(selUsesOpen ? t("v4.collapse") : t("v4.expand"), () => {
-      selUsesOpen = !selUsesOpen;
-      renderSelHome();
-    });
-    tog.dataset.k = "uses";
-    tog.setAttribute("aria-expanded", String(selUsesOpen));
-    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub], actions: [tog] });
+    const view = selLink(t("v4.viewArrow"), () => openUsesFilter());
+    view.dataset.k = "uses";
+    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub], actions: [view] });
     card.querySelector(".t").title = t("v4.usesTip");
     put(card);
-    if (!selUsesOpen) return;
-    const list = document.createElement("div");
-    list.className = "sel-list";
-    list.setAttribute("role", "grid");
-    list.setAttribute("aria-label", t("v4.usesN", { n }));
-    const tierRank = (tier) => tier === 3 ? 0 : tier === 2 ? 1 : tier === 1 ? 2 : 3;
-    const rows = [];
-    local.forEach((v) => {
-      var _a4, _b, _c;
-      const c = vmCols.find((x) => x.id === v.collectionId);
-      const cut = v.name.lastIndexOf("/");
-      rows.push({ path: `${tierBadge(c != null ? c : { tier: 0 })} ${(_a4 = c == null ? void 0 : c.name) != null ? _a4 : ""}${cut > 0 ? " \u203A " + v.name.slice(0, cut) : ""}`, name: cut >= 0 ? v.name.slice(cut + 1) : v.name, ref: { local: v }, cell: currentModeCell(v), places: (_c = (_b = usageMap.get(v.id)) == null ? void 0 : _b.places) != null ? _c : 0, rank: tierRank(c == null ? void 0 : c.tier), order: vmVars.indexOf(v) });
-    });
-    lib.forEach((l, i) => {
-      var _a4, _b;
-      const cut = l.name.lastIndexOf("/");
-      rows.push({ path: `${t("v4.libName")} \u203A ${l.collection}`, name: cut >= 0 ? l.name.slice(cut + 1) : l.name, ref: { lib: l }, cell: l.value, places: (_b = (_a4 = usageMap.get(l.id)) == null ? void 0 : _a4.places) != null ? _b : 0, rank: 4, order: i });
-    });
-    rows.sort((a, b) => a.rank - b.rank || a.path.localeCompare(b.path) || a.order - b.order);
-    let lastPath = "";
-    const focusables = [];
-    for (const r of rows) {
-      if (r.path !== lastPath) {
-        const ph = document.createElement("div");
-        ph.className = "sl-path";
-        ph.textContent = r.path;
-        list.appendChild(ph);
-        lastPath = r.path;
-      }
-      const row = document.createElement("div");
-      row.className = "sl-row";
-      row.setAttribute("role", "row");
-      row.tabIndex = -1;
-      row.dataset.k = `use:${r.ref.local ? r.ref.local.id : r.ref.lib.id}`;
-      const nm = document.createElement("span");
-      nm.className = "nm";
-      nm.textContent = r.name;
-      const num = document.createElement("span");
-      num.className = "num";
-      num.textContent = t("v4.places", { n: r.places });
-      row.append(nm, valueEl(r.cell), num);
-      const open = () => openDetail(r.ref, row);
-      row.addEventListener("click", open);
-      row.addEventListener("contextmenu", (e) => {
-        e.preventDefault();
-        openMenu(e.clientX, e.clientY, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], row);
-      });
-      row.addEventListener("keydown", (e) => {
-        const i = focusables.indexOf(row);
-        const go = (j) => {
-          const tg = focusables[Math.max(0, Math.min(focusables.length - 1, j))];
-          focusables.forEach((x) => x.tabIndex = -1);
-          tg.tabIndex = 0;
-          tg.focus();
-        };
-        if (e.key === "ArrowDown") go(i + 1);
-        else if (e.key === "ArrowUp") go(i - 1);
-        else if (e.key === "Home") go(0);
-        else if (e.key === "End") go(focusables.length - 1);
-        else if (e.key === "Enter") open();
-        else if (e.key === "ContextMenu" || e.key === "F10" && e.shiftKey) {
-          const rc = row.getBoundingClientRect();
-          openMenu(rc.left + 16, rc.bottom, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], row);
-        } else return;
-        e.preventDefault();
-      });
-      focusables.push(row);
-      list.appendChild(row);
-    }
-    if (focusables[0]) focusables[0].tabIndex = 0;
-    put(list);
   }
   function renderDeletedCard(put) {
     var _a3;
