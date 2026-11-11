@@ -229,6 +229,7 @@
     "op.createVar": "\uC0C8 \uBCC0\uC218",
     "op.dupVar": "\uBCF5\uC81C",
     "op.delVar": "\uC0AD\uC81C",
+    "op.tsRename": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uBC14\uAFB8\uAE30",
     "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
@@ -610,7 +611,7 @@
     // 스캔의 옵션이 아니라 스캔 뒤에 누르는 동작(결정 2026-08-06) — 라벨도 「~으로」가 아니라 「~ 채우기」로,
     // 지금 무슨 일이 일어나는지를 적는다.
     "textStyle.rowLabelBtn": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984 \uCC44\uC6B0\uAE30",
-    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 \uD06C\uAE30 \uC21C \uC774\uB984(display/h1\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
+    "textStyle.rowLabelTip": "\uAC19\uC740 \uAC00\uB85C \uC904\uC758 \uC67C\uCABD \uD14D\uC2A4\uD2B8\uB97C \uB77C\uBCA8(\uC774\uB984)\uC73C\uB85C, \uD070 \uD14D\uC2A4\uD2B8\uB97C \uD45C\uBCF8\uC73C\uB85C \uBD10\uC694. \uC9DD\uC744 \uBABB \uCC3E\uC740 \uD589\uC740 KRDS \uC774\uB984(heading/large\u2026) \uADF8\uB300\uB85C \uB46C\uC694.",
     "textStyle.registerBtn": "\uB4F1\uB85D",
     // 스타일 행의 이름 칸 — 파랑(등록됨) / 앰버(신규)로 갈리는 뜻을 툴팁이 말한다.
     "textStyle.namePlaceholder": "\uC2A4\uD0C0\uC77C \uC774\uB984",
@@ -860,7 +861,33 @@
     "textStyle.scanLsPct": " \xB7 \uC790\uAC04% {n}",
     "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
     "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
-    "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
+    "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 KRDS \uC774\uB984 {b}",
+    "textStyle.renameBtn": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30",
+    "textStyle.renameMenu": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30\u2026",
+    "textStyle.renameReading": "\uC2A4\uD0C0\uC77C\uC744 \uC77D\uB294 \uC911\u2026",
+    "textStyle.renameHead": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30 \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
+    "textStyle.renameNone": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
+    "textStyle.renameApply": "{k}\uAC1C \uC774\uB984 \uBC14\uAFB8\uAE30",
+    "textStyle.renameNeedOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "textStyle.renameClash": "\uAC19\uC740 \uC774\uB984\uC774 \uB0A8\uC544\uC694",
+    "textStyle.renameRowAria": "{from} \u2192 {to}",
+    "textStyle.renamed": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "textStyle.renameSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
+    "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
+    "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
+    "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
+    "textStyle.renameSkip.error": "\uC624\uB958",
+    "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
+    "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
+    "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
+    "textStyle.offDecimal": "\uC18C\uC218 \uD06C\uAE30",
+    "textStyle.offScale": "KRDS \uBC16",
+    "textStyle.offTip": "KRDS \uD06C\uAE30\uAC00 \uC544\uB2C8\uC5D0\uC694 \xB7 \uAC00\uAE4C\uC6B4 KRDS \uD06C\uAE30 {n}px",
+    "textStyle.offSum": " \xB7 KRDS \uBC16 \uD06C\uAE30 {k}\uAC1C(\uC18C\uC218 {m})",
+    "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
     "textStyle.missingN": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -1890,1831 +1917,6 @@
     return new Set([(_a = o.global) == null ? void 0 : _a.id, (_b = o.semantic) == null ? void 0 : _b.id].filter((x) => !!x));
   }
 
-  // src/lib/varKind.ts
-  var FIRST_FLOAT = {
-    spacing: "gap",
-    radius: "radius",
-    size: "size",
-    "stroke-width": "stroke",
-    opacity: "opacity",
-    "font-size": "text",
-    "line-height": "text",
-    "letter-spacing": "text"
-  };
-  var DIRS = ["top", "right", "bottom", "left"];
-  var CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
-  function lastFloatKind(seg) {
-    if (["gap", "row-gap", "column-gap", "spacing", "padding", "padding-x", "padding-y"].includes(seg)) return "gap";
-    if (DIRS.some((d) => seg === `padding-${d}`)) return "gap";
-    if (seg === "radius" || CORNERS.some((c) => seg === `radius-${c}`)) return "radius";
-    if (["size", "width", "height"].includes(seg)) return "size";
-    if (seg === "stroke-width" || DIRS.some((d) => seg === `stroke-width-${d}`)) return "stroke";
-    if (seg === "opacity") return "opacity";
-    if (["font-size", "line-height", "letter-spacing"].includes(seg)) return "text";
-    return null;
-  }
-  var SCOPE_KIND = {
-    GAP: "gap",
-    CORNER_RADIUS: "radius",
-    WIDTH_HEIGHT: "size",
-    STROKE_FLOAT: "stroke",
-    OPACITY: "opacity",
-    FONT_SIZE: "text",
-    LINE_HEIGHT: "text",
-    LETTER_SPACING: "text",
-    FONT_FAMILY: "text"
-  };
-  function varKind(v) {
-    var _a, _b, _c;
-    if (v.type === "COLOR") return "color";
-    if (v.type === "BOOLEAN") return "other";
-    const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
-    const first = (_a = segs[0]) != null ? _a : "";
-    const last = (_b = segs[segs.length - 1]) != null ? _b : "";
-    if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
-    if (v.type === "STRING" && first === "font-family") return "text";
-    if (v.type === "FLOAT") {
-      const k = lastFloatKind(last);
-      if (k) return k;
-    }
-    if (v.type === "STRING" && last === "font-family") return "text";
-    if (v.type === "FLOAT" || v.type === "STRING") {
-      const kinds = new Set(((_c = v.scopes) != null ? _c : []).map((s) => SCOPE_KIND[s]).filter(Boolean));
-      if (kinds.size === 1) return [...kinds][0];
-    }
-    return "other";
-  }
-  var FILL_SUB = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
-  function expand(scopes) {
-    const out = /* @__PURE__ */ new Set();
-    for (const s of scopes) {
-      if (s === "ALL_FILLS") FILL_SUB.forEach((x) => out.add(x));
-      else out.add(s);
-    }
-    return out;
-  }
-  var APPLY_TARGETS = {
-    color: ["fill", "stroke", "text", "shadow"],
-    gap: ["gap", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right"],
-    radius: ["radius", "radius-tl", "radius-tr", "radius-bl", "radius-br"]
-  };
-  var TARGET_SCOPES = {
-    fill: ["FRAME_FILL", "SHAPE_FILL"],
-    text: ["TEXT_FILL"],
-    stroke: ["STROKE_COLOR"],
-    shadow: ["EFFECT_COLOR"],
-    gap: ["GAP"],
-    padding: ["GAP"],
-    "padding-top": ["GAP"],
-    "padding-right": ["GAP"],
-    "padding-bottom": ["GAP"],
-    "padding-left": ["GAP"],
-    radius: ["CORNER_RADIUS"],
-    "radius-tl": ["CORNER_RADIUS"],
-    "radius-tr": ["CORNER_RADIUS"],
-    "radius-bl": ["CORNER_RADIUS"],
-    "radius-br": ["CORNER_RADIUS"]
-  };
-  function targetAllowed(scopes, target) {
-    if (scopes.includes("ALL_SCOPES")) return true;
-    const ex = expand(scopes);
-    return TARGET_SCOPES[target].some((s) => ex.has(s));
-  }
-  var FREE_MANUAL_CREATE_LIMIT = 20;
-  var MANUAL_KEY = "dsl.manual";
-  function duplicateName(name, taken) {
-    const base = `${name}-copy`;
-    if (!taken.has(base)) return base;
-    for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
-  }
-
-  // src/lib/variables.ts
-  function isManualVar(v) {
-    try {
-      const fn = v.getPluginData;
-      return typeof fn === "function" && fn.call(v, MANUAL_KEY) === "1";
-    } catch (e) {
-      return false;
-    }
-  }
-  var vkey = (collectionId, name) => `${collectionId}\0${name}`;
-  async function buildVarIndex() {
-    const idx = /* @__PURE__ */ new Map();
-    for (const v of await figma.variables.getLocalVariablesAsync()) {
-      idx.set(vkey(v.variableCollectionId, v.name), v);
-    }
-    return idx;
-  }
-  function upsertVariable(name, collection, type, idx) {
-    const k = vkey(collection.id, name);
-    const existing = idx.get(k);
-    if (existing) return { variable: existing, created: false };
-    const variable = figma.variables.createVariable(name, collection, type);
-    idx.set(k, variable);
-    return { variable, created: true };
-  }
-  var REUSE_MAP_KEY = "dsl.reuseMap";
-  function literalOf(t2, type, base) {
-    var _a;
-    if (type === "COLOR") return colorKey(String(t2.value), t2.alpha);
-    if (type === "STRING") return String(t2.value);
-    return t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base }) : Number(t2.value);
-  }
-  function directValue(v, modeOf) {
-    var _a;
-    const raw = v.valuesByMode[(_a = modeOf.get(v.variableCollectionId)) != null ? _a : ""];
-    if (raw == null || typeof raw === "object" && raw.type === "VARIABLE_ALIAS") return void 0;
-    return raw;
-  }
-  function sameLiteral(raw, lit, type) {
-    if (raw == null) return false;
-    if (type === "COLOR") {
-      if (typeof raw !== "object" || !("r" in raw)) return false;
-      return colorKey(rgbToHex(raw), raw.a) === lit;
-    }
-    if (type === "STRING") return typeof raw === "string" && raw === lit;
-    return typeof raw === "number" && Math.round(raw * 100) === Math.round(Number(lit) * 100);
-  }
-  async function pickReusable(tokens, base) {
-    const out = /* @__PURE__ */ new Map();
-    const withUses = tokens.filter((t2) => {
-      var _a;
-      return (_a = t2.uses) == null ? void 0 : _a.length;
-    });
-    if (!withUses.length) return out;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
-    const tiers = collectionTiers(cols, vars);
-    const owned = ownedIds(cols);
-    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const userGlobals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId)).sort((a, b) => {
-      var _a, _b;
-      return ((_a = colIdx.get(a.variableCollectionId)) != null ? _a : 0) - ((_b = colIdx.get(b.variableCollectionId)) != null ? _b : 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-    });
-    for (const t2 of withUses) {
-      const type = resolvedTypeForToken(t2);
-      const lit = literalOf(t2, type, base);
-      const allowed = scopesForType(scopesForSources(t2.sources), type);
-      const hit = userGlobals.find((v) => {
-        var _a;
-        if (v.resolvedType !== type) return false;
-        const sc = (_a = v.scopes) != null ? _a : [];
-        if (!sc.includes("ALL_SCOPES") && !allowed.some((x) => sc.includes(x))) return false;
-        return sameLiteral(directValue(v, modeOf), lit, type);
-      });
-      if (hit) out.set(t2.name, hit);
-    }
-    return out;
-  }
-  function readReuseMap() {
-    var _a, _b;
-    try {
-      const raw = (_b = (_a = figma.root) == null ? void 0 : _a.getPluginData) == null ? void 0 : _b.call(_a, REUSE_MAP_KEY);
-      const o = raw ? JSON.parse(raw) : {};
-      return o && typeof o === "object" && !Array.isArray(o) ? o : {};
-    } catch (e) {
-      return {};
-    }
-  }
-  function writeReuseMap(map) {
-    var _a, _b;
-    try {
-      (_b = (_a = figma.root) == null ? void 0 : _a.setPluginData) == null ? void 0 : _b.call(_a, REUSE_MAP_KEY, JSON.stringify(map));
-    } catch (e) {
-    }
-  }
-  async function createTokens(tokens, base) {
-    const reuse = await pickReusable(tokens, base);
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set() };
-    const reuseMap = readReuseMap();
-    const toCreate = tokens.filter((t2) => !reuse.has(t2.name));
-    for (const [name, v] of reuse) {
-      summary.globalOf.set(name, v.id);
-      reuseMap[name] = v.id;
-    }
-    if (toCreate.length) {
-      const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), "global");
-      const gMode = globalCol.defaultModeId;
-      const idx = await buildVarIndex();
-      const touched = /* @__PURE__ */ new Set();
-      for (const t2 of toCreate) {
-        const type = resolvedTypeForToken(t2);
-        const mine = idx.get(vkey(globalCol.id, t2.name));
-        if (mine && isManualVar(mine)) {
-          if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gMode], literalOf(t2, type, base), type)) {
-            summary.globalOf.set(t2.name, mine.id);
-            delete reuseMap[t2.name];
-          } else if (!summary.skippedManualNames.has(t2.name)) {
-            summary.globalOf.delete(t2.name);
-            summary.skippedManualNames.add(t2.name);
-            summary.skippedManual++;
-          }
-          continue;
-        }
-        const g = upsertVariable(t2.name, globalCol, type, idx);
-        summary[g.created ? "created" : "updated"]++;
-        summary.globals++;
-        summary.globalOf.set(t2.name, g.variable.id);
-        delete reuseMap[t2.name];
-        setGlobalLiteral(g.variable, gMode, t2, type, base);
-        const scopes = scopesForType(scopesForSources(t2.sources), type);
-        const key = vkey(globalCol.id, t2.name);
-        const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
-        touched.add(key);
-        g.variable.scopes = merged;
-        g.variable.hiddenFromPublishing = true;
-        const desc = unitDescription(t2);
-        if (desc) g.variable.description = desc;
-      }
-    }
-    writeReuseMap(reuseMap);
-    return summary;
-  }
-  async function previewCreateTokens(tokens, base) {
-    var _a, _b;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const gId = (_b = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
-    const reuse = await pickReusable(tokens, base);
-    const existing = /* @__PURE__ */ new Set();
-    for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
-    const states = /* @__PURE__ */ new Map();
-    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), tokenStates: states };
-    const setState = (name, st) => {
-      if (!states.has(name)) states.set(name, st);
-    };
-    const seen = /* @__PURE__ */ new Set();
-    const tally = (colId, name, kind) => {
-      const k = vkey(colId, name);
-      summary[kind]++;
-      if (seen.has(k)) {
-        summary.updated++;
-        return;
-      }
-      seen.add(k);
-      summary[existing.has(k) ? "updated" : "created"]++;
-    };
-    const gCol = cols.find((c) => c.id === gId);
-    const manualByName = /* @__PURE__ */ new Map();
-    if (gCol) {
-      for (const v of await figma.variables.getLocalVariablesAsync()) if (v.variableCollectionId === gId && isManualVar(v)) manualByName.set(v.name, v);
-    }
-    for (const t2 of tokens) {
-      const r = reuse.get(t2.name);
-      if (r) {
-        summary.globalOf.set(t2.name, r.id);
-        setState(t2.name, { state: "reuse", varName: r.name });
-        continue;
-      }
-      const mine = manualByName.get(t2.name);
-      if (mine && gCol) {
-        const type = resolvedTypeForToken(t2);
-        if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gCol.defaultModeId], literalOf(t2, type, base), type)) {
-          summary.globalOf.set(t2.name, mine.id);
-          setState(t2.name, { state: "reuse", varName: mine.name });
-        } else if (!summary.skippedManualNames.has(t2.name)) {
-          summary.globalOf.delete(t2.name);
-          summary.skippedManualNames.add(t2.name);
-          summary.skippedManual++;
-          states.set(t2.name, { state: "manual" });
-        }
-        continue;
-      }
-      setState(t2.name, { state: existing.has(vkey(gId, t2.name)) ? "update" : "new" });
-      tally(gId, t2.name, "globals");
-    }
-    return summary;
-  }
-  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut) {
-    var _a, _b, _c, _d, _e, _f, _g, _h;
-    const withUses = tokens.filter((t2) => {
-      var _a2;
-      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
-    });
-    if (!withUses.length) return 0;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
-    const tiers = collectionTiers(cols, vars);
-    const owned = ownedIds(cols);
-    const byId = new Map(vars.map((v) => [v.id, v]));
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const resolve = (v) => {
-      var _a2;
-      let cur = v;
-      for (let i = 0; i < 12 && cur; i++) {
-        const val = cur.valuesByMode[(_a2 = modeOf.get(cur.variableCollectionId)) != null ? _a2 : ""];
-        if (val && typeof val === "object" && val.type === "VARIABLE_ALIAS") cur = byId.get(val.id);
-        else return val;
-      }
-      return void 0;
-    };
-    const keyOfValue = (val) => {
-      if (val == null) return "";
-      if (typeof val === "object" && "r" in val) return colorKey(rgbToHex(val), val.a);
-      return typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
-    };
-    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-    const rank = (id) => {
-      var _a2;
-      return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
-    };
-    const existing = /* @__PURE__ */ new Map();
-    for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
-      const k = keyOfValue(resolve(v));
-      const arr = existing.get(v.name);
-      if (!arr) existing.set(v.name, k ? [k] : []);
-      else if (k && !arr.includes(k)) arr.push(k);
-    }
-    const pluginGlobal = ownedCollection(cols, "global");
-    const globalFor = (t2) => {
-      const id = globalOf == null ? void 0 : globalOf.get(t2.name);
-      if (id) return byId.get(id);
-      return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === t2.name) : void 0;
-    };
-    const reqs = [];
-    const colorUses = /* @__PURE__ */ new Map();
-    for (const t2 of withUses) {
-      for (const u of (_a = t2.uses) != null ? _a : []) {
-        if (u.name.startsWith("color/")) {
-          const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
-          arr.push({ token: t2, count: u.count, bg: u.bg });
-          colorUses.set(u.name, arr);
-        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
-      }
-    }
-    for (const [use, list] of colorUses) {
-      const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
-      const bases = colorRoleBases(
-        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-        defKey || void 0,
-        // 색 값 키여도 colorRoleBases가 hex만 본다
-        use.slice("color/".length)
-      );
-      for (const x of list) {
-        const hex = String(x.token.value).toLowerCase();
-        reqs.push({ base: `${use}/${(_d = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _d : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
-      }
-    }
-    const names = assignNames(reqs, existing);
-    const toMake = /* @__PURE__ */ new Map();
-    for (const r of reqs) {
-      const name = (_e = names.get(`${r.base}\0${r.value}`)) != null ? _e : r.base;
-      if (existing.has(name) || toMake.has(name)) continue;
-      toMake.set(name, r.token);
-    }
-    if (preview) {
-      if (rowsOut) {
-        for (const [name, t2] of toMake) {
-          const id = globalOf == null ? void 0 : globalOf.get(t2.name);
-          rowsOut.push({ name, global: id && ((_f = byId.get(id)) == null ? void 0 : _f.name) || t2.name, token: t2.name });
-        }
-      }
-      return toMake.size;
-    }
-    if (!toMake.size) return 0;
-    const col = ensureOwnedCollection(cols, "semantic");
-    let made = 0;
-    for (const [name, t2] of toMake) {
-      const g = globalFor(t2);
-      if (!g) continue;
-      const v = figma.variables.createVariable(name, col, g.resolvedType);
-      for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_g = scopeForSemanticRole(name)) != null ? _g : g.scopes, g.resolvedType);
-      try {
-        (_h = v.setPluginData) == null ? void 0 : _h.call(v, AUTO_ROLE_KEY, "1");
-      } catch (e) {
-      }
-      made++;
-    }
-    return made;
-  }
-  function setGlobalLiteral(v, modeId, t2, type, base) {
-    var _a, _b;
-    if (type === "COLOR") {
-      const { r, g, b } = hexToRgb(String(t2.value));
-      v.setValueForMode(modeId, { r, g, b, a: (_a = t2.alpha) != null ? _a : 1 });
-    } else if (type === "STRING") {
-      v.setValueForMode(modeId, String(t2.value));
-    } else {
-      const num = t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_b = t2.fontSize) != null ? _b : base }) : Number(t2.value);
-      v.setValueForMode(modeId, num);
-    }
-  }
-  async function prunePaletteColors(keep) {
-    const keepSet = new Set(keep);
-    const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const palIds = ownedIds(cols);
-    let removed = 0;
-    for (const v of await figma.variables.getLocalVariablesAsync()) {
-      if (!palIds.has(v.variableCollectionId)) continue;
-      if (isManualVar(v)) continue;
-      const fam = paletteFamilyOf(v.name);
-      if (fam && keepFamilies.has(fam) && !keepSet.has(v.name)) {
-        v.remove();
-        removed++;
-      }
-    }
-    return removed;
-  }
-  async function createSemanticAliases(map) {
-    var _a, _b, _c, _d;
-    const summary = { created: 0, updated: 0, aliased: 0, missing: [], skippedManual: 0 };
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
-    const tiers = collectionTiers(cols, vars);
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const pluginGlobalId = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id;
-    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-    const globals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && directValue(v, modeOf) !== void 0).sort((a, b) => {
-      var _a2, _b2;
-      return Number(b.variableCollectionId === pluginGlobalId) - Number(a.variableCollectionId === pluginGlobalId) || ((_a2 = colIdx.get(a.variableCollectionId)) != null ? _a2 : 0) - ((_b2 = colIdx.get(b.variableCollectionId)) != null ? _b2 : 0);
-    });
-    const byName2 = /* @__PURE__ */ new Map();
-    for (const v of globals) if (!byName2.has(v.name)) byName2.set(v.name, v);
-    const okIds = new Map(globals.map((v) => [v.id, v]));
-    const reuseMap = readReuseMap();
-    let semanticCol;
-    let idx;
-    for (const [semName, globalName] of Object.entries(map)) {
-      const g = (_c = byName2.get(globalName)) != null ? _c : okIds.get((_b = reuseMap[globalName]) != null ? _b : "");
-      if (!g) {
-        summary.missing.push(globalName);
-        continue;
-      }
-      if (!semanticCol || !idx) {
-        semanticCol = ensureOwnedCollection(cols, "semantic");
-        idx = await buildVarIndex();
-      }
-      const sMode = semanticCol.defaultModeId;
-      const mine = idx.get(vkey(semanticCol.id, semName));
-      if (mine && isManualVar(mine)) {
-        summary.skippedManual++;
-        continue;
-      }
-      const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
-      u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g));
-      u.variable.scopes = scopesForType((_d = scopeForSemanticRole(semName)) != null ? _d : g.scopes, g.resolvedType);
-      summary[u.created ? "created" : "updated"]++;
-      summary.aliased++;
-    }
-    return summary;
-  }
-  var roundN = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
-  function walkText(node, out, instanceOut) {
-    if (node.visible === false) return;
-    if (node.type === "TEXT") out.push(node);
-    else if (instanceOut && node.type === "INSTANCE") walkText(node, instanceOut);
-    else if ("children" in node) for (const c of node.children) walkText(c, out, instanceOut);
-  }
-  function measureLineHeight(fontSize, lh) {
-    if (lh === figma.mixed || !lh || lh.unit === "AUTO") return { px: 0, pct: 0 };
-    const unit = String(lh.unit).toUpperCase();
-    if (unit === "PERCENT") {
-      return { px: roundN(fontSize * lh.value / 100), pct: roundN(lh.value) };
-    }
-    const v = roundN(lh.value);
-    if (unit === "PIXELS" && fontSize > 0) {
-      const pxRatio = v / fontSize;
-      const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
-      const plausibleAsPct = v >= 100 && v <= 300;
-      if (!plausibleAsPx && plausibleAsPct) return { px: roundN(fontSize * v / 100), pct: v };
-    }
-    return { px: v, pct: 0 };
-  }
-  function measureLetterSpacing(fontSize, ls) {
-    if (ls === figma.mixed || !ls) return { px: 0, pct: 0 };
-    const unit = String(ls.unit).toUpperCase();
-    if (unit === "PERCENT") {
-      return { px: roundN(fontSize * ls.value / 100), pct: roundN(ls.value) };
-    }
-    const px = roundN(ls.value);
-    if (unit === "PIXELS" && fontSize > 0 && px !== 0) {
-      const authoredPx = Math.abs(px * 2 - Math.round(px * 2)) < 1e-9;
-      const pct2 = roundN(px / fontSize * 100);
-      const back = roundN(fontSize * pct2 / 100);
-      const common = pct2 === Math.trunc(pct2) && Math.abs(pct2) >= 1 && Math.abs(pct2) <= 10;
-      if (!authoredPx && common && Math.abs(back - px) <= 0.011) return { px: back, pct: pct2 };
-    }
-    return { px, pct: 0 };
-  }
-  function readNodeTypography(t2) {
-    if (t2.fontSize === figma.mixed || t2.fontName === figma.mixed) return null;
-    return {
-      fontSize: t2.fontSize,
-      family: t2.fontName.family,
-      style: t2.fontName.style,
-      lineHeight: t2.lineHeight,
-      letterSpacing: t2.letterSpacing
-    };
-  }
-  async function percentFromVariableDescription(varId, cache2) {
-    var _a;
-    let id = varId;
-    const seen = /* @__PURE__ */ new Set();
-    while (id && !seen.has(id)) {
-      seen.add(id);
-      let v = cache2.get(id);
-      if (v === void 0) {
-        v = await figma.variables.getVariableByIdAsync(id);
-        cache2.set(id, v);
-      }
-      if (!v) return void 0;
-      const desc = ((_a = v.description) != null ? _a : "").trim();
-      const m = /^(-?\d+(?:\.\d+)?)%$/.exec(desc);
-      if (m) return roundN(Number(m[1]));
-      const modeIds = Object.keys(v.valuesByMode);
-      const raw = modeIds.length ? v.valuesByMode[modeIds[0]] : void 0;
-      if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
-        id = raw.id;
-        continue;
-      }
-      return void 0;
-    }
-    return void 0;
-  }
-  async function percentFromNodeBinding(t2, field, cache2) {
-    var _a;
-    const entry = (_a = t2.boundVariables) == null ? void 0 : _a[field];
-    if (!entry) return void 0;
-    const alias = Array.isArray(entry) ? entry[0] : entry;
-    if (!(alias == null ? void 0 : alias.id)) return void 0;
-    return percentFromVariableDescription(alias.id, cache2);
-  }
-  async function scanTextStyles(nodes) {
-    const texts = [];
-    for (const n of nodes) walkText(n, texts);
-    const samples = [];
-    const warnings = /* @__PURE__ */ new Set();
-    const styleCache = /* @__PURE__ */ new Map();
-    const varCache = /* @__PURE__ */ new Map();
-    const styleOf = async (id) => {
-      var _a;
-      if (styleCache.has(id)) return (_a = styleCache.get(id)) != null ? _a : null;
-      const raw = await figma.getStyleByIdAsync(id);
-      const st = raw && raw.type === "TEXT" ? raw : null;
-      styleCache.set(id, st);
-      return st;
-    };
-    for (const node of texts) {
-      const typo = readNodeTypography(node);
-      if (!typo) {
-        warnings.add(t("textStyle.warnMixed"));
-        continue;
-      }
-      const fontSize = roundN(typo.fontSize);
-      const { family, style } = { family: typo.family, style: typo.style };
-      const lhMeas = measureLineHeight(fontSize, typo.lineHeight);
-      let lineHeight = lhMeas.px;
-      let lineHeightPercent = lhMeas.pct;
-      const lsMeas = measureLetterSpacing(fontSize, typo.letterSpacing);
-      let letterSpacing = lsMeas.px;
-      let letterSpacingPercent = lsMeas.pct;
-      if (lineHeightPercent === 0) {
-        const fromVar = await percentFromNodeBinding(node, "lineHeight", varCache);
-        if (fromVar !== void 0 && fromVar > 0) {
-          lineHeightPercent = fromVar;
-          lineHeight = roundN(fontSize * fromVar / 100);
-        }
-      }
-      if (letterSpacingPercent === 0) {
-        const fromVar = await percentFromNodeBinding(node, "letterSpacing", varCache);
-        if (fromVar !== void 0 && fromVar !== 0) {
-          letterSpacingPercent = fromVar;
-          letterSpacing = roundN(fontSize * fromVar / 100);
-        }
-      }
-      const sid = node.textStyleId;
-      const styleId = sid === figma.mixed ? "" : sid;
-      if (styleId) {
-        const st = await styleOf(styleId);
-        if (st) {
-          const stLh = measureLineHeight(fontSize, st.lineHeight);
-          const stLs = measureLetterSpacing(fontSize, st.letterSpacing);
-          if (lineHeightPercent === 0 && stLh.pct > 0) {
-            lineHeightPercent = stLh.pct;
-            lineHeight = stLh.px;
-          }
-          if (letterSpacingPercent === 0 && stLs.pct !== 0) {
-            letterSpacingPercent = stLs.pct;
-            letterSpacing = stLs.px;
-          }
-        }
-      }
-      let characters = "";
-      try {
-        characters = node.characters;
-      } catch (e) {
-        characters = "";
-      }
-      let rowId;
-      let indexInParent;
-      const parent = node.parent;
-      if (parent && "layoutMode" in parent && parent.layoutMode === "HORIZONTAL" && "children" in parent) {
-        rowId = parent.id;
-        indexInParent = parent.children.indexOf(node);
-        if (indexInParent < 0) indexInParent = void 0;
-      }
-      samples.push({
-        fontSize,
-        lineHeight,
-        lineHeightPercent,
-        letterSpacing,
-        letterSpacingPercent,
-        family,
-        style,
-        layerName: node.name,
-        styleId,
-        characters,
-        id: node.id,
-        rowId,
-        indexInParent
-      });
-    }
-    return { samples, warnings: [...warnings] };
-  }
-  function lhPxOf(fontSize, lh) {
-    if (lh === figma.mixed || lh.unit === "AUTO") return 0;
-    return lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
-  }
-  function lhPctOf(lh) {
-    if (lh === figma.mixed || lh.unit !== "PERCENT") return 0;
-    return roundN(lh.value);
-  }
-  function lsPxOf(fontSize, ls) {
-    if (ls === figma.mixed) return 0;
-    return ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
-  }
-  function lsPctOf(ls) {
-    if (ls === figma.mixed || ls.unit !== "PERCENT") return 0;
-    return roundN(ls.value);
-  }
-  async function scanExistingTextStyles() {
-    const out = [];
-    for (const s of await figma.getLocalTextStylesAsync()) {
-      const fontSize = roundN(s.fontSize);
-      const lineHeightPercent = lhPctOf(s.lineHeight);
-      const letterSpacingPercent = lsPctOf(s.letterSpacing);
-      out.push(__spreadValues(__spreadValues({
-        id: s.id,
-        name: s.name,
-        fontSize,
-        // 등록된 스타일은 사실이라 원값으로 잰다(applyExistingTextStyles의 인덱스와 같은 이유).
-        // 스캔이 %로 등록해 둔 스타일은 lhPxOf가 %→px로 환산하므로 클러스터 측정값과 그대로 만난다.
-        lineHeight: lhPxOf(fontSize, s.lineHeight),
-        letterSpacing: lsPxOf(fontSize, s.letterSpacing),
-        family: s.fontName.family,
-        style: s.fontName.style
-      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}));
-    }
-    return out;
-  }
-  async function globalFamilyVars() {
-    var _a;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
-    const tiers = collectionTiers(cols, vars);
-    const pluginGlobalId = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id;
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const list = vars.filter((v) => v.resolvedType === "STRING" && tiers.get(v.variableCollectionId) === 1).sort((a, b) => {
-      const pa = a.variableCollectionId === pluginGlobalId ? 0 : 1;
-      const pb = b.variableCollectionId === pluginGlobalId ? 0 : 1;
-      return pa - pb || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-    });
-    return (family) => list.find((v) => directValue(v, modeOf) === family);
-  }
-  async function createSemanticTextStyles(specs) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
-    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
-    if (!specs.length) return res;
-    const existing = await figma.getLocalTextStylesAsync();
-    const styleById = new Map(existing.map((s) => [s.id, s]));
-    const styleByName = new Map(existing.map((s) => [s.name, s]));
-    const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
-    const renameBlocked = /* @__PURE__ */ new Set();
-    const roleRenames = [];
-    for (const spec of specs) {
-      const st = anchoredStyle(spec);
-      if (!st || st.name === spec.name) continue;
-      const occupant = styleByName.get(spec.name);
-      if (occupant && occupant.id !== st.id) {
-        renameBlocked.add(spec.boundStyleId);
-        res.missing.push(t("textStyle.missRename", { from: st.name, to: spec.name }));
-        continue;
-      }
-      roleRenames.push({ from: st.name, to: spec.name });
-    }
-    if (roleRenames.length) {
-      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_a = ownedCollection(cols0, "semantic")) == null ? void 0 : _a.id;
-      if (semId0) {
-        const byName2 = /* @__PURE__ */ new Map();
-        for (const v of await figma.variables.getLocalVariablesAsync())
-          if (v.variableCollectionId === semId0) byName2.set(v.name, v);
-        for (const { from, to } of roleRenames)
-          for (const cat of ["font-size", "line-height", "letter-spacing"]) {
-            const v = byName2.get(`${cat}/${from}`);
-            if (v && !byName2.has(`${cat}/${to}`)) {
-              v.name = `${cat}/${to}`;
-              byName2.set(`${cat}/${to}`, v);
-              byName2.delete(`${cat}/${from}`);
-            }
-          }
-      }
-    }
-    const tokens = [];
-    const seen = /* @__PURE__ */ new Set();
-    const pushTok = (t2) => {
-      if (!seen.has(t2.name)) {
-        seen.add(t2.name);
-        tokens.push(t2);
-      }
-    };
-    const aliasMap = {};
-    const lhTokens = /* @__PURE__ */ new Map();
-    const pushLineHeightTok = (name, px, pct2, fontSize) => {
-      const prev = lhTokens.get(name);
-      if (!prev) {
-        const t2 = pct2 > 0 ? { name, category: "lineHeight", value: pct2, unit: "percent", fontSize, sources: ["lineHeight"] } : { name, category: "lineHeight", value: px, unit: "px", sources: ["lineHeight"] };
-        lhTokens.set(name, t2);
-        pushTok(t2);
-        return;
-      }
-      const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
-      if (prevPct === pct2 && (pct2 === 0 || prev.fontSize === fontSize)) return;
-      prev.value = px;
-      prev.unit = "px";
-      prev.fontSize = void 0;
-      res.notes.push(t("textStyle.noteLhPx", { name }));
-    };
-    const lsTokens = /* @__PURE__ */ new Map();
-    const pushLetterSpacingTok = (name, px, pct2, fontSize) => {
-      const prev = lsTokens.get(name);
-      if (!prev) {
-        const t2 = pct2 !== 0 ? { name, category: "letterSpacing", value: pct2, unit: "percent", fontSize, sources: ["letterSpacing"] } : { name, category: "letterSpacing", value: px, unit: "px", sources: ["letterSpacing"] };
-        lsTokens.set(name, t2);
-        pushTok(t2);
-        return;
-      }
-      const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
-      if (prevPct === pct2 && (pct2 === 0 || prev.fontSize === fontSize)) return;
-      prev.value = px;
-      prev.unit = "px";
-      prev.fontSize = void 0;
-      res.notes.push(t("textStyle.noteLsPx", { name }));
-    };
-    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
-      pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
-      aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
-      if (lineHeight > 0 && lineHeightPercent === 0 && Number.isInteger(lineHeight)) {
-        const lhName = numberTokenName("line-height", lineHeight);
-        pushLineHeightTok(lhName, lineHeight, 0, fontSize);
-        aliasMap[`line-height/${role}`] = lhName;
-      }
-      if (letterSpacing !== 0 && letterSpacingPercent === 0 && Number.isInteger(letterSpacing)) {
-        const lsName = numberTokenName("letter-spacing", letterSpacing);
-        pushLetterSpacingTok(lsName, letterSpacing, 0, fontSize);
-        aliasMap[`letter-spacing/${role}`] = lsName;
-      }
-    };
-    for (const s of specs) {
-      if (anchoredStyle(s)) continue;
-      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_b = s.lineHeightPercent) != null ? _b : 0, (_c = s.letterSpacingPercent) != null ? _c : 0);
-    }
-    {
-      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_d = ownedCollection(cols0, "semantic")) == null ? void 0 : _d.id;
-      const semNames = /* @__PURE__ */ new Set();
-      if (semId0) {
-        for (const v of await figma.variables.getLocalVariablesAsync())
-          if (v.variableCollectionId === semId0) semNames.add(v.name);
-      }
-      for (const s of specs) {
-        const st = anchoredStyle(s);
-        if (!st) continue;
-        if (semNames.has(`font-size/${s.name}`)) continue;
-        const fontSize = roundN(st.fontSize);
-        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
-      }
-    }
-    if (tokens.length) await createTokens(tokens, 16);
-    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_e = ownedCollection(cols, "semantic")) == null ? void 0 : _e.id;
-    const semByName = /* @__PURE__ */ new Map();
-    if (semId) {
-      for (const v of await figma.variables.getLocalVariablesAsync())
-        if (v.variableCollectionId === semId) semByName.set(v.name, v);
-    }
-    const familyVarFor = await globalFamilyVars();
-    for (const spec of specs) {
-      const anchored = anchoredStyle(spec);
-      if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
-        continue;
-      }
-      let style = anchored != null ? anchored : styleByName.get(spec.name);
-      const created = !style;
-      const isRename = !!anchored;
-      const setName = (st) => {
-        if (st.name === spec.name) return;
-        styleByName.delete(st.name);
-        st.name = spec.name;
-      };
-      try {
-        let loaded = null;
-        if (!isRename) {
-          const wanted = { family: spec.family, style: spec.style };
-          try {
-            await figma.loadFontAsync(wanted);
-            loaded = wanted;
-          } catch (e) {
-            try {
-              const fb = { family: spec.family, style: "Regular" };
-              await figma.loadFontAsync(fb);
-              loaded = fb;
-              res.missing.push(t("textStyle.missStyle", { name: spec.name, style: spec.style }));
-            } catch (e2) {
-              res.missing.push(t("textStyle.missFamily", { name: spec.name, family: spec.family }));
-              continue;
-            }
-          }
-        } else {
-          const fn = style.fontName;
-          try {
-            await figma.loadFontAsync(fn);
-          } catch (e) {
-            setName(style);
-            res.missing.push(t("textStyle.missFontKeep", { name: spec.name, font: `${fn.family} ${fn.style}` }));
-            styleByName.set(spec.name, style);
-            continue;
-          }
-        }
-        if (!style) style = figma.createTextStyle();
-        setName(style);
-        const lhPct = (_f = spec.lineHeightPercent) != null ? _f : 0;
-        const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
-        if (!isRename && loaded) {
-          style.fontName = loaded;
-          style.fontSize = spec.fontSize;
-          style.lineHeight = spec.lineHeight > 0 ? lhPct > 0 ? { value: lhPct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-          style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
-        } else if (lhPct > 0 || lsPct !== 0) {
-          if (lhPct > 0) {
-            if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
-            else style.lineHeight = { value: lhPct, unit: "PERCENT" };
-          }
-          if (lsPct !== 0) {
-            if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
-            else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
-          }
-        }
-        const bindRole = style.name;
-        const fsVar = semByName.get(`font-size/${bindRole}`);
-        if (fsVar) {
-          style.setBoundVariable("fontSize", fsVar);
-          res.bound++;
-        } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
-        if (spec.lineHeight > 0 || isRename) {
-          const pctNow = lhPctOf(style.lineHeight);
-          if (pctNow > 0) {
-            if ((_j = style.boundVariables) == null ? void 0 : _j.lineHeight) style.setBoundVariable("lineHeight", null);
-            res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
-          } else {
-            const lhVar = semByName.get(`line-height/${bindRole}`);
-            if (lhVar) {
-              style.setBoundVariable("lineHeight", lhVar);
-              res.bound++;
-            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
-          }
-        }
-        if (spec.letterSpacing !== 0 || isRename) {
-          const lsPctNow = lsPctOf(style.letterSpacing);
-          if (lsPctNow !== 0) {
-            if ((_k = style.boundVariables) == null ? void 0 : _k.letterSpacing) style.setBoundVariable("letterSpacing", null);
-            res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
-          } else {
-            const lsVar = semByName.get(`letter-spacing/${bindRole}`);
-            if (lsVar) {
-              style.setBoundVariable("letterSpacing", lsVar);
-              res.bound++;
-            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
-          }
-        }
-        const famVar = familyVarFor(style.fontName.family);
-        if (famVar) {
-          style.setBoundVariable("fontFamily", famVar);
-          res.bound++;
-        }
-        res[created ? "created" : "updated"]++;
-        if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
-        styleByName.set(style.name, style);
-      } catch (e) {
-        res.missing.push(t("textStyle.missError", { name: spec.name, error: explainError(e instanceof Error ? e.message : String(e)).message }));
-        if (style) styleByName.set(style.name, style);
-      }
-    }
-    return res;
-  }
-  function typoKey(t2) {
-    var _a, _b, _c, _d;
-    const fontSize = roundN(t2.fontSize);
-    const lh = t2.lineHeight !== figma.mixed && t2.lineHeight && t2.lineHeight.unit === "AUTO" ? "auto" : String(lhPxOf(fontSize, t2.lineHeight));
-    return [
-      fontSize,
-      lh,
-      lsPxOf(fontSize, t2.letterSpacing),
-      t2.fontName.family,
-      t2.fontName.style,
-      (_a = t2.textCase) != null ? _a : "ORIGINAL",
-      (_b = t2.textDecoration) != null ? _b : "NONE",
-      roundN((_c = t2.paragraphSpacing) != null ? _c : 0),
-      roundN((_d = t2.paragraphIndent) != null ? _d : 0)
-    ].join("|");
-  }
-  function isMixedTypography(t2) {
-    return t2.fontSize === figma.mixed || t2.fontName === figma.mixed || t2.lineHeight === figma.mixed || t2.letterSpacing === figma.mixed || t2.textCase === figma.mixed || t2.textDecoration === figma.mixed;
-  }
-  var STYLE_TEXT_VAR_FIELDS = ["fontFamily", "fontSize", "fontStyle", "fontWeight", "letterSpacing", "lineHeight", "paragraphSpacing", "paragraphIndent"];
-  function unbindStyleTextVars(t2) {
-    var _a;
-    const bv = t2.boundVariables;
-    if (!bv) return;
-    const len = typeof t2.characters === "string" ? t2.characters.length : 0;
-    const node = t2;
-    for (const f of STYLE_TEXT_VAR_FIELDS) {
-      const e = bv[f];
-      if (!(Array.isArray(e) ? e.length > 0 : !!e)) continue;
-      if (len > 0 && node.setRangeBoundVariable) node.setRangeBoundVariable(0, len, f, null);
-      try {
-        (_a = node.setBoundVariable) == null ? void 0 : _a.call(node, f, null);
-      } catch (e2) {
-      }
-    }
-  }
-  async function loadTextFonts(t2, loaded) {
-    const len = typeof t2.characters === "string" ? t2.characters.length : 0;
-    const fonts = len > 0 && typeof t2.getRangeAllFontNames === "function" ? t2.getRangeAllFontNames(0, len) : t2.fontName !== figma.mixed ? [t2.fontName] : [];
-    for (const fn of fonts) {
-      const k = `${fn.family} ${fn.style}`;
-      if (loaded.has(k)) continue;
-      await figma.loadFontAsync(fn);
-      loaded.add(k);
-    }
-  }
-  async function attachTextStyle(t2, styleId, loaded) {
-    await loadTextFonts(t2, loaded);
-    unbindStyleTextVars(t2);
-    await t2.setTextStyleIdAsync(styleId);
-  }
-  function hasTextStyle(t2) {
-    const id = t2.textStyleId;
-    return id === figma.mixed || typeof id === "string" && id !== "";
-  }
-  function insideInstance(node) {
-    for (let p = node.parent; p; p = p.parent) if (p.type === "INSTANCE") return true;
-    return false;
-  }
-  async function textStyleIndex() {
-    const styleByKey = /* @__PURE__ */ new Map();
-    for (const s of await figma.getLocalTextStylesAsync()) {
-      const k = typoKey(s);
-      styleByKey.set(k, styleByKey.has(k) ? null : s);
-    }
-    return styleByKey;
-  }
-  function planTexts(nodes) {
-    const texts = [];
-    const inInstance = [];
-    for (const n of nodes) {
-      if (insideInstance(n)) walkText(n, inInstance);
-      else walkText(n, texts, inInstance);
-    }
-    return { texts, inInstance };
-  }
-  function textStyleFor(t2, styleByKey) {
-    if (hasTextStyle(t2)) return "hasStyle";
-    if (isMixedTypography(t2)) return "mixed";
-    const hit = styleByKey.get(typoKey(t2));
-    if (hit === void 0) return "noStyle";
-    if (hit === null) return "ambiguous";
-    return hit;
-  }
-  async function planExistingTextStyles(nodes) {
-    var _a;
-    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
-    const styleByKey = await textStyleIndex();
-    const { texts, inInstance } = planTexts(nodes);
-    skipReasons.instance += inInstance.length;
-    const rows = /* @__PURE__ */ new Map();
-    for (const t2 of texts) {
-      const r = textStyleFor(t2, styleByKey);
-      if (typeof r === "string") {
-        skipReasons[r]++;
-        continue;
-      }
-      const row = (_a = rows.get(r.id)) != null ? _a : { styleId: r.id, name: r.name, nodeIds: [] };
-      row.nodeIds.push(t2.id);
-      rows.set(r.id, row);
-    }
-    return { rows: [...rows.values()], skipReasons };
-  }
-  async function applyTextStyleRows(rows) {
-    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
-    const res = { applied: 0, skipped: 0, skipReasons };
-    const styleByKey = await textStyleIndex();
-    const loaded = /* @__PURE__ */ new Set();
-    for (const row of rows) {
-      for (const id of row.nodeIds) {
-        const t2 = await figma.getNodeByIdAsync(id).catch(() => null);
-        if (!t2 || t2.type !== "TEXT") {
-          skipReasons.noStyle++;
-          res.skipped++;
-          continue;
-        }
-        const r = textStyleFor(t2, styleByKey);
-        if (typeof r === "string" || r.id !== row.styleId) {
-          skipReasons[typeof r === "string" ? r : "noStyle"]++;
-          res.skipped++;
-          continue;
-        }
-        try {
-          await attachTextStyle(t2, r.id, loaded);
-          res.applied++;
-        } catch (e) {
-        }
-      }
-    }
-    return res;
-  }
-  async function textStyleCandidateTest() {
-    const styleByKey = await textStyleIndex();
-    return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
-  }
-  async function applyRegisteredTextStyles(roots, styleIds) {
-    var _a, _b;
-    const applyReasons = { hasStyle: 0, instance: 0, ambiguous: 0 };
-    const out = { applied: 0, applySkipped: 0, applyReasons };
-    if (!styleIds.length) return out;
-    const ids = new Set(styleIds);
-    const idByKey = /* @__PURE__ */ new Map();
-    for (const st of await figma.getLocalTextStylesAsync()) if (ids.has(st.id)) idByKey.set(typoKey(st), st.id);
-    if (!idByKey.size) return out;
-    const keyOf2 = (t2) => isMixedTypography(t2) ? void 0 : typoKey(t2);
-    const plan = planTexts(roots);
-    const skipped = (k) => {
-      applyReasons[k]++;
-      out.applySkipped++;
-    };
-    for (const t2 of plan.inInstance) if (idByKey.has((_a = keyOf2(t2)) != null ? _a : "\0")) skipped("instance");
-    const rows = /* @__PURE__ */ new Map();
-    const styleByKey = await textStyleIndex();
-    for (const t2 of plan.texts) {
-      const k = keyOf2(t2);
-      if (k === void 0 || !idByKey.has(k)) continue;
-      const r = textStyleFor(t2, styleByKey);
-      if (r === "hasStyle") {
-        if (t2.textStyleId !== idByKey.get(k)) skipped("hasStyle");
-        continue;
-      }
-      if (r === "ambiguous") {
-        skipped("ambiguous");
-        continue;
-      }
-      if (typeof r === "string" || !ids.has(r.id)) continue;
-      const arr = (_b = rows.get(r.id)) != null ? _b : [];
-      arr.push(t2.id);
-      rows.set(r.id, arr);
-    }
-    if (rows.size) {
-      const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
-      out.applied = r.applied;
-    }
-    return out;
-  }
-  var VarNameError = class extends Error {
-  };
-  var VarGoneError = class extends Error {
-  };
-  var USER_COLLECTION_NAME = "Variables";
-  async function editValueToFigma(ev) {
-    if (ev.kind === "color") return __spreadProps(__spreadValues({}, hexToRgb(ev.hex)), { a: Math.max(0, Math.min(1, ev.alpha)) });
-    if (ev.kind === "number") return ev.value;
-    if (ev.kind === "string") return ev.text;
-    if (ev.kind === "bool") return ev.value;
-    const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
-    if (!target) throw new Error("alias target not found");
-    return figma.variables.createVariableAlias(target);
-  }
-  function markManual(v) {
-    var _a;
-    try {
-      (_a = v.setPluginData) == null ? void 0 : _a.call(v, MANUAL_KEY, "1");
-    } catch (e) {
-    }
-  }
-  function dropQuietly(x) {
-    var _a;
-    try {
-      (_a = x == null ? void 0 : x.remove) == null ? void 0 : _a.call(x);
-    } catch (e) {
-    }
-  }
-  async function createManualVariable(input) {
-    var _a, _b;
-    let col;
-    let newCollection = false;
-    if (input.collectionId) {
-      col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === input.collectionId);
-      if (!col) throw new VarGoneError("collection not found");
-    } else {
-      col = figma.variables.createVariableCollection(USER_COLLECTION_NAME);
-      newCollection = true;
-    }
-    let v;
-    try {
-      v = figma.variables.createVariable(input.name, col, input.varType);
-    } catch (e) {
-      if (newCollection) dropQuietly(col);
-      throw new VarNameError(e instanceof Error ? e.message : String(e));
-    }
-    try {
-      const def = col.defaultModeId;
-      const defVal = (_a = input.values[def]) != null ? _a : input.values["*"];
-      if (!defVal) throw new Error("default mode value required");
-      for (const m of col.modes) {
-        const ev = m.modeId === def ? defVal : (_b = input.values[m.modeId]) != null ? _b : defVal;
-        v.setValueForMode(m.modeId, await editValueToFigma(ev));
-      }
-      if (input.scopes) v.scopes = input.scopes;
-      markManual(v);
-    } catch (e) {
-      dropQuietly(v);
-      if (newCollection) dropQuietly(col);
-      throw e;
-    }
-    return { variable: v, newCollection };
-  }
-  async function duplicateVariable(id) {
-    var _a, _b, _c;
-    const src = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-    if (!src || src.remote) throw new VarGoneError("variable not found");
-    const col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === src.variableCollectionId);
-    if (!col) throw new VarGoneError("collection not found");
-    const taken = new Set((await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === col.id).map((v) => v.name));
-    const nv = figma.variables.createVariable(duplicateName(src.name, taken), col, src.resolvedType);
-    try {
-      for (const [modeId, raw] of Object.entries(src.valuesByMode)) {
-        if (raw === void 0 || raw === null) continue;
-        const val = typeof raw === "object" && raw.type === "VARIABLE_ALIAS" ? { type: "VARIABLE_ALIAS", id: raw.id } : raw;
-        nv.setValueForMode(modeId, val);
-      }
-      nv.scopes = [...(_a = src.scopes) != null ? _a : []];
-      nv.description = (_b = src.description) != null ? _b : "";
-      nv.hiddenFromPublishing = !!src.hiddenFromPublishing;
-      const cs = (_c = src.codeSyntax) != null ? _c : {};
-      for (const [platform, value] of Object.entries(cs)) {
-        if (value) nv.setVariableCodeSyntax(platform, value);
-      }
-      markManual(nv);
-    } catch (e) {
-      dropQuietly(nv);
-      throw e;
-    }
-    return nv;
-  }
-  async function deleteVariable(id) {
-    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-    if (!v || v.remote) throw new VarGoneError("variable not found");
-    const name = v.name;
-    v.remove();
-    return name;
-  }
-
-  // src/lib/scopes.ts
-  var FIELD_SCOPE = {
-    width: "WIDTH_HEIGHT",
-    height: "WIDTH_HEIGHT",
-    itemSpacing: "GAP",
-    counterAxisSpacing: "GAP",
-    gridRowGap: "GAP",
-    gridColumnGap: "GAP",
-    paddingLeft: "GAP",
-    paddingRight: "GAP",
-    paddingTop: "GAP",
-    paddingBottom: "GAP",
-    topLeftRadius: "CORNER_RADIUS",
-    topRightRadius: "CORNER_RADIUS",
-    bottomLeftRadius: "CORNER_RADIUS",
-    bottomRightRadius: "CORNER_RADIUS",
-    strokeWeight: "STROKE_FLOAT",
-    strokeTopWeight: "STROKE_FLOAT",
-    strokeRightWeight: "STROKE_FLOAT",
-    strokeBottomWeight: "STROKE_FLOAT",
-    strokeLeftWeight: "STROKE_FLOAT",
-    fontSize: "FONT_SIZE",
-    lineHeight: "LINE_HEIGHT",
-    letterSpacing: "LETTER_SPACING",
-    opacity: "OPACITY"
-  };
-  var STROKE_SCOPES = ["STROKE_COLOR"];
-  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
-  var TEXT_FILLS = ["ALL_FILLS", "TEXT_FILL"];
-  var FRAME_FILLS = ["ALL_FILLS", "FRAME_FILL"];
-  var SHAPE_FILLS = ["ALL_FILLS", "SHAPE_FILL"];
-  function fillScopesFor(nodeType) {
-    if (nodeType === "TEXT") return TEXT_FILLS;
-    if (FRAME_LIKE.has(nodeType)) return FRAME_FILLS;
-    return SHAPE_FILLS;
-  }
-  var EFFECT_SCOPES = ["EFFECT_COLOR"];
-
-  // src/lib/applyVar.ts
-  var allows = (scopes, need) => scopes.includes("ALL_SCOPES") || need.some((s) => scopes.includes(s));
-  var visibleSolidIdx = (list) => {
-    if (!Array.isArray(list)) return -1;
-    for (let i = list.length - 1; i >= 0; i--) {
-      const p = list[i];
-      if (p && p.type === "SOLID" && p.visible !== false) return i;
-    }
-    return -1;
-  };
-  var hasVisible = (list) => Array.isArray(list) && list.some((p) => p && p.visible !== false);
-  var newSolid = () => ({ type: "SOLID", color: { r: 0, g: 0, b: 0 }, opacity: 1, visible: true, blendMode: "NORMAL" });
-  async function detachStyle(node, field) {
-    const n = node;
-    if (!(field in n) || !n[field] || typeof n[field] !== "string") return;
-    const setter = `set${field[0].toUpperCase()}${field.slice(1)}Async`;
-    try {
-      const fn = n[setter];
-      if (typeof fn === "function") await fn.call(n, "");
-      else n[field] = "";
-    } catch (e) {
-    }
-  }
-  function fillProp(textOnly) {
-    return {
-      scopeOk: (scopes, node) => allows(scopes, fillScopesFor(node.type)),
-      check(node, create) {
-        if (textOnly ? node.type !== "TEXT" : node.type === "TEXT") return "no-prop";
-        if (node.type === "GROUP" || node.type === "SLICE" || !("fills" in node)) return "no-prop";
-        if (create) return null;
-        const fills = node.fills;
-        return visibleSolidIdx(fills) >= 0 ? null : "no-prop";
-      },
-      async run(node, v) {
-        const n = node;
-        await detachStyle(node, "fillStyleId");
-        const fills = n.fills;
-        if (!Array.isArray(fills)) {
-          n.fills = [figma.variables.setBoundVariableForPaint(newSolid(), "color", v)];
-          return null;
-        }
-        const arr = fills.slice();
-        const i = visibleSolidIdx(arr);
-        if (i >= 0) arr[i] = figma.variables.setBoundVariableForPaint(arr[i], "color", v);
-        else arr.push(figma.variables.setBoundVariableForPaint(newSolid(), "color", v));
-        n.fills = arr;
-        return null;
-      }
-    };
-  }
-  var strokeColorProp = {
-    scopeOk: (scopes) => allows(scopes, ["STROKE_COLOR"]),
-    check(node, create) {
-      if (node.type === "GROUP" || node.type === "SLICE" || !("strokes" in node)) return "no-prop";
-      if (create) return null;
-      return visibleSolidIdx(node.strokes) >= 0 ? null : "no-stroke";
-    },
-    async run(node, v) {
-      const n = node;
-      await detachStyle(node, "strokeStyleId");
-      const strokes = Array.isArray(n.strokes) ? n.strokes.slice() : [];
-      const hadVisible = hasVisible(strokes);
-      const i = visibleSolidIdx(strokes);
-      if (i >= 0) strokes[i] = figma.variables.setBoundVariableForPaint(strokes[i], "color", v);
-      else strokes.push(figma.variables.setBoundVariableForPaint(newSolid(), "color", v));
-      n.strokes = strokes;
-      if (!hadVisible) {
-        try {
-          n.strokeWeight = 1;
-          n.strokeAlign = "INSIDE";
-        } catch (e) {
-        }
-      }
-      return null;
-    }
-  };
-  var shadowProp = {
-    scopeOk: (scopes) => allows(scopes, ["EFFECT_COLOR"]),
-    check(node) {
-      if (!("effects" in node)) return "no-shadow";
-      return shadowIdx(node.effects) >= 0 ? null : "no-shadow";
-    },
-    async run(node, v) {
-      const n = node;
-      await detachStyle(node, "effectStyleId");
-      const effs = n.effects.slice();
-      const i = shadowIdx(effs);
-      effs[i] = figma.variables.setBoundVariableForEffect(effs[i], "color", v);
-      n.effects = effs;
-      return null;
-    }
-  };
-  function shadowIdx(list) {
-    if (!Array.isArray(list)) return -1;
-    for (let i = list.length - 1; i >= 0; i--) {
-      const e = list[i];
-      if (e && (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") && e.visible !== false) return i;
-    }
-    return -1;
-  }
-  function bindFields(node, fields, v) {
-    const n = node;
-    for (const f of fields) n.setBoundVariable(f, v);
-  }
-  var isAutoLayout = (node) => {
-    const m = node.layoutMode;
-    return m === "HORIZONTAL" || m === "VERTICAL";
-  };
-  function gapProp(fields) {
-    return {
-      scopeOk: (scopes) => allows(scopes, ["GAP"]),
-      check: (node) => isAutoLayout(node) ? null : "not-autolayout",
-      async run(node, v) {
-        bindFields(node, fields(node), v);
-        return null;
-      }
-    };
-  }
-  var CORNER_FIELD = { "top-left": "topLeftRadius", "top-right": "topRightRadius", "bottom-left": "bottomLeftRadius", "bottom-right": "bottomRightRadius" };
-  var ALL_CORNERS = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"];
-  function radiusProp(fields) {
-    return {
-      scopeOk: (scopes) => allows(scopes, ["CORNER_RADIUS"]),
-      check: (node) => node.type !== "TEXT" && "topLeftRadius" in node ? null : "no-prop",
-      async run(node, v) {
-        bindFields(node, fields, v);
-        return null;
-      }
-    };
-  }
-  function sizeProp(fields) {
-    return {
-      scopeOk: (scopes) => allows(scopes, ["WIDTH_HEIGHT"]),
-      check: (node) => node.type === "TEXT" || node.type === "GROUP" || !("width" in node) ? "no-prop" : null,
-      async run(node, v) {
-        const n = node;
-        for (const f of fields) {
-          const key = f === "width" ? "layoutSizingHorizontal" : "layoutSizingVertical";
-          if (key in n && (n[key] === "HUG" || n[key] === "FILL")) {
-            try {
-              n[key] = "FIXED";
-            } catch (e) {
-            }
-          }
-        }
-        bindFields(node, fields, v);
-        return null;
-      }
-    };
-  }
-  var SIDE_WEIGHT = { top: "strokeTopWeight", right: "strokeRightWeight", bottom: "strokeBottomWeight", left: "strokeLeftWeight" };
-  function strokeWeightProp(field) {
-    return {
-      scopeOk: (scopes) => allows(scopes, ["STROKE_FLOAT"]),
-      check(node) {
-        if (!(field in node)) return "no-prop";
-        return hasVisible(node.strokes) ? null : "no-stroke";
-      },
-      async run(node, v) {
-        bindFields(node, [field], v);
-        return null;
-      }
-    };
-  }
-  var opacityProp = {
-    scopeOk: (scopes) => allows(scopes, ["OPACITY"]),
-    check: (node) => "opacity" in node ? null : "no-prop",
-    async run(node, v) {
-      bindFields(node, ["opacity"], v);
-      return null;
-    }
-  };
-  var TEXT_FIELD_SCOPE = { fontSize: "FONT_SIZE", lineHeight: "LINE_HEIGHT", letterSpacing: "LETTER_SPACING", fontFamily: "FONT_FAMILY" };
-  async function valueFor(v, node) {
-    var _a;
-    try {
-      const fn = v.resolveForConsumer;
-      if (typeof fn === "function") return fn.call(v, node).value;
-    } catch (e) {
-    }
-    let cur = v;
-    for (let i = 0; i < 12 && cur; i++) {
-      const raw = Object.values((_a = cur.valuesByMode) != null ? _a : {})[0];
-      if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
-        cur = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
-      } else return raw;
-    }
-    return void 0;
-  }
-  function textProp(field) {
-    return {
-      scopeOk: (scopes) => allows(scopes, [TEXT_FIELD_SCOPE[field]]),
-      check(node) {
-        if (node.type !== "TEXT") return "no-prop";
-        return node.characters.length ? null : "empty-text";
-      },
-      async run(node, v) {
-        const tn = node;
-        const len = tn.characters.length;
-        let fonts;
-        try {
-          fonts = typeof tn.getRangeAllFontNames === "function" ? tn.getRangeAllFontNames(0, len) : [tn.fontName];
-          for (const f of fonts) await figma.loadFontAsync(f);
-        } catch (e) {
-          return "font";
-        }
-        if (field === "fontFamily") {
-          const family = await valueFor(v, node);
-          if (typeof family !== "string") return "font";
-          try {
-            for (const f of fonts) await figma.loadFontAsync({ family, style: f.style });
-          } catch (e) {
-            return "font";
-          }
-        }
-        tn.setRangeBoundVariable(0, len, field, v);
-        return null;
-      }
-    };
-  }
-  var DIRS2 = ["top", "right", "bottom", "left"];
-  var PADDING = {
-    padding: ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"],
-    "padding-x": ["paddingLeft", "paddingRight"],
-    "padding-y": ["paddingTop", "paddingBottom"],
-    "padding-top": ["paddingTop"],
-    "padding-right": ["paddingRight"],
-    "padding-bottom": ["paddingBottom"],
-    "padding-left": ["paddingLeft"]
-  };
-  var wraps = (node) => node.layoutWrap === "WRAP";
-  function lastSeg(name) {
-    var _a;
-    const segs = name.split("/").map((s) => s.trim().toLowerCase());
-    return (_a = segs[segs.length - 1]) != null ? _a : "";
-  }
-  function textFieldOf(name, scopes) {
-    const segs = name.split("/").map((s) => s.trim().toLowerCase());
-    const byName2 = { "font-size": "fontSize", "line-height": "lineHeight", "letter-spacing": "letterSpacing", "font-family": "fontFamily" };
-    for (const s of [segs[segs.length - 1], segs[0]]) if (s && byName2[s]) return byName2[s];
-    const byScope = { FONT_SIZE: "fontSize", LINE_HEIGHT: "lineHeight", LETTER_SPACING: "letterSpacing", FONT_FAMILY: "fontFamily" };
-    for (const s of scopes) if (byScope[s]) return byScope[s];
-    return null;
-  }
-  function propsFor(kind, v, node) {
-    var _a;
-    const last = lastSeg(v.name);
-    switch (kind) {
-      case "color":
-        return [fillProp(node.type === "TEXT"), strokeColorProp, shadowProp];
-      case "gap": {
-        if (PADDING[last]) {
-          const f = PADDING[last];
-          return [gapProp(() => f)];
-        }
-        if (last === "row-gap") return [gapProp((n) => [wraps(n) ? "counterAxisSpacing" : "itemSpacing"])];
-        return [gapProp(() => ["itemSpacing"])];
-      }
-      case "radius": {
-        const corner = Object.keys(CORNER_FIELD).find((c) => last === `radius-${c}`);
-        return [radiusProp(corner ? [CORNER_FIELD[corner]] : ALL_CORNERS)];
-      }
-      case "size":
-        return [sizeProp(last === "width" ? ["width"] : last === "height" ? ["height"] : ["width", "height"])];
-      case "stroke": {
-        const dir = DIRS2.find((d) => last.endsWith(`-${d}`));
-        return [strokeWeightProp(dir ? SIDE_WEIGHT[dir] : "strokeWeight")];
-      }
-      case "opacity":
-        return [opacityProp];
-      case "text": {
-        const f = textFieldOf(v.name, (_a = v.scopes) != null ? _a : []);
-        return f ? [textProp(f)] : [];
-      }
-      default:
-        return [];
-    }
-  }
-  function propForTarget(kind, target) {
-    var _a;
-    if (!((_a = APPLY_TARGETS[kind]) != null ? _a : []).includes(target)) return null;
-    switch (target) {
-      case "fill":
-        return fillProp(false);
-      case "text":
-        return fillProp(true);
-      case "stroke":
-        return strokeColorProp;
-      case "shadow":
-        return shadowProp;
-      case "gap":
-        return gapProp(() => ["itemSpacing"]);
-      case "radius":
-        return radiusProp(ALL_CORNERS);
-      case "radius-tl":
-        return radiusProp(["topLeftRadius"]);
-      case "radius-tr":
-        return radiusProp(["topRightRadius"]);
-      case "radius-bl":
-        return radiusProp(["bottomLeftRadius"]);
-      case "radius-br":
-        return radiusProp(["bottomRightRadius"]);
-      default:
-        return PADDING[target] ? gapProp(() => PADDING[target]) : null;
-    }
-  }
-  async function applyVariableToNodes(nodes, variable, target) {
-    var _a;
-    const res = { applied: 0, skipped: 0, skipReasons: {} };
-    const skip2 = (r) => {
-      var _a2;
-      res.skipped++;
-      res.skipReasons[r] = ((_a2 = res.skipReasons[r]) != null ? _a2 : 0) + 1;
-    };
-    const scopes = (_a = variable.scopes) != null ? _a : [];
-    const kind = varKind({ name: variable.name, type: variable.resolvedType, scopes });
-    for (const node of nodes) {
-      try {
-        if (kind === "other") {
-          skip2("other-kind");
-          continue;
-        }
-        if (target) {
-          const p = propForTarget(kind, target);
-          if (!p) {
-            skip2("no-prop");
-            continue;
-          }
-          if (!targetAllowed(scopes, target)) {
-            skip2("no-scope");
-            continue;
-          }
-          const why = p.check(node, true);
-          if (why) {
-            skip2(why);
-            continue;
-          }
-          if (!p.scopeOk(scopes, node)) {
-            skip2("no-scope");
-            continue;
-          }
-          const r3 = await p.run(node, variable, true);
-          if (r3) skip2(r3);
-          else res.applied++;
-          continue;
-        }
-        const list = propsFor(kind, variable, node);
-        let firstWhy = null;
-        let chosen = null;
-        for (let i = 0; i < list.length; i++) {
-          const p = list[i];
-          if (!p.scopeOk(scopes, node)) continue;
-          const create = i === 0;
-          const why = p.check(node, create);
-          if (!why) {
-            chosen = { p, create };
-            break;
-          }
-          firstWhy != null ? firstWhy : firstWhy = why;
-        }
-        if (!chosen) {
-          skip2(firstWhy != null ? firstWhy : "no-scope");
-          continue;
-        }
-        const r = await chosen.p.run(node, variable, chosen.create);
-        if (r) skip2(r);
-        else res.applied++;
-      } catch (e) {
-        skip2("error");
-      }
-    }
-    return res;
-  }
-
-  // src/lib/textStyles.ts
-  var RAMP_NAMES = ["display", "h1", "h2", "h3", "title", "body", "caption", "overline"];
-  function tsSig(s) {
-    return `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
-  }
-  var sigKey = tsSig;
-  function clusterTextStyles(samples) {
-    var _a;
-    const map = /* @__PURE__ */ new Map();
-    const ids = /* @__PURE__ */ new Map();
-    for (const s of samples) {
-      const k = sigKey(s);
-      const ex = map.get(k);
-      if (ex) {
-        ex.count++;
-        if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent;
-        if (!ex.letterSpacingPercent && s.letterSpacingPercent) ex.letterSpacingPercent = s.letterSpacingPercent;
-      } else {
-        map.set(k, {
-          fontSize: s.fontSize,
-          lineHeight: s.lineHeight,
-          lineHeightPercent: s.lineHeightPercent,
-          letterSpacing: s.letterSpacing,
-          letterSpacingPercent: (_a = s.letterSpacingPercent) != null ? _a : 0,
-          family: s.family,
-          style: s.style,
-          count: 1,
-          sample: s.layerName,
-          nodeIds: [],
-          styleIds: []
-        });
-        ids.set(k, /* @__PURE__ */ new Set());
-      }
-      if (s.id) map.get(k).nodeIds.push(s.id);
-      if (s.styleId) ids.get(k).add(s.styleId);
-    }
-    for (const [k, c] of map) c.styleIds = [...ids.get(k)];
-    return [...map.values()];
-  }
-  var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  function nameTextStyles(clusters, existing) {
-    var _a, _b, _c;
-    const nameById = /* @__PURE__ */ new Map();
-    const sigById = /* @__PURE__ */ new Map();
-    const idBySig = /* @__PURE__ */ new Map();
-    for (const e of existing != null ? existing : []) {
-      nameById.set(e.id, e.name);
-      const k = sigKey(e);
-      sigById.set(e.id, k);
-      idBySig.set(k, idBySig.has(k) ? null : e.id);
-    }
-    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
-    const boundIdOf = (c) => {
-      if (!existing) return void 0;
-      if (c.styleIds.length === 1) {
-        const id = c.styleIds[0];
-        if (nameById.has(id) && sigById.get(id) === sigKey(c)) return id;
-      }
-      const sigId = idBySig.get(sigKey(c));
-      return sigId && nameById.has(sigId) ? sigId : void 0;
-    };
-    const sizesDesc = [...new Set(clusters.map((c) => c.fontSize))].sort((a, b) => b - a);
-    const baseBySize = /* @__PURE__ */ new Map();
-    sizesDesc.forEach((sz, i) => baseBySize.set(sz, i < RAMP_NAMES.length ? RAMP_NAMES[i] : `text-${i + 1}`));
-    const used = /* @__PURE__ */ new Set();
-    const unique = (n) => {
-      if (!used.has(n)) {
-        used.add(n);
-        return n;
-      }
-      let k = 2;
-      while (used.has(`${n}-${k}`)) k++;
-      const u = `${n}-${k}`;
-      used.add(u);
-      return u;
-    };
-    for (const c of clusters) {
-      const id = boundIdOf(c);
-      if (id) used.add(nameById.get(id));
-    }
-    const specs = [];
-    for (const sz of sizesDesc) {
-      const base = baseBySize.get(sz);
-      const group = clusters.filter((c) => c.fontSize === sz).sort((a, b) => b.count - a.count || b.lineHeight - a.lineHeight);
-      const weightUnique = new Set(group.map((c) => slug(c.style))).size === group.length;
-      for (const c of group) {
-        const boundId = boundIdOf(c);
-        const name = boundId ? nameById.get(boundId) : unique(group.length === 1 ? base : weightUnique ? `${base}/${slug(c.style)}` : `${base}/${slug(c.family)}-${slug(c.style)}`);
-        const ex = boundId ? existingById.get(boundId) : void 0;
-        const lineHeightPercent = c.lineHeightPercent || (ex == null ? void 0 : ex.lineHeightPercent) || 0;
-        const letterSpacingPercent = ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? c.letterSpacingPercent : (_b = ex == null ? void 0 : ex.letterSpacingPercent) != null ? _b : 0;
-        specs.push(__spreadValues(__spreadProps(__spreadValues(__spreadValues(__spreadValues({
-          name,
-          fontSize: c.fontSize,
-          lineHeight: c.lineHeight,
-          letterSpacing: c.letterSpacing,
-          family: c.family,
-          style: c.style
-        }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}), {
-          count: c.count
-        }), ((_c = c.nodeIds) == null ? void 0 : _c.length) ? { nodeIds: c.nodeIds } : {}));
-      }
-    }
-    return specs;
-  }
-  var LABEL_RAMP_RE = /^(display|h[1-6]|title|body|caption|overline)(\/\S+)?$/i;
-  function isRowLabelNameLike(characters) {
-    const t2 = characters.trim();
-    if (!t2 || t2.includes("\n")) return false;
-    if (t2.length <= 24) return true;
-    return LABEL_RAMP_RE.test(t2);
-  }
-  function pairHorizontalRowLabel(row) {
-    var _a, _b, _c, _d, _e, _f, _g;
-    if (row.length < 2) return null;
-    const byIndex = [...row].sort((a, b) => {
-      var _a2, _b2;
-      return ((_a2 = a.indexInParent) != null ? _a2 : 0) - ((_b2 = b.indexInParent) != null ? _b2 : 0);
-    });
-    const pool = isRowLabelNameLike((_a = byIndex[0].characters) != null ? _a : "") ? byIndex.slice(1) : byIndex;
-    let specimen = pool[0];
-    for (let i = 1; i < pool.length; i++) {
-      const s = pool[i];
-      const si = (_b = s.indexInParent) != null ? _b : 0;
-      const pi = (_c = specimen.indexInParent) != null ? _c : 0;
-      if (s.fontSize > specimen.fontSize || s.fontSize === specimen.fontSize && si > pi) {
-        specimen = s;
-      }
-    }
-    const specIdx = (_d = specimen.indexInParent) != null ? _d : 0;
-    const left = row.filter((s) => {
-      var _a2;
-      return ((_a2 = s.indexInParent) != null ? _a2 : 0) < specIdx;
-    });
-    if (!left.length) return null;
-    const cands = [];
-    for (const s of left) {
-      const nameLike = isRowLabelNameLike((_e = s.characters) != null ? _e : "");
-      const smaller = s.fontSize < specimen.fontSize;
-      if (!nameLike && !smaller) continue;
-      const idx = (_f = s.indexInParent) != null ? _f : 0;
-      let score = 1e3 - idx;
-      if (nameLike) score += 100;
-      if (smaller) score += 50;
-      cands.push({ s, score });
-    }
-    if (!cands.length) return null;
-    cands.sort((a, b) => b.score - a.score);
-    if (cands.length > 1 && cands[0].score === cands[1].score) return null;
-    const label = cands[0].s;
-    const labelName = ((_g = label.characters) != null ? _g : "").trim();
-    if (!labelName) return null;
-    return { label, specimen, labelName };
-  }
-  function nameTextStylesWithRowLabels(samples, existing) {
-    var _a;
-    const excludeIds = /* @__PURE__ */ new Set();
-    const labelBySig = /* @__PURE__ */ new Map();
-    const byRow = /* @__PURE__ */ new Map();
-    for (const s of samples) {
-      if (!s.rowId || s.id == null || s.indexInParent == null) continue;
-      const list = (_a = byRow.get(s.rowId)) != null ? _a : [];
-      list.push(s);
-      byRow.set(s.rowId, list);
-    }
-    for (const row of byRow.values()) {
-      if (row.length < 2) continue;
-      const pair = pairHorizontalRowLabel(row);
-      if (!pair || !pair.specimen.id) continue;
-      const k = sigKey(pair.specimen);
-      if (!labelBySig.has(k)) labelBySig.set(k, pair.labelName);
-      for (const s of row) {
-        if (!s.id || s.id === pair.specimen.id) continue;
-        excludeIds.add(s.id);
-      }
-    }
-    const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
-    const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
-    const used = /* @__PURE__ */ new Set();
-    const unique = (n) => {
-      const base = n || "text";
-      if (!used.has(base)) {
-        used.add(base);
-        return base;
-      }
-      let i = 2;
-      while (used.has(`${base}-${i}`)) i++;
-      const u = `${base}-${i}`;
-      used.add(u);
-      return u;
-    };
-    for (const s of styles) {
-      if (s.boundStyleId) used.add(s.name);
-    }
-    let labeled = 0;
-    let fallback = 0;
-    for (const style of styles) {
-      if (style.boundStyleId) continue;
-      const label = labelBySig.get(sigKey(style));
-      if (label) {
-        style.name = unique(label);
-        labeled++;
-      }
-    }
-    for (const style of styles) {
-      if (style.boundStyleId) continue;
-      if (labelBySig.has(sigKey(style))) continue;
-      style.name = unique(style.name);
-      fallback++;
-    }
-    return { styles, labeled, fallback };
-  }
-
   // src/lib/naming.ts
   var EMITTED_ROLES = [
     // 구조 폴백(역할을 못 정했을 때)
@@ -3890,15 +2092,673 @@
     return known.length ? known[known.length - 1] : segs[segs.length - 1];
   }
 
+  // src/lib/exporters.ts
+  var WEIGHT_NAMES = {
+    thin: 100,
+    hairline: 100,
+    extralight: 200,
+    ultralight: 200,
+    light: 300,
+    regular: 400,
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    demibold: 600,
+    bold: 700,
+    extrabold: 800,
+    ultrabold: 800,
+    black: 900,
+    heavy: 900
+  };
+  function splitWeightStyle(value) {
+    var _a;
+    if (typeof value === "number") return { weight: value, italic: false };
+    const s = String(value);
+    const italic = /italic|oblique/i.test(s);
+    const cleaned = s.replace(/italic|oblique/gi, "").replace(/[\s_-]/g, "").toLowerCase();
+    const weight = (_a = WEIGHT_NAMES[cleaned]) != null ? _a : Number(cleaned) || 400;
+    return { weight, italic };
+  }
+  function dimension(token, opts) {
+    const n = Number(token.value);
+    if (token.kind === "fontSize" && opts.fontSizeUnit === "rem") {
+      const r = n / opts.base;
+      return `${Number(r.toFixed(4))}rem`;
+    }
+    return `${n}px`;
+  }
+  function cssLiteral(token, opts) {
+    var _a;
+    switch (token.kind) {
+      case "color":
+        return String(token.value);
+      case "fontFamily":
+        return String(token.value);
+      case "opacity":
+        return String(token.value);
+      case "lineHeight":
+      case "letterSpacing":
+        return (_a = token.description) != null ? _a : `${Number(token.value)}px`;
+      case "fontWeight":
+        return String(splitWeightStyle(token.value).weight);
+      case "fontSize":
+      case "spacing":
+      case "radius":
+      case "size":
+      case "strokeWidth":
+      case "effectFloat":
+        return dimension(token, opts);
+      default:
+        return String(token.value);
+    }
+  }
+  var cssVar = (name) => `--${kebab(name)}`;
+  function toCss(tokens, opts) {
+    const lines = [":root {"];
+    for (const t2 of tokens) {
+      if (t2.aliasOf) {
+        lines.push(`  ${cssVar(t2.name)}: var(${cssVar(t2.aliasOf)});`);
+      } else {
+        lines.push(`  ${cssVar(t2.name)}: ${cssLiteral(t2, opts)};`);
+        if (t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
+          lines.push(`  ${cssVar(t2.name)}-style: italic;`);
+        }
+      }
+    }
+    lines.push("}");
+    return lines.join("\n");
+  }
+  var W3C_TYPE = {
+    color: "color",
+    fontSize: "dimension",
+    spacing: "dimension",
+    radius: "dimension",
+    size: "dimension",
+    strokeWidth: "dimension",
+    effectFloat: "dimension",
+    fontFamily: "fontFamily",
+    fontWeight: "fontWeight",
+    opacity: "number",
+    lineHeight: "lineHeight",
+    // 비표준(DTCG 미정의) — 단위 보존 위해 문자열 값
+    letterSpacing: "letterSpacing"
+    // 비표준
+  };
+  var w3cRef = (name) => `{${name.split("/").filter(Boolean).join(".")}}`;
+  function w3cValue(token, opts) {
+    var _a, _b;
+    if (token.aliasOf) return w3cRef(token.aliasOf);
+    switch (token.kind) {
+      case "color":
+      case "fontFamily":
+        return String(token.value);
+      case "lineHeight":
+      case "letterSpacing":
+        return (_a = token.description) != null ? _a : `${Number(token.value)}px`;
+      case "opacity":
+        return Number(token.value);
+      case "fontWeight":
+        return splitWeightStyle(token.value).weight;
+      case "fontSize":
+      case "spacing":
+      case "radius":
+      case "size":
+      case "strokeWidth":
+      case "effectFloat":
+        return dimension(token, opts);
+      default:
+        return (_b = token.value) != null ? _b : "";
+    }
+  }
+  function toW3C(tokens, opts) {
+    var _a;
+    const root = {};
+    for (const t2 of tokens) {
+      const segs = t2.name.split("/").filter(Boolean);
+      let node = root;
+      for (let i = 0; i < segs.length - 1; i++) {
+        const key = segs[i];
+        if (!node[key] || "$value" in node[key]) node[key] = (_a = node[key]) != null ? _a : {};
+        node = node[key];
+      }
+      const leaf = { $value: w3cValue(t2, opts) };
+      const ty = W3C_TYPE[t2.kind];
+      if (ty) leaf.$type = ty;
+      node[segs[segs.length - 1]] = leaf;
+      if (!t2.aliasOf && t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
+        node[`${segs[segs.length - 1]}-style`] = { $type: "fontStyle", $value: "italic" };
+      }
+    }
+    return JSON.stringify(root, null, 2);
+  }
+  function dedupeByName(tokens) {
+    const seen = /* @__PURE__ */ new Map();
+    for (const t2 of tokens) {
+      const prev = seen.get(t2.name);
+      if (!prev || prev.collection === "Semantic" && t2.collection === "Global") seen.set(t2.name, t2);
+    }
+    return [...seen.values()];
+  }
+  var TYPO_PREFIX = "typography";
+  var pct = (n) => `${Number(n.toFixed(2))}%`;
+  var lineHeightStr = (lh) => lh.unit === "auto" ? "normal" : lh.unit === "percent" ? pct(lh.value) : `${Number(lh.value.toFixed(2))}px`;
+  var letterSpacingStr = (ls) => ls.unit === "percent" ? pct(ls.value) : `${Number(ls.value.toFixed(2))}px`;
+  var fontSizeStr = (px, opts) => opts.fontSizeUnit === "rem" ? `${Number((px / opts.base).toFixed(4))}rem` : `${px}px`;
+  function textStylesToCss(styles, opts) {
+    const lines = [];
+    for (const st of styles) {
+      const base = cssVar(`${TYPO_PREFIX}/${st.name}`);
+      const { weight, italic } = splitWeightStyle(st.fontStyle);
+      lines.push(`  ${base}-font-family: ${st.fontFamily};`);
+      lines.push(`  ${base}-font-size: ${fontSizeStr(st.fontSize, opts)};`);
+      lines.push(`  ${base}-font-weight: ${weight};`);
+      if (italic) lines.push(`  ${base}-font-style: italic;`);
+      lines.push(`  ${base}-line-height: ${lineHeightStr(st.lineHeight)};`);
+      lines.push(`  ${base}-letter-spacing: ${letterSpacingStr(st.letterSpacing)};`);
+    }
+    return lines;
+  }
+  function textStylesToW3C(styles, opts, root) {
+    var _a;
+    for (const st of styles) {
+      const segs = [TYPO_PREFIX, ...st.name.split("/").filter(Boolean)];
+      let node = root;
+      for (let i = 0; i < segs.length - 1; i++) {
+        const key = segs[i];
+        if (!node[key] || "$value" in node[key]) node[key] = (_a = node[key]) != null ? _a : {};
+        node = node[key];
+      }
+      const { weight, italic } = splitWeightStyle(st.fontStyle);
+      const value = {
+        fontFamily: st.fontFamily,
+        fontSize: fontSizeStr(st.fontSize, opts),
+        fontWeight: weight,
+        lineHeight: lineHeightStr(st.lineHeight),
+        // DTCG는 number(배율)를 권하지만 원본 %를 그대로 보존(2026-10-28 결정)
+        letterSpacing: letterSpacingStr(st.letterSpacing)
+      };
+      if (italic) value.fontStyle = "italic";
+      node[segs[segs.length - 1]] = { $type: "typography", $value: value };
+    }
+  }
+  function exportTokens(tokens, opts, textStyles = []) {
+    const list = dedupeByName(tokens);
+    if (opts.format === "css") {
+      const css = toCss(list, opts);
+      if (!textStyles.length) return css;
+      const body = css.slice(0, css.lastIndexOf("}"));
+      return `${body}${textStylesToCss(textStyles, opts).join("\n")}
+}`;
+    }
+    const root = JSON.parse(toW3C(list, opts));
+    textStylesToW3C(textStyles, opts, root);
+    return JSON.stringify(root, null, 2);
+  }
+
+  // src/lib/krdsType.ts
+  var KRDS_SIZES = [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60];
+  var KRDS_STEPS = {
+    display: [
+      { step: "large", ref: 60, min: 52 },
+      { step: "medium", ref: 44, min: -Infinity }
+    ],
+    heading: [
+      { step: "xlarge", ref: 40, min: 36 },
+      { step: "large", ref: 32, min: 28 },
+      { step: "medium", ref: 24, min: 21.5 },
+      { step: "small", ref: 19, min: 18 },
+      { step: "xsmall", ref: 17, min: 16 },
+      { step: "xxsmall", ref: 15, min: -Infinity }
+    ],
+    body: [
+      { step: "large", ref: 19, min: 18 },
+      { step: "medium", ref: 17, min: 16 },
+      { step: "small", ref: 15, min: 14 },
+      { step: "xsmall", ref: 13, min: -Infinity }
+    ],
+    label: [
+      { step: "large", ref: 19, min: 18 },
+      { step: "medium", ref: 17, min: 16 },
+      { step: "small", ref: 15, min: 14 },
+      { step: "xsmall", ref: 13, min: -Infinity }
+    ]
+  };
+  function round1(n) {
+    const r = Math.sign(n) * Math.round(Math.abs(n) * 10) / 10;
+    return r === 0 ? 0 : r;
+  }
+  function krdsNum(n) {
+    return String(round1(n)).replace("-", "m").replace(".", "_");
+  }
+  var WIDTH_OPTICAL_RE = /(?:semi|extra|ultra)?[\s_-]*(?:condensed|narrow|compressed|expanded|extended|wide|display|text|caption|micro)/gi;
+  function weightOf(style) {
+    const stripped = String(style != null ? style : "").replace(WIDTH_OPTICAL_RE, " ");
+    const r = splitWeightStyle(stripped);
+    const weight = Number.isFinite(r.weight) && r.weight >= 1 && r.weight <= 1e3 ? r.weight : 400;
+    return { weight, italic: r.italic };
+  }
+  function lineHeightPct(i) {
+    if (!i.lineHeight) return "auto";
+    const p = i.lineHeightPercent ? i.lineHeightPercent : i.fontSize ? i.lineHeight / i.fontSize * 100 : 0;
+    return Math.round(p);
+  }
+  var LABEL_TOKENS = /* @__PURE__ */ new Set(["label", "button", "btn", "chip", "input", "field"]);
+  function krdsCategory(input, path = "scan") {
+    var _a, _b, _c;
+    if (path === "scan") {
+      const ui = (_a = input.uiCount) != null ? _a : 0;
+      if (ui > 0 && ui * 2 >= ((_b = input.count) != null ? _b : 0)) return "label";
+    } else {
+      const tokens = String((_c = input.name) != null ? _c : "").split(/[/\-_\s]+/).map((t2) => t2.toLowerCase());
+      if (tokens.some((t2) => LABEL_TOKENS.has(t2))) return "label";
+    }
+    const { weight } = weightOf(input.style);
+    const size = round1(input.fontSize);
+    if (weight >= 600 && size >= 42) return "display";
+    if (weight >= 600) return "heading";
+    return "body";
+  }
+  function krdsStepDef(category, size) {
+    var _a;
+    const d = round1(size);
+    const steps = KRDS_STEPS[category];
+    return (_a = steps.find((s) => d >= s.min)) != null ? _a : steps[steps.length - 1];
+  }
+  function offScale(size) {
+    const d = round1(size);
+    let nearest = KRDS_SIZES[0];
+    for (const k of KRDS_SIZES) {
+      const dk = Math.abs(k - d);
+      const dn = Math.abs(nearest - d);
+      if (dk < dn || dk === dn && k > nearest) nearest = k;
+    }
+    const kind = !Number.isInteger(d) ? "decimal" : KRDS_SIZES.includes(d) ? null : "off";
+    return { kind, nearest };
+  }
+  var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  var sigOf = (i) => `${i.fontSize}|${i.lineHeight}|${i.letterSpacing}|${i.family}|${i.style}`;
+  function groupBy(items, key) {
+    const m = /* @__PURE__ */ new Map();
+    for (const it of items) {
+      const k = key(it);
+      const l = m.get(k);
+      if (l) l.push(it);
+      else m.set(k, [it]);
+    }
+    return [...m.values()];
+  }
+  var cmpLast = (a, b) => {
+    var _a, _b, _c, _d;
+    return b.count - a.count || cmpStr(sigOf(a.input), sigOf(b.input)) || cmpStr((_a = a.input.name) != null ? _a : "", (_b = b.input.name) != null ? _b : "") || cmpStr((_c = a.input.id) != null ? _c : "", (_d = b.input.id) != null ? _d : "") || a.idx - b.idx;
+  };
+  var weightKey = (w) => `${w.weight}${w.italic ? "i" : ""}`;
+  var lhTail = (lh) => lh === "auto" ? "-auto" : lh === 150 ? "" : `-${lh}`;
+  function nameKrdsStyles(inputs, opts = {}) {
+    var _a, _b, _c;
+    const path = (_a = opts.path) != null ? _a : "scan";
+    const anchored = (_b = opts.anchored) != null ? _b : /* @__PURE__ */ new Map();
+    const out = inputs.map((_, i) => {
+      var _a2;
+      return (_a2 = anchored.get(i)) != null ? _a2 : "";
+    });
+    const works = [];
+    inputs.forEach((input, idx) => {
+      if (anchored.has(idx)) return;
+      const cat = krdsCategory(input, path);
+      const size = round1(input.fontSize);
+      const w = weightOf(input.style);
+      works.push({
+        idx,
+        input,
+        cat,
+        step: krdsStepDef(cat, size),
+        size,
+        weight: w.weight,
+        italic: w.italic,
+        lh: lineHeightPct(input),
+        ls: round1(input.letterSpacing || 0),
+        count: input.count || 0,
+        base: "",
+        lastTail: "",
+        name: ""
+      });
+    });
+    const sizeKey = /* @__PURE__ */ new Map();
+    for (const g of groupBy(works, (w) => `${w.cat}/${w.step.step}`)) {
+      const sizes = groupBy(g, (w) => String(w.size));
+      const ref = g[0].step.ref;
+      const ranked = sizes.map((ws) => ({ size: ws[0].size, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => Math.abs(a.size - ref) - Math.abs(b.size - ref) || b.used - a.used || b.size - a.size);
+      ranked.forEach((r, i) => {
+        for (const w of r.ws) sizeKey.set(w, `${w.cat}/${w.step.step}${i === 0 ? "" : `-${krdsNum(w.size)}`}`);
+      });
+    }
+    for (const g of groupBy(works, (w) => sizeKey.get(w))) {
+      const heavy = g[0].cat === "display" || g[0].cat === "heading";
+      const def = heavy ? 700 : 400;
+      const inDefault = (w) => heavy ? w.weight >= 600 : w.weight <= 500;
+      const weights = groupBy(g, weightKey).filter((ws) => inDefault(ws[0])).map((ws) => ({ w: ws[0], used: ws.reduce((s, x) => s + x.count, 0) })).sort(
+        (a, b) => b.used - a.used || Math.abs(a.w.weight - def) - Math.abs(b.w.weight - def) || Number(a.w.italic) - Number(b.w.italic) || a.w.weight - b.w.weight
+      );
+      const winner = weights.length ? weightKey(weights[0].w) : null;
+      for (const w of g) {
+        const wt = weightKey(w) === winner ? "" : `-w${weightKey(w)}`;
+        w.base = `${sizeKey.get(w)}${wt}${lhTail(w.lh)}`;
+        w.name = w.base;
+      }
+    }
+    for (const g of groupBy(works, (w) => w.name)) {
+      const byLs = groupBy(g, (w) => String(w.ls));
+      if (byLs.length < 2) continue;
+      const ranked = byLs.map((ws) => ({ ls: ws[0].ls, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort(
+        (a, b) => Number(b.ls === 0) - Number(a.ls === 0) || b.used - a.used || Math.abs(a.ls) - Math.abs(b.ls) || a.ls - b.ls
+      );
+      ranked.forEach((r, i) => {
+        if (i === 0) return;
+        for (const w of r.ws) {
+          w.lastTail += `-ls${krdsNum(w.ls)}`;
+          w.name = w.base + w.lastTail;
+        }
+      });
+    }
+    for (const g of groupBy(works, (w) => w.name)) {
+      const byFam = groupBy(g, (w) => w.input.family);
+      if (byFam.length < 2) continue;
+      const ranked = byFam.map((ws) => ({ fam: ws[0].input.family, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => b.used - a.used || cmpStr(a.fam, b.fam));
+      ranked.forEach((r, i) => {
+        if (i === 0) return;
+        for (const w of r.ws) {
+          w.lastTail += `-${slug(w.input.family) || "font"}`;
+          w.name = w.base + w.lastTail;
+        }
+      });
+    }
+    for (const g of groupBy(works, (w) => w.name)) {
+      if (g.length < 2) continue;
+      [...g].sort(cmpLast).forEach((w, i) => {
+        if (i > 0) w.name = `${w.name}-${i + 1}`;
+      });
+    }
+    const taken = new Set((_c = opts.reserved) != null ? _c : []);
+    for (const n of anchored.values()) taken.add(n);
+    const forced = [];
+    const claimed = /* @__PURE__ */ new Set();
+    for (const w of works) {
+      if (taken.has(w.name) || claimed.has(w.name)) forced.push(w);
+      else claimed.add(w.name);
+    }
+    for (const n of claimed) taken.add(n);
+    for (const w of [...forced].sort(cmpLast)) {
+      const wt = `-w${weightKey(w)}`;
+      const lh = w.lh === "auto" ? "-auto" : `-${w.lh}`;
+      const name = `${w.cat}/${w.step.step}-${krdsNum(w.size)}${wt}${lh}${w.lastTail}`;
+      let final = name;
+      for (let k = 2; taken.has(final); k++) final = `${name}-${k}`;
+      taken.add(final);
+      w.name = final;
+    }
+    for (const w of works) out[w.idx] = w.name;
+    return out;
+  }
+
+  // src/lib/textStyles.ts
+  function tsSig(s) {
+    return `${s.fontSize}|${s.lineHeight}|${s.letterSpacing}|${s.family}|${s.style}`;
+  }
+  var sigKey = tsSig;
+  function clusterTextStyles(samples) {
+    var _a;
+    const map = /* @__PURE__ */ new Map();
+    const ids = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      const k = sigKey(s);
+      const ex = map.get(k);
+      if (ex) {
+        ex.count++;
+        if (s.uiRole === true) ex.uiCount++;
+        if (!ex.lineHeightPercent && s.lineHeightPercent) ex.lineHeightPercent = s.lineHeightPercent;
+        if (!ex.letterSpacingPercent && s.letterSpacingPercent) ex.letterSpacingPercent = s.letterSpacingPercent;
+      } else {
+        map.set(k, {
+          fontSize: s.fontSize,
+          lineHeight: s.lineHeight,
+          lineHeightPercent: s.lineHeightPercent,
+          letterSpacing: s.letterSpacing,
+          letterSpacingPercent: (_a = s.letterSpacingPercent) != null ? _a : 0,
+          family: s.family,
+          style: s.style,
+          count: 1,
+          uiCount: s.uiRole === true ? 1 : 0,
+          sample: s.layerName,
+          nodeIds: [],
+          styleIds: []
+        });
+        ids.set(k, /* @__PURE__ */ new Set());
+      }
+      if (s.id) map.get(k).nodeIds.push(s.id);
+      if (s.styleId) ids.get(k).add(s.styleId);
+    }
+    for (const [k, c] of map) c.styleIds = [...ids.get(k)];
+    return [...map.values()];
+  }
+  function nameTextStyles(clusters, existing) {
+    const nameById = /* @__PURE__ */ new Map();
+    const sigById = /* @__PURE__ */ new Map();
+    const idBySig = /* @__PURE__ */ new Map();
+    for (const e of existing != null ? existing : []) {
+      nameById.set(e.id, e.name);
+      const k = sigKey(e);
+      sigById.set(e.id, k);
+      idBySig.set(k, idBySig.has(k) ? null : e.id);
+    }
+    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
+    const boundIdOf = (c) => {
+      if (!existing) return void 0;
+      if (c.styleIds.length === 1) {
+        const id = c.styleIds[0];
+        if (nameById.has(id) && sigById.get(id) === sigKey(c)) return id;
+      }
+      const sigId = idBySig.get(sigKey(c));
+      return sigId && nameById.has(sigId) ? sigId : void 0;
+    };
+    const ordered = [...clusters].sort(
+      (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
+    );
+    const boundIds = ordered.map(boundIdOf);
+    const anchored = /* @__PURE__ */ new Map();
+    boundIds.forEach((id, i) => {
+      if (id) anchored.set(i, nameById.get(id));
+    });
+    const anchoredNames = new Set(anchored.values());
+    const reserved = new Set((existing != null ? existing : []).map((e) => e.name).filter((n) => !anchoredNames.has(n)));
+    const inputs = ordered.map((c) => {
+      var _a;
+      return {
+        fontSize: c.fontSize,
+        lineHeight: c.lineHeight,
+        lineHeightPercent: c.lineHeightPercent,
+        letterSpacing: c.letterSpacing,
+        family: c.family,
+        style: c.style,
+        count: c.count,
+        uiCount: (_a = c.uiCount) != null ? _a : 0
+      };
+    });
+    const names = nameKrdsStyles(inputs, { reserved, anchored, path: "scan" });
+    return ordered.map((c, i) => {
+      var _a, _b, _c;
+      const boundId = boundIds[i];
+      const ex = boundId ? existingById.get(boundId) : void 0;
+      const lineHeightPercent = c.lineHeightPercent || (ex == null ? void 0 : ex.lineHeightPercent) || 0;
+      const letterSpacingPercent = ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? c.letterSpacingPercent : (_b = ex == null ? void 0 : ex.letterSpacingPercent) != null ? _b : 0;
+      return __spreadValues(__spreadProps(__spreadValues(__spreadValues(__spreadValues({
+        name: names[i],
+        fontSize: c.fontSize,
+        lineHeight: c.lineHeight,
+        letterSpacing: c.letterSpacing,
+        family: c.family,
+        style: c.style
+      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}), {
+        count: c.count
+      }), ((_c = c.nodeIds) == null ? void 0 : _c.length) ? { nodeIds: c.nodeIds } : {});
+    });
+  }
+  var LABEL_RAMP_RE = /^(display|heading|body|label|h[1-6]|title|caption|overline)(\/\S+)?$/i;
+  function isRowLabelNameLike(characters) {
+    const t2 = characters.trim();
+    if (!t2 || t2.includes("\n")) return false;
+    if (t2.length <= 24) return true;
+    return LABEL_RAMP_RE.test(t2);
+  }
+  function pairHorizontalRowLabel(row) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    if (row.length < 2) return null;
+    const byIndex = [...row].sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = a.indexInParent) != null ? _a2 : 0) - ((_b2 = b.indexInParent) != null ? _b2 : 0);
+    });
+    const pool = isRowLabelNameLike((_a = byIndex[0].characters) != null ? _a : "") ? byIndex.slice(1) : byIndex;
+    let specimen = pool[0];
+    for (let i = 1; i < pool.length; i++) {
+      const s = pool[i];
+      const si = (_b = s.indexInParent) != null ? _b : 0;
+      const pi = (_c = specimen.indexInParent) != null ? _c : 0;
+      if (s.fontSize > specimen.fontSize || s.fontSize === specimen.fontSize && si > pi) {
+        specimen = s;
+      }
+    }
+    const specIdx = (_d = specimen.indexInParent) != null ? _d : 0;
+    const left = row.filter((s) => {
+      var _a2;
+      return ((_a2 = s.indexInParent) != null ? _a2 : 0) < specIdx;
+    });
+    if (!left.length) return null;
+    const cands = [];
+    for (const s of left) {
+      const nameLike = isRowLabelNameLike((_e = s.characters) != null ? _e : "");
+      const smaller = s.fontSize < specimen.fontSize;
+      if (!nameLike && !smaller) continue;
+      const idx = (_f = s.indexInParent) != null ? _f : 0;
+      let score = 1e3 - idx;
+      if (nameLike) score += 100;
+      if (smaller) score += 50;
+      cands.push({ s, score });
+    }
+    if (!cands.length) return null;
+    cands.sort((a, b) => b.score - a.score);
+    if (cands.length > 1 && cands[0].score === cands[1].score) return null;
+    const label = cands[0].s;
+    const labelName = ((_g = label.characters) != null ? _g : "").trim();
+    if (!labelName) return null;
+    return { label, specimen, labelName };
+  }
+  function nameTextStylesWithRowLabels(samples, existing) {
+    var _a;
+    const excludeIds = /* @__PURE__ */ new Set();
+    const labelBySig = /* @__PURE__ */ new Map();
+    const byRow = /* @__PURE__ */ new Map();
+    for (const s of samples) {
+      if (!s.rowId || s.id == null || s.indexInParent == null) continue;
+      const list = (_a = byRow.get(s.rowId)) != null ? _a : [];
+      list.push(s);
+      byRow.set(s.rowId, list);
+    }
+    for (const row of byRow.values()) {
+      if (row.length < 2) continue;
+      const pair = pairHorizontalRowLabel(row);
+      if (!pair || !pair.specimen.id) continue;
+      const k = sigKey(pair.specimen);
+      if (!labelBySig.has(k)) labelBySig.set(k, pair.labelName);
+      for (const s of row) {
+        if (!s.id || s.id === pair.specimen.id) continue;
+        excludeIds.add(s.id);
+      }
+    }
+    const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
+    const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
+    const used = /* @__PURE__ */ new Set();
+    const unique = (n) => {
+      const base = n || "text";
+      if (!used.has(base)) {
+        used.add(base);
+        return base;
+      }
+      let i = 2;
+      while (used.has(`${base}-${i}`)) i++;
+      const u = `${base}-${i}`;
+      used.add(u);
+      return u;
+    };
+    for (const e of existing != null ? existing : []) used.add(e.name);
+    for (const s of styles) {
+      if (s.boundStyleId) used.add(s.name);
+    }
+    let labeled = 0;
+    let fallback = 0;
+    for (const style of styles) {
+      if (style.boundStyleId) continue;
+      const label = labelBySig.get(sigKey(style));
+      if (label) {
+        style.name = unique(label);
+        labeled++;
+      }
+    }
+    for (const style of styles) {
+      if (style.boundStyleId) continue;
+      if (labelBySig.has(sigKey(style))) continue;
+      style.name = unique(style.name);
+      fallback++;
+    }
+    return { styles, labeled, fallback };
+  }
+
+  // src/lib/scopes.ts
+  var FIELD_SCOPE = {
+    width: "WIDTH_HEIGHT",
+    height: "WIDTH_HEIGHT",
+    itemSpacing: "GAP",
+    counterAxisSpacing: "GAP",
+    gridRowGap: "GAP",
+    gridColumnGap: "GAP",
+    paddingLeft: "GAP",
+    paddingRight: "GAP",
+    paddingTop: "GAP",
+    paddingBottom: "GAP",
+    topLeftRadius: "CORNER_RADIUS",
+    topRightRadius: "CORNER_RADIUS",
+    bottomLeftRadius: "CORNER_RADIUS",
+    bottomRightRadius: "CORNER_RADIUS",
+    strokeWeight: "STROKE_FLOAT",
+    strokeTopWeight: "STROKE_FLOAT",
+    strokeRightWeight: "STROKE_FLOAT",
+    strokeBottomWeight: "STROKE_FLOAT",
+    strokeLeftWeight: "STROKE_FLOAT",
+    fontSize: "FONT_SIZE",
+    lineHeight: "LINE_HEIGHT",
+    letterSpacing: "LETTER_SPACING",
+    opacity: "OPACITY"
+  };
+  var STROKE_SCOPES = ["STROKE_COLOR"];
+  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
+  var TEXT_FILLS = ["ALL_FILLS", "TEXT_FILL"];
+  var FRAME_FILLS = ["ALL_FILLS", "FRAME_FILL"];
+  var SHAPE_FILLS = ["ALL_FILLS", "SHAPE_FILL"];
+  function fillScopesFor(nodeType) {
+    if (nodeType === "TEXT") return TEXT_FILLS;
+    if (FRAME_LIKE.has(nodeType)) return FRAME_FILLS;
+    return SHAPE_FILLS;
+  }
+  var EFFECT_SCOPES = ["EFFECT_COLOR"];
+
   // src/lib/selCards.ts
-  var PADDING2 = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
+  var PADDING = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
   var RADIUS = /* @__PURE__ */ new Set(["cornerRadius", "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]);
   var STROKE = /* @__PURE__ */ new Set(["strokeWeight", "strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"]);
   var TEXT = /* @__PURE__ */ new Set(["fontSize", "lineHeight", "letterSpacing", "fontFamily"]);
   var COLOR = /* @__PURE__ */ new Set(["fills", "strokes", "effects"]);
   function fieldKind(field) {
     if (!field) return "other";
-    if (field === "itemSpacing" || field === "counterAxisSpacing" || PADDING2.has(field) || field.startsWith("grid")) return "gap";
+    if (field === "itemSpacing" || field === "counterAxisSpacing" || PADDING.has(field) || field.startsWith("grid")) return "gap";
     if (RADIUS.has(field)) return "radius";
     if (field === "width" || field === "height") return "size";
     if (STROKE.has(field)) return "stroke";
@@ -5063,6 +3923,1792 @@
     return { count, nodeIds };
   }
 
+  // src/lib/varKind.ts
+  var FIRST_FLOAT = {
+    spacing: "gap",
+    radius: "radius",
+    size: "size",
+    "stroke-width": "stroke",
+    opacity: "opacity",
+    "font-size": "text",
+    "line-height": "text",
+    "letter-spacing": "text"
+  };
+  var DIRS = ["top", "right", "bottom", "left"];
+  var CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  function lastFloatKind(seg) {
+    if (["gap", "row-gap", "column-gap", "spacing", "padding", "padding-x", "padding-y"].includes(seg)) return "gap";
+    if (DIRS.some((d) => seg === `padding-${d}`)) return "gap";
+    if (seg === "radius" || CORNERS.some((c) => seg === `radius-${c}`)) return "radius";
+    if (["size", "width", "height"].includes(seg)) return "size";
+    if (seg === "stroke-width" || DIRS.some((d) => seg === `stroke-width-${d}`)) return "stroke";
+    if (seg === "opacity") return "opacity";
+    if (["font-size", "line-height", "letter-spacing"].includes(seg)) return "text";
+    return null;
+  }
+  var SCOPE_KIND = {
+    GAP: "gap",
+    CORNER_RADIUS: "radius",
+    WIDTH_HEIGHT: "size",
+    STROKE_FLOAT: "stroke",
+    OPACITY: "opacity",
+    FONT_SIZE: "text",
+    LINE_HEIGHT: "text",
+    LETTER_SPACING: "text",
+    FONT_FAMILY: "text"
+  };
+  function varKind(v) {
+    var _a, _b, _c;
+    if (v.type === "COLOR") return "color";
+    if (v.type === "BOOLEAN") return "other";
+    const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
+    const first = (_a = segs[0]) != null ? _a : "";
+    const last = (_b = segs[segs.length - 1]) != null ? _b : "";
+    if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
+    if (v.type === "STRING" && first === "font-family") return "text";
+    if (v.type === "FLOAT") {
+      const k = lastFloatKind(last);
+      if (k) return k;
+    }
+    if (v.type === "STRING" && last === "font-family") return "text";
+    if (v.type === "FLOAT" || v.type === "STRING") {
+      const kinds = new Set(((_c = v.scopes) != null ? _c : []).map((s) => SCOPE_KIND[s]).filter(Boolean));
+      if (kinds.size === 1) return [...kinds][0];
+    }
+    return "other";
+  }
+  var FILL_SUB = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  function expand(scopes) {
+    const out = /* @__PURE__ */ new Set();
+    for (const s of scopes) {
+      if (s === "ALL_FILLS") FILL_SUB.forEach((x) => out.add(x));
+      else out.add(s);
+    }
+    return out;
+  }
+  var APPLY_TARGETS = {
+    color: ["fill", "stroke", "text", "shadow"],
+    gap: ["gap", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right"],
+    radius: ["radius", "radius-tl", "radius-tr", "radius-bl", "radius-br"]
+  };
+  var TARGET_SCOPES = {
+    fill: ["FRAME_FILL", "SHAPE_FILL"],
+    text: ["TEXT_FILL"],
+    stroke: ["STROKE_COLOR"],
+    shadow: ["EFFECT_COLOR"],
+    gap: ["GAP"],
+    padding: ["GAP"],
+    "padding-top": ["GAP"],
+    "padding-right": ["GAP"],
+    "padding-bottom": ["GAP"],
+    "padding-left": ["GAP"],
+    radius: ["CORNER_RADIUS"],
+    "radius-tl": ["CORNER_RADIUS"],
+    "radius-tr": ["CORNER_RADIUS"],
+    "radius-bl": ["CORNER_RADIUS"],
+    "radius-br": ["CORNER_RADIUS"]
+  };
+  function targetAllowed(scopes, target) {
+    if (scopes.includes("ALL_SCOPES")) return true;
+    const ex = expand(scopes);
+    return TARGET_SCOPES[target].some((s) => ex.has(s));
+  }
+  var FREE_MANUAL_CREATE_LIMIT = 20;
+  var MANUAL_KEY = "dsl.manual";
+  function duplicateName(name, taken) {
+    const base = `${name}-copy`;
+    if (!taken.has(base)) return base;
+    for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
+  }
+
+  // src/lib/variables.ts
+  function isManualVar(v) {
+    try {
+      const fn = v.getPluginData;
+      return typeof fn === "function" && fn.call(v, MANUAL_KEY) === "1";
+    } catch (e) {
+      return false;
+    }
+  }
+  var vkey = (collectionId, name) => `${collectionId}\0${name}`;
+  async function buildVarIndex() {
+    const idx = /* @__PURE__ */ new Map();
+    for (const v of await figma.variables.getLocalVariablesAsync()) {
+      idx.set(vkey(v.variableCollectionId, v.name), v);
+    }
+    return idx;
+  }
+  function upsertVariable(name, collection, type, idx) {
+    const k = vkey(collection.id, name);
+    const existing = idx.get(k);
+    if (existing) return { variable: existing, created: false };
+    const variable = figma.variables.createVariable(name, collection, type);
+    idx.set(k, variable);
+    return { variable, created: true };
+  }
+  var REUSE_MAP_KEY = "dsl.reuseMap";
+  function literalOf(t2, type, base) {
+    var _a;
+    if (type === "COLOR") return colorKey(String(t2.value), t2.alpha);
+    if (type === "STRING") return String(t2.value);
+    return t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_a = t2.fontSize) != null ? _a : base }) : Number(t2.value);
+  }
+  function directValue(v, modeOf) {
+    var _a;
+    const raw = v.valuesByMode[(_a = modeOf.get(v.variableCollectionId)) != null ? _a : ""];
+    if (raw == null || typeof raw === "object" && raw.type === "VARIABLE_ALIAS") return void 0;
+    return raw;
+  }
+  function sameLiteral(raw, lit, type) {
+    if (raw == null) return false;
+    if (type === "COLOR") {
+      if (typeof raw !== "object" || !("r" in raw)) return false;
+      return colorKey(rgbToHex(raw), raw.a) === lit;
+    }
+    if (type === "STRING") return typeof raw === "string" && raw === lit;
+    return typeof raw === "number" && Math.round(raw * 100) === Math.round(Number(lit) * 100);
+  }
+  async function pickReusable(tokens, base) {
+    const out = /* @__PURE__ */ new Map();
+    const withUses = tokens.filter((t2) => {
+      var _a;
+      return (_a = t2.uses) == null ? void 0 : _a.length;
+    });
+    if (!withUses.length) return out;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const owned = ownedIds(cols);
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const userGlobals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId)).sort((a, b) => {
+      var _a, _b;
+      return ((_a = colIdx.get(a.variableCollectionId)) != null ? _a : 0) - ((_b = colIdx.get(b.variableCollectionId)) != null ? _b : 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+    for (const t2 of withUses) {
+      const type = resolvedTypeForToken(t2);
+      const lit = literalOf(t2, type, base);
+      const allowed = scopesForType(scopesForSources(t2.sources), type);
+      const hit = userGlobals.find((v) => {
+        var _a;
+        if (v.resolvedType !== type) return false;
+        const sc = (_a = v.scopes) != null ? _a : [];
+        if (!sc.includes("ALL_SCOPES") && !allowed.some((x) => sc.includes(x))) return false;
+        return sameLiteral(directValue(v, modeOf), lit, type);
+      });
+      if (hit) out.set(t2.name, hit);
+    }
+    return out;
+  }
+  function readReuseMap() {
+    var _a, _b;
+    try {
+      const raw = (_b = (_a = figma.root) == null ? void 0 : _a.getPluginData) == null ? void 0 : _b.call(_a, REUSE_MAP_KEY);
+      const o = raw ? JSON.parse(raw) : {};
+      return o && typeof o === "object" && !Array.isArray(o) ? o : {};
+    } catch (e) {
+      return {};
+    }
+  }
+  function writeReuseMap(map) {
+    var _a, _b;
+    try {
+      (_b = (_a = figma.root) == null ? void 0 : _a.setPluginData) == null ? void 0 : _b.call(_a, REUSE_MAP_KEY, JSON.stringify(map));
+    } catch (e) {
+    }
+  }
+  async function createTokens(tokens, base) {
+    const reuse = await pickReusable(tokens, base);
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set() };
+    const reuseMap = readReuseMap();
+    const toCreate = tokens.filter((t2) => !reuse.has(t2.name));
+    for (const [name, v] of reuse) {
+      summary.globalOf.set(name, v.id);
+      reuseMap[name] = v.id;
+    }
+    if (toCreate.length) {
+      const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), "global");
+      const gMode = globalCol.defaultModeId;
+      const idx = await buildVarIndex();
+      const touched = /* @__PURE__ */ new Set();
+      for (const t2 of toCreate) {
+        const type = resolvedTypeForToken(t2);
+        const mine = idx.get(vkey(globalCol.id, t2.name));
+        if (mine && isManualVar(mine)) {
+          if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gMode], literalOf(t2, type, base), type)) {
+            summary.globalOf.set(t2.name, mine.id);
+            delete reuseMap[t2.name];
+          } else if (!summary.skippedManualNames.has(t2.name)) {
+            summary.globalOf.delete(t2.name);
+            summary.skippedManualNames.add(t2.name);
+            summary.skippedManual++;
+          }
+          continue;
+        }
+        const g = upsertVariable(t2.name, globalCol, type, idx);
+        summary[g.created ? "created" : "updated"]++;
+        summary.globals++;
+        summary.globalOf.set(t2.name, g.variable.id);
+        delete reuseMap[t2.name];
+        setGlobalLiteral(g.variable, gMode, t2, type, base);
+        const scopes = scopesForType(scopesForSources(t2.sources), type);
+        const key = vkey(globalCol.id, t2.name);
+        const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
+        touched.add(key);
+        g.variable.scopes = merged;
+        g.variable.hiddenFromPublishing = true;
+        const desc = unitDescription(t2);
+        if (desc) g.variable.description = desc;
+      }
+    }
+    writeReuseMap(reuseMap);
+    return summary;
+  }
+  async function previewCreateTokens(tokens, base) {
+    var _a, _b;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const gId = (_b = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
+    const reuse = await pickReusable(tokens, base);
+    const existing = /* @__PURE__ */ new Set();
+    for (const v of await figma.variables.getLocalVariablesAsync()) existing.add(vkey(v.variableCollectionId, v.name));
+    const states = /* @__PURE__ */ new Map();
+    const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), tokenStates: states };
+    const setState = (name, st) => {
+      if (!states.has(name)) states.set(name, st);
+    };
+    const seen = /* @__PURE__ */ new Set();
+    const tally = (colId, name, kind) => {
+      const k = vkey(colId, name);
+      summary[kind]++;
+      if (seen.has(k)) {
+        summary.updated++;
+        return;
+      }
+      seen.add(k);
+      summary[existing.has(k) ? "updated" : "created"]++;
+    };
+    const gCol = cols.find((c) => c.id === gId);
+    const manualByName = /* @__PURE__ */ new Map();
+    if (gCol) {
+      for (const v of await figma.variables.getLocalVariablesAsync()) if (v.variableCollectionId === gId && isManualVar(v)) manualByName.set(v.name, v);
+    }
+    for (const t2 of tokens) {
+      const r = reuse.get(t2.name);
+      if (r) {
+        summary.globalOf.set(t2.name, r.id);
+        setState(t2.name, { state: "reuse", varName: r.name });
+        continue;
+      }
+      const mine = manualByName.get(t2.name);
+      if (mine && gCol) {
+        const type = resolvedTypeForToken(t2);
+        if (!summary.skippedManualNames.has(t2.name) && mine.resolvedType === type && sameLiteral(mine.valuesByMode[gCol.defaultModeId], literalOf(t2, type, base), type)) {
+          summary.globalOf.set(t2.name, mine.id);
+          setState(t2.name, { state: "reuse", varName: mine.name });
+        } else if (!summary.skippedManualNames.has(t2.name)) {
+          summary.globalOf.delete(t2.name);
+          summary.skippedManualNames.add(t2.name);
+          summary.skippedManual++;
+          states.set(t2.name, { state: "manual" });
+        }
+        continue;
+      }
+      setState(t2.name, { state: existing.has(vkey(gId, t2.name)) ? "update" : "new" });
+      tally(gId, t2.name, "globals");
+    }
+    return summary;
+  }
+  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    const withUses = tokens.filter((t2) => {
+      var _a2;
+      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
+    });
+    if (!withUses.length) return 0;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const owned = ownedIds(cols);
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const resolve = (v) => {
+      var _a2;
+      let cur = v;
+      for (let i = 0; i < 12 && cur; i++) {
+        const val = cur.valuesByMode[(_a2 = modeOf.get(cur.variableCollectionId)) != null ? _a2 : ""];
+        if (val && typeof val === "object" && val.type === "VARIABLE_ALIAS") cur = byId.get(val.id);
+        else return val;
+      }
+      return void 0;
+    };
+    const keyOfValue = (val) => {
+      if (val == null) return "";
+      if (typeof val === "object" && "r" in val) return colorKey(rgbToHex(val), val.a);
+      return typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
+    };
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const rank = (id) => {
+      var _a2;
+      return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
+    };
+    const existing = /* @__PURE__ */ new Map();
+    for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
+      const k = keyOfValue(resolve(v));
+      const arr = existing.get(v.name);
+      if (!arr) existing.set(v.name, k ? [k] : []);
+      else if (k && !arr.includes(k)) arr.push(k);
+    }
+    const pluginGlobal = ownedCollection(cols, "global");
+    const globalFor = (t2) => {
+      const id = globalOf == null ? void 0 : globalOf.get(t2.name);
+      if (id) return byId.get(id);
+      return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === t2.name) : void 0;
+    };
+    const reqs = [];
+    const colorUses = /* @__PURE__ */ new Map();
+    for (const t2 of withUses) {
+      for (const u of (_a = t2.uses) != null ? _a : []) {
+        if (u.name.startsWith("color/")) {
+          const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
+          arr.push({ token: t2, count: u.count, bg: u.bg });
+          colorUses.set(u.name, arr);
+        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
+      }
+    }
+    for (const [use, list] of colorUses) {
+      const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
+      const bases = colorRoleBases(
+        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
+        defKey || void 0,
+        // 색 값 키여도 colorRoleBases가 hex만 본다
+        use.slice("color/".length)
+      );
+      for (const x of list) {
+        const hex = String(x.token.value).toLowerCase();
+        reqs.push({ base: `${use}/${(_d = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _d : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token });
+      }
+    }
+    const names = assignNames(reqs, existing);
+    const toMake = /* @__PURE__ */ new Map();
+    for (const r of reqs) {
+      const name = (_e = names.get(`${r.base}\0${r.value}`)) != null ? _e : r.base;
+      if (existing.has(name) || toMake.has(name)) continue;
+      toMake.set(name, r.token);
+    }
+    if (preview) {
+      if (rowsOut) {
+        for (const [name, t2] of toMake) {
+          const id = globalOf == null ? void 0 : globalOf.get(t2.name);
+          rowsOut.push({ name, global: id && ((_f = byId.get(id)) == null ? void 0 : _f.name) || t2.name, token: t2.name });
+        }
+      }
+      return toMake.size;
+    }
+    if (!toMake.size) return 0;
+    const col = ensureOwnedCollection(cols, "semantic");
+    let made = 0;
+    for (const [name, t2] of toMake) {
+      const g = globalFor(t2);
+      if (!g) continue;
+      const v = figma.variables.createVariable(name, col, g.resolvedType);
+      for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
+      v.scopes = scopesForType((_g = scopeForSemanticRole(name)) != null ? _g : g.scopes, g.resolvedType);
+      try {
+        (_h = v.setPluginData) == null ? void 0 : _h.call(v, AUTO_ROLE_KEY, "1");
+      } catch (e) {
+      }
+      made++;
+    }
+    return made;
+  }
+  function setGlobalLiteral(v, modeId, t2, type, base) {
+    var _a, _b;
+    if (type === "COLOR") {
+      const { r, g, b } = hexToRgb(String(t2.value));
+      v.setValueForMode(modeId, { r, g, b, a: (_a = t2.alpha) != null ? _a : 1 });
+    } else if (type === "STRING") {
+      v.setValueForMode(modeId, String(t2.value));
+    } else {
+      const num = t2.unit && t2.unit !== "px" && typeof t2.value === "number" ? toPx(t2.value, t2.unit, { base, fontSize: (_b = t2.fontSize) != null ? _b : base }) : Number(t2.value);
+      v.setValueForMode(modeId, num);
+    }
+  }
+  async function prunePaletteColors(keep) {
+    const keepSet = new Set(keep);
+    const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const palIds = ownedIds(cols);
+    let removed = 0;
+    for (const v of await figma.variables.getLocalVariablesAsync()) {
+      if (!palIds.has(v.variableCollectionId)) continue;
+      if (isManualVar(v)) continue;
+      const fam = paletteFamilyOf(v.name);
+      if (fam && keepFamilies.has(fam) && !keepSet.has(v.name)) {
+        v.remove();
+        removed++;
+      }
+    }
+    return removed;
+  }
+  async function createSemanticAliases(map) {
+    var _a, _b, _c, _d;
+    const summary = { created: 0, updated: 0, aliased: 0, missing: [], skippedManual: 0 };
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const pluginGlobalId = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id;
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const globals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && directValue(v, modeOf) !== void 0).sort((a, b) => {
+      var _a2, _b2;
+      return Number(b.variableCollectionId === pluginGlobalId) - Number(a.variableCollectionId === pluginGlobalId) || ((_a2 = colIdx.get(a.variableCollectionId)) != null ? _a2 : 0) - ((_b2 = colIdx.get(b.variableCollectionId)) != null ? _b2 : 0);
+    });
+    const byName2 = /* @__PURE__ */ new Map();
+    for (const v of globals) if (!byName2.has(v.name)) byName2.set(v.name, v);
+    const okIds = new Map(globals.map((v) => [v.id, v]));
+    const reuseMap = readReuseMap();
+    let semanticCol;
+    let idx;
+    for (const [semName, globalName] of Object.entries(map)) {
+      const g = (_c = byName2.get(globalName)) != null ? _c : okIds.get((_b = reuseMap[globalName]) != null ? _b : "");
+      if (!g) {
+        summary.missing.push(globalName);
+        continue;
+      }
+      if (!semanticCol || !idx) {
+        semanticCol = ensureOwnedCollection(cols, "semantic");
+        idx = await buildVarIndex();
+      }
+      const sMode = semanticCol.defaultModeId;
+      const mine = idx.get(vkey(semanticCol.id, semName));
+      if (mine && isManualVar(mine)) {
+        summary.skippedManual++;
+        continue;
+      }
+      const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
+      u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g));
+      u.variable.scopes = scopesForType((_d = scopeForSemanticRole(semName)) != null ? _d : g.scopes, g.resolvedType);
+      summary[u.created ? "created" : "updated"]++;
+      summary.aliased++;
+    }
+    return summary;
+  }
+  var roundN = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
+  function walkText(node, out, instanceOut) {
+    if (node.visible === false) return;
+    if (node.type === "TEXT") out.push(node);
+    else if (instanceOut && node.type === "INSTANCE") walkText(node, instanceOut);
+    else if ("children" in node) for (const c of node.children) walkText(c, out, instanceOut);
+  }
+  function measureLineHeight(fontSize, lh) {
+    if (lh === figma.mixed || !lh || lh.unit === "AUTO") return { px: 0, pct: 0 };
+    const unit = String(lh.unit).toUpperCase();
+    if (unit === "PERCENT") {
+      return { px: roundN(fontSize * lh.value / 100), pct: roundN(lh.value) };
+    }
+    const v = roundN(lh.value);
+    if (unit === "PIXELS" && fontSize > 0) {
+      const pxRatio = v / fontSize;
+      const plausibleAsPx = pxRatio >= 0.8 && pxRatio <= 3;
+      const plausibleAsPct = v >= 100 && v <= 300;
+      if (!plausibleAsPx && plausibleAsPct) return { px: roundN(fontSize * v / 100), pct: v };
+    }
+    return { px: v, pct: 0 };
+  }
+  function measureLetterSpacing(fontSize, ls) {
+    if (ls === figma.mixed || !ls) return { px: 0, pct: 0 };
+    const unit = String(ls.unit).toUpperCase();
+    if (unit === "PERCENT") {
+      return { px: roundN(fontSize * ls.value / 100), pct: roundN(ls.value) };
+    }
+    const px = roundN(ls.value);
+    if (unit === "PIXELS" && fontSize > 0 && px !== 0) {
+      const authoredPx = Math.abs(px * 2 - Math.round(px * 2)) < 1e-9;
+      const pct2 = roundN(px / fontSize * 100);
+      const back = roundN(fontSize * pct2 / 100);
+      const common = pct2 === Math.trunc(pct2) && Math.abs(pct2) >= 1 && Math.abs(pct2) <= 10;
+      if (!authoredPx && common && Math.abs(back - px) <= 0.011) return { px: back, pct: pct2 };
+    }
+    return { px, pct: 0 };
+  }
+  function readNodeTypography(t2) {
+    if (t2.fontSize === figma.mixed || t2.fontName === figma.mixed) return null;
+    return {
+      fontSize: t2.fontSize,
+      family: t2.fontName.family,
+      style: t2.fontName.style,
+      lineHeight: t2.lineHeight,
+      letterSpacing: t2.letterSpacing
+    };
+  }
+  async function percentFromVariableDescription(varId, cache2) {
+    var _a;
+    let id = varId;
+    const seen = /* @__PURE__ */ new Set();
+    while (id && !seen.has(id)) {
+      seen.add(id);
+      let v = cache2.get(id);
+      if (v === void 0) {
+        v = await figma.variables.getVariableByIdAsync(id);
+        cache2.set(id, v);
+      }
+      if (!v) return void 0;
+      const desc = ((_a = v.description) != null ? _a : "").trim();
+      const m = /^(-?\d+(?:\.\d+)?)%$/.exec(desc);
+      if (m) return roundN(Number(m[1]));
+      const modeIds = Object.keys(v.valuesByMode);
+      const raw = modeIds.length ? v.valuesByMode[modeIds[0]] : void 0;
+      if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
+        id = raw.id;
+        continue;
+      }
+      return void 0;
+    }
+    return void 0;
+  }
+  async function percentFromNodeBinding(t2, field, cache2) {
+    var _a;
+    const entry = (_a = t2.boundVariables) == null ? void 0 : _a[field];
+    if (!entry) return void 0;
+    const alias = Array.isArray(entry) ? entry[0] : entry;
+    if (!(alias == null ? void 0 : alias.id)) return void 0;
+    return percentFromVariableDescription(alias.id, cache2);
+  }
+  var UI_ROLES = /* @__PURE__ */ new Set(["button", "chip", "input", "field"]);
+  function inUiRole(node, cache2) {
+    let cur = node.parent;
+    while (cur && cur.type !== "PAGE" && cur.type !== "DOCUMENT") {
+      let role;
+      if (cache2.has(cur)) role = cache2.get(cur);
+      else {
+        role = dsRoleOwner(cur);
+        cache2.set(cur, role);
+      }
+      if (role) return UI_ROLES.has(role);
+      cur = cur.parent;
+    }
+    return false;
+  }
+  async function scanTextStyles(nodes) {
+    const texts = [];
+    for (const n of nodes) walkText(n, texts);
+    const samples = [];
+    const warnings = /* @__PURE__ */ new Set();
+    const styleCache = /* @__PURE__ */ new Map();
+    const varCache = /* @__PURE__ */ new Map();
+    const styleOf = async (id) => {
+      var _a;
+      if (styleCache.has(id)) return (_a = styleCache.get(id)) != null ? _a : null;
+      const raw = await figma.getStyleByIdAsync(id);
+      const st = raw && raw.type === "TEXT" ? raw : null;
+      styleCache.set(id, st);
+      return st;
+    };
+    const ownerCache = /* @__PURE__ */ new Map();
+    for (const node of texts) {
+      const typo = readNodeTypography(node);
+      if (!typo) {
+        warnings.add(t("textStyle.warnMixed"));
+        continue;
+      }
+      const fontSize = roundN(typo.fontSize);
+      const { family, style } = { family: typo.family, style: typo.style };
+      const lhMeas = measureLineHeight(fontSize, typo.lineHeight);
+      let lineHeight = lhMeas.px;
+      let lineHeightPercent = lhMeas.pct;
+      const lsMeas = measureLetterSpacing(fontSize, typo.letterSpacing);
+      let letterSpacing = lsMeas.px;
+      let letterSpacingPercent = lsMeas.pct;
+      if (lineHeightPercent === 0) {
+        const fromVar = await percentFromNodeBinding(node, "lineHeight", varCache);
+        if (fromVar !== void 0 && fromVar > 0) {
+          lineHeightPercent = fromVar;
+          lineHeight = roundN(fontSize * fromVar / 100);
+        }
+      }
+      if (letterSpacingPercent === 0) {
+        const fromVar = await percentFromNodeBinding(node, "letterSpacing", varCache);
+        if (fromVar !== void 0 && fromVar !== 0) {
+          letterSpacingPercent = fromVar;
+          letterSpacing = roundN(fontSize * fromVar / 100);
+        }
+      }
+      const sid = node.textStyleId;
+      const styleId = sid === figma.mixed ? "" : sid;
+      if (styleId) {
+        const st = await styleOf(styleId);
+        if (st) {
+          const stLh = measureLineHeight(fontSize, st.lineHeight);
+          const stLs = measureLetterSpacing(fontSize, st.letterSpacing);
+          if (lineHeightPercent === 0 && stLh.pct > 0) {
+            lineHeightPercent = stLh.pct;
+            lineHeight = stLh.px;
+          }
+          if (letterSpacingPercent === 0 && stLs.pct !== 0) {
+            letterSpacingPercent = stLs.pct;
+            letterSpacing = stLs.px;
+          }
+        }
+      }
+      let characters = "";
+      try {
+        characters = node.characters;
+      } catch (e) {
+        characters = "";
+      }
+      let rowId;
+      let indexInParent;
+      const parent = node.parent;
+      if (parent && "layoutMode" in parent && parent.layoutMode === "HORIZONTAL" && "children" in parent) {
+        rowId = parent.id;
+        indexInParent = parent.children.indexOf(node);
+        if (indexInParent < 0) indexInParent = void 0;
+      }
+      samples.push({
+        fontSize,
+        lineHeight,
+        lineHeightPercent,
+        letterSpacing,
+        letterSpacingPercent,
+        family,
+        style,
+        layerName: node.name,
+        styleId,
+        characters,
+        id: node.id,
+        rowId,
+        indexInParent,
+        uiRole: inUiRole(node, ownerCache)
+      });
+    }
+    return { samples, warnings: [...warnings] };
+  }
+  function lhPxOf(fontSize, lh) {
+    if (lh === figma.mixed || lh.unit === "AUTO") return 0;
+    return lh.unit === "PERCENT" ? roundN(fontSize * lh.value / 100) : roundN(lh.value);
+  }
+  function lhPctOf(lh) {
+    if (lh === figma.mixed || lh.unit !== "PERCENT") return 0;
+    return roundN(lh.value);
+  }
+  function lsPxOf(fontSize, ls) {
+    if (ls === figma.mixed) return 0;
+    return ls.unit === "PERCENT" ? roundN(fontSize * ls.value / 100) : roundN(ls.value);
+  }
+  function lsPctOf(ls) {
+    if (ls === figma.mixed || ls.unit !== "PERCENT") return 0;
+    return roundN(ls.value);
+  }
+  async function scanExistingTextStyles() {
+    return (await figma.getLocalTextStylesAsync()).map(existingOf);
+  }
+  function existingOf(s) {
+    const fontSize = roundN(s.fontSize);
+    const lineHeightPercent = lhPctOf(s.lineHeight);
+    const letterSpacingPercent = lsPctOf(s.letterSpacing);
+    return __spreadValues(__spreadValues({
+      id: s.id,
+      name: s.name,
+      fontSize,
+      // 등록된 스타일은 사실이라 원값으로 잰다(applyExistingTextStyles의 인덱스와 같은 이유).
+      // 스캔이 %로 등록해 둔 스타일은 lhPxOf가 %→px로 환산하므로 클러스터 측정값과 그대로 만난다.
+      lineHeight: lhPxOf(fontSize, s.lineHeight),
+      letterSpacing: lsPxOf(fontSize, s.letterSpacing),
+      family: s.fontName.family,
+      style: s.fontName.style
+    }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {});
+  }
+  async function globalFamilyVars() {
+    var _a;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const pluginGlobalId = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id;
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const list = vars.filter((v) => v.resolvedType === "STRING" && tiers.get(v.variableCollectionId) === 1).sort((a, b) => {
+      const pa = a.variableCollectionId === pluginGlobalId ? 0 : 1;
+      const pb = b.variableCollectionId === pluginGlobalId ? 0 : 1;
+      return pa - pb || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
+    });
+    return (family) => list.find((v) => directValue(v, modeOf) === family);
+  }
+  async function createSemanticTextStyles(specs) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
+    if (!specs.length) return res;
+    const existing = await figma.getLocalTextStylesAsync();
+    const styleById = new Map(existing.map((s) => [s.id, s]));
+    const styleByName = new Map(existing.map((s) => [s.name, s]));
+    const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+    const renameBlocked = /* @__PURE__ */ new Set();
+    const roleRenames = [];
+    const roleSpecs = [];
+    for (const spec of specs) {
+      const st = anchoredStyle(spec);
+      if (!st || st.name === spec.name) continue;
+      const occupant = styleByName.get(spec.name);
+      if (occupant && occupant.id !== st.id) {
+        renameBlocked.add(spec.boundStyleId);
+        res.missing.push(t("textStyle.missRename", { from: st.name, to: spec.name }));
+        continue;
+      }
+      roleRenames.push({ from: st.name, to: spec.name });
+      roleSpecs.push(spec);
+    }
+    const roleMoved = roleRenames.length ? (await renameTextRoleVars(roleRenames)).moved : [];
+    const tokens = [];
+    const seen = /* @__PURE__ */ new Set();
+    const pushTok = (t2) => {
+      if (!seen.has(t2.name)) {
+        seen.add(t2.name);
+        tokens.push(t2);
+      }
+    };
+    const aliasMap = {};
+    const lhTokens = /* @__PURE__ */ new Map();
+    const pushLineHeightTok = (name, px, pct2, fontSize) => {
+      const prev = lhTokens.get(name);
+      if (!prev) {
+        const t2 = pct2 > 0 ? { name, category: "lineHeight", value: pct2, unit: "percent", fontSize, sources: ["lineHeight"] } : { name, category: "lineHeight", value: px, unit: "px", sources: ["lineHeight"] };
+        lhTokens.set(name, t2);
+        pushTok(t2);
+        return;
+      }
+      const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
+      if (prevPct === pct2 && (pct2 === 0 || prev.fontSize === fontSize)) return;
+      prev.value = px;
+      prev.unit = "px";
+      prev.fontSize = void 0;
+      res.notes.push(t("textStyle.noteLhPx", { name }));
+    };
+    const lsTokens = /* @__PURE__ */ new Map();
+    const pushLetterSpacingTok = (name, px, pct2, fontSize) => {
+      const prev = lsTokens.get(name);
+      if (!prev) {
+        const t2 = pct2 !== 0 ? { name, category: "letterSpacing", value: pct2, unit: "percent", fontSize, sources: ["letterSpacing"] } : { name, category: "letterSpacing", value: px, unit: "px", sources: ["letterSpacing"] };
+        lsTokens.set(name, t2);
+        pushTok(t2);
+        return;
+      }
+      const prevPct = prev.unit === "percent" ? Number(prev.value) : 0;
+      if (prevPct === pct2 && (pct2 === 0 || prev.fontSize === fontSize)) return;
+      prev.value = px;
+      prev.unit = "px";
+      prev.fontSize = void 0;
+      res.notes.push(t("textStyle.noteLsPx", { name }));
+    };
+    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
+      pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
+      aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
+      if (lineHeight > 0 && lineHeightPercent === 0 && Number.isInteger(lineHeight)) {
+        const lhName = numberTokenName("line-height", lineHeight);
+        pushLineHeightTok(lhName, lineHeight, 0, fontSize);
+        aliasMap[`line-height/${role}`] = lhName;
+      }
+      if (letterSpacing !== 0 && letterSpacingPercent === 0 && Number.isInteger(letterSpacing)) {
+        const lsName = numberTokenName("letter-spacing", letterSpacing);
+        pushLetterSpacingTok(lsName, letterSpacing, 0, fontSize);
+        aliasMap[`letter-spacing/${role}`] = lsName;
+      }
+    };
+    for (const s of specs) {
+      if (anchoredStyle(s)) continue;
+      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_a = s.lineHeightPercent) != null ? _a : 0, (_b = s.letterSpacingPercent) != null ? _b : 0);
+    }
+    {
+      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
+      const semId0 = (_c = ownedCollection(cols0, "semantic")) == null ? void 0 : _c.id;
+      const semNames = /* @__PURE__ */ new Set();
+      if (semId0) {
+        for (const v of await figma.variables.getLocalVariablesAsync())
+          if (v.variableCollectionId === semId0) semNames.add(v.name);
+      }
+      for (const s of specs) {
+        const st = anchoredStyle(s);
+        if (!st) continue;
+        if (semNames.has(`font-size/${s.name}`)) continue;
+        const fontSize = roundN(st.fontSize);
+        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
+      }
+    }
+    if (tokens.length) await createTokens(tokens, 16);
+    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semId = (_d = ownedCollection(cols, "semantic")) == null ? void 0 : _d.id;
+    const semByName = /* @__PURE__ */ new Map();
+    if (semId) {
+      for (const v of await figma.variables.getLocalVariablesAsync())
+        if (v.variableCollectionId === semId) semByName.set(v.name, v);
+    }
+    const familyVarFor = await globalFamilyVars();
+    for (const spec of specs) {
+      const anchored = anchoredStyle(spec);
+      if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
+        continue;
+      }
+      let style = anchored != null ? anchored : styleByName.get(spec.name);
+      const created = !style;
+      const isRename = !!anchored;
+      const setName = (st) => {
+        if (st.name === spec.name) return;
+        styleByName.delete(st.name);
+        st.name = spec.name;
+      };
+      try {
+        let loaded = null;
+        if (!isRename) {
+          const wanted = { family: spec.family, style: spec.style };
+          try {
+            await figma.loadFontAsync(wanted);
+            loaded = wanted;
+          } catch (e) {
+            try {
+              const fb = { family: spec.family, style: "Regular" };
+              await figma.loadFontAsync(fb);
+              loaded = fb;
+              res.missing.push(t("textStyle.missStyle", { name: spec.name, style: spec.style }));
+            } catch (e2) {
+              res.missing.push(t("textStyle.missFamily", { name: spec.name, family: spec.family }));
+              continue;
+            }
+          }
+        } else {
+          const fn = style.fontName;
+          try {
+            await figma.loadFontAsync(fn);
+          } catch (e) {
+            setName(style);
+            res.missing.push(t("textStyle.missFontKeep", { name: spec.name, font: `${fn.family} ${fn.style}` }));
+            styleByName.set(spec.name, style);
+            continue;
+          }
+        }
+        if (!style) style = figma.createTextStyle();
+        setName(style);
+        const lhPct = (_e = spec.lineHeightPercent) != null ? _e : 0;
+        const lsPct = (_f = spec.letterSpacingPercent) != null ? _f : 0;
+        if (!isRename && loaded) {
+          style.fontName = loaded;
+          style.fontSize = spec.fontSize;
+          style.lineHeight = spec.lineHeight > 0 ? lhPct > 0 ? { value: lhPct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+          style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
+        } else if (lhPct > 0 || lsPct !== 0) {
+          if (lhPct > 0) {
+            if ((_g = style.boundVariables) == null ? void 0 : _g.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
+            else style.lineHeight = { value: lhPct, unit: "PERCENT" };
+          }
+          if (lsPct !== 0) {
+            if ((_h = style.boundVariables) == null ? void 0 : _h.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
+            else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
+          }
+        }
+        const bindRole = style.name;
+        const fsVar = semByName.get(`font-size/${bindRole}`);
+        if (fsVar) {
+          style.setBoundVariable("fontSize", fsVar);
+          res.bound++;
+        } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
+        if (spec.lineHeight > 0 || isRename) {
+          const pctNow = lhPctOf(style.lineHeight);
+          if (pctNow > 0) {
+            if ((_i = style.boundVariables) == null ? void 0 : _i.lineHeight) style.setBoundVariable("lineHeight", null);
+            res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
+          } else {
+            const lhVar = semByName.get(`line-height/${bindRole}`);
+            if (lhVar) {
+              style.setBoundVariable("lineHeight", lhVar);
+              res.bound++;
+            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
+          }
+        }
+        if (spec.letterSpacing !== 0 || isRename) {
+          const lsPctNow = lsPctOf(style.letterSpacing);
+          if (lsPctNow !== 0) {
+            if ((_j = style.boundVariables) == null ? void 0 : _j.letterSpacing) style.setBoundVariable("letterSpacing", null);
+            res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
+          } else {
+            const lsVar = semByName.get(`letter-spacing/${bindRole}`);
+            if (lsVar) {
+              style.setBoundVariable("letterSpacing", lsVar);
+              res.bound++;
+            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
+          }
+        }
+        const famVar = familyVarFor(style.fontName.family);
+        if (famVar) {
+          style.setBoundVariable("fontFamily", famVar);
+          res.bound++;
+        }
+        res[created ? "created" : "updated"]++;
+        if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
+        styleByName.set(style.name, style);
+      } catch (e) {
+        res.missing.push(t("textStyle.missError", { name: spec.name, error: explainError(e instanceof Error ? e.message : String(e)).message }));
+        if (style) styleByName.set(style.name, style);
+      }
+    }
+    for (let i = 0; i < roleSpecs.length; i++) {
+      const spec = roleSpecs[i];
+      const st = anchoredStyle(spec);
+      const ids = new Set(roleMoved.filter((m) => m.pair === i).map((m) => m.id));
+      if (!st || !ids.size || st.name === spec.name) continue;
+      const orig = roleRenames[i].from;
+      await renameTextRoleVars([{ from: spec.name, to: orig }], { onlyIds: ids });
+      const want = new Set(ROLE_VAR_CATS.map((c) => `${c}/${orig}`));
+      const stuck = [];
+      for (const id of ids) {
+        const v = await figma.variables.getVariableByIdAsync(id);
+        if (v && !want.has(v.name)) stuck.push(v.name);
+      }
+      if (stuck.length) res.missing.push(t("textStyle.missRoleStuck", { name: st.name, vars: stuck.join(", ") }));
+    }
+    return res;
+  }
+  var ROLE_VAR_CATS = ["font-size", "line-height", "letter-spacing"];
+  function finalNameTaken(cands, others) {
+    var _a;
+    const out = /* @__PURE__ */ new Set();
+    for (; ; ) {
+      const count = /* @__PURE__ */ new Map();
+      const add2 = (n) => {
+        var _a2;
+        return void count.set(n, ((_a2 = count.get(n)) != null ? _a2 : 0) + 1);
+      };
+      for (const n of others) add2(n);
+      for (const c of cands) add2(out.has(c.key) ? c.from : c.to);
+      let grew = false;
+      for (const c of cands)
+        if (!out.has(c.key) && ((_a = count.get(c.to)) != null ? _a : 0) > 1) {
+          out.add(c.key);
+          grew = true;
+        }
+      if (!grew) return out;
+    }
+  }
+  function twoPhaseRename(jobs) {
+    const trySet = (j, name) => {
+      try {
+        j.set(name);
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+    const status = /* @__PURE__ */ new Map();
+    const failed = /* @__PURE__ */ new Set();
+    for (const j of jobs) if (!trySet(j, j.tmp)) failed.add(j.key);
+    for (const j of jobs) if (!failed.has(j.key) && !trySet(j, j.to)) failed.add(j.key);
+    for (const j of jobs) status.set(j.key, "renamed");
+    if (!failed.size) return status;
+    const back = new Set(failed);
+    for (let grew = true; grew; ) {
+      grew = false;
+      const reclaim = new Set(jobs.filter((j) => back.has(j.key)).map((j) => j.from));
+      for (const j of jobs)
+        if (!back.has(j.key) && reclaim.has(j.to)) {
+          back.add(j.key);
+          grew = true;
+        }
+    }
+    const backJobs = jobs.filter((j) => back.has(j.key));
+    const cur = (j) => {
+      try {
+        return j.get();
+      } catch (e) {
+        return "";
+      }
+    };
+    for (const j of backJobs) if (cur(j) !== j.from) trySet(j, j.tmp);
+    for (const j of backJobs) if (cur(j) !== j.from) trySet(j, j.from);
+    for (const j of backJobs) status.set(j.key, cur(j) !== j.from ? "error-stuck" : failed.has(j.key) ? "error" : "error-chain");
+    return status;
+  }
+  var varTmpName = (id) => `__dsl_tmp_${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
+  async function renameTextRoleVars(pairs, opts = {}) {
+    var _a;
+    const res = { renamed: 0, taken: 0, error: 0, stuck: [], moved: [] };
+    if (!pairs.length) return res;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const semId = (_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id;
+    if (!semId) return res;
+    const vars = (await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === semId);
+    const byName2 = /* @__PURE__ */ new Map();
+    for (const v of vars) if (!byName2.has(v.name)) byName2.set(v.name, v);
+    const cands = [];
+    const picked = /* @__PURE__ */ new Set();
+    pairs.forEach((p, pair) => {
+      if (p.from === p.to) return;
+      for (const cat of ROLE_VAR_CATS) {
+        const v = byName2.get(`${cat}/${p.from}`);
+        if (!v || picked.has(v.id) || isManualVar(v) || opts.onlyIds && !opts.onlyIds.has(v.id)) continue;
+        picked.add(v.id);
+        cands.push({ key: v.id, from: v.name, to: `${cat}/${p.to}`, v, pair });
+      }
+    });
+    if (!cands.length) return res;
+    const taken = finalNameTaken(cands, vars.filter((v) => !picked.has(v.id)).map((v) => v.name));
+    res.taken = taken.size;
+    const live = cands.filter((c) => !taken.has(c.key));
+    const status = twoPhaseRename(
+      live.map((c) => ({
+        key: c.key,
+        from: c.from,
+        to: c.to,
+        tmp: varTmpName(c.v.id),
+        get: () => c.v.name,
+        set: (n) => {
+          c.v.name = n;
+        }
+      }))
+    );
+    for (const c of live) {
+      const st = status.get(c.key);
+      if (st === "renamed") {
+        res.renamed++;
+        res.moved.push({ id: c.v.id, pair: c.pair });
+      } else {
+        res.error++;
+        if (st === "error-stuck") res.stuck.push(c.v.name);
+      }
+    }
+    return res;
+  }
+  function krdsInputOf(s) {
+    const e = existingOf(s);
+    return __spreadProps(__spreadValues({
+      id: e.id,
+      name: e.name,
+      fontSize: e.fontSize,
+      lineHeight: e.lineHeight
+    }, e.lineHeightPercent ? { lineHeightPercent: e.lineHeightPercent } : {}), {
+      letterSpacing: e.letterSpacing,
+      family: e.family,
+      style: e.style,
+      count: 0,
+      uiCount: 0
+    });
+  }
+  async function planTsRename() {
+    const styles = await figma.getLocalTextStylesAsync();
+    const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: /* @__PURE__ */ new Set(), path: "rename" });
+    const rows = [];
+    styles.forEach((s, i) => {
+      const to = names[i];
+      if (!to || to === s.name) return;
+      const e = existingOf(s);
+      const off = offScale(e.fontSize);
+      rows.push({ id: s.id, from: s.name, to, sig: tsSig(e), fontSize: e.fontSize, offScale: off.kind, nearest: off.nearest });
+    });
+    return rows;
+  }
+  async function applyTsRename(items) {
+    var _a, _b, _c;
+    const styles = await figma.getLocalTextStylesAsync();
+    const byId = new Map(styles.map((s) => [s.id, s]));
+    const status = /* @__PURE__ */ new Map();
+    const order = [];
+    const cands = [];
+    for (const it of items) {
+      if (status.has(it.id)) continue;
+      order.push(it.id);
+      const st = byId.get(it.id);
+      if (!st || st.name !== it.from) status.set(it.id, "renamed-meanwhile");
+      else if (tsSig(existingOf(st)) !== it.sig) status.set(it.id, "value-changed");
+      else {
+        status.set(it.id, "pending");
+        cands.push({ key: it.id, from: it.from, to: it.to, st });
+      }
+    }
+    const candIds = new Set(cands.map((c) => c.key));
+    const taken = finalNameTaken(cands, styles.filter((s) => !candIds.has(s.id)).map((s) => s.name));
+    for (const k of taken) status.set(k, "name-taken");
+    const live = cands.filter((c) => !taken.has(c.key));
+    const done = twoPhaseRename(
+      live.map((c) => ({
+        key: c.key,
+        from: c.from,
+        to: c.to,
+        tmp: `__dsl_tmp_${c.key}`,
+        get: () => c.st.name,
+        set: (n) => {
+          c.st.name = n;
+        }
+      }))
+    );
+    for (const [k, v] of done) status.set(k, v);
+    const res = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [] };
+    for (const id of order) {
+      const st = status.get(id);
+      res.results.push({ id, status: st, name: (_b = (_a = byId.get(id)) == null ? void 0 : _a.name) != null ? _b : "" });
+      if (st === "renamed") res.renamed++;
+      else {
+        res.skipped++;
+        res.skipReasons[st] = ((_c = res.skipReasons[st]) != null ? _c : 0) + 1;
+      }
+    }
+    const pairs = live.filter((c) => status.get(c.key) === "renamed").map((c) => ({ from: c.from, to: c.to }));
+    if (pairs.length) {
+      try {
+        const rv = await renameTextRoleVars(pairs);
+        res.roleVarsRenamed = rv.renamed;
+        res.roleVarsTaken = rv.taken;
+        res.roleVarsError = rv.error;
+        res.roleVarsStuck = rv.stuck;
+      } catch (e) {
+        res.roleVarsError = pairs.length;
+      }
+    }
+    return res;
+  }
+  function typoKey(t2) {
+    var _a, _b, _c, _d;
+    const fontSize = roundN(t2.fontSize);
+    const lh = t2.lineHeight !== figma.mixed && t2.lineHeight && t2.lineHeight.unit === "AUTO" ? "auto" : String(lhPxOf(fontSize, t2.lineHeight));
+    return [
+      fontSize,
+      lh,
+      lsPxOf(fontSize, t2.letterSpacing),
+      t2.fontName.family,
+      t2.fontName.style,
+      (_a = t2.textCase) != null ? _a : "ORIGINAL",
+      (_b = t2.textDecoration) != null ? _b : "NONE",
+      roundN((_c = t2.paragraphSpacing) != null ? _c : 0),
+      roundN((_d = t2.paragraphIndent) != null ? _d : 0)
+    ].join("|");
+  }
+  function isMixedTypography(t2) {
+    return t2.fontSize === figma.mixed || t2.fontName === figma.mixed || t2.lineHeight === figma.mixed || t2.letterSpacing === figma.mixed || t2.textCase === figma.mixed || t2.textDecoration === figma.mixed;
+  }
+  var STYLE_TEXT_VAR_FIELDS = ["fontFamily", "fontSize", "fontStyle", "fontWeight", "letterSpacing", "lineHeight", "paragraphSpacing", "paragraphIndent"];
+  function unbindStyleTextVars(t2) {
+    var _a;
+    const bv = t2.boundVariables;
+    if (!bv) return;
+    const len = typeof t2.characters === "string" ? t2.characters.length : 0;
+    const node = t2;
+    for (const f of STYLE_TEXT_VAR_FIELDS) {
+      const e = bv[f];
+      if (!(Array.isArray(e) ? e.length > 0 : !!e)) continue;
+      if (len > 0 && node.setRangeBoundVariable) node.setRangeBoundVariable(0, len, f, null);
+      try {
+        (_a = node.setBoundVariable) == null ? void 0 : _a.call(node, f, null);
+      } catch (e2) {
+      }
+    }
+  }
+  async function loadTextFonts(t2, loaded) {
+    const len = typeof t2.characters === "string" ? t2.characters.length : 0;
+    const fonts = len > 0 && typeof t2.getRangeAllFontNames === "function" ? t2.getRangeAllFontNames(0, len) : t2.fontName !== figma.mixed ? [t2.fontName] : [];
+    for (const fn of fonts) {
+      const k = `${fn.family} ${fn.style}`;
+      if (loaded.has(k)) continue;
+      await figma.loadFontAsync(fn);
+      loaded.add(k);
+    }
+  }
+  async function attachTextStyle(t2, styleId, loaded) {
+    await loadTextFonts(t2, loaded);
+    unbindStyleTextVars(t2);
+    await t2.setTextStyleIdAsync(styleId);
+  }
+  function hasTextStyle(t2) {
+    const id = t2.textStyleId;
+    return id === figma.mixed || typeof id === "string" && id !== "";
+  }
+  function insideInstance(node) {
+    for (let p = node.parent; p; p = p.parent) if (p.type === "INSTANCE") return true;
+    return false;
+  }
+  async function textStyleIndex() {
+    const styleByKey = /* @__PURE__ */ new Map();
+    for (const s of await figma.getLocalTextStylesAsync()) {
+      const k = typoKey(s);
+      styleByKey.set(k, styleByKey.has(k) ? null : s);
+    }
+    return styleByKey;
+  }
+  function planTexts(nodes) {
+    const texts = [];
+    const inInstance = [];
+    for (const n of nodes) {
+      if (insideInstance(n)) walkText(n, inInstance);
+      else walkText(n, texts, inInstance);
+    }
+    return { texts, inInstance };
+  }
+  function textStyleFor(t2, styleByKey) {
+    if (hasTextStyle(t2)) return "hasStyle";
+    if (isMixedTypography(t2)) return "mixed";
+    const hit = styleByKey.get(typoKey(t2));
+    if (hit === void 0) return "noStyle";
+    if (hit === null) return "ambiguous";
+    return hit;
+  }
+  async function planExistingTextStyles(nodes) {
+    var _a;
+    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
+    const styleByKey = await textStyleIndex();
+    const { texts, inInstance } = planTexts(nodes);
+    skipReasons.instance += inInstance.length;
+    const rows = /* @__PURE__ */ new Map();
+    for (const t2 of texts) {
+      const r = textStyleFor(t2, styleByKey);
+      if (typeof r === "string") {
+        skipReasons[r]++;
+        continue;
+      }
+      const row = (_a = rows.get(r.id)) != null ? _a : { styleId: r.id, name: r.name, nodeIds: [] };
+      row.nodeIds.push(t2.id);
+      rows.set(r.id, row);
+    }
+    return { rows: [...rows.values()], skipReasons };
+  }
+  async function applyTextStyleRows(rows) {
+    const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
+    const res = { applied: 0, skipped: 0, skipReasons };
+    const styleByKey = await textStyleIndex();
+    const loaded = /* @__PURE__ */ new Set();
+    for (const row of rows) {
+      for (const id of row.nodeIds) {
+        const t2 = await figma.getNodeByIdAsync(id).catch(() => null);
+        if (!t2 || t2.type !== "TEXT") {
+          skipReasons.noStyle++;
+          res.skipped++;
+          continue;
+        }
+        const r = textStyleFor(t2, styleByKey);
+        if (typeof r === "string" || r.id !== row.styleId) {
+          skipReasons[typeof r === "string" ? r : "noStyle"]++;
+          res.skipped++;
+          continue;
+        }
+        try {
+          await attachTextStyle(t2, r.id, loaded);
+          res.applied++;
+        } catch (e) {
+        }
+      }
+    }
+    return res;
+  }
+  async function textStyleCandidateTest() {
+    const styleByKey = await textStyleIndex();
+    return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
+  }
+  async function applyRegisteredTextStyles(roots, styleIds) {
+    var _a, _b;
+    const applyReasons = { hasStyle: 0, instance: 0, ambiguous: 0 };
+    const out = { applied: 0, applySkipped: 0, applyReasons };
+    if (!styleIds.length) return out;
+    const ids = new Set(styleIds);
+    const idByKey = /* @__PURE__ */ new Map();
+    for (const st of await figma.getLocalTextStylesAsync()) if (ids.has(st.id)) idByKey.set(typoKey(st), st.id);
+    if (!idByKey.size) return out;
+    const keyOf2 = (t2) => isMixedTypography(t2) ? void 0 : typoKey(t2);
+    const plan = planTexts(roots);
+    const skipped = (k) => {
+      applyReasons[k]++;
+      out.applySkipped++;
+    };
+    for (const t2 of plan.inInstance) if (idByKey.has((_a = keyOf2(t2)) != null ? _a : "\0")) skipped("instance");
+    const rows = /* @__PURE__ */ new Map();
+    const styleByKey = await textStyleIndex();
+    for (const t2 of plan.texts) {
+      const k = keyOf2(t2);
+      if (k === void 0 || !idByKey.has(k)) continue;
+      const r = textStyleFor(t2, styleByKey);
+      if (r === "hasStyle") {
+        if (t2.textStyleId !== idByKey.get(k)) skipped("hasStyle");
+        continue;
+      }
+      if (r === "ambiguous") {
+        skipped("ambiguous");
+        continue;
+      }
+      if (typeof r === "string" || !ids.has(r.id)) continue;
+      const arr = (_b = rows.get(r.id)) != null ? _b : [];
+      arr.push(t2.id);
+      rows.set(r.id, arr);
+    }
+    if (rows.size) {
+      const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
+      out.applied = r.applied;
+    }
+    return out;
+  }
+  var VarNameError = class extends Error {
+  };
+  var VarGoneError = class extends Error {
+  };
+  var USER_COLLECTION_NAME = "Variables";
+  async function editValueToFigma(ev) {
+    if (ev.kind === "color") return __spreadProps(__spreadValues({}, hexToRgb(ev.hex)), { a: Math.max(0, Math.min(1, ev.alpha)) });
+    if (ev.kind === "number") return ev.value;
+    if (ev.kind === "string") return ev.text;
+    if (ev.kind === "bool") return ev.value;
+    const target = await figma.variables.getVariableByIdAsync(ev.targetId).catch(() => null);
+    if (!target) throw new Error("alias target not found");
+    return figma.variables.createVariableAlias(target);
+  }
+  function markManual(v) {
+    var _a;
+    try {
+      (_a = v.setPluginData) == null ? void 0 : _a.call(v, MANUAL_KEY, "1");
+    } catch (e) {
+    }
+  }
+  function dropQuietly(x) {
+    var _a;
+    try {
+      (_a = x == null ? void 0 : x.remove) == null ? void 0 : _a.call(x);
+    } catch (e) {
+    }
+  }
+  async function createManualVariable(input) {
+    var _a, _b;
+    let col;
+    let newCollection = false;
+    if (input.collectionId) {
+      col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === input.collectionId);
+      if (!col) throw new VarGoneError("collection not found");
+    } else {
+      col = figma.variables.createVariableCollection(USER_COLLECTION_NAME);
+      newCollection = true;
+    }
+    let v;
+    try {
+      v = figma.variables.createVariable(input.name, col, input.varType);
+    } catch (e) {
+      if (newCollection) dropQuietly(col);
+      throw new VarNameError(e instanceof Error ? e.message : String(e));
+    }
+    try {
+      const def = col.defaultModeId;
+      const defVal = (_a = input.values[def]) != null ? _a : input.values["*"];
+      if (!defVal) throw new Error("default mode value required");
+      for (const m of col.modes) {
+        const ev = m.modeId === def ? defVal : (_b = input.values[m.modeId]) != null ? _b : defVal;
+        v.setValueForMode(m.modeId, await editValueToFigma(ev));
+      }
+      if (input.scopes) v.scopes = input.scopes;
+      markManual(v);
+    } catch (e) {
+      dropQuietly(v);
+      if (newCollection) dropQuietly(col);
+      throw e;
+    }
+    return { variable: v, newCollection };
+  }
+  async function duplicateVariable(id) {
+    var _a, _b, _c;
+    const src = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!src || src.remote) throw new VarGoneError("variable not found");
+    const col = (await figma.variables.getLocalVariableCollectionsAsync()).find((c) => c.id === src.variableCollectionId);
+    if (!col) throw new VarGoneError("collection not found");
+    const taken = new Set((await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === col.id).map((v) => v.name));
+    const nv = figma.variables.createVariable(duplicateName(src.name, taken), col, src.resolvedType);
+    try {
+      for (const [modeId, raw] of Object.entries(src.valuesByMode)) {
+        if (raw === void 0 || raw === null) continue;
+        const val = typeof raw === "object" && raw.type === "VARIABLE_ALIAS" ? { type: "VARIABLE_ALIAS", id: raw.id } : raw;
+        nv.setValueForMode(modeId, val);
+      }
+      nv.scopes = [...(_a = src.scopes) != null ? _a : []];
+      nv.description = (_b = src.description) != null ? _b : "";
+      nv.hiddenFromPublishing = !!src.hiddenFromPublishing;
+      const cs = (_c = src.codeSyntax) != null ? _c : {};
+      for (const [platform, value] of Object.entries(cs)) {
+        if (value) nv.setVariableCodeSyntax(platform, value);
+      }
+      markManual(nv);
+    } catch (e) {
+      dropQuietly(nv);
+      throw e;
+    }
+    return nv;
+  }
+  async function deleteVariable(id) {
+    const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
+    if (!v || v.remote) throw new VarGoneError("variable not found");
+    const name = v.name;
+    v.remove();
+    return name;
+  }
+
+  // src/lib/applyVar.ts
+  var allows = (scopes, need) => scopes.includes("ALL_SCOPES") || need.some((s) => scopes.includes(s));
+  var visibleSolidIdx = (list) => {
+    if (!Array.isArray(list)) return -1;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const p = list[i];
+      if (p && p.type === "SOLID" && p.visible !== false) return i;
+    }
+    return -1;
+  };
+  var hasVisible = (list) => Array.isArray(list) && list.some((p) => p && p.visible !== false);
+  var newSolid = () => ({ type: "SOLID", color: { r: 0, g: 0, b: 0 }, opacity: 1, visible: true, blendMode: "NORMAL" });
+  async function detachStyle(node, field) {
+    const n = node;
+    if (!(field in n) || !n[field] || typeof n[field] !== "string") return;
+    const setter = `set${field[0].toUpperCase()}${field.slice(1)}Async`;
+    try {
+      const fn = n[setter];
+      if (typeof fn === "function") await fn.call(n, "");
+      else n[field] = "";
+    } catch (e) {
+    }
+  }
+  function fillProp(textOnly) {
+    return {
+      scopeOk: (scopes, node) => allows(scopes, fillScopesFor(node.type)),
+      check(node, create) {
+        if (textOnly ? node.type !== "TEXT" : node.type === "TEXT") return "no-prop";
+        if (node.type === "GROUP" || node.type === "SLICE" || !("fills" in node)) return "no-prop";
+        if (create) return null;
+        const fills = node.fills;
+        return visibleSolidIdx(fills) >= 0 ? null : "no-prop";
+      },
+      async run(node, v) {
+        const n = node;
+        await detachStyle(node, "fillStyleId");
+        const fills = n.fills;
+        if (!Array.isArray(fills)) {
+          n.fills = [figma.variables.setBoundVariableForPaint(newSolid(), "color", v)];
+          return null;
+        }
+        const arr = fills.slice();
+        const i = visibleSolidIdx(arr);
+        if (i >= 0) arr[i] = figma.variables.setBoundVariableForPaint(arr[i], "color", v);
+        else arr.push(figma.variables.setBoundVariableForPaint(newSolid(), "color", v));
+        n.fills = arr;
+        return null;
+      }
+    };
+  }
+  var strokeColorProp = {
+    scopeOk: (scopes) => allows(scopes, ["STROKE_COLOR"]),
+    check(node, create) {
+      if (node.type === "GROUP" || node.type === "SLICE" || !("strokes" in node)) return "no-prop";
+      if (create) return null;
+      return visibleSolidIdx(node.strokes) >= 0 ? null : "no-stroke";
+    },
+    async run(node, v) {
+      const n = node;
+      await detachStyle(node, "strokeStyleId");
+      const strokes = Array.isArray(n.strokes) ? n.strokes.slice() : [];
+      const hadVisible = hasVisible(strokes);
+      const i = visibleSolidIdx(strokes);
+      if (i >= 0) strokes[i] = figma.variables.setBoundVariableForPaint(strokes[i], "color", v);
+      else strokes.push(figma.variables.setBoundVariableForPaint(newSolid(), "color", v));
+      n.strokes = strokes;
+      if (!hadVisible) {
+        try {
+          n.strokeWeight = 1;
+          n.strokeAlign = "INSIDE";
+        } catch (e) {
+        }
+      }
+      return null;
+    }
+  };
+  var shadowProp = {
+    scopeOk: (scopes) => allows(scopes, ["EFFECT_COLOR"]),
+    check(node) {
+      if (!("effects" in node)) return "no-shadow";
+      return shadowIdx(node.effects) >= 0 ? null : "no-shadow";
+    },
+    async run(node, v) {
+      const n = node;
+      await detachStyle(node, "effectStyleId");
+      const effs = n.effects.slice();
+      const i = shadowIdx(effs);
+      effs[i] = figma.variables.setBoundVariableForEffect(effs[i], "color", v);
+      n.effects = effs;
+      return null;
+    }
+  };
+  function shadowIdx(list) {
+    if (!Array.isArray(list)) return -1;
+    for (let i = list.length - 1; i >= 0; i--) {
+      const e = list[i];
+      if (e && (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") && e.visible !== false) return i;
+    }
+    return -1;
+  }
+  function bindFields(node, fields, v) {
+    const n = node;
+    for (const f of fields) n.setBoundVariable(f, v);
+  }
+  var isAutoLayout = (node) => {
+    const m = node.layoutMode;
+    return m === "HORIZONTAL" || m === "VERTICAL";
+  };
+  function gapProp(fields) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["GAP"]),
+      check: (node) => isAutoLayout(node) ? null : "not-autolayout",
+      async run(node, v) {
+        bindFields(node, fields(node), v);
+        return null;
+      }
+    };
+  }
+  var CORNER_FIELD = { "top-left": "topLeftRadius", "top-right": "topRightRadius", "bottom-left": "bottomLeftRadius", "bottom-right": "bottomRightRadius" };
+  var ALL_CORNERS = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"];
+  function radiusProp(fields) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["CORNER_RADIUS"]),
+      check: (node) => node.type !== "TEXT" && "topLeftRadius" in node ? null : "no-prop",
+      async run(node, v) {
+        bindFields(node, fields, v);
+        return null;
+      }
+    };
+  }
+  function sizeProp(fields) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["WIDTH_HEIGHT"]),
+      check: (node) => node.type === "TEXT" || node.type === "GROUP" || !("width" in node) ? "no-prop" : null,
+      async run(node, v) {
+        const n = node;
+        for (const f of fields) {
+          const key = f === "width" ? "layoutSizingHorizontal" : "layoutSizingVertical";
+          if (key in n && (n[key] === "HUG" || n[key] === "FILL")) {
+            try {
+              n[key] = "FIXED";
+            } catch (e) {
+            }
+          }
+        }
+        bindFields(node, fields, v);
+        return null;
+      }
+    };
+  }
+  var SIDE_WEIGHT = { top: "strokeTopWeight", right: "strokeRightWeight", bottom: "strokeBottomWeight", left: "strokeLeftWeight" };
+  function strokeWeightProp(field) {
+    return {
+      scopeOk: (scopes) => allows(scopes, ["STROKE_FLOAT"]),
+      check(node) {
+        if (!(field in node)) return "no-prop";
+        return hasVisible(node.strokes) ? null : "no-stroke";
+      },
+      async run(node, v) {
+        bindFields(node, [field], v);
+        return null;
+      }
+    };
+  }
+  var opacityProp = {
+    scopeOk: (scopes) => allows(scopes, ["OPACITY"]),
+    check: (node) => "opacity" in node ? null : "no-prop",
+    async run(node, v) {
+      bindFields(node, ["opacity"], v);
+      return null;
+    }
+  };
+  var TEXT_FIELD_SCOPE = { fontSize: "FONT_SIZE", lineHeight: "LINE_HEIGHT", letterSpacing: "LETTER_SPACING", fontFamily: "FONT_FAMILY" };
+  async function valueFor(v, node) {
+    var _a;
+    try {
+      const fn = v.resolveForConsumer;
+      if (typeof fn === "function") return fn.call(v, node).value;
+    } catch (e) {
+    }
+    let cur = v;
+    for (let i = 0; i < 12 && cur; i++) {
+      const raw = Object.values((_a = cur.valuesByMode) != null ? _a : {})[0];
+      if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
+        cur = await figma.variables.getVariableByIdAsync(raw.id).catch(() => null);
+      } else return raw;
+    }
+    return void 0;
+  }
+  function textProp(field) {
+    return {
+      scopeOk: (scopes) => allows(scopes, [TEXT_FIELD_SCOPE[field]]),
+      check(node) {
+        if (node.type !== "TEXT") return "no-prop";
+        return node.characters.length ? null : "empty-text";
+      },
+      async run(node, v) {
+        const tn = node;
+        const len = tn.characters.length;
+        let fonts;
+        try {
+          fonts = typeof tn.getRangeAllFontNames === "function" ? tn.getRangeAllFontNames(0, len) : [tn.fontName];
+          for (const f of fonts) await figma.loadFontAsync(f);
+        } catch (e) {
+          return "font";
+        }
+        if (field === "fontFamily") {
+          const family = await valueFor(v, node);
+          if (typeof family !== "string") return "font";
+          try {
+            for (const f of fonts) await figma.loadFontAsync({ family, style: f.style });
+          } catch (e) {
+            return "font";
+          }
+        }
+        tn.setRangeBoundVariable(0, len, field, v);
+        return null;
+      }
+    };
+  }
+  var DIRS2 = ["top", "right", "bottom", "left"];
+  var PADDING2 = {
+    padding: ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"],
+    "padding-x": ["paddingLeft", "paddingRight"],
+    "padding-y": ["paddingTop", "paddingBottom"],
+    "padding-top": ["paddingTop"],
+    "padding-right": ["paddingRight"],
+    "padding-bottom": ["paddingBottom"],
+    "padding-left": ["paddingLeft"]
+  };
+  var wraps = (node) => node.layoutWrap === "WRAP";
+  function lastSeg(name) {
+    var _a;
+    const segs = name.split("/").map((s) => s.trim().toLowerCase());
+    return (_a = segs[segs.length - 1]) != null ? _a : "";
+  }
+  function textFieldOf(name, scopes) {
+    const segs = name.split("/").map((s) => s.trim().toLowerCase());
+    const byName2 = { "font-size": "fontSize", "line-height": "lineHeight", "letter-spacing": "letterSpacing", "font-family": "fontFamily" };
+    for (const s of [segs[segs.length - 1], segs[0]]) if (s && byName2[s]) return byName2[s];
+    const byScope = { FONT_SIZE: "fontSize", LINE_HEIGHT: "lineHeight", LETTER_SPACING: "letterSpacing", FONT_FAMILY: "fontFamily" };
+    for (const s of scopes) if (byScope[s]) return byScope[s];
+    return null;
+  }
+  function propsFor(kind, v, node) {
+    var _a;
+    const last = lastSeg(v.name);
+    switch (kind) {
+      case "color":
+        return [fillProp(node.type === "TEXT"), strokeColorProp, shadowProp];
+      case "gap": {
+        if (PADDING2[last]) {
+          const f = PADDING2[last];
+          return [gapProp(() => f)];
+        }
+        if (last === "row-gap") return [gapProp((n) => [wraps(n) ? "counterAxisSpacing" : "itemSpacing"])];
+        return [gapProp(() => ["itemSpacing"])];
+      }
+      case "radius": {
+        const corner = Object.keys(CORNER_FIELD).find((c) => last === `radius-${c}`);
+        return [radiusProp(corner ? [CORNER_FIELD[corner]] : ALL_CORNERS)];
+      }
+      case "size":
+        return [sizeProp(last === "width" ? ["width"] : last === "height" ? ["height"] : ["width", "height"])];
+      case "stroke": {
+        const dir = DIRS2.find((d) => last.endsWith(`-${d}`));
+        return [strokeWeightProp(dir ? SIDE_WEIGHT[dir] : "strokeWeight")];
+      }
+      case "opacity":
+        return [opacityProp];
+      case "text": {
+        const f = textFieldOf(v.name, (_a = v.scopes) != null ? _a : []);
+        return f ? [textProp(f)] : [];
+      }
+      default:
+        return [];
+    }
+  }
+  function propForTarget(kind, target) {
+    var _a;
+    if (!((_a = APPLY_TARGETS[kind]) != null ? _a : []).includes(target)) return null;
+    switch (target) {
+      case "fill":
+        return fillProp(false);
+      case "text":
+        return fillProp(true);
+      case "stroke":
+        return strokeColorProp;
+      case "shadow":
+        return shadowProp;
+      case "gap":
+        return gapProp(() => ["itemSpacing"]);
+      case "radius":
+        return radiusProp(ALL_CORNERS);
+      case "radius-tl":
+        return radiusProp(["topLeftRadius"]);
+      case "radius-tr":
+        return radiusProp(["topRightRadius"]);
+      case "radius-bl":
+        return radiusProp(["bottomLeftRadius"]);
+      case "radius-br":
+        return radiusProp(["bottomRightRadius"]);
+      default:
+        return PADDING2[target] ? gapProp(() => PADDING2[target]) : null;
+    }
+  }
+  async function applyVariableToNodes(nodes, variable, target) {
+    var _a;
+    const res = { applied: 0, skipped: 0, skipReasons: {} };
+    const skip2 = (r) => {
+      var _a2;
+      res.skipped++;
+      res.skipReasons[r] = ((_a2 = res.skipReasons[r]) != null ? _a2 : 0) + 1;
+    };
+    const scopes = (_a = variable.scopes) != null ? _a : [];
+    const kind = varKind({ name: variable.name, type: variable.resolvedType, scopes });
+    for (const node of nodes) {
+      try {
+        if (kind === "other") {
+          skip2("other-kind");
+          continue;
+        }
+        if (target) {
+          const p = propForTarget(kind, target);
+          if (!p) {
+            skip2("no-prop");
+            continue;
+          }
+          if (!targetAllowed(scopes, target)) {
+            skip2("no-scope");
+            continue;
+          }
+          const why = p.check(node, true);
+          if (why) {
+            skip2(why);
+            continue;
+          }
+          if (!p.scopeOk(scopes, node)) {
+            skip2("no-scope");
+            continue;
+          }
+          const r3 = await p.run(node, variable, true);
+          if (r3) skip2(r3);
+          else res.applied++;
+          continue;
+        }
+        const list = propsFor(kind, variable, node);
+        let firstWhy = null;
+        let chosen = null;
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i];
+          if (!p.scopeOk(scopes, node)) continue;
+          const create = i === 0;
+          const why = p.check(node, create);
+          if (!why) {
+            chosen = { p, create };
+            break;
+          }
+          firstWhy != null ? firstWhy : firstWhy = why;
+        }
+        if (!chosen) {
+          skip2(firstWhy != null ? firstWhy : "no-scope");
+          continue;
+        }
+        const r = await chosen.p.run(node, variable, chosen.create);
+        if (r) skip2(r);
+        else res.applied++;
+      } catch (e) {
+        skip2("error");
+      }
+    }
+    return res;
+  }
+
   // src/lib/rename.ts
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
@@ -5552,209 +6198,6 @@
     if (!d || d.w <= 0 || d.h <= 0) return false;
     if (Math.max(d.w, d.h) > 16) return false;
     return node.type === "ELLIPSE" || cornerRadiusOf(node) >= Math.min(d.w, d.h) / 2 - 1;
-  }
-
-  // src/lib/exporters.ts
-  var WEIGHT_NAMES = {
-    thin: 100,
-    hairline: 100,
-    extralight: 200,
-    ultralight: 200,
-    light: 300,
-    regular: 400,
-    normal: 400,
-    medium: 500,
-    semibold: 600,
-    demibold: 600,
-    bold: 700,
-    extrabold: 800,
-    ultrabold: 800,
-    black: 900,
-    heavy: 900
-  };
-  function splitWeightStyle(value) {
-    var _a;
-    if (typeof value === "number") return { weight: value, italic: false };
-    const s = String(value);
-    const italic = /italic|oblique/i.test(s);
-    const cleaned = s.replace(/italic|oblique/gi, "").replace(/[\s_-]/g, "").toLowerCase();
-    const weight = (_a = WEIGHT_NAMES[cleaned]) != null ? _a : Number(cleaned) || 400;
-    return { weight, italic };
-  }
-  function dimension(token, opts) {
-    const n = Number(token.value);
-    if (token.kind === "fontSize" && opts.fontSizeUnit === "rem") {
-      const r = n / opts.base;
-      return `${Number(r.toFixed(4))}rem`;
-    }
-    return `${n}px`;
-  }
-  function cssLiteral(token, opts) {
-    var _a;
-    switch (token.kind) {
-      case "color":
-        return String(token.value);
-      case "fontFamily":
-        return String(token.value);
-      case "opacity":
-        return String(token.value);
-      case "lineHeight":
-      case "letterSpacing":
-        return (_a = token.description) != null ? _a : `${Number(token.value)}px`;
-      case "fontWeight":
-        return String(splitWeightStyle(token.value).weight);
-      case "fontSize":
-      case "spacing":
-      case "radius":
-      case "size":
-      case "strokeWidth":
-      case "effectFloat":
-        return dimension(token, opts);
-      default:
-        return String(token.value);
-    }
-  }
-  var cssVar = (name) => `--${kebab(name)}`;
-  function toCss(tokens, opts) {
-    const lines = [":root {"];
-    for (const t2 of tokens) {
-      if (t2.aliasOf) {
-        lines.push(`  ${cssVar(t2.name)}: var(${cssVar(t2.aliasOf)});`);
-      } else {
-        lines.push(`  ${cssVar(t2.name)}: ${cssLiteral(t2, opts)};`);
-        if (t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
-          lines.push(`  ${cssVar(t2.name)}-style: italic;`);
-        }
-      }
-    }
-    lines.push("}");
-    return lines.join("\n");
-  }
-  var W3C_TYPE = {
-    color: "color",
-    fontSize: "dimension",
-    spacing: "dimension",
-    radius: "dimension",
-    size: "dimension",
-    strokeWidth: "dimension",
-    effectFloat: "dimension",
-    fontFamily: "fontFamily",
-    fontWeight: "fontWeight",
-    opacity: "number",
-    lineHeight: "lineHeight",
-    // 비표준(DTCG 미정의) — 단위 보존 위해 문자열 값
-    letterSpacing: "letterSpacing"
-    // 비표준
-  };
-  var w3cRef = (name) => `{${name.split("/").filter(Boolean).join(".")}}`;
-  function w3cValue(token, opts) {
-    var _a, _b;
-    if (token.aliasOf) return w3cRef(token.aliasOf);
-    switch (token.kind) {
-      case "color":
-      case "fontFamily":
-        return String(token.value);
-      case "lineHeight":
-      case "letterSpacing":
-        return (_a = token.description) != null ? _a : `${Number(token.value)}px`;
-      case "opacity":
-        return Number(token.value);
-      case "fontWeight":
-        return splitWeightStyle(token.value).weight;
-      case "fontSize":
-      case "spacing":
-      case "radius":
-      case "size":
-      case "strokeWidth":
-      case "effectFloat":
-        return dimension(token, opts);
-      default:
-        return (_b = token.value) != null ? _b : "";
-    }
-  }
-  function toW3C(tokens, opts) {
-    var _a;
-    const root = {};
-    for (const t2 of tokens) {
-      const segs = t2.name.split("/").filter(Boolean);
-      let node = root;
-      for (let i = 0; i < segs.length - 1; i++) {
-        const key = segs[i];
-        if (!node[key] || "$value" in node[key]) node[key] = (_a = node[key]) != null ? _a : {};
-        node = node[key];
-      }
-      const leaf = { $value: w3cValue(t2, opts) };
-      const ty = W3C_TYPE[t2.kind];
-      if (ty) leaf.$type = ty;
-      node[segs[segs.length - 1]] = leaf;
-      if (!t2.aliasOf && t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
-        node[`${segs[segs.length - 1]}-style`] = { $type: "fontStyle", $value: "italic" };
-      }
-    }
-    return JSON.stringify(root, null, 2);
-  }
-  function dedupeByName(tokens) {
-    const seen = /* @__PURE__ */ new Map();
-    for (const t2 of tokens) {
-      const prev = seen.get(t2.name);
-      if (!prev || prev.collection === "Semantic" && t2.collection === "Global") seen.set(t2.name, t2);
-    }
-    return [...seen.values()];
-  }
-  var TYPO_PREFIX = "typography";
-  var pct = (n) => `${Number(n.toFixed(2))}%`;
-  var lineHeightStr = (lh) => lh.unit === "auto" ? "normal" : lh.unit === "percent" ? pct(lh.value) : `${Number(lh.value.toFixed(2))}px`;
-  var letterSpacingStr = (ls) => ls.unit === "percent" ? pct(ls.value) : `${Number(ls.value.toFixed(2))}px`;
-  var fontSizeStr = (px, opts) => opts.fontSizeUnit === "rem" ? `${Number((px / opts.base).toFixed(4))}rem` : `${px}px`;
-  function textStylesToCss(styles, opts) {
-    const lines = [];
-    for (const st of styles) {
-      const base = cssVar(`${TYPO_PREFIX}/${st.name}`);
-      const { weight, italic } = splitWeightStyle(st.fontStyle);
-      lines.push(`  ${base}-font-family: ${st.fontFamily};`);
-      lines.push(`  ${base}-font-size: ${fontSizeStr(st.fontSize, opts)};`);
-      lines.push(`  ${base}-font-weight: ${weight};`);
-      if (italic) lines.push(`  ${base}-font-style: italic;`);
-      lines.push(`  ${base}-line-height: ${lineHeightStr(st.lineHeight)};`);
-      lines.push(`  ${base}-letter-spacing: ${letterSpacingStr(st.letterSpacing)};`);
-    }
-    return lines;
-  }
-  function textStylesToW3C(styles, opts, root) {
-    var _a;
-    for (const st of styles) {
-      const segs = [TYPO_PREFIX, ...st.name.split("/").filter(Boolean)];
-      let node = root;
-      for (let i = 0; i < segs.length - 1; i++) {
-        const key = segs[i];
-        if (!node[key] || "$value" in node[key]) node[key] = (_a = node[key]) != null ? _a : {};
-        node = node[key];
-      }
-      const { weight, italic } = splitWeightStyle(st.fontStyle);
-      const value = {
-        fontFamily: st.fontFamily,
-        fontSize: fontSizeStr(st.fontSize, opts),
-        fontWeight: weight,
-        lineHeight: lineHeightStr(st.lineHeight),
-        // DTCG는 number(배율)를 권하지만 원본 %를 그대로 보존(2026-10-28 결정)
-        letterSpacing: letterSpacingStr(st.letterSpacing)
-      };
-      if (italic) value.fontStyle = "italic";
-      node[segs[segs.length - 1]] = { $type: "typography", $value: value };
-    }
-  }
-  function exportTokens(tokens, opts, textStyles = []) {
-    const list = dedupeByName(tokens);
-    if (opts.format === "css") {
-      const css = toCss(list, opts);
-      if (!textStyles.length) return css;
-      const body = css.slice(0, css.lastIndexOf("}"));
-      return `${body}${textStylesToCss(textStyles, opts).join("\n")}
-}`;
-    }
-    const root = JSON.parse(toW3C(list, opts));
-    textStylesToW3C(textStyles, opts, root);
-    return JSON.stringify(root, null, 2);
   }
 
   // src/lib/componentLike.ts
@@ -9999,9 +10442,23 @@
           if (msg.reqId == null) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
           const styles = nameTextStyles(clusterTextStyles(samples), existing);
+          const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
           if (msg.reqId != null) {
-            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, reqId: msg.reqId, existing: existing.map((e) => ({ name: e.name, sig: tsSig(e) })) });
-          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings });
+            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, reqId: msg.reqId, existing: existingSigs });
+          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, existing: existingSigs });
+          break;
+        }
+        case "SCAN_TS_RENAME": {
+          if (!requireTextStyles()) break;
+          post({ type: "TS_RENAME_PLAN", reqId: msg.reqId, rows: await planTsRename() });
+          break;
+        }
+        case "APPLY_TS_RENAME": {
+          if (!requireTextStyles()) break;
+          const r = await applyTsRename(msg.items);
+          post(__spreadValues({ type: "TS_RENAMED", reqId: msg.reqId }, r));
+          commitUndo(figma);
+          await postPrereq();
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {

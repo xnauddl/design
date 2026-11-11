@@ -7015,14 +7015,14 @@ test('createSemanticTextStyles — 등록 경로 되돌림: 0단계에서 바꾼
   assert.ok(r.missing.some((m) => m.startsWith('heading/large: 끝까지 만들지 못했어요')), r.missing.join(' | '));
   assert.ok(findVar(figma, 'Semantic', 'font-size/a') && findVar(figma, 'Semantic', 'line-height/a'), '변수 이름 되돌림');
   assert.equal(findVar(figma, 'Semantic', 'line-height/heading/large'), undefined);
-  assert.equal(r.missing.some((m) => m.includes('되돌리지 못했어요')), false);
+  assert.equal(r.missing.some((m) => m.includes('변수 이름을 되돌리지 못했어요')), false);
   // 되돌림도 실패 — 변수 이름이 남으면 알린다
   const lh = findVar(figma, 'Semantic', 'line-height/a');
   let name = lh.name;
   Object.defineProperty(lh, 'name', { configurable: true, get: () => name, set: (n) => { if (n === 'line-height/a' && name !== n) throw new Error('boom'); name = n; } });
   const r2 = await createSemanticTextStyles([{ ...spec, name: 'heading/large', boundStyleId: st.id }]);
-  const stuck = r2.missing.find((m) => m.includes('역할 변수 이름을 되돌리지 못했어요'));
-  assert.ok(stuck && stuck.startsWith('a: ') && stuck.includes('__dsl_tmp_'), r2.missing.join(' | '));
+  // 되돌림 자체가 실패하면 그 되돌림의 2단계 되돌림이 변수를 0단계 뒤 이름(새 이름)으로 돌려 둔다 — 그 지금 이름을 알린다.
+  assert.ok(r2.missing.includes('a: Semantic 변수 이름을 되돌리지 못했어요 — line-height/heading/large'), r2.missing.join(' | '));
   assert.ok(findVar(figma, 'Semantic', 'font-size/a'), '되돌린 변수는 돌아옴');
 });
 
