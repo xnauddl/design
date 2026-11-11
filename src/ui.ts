@@ -2004,7 +2004,10 @@ window.onmessage = (event: MessageEvent) => {
       }
       break;
     }
-    case 'TEXT_STYLES_RESULT':
+    case 'TEXT_STYLES_RESULT': {
+      // 툴팁: 못 붙인 글자 사유별 수 → 빈 줄 → 알림 목록(IA v4 §4.3 "결과")
+      const why = Object.entries(msg.applyReasons ?? {}).filter(([, n]) => (n ?? 0) > 0).map(([k, n]) => `${t('tsSkip.' + k)} ${t('v4.layerCount', { n })}`);
+      const tsTip = [why.join('\n'), msg.missing.join('\n')].filter(Boolean).join('\n\n');
       setStatus(
         'tsStatus',
         t('textStyle.registered', { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) +
@@ -2012,10 +2015,12 @@ window.onmessage = (event: MessageEvent) => {
           (msg.applySkipped ? t('textStyle.linkSkipped', { k: msg.applySkipped }) : '') +
           // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` · ${msg.notes.join(' · ')}` : '') +
-          (msg.missing.length ? t('textStyle.unlinked', { names: msg.missing.join(', ') }) : ''),
+          (msg.missing.length ? t('textStyle.missingN', { k: msg.missing.length }) : ''),
         msg.missing.length ? 'warn' : 'ok',
+        tsTip || undefined,
       );
       break;
+    }
     case 'TEXT_STYLES_PREVIEW': {
       // 텍스트 스타일 미리보기(§4.2) — 같은 찾기 차례의 응답만.
       if (msg.reqId !== bindTsReq || msg.reqId !== bindLatest) break;
@@ -2650,7 +2655,7 @@ let mkFocusPending = false;
 let mkRunning = false;
 let mkCancelReq = false;
 let mkProg: { steps: MakeStepId[]; i: number; done: MakeStepId[] } | null = null;
-let mkResults: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string }[] | null = null;
+let mkResults: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string; tip?: string }[] | null = null;
 let mkResultsCreated = false;
 let mkCancelNote = '';
 
@@ -3088,6 +3093,7 @@ function renderMakeResults(): void {
     tx.className = 'tr-cnt';
     if (r.mark === 'warn') tx.style.color = 'var(--warn)';
     tx.textContent = r.text;
+    if (r.tip) row.title = r.tip; // 텍스트 스타일 알림 목록(§4.3 "글꼴")
     row.append(mark, nm, tx);
     box.appendChild(row);
   }
@@ -3168,7 +3174,7 @@ async function runMake(): Promise<void> {
   opWizardStart();
   renderMakeScreen();
   const totals: MakeTotals = {};
-  const results: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string }[] = [];
+  const results: { id: MakeStepId; mark: 'ok' | 'warn' | 'off'; text: string; tip?: string }[] = [];
   let stay = false;
   let stopped = false;
   for (let i = 0; i < steps.length; i++) {
@@ -3198,8 +3204,8 @@ async function runMake(): Promise<void> {
       } else if (id === 'textStyles') {
         const rid = mkNextReq();
         const r = await wizardRequest({ type: 'CREATE_TEXT_STYLES', styles, reqId: rid, ...(link ? { applyTo: ids } : {}) }, ['TEXT_STYLES_RESULT'], rid);
-        totals.styles = { s: r.created + r.updated, a: r.applied ?? 0 };
-        results.push({ id, mark: 'ok', text: t('wizard.seq.textStyles', { created: r.created, updated: r.updated }) + (r.applied ? t('wizard.seq.textStylesLinked', { a: r.applied }) : '') + (r.missing.length ? t('wizard.seq.textStylesMissing', { k: r.missing.length }) : '') });
+        totals.styles = { s: r.created + r.updated, a: r.applied ?? 0, ...(r.missing.length ? { missing: r.missing } : {}) };
+        results.push({ id, mark: 'ok', text: t('wizard.seq.textStyles', { created: r.created, updated: r.updated }) + (r.applied ? t('wizard.seq.textStylesLinked', { a: r.applied }) : '') + (r.missing.length ? t('wizard.seq.textStylesMissing', { k: r.missing.length }) : ''), ...(r.missing.length ? { tip: r.missing.join('\n') } : {}) });
       } else if (id === 'bind') {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
@@ -3255,7 +3261,8 @@ async function runMake(): Promise<void> {
   // 다 됨 — 하위 화면을 첫 화면으로(탭은 바꾸지 않음) + 상태 줄.
   const linkOff = !link;
   if (selSub === 'make') showSelSub('home');
-  showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
+  const doneTip = totals.styles?.missing?.join('\n'); // 텍스트 스타일 알림 목록(§4.3 "글꼴")
+  showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(doneTip ? { tip: doneTip } : {}), ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
 }
 $('btnMakeRun').addEventListener('click', () => void runMake());
 $('btnMakeCancel').addEventListener('click', () => { mkCancelReq = true; send({ type: 'CANCEL' }); });
@@ -4006,12 +4013,13 @@ function hideApplyProgress(): void {
   if (curSel) renderBindChrome(); // 찾는 중 표시를 거둔다
 }
 
-function setStatus(id: string, text: string, cls: 'ok' | 'warn' | ''): void {
+function setStatus(id: string, text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
   const el = $(id);
   el.textContent = text;
   el.className = `status ${cls}`;
-  // 라이선스 줄의 원문 사유 툴팁(noteTip)이 다음 문구에 남지 않게 — 쓸 때마다 비운다.
-  if (id === 'licenseStatus') el.removeAttribute('title');
+  // 툴팁은 쓸 때마다 새로 — 옛 목록 · 라이선스 원문 사유(noteTip, 부른 쪽이 뒤에 단다)가 다음 문구에 남지 않게.
+  if (tip) el.title = tip;
+  else el.removeAttribute('title');
 }
 
 function escapeHtml(s: string): string {

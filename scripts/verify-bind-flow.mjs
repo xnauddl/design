@@ -1167,14 +1167,15 @@ async function saveAndGet(p) {
   await p.waitForTimeout(80);
   const ts = (await sent(p, 'CREATE_TEXT_STYLES')).at(-1);
   check('17 텍스트 스타일 — 다시 스캔 없이 켠 줄(고친 이름) · applyTo = 시작 때 기준', ts?.styles?.[0]?.name === 'body/base' && ts.applyTo?.[0] === 'w1' && (await sent(p, 'SCAN_TEXT_STYLES')).length === scBefore, String((await sent(p, 'SCAN_TEXT_STYLES')).length));
-  await recv(p, { type: 'TEXT_STYLES_RESULT', reqId: ts.reqId, created: 1, updated: 0, bound: 1, missing: [], notes: [], applied: 3, applySkipped: 0 });
+  await recv(p, { type: 'TEXT_STYLES_RESULT', reqId: ts.reqId, created: 1, updated: 0, bound: 1, missing: ["title: 글꼴 'Gone Bold'을 불러오지 못해 값 · 변수 연결을 건너뛰었어요"], notes: [], applied: 3, applySkipped: 0 });
   await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   check('17 연결 — APPLY(preview 아님) · skipTextStyleNodes · 시작 때 기준 · reqId', !!ap && ap.skipTextStyleNodes === true && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
   check('17 실행 중 [연결] 잠금', await locked(p, '#btnApplyConfirm'));
   await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   await p.waitForTimeout(120);
-  check('17 다 됨 → 첫 화면 · 상태 줄 "Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 5곳 연결"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 5곳 연결', await p.textContent('#statusText'));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-make-done-missing.png` : '/dev/null' }).catch(() => {});
+  check('17 다 됨 → 첫 화면 · 상태 줄 "… 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결"(글꼴 알림이 있어도 연결까지 돈다) · 툴팁에 알림 글', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결' && (await p.getAttribute('#statusText', 'title')).includes("title: 글꼴 'Gone Bold'"), await p.textContent('#statusText'));
   check('17 실행 결과로 연결 화면 상태 줄 "🔗 …곳 연결"을 쓰지 않음', !(await p.textContent('#statusText')).startsWith('🔗'));
   await p.close();
 }

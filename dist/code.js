@@ -491,6 +491,7 @@
     "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
+    "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
     "make.done.stylesLinked": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C(\uAE00\uC790 {a}\uAC1C)",
     "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
     "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
@@ -857,7 +858,7 @@
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
-    "textStyle.unlinked": " \xB7 \uBBF8\uC5F0\uACB0: {names}",
+    "textStyle.missingN": " \xB7 \uC54C\uB9BC {k}\uAC1C",
     "textStyle.needScan": "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC5B4\uC694.",
     "textStyle.warnMixed": "\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694.",
     "textStyle.missRename": "\uC774\uB984 \uCDA9\uB3CC '{from}'\u2192'{to}' \u2014 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 \uC774\uB984\uC744 \uBC14\uAFB8\uC9C0 \uC54A\uC558\uC5B4\uC694",
@@ -865,6 +866,9 @@
     "textStyle.noteLsPx": "{name}: \uC5ED\uD560\uB9C8\uB2E4 \uC790\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)",
     "textStyle.missStyle": "{name}: \uD3F0\uD2B8 {style}\u2192Regular",
     "textStyle.missFamily": "{name}: \uD3F0\uD2B8 '{family}' \uC5C6\uC74C",
+    "textStyle.missFontKeep": "{name}: \uAE00\uAF34 '{font}'\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD574 \uAC12 \xB7 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694",
+    "textStyle.missError": "{name}: \uB05D\uAE4C\uC9C0 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694(\uC77C\uBD80 \uAC12\uB9CC \uB4E4\uC5B4\uAC14\uC744 \uC218 \uC788\uC5B4\uC694) \u2014 {error}",
+    "textStyle.missVar": "{name}: \uBCC0\uC218 '{var}'\uC774 \uC5C6\uC5B4 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
@@ -1770,6 +1774,24 @@
     const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
     const warnings = tokens.length ? [...acc.warnings] : [...acc.warnings, ...acc.skipped];
     return { tokens, warnings };
+  }
+
+  // src/lib/errors.ts
+  function explainError(raw) {
+    const s = (raw || "").toLowerCase();
+    if (/font|loadfontasync|has not been loaded/.test(s))
+      return { message: t("err.font"), action: t("err.fontAction"), retryable: true };
+    if (/invalid scope|scope/.test(s))
+      return { message: t("err.scope"), action: t("err.scopeAction"), retryable: true };
+    if (/incompatible|property value/.test(s))
+      return { message: t("err.prop"), action: t("err.propAction"), retryable: false };
+    if (/read[- ]?only|permission|not allowed|cannot edit/.test(s))
+      return { message: t("err.readonly"), action: t("err.readonlyAction"), retryable: false };
+    if (/network|fetch|timeout|offline/.test(s))
+      return { message: t("err.network"), action: t("err.networkAction"), retryable: true };
+    if (/storage|quota|exceeded/.test(s))
+      return { message: t("err.storage"), action: t("err.storageAction"), retryable: true };
+    return { message: raw || t("err.unknown"), action: t("err.unknownAction"), retryable: true };
   }
 
   // src/lib/tiers.ts
@@ -2685,88 +2707,106 @@
       if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
         continue;
       }
-      let style = anchored;
-      if (!style) style = styleByName.get(spec.name);
+      let style = anchored != null ? anchored : styleByName.get(spec.name);
       const created = !style;
       const isRename = !!anchored;
-      if (!style) style = figma.createTextStyle();
-      if (style.name !== spec.name) {
-        styleByName.delete(style.name);
-        style.name = spec.name;
-      }
-      const lhPct = (_f = spec.lineHeightPercent) != null ? _f : 0;
-      const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
-      if (!isRename) {
-        const wanted = { family: spec.family, style: spec.style };
-        let loaded;
-        try {
-          await figma.loadFontAsync(wanted);
-          loaded = wanted;
-        } catch (e) {
+      const setName = (st) => {
+        if (st.name === spec.name) return;
+        styleByName.delete(st.name);
+        st.name = spec.name;
+      };
+      try {
+        let loaded = null;
+        if (!isRename) {
+          const wanted = { family: spec.family, style: spec.style };
           try {
-            const fb = { family: spec.family, style: "Regular" };
-            await figma.loadFontAsync(fb);
-            loaded = fb;
-            res.missing.push(t("textStyle.missStyle", { name: spec.name, style: spec.style }));
-          } catch (e2) {
-            res.missing.push(t("textStyle.missFamily", { name: spec.name, family: spec.family }));
+            await figma.loadFontAsync(wanted);
+            loaded = wanted;
+          } catch (e) {
+            try {
+              const fb = { family: spec.family, style: "Regular" };
+              await figma.loadFontAsync(fb);
+              loaded = fb;
+              res.missing.push(t("textStyle.missStyle", { name: spec.name, style: spec.style }));
+            } catch (e2) {
+              res.missing.push(t("textStyle.missFamily", { name: spec.name, family: spec.family }));
+              continue;
+            }
+          }
+        } else {
+          const fn = style.fontName;
+          try {
+            await figma.loadFontAsync(fn);
+          } catch (e) {
+            setName(style);
+            res.missing.push(t("textStyle.missFontKeep", { name: spec.name, font: `${fn.family} ${fn.style}` }));
+            styleByName.set(spec.name, style);
             continue;
           }
         }
-        style.fontName = loaded;
-        style.fontSize = spec.fontSize;
-        style.lineHeight = spec.lineHeight > 0 ? lhPct > 0 ? { value: lhPct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
-        style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
-      } else if (lhPct > 0 || lsPct !== 0) {
-        if (lhPct > 0) {
-          if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
-          else style.lineHeight = { value: lhPct, unit: "PERCENT" };
+        if (!style) style = figma.createTextStyle();
+        setName(style);
+        const lhPct = (_f = spec.lineHeightPercent) != null ? _f : 0;
+        const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
+        if (!isRename && loaded) {
+          style.fontName = loaded;
+          style.fontSize = spec.fontSize;
+          style.lineHeight = spec.lineHeight > 0 ? lhPct > 0 ? { value: lhPct, unit: "PERCENT" } : { value: spec.lineHeight, unit: "PIXELS" } : { unit: "AUTO" };
+          style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
+        } else if (lhPct > 0 || lsPct !== 0) {
+          if (lhPct > 0) {
+            if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
+            else style.lineHeight = { value: lhPct, unit: "PERCENT" };
+          }
+          if (lsPct !== 0) {
+            if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
+            else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
+          }
         }
-        if (lsPct !== 0) {
-          if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
-          else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
+        const bindRole = style.name;
+        const fsVar = semByName.get(`font-size/${bindRole}`);
+        if (fsVar) {
+          style.setBoundVariable("fontSize", fsVar);
+          res.bound++;
+        } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
+        if (spec.lineHeight > 0 || isRename) {
+          const pctNow = lhPctOf(style.lineHeight);
+          if (pctNow > 0) {
+            if ((_j = style.boundVariables) == null ? void 0 : _j.lineHeight) style.setBoundVariable("lineHeight", null);
+            res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
+          } else {
+            const lhVar = semByName.get(`line-height/${bindRole}`);
+            if (lhVar) {
+              style.setBoundVariable("lineHeight", lhVar);
+              res.bound++;
+            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
+          }
         }
-      }
-      const bindRole = style.name;
-      const fsVar = semByName.get(`font-size/${bindRole}`);
-      if (fsVar) {
-        style.setBoundVariable("fontSize", fsVar);
-        res.bound++;
-      } else res.missing.push(`font-size/${bindRole}`);
-      if (spec.lineHeight > 0 || isRename) {
-        const pctNow = lhPctOf(style.lineHeight);
-        if (pctNow > 0) {
-          if ((_j = style.boundVariables) == null ? void 0 : _j.lineHeight) style.setBoundVariable("lineHeight", null);
-          res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
-        } else {
-          const lhVar = semByName.get(`line-height/${bindRole}`);
-          if (lhVar) {
-            style.setBoundVariable("lineHeight", lhVar);
-            res.bound++;
-          } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(`line-height/${bindRole}`);
+        if (spec.letterSpacing !== 0 || isRename) {
+          const lsPctNow = lsPctOf(style.letterSpacing);
+          if (lsPctNow !== 0) {
+            if ((_k = style.boundVariables) == null ? void 0 : _k.letterSpacing) style.setBoundVariable("letterSpacing", null);
+            res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
+          } else {
+            const lsVar = semByName.get(`letter-spacing/${bindRole}`);
+            if (lsVar) {
+              style.setBoundVariable("letterSpacing", lsVar);
+              res.bound++;
+            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
+          }
         }
-      }
-      if (spec.letterSpacing !== 0 || isRename) {
-        const lsPctNow = lsPctOf(style.letterSpacing);
-        if (lsPctNow !== 0) {
-          if ((_k = style.boundVariables) == null ? void 0 : _k.letterSpacing) style.setBoundVariable("letterSpacing", null);
-          res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
-        } else {
-          const lsVar = semByName.get(`letter-spacing/${bindRole}`);
-          if (lsVar) {
-            style.setBoundVariable("letterSpacing", lsVar);
-            res.bound++;
-          } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(`letter-spacing/${bindRole}`);
+        const famVar = familyVarFor(style.fontName.family);
+        if (famVar) {
+          style.setBoundVariable("fontFamily", famVar);
+          res.bound++;
         }
+        res[created ? "created" : "updated"]++;
+        if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
+        styleByName.set(style.name, style);
+      } catch (e) {
+        res.missing.push(t("textStyle.missError", { name: spec.name, error: explainError(e instanceof Error ? e.message : String(e)).message }));
+        if (style) styleByName.set(style.name, style);
       }
-      const famVar = familyVarFor(style.fontName.family);
-      if (famVar) {
-        style.setBoundVariable("fontFamily", famVar);
-        res.bound++;
-      }
-      res[created ? "created" : "updated"]++;
-      if (!res.styleIds.includes(style.id)) res.styleIds.push(style.id);
-      styleByName.set(style.name, style);
     }
     return res;
   }

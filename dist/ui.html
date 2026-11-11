@@ -1798,6 +1798,7 @@
     "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
+    "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
     "make.done.stylesLinked": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C(\uAE00\uC790 {a}\uAC1C)",
     "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
     "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
@@ -2164,7 +2165,7 @@
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 \uD06C\uAE30 \uC21C {b}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
-    "textStyle.unlinked": " \xB7 \uBBF8\uC5F0\uACB0: {names}",
+    "textStyle.missingN": " \xB7 \uC54C\uB9BC {k}\uAC1C",
     "textStyle.needScan": "\uBA3C\uC800 \uC2A4\uCE94\uD558\uC138\uC694 \u2014 \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE38 \uD45C\uBCF8\uC774 \uC5C6\uC5B4\uC694.",
     "textStyle.warnMixed": "\uBD80\uBD84 \uC11C\uC2DD(\uD63C\uD569) \uD14D\uC2A4\uD2B8\uB294 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694.",
     "textStyle.missRename": "\uC774\uB984 \uCDA9\uB3CC '{from}'\u2192'{to}' \u2014 \uAC19\uC740 \uC774\uB984 \uC2A4\uD0C0\uC77C\uC774 \uC788\uC5B4 \uC774\uB984\uC744 \uBC14\uAFB8\uC9C0 \uC54A\uC558\uC5B4\uC694",
@@ -2172,6 +2173,9 @@
     "textStyle.noteLsPx": "{name}: \uC5ED\uD560\uB9C8\uB2E4 \uC790\uAC04 \uC6D0\uBCF8\uC774 \uB2EC\uB77C px\uB85C \uAE30\uB85D(\uC6D0\uBCF8 \uD45C\uAE30 \uC0DD\uB7B5)",
     "textStyle.missStyle": "{name}: \uD3F0\uD2B8 {style}\u2192Regular",
     "textStyle.missFamily": "{name}: \uD3F0\uD2B8 '{family}' \uC5C6\uC74C",
+    "textStyle.missFontKeep": "{name}: \uAE00\uAF34 '{font}'\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD574 \uAC12 \xB7 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694",
+    "textStyle.missError": "{name}: \uB05D\uAE4C\uC9C0 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694(\uC77C\uBD80 \uAC12\uB9CC \uB4E4\uC5B4\uAC14\uC744 \uC218 \uC788\uC5B4\uC694) \u2014 {error}",
+    "textStyle.missVar": "{name}: \uBCC0\uC218 '{var}'\uC774 \uC5C6\uC5B4 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
@@ -3862,10 +3866,12 @@
     return __spreadValues({ collectionId: target.collectionId, fromModeId: from.modeId }, dark ? { toModeId: dark.modeId } : {});
   }
   function makeDoneText(totals, opts) {
+    var _a3, _b;
     const parts = [];
     if (totals.created) parts.push(t("make.done.create", { g: totals.created.g, r: totals.created.r }));
     if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
     if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
+    if ((_b = (_a3 = totals.styles) == null ? void 0 : _a3.missing) == null ? void 0 : _b.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
     if (totals.bound != null) parts.push(t("make.done.bind", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("make.done.rename", { c: totals.renamed }));
     if (totals.created && totals.created.m > 0) parts.push(t("make.done.manual", { m: totals.created.m }));
@@ -5154,7 +5160,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -5373,14 +5379,18 @@
         }
         break;
       }
-      case "TEXT_STYLES_RESULT":
+      case "TEXT_STYLES_RESULT": {
+        const why = Object.entries((_h = msg.applyReasons) != null ? _h : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setStatus(
           "tsStatus",
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
-          (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? t("textStyle.unlinked", { names: msg.missing.join(", ") }) : ""),
-          msg.missing.length ? "warn" : "ok"
+          (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? t("textStyle.missingN", { k: msg.missing.length }) : ""),
+          msg.missing.length ? "warn" : "ok",
+          tsTip || void 0
         );
         break;
+      }
       case "TEXT_STYLES_PREVIEW": {
         if (msg.reqId !== bindTsReq || msg.reqId !== bindLatest) break;
         bindTsRows = msg.rows;
@@ -5403,7 +5413,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_h = msg.tierVars) != null ? _h : 0) + ((_i = msg.otherVars) != null ? _i : 0);
+        prereqLocalVars = ((_i = msg.tierVars) != null ? _i : 0) + ((_j = msg.otherVars) != null ? _j : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -5418,7 +5428,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_j = msg.noteKind) != null ? _j : "ok");
+          setStatus("licenseStatus", msg.note, (_k = msg.noteKind) != null ? _k : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -5450,12 +5460,12 @@
       }
       case "COMPONENTS_RESULT": {
         clearCompPreview();
-        const misplaced = (_k = msg.placeFailed) != null ? _k : [];
-        const cloned = (_l = msg.placeCloned) != null ? _l : [];
-        const propFailed = (_m = msg.propFailed) != null ? _m : [];
-        const fillKept = (_n = msg.fillKept) != null ? _n : [];
-        const reused = (_o = msg.reused) != null ? _o : [];
-        const reuseKept = (_p = msg.reuseKept) != null ? _p : [];
+        const misplaced = (_l = msg.placeFailed) != null ? _l : [];
+        const cloned = (_m = msg.placeCloned) != null ? _m : [];
+        const propFailed = (_n = msg.propFailed) != null ? _n : [];
+        const fillKept = (_o = msg.fillKept) != null ? _o : [];
+        const reused = (_p = msg.reused) != null ? _p : [];
+        const reuseKept = (_q = msg.reuseKept) != null ? _q : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -5519,7 +5529,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_q = msg.placeFailed) != null ? _q : [];
+          const misplaced0 = (_r = msg.placeFailed) != null ? _r : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -5528,7 +5538,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_r = msg.placeFailed) != null ? _r : [];
+        const misplaced = (_s = msg.placeFailed) != null ? _s : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -6484,6 +6494,7 @@
       tx.className = "tr-cnt";
       if (r.mark === "warn") tx.style.color = "var(--warn)";
       tx.textContent = r.text;
+      if (r.tip) row.title = r.tip;
       row.append(mark, nm, tx);
       box.appendChild(row);
     }
@@ -6541,7 +6552,7 @@
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -6604,8 +6615,8 @@
         } else if (id === "textStyles") {
           const rid = mkNextReq();
           const r = await wizardRequest(__spreadValues({ type: "CREATE_TEXT_STYLES", styles, reqId: rid }, link ? { applyTo: ids } : {}), ["TEXT_STYLES_RESULT"], rid);
-          totals.styles = { s: r.created + r.updated, a: (_c = r.applied) != null ? _c : 0 };
-          results.push({ id, mark: "ok", text: t("wizard.seq.textStyles", { created: r.created, updated: r.updated }) + (r.applied ? t("wizard.seq.textStylesLinked", { a: r.applied }) : "") + (r.missing.length ? t("wizard.seq.textStylesMissing", { k: r.missing.length }) : "") });
+          totals.styles = __spreadValues({ s: r.created + r.updated, a: (_c = r.applied) != null ? _c : 0 }, r.missing.length ? { missing: r.missing } : {});
+          results.push(__spreadValues({ id, mark: "ok", text: t("wizard.seq.textStyles", { created: r.created, updated: r.updated }) + (r.applied ? t("wizard.seq.textStylesLinked", { a: r.applied }) : "") + (r.missing.length ? t("wizard.seq.textStylesMissing", { k: r.missing.length }) : "") }, r.missing.length ? { tip: r.missing.join("\n") } : {}));
         } else if (id === "bind") {
           wizBindReq = ++bindReqSeq;
           wizBindPending = true;
@@ -6662,7 +6673,8 @@
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues({ cls: "ok" }, linkOff ? { action: { label: t("wizard.toBind"), run: () => {
+    const doneTip = (_i = (_h = totals.styles) == null ? void 0 : _h.missing) == null ? void 0 : _i.join("\n");
+    showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");
     } } } : {}));
@@ -7334,11 +7346,12 @@
     bindFinding = false;
     if (curSel) renderBindChrome();
   }
-  function setStatus(id, text, cls) {
+  function setStatus(id, text, cls, tip) {
     const el = $(id);
     el.textContent = text;
     el.className = `status ${cls}`;
-    if (id === "licenseStatus") el.removeAttribute("title");
+    if (tip) el.title = tip;
+    else el.removeAttribute("title");
   }
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);

@@ -6764,3 +6764,65 @@ test('code.ts — EXPORT: 투명도가 1이 아닌 색은 #rrggbbaa, 1이면 #rr
   assert.ok(content.includes('"#00000014"'), content);
   assert.ok(content.includes('"#000000"'));
 });
+
+test('createSemanticTextStyles — 다시 실행(앵커)은 지금 글꼴을 불러온 뒤 쓴다 · 못 불러오면 값 · 연결만 건너뜀 · 없는 글꼴의 새 스타일은 안 생김 (IA v4 §4.3 "글꼴")', async () => {
+  const figma = installFigma();
+  const body = { name: 'body', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' };
+  await createSemanticTextStyles([body]);
+  const st = figma._state.textStyles.find((s) => s.name === 'body');
+  // 지금 글꼴이 없는 앵커 스타일 두 개(이름 같음 · 이름 바뀜)
+  const gone = figma.createTextStyle();
+  gone.name = 'title';
+  gone.fontName = { family: 'Gone', style: 'Bold' };
+  const gone2 = figma.createTextStyle();
+  gone2.name = 'old-caption';
+  gone2.fontName = { family: 'Gone', style: 'Light' };
+  // 실제 피그마처럼: 불러온 글꼴을 기억하고, 안 불러온 글꼴의 스타일에 값 쓰기(이름 제외)는 던진다
+  const loaded = new Set();
+  figma.loadFontAsync = async (f) => {
+    if (f.family === 'Gone' || f.family === 'Nope') throw new Error('no font');
+    loaded.add(`${f.family}/${f.style}`);
+  };
+  for (const s of figma._state.textStyles) {
+    const bind = s.setBoundVariable.bind(s);
+    s.setBoundVariable = (field, v) => {
+      if (!loaded.has(`${s.fontName.family}/${s.fontName.style}`)) throw new Error(`Cannot write to style with unloaded font. Font "${s.fontName.family} ${s.fontName.style}" has not been loaded`);
+      bind(field, v);
+    };
+  }
+  const r = await createSemanticTextStyles([
+    { ...body, boundStyleId: st.id },
+    { name: 'title', fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Gone', style: 'Bold', boundStyleId: gone.id },
+    { name: 'caption', fontSize: 12, lineHeight: 16, letterSpacing: 0, family: 'Gone', style: 'Light', boundStyleId: gone2.id },
+    { name: 'display', fontSize: 48, lineHeight: 56, letterSpacing: 0, family: 'Nope', style: 'Bold' },
+  ]);
+  assert.equal(r.updated, 1, '앵커 body는 글꼴을 불러와 갱신 — 전에는 여기서 던져 단계가 멈췄다');
+  assert.ok(loaded.has('Inter/Regular'));
+  assert.ok(r.styleIds.includes(st.id) && !r.styleIds.includes(gone.id) && !r.styleIds.includes(gone2.id), '글꼴을 못 불러온 앵커는 styleIds에 없음');
+  assert.ok(r.missing.includes("title: 글꼴 'Gone Bold'을 불러오지 못해 값 · 변수 연결을 건너뛰었어요"), r.missing.join(' | '));
+  assert.ok(r.missing.includes("caption: 글꼴 'Gone Light'을 불러오지 못해 값 · 변수 연결을 건너뛰었어요"), r.missing.join(' | '));
+  assert.equal(gone2.name, 'caption', '이름이 다르면 이름만 바꿈');
+  assert.deepEqual(gone.boundVariables, {}, '값 · 연결은 건너뜀');
+  assert.ok(r.missing.includes("display: 폰트 'Nope' 없음"));
+  assert.equal(figma._state.textStyles.some((s) => s.name === 'display'), false, '없는 글꼴의 새 스타일은 생기지 않음');
+});
+
+test('createSemanticTextStyles — 스타일 하나의 도중 오류는 그 행만 건너뛰고(missError) 다음 행은 갱신 · 변수 없음은 missVar 글', async () => {
+  const figma = installFigma();
+  const a = { name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' };
+  const b = { name: 'b', fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Regular' };
+  await createSemanticTextStyles([a, b]);
+  const sa = figma._state.textStyles.find((s) => s.name === 'a');
+  sa.setBoundVariable = () => { throw new Error('boom'); };
+  const r = await createSemanticTextStyles([a, b]);
+  assert.equal(r.updated, 1, 'b는 갱신');
+  assert.ok(!r.styleIds.includes(sa.id));
+  assert.ok(r.missing.some((m) => m.startsWith('a: 끝까지 만들지 못했어요(일부 값만 들어갔을 수 있어요) — ')), r.missing.join(' | '));
+  assert.equal(figma._state.textStyles.filter((s) => s.name === 'a').length, 1, '같은 이름을 또 만들지 않음');
+  // 변수 없음 — 날것 경로 대신 missVar 글
+  const v = findVar(figma, 'Semantic', 'line-height/b');
+  figma._state.variables.splice(figma._state.variables.indexOf(v), 1);
+  const sb = figma._state.textStyles.find((s) => s.name === 'b');
+  const r2 = await createSemanticTextStyles([{ ...b, boundStyleId: sb.id }]);
+  assert.ok(r2.missing.every((m) => !/^(font-size|line-height|letter-spacing)\//.test(m)), r2.missing.join(' | '));
+});
