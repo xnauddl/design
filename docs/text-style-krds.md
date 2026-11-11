@@ -162,7 +162,7 @@
 - `variables.ts scanTextStyles`: 표본에 `uiRole`(§3.2-1 조상 탐색). `scanExistingTextStyles`는 그대로.
 - `variables.ts`: `renameTextRoleVars(pairs)` 공용 함수(직접 만든 변수 거름) + 이름 다시 짓기 적용 함수 + 등록 경로의 되돌림(§5.3). `code.ts` · `messages.ts`: 메시지 2쌍(`SCAN_TS_RENAME` → `TS_RENAME_PLAN`, `APPLY_TS_RENAME` → `TS_RENAMED`).
 - `ui.ts` · `ui.html`: 변수 탭 ⋯ 메뉴 항목 · 타이포 카드 [이름 다시 짓기](`PAID_FIELDS`) · 이름 다시 짓기 팝업 · OPS `tsRename` · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움. `ui.html` `btnTsRowLabels`의 기본 `title`(지금 `rowLabelTip`과 같은 옛 글)도 고친다.
-- **타이포 목록 줄 모양(CLAUDE.md "카드 안에 카드")**: 지금 `tsList` 줄은 `resultCard` → `.r-card`(테두리 + 둥근 모서리 + 배경)가 `.step` 카드 안에 쌓인 모양이다. 이 목록의 줄을 구분선 줄(아래 테두리 한 줄, 둥근 모서리 · 배경 · 그림자 없음, 줄 사이 간격 0)로 바꾼다 — 타이포 목록에만(`#tsList .r-card`로 범위를 좁혀, 다른 화면의 `.r-card`는 UX 검수 C에서). 줄 안 내용 · 높이는 그대로.
+- **타이포 목록 줄 모양(CLAUDE.md "카드 안에 카드")**: 지금 `tsList` 줄은 `resultCard` → `.r-card`(테두리 + 둥근 모서리 + 배경)가 `.step` 카드 안에 쌓인 모양이다. 이 목록의 줄을 구분선 줄(아래 테두리 한 줄, 둥근 모서리 · 배경 · 그림자 없음, 줄 사이 간격 0)로 바꾼다 — 타이포 목록에만(`#tsList .r-card`로 범위를 좁혀, 다른 화면의 `.r-card`는 ia-v4 §2.8 · B.12에서(완료)). 줄 안 내용 · 높이는 그대로.
 - **×n 배지 없앰 (2026-11-11 사용자 결정 B)**: 타이포 목록 스캔 줄 오른쪽의 `×{n}` 버튼(그 스타일 후보를 쓰는 글자 레이어 수 · 누르면 그 레이어 선택, `.r-badge`)을 없앤다 — 기호만으로는 뜻과 기능이 읽히지 않는다. 그 자리에 다른 것을 두지 않는다.
   - 줄 끝: 스캔 줄(배지가 있던 줄 — `count > 0`이고 `nodeIds`가 있음)은 아무것도 없다. 그 밖의 줄(기본 램프 줄 등)은 [삭제](`textStyle.rowDelete`)만 — [삭제]가 붙는 조건은 그대로(배지 분기의 else). (2026-11-11 §4 — 그전에는 둘 다 끝에 크기 표시가 붙었다.)
   - 격자: 크기 표시가 없어져(§4) `putOffMark` · `has-off`(표시 칸을 하나 늘리던 격자)도 지운다 — `.r-top`은 체크 · 본문 · 끝(없음 또는 [삭제]) 세 칸 그대로.
