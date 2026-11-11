@@ -84,11 +84,9 @@ import {
   fontStyleForWeight,
   rampToSpecs,
   DEFAULT_TYPE_RAMP,
-  KRDS_SIZES,
   weightOf,
   krdsCategory,
   krdsStep,
-  offScale,
   nameKrdsStyles,
   commitUndo,
   explainError,
@@ -3081,19 +3079,6 @@ test('krdsType — 단계 경계(중간점 · 표기값)', () => {
     assert.equal(krdsStep('body', sz), st, `body ${sz}`);
     assert.equal(krdsStep('label', sz), st, `label ${sz}`);
   }
-});
-
-test('krdsType — offScale: 소수 · 모음 밖 · 가까운 크기(같은 거리면 큰 값)', () => {
-  assert.deepEqual([...KRDS_SIZES], [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60]);
-  assert.deepEqual(offScale(26.67), { kind: 'decimal', nearest: 28 });
-  assert.deepEqual(offScale(20), { kind: 'off', nearest: 19 });
-  assert.deepEqual(offScale(18), { kind: 'off', nearest: 19 });
-  assert.deepEqual(offScale(16), { kind: 'off', nearest: 17 });
-  assert.deepEqual(offScale(52), { kind: 'off', nearest: 60 });
-  assert.deepEqual(offScale(10), { kind: 'off', nearest: 13 });
-  assert.deepEqual(offScale(13), { kind: null, nearest: 13 });
-  assert.deepEqual(offScale(14.96), { kind: null, nearest: 15 }); // 표기값 15
-  assert.deepEqual(offScale(28), { kind: null, nearest: 28 });
 });
 
 test('krdsType — 크기 꼬리: 기준값 거리 → 쓰인 곳 → 큰 크기', () => {

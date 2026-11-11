@@ -386,8 +386,6 @@
     .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
-    .r-top.has-off { grid-template-columns: 16px 1fr auto auto; }
-    .r-top.no-check.has-off { grid-template-columns: 1fr auto auto; }
     .r-main { min-width: 0; } /* 그리드 자식은 기본 min-width:auto라 이게 없으면 말줄임이 안 걸린다 */
     .r-title { font-size: var(--fs); font-weight: 600; color: var(--text); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .r-title.mono, .r-sum.mono { font-family: var(--mono); }
@@ -434,10 +432,6 @@
     /* 타이포 목록 — 구분선 줄(카드 안 카드 금지, CLAUDE.md · docs/text-style-krds.md §6) */
     #tsList { gap: 0; }
     #tsList .r-card { border: none; border-bottom: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; margin: 0; }
-    /* 규칙 밖 크기(docs/text-style-krds.md §4) */
-    .ts-off { font-size: 11px; white-space: nowrap; flex: 0 0 auto; }
-    .ts-off.decimal { color: var(--danger); }
-    .ts-off.off { color: var(--text-2); }
     /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
     .tsr-all { padding: 0 0 6px; }
     .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
@@ -451,6 +445,15 @@
 
     /* ── 색 정리(ΔE 군집) 요약 ── */
     #colorSection { border-top: 1px solid var(--border); padding-top: 8px; }
+    /* 색 단계 위쪽(ia-v4 §4.3a-4) — "그 외" 줄 · 팔레트 띠(테두리 없는 옅은 배경 띠 — 카드가 아니다, §2.8) */
+    #selInfo { display: block; font-size: 11.5px; }
+    #selInfo:empty { display: none; }
+    .palette-band { background: var(--surface-2); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 6px; }
+    .palette-band[hidden] { display: none; }
+    /* 띠 위의 입력 칸은 흰 바탕(--surface) — 띠와 같은 회색이면 칸이 보이지 않는다 */
+    .palette-band input[type="text"], .palette-band input[type="color"], .palette-band select { background: var(--surface); }
+    .palette-run { justify-content: flex-end; }
+    .pb-caret { display: inline-block; margin-left: 2px; font-size: 9px; color: var(--text-2); }
     #colorSection > * + * { margin-top: 6px; }
     .tidy { background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
@@ -496,6 +499,14 @@
       background: var(--surface-2); border-bottom: 1px solid var(--border);
       font-size: 12.5px; font-weight: 600; letter-spacing: 0; color: var(--text);
     }
+    /* 머리 띠 안 개수 "{n}개"(ia-v4 §4.3a-3) — 트리 머리의 .tr-cnt와 같은 값 */
+    .r-ghead .r-gcnt { color: var(--text-2); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 4px; }
+    .r-ghead .r-gcnt:empty { display: none; }
+    /* 컴포넌트 후보 줄 — 변형 세트의 변형 이름은 회색 보통 굵기(ia-v4 §4.3a-3) */
+    .r-title .r-var { font-weight: 400; color: var(--text-2); }
+    /* 베리언트 결과 — 머리 띠는 본문 글꼴, 항목은 mono 11px 보통 굵기 */
+    #variantReport .r-ghead { font-family: var(--font); }
+    #variantReport .r-title { font-weight: 400; }
 
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
@@ -1034,32 +1045,33 @@
     <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
          목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
     <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span> <span class="muted" id="compCount"></span> <span class="muted" id="similarCount"></span> <span class="muted" id="componentCount"></span> <span class="muted" data-i18n="structure.scope">닮은 프레임</span></h2>
-      <div class="hint" data-i18n="component.hint">위는 후보 등록, 아래는 닮은 프레임 묶기. 닮은 스캔은 무료</div>
+      <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span></h2>
+      <div class="hint" data-i18n="component.hint">후보를 찾아 등록하거나, 닮은 프레임을 하나의 컴포넌트로 합쳐요 · 닮은 프레임 찾기는 무료</div>
       <div class="toolbar">
-        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">후보 스캔</button>
-        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요.">닮은 스캔</button>
+        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">컴포넌트 후보 찾기</button>
+        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 찾아 보여 줘요. 파일은 안 바꿔요.">닮은 프레임 찾기</button>
       </div>
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="마스터를 컴포넌트로, 나머지는 인스턴스로 바꿔요. 원본의 연결과 값은 마스터를 따라요.">묶기</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나의 컴포넌트로 합치기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
       </div>
-      <div class="r-group" id="compTreeGroup" style="display:none" data-i18n="structure.groupComp">컴포넌트 후보</div>
+      <!-- 목록 머리 띠 + 개수(ia-v4 §4.3a-3) -->
+      <div class="r-group r-ghead" id="compTreeGroup" style="display:none"><span data-i18n="structure.groupComp">컴포넌트 후보</span><span class="r-gcnt" id="compTreeCount"></span></div>
       <div id="compTree" class="results"></div>
-      <div class="r-group" id="similarGroup" style="display:none" data-i18n="structure.groupSimilar">닮은 프레임</div>
+      <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
       <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
            낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
       <div id="variantRow" hidden>
         <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
         <div class="row">
-          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트만 같은 이름끼리 세트로 다시 묶어요.">베리언트 분류</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 세트의 빠진 속성 조합을 첫 베리언트 복제로 채워요.">누락 조합 생성</button>
+          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트를 이름이 같은 것끼리 변형 세트로 묶어요.">변형 세트로 묶기</button>
+          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 변형 세트의 빠진 조합을 첫 변형을 복제해 채워요.">빠진 변형 채우기</button>
         </div>
       </div>
       <div id="variantReport" class="results"></div>
@@ -1116,36 +1128,41 @@
            이미 말한다. 게다가 잠금 배지와 범위 라벨 사이에 끼어 「🔒 색 12개 변수화」로 읽혔다.
            와이어에서 개수를 다는 건 미리보기로 후보를 뽑는 카드(토큰·연결·이름)뿐이다. -->
       <h2><span data-i18n="color.title">색</span> <span class="muted lock" id="paletteLock"></span> <span class="muted" data-i18n="color.scope">변수화</span></h2>
-      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 쓰임 이름은 Semantic으로 붙어요.">뽑거나 팔레트를 만든 뒤, 목록에서 Semantic을 정하고 변수로 만들어요. 보조색을 켠 뒤에만 하모니를 고를 수 있어요. 추출은 무료 · 팔레트·변수화는 유료</div>
+      <div class="hint" data-i18n="colorTidy.hint" data-i18n-title="colorTidy.hintTip" title="추출한 색은 전부 변수가 돼요. Global 이름은 hue 패밀리(color/blue/500 · 같은 단계면 -2, -3), 쓰임 이름은 Semantic으로 붙어요.">색을 뽑거나 팔레트를 만든 뒤 Semantic을 정하고 변수로 만들어요</div>
       <div class="toolbar">
         <button id="btnExtract" data-i18n="extract.scanBtn">선택에서 추출</button>
-        <button id="btnPalette"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span></button>
+        <!-- [팔레트 생성] = 아래 팔레트 띠를 여는 단추(ia-v4 §4.3a-4) — 글 → 🔒 → ▸/▾ -->
+        <button id="btnPalette" aria-expanded="false" aria-controls="paletteBand"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span><span class="pb-caret" id="paletteCaret" aria-hidden="true">▸</span></button>
         <span class="grow"></span>
         <button id="btnColorVars" class="primary"><span data-i18n="color.makeVars">색 변수 만들기</span> <span class="muted" id="colorVarsLock"></span></button>
         <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
       </div>
-      <!-- 시드(팔레트 생성용) — 브랜드색 + 무엇을 함께 만들지. -->
-      <div class="row">
-        <input id="brand" type="color" value="#3366ff" />
-        <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
-        <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
-        <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태</span></label>
-        <span class="muted" id="paletteInfo"></span>
-      </div>
-      <div class="row">
-        <label class="inline"><input id="useBrand2" type="checkbox" /> <span data-i18n="palette.brand2">보조색</span></label>
-        <input id="brand2" type="color" value="#ff5722" disabled />
-        <input id="brand2Hex" type="text" value="#ff5722" spellcheck="false" style="width:90px;" disabled />
-        <label class="inline"><span data-i18n="palette.harmony">하모니</span>
-          <select id="harmony" disabled>
-            <option value="complementary" data-i18n="harmony.complementary">보색</option>
-            <option value="analogous" data-i18n="harmony.analogous">유사</option>
-            <option value="triadic" data-i18n="harmony.triadic">삼각</option>
-            <option value="split" data-i18n="harmony.split">분할보색</option>
-            <option value="tetradic" data-i18n="harmony.tetradic">사각</option>
-          </select>
-        </label>
-        <span class="muted" id="selInfo"></span>
+      <!-- "그 외" 줄 — 띠 밖(버튼 줄 아래 · 띠 위), 글이 없으면 숨김(§4.3a-4). -->
+      <span class="muted" id="selInfo"></span>
+      <!-- 팔레트 띠 — 테두리 없는 옅은 배경 띠(카드가 아니다, ia-v4 §2.8). 시드 = 브랜드색 + 무엇을 함께 만들지. -->
+      <div class="palette-band" id="paletteBand" hidden>
+        <div class="row">
+          <input id="brand" type="color" value="#3366ff" />
+          <input id="brandHex" type="text" value="#3366ff" spellcheck="false" style="width:90px;" />
+          <label class="inline"><input id="incNeutral" type="checkbox" checked /> <span data-i18n="palette.neutral">중립</span></label>
+          <label class="inline"><input id="incStatus" type="checkbox" checked /> <span data-i18n="palette.status">상태</span></label>
+          <span class="muted" id="paletteInfo"></span>
+        </div>
+        <div class="row">
+          <label class="inline"><input id="useBrand2" type="checkbox" /> <span data-i18n="palette.brand2">보조색</span></label>
+          <input id="brand2" type="color" value="#ff5722" disabled />
+          <input id="brand2Hex" type="text" value="#ff5722" spellcheck="false" style="width:90px;" disabled />
+          <label class="inline" id="harmonyLabel" data-i18n-title="palette.harmonyTip" title="보조색을 켜면 고를 수 있어요"><span data-i18n="palette.harmony">하모니</span>
+            <select id="harmony" disabled>
+              <option value="complementary" data-i18n="harmony.complementary">보색</option>
+              <option value="analogous" data-i18n="harmony.analogous">유사</option>
+              <option value="triadic" data-i18n="harmony.triadic">삼각</option>
+              <option value="split" data-i18n="harmony.split">분할보색</option>
+              <option value="tetradic" data-i18n="harmony.tetradic">사각</option>
+            </select>
+          </label>
+        </div>
+        <div class="row palette-run"><span class="grow"></span><button id="btnPaletteRun" data-i18n="palette.run">팔레트 만들기</button></div>
       </div>
       <!-- 추출·정리된 색 — 역할(Semantic)을 정하는 자리. Global 이름은 hue. -->
       <div id="colorSection" style="display:none">
@@ -1380,7 +1397,7 @@
     "create.preview": "\uBBF8\uB9AC\uBCF4\uAE30 \u2014 {summary} \xB7 \u2018\uC801\uC6A9\u2019\uC73C\uB85C \uBC18\uC601",
     "create.colorsDone": "\uC0C9 \uBCC0\uC218 {count}\uAC1C \uC774\uBBF8 \uC0DD\uC131\uB428 \xB7 \uC5EC\uAE30\uC120 \uC0C9 \uC678\uB9CC",
     "color.summary": "\uC0C9 {count}\uAC1C \xB7 Semantic \uC9C0\uC815 {roles} \xB7 \uBCC0\uC218\uD654 \uB300\uAE30",
-    "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019 \uB610\uB294 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC73C\uC138\uC694.",
+    "color.needColors": "\uBA3C\uC800 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC774\uB098 \u2018\uD314\uB808\uD2B8 \uC0DD\uC131\u2019\uC73C\uB85C \uC0C9\uC744 \uBAA8\uC544 \uC8FC\uC138\uC694",
     "color.fileVars": "\uD30C\uC77C\uC5D0 \uC0C9 \uBCC0\uC218 {n}\uAC1C \xB7 Semantic {roles}\uAC1C \u2014 \u2018\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C\u2019\uC744 \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uC0C9\uC744 \uC77D\uC5B4\uC694",
     "create.fileVars": "\uD30C\uC77C\uC5D0 \uAC04\uACA9\xB7\uD06C\uAE30\xB7\uD3F0\uD2B8 \uBCC0\uC218 {n}\uAC1C \u2014 \u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uD604\uC7AC \uD654\uBA74\uC758 \uAC12\uC744 \uC77D\uC5B4\uC694",
     // 지나친 이유조차 없는 빈손 — 버튼이 고장 난 것처럼 보이지 않게 최소한의 말은 한다.
@@ -1397,17 +1414,17 @@
     // 리네임
     "rename.none": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
     // 컴포넌트 / 베리언트
-    "component.scanning": "\uD6C4\uBCF4 \uC2A4\uCE94 \uC911\u2026",
+    "component.scanning": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4\uB97C \uCC3E\uB294 \uC911\u2026",
     "component.registering": "\uCEF4\uD3EC\uB10C\uD2B8 \uB4F1\uB85D \uC911\u2026",
-    "component.classifying": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958 \uC911\u2026",
-    "component.generating": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131 \uC911\u2026",
+    "component.classifying": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uB294 \uC911\u2026",
+    "component.generating": "\uBE60\uC9C4 \uBCC0\uD615\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
     "component.noEligible": "\uC120\uD0DD \uC544\uB798\uC5D0 \uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
-    "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694.",
-    "component.noChecked": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBB36\uC744 \uD56D\uBAA9\uC744 \uCCB4\uD06C\uD558\uC138\uC694",
+    "component.noEligibleShort": "\uB4F1\uB85D\uD560 \uC218 \uC788\uB294 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694",
+    "component.noChecked": "\uB4F1\uB85D\uD560 \uD6C4\uBCF4\uB97C \uCCB4\uD06C\uD574 \uC8FC\uC138\uC694",
     "component.candidates": "\uB4F1\uB85D \uD6C4\uBCF4 {total}\uAC1C \xB7 {sel}\uAC1C \uCCB4\uD06C",
-    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {total} (\uC138\uD2B8 {sets} \xB7 \uB2E8\uC77C {singles}){extraPart}",
-    "component.variants": "\uBCA0\uB9AC\uC5B8\uD2B8 \uC138\uD2B8 {sets}\uAC1C \uC0DD\uC131{extraPart}",
-    "component.generated": "\uB204\uB77D \uC870\uD569 {generated}\uAC1C \uC0DD\uC131(\uC138\uD2B8 {sets})",
+    "component.registered": "\uCEF4\uD3EC\uB10C\uD2B8 {total} (\uBCC0\uD615 \uC138\uD2B8 {sets} \xB7 \uCEF4\uD3EC\uB10C\uD2B8 {singles}){extraPart}",
+    "component.variants": "\uBCC0\uD615 \uC138\uD2B8 {sets}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694{extraPart}",
+    "component.generated": "\uBE60\uC9C4 \uBCC0\uD615 {generated}\uAC1C\uB97C \uCC44\uC6E0\uC5B4\uC694(\uBCC0\uD615 \uC138\uD2B8 {sets})",
     "component.placeFailed": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uBABB \uB454 {n}\uAC1C: {names}",
     "component.placeFailedMore": " \uC678",
     "common.beta": "\uBCA0\uD0C0",
@@ -1431,8 +1448,8 @@
     // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 닮은 프레임 컴포넌트화
-    "similar.scanBtn": "\uB2EE\uC740 \uC2A4\uCE94",
-    "similar.componentizeBtn": "\uBB36\uAE30",
+    "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
+    "similar.componentizeBtn": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -1918,6 +1935,8 @@
     "palette.neutral": "\uC911\uB9BD",
     "palette.status": "\uC0C1\uD0DC",
     "palette.gen": "\uD314\uB808\uD2B8 \uC0DD\uC131",
+    "palette.run": "\uD314\uB808\uD2B8 \uB9CC\uB4E4\uAE30",
+    "palette.harmonyTip": "\uBCF4\uC870\uC0C9\uC744 \uCF1C\uBA74 \uACE0\uB97C \uC218 \uC788\uC5B4\uC694",
     // 하모니 선택지 — 보조색을 브랜드색에서 몇 도 돌려 뽑을지.
     "harmony.complementary": "\uBCF4\uC0C9",
     "harmony.analogous": "\uC720\uC0AC",
@@ -1927,7 +1946,7 @@
     // 추출
     "extract.scanBtn": "\uC120\uD0DD\uC5D0\uC11C \uCD94\uCD9C",
     // 색 정리(추출 카드에 흡수)
-    "colorTidy.hint": "\uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4, \uBAA9\uB85D\uC5D0\uC11C Semantic\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694. \uBCF4\uC870\uC0C9\uC744 \uCF20 \uB4A4\uC5D0\uB9CC \uD558\uBAA8\uB2C8\uB97C \uACE0\uB97C \uC218 \uC788\uC5B4\uC694. \uCD94\uCD9C\uC740 \uBB34\uB8CC \xB7 \uD314\uB808\uD2B8\xB7\uBCC0\uC218\uD654\uB294 \uC720\uB8CC",
+    "colorTidy.hint": "\uC0C9\uC744 \uBF51\uAC70\uB098 \uD314\uB808\uD2B8\uB97C \uB9CC\uB4E0 \uB4A4 Semantic\uC744 \uC815\uD558\uACE0 \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
     "colorTidy.hintTip": "\uCD94\uCD9C\uD55C \uC0C9\uC740 \uC804\uBD80 \uBCC0\uC218\uAC00 \uB3FC\uC694. Global \uC774\uB984\uC740 hue \uD328\uBC00\uB9AC(color/blue/500 \xB7 \uAC19\uC740 \uB2E8\uACC4\uBA74 -2, -3), \uC4F0\uC784 \uC774\uB984\uC740 Semantic\uC73C\uB85C \uBD99\uC5B4\uC694.",
     // 토큰 생성
     "create.title": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
@@ -2008,23 +2027,23 @@
     // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "structure.scope": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
     "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
-    "component.hint": "\uC704\uB294 \uD6C4\uBCF4 \uB4F1\uB85D, \uC544\uB798\uB294 \uB2EE\uC740 \uD504\uB808\uC784 \uBB36\uAE30. \uB2EE\uC740 \uC2A4\uCE94\uC740 \uBB34\uB8CC",
-    "component.scanBtn": "\uD6C4\uBCF4 \uC2A4\uCE94",
+    "component.hint": "\uD6C4\uBCF4\uB97C \uCC3E\uC544 \uB4F1\uB85D\uD558\uAC70\uB098, \uB2EE\uC740 \uD504\uB808\uC784\uC744 \uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCCD0\uC694 \xB7 \uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\uB294 \uBB34\uB8CC",
+    "component.scanBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30",
     "component.registerBtn": "\uB4F1\uB85D",
-    "component.classifyBtn": "\uBCA0\uB9AC\uC5B8\uD2B8 \uBD84\uB958",
-    "component.genMissingBtn": "\uB204\uB77D \uC870\uD569 \uC0DD\uC131",
+    "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
+    "component.genMissingBtn": "\uBE60\uC9C4 \uBCC0\uD615 \uCC44\uC6B0\uAE30",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
     "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
-    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB9CC \uAC19\uC740 \uC774\uB984\uB07C\uB9AC \uC138\uD2B8\uB85C \uB2E4\uC2DC \uBB36\uC5B4\uC694.",
-    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC18D\uC131 \uC870\uD569\uC744 \uCCAB \uBCA0\uB9AC\uC5B8\uD2B8 \uBCF5\uC81C\uB85C \uCC44\uC6CC\uC694.",
-    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uBBF8\uB9AC \uBB36\uC5B4\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
-    "similar.componentizeHelp": "\uB9C8\uC2A4\uD130\uB97C \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
-    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC73C\uB85C \uBB36\uC744 \uD504\uB808\uC784\uACFC \uB9C8\uC2A4\uD130\uB97C \uACE0\uB974\uC138\uC694.",
-    "similar.needScanAfterComp": "\u2018\uD6C4\uBCF4 \uC2A4\uCE94\u2019 \uACB0\uACFC\uB294 \u2018\uB4F1\uB85D\u2019\uC774 \uC368\uC694. \uBB36\uAE30\uB294 \u2018\uB2EE\uC740 \uC2A4\uCE94\u2019\uC744 \uBA3C\uC800 \uC2E4\uD589\uD558\uC138\uC694.",
+    "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
+    "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
+    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
+    "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
+    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
     "export.hint": "\uB204\uB974\uBA74 \uBC14\uB85C \uCF54\uB4DC \uD30C\uC77C\uB85C \uC800\uC7A5\uB3FC\uC694",
@@ -2069,24 +2088,18 @@
     // 레이어 › 이름
     // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
     "component.extraSkipped": " \xB7 \uAC74\uB108\uB700 {n}",
-    "component.extraSingles": " \xB7 \uB2E8\uC77C {n}",
+    "component.extraSingles": " \xB7 \uCEF4\uD3EC\uB10C\uD2B8 {n}",
     "component.extraProps": " \xB7 \uC18D\uC131 {n}",
     "component.extraIcons": " \xB7 \uC544\uC774\uCF58 {n}",
-    "component.extraMissing": " \xB7 \uBE48 \uC870\uD569 \uC788\uC74C",
-    "component.tagAdded": "\uC0DD\uC131",
-    "component.variantFallback": "\uBCA0\uB9AC\uC5B8\uD2B8",
-    "component.badgeSet": "\uC138\uD2B8",
-    "component.changeProps": "{name} \xB7 \uC18D\uC131",
-    "component.badgeProps": "\uC18D\uC131",
+    "component.extraMissing": " \xB7 \uBE48 \uBCC0\uD615 \uC788\uC74C",
+    "component.variantFallback": "\uBCC0\uD615",
+    "component.badgeSet": "\uBCC0\uD615 \uC138\uD2B8",
+    "component.badgeProps": "\uC18D\uC131 \uCEF4\uD3EC\uB10C\uD2B8",
     "component.nameFallback": "\uCEF4\uD3EC\uB10C\uD2B8",
-    "component.badgeSingle": "\uB2E8\uB3C5",
+    "component.badgeSingle": "\uCEF4\uD3EC\uB10C\uD2B8",
     "component.badgeReuse": "\uC7AC\uC0AC\uC6A9",
-    "component.count": "\uD6C4\uBCF4 {total}",
-    "component.tagMissing": "\uBE48 \uC870\uD569",
-    "component.headMissing": "\uBE48 \uC870\uD569(\uBBF8\uC0DD\uC131):",
-    "component.tagIssue": "\uBB38\uC81C",
-    "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C {n}\uAC74:",
-    "component.tagCount": "{tag} {n}\uAC1C",
+    "component.headMissing": "\uBE48 \uBCC0\uD615",
+    "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C",
     // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
     "component.fail.copyPlaced": "\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694({label} \u2192 {name}){causePart}",
     "component.fail.nothingPlaced": "\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694({label} \u2192 {name}){causePart}",
@@ -2120,10 +2133,10 @@
     "component.fail.photo": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}): {error}",
     // 레이어 › 컴포넌트 — 닮은 프레임 묶기
     "similar.scanning": "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026",
-    "similar.componentizing": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uB294 \uC911\u2026",
-    "similar.failed": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
+    "similar.componentizing": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uB294 \uC911\u2026",
+    "similar.failed": "\uD569\uCE58\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
     "similar.failedWarn": " \u2014 {warning}",
-    "similar.resMaster": "\uB9C8\uC2A4\uD130 {name}",
+    "similar.resMaster": "\uC6D0\uBCF8 {name}",
     "similar.resInstances": "\uC778\uC2A4\uD134\uC2A4 {n}\uAC1C",
     "similar.resProps": "\uC18D\uC131 {n}\uAC1C",
     "similar.resImages": "\uC774\uBBF8\uC9C0 {n}\uAC1C",
@@ -2131,10 +2144,9 @@
     "similar.metaText": "\uD14D\uC2A4\uD2B8 {filled}/{total}",
     "similar.metaImages": "\uC774\uBBF8\uC9C0 {n}",
     "similar.metaEmpty": "\uBE48 \uCE78 {n}",
-    "similar.recommended": "\uCD94\uCC9C",
-    "similar.count": "\uB2EE\uC740 {n}\uAC1C",
-    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC744 2\uAC1C \uC774\uC0C1 \uC120\uD0DD\uD558\uC138\uC694.",
-    "similar.none": "\uCEF4\uD3EC\uB10C\uD2B8\uD654\uD560 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
+    "similar.recommended": "\uC6D0\uBCF8 \uCD94\uCC9C",
+    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uC788\uC5B4\uC57C \uD574\uC694",
+    "similar.none": "\uD569\uCE60 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
     "similar.openText": "\uD14D\uC2A4\uD2B8 {n}",
     "similar.openSwap": "\uC544\uC774\uCF58 \uAD50\uCCB4 {n}",
     "similar.openImage": "\uC774\uBBF8\uC9C0 {n}",
@@ -2142,8 +2154,8 @@
     "similar.noVarying": "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
     "similar.excluded": " \xB7 \uC81C\uC678 {n}\uAC1C({why})",
     "similar.scanned": "\uB300\uC0C1 {n}\uAC1C \xB7 {openPart}{skipPart}",
-    "similar.noMaster": "\uB9C8\uC2A4\uD130 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \uC2A4\uCE94\uD558\uC138\uC694.",
+    "similar.noMaster": "\uC6D0\uBCF8 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
+    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "similar.overrideFail": "{name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
     "similar.placeFail": "{name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
     "similar.why.needTwo": "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694",
@@ -2155,7 +2167,6 @@
     "create.hintReveal": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uBA74 \uB9CC\uB4E4 \uD1A0\uD070\uC774 \uBCF4\uC5EC\uC694",
     "create.onlyColors": "\uC0C9 \uC678 \uD1A0\uD070\uC774 \uC5C6\uC5B4\uC694(\uC0C9\uB9CC \uBF51\uC558\uC5B4\uC694)",
     "create.count": "\uD6C4\uBCF4 {sel}/{total}",
-    "color.usedCount": " \xB7 {n}\xD7 \uC0AC\uC6A9",
     "create.tidyMerged": " \xB7 \uAC19\uC740 \uCE78 {n}\uAC1C \uBCD1\uD569",
     // 만들기 결과 · 미리보기 꼬리 — 새로 만든(만들) 쓰임 역할 수(§2.12 12.10).
     "create.sumRoles": " \xB7 Semantic {n}\uAC1C",
@@ -2221,10 +2232,6 @@
     "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
     "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
     "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
-    "textStyle.offDecimal": "\uC18C\uC218 \uD06C\uAE30",
-    "textStyle.offScale": "KRDS \uBC16",
-    "textStyle.offTip": "KRDS \uD06C\uAE30\uAC00 \uC544\uB2C8\uC5D0\uC694 \xB7 \uAC00\uAE4C\uC6B4 KRDS \uD06C\uAE30 {n}px",
-    "textStyle.offSum": " \xB7 KRDS \uBC16 \uD06C\uAE30 {k}\uAC1C(\uC18C\uC218 {m})",
     "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
@@ -2701,7 +2708,6 @@
   }
 
   // src/lib/krdsType.ts
-  var KRDS_SIZES = [13, 15, 17, 19, 22, 24, 28, 32, 36, 40, 44, 60];
   var KRDS_STEPS = {
     display: [
       { step: "large", ref: 60, min: 52 },
@@ -2768,17 +2774,6 @@
     const d = round1(size);
     const steps = KRDS_STEPS[category];
     return (_a3 = steps.find((s) => d >= s.min)) != null ? _a3 : steps[steps.length - 1];
-  }
-  function offScale(size) {
-    const d = round1(size);
-    let nearest = KRDS_SIZES[0];
-    for (const k of KRDS_SIZES) {
-      const dk = Math.abs(k - d);
-      const dn = Math.abs(nearest - d);
-      if (dk < dn || dk === dn && k > nearest) nearest = k;
-    }
-    const kind = !Number.isInteger(d) ? "decimal" : KRDS_SIZES.includes(d) ? null : "off";
-    return { kind, nearest };
   }
   var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -4408,11 +4403,20 @@
     title.prepend(sw);
     title.classList.add("has-swatch");
   }
-  function resultGroup(label) {
+  function resultGroup(label, count) {
     const el = document.createElement("div");
     el.className = "r-group r-ghead";
-    el.textContent = label;
     el.title = label;
+    if (count === void 0) {
+      el.textContent = label;
+      return el;
+    }
+    const name = document.createElement("span");
+    name.textContent = label;
+    const cnt = document.createElement("span");
+    cnt.className = "r-gcnt";
+    cnt.textContent = t("tree.count", { n: count });
+    el.append(name, cnt);
     return el;
   }
   var UNIT_CHIP = { px: "px", percent: "%", em: "em", rem: "rem", ratio: "\xD7" };
@@ -4559,7 +4563,15 @@
   brand2Hex.addEventListener("input", () => {
     if (HEX6.test(brand2Hex.value)) brand2Color.value = brand2Hex.value.toLowerCase();
   });
+  function setPaletteBand(open) {
+    $("paletteBand").hidden = !open;
+    $("btnPalette").setAttribute("aria-expanded", String(open));
+    $("paletteCaret").textContent = open ? "\u25BE" : "\u25B8";
+  }
   $("btnPalette").addEventListener("click", () => {
+    setPaletteBand($("paletteBand").hidden);
+  });
+  $("btnPaletteRun").addEventListener("click", () => {
     const primary = brandHex.value.trim();
     if (!HEX6.test(primary)) {
       setStatus("colorStatus", t("palette.invalidHex"), "warn");
@@ -4678,6 +4690,7 @@
       card.style.display = "none";
       $("colorTable").innerHTML = "";
       $("paletteRow").innerHTML = "";
+      updateEmptyLocks();
       return;
     }
     card.style.display = "";
@@ -4694,7 +4707,7 @@
       var _a3;
       const role = roleSelect((_a3 = roleByName.get(tok.name)) != null ? _a3 : "");
       role.dataset.name = tok.name;
-      const used = tok.count ? t("color.usedCount", { n: tok.count }) : "";
+      const used = tok.count ? " \xB7 " + t("make.layers", { n: tok.count }) : "";
       const card2 = resultCard({
         title: tok.name,
         titleMono: true,
@@ -4707,6 +4720,7 @@
       return card2;
     });
     updateColorSummary();
+    updateEmptyLocks();
   }
   function renderPaletteRow(colors) {
     const row = $("paletteRow");
@@ -4861,10 +4875,7 @@
   });
   $("btnColorVars").addEventListener("click", () => {
     const colors = tokens.filter((t2) => t2.category === "color");
-    if (!colors.length) {
-      setStatus("colorStatus", t("color.needColors"), "warn");
-      return;
-    }
+    if (!colors.length) return;
     setSemMapText(colorAuthoritativeRoles(Number($("base").value) || 16));
     createFrom = "colors";
     send(__spreadValues({
@@ -4932,13 +4943,7 @@
     };
     row.appendChild(text("ts-family", "", s.family, t("ts.family"), (v) => s.family = v));
     row.appendChild(sep("\xB7"));
-    const sizeEl = num("40px", s.fontSize, t("ts.size"), "1", (n) => {
-      s.fontSize = n;
-      const card = row.closest(".r-card");
-      if (card) putOffMark(card, s.fontSize);
-    });
-    sizeEl.addEventListener("change", tsRefreshTail);
-    row.appendChild(sizeEl);
+    row.appendChild(num("40px", s.fontSize, t("ts.size"), "1", (n) => s.fontSize = n));
     row.appendChild(sep("/"));
     row.appendChild(num("44px", s.lineHeight, t("ts.lineHeight"), "0", (n) => {
       s.lineHeight = n;
@@ -4982,19 +4987,17 @@
       });
       card.querySelector(".r-top").appendChild(del);
     }
-    putOffMark(card, s.fontSize);
     return card;
   }
   var tsScanNote = { namePart: "", warnings: [] };
   function renderTextStyles() {
     renderChunked($("tsList"), tsSpecs, textStyleCard);
     if (!tsSpecs.length) {
-      setTsStatus("other", "", "");
+      setTsStatus("", "");
       return;
     }
     const fresh = tsSpecs.filter((s) => !s.boundStyleId).length;
     setTsStatus(
-      "scan",
       t("textStyle.scanSummary", { a: fresh, b: tsSpecs.length - fresh }) + tsScanNote.namePart + t("textStyle.scanLhPct", { n: tsSpecs.filter((s) => s.lineHeightPercent).length }) + t("textStyle.scanLsPct", { n: tsSpecs.filter((s) => {
         var _a3;
         return ((_a3 = s.letterSpacingPercent) != null ? _a3 : 0) !== 0;
@@ -5023,37 +5026,11 @@
     setLock($("tsLinkNow"), tsScanIds ? null : "prereq", t("textStyle.linkNeedScan"));
   }
   $("btnTsRowLabels").addEventListener("click", () => {
-    setTsStatus("other", t("textStyle.renaming"), "ok");
+    setTsStatus(t("textStyle.renaming"), "ok");
     send({ type: "NAME_TEXT_STYLES_BY_ROW" });
   });
-  function offMarkEl(size, withText) {
-    const o = offScale(size);
-    if (!o.kind) return null;
-    const el = document.createElement("span");
-    el.className = `ts-off ${o.kind}`;
-    const label = t(o.kind === "decimal" ? "textStyle.offDecimal" : "textStyle.offScale");
-    el.textContent = (o.kind === "decimal" ? "\u26A0" : "\u25CB") + (withText ? ` ${label}` : "");
-    el.title = `${label} \xB7 ${t("textStyle.offTip", { n: o.nearest })}`;
-    el.setAttribute("aria-label", el.title);
-    return el;
-  }
-  function putOffMark(card, size) {
-    var _a3, _b;
-    (_a3 = card.querySelector(".ts-off")) == null ? void 0 : _a3.remove();
-    const m = offMarkEl(size, true);
-    const top = card.querySelector(".r-top");
-    const del = (_b = top == null ? void 0 : top.querySelector(".link")) != null ? _b : null;
-    top == null ? void 0 : top.classList.toggle("has-off", !!m && !!del);
-    if (m && top) top.insertBefore(m, del);
-  }
-  var tsStatusBase = { kind: "other", text: "", cls: "" };
-  function offTail() {
-    const marks = tsSpecs.map((s) => offScale(s.fontSize).kind).filter((k) => k);
-    return marks.length ? t("textStyle.offSum", { k: marks.length, m: marks.filter((k) => k === "decimal").length }) : "";
-  }
-  function setTsStatus(kind, text, cls, tip) {
-    tsStatusBase = { kind, text, cls };
-    setStatus("tsStatus", kind === "other" || !text ? text : text + offTail(), cls, tip);
+  function setTsStatus(text, cls, tip) {
+    setStatus("tsStatus", text, cls, tip);
   }
   var tsExistingNames = [];
   var tsrReq = 0;
@@ -5160,8 +5137,6 @@
       to.className = "tsr-to";
       to.textContent = r.to;
       row.append(from, arrow, to);
-      const om = offMarkEl(r.fontSize, false);
-      if (om) row.appendChild(om);
       const on = !tsrOff.has(r.id);
       if (on && tsrClash(r)) {
         const c = document.createElement("span");
@@ -5239,17 +5214,14 @@
         tsSpecs = [];
         renderTextStyles();
         $("btnTsRowLabels").disabled = true;
-        setTsStatus("other", text + t("textStyle.renameClearedTable"), warn ? "warn" : "ok");
+        setTsStatus(text + t("textStyle.renameClearedTable"), warn ? "warn" : "ok");
       }
     }
-  }
-  function tsRefreshTail() {
-    if (tsStatusBase.kind !== "other") setTsStatus(tsStatusBase.kind, tsStatusBase.text, tsStatusBase.cls);
   }
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
     if (!styles.length) {
-      setTsStatus("other", t("textStyle.needSpecs"), "warn");
+      setTsStatus(t("textStyle.needSpecs"), "warn");
       return;
     }
     const link = $("tsLinkNow").checked && !!tsScanIds;
@@ -5473,6 +5445,7 @@
   var PAID_FIELDS = [
     ...COMPONENT_FIELDS,
     "btnPalette",
+    "btnPaletteRun",
     "btnColorVars",
     "btnCreate",
     "btnCreateApply",
@@ -5497,6 +5470,40 @@
     setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
     renderBindPrereq();
+    updateEmptyLocks();
+  }
+  var similarScanned = false;
+  var baseLocked = (el) => !!el.dataset.baseLock;
+  function setEmptyLock(el, msg) {
+    if (!isPaid) return;
+    setLock(el, msg ? "prereq" : null, msg != null ? msg : "");
+  }
+  function setCardPrimary(all, order) {
+    var _a3;
+    const pick = (_a3 = order.find((el) => !baseLocked(el))) != null ? _a3 : null;
+    for (const el of all) el.classList.toggle("primary", el === pick);
+  }
+  var colorsVisible = () => colorRevealed && tokens.some((tk) => tk.category === "color" && typeof tk.value === "string");
+  function updateEmptyLocks() {
+    const extract = $("btnExtract");
+    const colorVars = $("btnColorVars");
+    setEmptyLock(colorVars, colorsVisible() ? null : t("color.needColors"));
+    setCardPrimary([extract, colorVars], baseLocked(colorVars) ? [extract] : [colorVars, extract]);
+    const scan = $("btnScanComp");
+    const similar = $("btnScanSimilar");
+    const reg = $("btnRegisterComp");
+    const merge = $("btnComponentize");
+    const eligible = compEligibleCount();
+    const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
+    setEmptyLock(
+      reg,
+      !compCandidates.length ? t("component.needScan") : !eligible ? t("component.noEligibleShort") : !checked ? t("component.noChecked") : null
+    );
+    const canMerge = similarMemberIds.length >= 2 && !!similarMasterId;
+    setEmptyLock(merge, canMerge ? null : t(similarScanned ? "similar.needTwo" : "similar.needScan"));
+    const first = eligible > 0 ? reg : canMerge ? merge : scan;
+    const order = isPaid ? [first, merge, scan] : [first, similar];
+    setCardPrimary([scan, similar, reg, merge], order);
   }
   function setLockTitle(el, locked) {
     var _a3;
@@ -5553,7 +5560,8 @@
     } else {
       showPick(target.make, "vars");
     }
-    const b = $(target.btn);
+    const btnId = id === "colors" && $("btnColorVars").dataset.baseLock === "prereq" ? "btnExtract" : target.btn;
+    const b = $(btnId);
     b.scrollIntoView({ behavior: "smooth", block: "center" });
     b.focus();
   }
@@ -5697,33 +5705,22 @@
     send({ type: "SCAN_SIMILAR" });
   });
   $("btnComponentize").addEventListener("click", () => {
-    if (similarMemberIds.length < 2 || !similarMasterId) {
-      setStatus("structureStatus", t(compCandidates.length ? "similar.needScanAfterComp" : "similar.needScan"), "warn");
-      return;
-    }
+    if (similarMemberIds.length < 2 || !similarMasterId) return;
     setStatus("structureStatus", t("similar.componentizing"), "");
     send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
   });
   $("btnRegisterComp").addEventListener("click", () => {
     var _a3;
-    if (compCandidates.length) {
-      const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
-      if (!nodeIds.length) {
-        setStatus("structureStatus", t("component.noChecked"), "warn");
-        return;
-      }
-      setStatus("structureStatus", t("component.registering"), "");
-      const names = {};
-      for (const c of compCandidates) {
-        if (c.reuse) continue;
-        const shown = (_a3 = c.group) != null ? _a3 : c.single;
-        if (shown && compChecked.has(c.id)) names[c.id] = shown;
-      }
-      send({ type: "REGISTER_COMPONENTS", nodeIds, names });
-    } else {
-      setStatus("structureStatus", t("component.registering"), "");
-      send({ type: "REGISTER_COMPONENTS" });
+    const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
+    if (!nodeIds.length) return;
+    setStatus("structureStatus", t("component.registering"), "");
+    const names = {};
+    for (const c of compCandidates) {
+      if (c.reuse) continue;
+      const shown = (_a3 = c.group) != null ? _a3 : c.single;
+      if (shown && compChecked.has(c.id)) names[c.id] = shown;
     }
+    send({ type: "REGISTER_COMPONENTS", nodeIds, names });
   });
   $("compAll").addEventListener("change", (e) => {
     const on = e.target.checked;
@@ -5995,7 +5992,7 @@
           renderTsLink();
           tsScanNote = { namePart: "", warnings: [] };
           renderTextStyles();
-          setTsStatus("ramp", t("textStyle.fallbackRamp"), "warn");
+          setTsStatus(t("textStyle.fallbackRamp"), "warn");
         }
         break;
       }
@@ -6003,7 +6000,6 @@
         const why = Object.entries((_i = msg.applyReasons) != null ? _i : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setTsStatus(
-          "other",
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
           (msg.notes.length ? ` \xB7 ${msg.notes.join(" \xB7 ")}` : "") + (msg.missing.length ? t("textStyle.missingN", { k: msg.missing.length }) : ""),
           msg.missing.length ? "warn" : "ok",
@@ -6098,7 +6094,7 @@
         break;
       }
       case "GENERATE_RESULT": {
-        renderVariantReport([{ tag: t("component.tagAdded"), items: msg.combos, marker: "added" }]);
+        renderVariantReport([{ items: msg.combos, marker: "added" }]);
         setStatus("structureStatus", t("component.generated", { generated: msg.generated, sets: msg.sets }), msg.generated ? "ok" : "warn");
         break;
       }
@@ -6165,9 +6161,11 @@
         setStatus("structureStatus", `${parts.join(" \xB7 ")}${warn}${placeFailedText(misplaced)}`, msg.warnings.length ? "warn" : "ok");
         similarMemberIds = [];
         similarMasterId = null;
+        similarScanned = false;
         $("similarList").innerHTML = "";
-        $("similarCount").textContent = "";
+        $("similarGroupCount").textContent = "";
         $("similarGroup").style.display = "none";
+        updateEmptyLocks();
         break;
       }
       case "PREMIUM_REQUIRED": {
@@ -6336,10 +6334,16 @@
       return card2;
     }
     const title = document.createElement("span");
-    const nameCls = r.replace === false ? "tree-name" : "before";
-    title.innerHTML = `<span class="${nameCls}">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
     title.title = `${r.name} \u2192 ${r.change}`;
-    const card = resultCard(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true, meta: (_b = r.badge) == null ? void 0 : _b.text }));
+    let fromLine;
+    if (r.replace === false) {
+      title.innerHTML = r.variant ? `<span class="tree-name">${escapeHtml(r.variant.set)}</span> <span class="r-var">${escapeHtml(r.variant.name)}</span>` : `<span class="tree-name">${escapeHtml(r.change)}</span>`;
+      if (r.name !== r.change) fromLine = t("component.fromName", { name: r.name });
+    } else {
+      title.innerHTML = `<span class="before">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
+    }
+    const card = resultCard(__spreadProps(__spreadValues(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true }), fromLine ? { summary: fromLine, summaryMono: true } : {}), { meta: (_b = r.badge) == null ? void 0 : _b.text }));
+    if (fromLine) card.querySelector(".r-sum").title = title.title;
     if (r.badge) {
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
@@ -6860,8 +6864,6 @@
         const sub = document.createElement("span");
         sub.className = "tr-sub";
         sub.textContent = tsSummary(s);
-        const om = offMarkEl(s.fontSize, false);
-        if (om) sub.append(" ", om);
         cells.push(sub);
         if (s.boundStyleId) cells.push(mkTag(t("make.tagHas"), t("make.tsHasTip")));
         items.push({
@@ -7751,10 +7753,11 @@
         return __spreadProps(__spreadValues({}, base), { change: n.reuse.name, badge: { text: t("component.badgeReuse"), kind: "reuse" } });
       }
       if (n.group) {
-        return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${n.variant || t("component.variantFallback")}`, badge: { text: t("component.badgeSet"), kind: "set" } });
+        const variant = n.variant || t("component.variantFallback");
+        return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${variant}`, variant: { set: n.group, name: variant }, badge: { text: t("component.badgeSet"), kind: "set" } });
       }
       if (n.propsOnly) {
-        return __spreadProps(__spreadValues({}, base), { change: t("component.changeProps", { name: n.single || t("component.nameFallback") }), badge: { text: t("component.badgeProps"), kind: "single" } });
+        return __spreadProps(__spreadValues({}, base), { change: n.single || t("component.nameFallback"), badge: { text: t("component.badgeProps"), kind: "single" } });
       }
       return __spreadProps(__spreadValues({}, base), { change: n.single || t("component.nameFallback"), badge: { text: t("component.badgeSingle"), kind: "single" } });
     });
@@ -7771,7 +7774,7 @@
   function updateCompRegister() {
     const total = compEligibleCount();
     const sel = compChecked.size;
-    $("compCount").textContent = total ? t("component.count", { total }) : "";
+    $("compTreeCount").textContent = total ? t("tree.count", { n: total }) : "";
     $("compTreeGroup").style.display = total ? "" : "none";
     if (compCandidates.length) {
       const all = $("compAll");
@@ -7779,18 +7782,20 @@
       all.indeterminate = sel > 0 && sel < total;
       setStatus("structureStatus", total === 0 ? t("component.noEligibleShort") : t("component.candidates", { total, sel }), "");
     }
+    updateEmptyLocks();
   }
   function clearCompPreview() {
     compCandidates = [];
     compChecked.clear();
     clearMount($("compTree"));
-    $("compCount").textContent = "";
+    $("compTreeCount").textContent = "";
     $("compTreeGroup").style.display = "none";
     $("compTreeCtrls").style.display = "none";
+    updateEmptyLocks();
   }
   function makeVariantReportRow(l) {
     if (l.head) {
-      const g = resultGroup(l.text);
+      const g = resultGroup(l.text, l.count);
       if (l.warn) g.classList.add("warn");
       return g;
     }
@@ -7801,16 +7806,15 @@
   function variantIssueSections(missing, failures) {
     const f = failures || [];
     return [
-      { tag: t("component.tagMissing"), head: t("component.headMissing"), items: missing },
-      { tag: t("component.tagIssue"), head: t("component.headIssue", { n: f.length }), items: f, warn: true, marker: "bullet" }
+      { head: t("component.headMissing"), items: missing },
+      { head: t("component.headIssue"), items: f, warn: true, marker: "bullet" }
     ];
   }
   function renderVariantReport(sections) {
     const filled = sections.filter((s) => s.items.length);
-    $("componentCount").textContent = filled.map((s) => t("component.tagCount", { tag: s.tag, n: s.items.length })).join(" \xB7 ");
     const lines = [];
     for (const s of filled) {
-      if (s.head) lines.push({ text: s.head, head: true, warn: s.warn });
+      if (s.head) lines.push({ text: s.head, head: true, count: s.items.length, warn: s.warn });
       for (const it of s.items) lines.push({ text: it, warn: s.warn });
     }
     renderChunked($("variantReport"), lines, makeVariantReportRow);
@@ -7941,8 +7945,10 @@
   function renderSimilar(msg) {
     similarMemberIds = msg.metas.map((m) => m.id);
     similarMasterId = msg.recommendedMasterId;
-    $("similarCount").textContent = msg.metas.length ? t("similar.count", { n: msg.metas.length }) : "";
+    similarScanned = true;
+    $("similarGroupCount").textContent = msg.metas.length ? t("tree.count", { n: msg.metas.length }) : "";
     $("similarGroup").style.display = msg.metas.length ? "" : "none";
+    updateEmptyLocks();
     const box = $("similarList");
     renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
     if (!msg.metas.length) {
