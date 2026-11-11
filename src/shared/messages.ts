@@ -226,7 +226,10 @@ export type UiToCode =
   | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
-  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 항상 크기 순(display/h1…)
+  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
+  // [이름 다시 짓기](docs/text-style-krds.md §5): 미리보기(파일의 로컬 텍스트 스타일 전부 — 선택 무관) · 바꾸기(이름만, 역할 변수 함께)
+  | { type: 'SCAN_TS_RENAME'; reqId: number }
+  | { type: 'APPLY_TS_RENAME'; reqId: number; items: TsRenameItem[] }
   // 스캔 결과에 가로 행 라벨 이름을 덧입힌다. 스캔의 옵션이 아니라 뒤따르는 별도 동작이다
   // (결정 2026-08-06) — 켜고 스캔하는 대신, 결과를 보고 마음에 안 들면 눌러 이름만 다시 매긴다.
   | { type: 'NAME_TEXT_STYLES_BY_ROW' }
@@ -283,8 +286,10 @@ export type CodeToUi =
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[]; skippedManual?: number } // skippedManual: 직접 만든 변수라 건너뛴 역할 수(§4.9)
   // labeled/fallback은 「왼쪽 글자로 이름 채우기」를 눌렀을 때만 온다 — 맨 스캔은 전부 크기 순이라
   // `왼쪽 글자 0`을 적어 봐야 실패처럼 읽힐 뿐이다. undefined면 상태줄에서 그 조각을 생략한다.
-  // existing: reqId 스캔일 때만 — 로컬 텍스트 스타일 전부(이름 겹침 잠금, IA v4 §4.3).
+  // existing: 로컬 텍스트 스타일 전부 — 이름 겹침 잠금(IA v4 §4.3) · 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프 rampToSpecs).
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
+  | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
+  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[] }
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number> } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
@@ -348,4 +353,23 @@ export type CodeToUi =
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {
   figma.ui.postMessage(msg);
+}
+
+/** [이름 다시 짓기] 미리보기 줄(docs/text-style-krds.md §5.2). sig = tsSig(바꾸기 때 그대로 돌려보냄). */
+export interface TsRenameRow {
+  id: string;
+  from: string;
+  to: string;
+  sig: string;
+  fontSize: number;
+  /** 규칙 밖 크기(§4) — 소수 · KRDS 모음 밖 정수 · 안이면 null. */
+  offScale: 'decimal' | 'off' | null;
+  nearest: number;
+}
+/** [이름 다시 짓기] 바꾸기 항목. */
+export interface TsRenameItem {
+  id: string;
+  from: string;
+  to: string;
+  sig: string;
 }
