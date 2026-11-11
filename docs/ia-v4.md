@@ -1069,6 +1069,7 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
   - `onUsageResult`의 `if (changed || wasVisible) renderVarScreen()`(5520)와 `wasVisible` · `vmUsageVisible`(선언 5377 · 5495 · 5496 · 5510 · 5511) 지움 — `renderSelHome()`만 남김
   - `requestManagerUsage`의 `if (vmUsageVisible && vmOpen && varScreen() === 'list') renderVarList()`(5496)와 `if (vmOpen) renderVarScreen()` 두 곳(5482 · 5488) 지움 — `renderSelHome()`만 남김
   - `setBaseline`의 `if (vmOpen) renderVarScreen()` 두 곳(5458 · 5465) 지움(5471 `usesFilter` 갈래는 위 항목에서 지움)
+  - **단, 변수 탭 빈 화면 [선택에서 변수 만들기](`btnVarEmptyMake`) 잠금은 선택이 바뀔 때 따로 정한다.** 지금은 `renderVarScreen`(5408) 안에서만 정하고, 위의 다시 그리기 호출들이 선택 변경 때 그것을 불러 주었다. 그 한 줄을 `updateVarEmptyLock()`으로 빼서 `renderVarScreen`과 `onSelectionForList`(5434 — `curSel`을 바꾼 바로 뒤, `selfSelect` 갈래보다 앞) 양쪽에서 부른다. 잠금 사유는 그대로 `status.noSelection`
 - [ ] `src/ui.ts`는 그대로: `vmUsageInFlight` · `requestManagerUsage`(변수 탭에서도 쓰는 변수 · 삭제된 변수를 읽음 — §7), `libVars`(카드 2 · 상태 5가 씀), `src/lib/varTable.ts`의 `SideSel` `lib` 종류(v3 결정 B 때부터 있던 것 — 이번에 건드리지 않음)
 - [ ] `src/ui.html` — 필터 줄 마크업 `#usesFilterBar`(964–971: 주석 · `#usesFilterName` · `#usesFilterDiff` · `#usesFilterRebase` · `.grow` · `#usesFilterX`), CSS `.uses-bar*`(752–758) · `.vt-row.vt-row.uses` · `.vt-row .vr-n`(759–761) 지움. `.lh-row` 감싸기는 그대로 둔다(한 줄이라 모양 차이 없음). `.uses-head`(상세 쓰인 곳 머리)는 남김
 - [ ] i18n(`src/lib/i18n.ts`) 지울 키 — 필터 · 카드 2 [보기 →]에서만 쓰던 것: `v4.viewArrow`(407) · `v4.usesFilter`(408) · `v4.usesFilterClear`(409) · `v4.usesSideAria`(410) · `v4.libBadgeTip`(411) · `v4.usesViewOff`(412) · `v4.usesNone`(413) · `v4.detail`(417 — 라이브러리 줄 우클릭 메뉴에서만 씀), 그리고 라이브러리 상세의 `list.libCollection`(341) · `list.libManaged`(342) · `list.dValue`(348). **남기는 키:** `v4.libName`(카드 2 둘째 줄 "라이브러리 {n}"), `v4.places`(상세 "쓰인 곳 {n}곳"), `v4.baseDiff` · `list.rebase`(선택 탭 머리 줄), `list.big` · `list.read` · `v4.reading`(선택 탭 · 하위 화면), `v4.usesTip`(카드 2 툴팁 · 상세). `verify:i18n` 미참조 0
@@ -1080,8 +1081,9 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 - [ ] `scripts/verify-bind-flow.mjs` — 새 검사(지운 360–401 자리, 블록 9 흐름 안):
   - "9 카드 2 — 안내만(버튼 없음)": "쓰는 변수 2개" 카드 안 `button` 0개 · `.acts` 없음 · `[data-k="uses"]` 없음 · `.sel-list` 없음
   - "9 선택 탭에서 변수 탭으로 — 모든 로컬 컬렉션 · 전체 수": `#tabbtn-variables` 클릭 → `sideItems` = `[['Semantic','1'],['Global','4']]`(쓴 변수가 없는 Global도 있음) · `[data-key="side:lib"]` 없음 · `#varTree .vr-n` 0개, 그 뒤 `#tabbtn-select`로 돌아가 402행 흐름
+  - (블록 9 빈 상태 검사 "선택 없으면 잠금" 바로 뒤) "빈 상태 [선택에서 변수 만들기] — 선택을 따라감": `SELECTION_STATE` count 1 → `btnVarEmptyMake` 잠금 풀림 · count 0 → 다시 잠김(다시 그리기 호출을 지운 뒤에도)
   - "필터 줄 없음": `#usesFilterBar` · `#usesFilterX` 요소가 없다(`p.$(…) === null`)
-  - "변수 탭에서 쓰는 변수 결과가 와도 그대로": 변수 탭 목록의 한 줄(또는 알약)에 포커스 · 목록을 조금 스크롤한 뒤 `USAGE_RESULT`(내용이 바뀐 응답)를 보냄 → `document.activeElement`가 같은 요소 · `scrollTop`이 같음
+  - "변수 탭에서 쓰는 변수 결과가 와도 그대로": 변수 탭 목록의 한 줄(또는 알약)에 포커스 · 목록을 조금 스크롤한 뒤 `USAGE_RESULT`(내용이 바뀐 응답)를 보냄 → `document.activeElement`가 같은 요소 · `window.scrollY`가 같음(변수 탭 목록은 페이지가 스크롤한다). `USAGE_RESULT`는 마지막 `SCAN_USAGE`의 reqId를 싣는다(`onUsageResult`는 `vmUsageReq`만 받는다)
   - (지운 9F 상태 5 자리) "상태 5 — 카드 2(라이브러리 1)에 버튼 없음 · 변수 탭은 빈 화면(`#varEmpty`) · 사이드바 없음"
 - [ ] `ROADMAP.md` "변수 탭 \"쓰는 변수\" 필터 없앰" 항목 — 병합할 때 체크
 - [ ] 4검사 · 화면 시안(바뀌는 화면: 선택 탭 첫 화면 — 카드 2 버튼 없음(카드 1 있음 · 상태 5 라이브러리만), 변수 탭 — 선택 탭에서 와도 모든 컬렉션) · 실기 확인(Figma — 카드 2 · 변수 탭 Global이 늘 보임)
