@@ -44,7 +44,7 @@
 - 스타일 하나 = `{ fontSize, lineHeight(px, 0 = AUTO), lineHeightPercent?, letterSpacing(px), family, style, count, uiCount }`(지금 `StyleCluster` · `ExistingTextStyle` 모양 그대로 + `uiCount`).
   - 스캔 경로: 지금 군집(`StyleCluster`)에 `uiCount`를 더한다 — 그 군집 표본 중 §3.2-1의 UI 역할 안에 있는 표본 수. `count`는 지금처럼 표본 수.
   - 이름 다시 짓기 경로: 로컬 스타일 정의. `count` = 0, `uiCount` = 0(쓰인 횟수를 세지 않는다 — 동점은 다음 정렬 키로 간다).
-- **굵기:** `weightOf(style) → { weight, italic }` — `exporters.ts splitWeightStyle`을 **감싸는 새 함수**(내보내기 결과는 그대로)로, 이름에서 폭 · 광학 수식어(condensed · narrow · compressed · expanded · extended · wide · display · text · caption · micro)를 뗀 뒤 읽는다. 표에 없는 이름은 400. (예: "SemiBold Condensed" → 600, "Book" → 400, "Bold Italic" → 700 · 기울임)
+- **굵기:** `weightOf(style) → { weight, italic }` — `exporters.ts splitWeightStyle`을 **감싸는 새 함수**(내보내기 결과는 그대로)로, 이름에서 폭 · 광학 수식어(condensed · narrow · compressed · expanded · extended · wide · display · text · caption · micro)를 뗀 뒤 읽는다. 수식어 앞의 semi · extra · ultra 접두도 함께 뗀다(예 "SemiCondensed Bold" → 700 — "Semi"가 600으로 읽히지 않게, `krdsType.ts` 75–77). 표에 없는 이름은 400. (예: "SemiBold Condensed" → 600, "Book" → 400, "Bold Italic" → 700 · 기울임)
 - **줄 높이 %:** `lineHeight`가 0이면 'auto'. `lineHeightPercent`가 있으면 그 값, 아니면 `lineHeight / fontSize × 100`. 정수 반올림해 비교 · 표기한다(149.6 → 150은 150%와 같다).
 - **크기 표기값:** 소수 첫째 자리 반올림(26.67 → 26.7, 정수면 정수). **분류 · 단계 경계 · 기준값 거리 · 크기 꼬리는 모두 이 표기값으로 한다.** 원래 크기는 달라도 표기값이 같은 스타일은 같은 크기로 보고, 이름이 겹치면 §3.8로 간다.
 
@@ -69,7 +69,7 @@
 ### 3.4 앵커 · 이미 있는 이름
 - **앵커**(지금 `nameTextStyles` 조건 그대로 — 노드가 그 스타일에 묶였고 시그니처가 같거나, 시그니처가 같은 기존 스타일이 정확히 1개)된 스타일은 기존 이름을 그대로 쓰고, §3.5 ~ §3.8의 꼬리 계산에서 빠진다.
 - **이름 예약:** 이 파일의 모든 로컬 텍스트 스타일 이름을 처음부터 "사용 중"으로 둔다(앵커되지 않은 스타일이 관계없는 기존 스타일 이름을 차지해 등록이 그 스타일 값을 덮어쓰지 않게). 이름 다시 짓기에서는 대상 스타일 자신의 지금 이름은 예약하지 않는다(§5.2 · §5.3).
-- **순서:** §3.5 ~ §3.8로 이름을 다 지은 뒤 예약 이름과 견준다. 겹친 스타일만 **강제 꼬리**: `{분류}/{단계}-{크기}-w{굵기}[i]-{줄높이}` — 크기 · 굵기 · 줄 높이를 생략 없이(150%도 `-150`, 자동은 `-auto`, 기울임은 `i`) 쓰고, §3.8에서 붙은 `-ls…` · 글꼴 꼬리는 그 뒤에 그대로 둔다. 그래도 겹치면(예약 이름 또는 같은 회차의 다른 강제 이름) §3.8-3 정렬 순서대로 `-2` · `-3`을 붙인다.
+- **순서:** §3.5 ~ §3.8로 이름을 다 지은 뒤 예약 이름과 견준다. 겹친 스타일만 **강제 꼬리**: `{분류}/{단계}-{크기}-w{굵기}[i]-{줄높이}` — 크기 · 굵기 · 줄 높이를 생략 없이(150%도 `-150`, 자동은 `-auto`, 기울임은 `i`) 쓰고, §3.8에서 붙은 `-ls…` · 글꼴 꼬리는 그 뒤에 그대로 둔다. 그래도 겹치면(예약 이름 또는 같은 회차의 다른 강제 이름) §3.8-3 정렬 순서대로 `-2` · `-3`을 붙인다. §3.8까지 지은 이름끼리 같아져도(드묾 — 크기 꼬리 `-2`와 §3.8-3의 `-2` 등) 입력 순서로 처음 것만 그 이름을 갖고 뒤의 것은 강제 꼬리를 붙인다(`krdsType.ts` 296–303).
 
 ### 3.5 크기 꼬리 — 한 단계에 크기가 둘 이상일 때
 - 같은 `{분류}/{단계}`(앵커 제외)의 서로 다른 크기 중 하나만 꼬리 없이, 나머지는 `-{크기}`.
@@ -159,7 +159,7 @@
 
 - 새 `src/lib/krdsType.ts`(순수): `KRDS_STEPS`, `weightOf(style)`, `krdsCategory(input, path)`, `krdsStep(category, size)`, `nameKrdsStyles(inputs, { reserved, anchored })`.
 - `textStyles.ts`: `nameTextStyles`가 RAMP_NAMES 순위 대신 `nameKrdsStyles`를 쓴다(앵커 조건은 유지, 행 라벨은 예약을 따름 — §3.9). `StyleCluster`에 `uiCount`, `TextSample`에 `uiRole?: boolean`. `LABEL_RAMP_RE` 넓힘(§3.9). `RAMP_NAMES` · 옛 램프는 지운다. 주석 "크기 순(display/h1…)"(code.ts · messages.ts)도 KRDS 이름으로 고친다.
-- `rampToSpecs`(스캔 결과가 없을 때의 기본 램프): display/large 60 · heading/large 32 · heading/medium 24 · heading/small 19 = Bold, body/medium 17 · body/small 15 = Regular, 줄 높이 `lineHeightPercent: 150` · `lineHeight = 크기 × 1.5`, 자간 0. 글꼴은 지금처럼 `DEFAULT_TS_FAMILY`(Inter — Pretendard GOV는 설치되지 않았을 수 있다). label 줄은 넣지 않는다(body/medium과 값이 같아 앵커 · 기존 스타일 연결이 모호해지므로). 램프 이름도 §3.4 예약을 따른다 — 같은 이름의 로컬 스타일이 있으면 그 줄은 강제 꼬리를 붙인다(등록이 이름으로 찾아 남의 스타일 값을 덮어쓰지 않게). 이를 위해 이미 있는 `TEXT_STYLE_CANDIDATES.existing:{name, sig}[]`(지금은 reqId 스캔에서만 보냄)를 reqId 없는 스캔에도 싣고, 그 `name`을 예약 이름으로 쓴다. 순수 함수 `rampToSpecs(family, reserved)`(textStyles.ts)가 예약을 적용한다(램프 폴백 판정 · 문구는 지금 그대로).
+- `rampToSpecs`(스캔 결과가 없을 때의 기본 램프): display/large 60 · heading/large 32 · heading/medium 24 · heading/small 19 = Bold, body/medium 17 · body/small 15 = Regular, 줄 높이 `lineHeightPercent: 150` · `lineHeight = 크기 × 1.5`, 자간 0. 글꼴은 지금처럼 `DEFAULT_TS_FAMILY`(Inter — Pretendard GOV는 설치되지 않았을 수 있다). label 줄은 넣지 않는다(body/medium과 값이 같아 앵커 · 기존 스타일 연결이 모호해지므로). 램프 이름도 §3.4 예약을 따른다 — 같은 이름의 로컬 스타일이 있으면 그 줄은 강제 꼬리를 붙인다(등록이 이름으로 찾아 남의 스타일 값을 덮어쓰지 않게). 이를 위해 이미 있는 `TEXT_STYLE_CANDIDATES.existing:{name, sig}[]`를 reqId 없는 스캔에도 싣고, 그 `name`을 예약 이름으로 쓴다. 순수 함수 `rampToSpecs(family, reserved)`(textStyles.ts)가 예약을 적용한다(램프 폴백 판정 · 문구는 지금 그대로).
 - `variables.ts scanTextStyles`: 표본에 `uiRole`(§3.2-1 조상 탐색). `scanExistingTextStyles`는 그대로.
 - `variables.ts`: `renameTextRoleVars(pairs)` 공용 함수(직접 만든 변수 거름) + 이름 다시 짓기 적용 함수 + 등록 경로의 되돌림(§5.3). `code.ts` · `messages.ts`: 메시지 2쌍(`SCAN_TS_RENAME` → `TS_RENAME_PLAN`, `APPLY_TS_RENAME` → `TS_RENAMED`).
 - `ui.ts` · `ui.html`: 변수 탭 ⋯ 메뉴 항목 · 타이포 카드 [이름 다시 짓기](`PAID_FIELDS`) · 이름 다시 짓기 팝업 · OPS `tsRename` · 바꾼 뒤 `tsSpecs` · `mkTsNames` 비움. `ui.html` `btnTsRowLabels`의 기본 `title`(지금 `rowLabelTip`과 같은 옛 글)도 고친다.
