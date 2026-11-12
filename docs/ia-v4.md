@@ -1053,9 +1053,9 @@
 
 B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번호는 이 명세를 쓸 때(2026-11-11) 기준이다.
 
-- [ ] `src/ui.ts` — 선택 탭 카드 2: `renderUsesCard`(7860–7882)에서 `view`(`selLink(t('v4.viewArrow'), () => openUsesFilter())` · `data-k="uses"` · 주석 "[보기 →] = …")를 지우고 `selCard({ title, subs })` — `actions` 없음(→ `.acts` 없음). 계층별 수 · `v4.libName` · `v4.usesTip` 툴팁은 그대로
-- [ ] `src/ui.ts` — 필터 상태 · 함수 묶음 지움(5574–5661): `usesFilter` · `usesSel` · `usesCollapsed` · `usesPlaces` · `usedLocal` · `usedLib` · `listVars` · `collapsedSet` · `usesSides` · `usesCurrentSel` · `listSel` · `libGroups` · `openUsesFilter` · `usesFocusFirst` · `closeUsesFilter` · `renderUsesBar` · `#usesFilterX` · `#usesFilterRebase` 처리기. 부르던 곳은 `listVars()` → `vmVars`, `collapsedSet()` → `grpCollapsed`, `listSel()` → `currentSel()`
-- [ ] `src/ui.ts` — `usesFilter`를 보던 곳 모두:
+- [x] `src/ui.ts` — 선택 탭 카드 2: `renderUsesCard`(7860–7882)에서 `view`(`selLink(t('v4.viewArrow'), () => openUsesFilter())` · `data-k="uses"` · 주석 "[보기 →] = …")를 지우고 `selCard({ title, subs })` — `actions` 없음(→ `.acts` 없음). 계층별 수 · `v4.libName` · `v4.usesTip` 툴팁은 그대로
+- [x] `src/ui.ts` — 필터 상태 · 함수 묶음 지움(5574–5661): `usesFilter` · `usesSel` · `usesCollapsed` · `usesPlaces` · `usedLocal` · `usedLib` · `listVars` · `collapsedSet` · `usesSides` · `usesCurrentSel` · `listSel` · `libGroups` · `openUsesFilter` · `usesFocusFirst` · `closeUsesFilter` · `renderUsesBar` · `#usesFilterX` · `#usesFilterRebase` 처리기. 부르던 곳은 `listVars()` → `vmVars`, `collapsedSet()` → `grpCollapsed`, `listSel()` → `currentSel()`
+- [x] `src/ui.ts` — `usesFilter`를 보던 곳 모두:
   - `showTab` 4906(선택 탭으로 가면 끔) · `varScreen` 5399(필터 중이면 로컬 0개여도 목록) · `setBaseline` 5453(기준 없음 → 끔) · 5471(`if (vmOpen && usesFilter) renderVarScreen()`)
   - `pickSide` 5665(필터 갈래)
   - `renderSidebar` 5677 · 5690(`uf ? usesSides()` 갈래 · `v4.usesSideAria` 접근성 이름 → 늘 `list.sideColAria`) · 5710–5735(라이브러리 항목 `side:lib` — 필터 중에만 있던 것, `v4.libName` · `v4.libBadgeTip` · `v4.usesSideAria`)
@@ -1063,22 +1063,22 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
   - `groupHeadEl` 5950(`collapsedSet()` → `grpCollapsed`)
   - `varJump` 7246–7275(되돌리기 상태 `uses` · `usesFilter = false` · 되돌릴 때 필터 켬) · `revealVar` 7331–7333(필터 갈래) · `openNewVar` 7342–7344(`fsel` — 늘 `currentSel()`) · `onVariableCreated` 7385 · `onVariableDuplicated` 7403(`usesFilter = false`)
   - ⋯ 메뉴 7513(색 격자 / 목록 항목의 `disabled: usesFilter` · `note: v4.usesViewOff`) · `setAllGroups` 7534–7536(`sel.kind === 'lib'` → `libGroups()` 갈래)
-- [ ] `src/ui.ts` — 필터 줄 모양: `varRowEl`(5997)의 `places` 인자 · `vt-row uses` 클래스 · 6016행, `placesEl`(6020–6025), `libRowEl`(6026–6061) 지움(그 우클릭 · ContextMenu 메뉴의 `v4.detail` "상세…" — 6052 · 6055 — 도 함께 없어짐)
-- [ ] `src/ui.ts` — 라이브러리 상세(여는 곳 `libRowEl`이 없어짐 — §4.8): `openDetail`(6242)의 라이브러리 갈래(6245–6268)를 지우고 `RowRef`(7212)를 `{ local: VarRow }`로 줄이거나 `openDetail`이 `VarRow`를 받게. 키 `list.libCollection` · `list.libManaged` · `list.dValue`("값" — 6258) 지움(다른 쓰임 없음). 값 칸 그리개 `valueEl`(5815, 주석 "상세 · 라이브러리 상세용" — 부르는 곳은 6258뿐)도 지운다(`noUnusedLocals`라 남기면 `tsc` 실패). 로컬 상세가 쓰는 `.vm-val`(6887) · `usesBlock` · `focusAfterDetail` · `detailBox`(7025 · 7068)는 남김. `.lib-tag` CSS · `list.libVar`(varJump의 라이브러리 대상 안내)는 다른 곳이 써서 남김
-- [ ] `src/ui.ts` — 쓰는 변수 결과가 올 때 변수 탭을 다시 그리던 것 지움(필터 화면 갱신용이었다 — 필터가 없으면 변수 탭 화면은 쓰는 변수 · 목록 기준과 무관하다. 남기면 §7의 읽기마다 변수 목록을 다시 그려 포커스 · 스크롤이 흔들린다):
+- [x] `src/ui.ts` — 필터 줄 모양: `varRowEl`(5997)의 `places` 인자 · `vt-row uses` 클래스 · 6016행, `placesEl`(6020–6025), `libRowEl`(6026–6061) 지움(그 우클릭 · ContextMenu 메뉴의 `v4.detail` "상세…" — 6052 · 6055 — 도 함께 없어짐)
+- [x] `src/ui.ts` — 라이브러리 상세(여는 곳 `libRowEl`이 없어짐 — §4.8): `openDetail`(6242)의 라이브러리 갈래(6245–6268)를 지우고 `RowRef`(7212)를 `{ local: VarRow }`로 줄이거나 `openDetail`이 `VarRow`를 받게. 키 `list.libCollection` · `list.libManaged` · `list.dValue`("값" — 6258) 지움(다른 쓰임 없음). 값 칸 그리개 `valueEl`(5815, 주석 "상세 · 라이브러리 상세용" — 부르는 곳은 6258뿐)도 지운다(`noUnusedLocals`라 남기면 `tsc` 실패). 로컬 상세가 쓰는 `.vm-val`(6887) · `usesBlock` · `focusAfterDetail` · `detailBox`(7025 · 7068)는 남김. `.lib-tag` CSS · `list.libVar`(varJump의 라이브러리 대상 안내)는 다른 곳이 써서 남김
+- [x] `src/ui.ts` — 쓰는 변수 결과가 올 때 변수 탭을 다시 그리던 것 지움(필터 화면 갱신용이었다 — 필터가 없으면 변수 탭 화면은 쓰는 변수 · 목록 기준과 무관하다. 남기면 §7의 읽기마다 변수 목록을 다시 그려 포커스 · 스크롤이 흔들린다):
   - `onUsageResult`의 `if (changed || wasVisible) renderVarScreen()`(5521)와 `wasVisible` · `vmUsageVisible`(선언 5377 · 5495 · 5496 · 5510 · 5511) 지움 — `renderSelHome()`만 남김
   - `requestManagerUsage`의 `if (vmUsageVisible && vmOpen && varScreen() === 'list') renderVarList()`(5496)와 `if (vmOpen) renderVarScreen()` 두 곳(5482 · 5488) 지움 — `renderSelHome()`만 남김
   - `setBaseline`의 `if (vmOpen) renderVarScreen()` 두 곳(5458 · 5466) 지움(5471 `usesFilter` 갈래는 위 항목에서 지움)
   - **단, 변수 탭 빈 화면 [선택에서 변수 만들기](`btnVarEmptyMake`) 잠금은 선택이 바뀔 때 따로 정한다.** 지금은 `renderVarScreen`(5408) 안에서만 정하고, 위의 다시 그리기 호출들이 선택 변경 때 그것을 불러 주었다. 그 한 줄을 `updateVarEmptyLock()`으로 빼서 `renderVarScreen`과 `onSelectionForList`(5434 — `curSel`을 바꾼 바로 뒤, `selfSelect` 갈래보다 앞) 양쪽에서 부른다. 잠금 사유는 그대로 `status.noSelection`
-- [ ] `src/ui.ts`는 그대로: `vmUsageInFlight` · `requestManagerUsage`(변수 탭에서도 쓰는 변수 · 삭제된 변수를 읽음 — §7), `libVars`(카드 2 · 상태 5가 씀), `src/lib/varTable.ts`의 `SideSel` `lib` 종류(v3 결정 B 때부터 있던 것 — 이번에 건드리지 않음)
-- [ ] `src/ui.html` — 필터 줄 마크업 `#usesFilterBar`(964–971: 주석 · `#usesFilterName` · `#usesFilterDiff` · `#usesFilterRebase` · `.grow` · `#usesFilterX`), CSS `.uses-bar*`(752–758) · `.vt-row.vt-row.uses` · `.vt-row .vr-n`(759–761) 지움. `.lh-row` 감싸기는 그대로 둔다(한 줄이라 모양 차이 없음). `.uses-head`(상세 쓰인 곳 머리)는 남김
-- [ ] i18n(`src/lib/i18n.ts`) 지울 키 — 필터 · 카드 2 [보기 →]에서만 쓰던 것: `v4.viewArrow`(407) · `v4.usesFilter`(408) · `v4.usesFilterClear`(409) · `v4.usesSideAria`(410) · `v4.libBadgeTip`(411) · `v4.usesViewOff`(412) · `v4.usesNone`(413) · `v4.detail`(417 — 라이브러리 줄 우클릭 메뉴에서만 씀), 그리고 라이브러리 상세의 `list.libCollection`(341) · `list.libManaged`(342) · `list.dValue`(348). **남기는 키:** `v4.libName`(카드 2 둘째 줄 "라이브러리 {n}"), `v4.places`(상세 "쓰인 곳 {n}곳"), `v4.baseDiff` · `list.rebase`(선택 탭 머리 줄), `list.big` · `list.read` · `v4.reading`(선택 탭 · 하위 화면), `v4.usesTip`(카드 2 툴팁 · 상세). `verify:i18n` 미참조 0
-- [ ] 단위 테스트: 없음(`test/*.mjs`에 필터 함수 · 키를 보는 테스트가 없다 — `usesSides` · `libGroups` 등은 `ui.ts` 안 함수)
-- [ ] `scripts/verify-bind-flow.mjs` — 지울 것:
+- [x] `src/ui.ts`는 그대로: `vmUsageInFlight` · `requestManagerUsage`(변수 탭에서도 쓰는 변수 · 삭제된 변수를 읽음 — §7), `libVars`(카드 2 · 상태 5가 씀), `src/lib/varTable.ts`의 `SideSel` `lib` 종류(v3 결정 B 때부터 있던 것 — 이번에 건드리지 않음)
+- [x] `src/ui.html` — 필터 줄 마크업 `#usesFilterBar`(964–971: 주석 · `#usesFilterName` · `#usesFilterDiff` · `#usesFilterRebase` · `.grow` · `#usesFilterX`), CSS `.uses-bar*`(752–758) · `.vt-row.vt-row.uses` · `.vt-row .vr-n`(759–761) 지움. `.lh-row` 감싸기는 그대로 둔다(한 줄이라 모양 차이 없음). `.uses-head`(상세 쓰인 곳 머리)는 남김
+- [x] i18n(`src/lib/i18n.ts`) 지울 키 — 필터 · 카드 2 [보기 →]에서만 쓰던 것: `v4.viewArrow`(407) · `v4.usesFilter`(408) · `v4.usesFilterClear`(409) · `v4.usesSideAria`(410) · `v4.libBadgeTip`(411) · `v4.usesViewOff`(412) · `v4.usesNone`(413) · `v4.detail`(417 — 라이브러리 줄 우클릭 메뉴에서만 씀), 그리고 라이브러리 상세의 `list.libCollection`(341) · `list.libManaged`(342) · `list.dValue`(348). **남기는 키:** `v4.libName`(카드 2 둘째 줄 "라이브러리 {n}"), `v4.places`(상세 "쓰인 곳 {n}곳"), `v4.baseDiff` · `list.rebase`(선택 탭 머리 줄), `list.big` · `list.read` · `v4.reading`(선택 탭 · 하위 화면), `v4.usesTip`(카드 2 툴팁 · 상세). `verify:i18n` 미참조 0
+- [x] 단위 테스트: 없음(`test/*.mjs`에 필터 함수 · 키를 보는 테스트가 없다 — `usesSides` · `libGroups` 등은 `ui.ts` 안 함수)
+- [x] `scripts/verify-bind-flow.mjs` — 지울 것:
   - 블록 9(선택 탭 카드) 360–401: 주석 · `USE9` · `LIB9` · "9 카드 2 — [보기 →]" · 필터 켬 · 필터 사이드바 · 필터 줄 "{n}곳" · 라이브러리 항목 · 라이브러리 줄 클릭 = 상세 · 닫으면 그 줄 · 쓴 변수 0 · ✕ → 일반 목록 · 선택 탭에 갔다 오면 필터 꺼짐(스크린샷 `b8-filter.png` · `b8-filter-lib.png` 포함). 402행 [연결 풀기] 흐름은 그대로 이어진다(선택 탭에 있고 카드 3이 있다)
   - 블록 9F 두 개 417–462 통째(Global도 줄 · 큰 선택 [읽기] · 상태 5 필터, 스크린샷 `b8-filter-global.png`)
-- [ ] `scripts/verify-bind-flow.mjs` — 바꿀 것: 블록 20 1486행 "(e) 포커스한 [n곳 연결]이 없어짐 → 카드 영역 첫 버튼(카드 2 [보기 →])"(`dataset.k === 'uses'`) → "카드 영역에 버튼이 없으면 할 일 [변수 만들기]"(`document.activeElement.id === 'btnGoMake'` — 이 흐름은 카드 3이 없어 카드 영역 버튼 0)
-- [ ] `scripts/verify-bind-flow.mjs` — 새 검사(지운 360–401 자리, 블록 9 흐름 안):
+- [x] `scripts/verify-bind-flow.mjs` — 바꿀 것: 블록 20 1486행 "(e) 포커스한 [n곳 연결]이 없어짐 → 카드 영역 첫 버튼(카드 2 [보기 →])"(`dataset.k === 'uses'`) → "카드 영역에 버튼이 없으면 할 일 [변수 만들기]"(`document.activeElement.id === 'btnGoMake'` — 이 흐름은 카드 3이 없어 카드 영역 버튼 0)
+- [x] `scripts/verify-bind-flow.mjs` — 새 검사(지운 360–401 자리, 블록 9 흐름 안):
   - "9 카드 2 — 안내만(버튼 없음)": "쓰는 변수 2개" 카드 안 `button` 0개 · `.acts` 없음 · `[data-k="uses"]` 없음 · `.sel-list` 없음
   - "9 선택 탭에서 변수 탭으로 — 모든 로컬 컬렉션 · 전체 수": `#tabbtn-variables` 클릭 → `sideItems` = `[['Semantic','1'],['Global','4']]`(쓴 변수가 없는 Global도 있음) · `[data-key="side:lib"]` 없음 · `#varTree .vr-n` 0개, 그 뒤 `#tabbtn-select`로 돌아가 402행 흐름
   - (블록 9 빈 상태 검사 "선택 없으면 잠금" 바로 뒤) "빈 상태 [선택에서 변수 만들기] — 선택을 따라감": `SELECTION_STATE` count 1 → `btnVarEmptyMake` 잠금 풀림 · count 0 → 다시 잠김(다시 그리기 호출을 지운 뒤에도)
