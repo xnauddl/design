@@ -749,16 +749,6 @@
     /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
     .list-head { margin: 0 0 6px; }
     .list-head .lh-row { display: flex; align-items: center; gap: 4px; }
-    /* 쓰는 변수 필터 줄 — 옅은 배경 띠 + 아래 구분선(카드 모양 아님, CLAUDE.md) */
-    .uses-bar { display: flex; align-items: center; gap: 6px; height: 28px; margin-top: 6px; padding: 0 4px 0 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; min-width: 0; }
-    .uses-bar[hidden] { display: none; }
-    .uses-bar .ub-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .uses-bar .ub-diff { color: var(--warn); white-space: nowrap; flex: 0 0 auto; }
-    .uses-bar .ub-rebase { flex: 0 0 auto; white-space: nowrap; }
-    .uses-bar .grow { flex: 1 1 auto; }
-    /* 필터 중 줄: 이름 · 값 140 · "{n}곳" */
-    .vt-row.vt-row.uses { grid-template-columns: minmax(0, 1fr) 140px 38px; }
-    .vt-row .vr-n { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
     .chip-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; min-width: 0; }
     .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
     .chip-row::-webkit-scrollbar { display: none; }
@@ -960,14 +950,6 @@
       <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
       <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
-     </div>
-     <!-- 쓰는 변수 필터 줄(IA v4 §4.6) — 선택 탭 카드 2 [보기 →]로 켬, 필터 중에만 보임 -->
-     <div class="uses-bar" id="usesFilterBar" hidden>
-      <span class="ub-name" id="usesFilterName"></span>
-      <span class="ub-diff" id="usesFilterDiff" hidden></span>
-      <button class="link link-btn ub-rebase" id="usesFilterRebase" type="button" hidden></button>
-      <span class="grow"></span>
-      <button class="icon-btn" id="usesFilterX" type="button">✕</button>
      </div>
     </div>
     <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
@@ -1691,14 +1673,11 @@
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
-    "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
-    "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.jumped": "{name}(\uC73C)\uB85C \uC62E\uACBC\uC5B4\uC694",
     "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
     "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
     "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
     "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
-    "list.dValue": "\uAC12",
     "list.dUses": "\uC4F0\uC778 \uACF3",
     "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
     "list.find": "\uCC3E\uAE30",
@@ -1757,17 +1736,9 @@
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
     "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
-    "v4.viewArrow": "\uBCF4\uAE30 \u2192",
-    "v4.usesFilter": "\uC4F0\uB294 \uBCC0\uC218 \xB7 {name}",
-    "v4.usesFilterClear": "\uD544\uD130 \uC9C0\uC6B0\uAE30",
-    "v4.usesSideAria": "{name}, {badge}, \uC4F0\uB294 \uBCC0\uC218 {num}\uAC1C",
-    "v4.libBadgeTip": "\uB2E4\uB978 \uD30C\uC77C\uC758 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218",
-    "v4.usesViewOff": "\uC4F0\uB294 \uBCC0\uC218 \uD544\uD130\uC5D0\uC11C\uB294 \uC904\uB85C\uB9CC \uBCF4\uC5EC\uC694",
-    "v4.usesNone": "\uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
     "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
     "v4.places": "{n}\uACF3",
-    "v4.detail": "\uC0C1\uC138\u2026",
     "v4.deletedN": "\uC0AD\uC81C\uB41C \uBCC0\uC218 {n}\uACF3",
     "v4.select": "\uC120\uD0DD",
     "v4.unbind": "\uC5F0\uACB0 \uD480\uAE30",
@@ -8551,7 +8522,6 @@ ${opts.tip}` : text;
   var screenKey = () => activeTab === "select" ? `select:${selSub}` : activeTab;
   function showTab(name) {
     var _a3;
-    if (usesFilter && name === "select") usesFilter = false;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
     if (changed && activeTab === "select" && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
@@ -9049,7 +9019,6 @@ ${opts.tip}` : text;
   var deletedUse = { count: 0, nodeIds: [] };
   var vmUsageReq = 0;
   var vmUsageInFlight = false;
-  var vmUsageVisible = false;
   var vmUsageSig = "";
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
@@ -9061,7 +9030,6 @@ ${opts.tip}` : text;
   var localVarCount = () => vmVars.length;
   function varScreen() {
     if (!vmTableKnown) return "loading";
-    if (usesFilter) return "list";
     if (localVarCount() === 0) return "empty";
     return "list";
   }
@@ -9070,9 +9038,12 @@ ${opts.tip}` : text;
     $("varLoading").style.display = scr === "loading" ? "" : "none";
     $("varEmpty").style.display = scr === "empty" ? "" : "none";
     $("varList").style.display = scr === "list" ? "" : "none";
-    setLock($("btnVarEmptyMake"), curSel.count ? null : "prereq", t("status.noSelection"));
+    updateVarEmptyLock();
     if (scr === "list") renderVarList();
     renderSelHome();
+  }
+  function updateVarEmptyLock() {
+    setLock($("btnVarEmptyMake"), curSel.count ? null : "prereq", t("status.noSelection"));
   }
   function syncManagerVisibility(read) {
     const want = activeTab === "variables";
@@ -9100,6 +9071,7 @@ ${opts.tip}` : text;
   function onSelectionForList(m) {
     var _a3, _b;
     curSel = { ids: (_a3 = m.ids) != null ? _a3 : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
+    updateVarEmptyLock();
     if (m.selfSelect) {
       renderSelBase();
       return;
@@ -9129,24 +9101,20 @@ ${opts.tip}` : text;
       else renderMakeScreen();
     }
     if (!b) {
-      usesFilter = false;
       usageMap = null;
       libVars = [];
       deletedUse = { count: 0, nodeIds: [] };
       vmUsageSig = "";
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     if (b.scanned > BIG_SELECTION || wizardRunning) {
       usageMap = null;
       selFindFor = null;
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     usageMap = null;
-    if (vmOpen && usesFilter) renderVarScreen();
     renderSelHome();
     if (!usageVisible() || isMini) return;
     vmUsageTimer = setTimeout(() => {
@@ -9159,21 +9127,17 @@ ${opts.tip}` : text;
   function requestManagerUsage(why = "quiet") {
     if (!baseline) {
       usageMap = null;
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     const auto = why !== "user";
     if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     if (vmUsageInFlight && why !== "user") return;
     vmUsageReq = ++bindReqSeq;
     vmUsageInFlight = true;
-    vmUsageVisible = why === "selection" || why === "user";
-    if (vmUsageVisible && vmOpen && varScreen() === "list") renderVarList();
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
   function onUsageResult(msg) {
@@ -9185,8 +9149,6 @@ ${opts.tip}` : text;
     }
     if (msg.reqId !== vmUsageReq) return;
     vmUsageInFlight = false;
-    const wasVisible = vmUsageVisible;
-    vmUsageVisible = false;
     const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
     const changed = sig !== vmUsageSig || usageMap === null;
     vmUsageSig = sig;
@@ -9195,7 +9157,6 @@ ${opts.tip}` : text;
       libVars = msg.libraryVars;
       deletedUse = msg.deleted;
     }
-    if (changed || wasVisible) renderVarScreen();
     renderSelHome();
     reentry.release();
   }
@@ -9240,106 +9201,8 @@ ${opts.tip}` : text;
     return sideSel;
   }
   var focusSideKey = null;
-  var usesFilter = false;
-  var usesSel = null;
-  var usesCollapsed = /* @__PURE__ */ new Set();
-  var usesPlaces = (id) => {
-    var _a3, _b;
-    return (_b = (_a3 = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a3.places) != null ? _b : 0;
-  };
-  var usedLocal = () => usageMap ? vmVars.filter((v) => usesPlaces(v.id) > 0) : [];
-  var usedLib = () => usageMap ? libVars.filter((l) => usesPlaces(l.id) > 0) : [];
-  var listVars = () => usesFilter ? usedLocal() : vmVars;
-  var collapsedSet = () => usesFilter ? usesCollapsed : grpCollapsed;
-  function usesSides() {
-    const sides = sidebarCollections(vmCols, usedLocal(), null, /* @__PURE__ */ new Set()).filter((x) => x.total > 0);
-    return { sides, lib: usedLib().length };
-  }
-  function usesCurrentSel() {
-    const { sides, lib } = usesSides();
-    const cur = usesSel;
-    const ok = cur && (cur.kind === "col" && sides.some((x) => x.collection.id === cur.id) || cur.kind === "lib" && lib > 0);
-    if (!ok) usesSel = sides[0] ? { kind: "col", id: sides[0].collection.id } : lib > 0 ? { kind: "lib" } : null;
-    return usesSel != null ? usesSel : { kind: "lib" };
-  }
-  var listSel = () => usesFilter ? usesCurrentSel() : currentSel();
-  function libGroups() {
-    const by = /* @__PURE__ */ new Map();
-    for (const l of usedLib()) {
-      const cut = l.name.lastIndexOf("/");
-      const path = cut < 0 ? "" : l.name.slice(0, cut);
-      const key = `lib|${l.collection}|${path}`;
-      let g = by.get(key);
-      if (!g) {
-        g = { key, label: path ? `${l.collection} \u203A ${path}` : l.collection, col: l.collection, path, rows: [] };
-        by.set(key, g);
-      }
-      g.rows.push(l);
-    }
-    return [...by.values()].sort((a, b) => a.col.localeCompare(b.col) || a.path.localeCompare(b.path));
-  }
-  function openUsesFilter() {
-    if (!baseline) return;
-    usesFilter = true;
-    usesSel = null;
-    usesCollapsed.clear();
-    query = "";
-    $("varSearch").value = "";
-    focusKey = null;
-    showTab("variables");
-    renderVarScreen();
-    requestAnimationFrame(() => window.scrollTo(0, 0));
-    usesFocusFirst();
-  }
-  function usesFocusFirst() {
-    var _a3, _b, _c;
-    const items = gridItems();
-    const el = (_b = (_a3 = items[0]) != null ? _a3 : $("varTree").querySelector("button")) != null ? _b : $("usesFilterX");
-    if (items[0]) {
-      items.forEach((x) => x.tabIndex = -1);
-      items[0].tabIndex = 0;
-      focusKey = (_c = items[0].dataset.key) != null ? _c : null;
-    }
-    el.focus({ preventScroll: true });
-  }
-  function closeUsesFilter() {
-    usesFilter = false;
-    usesSel = null;
-    focusKey = null;
-    if (varScreen() === "list") focusSideKey = `side:${sideSelKey(currentSel())}`;
-    renderVarScreen();
-    if (varScreen() === "empty") $("btnVarEmptyMake").focus();
-  }
-  $("usesFilterX").addEventListener("click", closeUsesFilter);
-  $("usesFilterRebase").addEventListener("click", () => {
-    rebaseToCurrent();
-    if (usesFilter) $("usesFilterX").focus();
-  });
-  function renderUsesBar() {
-    const bar = $("usesFilterBar");
-    bar.hidden = !usesFilter;
-    if (!usesFilter) return;
-    const nm = $("usesFilterName");
-    nm.textContent = t("v4.usesFilter", { name: baseLabel() });
-    nm.title = nm.textContent;
-    const diff = baseDiffers();
-    $("usesFilterDiff").hidden = !diff;
-    $("usesFilterDiff").textContent = `\xB7 ${t("v4.baseDiff")}`;
-    $("usesFilterRebase").hidden = !diff;
-    $("usesFilterRebase").textContent = t("list.rebase");
-    const x = $("usesFilterX");
-    x.setAttribute("aria-label", t("v4.usesFilterClear"));
-    x.title = t("v4.usesFilterClear");
-  }
   function pickSide(sel, focus = true) {
     if (query) clearSearch(false);
-    if (usesFilter) {
-      usesSel = sel;
-      focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
-      focusKey = null;
-      renderVarList();
-      return;
-    }
     sideSel = sel;
     focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
     focusKey = null;
@@ -9351,8 +9214,7 @@ ${opts.tip}` : text;
     nav.setAttribute("role", "listbox");
     const hadFocus = nav.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.key) != null ? _a3 : null : null;
     clearMount(nav);
-    const uf = usesFilter ? usesSides() : null;
-    const sides = uf ? uf.sides : sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
+    const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
     const selKey = query.trim() ? "" : sideSelKey(sel);
     for (const side of sides) {
       const c = side.collection;
@@ -9364,7 +9226,7 @@ ${opts.tip}` : text;
       d.setAttribute("aria-selected", String(selKey === key));
       const badge = tierBadge(c);
       const why = tierWhyText(c);
-      d.setAttribute("aria-label", (uf ? t("v4.usesSideAria", { name: c.name, badge, num: String(side.total) }) : t("list.sideColAria", { name: c.name, badge, num: String(side.total) })) + (why ? `, ${why}` : ""));
+      d.setAttribute("aria-label", t("list.sideColAria", { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ""));
       d.tabIndex = -1;
       const b = document.createElement("span");
       b.className = "vs-badge";
@@ -9380,31 +9242,6 @@ ${opts.tip}` : text;
       n.textContent = String(side.total);
       d.append(b, nm, n);
       const pick = () => pickSide({ kind: "col", id: c.id });
-      d.addEventListener("click", pick);
-      d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
-      nav.appendChild(d);
-    }
-    if (uf && uf.lib > 0) {
-      const d = document.createElement("div");
-      d.className = "vs-item lv1";
-      d.dataset.key = "side:lib";
-      d.setAttribute("role", "option");
-      d.setAttribute("aria-selected", String(selKey === "lib"));
-      d.setAttribute("aria-label", t("v4.usesSideAria", { name: t("v4.libName"), badge: "L", num: String(uf.lib) }));
-      d.tabIndex = -1;
-      const b = document.createElement("span");
-      b.className = "vs-badge";
-      b.setAttribute("aria-hidden", "true");
-      b.textContent = "L";
-      b.title = t("v4.libBadgeTip");
-      const nm = document.createElement("span");
-      nm.className = "vs-name";
-      nm.textContent = t("v4.libName");
-      const n = document.createElement("span");
-      n.className = "vs-num";
-      n.textContent = String(uf.lib);
-      d.append(b, nm, n);
-      const pick = () => pickSide({ kind: "lib" });
       d.addEventListener("click", pick);
       d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
       nav.appendChild(d);
@@ -9488,18 +9325,6 @@ ${opts.tip}` : text;
     return null;
   }
   var swatchHtml = (hex) => hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : "";
-  function valueEl(cell) {
-    const span = document.createElement("span");
-    span.className = "val";
-    if (!cell) {
-      span.textContent = "\u2014";
-      return span;
-    }
-    if (cell.kind === "alias") span.innerHTML = `${swatchHtml(resolveSwatch(cell))}\u2192 ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ""}`;
-    else if (cell.kind === "color") span.innerHTML = `${swatchHtml(cell.hex)}${escapeHtml(cell.hex.toUpperCase())}`;
-    else span.textContent = cell.text;
-    return span;
-  }
   function cellText(cell) {
     if (!cell) return "\u2014";
     if (cell.kind === "alias") return `\u2192 ${leafName(cell.aliasName)}`;
@@ -9534,8 +9359,7 @@ ${opts.tip}` : text;
   }
   function renderVarList() {
     if (!vmOpen || varScreen() !== "list") return;
-    renderUsesBar();
-    const sel = listSel();
+    const sel = currentSel();
     renderSidebar(sel);
     const tree = $("varTree");
     const prevScroll = window.scrollY;
@@ -9545,25 +9369,15 @@ ${opts.tip}` : text;
     $("varSide").classList.toggle("dim", searching);
     $("btnSearchClear").hidden = !query;
     const colId = sel.kind === "col" ? sel.id : null;
-    const uf = usesFilter;
-    const groups = uf && !usageMap ? [] : paletteGroups(vmCols, listVars(), colId, query);
+    const groups = paletteGroups(vmCols, vmVars, colId, query);
     lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
     const lines = [];
-    const set = collapsedSet();
-    if (uf && usageMap && sel.kind === "lib" && !searching) {
-      for (const g of libGroups()) {
-        const open = !set.has(g.key);
-        lines.push(groupHeadEl({ key: g.key, label: g.label, collectionId: "", head: true, kind: "other", rows: [] }, open));
-        if (open) for (const l of g.rows) lines.push(libRowEl(l));
-      }
-    }
     for (const g of groups) {
       const col = vmCols.find((c) => c.id === g.collectionId);
-      const open = !set.has(g.key);
+      const open = !grpCollapsed.has(g.key);
       if (g.head) lines.push(groupHeadEl(g, open));
       if (!open) continue;
-      if (uf) for (const v of g.rows) lines.push(varRowEl(v, usesPlaces(v.id)));
-      else if ((col == null ? void 0 : col.tier) === 1) {
+      if ((col == null ? void 0 : col.tier) === 1) {
         const colors = g.rows.filter((v) => v.type === "COLOR");
         const others = g.rows.filter((v) => v.type !== "COLOR");
         if (others.length) lines.push(paletteLineEl(others, "pill"));
@@ -9573,24 +9387,7 @@ ${opts.tip}` : text;
     if (!lines.length) {
       const d = document.createElement("div");
       d.className = "vt-empty";
-      const btn = (label, run) => {
-        const b = document.createElement("button");
-        b.className = "link link-btn";
-        b.type = "button";
-        b.textContent = label;
-        b.addEventListener("click", run);
-        return b;
-      };
-      if (uf && !usageMap) {
-        if (baseline && baseline.scanned > BIG_SELECTION && !vmUsageInFlight) d.append(t("list.big"), " \xB7 ", btn(t("list.read"), () => {
-          requestManagerUsage("user");
-          renderVarList();
-          $("usesFilterX").focus();
-        }));
-        else d.textContent = t("v4.reading");
-      } else if (uf && !searching && !usedLocal().length && !usedLib().length) {
-        d.append(t("v4.usesNone"), " \xB7 ", btn(t("v4.usesFilterClear"), closeUsesFilter));
-      } else if (searching) {
+      if (searching) {
         d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
         const b = document.createElement("button");
         b.className = "link link-btn";
@@ -9631,9 +9428,8 @@ ${opts.tip}` : text;
     d.append(tw, lb);
     const toggle = () => {
       var _a3, _b;
-      const set = collapsedSet();
-      if (open) set.add(g.key);
-      else set.delete(g.key);
+      if (open) grpCollapsed.add(g.key);
+      else grpCollapsed.delete(g.key);
       focusKey = (_a3 = d.dataset.key) != null ? _a3 : null;
       renderVarList();
       (_b = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _b.focus();
@@ -9682,9 +9478,9 @@ ${opts.tip}` : text;
     }
     return line;
   }
-  function varRowEl(v, places) {
+  function varRowEl(v) {
     const d = document.createElement("div");
-    d.className = places != null ? "vt-row uses" : "vt-row";
+    d.className = "vt-row";
     d.dataset.key = `v:${v.id}`;
     d.dataset.id = v.id;
     d.setAttribute("role", "row");
@@ -9701,65 +9497,7 @@ ${opts.tip}` : text;
     d.title = `${v.name} / ${cellTipText(cell)}`;
     d.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
     d.append(nm, val);
-    if (places != null) d.appendChild(placesEl(places));
     wireItem(d, v);
-    return d;
-  }
-  function placesEl(n) {
-    const c = document.createElement("span");
-    c.className = "vr-n";
-    c.textContent = t("v4.places", { n });
-    return c;
-  }
-  function libRowEl(l) {
-    var _a3;
-    const d = document.createElement("div");
-    d.className = "vt-row uses";
-    d.dataset.key = `v:${l.id}`;
-    d.setAttribute("role", "row");
-    const nm = document.createElement("span");
-    nm.className = "nm";
-    nm.textContent = leafName(l.name);
-    const val = document.createElement("span");
-    val.className = "vr-val";
-    const pill = document.createElement("span");
-    pill.className = `vr-pill${((_a3 = l.value) == null ? void 0 : _a3.kind) === "alias" ? " alias" : ""}`;
-    pill.innerHTML = `${l.type === "COLOR" ? swatchHtml(resolveSwatch(l.value)) : ""}${escapeHtml(cellText(l.value))}`;
-    val.appendChild(pill);
-    d.title = `${l.name} / ${cellTipText(l.value)}`;
-    d.setAttribute("aria-label", `${l.name}, ${cellTipText(l.value)}`);
-    d.append(nm, val, placesEl(usesPlaces(l.id)));
-    const open = () => openDetail({ lib: l }, d);
-    d.addEventListener("click", (e) => {
-      var _a4;
-      focusKey = (_a4 = d.dataset.key) != null ? _a4 : null;
-      gridItems().forEach((x) => x.tabIndex = -1);
-      d.tabIndex = 0;
-      if (e.detail > 1) return;
-      open();
-    });
-    d.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      openMenu(e.clientX, e.clientY, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], d);
-    });
-    d.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        open();
-        return;
-      }
-      if (ev.key === "ContextMenu" || ev.key === "F10" && ev.shiftKey) {
-        ev.preventDefault();
-        const r = d.getBoundingClientRect();
-        openMenu(r.left + 16, r.bottom, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], d);
-        return;
-      }
-      gridKey(ev, d);
-    });
-    d.addEventListener("focus", () => {
-      if (d.matches(":focus-visible")) showItemTip(d);
-    });
-    d.addEventListener("blur", hideItemTip);
     return d;
   }
   function wireItem(el, v) {
@@ -9972,37 +9710,7 @@ ${opts.tip}` : text;
     return { box: usesBox, list: usesList, run };
   }
   function openDetail(ref, returnEl, focusName = false) {
-    if (ref.local) {
-      openEditor(ref.local, focusName);
-      return;
-    }
-    const l = ref.lib;
-    const title = document.createElement("span");
-    title.innerHTML = `${l.type === "COLOR" ? swatchHtml(resolveSwatch(l.value)) : ""}<span class="vm-val">${escapeHtml(l.name)}</span> <span class="lib-tag">LIB</span>`;
-    const body = document.createElement("div");
-    const dl = document.createElement("dl");
-    const row = (k, val) => {
-      const dt = document.createElement("dt");
-      dt.textContent = k;
-      const dd = document.createElement("dd");
-      if (typeof val === "string") dd.textContent = val;
-      else dd.appendChild(val);
-      dl.append(dt, dd);
-    };
-    row(t("vm.dCollection"), t("list.libCollection", { name: l.collection }));
-    row(t("list.dValue"), valueEl(l.value));
-    const uses = usesBlock(l.id);
-    row(t("list.dUses"), uses.box);
-    body.appendChild(dl);
-    const n = document.createElement("div");
-    n.className = "hint";
-    n.textContent = t("list.libManaged");
-    body.appendChild(n);
-    const close = modalButton(t("common.close"), () => requestCloseModal("button"), true);
-    const box = openModal(title, body, [close], () => focusAfterDetail(l.id).el, void 0, { focus: close });
-    detailBox = box;
-    detailUsesEl = uses.list;
-    uses.run();
+    openEditor(ref.local, focusName);
   }
   function onVarUsers(msg) {
     if (msg.reqId !== detailReq || !detailUsesEl || !detailBox || !modalEl) return;
@@ -10994,8 +10702,7 @@ ${opts.tip}` : text;
       showStatusLine(t("list.libVar"));
       return;
     }
-    const undo = { sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey, uses: usesFilter ? { sel: usesSel, collapsed: new Set(usesCollapsed) } : null };
-    usesFilter = false;
+    const undo = { sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey };
     showTab("variables");
     query = "";
     $("varSearch").value = "";
@@ -11020,12 +10727,6 @@ ${opts.tip}` : text;
           sideSel = undo.sel;
           grpCollapsed.clear();
           undo.collapsed.forEach((k) => grpCollapsed.add(k));
-          if (undo.uses && baseline) {
-            usesFilter = true;
-            usesSel = undo.uses.sel;
-            usesCollapsed.clear();
-            undo.uses.collapsed.forEach((k) => usesCollapsed.add(k));
-          }
           query = undo.query;
           $("varSearch").value = query;
           focusKey = undo.focusKey;
@@ -11079,13 +10780,8 @@ ${opts.tip}` : text;
     $("varSearch").value = "";
     const cut = v.name.lastIndexOf("/");
     const gk = `${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`;
-    if (usesFilter) {
-      usesSel = { kind: "col", id: v.collectionId };
-      usesCollapsed.delete(gk);
-    } else {
-      sideSel = { kind: "col", id: v.collectionId };
-      grpCollapsed.delete(gk);
-    }
+    sideSel = { kind: "col", id: v.collectionId };
+    grpCollapsed.delete(gk);
     focusKey = `v:${v.id}`;
     renderVarList();
   }
@@ -11096,8 +10792,7 @@ ${opts.tip}` : text;
       showStatusLine(lock, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
       return;
     }
-    const fsel = usesFilter ? usesCurrentSel() : null;
-    const sel = (fsel == null ? void 0 : fsel.kind) === "col" ? fsel : currentSel();
+    const sel = currentSel();
     const col = sel.kind === "col" ? vmCols.find((c) => c.id === sel.id) : void 0;
     const first = (_b = paletteGroups(vmCols, vmVars, (_a3 = col == null ? void 0 : col.id) != null ? _a3 : null, "")[0]) == null ? void 0 : _b.rows[0];
     const type = (_c = first == null ? void 0 : first.type) != null ? _c : "FLOAT";
@@ -11150,7 +10845,6 @@ ${opts.tip}` : text;
     manualUsed = msg.manualUsed;
     const e = ed;
     if (!(e == null ? void 0 : e.create) || e.create.reqId !== msg.reqId) return;
-    usesFilter = false;
     afterTable = { focus: `v:${msg.id}` };
     e.create.opener = null;
     closeModal();
@@ -11170,7 +10864,6 @@ ${opts.tip}` : text;
   function onVariableDuplicated(msg) {
     manualUsed = msg.manualUsed;
     if (msg.reqId !== dupReq) return;
-    usesFilter = false;
     afterTable = { openDetail: msg.newId };
   }
   var delReq = 0;
@@ -11294,7 +10987,7 @@ ${opts.tip}` : text;
     openMenu(r.left, r.bottom + 2, [
       { label: t("list.readiness", { n: readinessDone(), total: 7 }) + "\u2026", onSelect: () => openReadiness(btn), focusElsewhere: true },
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
-      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t("v4.usesViewOff") : void 0, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
+      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
       { label: t("list.menuExpandAll"), onSelect: () => setAllGroups(true) },
       { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) },
       // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
@@ -11313,12 +11006,11 @@ ${opts.tip}` : text;
     ], btn);
   }
   function setAllGroups(open) {
-    const sel = listSel();
-    const set = collapsedSet();
-    const keys = sel.kind === "lib" && !query.trim() ? libGroups().map((g) => g.key) : paletteGroups(vmCols, listVars(), sel.kind === "col" ? sel.id : null, query).map((g) => g.key);
+    const sel = currentSel();
+    const keys = paletteGroups(vmCols, vmVars, sel.kind === "col" ? sel.id : null, query).map((g) => g.key);
     for (const k of keys) {
-      if (open) set.delete(k);
-      else set.add(k);
+      if (open) grpCollapsed.delete(k);
+      else grpCollapsed.add(k);
     }
     renderVarList();
   }
@@ -11688,9 +11380,7 @@ ${opts.tip}` : text;
     if (lib.length) tierN.set(t("v4.libName"), lib.length);
     const order = ["Component", "Semantic", "Global", t("v4.noTierName"), t("v4.libName")];
     const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(" \xB7 ");
-    const view = selLink(t("v4.viewArrow"), () => openUsesFilter());
-    view.dataset.k = "uses";
-    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub], actions: [view] });
+    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub] });
     card.querySelector(".t").title = t("v4.usesTip");
     put(card);
   }
