@@ -641,7 +641,7 @@
 - **준비 현황 줄 → 색:** `PIPELINE_TARGET.colors`는 `btnColorVars`로 포커스를 보낸다. 그 버튼이 빈 상태 잠금(`prereq`)이면 `gotoStep`은 [선택에서 추출] `btnExtract`로 보낸다(할 수 있는 첫 일로 — 유료 잠금이면 지금처럼 `btnColorVars`).
 - 잠금은 공통 잠금이다(§2.2 "잠금 표시와 사유"): `setLock(el, 'prereq', 사유)` — `aria-disabled`, 포커스는 받고, 누르면 동작 대신 공통 상태 줄에 사유. **유료 잠금이 먼저다**(무료면 `'paid'`와 그 사유 — 지금 `updateGates`가 PAID_FIELDS에 거는 것). 그래서 판정 함수(예 `updateEmptyLocks()`)는 `updateGates` 끝과, 조건이 바뀌는 모든 곳(추출 결과 · 팔레트 만들기 · 색 표 그리기 · 후보 트리 그리기 · 체크 바꿈 · 후보 지움 · 닮은 프레임 결과 · 합친 뒤 비움)에서 다시 부른다.
 - 클릭 처리기 안의 같은 검사(`btnColorVars`의 `color.needColors` 경고, `btnRegisterComp`의 `component.noChecked` 경고, `btnComponentize`의 `similar.needScan` · `needScanAfterComp` 경고)는 잠금이 대신하므로 지운다.
-- **후보 없이 [등록]하던 길을 닫는다:** 지금 [등록]은 후보 목록이 없으면 `REGISTER_COMPONENTS`를 `nodeIds` 없이 보내 선택 전체를 미리보기 없이 등록한다(`ui.ts` `btnRegisterComp` 처리기의 else 갈래 — ia-v3 §4.7 "스캔 없는 [등록]"). 이 갈래를 지운다 — UI는 늘 후보를 보고 고른 `nodeIds`를 보낸다. 플러그인 쪽 처리(`nodeIds` 없는 등록 경로 · 그 테스트)는 바꾸지 않는다(UI가 부르지 않을 뿐).
+- **후보 없이 [등록]하던 길을 닫는다(B.14에서 닫음 — 지금 코드):** UX 검수 C 전 [등록]은 후보 목록이 없으면 `REGISTER_COMPONENTS`를 `nodeIds` 없이 보내 선택 전체를 미리보기 없이 등록했다(`ui.ts` `btnRegisterComp` 처리기의 else 갈래 — ia-v3 §4.7 "스캔 없는 [등록]"). 이 갈래를 지웠다 — UI는 늘 후보를 보고 고른 `nodeIds`를 보낸다. 플러그인 쪽 처리(`nodeIds` 없는 등록 경로 · 그 테스트)는 바꾸지 않는다(UI가 부르지 않을 뿐).
 - `similar.needScanAfterComp`("‘후보 스캔’ 결과는 ‘등록’이 써요…")는 지운다 — 잠금 사유와 새 버튼 이름("컴포넌트 후보 찾기" · "닮은 프레임 찾기")이 그 헷갈림을 대신 푼다.
 
 **3. 컴포넌트 문구 · 제목 줄 · 목록 머리**
@@ -715,7 +715,7 @@
 | `component.needScan` (새) | — | 먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요 |
 | `component.noEligibleShort` | 등록할 수 있는 프레임이 없어요. | 등록할 수 있는 프레임이 없어요 |
 | `component.noEligible` | 선택 아래에 등록할 수 있는 프레임이 없어요. | 그대로(찾기 직후 상태 줄 — 후보가 없거나 등록할 후보가 0일 때, 경고) |
-| `component.registerHelp` (C-D3 — Components 정리 PR, 아직 코드 없음) | 체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요. | 체크한 후보를 Components에 등록하고 그 자리엔 인스턴스를 남겨요. 그 자리의 인스턴스는 등록한 컴포넌트의 연결과 값을 따라요("마스터"를 쓰지 않는다 — 최종 글은 UX 라이팅) |
+| `component.registerHelp` (C-D3 — Components 정리 PR, 아직 코드 없음) | 체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요. | 체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 그 인스턴스는 등록한 컴포넌트의 연결과 값을 따라요(예시 — "마스터"를 쓰지 않는다. 최종 글은 UX 라이팅) |
 | `similar.needTwo` | 구조가 같은 프레임을 2개 이상 선택하세요. | 구조가 같은 프레임이 2개 이상 있어야 해요 |
 | `similar.scanHelp` | 구조가 같고 내용만 다른 프레임을 미리 묶어요. 파일은 안 바꿔요. | 구조가 같고 내용만 다른 프레임을 찾아 보여 줘요. 파일은 안 바꿔요. |
 | `similar.componentizing` | 컴포넌트화하는 중… | 하나의 컴포넌트로 합치는 중… |
