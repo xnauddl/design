@@ -39,7 +39,7 @@
 | 8 | 그대로 | `common.applyingVars`(B.19 팔레트 "만드는 중"이 계속 씀) · `wizard.seq.renameDone` · `license.noteApplied` "라이선스를 적용했어요"(`code.ts` 1488 — 1회차 검토에서 더함). `create.*`는 B.19에서 없어짐 | PR 1 |
 | 9 | 그대로 | `wizard.seq.darkNothing`만 남음(나머지 5키는 B.19에서 없어짐) | PR 1(금지어 검사 추가는 PR 2) |
 | 10 | 그대로 · 도구 탭도 씀 | `dark.hint`(도구 다크 화면 안내로 옮겨감). `ts.weight`는 B.19 뒤 쓰는 곳 없음 | PR 1 |
-| 11 | 그대로 | ⌘Z가 든 8키(`v4.linked`도 지금은 꼬리에 ⌘Z — B.20에서 되돌리기 꼬리는 `apply.undo` 하나가 맡음) + B.18 만들기 카드 성공 글 "Global 변수 {n}개를 만들었어요 · ⌘Z로 되돌리기". verify 198 · 690 · 1355 · 1417 | PR 2(UW-D2 · 코드 · `test/pure.test.mjs` 1814 `rename.doneStatus` 기대 글 — 2회차 검토) |
+| 11 | 그대로 | ⌘Z가 든 8키(`v4.linked`도 지금은 꼬리에 ⌘Z — B.20에서 되돌리기 꼬리는 `apply.undo` 하나가 맡음) + B.18 만들기 카드 성공 글 "Global 변수 {n}개를 만들었어요 · ⌘Z로 되돌리기". verify 198 · 690 · 1355 · 1417 | PR 2(UW-D2 · 코드 · `test/pure.test.mjs` 1814 · 1817 `rename.doneStatus` 기대 글 — 2·3회차 검토) |
 | 12 | 그대로(A.15가 초안을 씀) | `component.registerHelp`는 A.15가 "마스터"를 뺀 초안을 두고 "최종 글은 UX 라이팅"(C-D3). `component.fail.propValue` · `extract.skipInstance` · `reasonHelp.instance-children`은 그대로. verify 1119는 [합치기] 툴팁에 "마스터"가 없는지만 봄(A.15가 [등록] 툴팁 검사를 더함) | PR 2(UW-D4 · ia-v4 §4.3a-3 표 · ia-v3 A.15) |
 | 13 | 그대로 | `vm.noTier` · `vm.tierWhyEmpty` · `bind.noTier`(verify 1561 includes "계층으로 쓸 컬렉션이 없어요") · `wizard.seq.bindNoTier` | PR 2(verify 1561 · `test/pure.test.mjs` 2636–2642 `tierWhyText`가 "계층 아님"을 봄 — 2회차 검토) |
 | 14 | 그대로 | `vm.tierWhy*` 4키. **verify 308이 이제 "직접 값 4/4 · Global"을 그대로 봄**(원본은 verify 없음 — 작음) | PR 2(verify 308 · `test/pure.test.mjs` 2636–2642 `tierWhyText` — 2회차 검토) |
