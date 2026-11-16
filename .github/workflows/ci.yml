@@ -35,3 +35,11 @@ jobs:
       # 브라우저를 안 쓰므로 playwright 설치가 필요 없다.
       - name: Verify i18n
         run: node scripts/verify-i18n.mjs
+
+      # 연결·변수 탭 상태 흐름 회귀 검사(헤드리스 Chromium). 위 빌드 산출물(dist/ui.html)을 그대로 쓴다.
+      # 브라우저는 package-lock의 playwright 버전에 맞춰 설치한다(--with-deps: OS 라이브러리·글꼴 포함).
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Verify bind flow
+        run: node scripts/verify-bind-flow.mjs
