@@ -1,7 +1,7 @@
 # Design System Linker — UX 라이팅 점검 (2026-11-11 · 2026-11-16 다시 대조)
 
 - 이 파일은 2026-11-11 점검 보고서(48건, 아래 "원본")를 저장소에 넣은 것이다(ROADMAP "UX 라이팅 검수" — "점검 보고서(48건)를 저장소 `docs/`에 넣기"). 맨 위 "2026-11-16 다시 대조"가 지금 기준이고, 원본은 그날 그대로 둔다(원본의 줄 번호 · 키 수는 2026-11-11 기준).
-- 이 점검으로 정한 규칙(용어표 · 문장 규칙 · 원칙 UW-P · 열린 질문 UW-Q)은 `docs/ia-v4.md` §2.4, 바꿀 문구 목록 · PR 2개는 `docs/ia-v4.md` 부록 B.20이다. 이 파일은 근거 기록이다 — 둘이 다르면 ia-v4를 따른다.
+- 이 점검으로 정한 규칙(용어표 · 문장 규칙 · 원칙 UW-P · 사용자 결정 UW-D1–UW-D6 — 처음엔 열린 질문 UW-Q1–Q6으로 적었고 2026-11-16 사용자가 답함)은 `docs/ia-v4.md` §2.4, 바꿀 문구 목록 · PR 2개는 `docs/ia-v4.md` 부록 B.20이다. 이 파일은 근거 기록이다 — 둘이 다르면 ia-v4를 따른다.
 
 ## 2026-11-16 다시 대조
 
@@ -39,21 +39,21 @@
 | 8 | 그대로 | `common.applyingVars`(B.19 팔레트 "만드는 중"이 계속 씀) · `wizard.seq.renameDone`. `create.*`는 B.19에서 없어짐 | PR 1 |
 | 9 | 그대로 | `wizard.seq.darkNothing`만 남음(나머지 5키는 B.19에서 없어짐) | PR 1(금지어 검사 추가는 PR 2) |
 | 10 | 그대로 · 도구 탭도 씀 | `dark.hint`(도구 다크 화면 안내로 옮겨감). `ts.weight`는 B.19 뒤 쓰는 곳 없음 | PR 1 |
-| 11 | 그대로 | 8키 + B.18 만들기 카드 성공 글 "Global 변수 {n}개를 만들었어요 · ⌘Z로 되돌리기". verify 198 · 690 · 1355 · 1417 | PR 2(UW-Q2 · 코드) |
-| 12 | 새 PR 화면에 옮겨감 | `component.registerHelp`는 A.15가 "마스터"를 뺀 초안을 두고 "최종 글은 UX 라이팅"(C-D3). `component.fail.propValue` · `extract.skipInstance` · `reasonHelp.instance-children`은 그대로. verify 1119는 [합치기] 툴팁에 "마스터"가 없는지만 봄(A.15가 [등록] 툴팁 검사를 더함) | PR 2(UW-Q4 · ia-v4 §4.3a-3 표 · ia-v3 A.15) |
+| 11 | 그대로 | 8키 + B.18 만들기 카드 성공 글 "Global 변수 {n}개를 만들었어요 · ⌘Z로 되돌리기". verify 198 · 690 · 1355 · 1417 | PR 2(UW-D2 · 코드) |
+| 12 | 새 PR 화면에 옮겨감 | `component.registerHelp`는 A.15가 "마스터"를 뺀 초안을 두고 "최종 글은 UX 라이팅"(C-D3). `component.fail.propValue` · `extract.skipInstance` · `reasonHelp.instance-children`은 그대로. verify 1119는 [합치기] 툴팁에 "마스터"가 없는지만 봄(A.15가 [등록] 툴팁 검사를 더함) | PR 2(UW-D4 · ia-v4 §4.3a-3 표 · ia-v3 A.15) |
 | 13 | 그대로 | `vm.noTier` · `vm.tierWhyEmpty` · `bind.noTier`(verify 1561 includes "계층으로 쓸 컬렉션이 없어요") · `wizard.seq.bindNoTier` | PR 2 |
 | 14 | 그대로 | `vm.tierWhy*` 4키. **verify 308이 이제 "직접 값 4/4 · Global"을 그대로 봄**(원본은 verify 없음 — 작음) | PR 2(verify 308) |
 | 15 | 그대로 | `err.networkAction` | PR 1 |
 | 16 | 그대로 | `err.scope` · `err.scopeAction` | PR 1 |
 | 17 | 그대로 | `err.prop` · `err.propAction` | PR 1 |
-| 18 | 그대로 · 도구 탭도 씀 | "~세요" 36키 중 B.19 뒤 28키. 잠금 · 오류 쪽은 `license.err.server.*` 4 · `err.*Action` 7 · `palette.invalidHex(2)`(도구 팔레트) · `license.needKey` · `export.empty` · `bind.needOn`(verify 657) · `dark.errSameMode` · `extract.skipHidden` · `extract.skipInstance`. 빈 상태 · 늘 떠 있는 안내(`v4.noSel` · `sel.noneHere` · `status.noSelection` · `dark.prereqNoModes` · `dark.prereqPick` · `pipeline.hint.*`)는 "~하세요" 그대로 | PR 1(UW-Q1이 A면) · PR 2(`bind.needOn` — verify 657) |
+| 18 | 그대로 · 도구 탭도 씀 | "~세요" 36키 중 B.19 뒤 28키. 잠금 · 오류 쪽은 `license.err.server.*` 4 · `err.*Action` 7 · `palette.invalidHex(2)`(도구 팔레트) · `license.needKey` · `export.empty` · `bind.needOn`(verify 657) · `dark.errSameMode` · `extract.skipHidden` · `extract.skipInstance`. 빈 상태 · 늘 떠 있는 안내(`v4.noSel` · `sel.noneHere` · `status.noSelection` · `dark.prereqNoModes` · `dark.prereqPick` · `pipeline.hint.*`)는 "~하세요" 그대로 | PR 1(UW-D1) · PR 2(`bind.needOn` — verify 657) |
 | 19 | 그대로 | 끝 마침표 51 → B.19 뒤 40키(여러 문장 툴팁 8키 — `dark.hintTip` · `component.scanHelp` · `component.registerHelp` · `component.classifyHelp` · `component.genMissingHelp` · `similar.scanHelp` · `similar.componentizeHelp` · `license.clearTip` — 는 규칙대로 마침표 유지). **더 찾은 결함:** 만들기 화면 결과의 실패 줄은 `{message} — {action}`으로 잇는데(`ui.ts` 3472) `err.*`가 마침표로 끝나 "글꼴을 불러오지 못했어요. — 그 폰트를…"이 된다. 도구 다크 화면 전제 띠 `dark.prereqNoModes` · `dark.prereqPick`도 마침표 | PR 1 |
 | 20 | 그대로 | `wizard.seq.darkNothing` · `wizard.seq.darkNoTarget`. `create.colorsDone`은 B.19에서 없어짐 | PR 1 |
 | 21 | 그대로 | `list.addNew` · `list.addFromSel` · `list.addDark` · `list.addTextStyles` — 뒤 둘은 B.19(T-D1)가 목적지를 도구 탭 화면으로 바꾸고 글은 그대로 둠(원본이 "다음 PR에서"로 미룬 것이 여기로 옴). verify 250 | PR 2(ia-v4 §4.6 ＋ 메뉴 와이어 · verify 250) |
 | 22 | 그대로 | `v4.noSel` "디자인에서" · `sel.noneHere` = `status.noSelection` "캔버스에서". `create.hintNoSel`은 B.19에서 없어짐. `make.noSel`은 사용자 결정 R5-D1 글이라 그대로. verify 317 · 461 · 463(· 465) | PR 2 |
 | 23 | 다른 PR에서 없어짐(B.19) | `palette.gen` · `palette.run` · `color.needColors` 모두 B.19에서 없어짐 — 팔레트 도구는 입력이 늘 보이고 바꾸면 바로 다시 그림(T-P8), 실행은 [변수 {k}개 만들기] | — |
 | 24 | 그대로 | `wizard.seq.createDone` · `wizard.seq.textStyles` · `create.sumGlobals` · `textStyle.registered`(도구 텍스트 스타일 다 됨 줄로도 옮겨감). `palette.summary`는 B.19가 " 생성"을 뺌, `semantic.result` · `create.rowCheckTip`은 B.19에서 없어짐 | PR 1 |
-| 25 | 새 PR 화면에 옮겨감 | B.18(F4)이 `make.freeBox`를 "🔒 무료는 Global 변수만 만들어요 · Semantic · 텍스트 스타일 · 다크 모드는 유료 · [라이선스 →]"로 바꾸고 `make.freeTop` · `make.freeCount`를 지움. 남는 문제는 주어 "무료는"(UW-Q6)과 가운뎃점 겹침(#52) | PR 2(UW-Q6 · B.18 verify) |
+| 25 | 새 PR 화면에 옮겨감 | B.18(F4)이 `make.freeBox`를 "🔒 무료는 Global 변수만 만들어요 · Semantic · 텍스트 스타일 · 다크 모드는 유료 · [라이선스 →]"로 바꾸고 `make.freeTop` · `make.freeCount`를 지움. 남는 문제(주어 "무료는" · 가운뎃점 겹침 #52)는 2026-11-16 사용자 결정 UW-D6(두 줄 라벨 "무료: Global 변수만" / "유료: Semantic · 텍스트 스타일 · 다크 모드")으로 풀었고, ia-v4 §4.3 "무료"(B.18)의 글을 그날 바꿈 | B.18(이미 고친 글로 구현) · B.20 PR 2에서 확인 |
 | 26 | 그대로 | `del.aliases` · `del.layers`(verify 276 "'삭제된 변수'가 돼요") · `list.noMatch`(verify 237) · `edit.nameEmptySeg`(verify 823) · `textStyle.missRename` · `textStyle.missFamily`(테스트 6835) · `textStyle.missFontKeep` · `textStyle.missVar`. `semantic.formatHint`는 B.19에서 없어짐 | PR 2 |
 | 27 | 그대로 | `reasonHelp.deleted-var` · `license.err.server.limit`. `textStyle.renameClearedTable`은 B.19 뒤 쓰는 곳 없음 | PR 1 |
 | 28 | 그대로 | `component.registered`(verify 1077 · 1083) · `component.extraSingles` · `component.reused`(verify 1079) · `component.extraSkipped`(verify 1051) · `v4.linkedSkipped`(verify 690) · `make.done.manual` · `create.sumManual` · `textStyle.renameSkipped` | PR 2 |
@@ -67,9 +67,9 @@
 | 36 | 그대로 | `reason.empty-text` · `reason.instance-children` · `reason.no-autolayout` · `tsSkip.hasStyle`(verify 739 includes "이미 스타일 있음") | PR 1(앞 셋) · PR 2(`tsSkip.hasStyle`) |
 | 37 | 그대로 | `similar.why.*` · `similar.tooFew`(verify 1850은 `similar.needTwo`만 봄 — 그대로인 글) | PR 1 |
 | 38 | 그대로 | `list.undo` · `bind.skipSelectBtn`. verify는 글을 그대로 비교하지 않고 설명에만 씀(298 · 300 · 342 · 346 · 352 · 678), 명세 와이어가 "[← 되돌리기]" · "[선택 ›]"를 인용 | PR 2(명세 와이어) |
-| 39 | 그대로 | `v4.fixPlaces` · `v4.fixPlacesChip` · 머리 `v4.skipFixHead`(ROADMAP 검수 요청과 같은 것). verify 336 · 341 | PR 2(UW-Q3) |
+| 39 | 그대로 | `v4.fixPlaces` · `v4.fixPlacesChip` · 머리 `v4.skipFixHead`(ROADMAP 검수 요청과 같은 것). verify 336 · 341 | PR 2(UW-D3) |
 | 40 | 그대로 | `component.fit.*` | PR 1 |
-| 41 | 그대로 | `make.layers` "Layer {n}" — B.18 만들기 카드도 같은 키(2026-11-13 사용자 결정 §9 5번). 사용자 결정이 둘이라 바꾸려면 다시 물어야 함 | UW-Q5(추천: 그대로 — 바꾸지 않으면 닫음) |
+| 41 | 그대로 | `make.layers` "Layer {n}" — B.18 만들기 카드도 같은 키(2026-11-13 사용자 결정 §9 5번). 사용자 결정이 둘이라 바꾸려면 다시 물어야 함 | 닫음 — 2026-11-16 사용자 결정 UW-D5 "Layer {n}" 그대로 |
 | 42 | 그대로 | `component.fillKept` · `component.fail.fillKept` · `dark.hint` · `dark.hintTip` · `component.scanHelp` · `license.manageTip` · `extract.skipGradient` · `license.setupHint` · `err.fontAction` · `pipeline.step.tokens`. `create.title` · `color.extractEmpty` · `rail.colorSub`는 B.19에서 없어짐 | PR 1(`pipeline.step.tokens`는 PR 2) |
 | 43 | 그대로 | `license.manageTip` "결제수단" · `similar.resKept` "남겨둔"(+ "건"). `semantic.formatLabel`은 B.19에서 없어짐 | PR 1 |
 | 44 | 그대로 | `v4.linked` + `v4.linkedSkipped` 순서 · 🔗(verify 690) | PR 2(#11과 함께 — 코드에서 잇는 순서) |
@@ -83,9 +83,9 @@
 |---|---|---|---|---|---|---|
 | 49 | ③ | B.18 만들기 카드 둘째 줄 셋(ia-v4 §4.1 "만들기 카드" 와이어) | "선택에서 찾은 값으로 Global 변수를 만들어요. 무료는 개수 제한이 없어요." · "선택에서 찾은 값으로 Global · Semantic 변수를 한 번에 만들고 바로 연결해요." · "이제 같은 값을 쓰는 레이어에 연결해요. Semantic 변수로 묶기는 유료예요." | 한 줄 자리(둘째 줄)에 끝 마침표 · 문장 사이 마침표(UW-P4) | "선택에서 찾은 값으로 Global 변수를 만들어요 · 개수 제한은 없어요" · "선택에서 찾은 값으로 Global · Semantic 변수를 만들고 바로 연결해요" · "이제 같은 값을 쓰는 레이어에 연결해요 · Semantic 변수 만들기는 유료예요"(#50) | B.18이 이 글로 만들면 끝, 아니면 PR 2 |
 | 50 | ① | B.18 만든 뒤 카드 둘째 줄 | "Semantic 변수로 **묶기**는 유료예요" | "묶기"는 컴포넌트의 [변형 세트로 묶기]에 쓰는 말(용어표) | "Semantic 변수 만들기는 유료예요" | 위와 같음 |
-| 51 | ⑥ | B.18 카드 만들기 성공 상태 줄 | "Global 변수 {n}개를 만들었어요 · ⌘Z로 되돌리기" | #11과 같음 | UW-Q2를 따름 | PR 2(#11과 함께) |
-| 52 | ⑥ | B.18 `make.freeBox` 새 글 | "🔒 무료는 Global 변수만 만들어요 · Semantic · 텍스트 스타일 · 다크 모드는 유료 · [라이선스 →]" | 가운뎃점이 나열(Semantic · 텍스트 스타일 · 다크 모드)과 절 구분에 함께 쓰여 어디서 끊기는지 안 보임(UW-P8) | "🔒 무료에서는 Global 변수만 만들 수 있어요 — Semantic · 텍스트 스타일 · 다크 모드는 유료예요 · [라이선스 →]"(UW-Q6 추천안) | PR 2(UW-Q6) |
-| 53 | ① | A.15 `component.registerHelp` 초안(ia-v4 §4.3a-3 표) | "체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 그 인스턴스는 등록한 컴포넌트의 연결과 값을 따라요" | 여러 문장 툴팁인데 마지막 마침표 없음(UW-P4) · "Components"가 페이지 이름인지 안 보임 · 피그마 말(메인 컴포넌트)과 다름(#12) | "체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요."(UW-Q4가 A일 때) | A.15가 이 글로 만들면 끝, 아니면 PR 2 |
+| 51 | ⑥ | B.18 카드 만들기 성공 상태 줄 | "Global 변수 {n}개를 만들었어요 · ⌘Z로 되돌리기" | #11과 같음 | UW-D2 — `{undo}` | PR 2(#11과 함께) |
+| 52 | ⑥ | B.18 `make.freeBox` 새 글 | "🔒 무료는 Global 변수만 만들어요 · Semantic · 텍스트 스타일 · 다크 모드는 유료 · [라이선스 →]" | 가운뎃점이 나열(Semantic · 텍스트 스타일 · 다크 모드)과 절 구분에 함께 쓰여 어디서 끊기는지 안 보임(UW-P8) | 두 줄 라벨 "🔒 무료: Global 변수만" / "유료: Semantic · 텍스트 스타일 · 다크 모드 · [라이선스 →]"(UW-D6 — 사용자는 명세 추천 B가 아니라 C를 고름. 키 `make.freeBox` · 새 `make.freeBoxPaid`) | B.18(ia-v4 §4.3 글 고침) |
+| 53 | ① | A.15 `component.registerHelp` 초안(ia-v4 §4.3a-3 표) | "체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 그 인스턴스는 등록한 컴포넌트의 연결과 값을 따라요" | 여러 문장 툴팁인데 마지막 마침표 없음(UW-P4) · "Components"가 페이지 이름인지 안 보임 · 피그마 말(메인 컴포넌트)과 다름(#12) | "체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요."(UW-D4) | A.15가 이 글로 만들면 끝, 아니면 PR 2 |
 | 54 | ① | B.19 `tools.intro` | "레이어를 **고르지** 않아도 파일에 바로 만들어요" | 레이어는 "선택"(용어표 — 다른 안내는 모두 "레이어를 선택하세요") | "레이어를 선택하지 않아도 파일에 바로 만들어요" | B.19가 이 글로 만들면 끝, 아니면 PR 1 |
 | 55 | ④ | B.19 브랜드 팔레트 · 텍스트 스타일 화면의 안내 한 줄(§4.11 와이어) | "기준 색으로 Global 색 변수를 만들어요" · "기본 글자 단계를 만들어요 · 이름을 더블클릭하면 고칠 수 있어요" | 와이어에만 있고 키 이름이 없다(B.19 새 키 목록에 없음 — 다크 화면만 `dark.hint`) | 새 키 `tools.paletteHint` · `tools.tsHint`(글은 와이어 그대로 — 둘 다 규칙에 맞음) | B.19 구현 때 이 이름으로 만든다(B.20에서 확인) |
 | 56 | ③⑥ | B.19 도구 다크 화면 안내(§4.11 ② 와이어 · `dark.hint`) | 와이어 "…다크에 채워요 · 목록 이름은 Figma 변수 컬렉션·모드예요" ↔ 키 "…다크에 채워요. 목록 이름은 Figma 변수 컬렉션·모드예요" | 와이어와 키 글이 다르고(마침표 · 가운뎃점), "Figma" · "·" 붙여 씀(#10 · #19 · #42) · "목록 이름"이 무엇인지 모호(고르개 이름) | "라이트 색을 뒤집어 다크 모드 값을 채워요 · 고르개 이름은 피그마 변수 컬렉션 · 모드 이름이에요" | PR 1 |
@@ -97,10 +97,10 @@
 - 규칙에 맞아 그대로 쓰는 초안(확인만): B.18 "기본으로 만들 값이 없어요 · [외 {k}개 보기]" · "Semantic 변수는 유료예요" · "Semantic 매핑은 유료예요" · "변수 만들기 실패 · [보기]" · "{선택 이름}에서 많이 쓴 값"(조사 "에서"는 받침과 무관), §4.1 찾기 실패 "선택을 읽지 못했어요 · [다시 읽기]"(13회차 — "UX 라이팅에서 다듬음" → 이대로 확정), §2.6 찾기 작업 이름 "찾기"(새 키 `op.find` — "찾기 실패 · [보기]"), B.19 `tab.tools` "도구" · `tools.paletteSub` · `tools.darkSub` · `tools.textStylesSub` · `palette.make` "변수 {k}개 만들기" · `palette.overwriteN` "기존 변수 {n}개의 값이 바뀌어요" · `palette.counting` "바뀌는 변수를 세는 중…" · `palette.countFail` "바뀌는 변수를 세지 못했어요" · `palette.use.*`(주색 · 보조색 · 하모니 1–3 · 중립 · 성공 · 경고 · 오류 · 정보 — "역할" 없음) · `tools.tsMake` "텍스트 스타일 {k}개 만들기" · `tools.tsNeedOn` "만들 스타일을 켜 주세요"(텍스트 스타일 화면 안이라 "스타일" — UW-P18) · `tools.tsReading` "스타일을 읽는 중…" · `tools.tsRunning` "텍스트 스타일을 만드는 중…" · `tools.tsRefreshFail` · `tools.darkReadFail` · `tools.darkRefreshFail` · `dark.prereqNoVars` 새 글 · `prereq.gotoCreate` "변수 만들기 →" · `list.semanticsNote` 새 글 · `op.palette` "브랜드 팔레트" · `op.updateVar` "고치기".
 
 ### ROADMAP "UX 라이팅 검수" 요청 — 어디서 정했나
-- `bind.needOn` "연결할 변수를 켜세요" → 잠금 사유라 "연결할 변수를 켜 주세요"(UW-Q1 추천안 A) — #18, B.20 PR 2(verify 657).
-- " · 건너뜀 {x}" · "건너뛴 곳" · "손볼 수 있는 곳" · "손볼 곳 {s}곳" → UW-Q3 — #39 · #28, B.20 PR 2.
+- `bind.needOn` "연결할 변수를 켜세요" → 잠금 사유라 "연결할 변수를 켜 주세요"(UW-D1) — #18, B.20 PR 2(verify 657).
+- " · 건너뜀 {x}" · "건너뛴 곳" · "손볼 수 있는 곳" · "손볼 곳 {s}곳" → UW-D3 — #39 · #28, B.20 PR 2.
 - 텍스트 스타일 이름 다시 짓기 팝업의 읽는 중 · 바꿀 이름 0개 버튼 · 사유 → UW-P12(모르는 수는 숫자로 쓰지 않는다) + B.20 PR 2 표. **더 찾은 결함:** text-style-krds §5.2는 응답 전 제목을 `textStyle.renameBtn` "이름 다시 짓기"로 정했는데, B.19는 `textStyle.renameBtn`을 지울 키로 적었다(`btnTsRename`만 쓴다고 봄) — 새 키 `textStyle.renameTitle`로 푼다(B.20).
-- `make.freeBox` 범위 → B.18(F4)이 새 글을 정함, 여기서는 다듬기만 — UW-Q6 · #52.
+- `make.freeBox` 범위 → B.18(F4)이 새 글을 정함, 여기서는 다듬기만 — UW-D6 · #52.
 - 화면에 "KRDS"를 쓰지 않음 → UW-P13. 지금 두 키(`textStyle.rowLabelTip` · `textStyle.nameSplit`)는 B.19에서 없어지고, B.20 PR 2에서 `terms.test` 금지어에 `KRDS`를 더한다.
 
 ---
