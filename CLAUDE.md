@@ -34,5 +34,5 @@ npm run verify:i18n
 CHROMIUM_PATH=/opt/pw-browsers/chromium node scripts/verify-bind-flow.mjs
 ```
 
-- CI는 앞의 셋(타입 검사 · 테스트 · i18n)만 돈다. `verify-bind-flow`는 직접 돌린다.
+- CI는 넷 모두 돈다(`verify-bind-flow`는 CI가 Chromium을 설치해 돌린다). 로컬에서는 위처럼 `CHROMIUM_PATH`로 설치된 브라우저를 지정한다.
 - `dist/`는 커밋한다(`manifest.json`이 `dist/code.js` · `dist/ui.html`을 가리킨다). `.gitignore`에 있으므로 `git add -u`로 올린다.
