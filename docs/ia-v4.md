@@ -1876,11 +1876,11 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 
 B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.manageTip`)를 같은 글로 바꾸므로 먼저 들어가는 PR이 바꾸고 나중 PR은 확인만 한다.
 
-- [ ] `ui.ts`: `#licenseLinkRow` 숨김(1996) 없앰. `renderLicenseLink()` — 티어별 글 · 툴팁(티어 툴팁 + 잠겼으면 " — " + `license.linkPending`, 매번 처음부터) · 링크가 자리표시자면 `setLock($('btnLicenseLink'), 'prereq', t('license.linkPending'))`. `applyStaticI18n`(4891) 뒤 처음 한 번 + `LICENSE_STATUS`(2313) 때 부른다. `setWait` · `setLockTitle`은 쓰지 않는다
-- [ ] `ui.html` 1308: `data-i18n="license.buy"` · `data-i18n-title="license.buyTip"` · 인라인 기본 글 무료 글로
-- [ ] i18n: 새 키 `license.buy` "유료 구매하기 ↗" · `license.buyTip` "결제 페이지를 열어요" · `license.linkPending` "구독 관리 페이지는 아직 준비 중이에요", 글 바꿈 `license.manage` "구독 관리 ↗" · `license.manageTip` "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요" · `verify:i18n` 0
-- [ ] 숨김을 전제로 한 주석 고침: `licenseConfig.ts` `licenseLinksConfigured` 문서 주석 · `ui.html` 1303–1304 · `ui.ts` 1992–1995
-- [ ] 점검 파일 `docs/qa/2026-11-11-ux-writing-audit.md` #42 · #43의 `license.manageTip` 갈 곳에 "B.21과 같은 글(먼저 들어가는 PR)"을 덧붙인다
-- [ ] 테스트(`verify-bind-flow` — `recv(LICENSE_STATUS)` · `__sent`): 무료 + 자리표시자 → 버튼 보임 · `aria-disabled` · 글 "유료 구매하기 ↗" · 툴팁 꼬리 · 누르면 상태 줄 사유 · `OPEN_LICENSE_LINK` 안 보냄 / `LICENSE_STATUS` 유료 → 글 "구독 관리 ↗" · 툴팁 바뀜 · 잠금 그대로
-- [ ] 4검사 · 스크린샷(무료 · 유료)
+- [x] `ui.ts`: `#licenseLinkRow` 숨김(1996) 없앰. `renderLicenseLink()` — 티어별 글 · 툴팁(티어 툴팁 + 잠겼으면 " — " + `license.linkPending`, 매번 처음부터) · 링크가 자리표시자면 `setLock($('btnLicenseLink'), 'prereq', t('license.linkPending'))`. `applyStaticI18n`(4891) 뒤 처음 한 번 + `LICENSE_STATUS`(2313) 때 부른다. `setWait` · `setLockTitle`은 쓰지 않는다
+- [x] `ui.html` 1308: `data-i18n="license.buy"` · `data-i18n-title="license.buyTip"` · 인라인 기본 글 무료 글로
+- [x] i18n: 새 키 `license.buy` "유료 구매하기 ↗" · `license.buyTip` "결제 페이지를 열어요" · `license.linkPending` "구독 관리 페이지는 아직 준비 중이에요", 글 바꿈 `license.manage` "구독 관리 ↗" · `license.manageTip` "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요" · `verify:i18n` 0
+- [x] 숨김을 전제로 한 주석 고침: `licenseConfig.ts` `licenseLinksConfigured` 문서 주석 · `ui.html` 1303–1304 · `ui.ts` 1992–1995
+- [x] 점검 파일 `docs/qa/2026-11-11-ux-writing-audit.md` #42 · #43의 `license.manageTip` 갈 곳에 "B.21과 같은 글(먼저 들어가는 PR)"을 덧붙인다
+- [x] 테스트(`verify-bind-flow` — `recv(LICENSE_STATUS)` · `__sent`): 무료 + 자리표시자 → 버튼 보임 · `aria-disabled` · 글 "유료 구매하기 ↗" · 툴팁 꼬리 · 누르면 상태 줄 사유 · `OPEN_LICENSE_LINK` 안 보냄 / `LICENSE_STATUS` 유료 → 글 "구독 관리 ↗" · 툴팁 바뀜 · 잠금 그대로
+- [x] 4검사(tsc · `npm test` 665 · `verify:i18n` 0 · `verify-bind-flow` 25번 4개 포함 통과) · 스크린샷(무료 · 유료 — 시안과 같음)
 - [ ] 실기 확인(사용자, 피그마): ⚙ 설정 › 라이선스에 [유료 구매하기 ↗]가 흐리게 보이고, 누르면 상태 줄에 "구독 관리 페이지는 아직 준비 중이에요"

@@ -1301,11 +1301,11 @@
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
-           licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
+           licenseConfig가 아직 자리표시자면 ui.ts가 이 버튼을 숨기지 않고 잠근다(ia-v4 §4.10 · B.21 — 없는 페이지로 보내지 않고 사유를 보인다). -->
       <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
            Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요" data-i18n="license.manage">결제 · 구독 관리 ↗</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.buyTip" title="결제 페이지를 열어요" data-i18n="license.buy">유료 구매하기 ↗</button>
       </div>
       <div class="hint" id="licenseLinkHint" data-i18n="license.priceHint">무료 · 유료 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none" data-i18n="license.setupHint">배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요</div>

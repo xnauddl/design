@@ -70,8 +70,8 @@
 | 39 | 그대로 | `v4.fixPlaces` · `v4.fixPlacesChip` · 머리 `v4.skipFixHead`(ROADMAP 검수 요청과 같은 것). verify 336 · 341 | PR 2(UW-D3) |
 | 40 | 그대로 | `component.fit.*` | PR 1 |
 | 41 | 그대로 | `make.layers` "Layer {n}" — B.18 만들기 카드도 같은 키(2026-11-13 사용자 결정 §9 5번). 사용자 결정이 둘이라 바꾸려면 다시 물어야 함 | 닫음 — 2026-11-16 사용자 결정 UW-D5 "Layer {n}" 그대로 |
-| 42 | 그대로 | `component.fillKept` · `component.fail.fillKept` · `dark.hint` · `dark.hintTip` · `component.scanHelp` · `license.manageTip` · `extract.skipGradient` · `license.setupHint` · `err.fontAction` · `pipeline.step.tokens`. `create.title` · `color.extractEmpty` · `rail.colorSub`는 B.19에서 없어짐 | PR 1 · PR 2(`pipeline.step.tokens` — 명세 인용, `component.fillKept` · `component.fail.fillKept` — verify 1061–1063 · 1091이 "채움·크기가 달라"를 봄 → "채움이나 크기가 달라") |
-| 43 | 그대로 | `license.manageTip` "결제수단" · `similar.resKept` "남겨둔"(+ "건"). `semantic.formatLabel`은 B.19에서 없어짐 | PR 1(`license.manageTip`) · PR 2(`similar.resKept` — verify 1068 `!includes('남겨둔 것')`을 '남겨 둔 것'으로 함께, 안 바꾸면 늘 참) |
+| 42 | 그대로 | `component.fillKept` · `component.fail.fillKept` · `dark.hint` · `dark.hintTip` · `component.scanHelp` · `license.manageTip` · `extract.skipGradient` · `license.setupHint` · `err.fontAction` · `pipeline.step.tokens`. `create.title` · `color.extractEmpty` · `rail.colorSub`는 B.19에서 없어짐 | PR 1(`license.manageTip`은 B.21이 먼저 바꿈 — 2026-11-17, PR 1은 확인만) · PR 2(`pipeline.step.tokens` — 명세 인용, `component.fillKept` · `component.fail.fillKept` — verify 1061–1063 · 1091이 "채움·크기가 달라"를 봄 → "채움이나 크기가 달라") |
+| 43 | 그대로 | `license.manageTip` "결제수단" · `similar.resKept` "남겨둔"(+ "건"). `semantic.formatLabel`은 B.19에서 없어짐 | PR 1(`license.manageTip` — B.21이 먼저 바꿈, 2026-11-17 · 확인만) · PR 2(`similar.resKept` — verify 1068 `!includes('남겨둔 것')`을 '남겨 둔 것'으로 함께, 안 바꾸면 늘 참) |
 | 44 | 그대로 | `v4.linked` + `v4.linkedSkipped` 순서 · 🔗(verify 690) | PR 2(#11과 함께 — 코드에서 잇는 순서) |
 | 45 | 그대로 | `list.rebase` "기준 바꾸기" — 명세(§2.5 · §4.1)가 "[기준 바꾸기]"를 여러 곳 인용 | PR 2 |
 | 46 | 그대로 | `license.priceHint` — F1(무료도 Global 변수를 만듦) 뒤에는 "무료 ·"만으로 범위가 더 모호 | PR 1 |

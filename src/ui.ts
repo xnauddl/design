@@ -1989,11 +1989,18 @@ $('btnLicenseLink').addEventListener('click', () =>
   send({ type: 'OPEN_LICENSE_LINK', target: isPaid ? 'portal' : 'purchase' }),
 );
 
-// 배포 전(자리표시자 URL)에는 구독 버튼을 숨긴다 — 눌러도 없는 페이지로 가서 혼란만 준다.
-// URL을 실제 값으로 갈아끼우면 조건이 자동으로 풀려 다시 노출된다.
-// 요금 한 줄('Free · Paid 연 $39 · 기기 1대')은 링크와 무관한 사실이라 항상 남긴다 —
-// 와이어에도 카드 마지막 줄로 있고, 이게 없으면 Free 사용자는 값을 알 방법이 없다.
-if (!licenseLinksConfigured()) $('licenseLinkRow').style.display = 'none';
+// 구매 버튼(ia-v4 §4.10 · B.21) — 늘 보인다. 글 · 툴팁은 티어에 따라(무료 [유료 구매하기 ↗] / 유료 [구독 관리 ↗]).
+// 배포 전(자리표시자 URL)에는 숨기지 않고 전제 잠금 — 누르면 상태 줄에 사유, 밖 페이지는 열지 않는다.
+// 툴팁 꼬리는 이 버튼만의 예외(" — " + 사유, 매번 처음부터 — setWait · setLockTitle을 쓰지 않는다).
+// URL을 실제 값으로 갈아끼우면 잠금이 저절로 풀린다. 정적 i18n 뒤 · LICENSE_STATUS 때 부른다.
+function renderLicenseLink(): void {
+  const btn = $('btnLicenseLink');
+  btn.textContent = isPaid ? t('license.manage') : t('license.buy');
+  const tip = isPaid ? t('license.manageTip') : t('license.buyTip');
+  const ready = licenseLinksConfigured();
+  btn.title = ready ? tip : `${tip} — ${t('license.linkPending')}`;
+  setLock(btn, ready ? null : 'prereq', t('license.linkPending'));
+}
 // 검증 서버·공개키가 미설정이면 키를 넣어도 반드시 '서명 검증 실패'가 난다. 그 이유를 미리 밝힌다.
 if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
 
@@ -2327,6 +2334,7 @@ window.onmessage = (event: MessageEvent) => {
       // Free/Paid 2티어 — 유료면 모든 유료 기능 해금.
       isPaid = msg.unlimited;
       updateGates();
+      renderLicenseLink(); // 티어가 바뀌면 구매 버튼 글 · 툴팁도(B.21)
       break;
     }
     case 'EXPORT_RESULT': {
@@ -4891,6 +4899,7 @@ document.addEventListener('pointercancel', () => { pointerDown = false; reentry.
 applyStaticI18n(); // 정적 라벨 외부화(캐논 변형 전에 원본 요소에 적용)
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
 applyButtonTips(); // 구조 버튼 호버 툴팁
+renderLicenseLink(); // 정적 i18n이 data-i18n 글로 덮은 뒤에 티어 글 · 잠금(B.21)
 syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
 // 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
 if (typeof ResizeObserver !== 'undefined') {
