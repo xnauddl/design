@@ -1573,8 +1573,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
         if (!requireComponents()) break;
-        // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
-        const roots = selection().filter(isEffectivelyVisible);
+        // 목록 기준의 nodeIds(ia-v4 §2.5) — 없으면 지금 선택. 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
+        const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible);
         // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
         // toStructNode가 인스턴스 내부를 펼치지 않으므로 스캔 범위는 그대로다.
         const rootStructs = roots.map((n) => toStructNode(n));
@@ -1658,7 +1658,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 미리보기 라벨 실패해도 후보는 반환(스캔 중 고정 방지).
           console.warn('component preview label failed', e);
         }
-        post({ type: 'COMPONENT_CANDIDATES', nodes });
+        post({ type: 'COMPONENT_CANDIDATES', nodes, reqId: msg.reqId });
         break;
       }
       case 'REGISTER_COMPONENTS': {
@@ -2430,10 +2430,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_SIMILAR': {
         // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천만 보여준다.
-        const frames = selection().filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
+        // 목록 기준의 nodeIds(ia-v4 §2.5) — 없으면 지금 선택.
+        const frames = (await resolveRoots(msg.nodeIds)).filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
         const r = await scanSimilar(frames);
         post({
           type: 'SIMILAR_CANDIDATES',
+          reqId: msg.reqId,
           metas: r.metas,
           recommendedMasterId: r.recommendedMasterId,
           varying: r.varying,

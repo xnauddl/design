@@ -59,6 +59,18 @@ async function goSub(p, sub) {
 const recv = (p, m) => p.evaluate((m) => window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: m } })), m);
 const sent = (p, type) => p.evaluate((t) => window.__sent.filter((m) => m && m.type === t), type);
 const lastReq = async (p, type) => (await sent(p, type)).at(-1)?.reqId;
+/** 컴포넌트 화면 찾기 — 버튼을 눌러 보낸 reqId로 응답한다(ia-v4 §4.5 — 비운 뒤 늦게 온 응답은 버림). 잠겨 있으면 유료 · 목록 기준을 먼저 준다. */
+async function compFound(p, nodes) {
+  if (await locked(p, '#btnScanComp')) await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  if (await locked(p, '#btnScanComp')) await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await p.click('#btnScanComp');
+  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes, reqId: await lastReq(p, 'SCAN_COMPONENT_CANDIDATES') });
+}
+async function similarFound(p, msg) {
+  if (await locked(p, '#btnScanSimilar')) await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await p.click('#btnScanSimilar');
+  await recv(p, { ...msg, reqId: await lastReq(p, 'SCAN_SIMILAR') });
+}
 /** 우클릭 메뉴 열기 — 510 높이에서는 행이 아래에 있어, 클릭 전 스크롤이 메뉴를 닫지 않게 먼저 화면 안으로. */
 async function rightClick(p, selector) {
   await p.$eval(selector, (e) => e.scrollIntoView({ block: 'center' }));
@@ -1115,12 +1127,12 @@ async function saveAndGet(p) {
       && s1.text.indexOf('구조가 달라 원본을 둔') < s1.text.indexOf('복사본을 둔')
       && s1.cls.includes('warn'), JSON.stringify(s1));
   // 후보 트리 — 재사용할 줄은 종류 배지 대신 [재사용] + 기존 컴포넌트 이름(세트면 "{세트} · {변형}")
-  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+  await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
     { id: 'a', name: 'Item Button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, group: 'ItemButton2', variant: 'Variant=1', reuse: { name: 'ItemButton · Variant=1' }, defaultOn: true },
     { id: 'b', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
     { id: 'c', name: 'hero-button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Button', defaultOn: true },
-  ] });
+  ]);
   const rows = await p.$$eval('#compTree .tag', (els) => els.map((e) => ({ text: e.textContent, cls: e.className, row: e.closest('.r-card')?.textContent ?? '' })));
   const reuseRow = rows.find((r) => r.text === '재사용');
   check('13 후보 트리 배지 [재사용] + 기존 이름(접미사 이름 안 보임)',
@@ -1139,7 +1151,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 1, instances: 2, images: 0, warnings: [], placeFailed: [] });
   s1 = await st();
   check('13 COMPONENTIZE_RESULT 상태 줄 "원본 Card · …"', s1.text.startsWith('원본 Card · 인스턴스 2개'), JSON.stringify(s1));
-  check('13 [하나의 컴포넌트로 합치기] 툴팁에 "마스터" 없음', !(await p.getAttribute('#btnComponentize', 'data-tip')).includes('마스터'), await p.getAttribute('#btnComponentize', 'data-tip'));
+  check('13 [하나로 합치기] 툴팁에 "마스터" 없음', !(await p.getAttribute('#btnComponentize', 'data-tip')).includes('마스터'), await p.getAttribute('#btnComponentize', 'data-tip'));
   await p.close();
 }
 
@@ -1611,11 +1623,11 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 {
   const p = await open(480, 'layer');
   await goSub(p, 'structure');
-  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+  await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
     { id: 'a', name: 'Item Button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Button', defaultOn: true },
     { id: 'b', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
-  ] });
+  ]);
   await p.waitForTimeout(60);
   check('22 컴포넌트 트리 — 행 ≥1', (await p.$$eval('#compTree .r-card', (e) => e.length)) >= 1);
   const row = await rowShape(p, '#compTree .r-card');
@@ -1857,12 +1869,12 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   const h2 = await p.$eval('#structureCard h2', (e) => e.textContent.replace(/\s+/g, ''));
   check('23 제목 줄 = "컴포넌트베타"(개수 · "닮은 프레임" 없음)', h2 === '컴포넌트베타', h2);
   const btns = await p.evaluate(() => ['btnScanComp', 'btnScanSimilar', 'btnRegisterComp', 'btnComponentize', 'btnClassifyVariants', 'btnGenMissing'].map((id) => document.getElementById(id).textContent.trim()));
-  check('23 버튼 글 — 컴포넌트 후보 찾기 · 닮은 프레임 찾기 · 등록 · 하나의 컴포넌트로 합치기 · 변형 세트로 묶기 · 빠진 변형 채우기', JSON.stringify(btns) === JSON.stringify(['컴포넌트 후보 찾기', '닮은 프레임 찾기', '등록', '하나의 컴포넌트로 합치기', '변형 세트로 묶기', '빠진 변형 채우기']), JSON.stringify(btns));
-  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+  check('23 버튼 글 — 컴포넌트 후보 찾기 · 닮은 프레임 찾기 · 등록 · 하나로 합치기 · 변형 세트로 묶기 · 빠진 변형 채우기', JSON.stringify(btns) === JSON.stringify(['컴포넌트 후보 찾기', '닮은 프레임 찾기', '등록', '하나로 합치기', '변형 세트로 묶기', '빠진 변형 채우기']), JSON.stringify(btns));
+  await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
     { id: 'b1', name: 'Button / primary', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, group: 'Button', variant: 'Type=primary', defaultOn: true },
     { id: 'lk', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
-  ] });
+  ]);
   await p.waitForTimeout(60);
   check('23 후보 받음 → [등록] 풀림 · #btnRegisterComp.primary', !(await locked(p, '#btnRegisterComp')) && JSON.stringify(await prim()) === JSON.stringify(['btnRegisterComp']), JSON.stringify(await prim()));
   const ctg = await p.$eval('#compTreeGroup', (e) => ({ name: e.firstElementChild?.textContent, cnt: e.querySelector('.r-gcnt')?.textContent, bg: getComputedStyle(e).backgroundColor }));
@@ -1877,17 +1889,18 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   check('23 전체 끔 → [등록] 잠김 · 사유 "등록할 후보를 체크해 주세요" · 주 버튼 하나', (await locked(p, '#btnRegisterComp')) && (await lockMsg(p, '#btnRegisterComp')) === '등록할 후보를 체크해 주세요' && (await prim()).length === 1 && !(await prim()).includes('btnRegisterComp'), JSON.stringify(await prim()));
   const meta = (id, name) => ({ id, name, textFilled: 3, textTotal: 3, images: 1, emptyLayers: 0, score: 1 });
   const simMsg = (metas) => ({ type: 'SIMILAR_CANDIDATES', metas, recommendedMasterId: metas[0]?.id ?? null, varying: [], imageVarying: [], excluded: [] });
-  await recv(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
+  await similarFound(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
   await p.waitForTimeout(40);
   const sg = await p.$eval('#similarGroup', (e) => ({ name: e.firstElementChild?.textContent, cnt: e.querySelector('.r-gcnt')?.textContent }));
   check('23 SIMILAR_CANDIDATES(2개) → [합치기] 풀림 · #similarGroup "닮은 프레임" + "2개" · 추천 줄 태그 "원본 추천" · 주 버튼 하나',
     !(await locked(p, '#btnComponentize')) && sg.name === '닮은 프레임' && sg.cnt === '2개' && (await p.textContent('#similarList .tag')) === '원본 추천' && (await prim()).length === 1, JSON.stringify({ sg, prim: await prim() }));
   const badComp = await nestedCards(p);
   check('23 카드 안 카드 0 — 머리 띠를 단 컴포넌트 화면', badComp.length === 0, badComp.join(' · '));
-  await recv(p, simMsg([meta('ca', 'Card A')]));
+  await similarFound(p, simMsg([meta('ca', 'Card A')]));
   await p.waitForTimeout(40);
   check('23 SIMILAR_CANDIDATES(1개) → [합치기] 잠김 · 사유 similar.needTwo', (await locked(p, '#btnComponentize')) && (await lockMsg(p, '#btnComponentize')) === '구조가 같은 프레임이 2개 이상 있어야 해요');
-  await recv(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
+  await similarFound(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
+  await p.click('#btnComponentize'); // 쓰기 작업 — 결과를 받으면 다시 읽고 두 목록을 비운다(§4.5 "목록 비우기")
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card A', properties: 1, instances: 1, images: 0, warnings: [], placeFailed: [] });
   await p.waitForTimeout(40);
   check('23 COMPONENTIZE_RESULT 뒤 → [합치기] 다시 잠김(사유 needScan) · 상태 줄 "원본 Card A · …"', (await locked(p, '#btnComponentize')) && (await lockMsg(p, '#btnComponentize')) === '먼저 ‘닮은 프레임 찾기’를 눌러 주세요' && (await p.textContent('#structureStatus')).startsWith('원본 Card A · '), await p.textContent('#structureStatus'));

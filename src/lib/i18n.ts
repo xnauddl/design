@@ -87,7 +87,7 @@ export const STRINGS: Record<string, string> = {
   'dark.toPlaceholder': 'Dark (없으면 만들어요)',
   // 닮은 프레임 컴포넌트화
   'similar.scanBtn': '닮은 프레임 찾기',
-  'similar.componentizeBtn': '하나의 컴포넌트로 합치기',
+  'similar.componentizeBtn': '하나로 합치기',
   // 내보내기
   'export.saved': '{format} — {file}로 저장했어요.',
   'export.empty': '내보낼 변수가 없어요. 먼저 토큰을 만드세요.',
@@ -691,7 +691,7 @@ export const STRINGS: Record<string, string> = {
   'component.classifyBtn': '변형 세트로 묶기',
   'component.genMissingBtn': '빠진 변형 채우기',
   'component.scanHelp': '선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.',
-  'component.registerHelp': '체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.',
+  'component.registerHelp': '체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.',
   'component.classifyHelp': '이미 만든 컴포넌트를 이름이 같은 것끼리 변형 세트로 묶어요.',
   'component.genMissingHelp': '선택한 변형 세트의 빠진 조합을 첫 변형을 복제해 채워요.',
   'similar.scanHelp': '구조가 같고 내용만 다른 프레임을 찾아 보여 줘요. 파일은 안 바꿔요.',

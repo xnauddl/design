@@ -92,7 +92,7 @@
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 닮은 프레임 컴포넌트화
     "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
-    "similar.componentizeBtn": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uAE30",
+    "similar.componentizeBtn": "\uD558\uB098\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -687,7 +687,7 @@
     "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
     "component.genMissingBtn": "\uBE60\uC9C4 \uBCC0\uD615 \uCC44\uC6B0\uAE30",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
-    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components \uD398\uC774\uC9C0\uC5D0 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD558\uACE0, \uC6D0\uB798 \uC790\uB9AC\uC5D0\uB294 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uB0A8\uAE34 \uC778\uC2A4\uD134\uC2A4\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
@@ -11128,7 +11128,7 @@
         }
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requireComponents()) break;
-          const roots = selection().filter(isEffectivelyVisible3);
+          const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible3);
           const rootStructs = roots.map((n) => toStructNode(n));
           const candidates = scanComponentCandidates(rootStructs);
           const scanIndex = /* @__PURE__ */ new Map();
@@ -11199,7 +11199,7 @@
           } catch (e) {
             console.warn("component preview label failed", e);
           }
-          post({ type: "COMPONENT_CANDIDATES", nodes });
+          post({ type: "COMPONENT_CANDIDATES", nodes, reqId: msg.reqId });
           break;
         }
         case "REGISTER_COMPONENTS": {
@@ -11935,10 +11935,11 @@
           break;
         }
         case "SCAN_SIMILAR": {
-          const frames = selection().filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
+          const frames = (await resolveRoots(msg.nodeIds)).filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
           const r = await scanSimilar(frames);
           post({
             type: "SIMILAR_CANDIDATES",
+            reqId: msg.reqId,
             metas: r.metas,
             recommendedMasterId: r.recommendedMasterId,
             varying: r.varying,
