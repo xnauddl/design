@@ -1090,6 +1090,27 @@
 - 머리: "← 설정". 내용은 v3 설정 탭 그대로(기본값 · 라이선스 — 지금. 도구 탭 PR에서 여백 격자 기본값 `settings.grid`(툴팁 `settings.gridTip`)을 없앰, §0 · §4.11 "없어지는 것"). 탭 밖 화면 규칙은 §2.1.
 - 포커스: 들어오면 ←(라이선스로 왔으면 키 입력 칸).
 
+**라이선스 카드의 구매 버튼 (2026-11-17 사용자 결정 B — 체크 B.21)**
+- **늘 보인다.** 지금은 결제 링크(`licenseConfig.ts` `PURCHASE_URL`)가 자리표시자면 버튼 줄 `#licenseLinkRow`를 숨긴다(`licenseLinksConfigured` — `ui.ts` 1996). 그러면 무료 사용자가 어디서 사는지 화면에서 알 수 없고, 출시 전에 이 화면을 확정 · 실기할 수 없다. 그래서 줄을 숨기지 않는다.
+- **버튼은 하나 — 글이 티어에 따라 갈린다**(가는 곳이 갈리는 것은 그대로 — 2026-08-06 결정 "한 버튼"). 무료: [유료 구매하기 ↗](새 키 `license.buy`, 누르면 결제 페이지 `PURCHASE_URL`), 유료: [구독 관리 ↗](`license.manage` 글 바꿈 — 지금 "결제 · 구독 관리 ↗", 누르면 고객 포털 `PORTAL_URL`). 툴팁도 티어마다 — 무료 새 키 `license.buyTip` "결제 페이지를 열어요", 유료 `license.manageTip` 글 바꿈 "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요"(지금 글은 두 티어를 한 문장에 말한다 — 버튼 글이 갈리므로 나눈다). 밖 링크라 글 끝에 " ↗"(§2.4 이동 표시). 티어가 바뀌면(키 확인 · 해제 · 만료 — `LICENSE_STATE`) 글 · 툴팁을 바로 바꾼다. 가는 곳은 지금처럼 누를 때의 티어로 정한다(`ui.ts` 1988).
+- **링크가 아직 자리표시자면 잠근다**(지금 숨기던 조건 `!licenseLinksConfigured()` 그대로). 전제 잠금(`setLock(…, 'prereq', msg)` — §2.3 잠금 모양: `aria-disabled` · 포커스는 받음)이고 사유는 새 키 `license.linkPending` "결제 페이지는 아직 준비 중이에요". 툴팁은 위 툴팁 뒤에 " · {사유}"를 붙인다(대기 사유 꼬리와 같은 모양 — `setWait`). 누르면 공통 상태 줄에 사유(경고, 링크 버튼 없음 — `onLockedActivate`의 `lockMsg`). 밖 페이지는 열지 않는다(`OPEN_LICENSE_LINK`를 보내지 않음). 잠금은 무료 · 유료 모두에 건다(포털 주소 `PORTAL_URL`은 이미 실제 주소지만 결제 링크와 함께 배포 PR에서 정하므로 같은 조건 하나로 본다 — ROADMAP "배포 전 남은 일" 7). 배포 PR에서 `PURCHASE_URL`을 실제 값으로 바꾸면 잠금이 저절로 풀린다.
+- **안내 줄은 그대로**: 요금 `license.priceHint`(버튼 아래, 늘 보임), 설정 안내 `license.setupHint`(검증 서버 · 공개키가 자리표시자면 보임 — "구독 링크는 아직 동작하지 않아요"가 잠금 사유와 같은 말을 하므로 둘이 어긋나지 않는다).
+- 버튼 모양은 지금처럼 주 버튼(`.primary`)이다 — 라이선스 카드의 다른 버튼([검증] · [해제])은 키 칸 줄의 보조 버튼이고, 카드에서 무료 사용자가 할 첫 일이 구매이기 때문. 잠기면 다른 잠긴 주 버튼과 같은 흐린 모양이다.
+- 와이어(무료 · 링크 자리표시자 — 지금 배포 전):
+
+  ```
+  ┌ 라이선스 ───────────────────────────────────┐
+  │ 유료를 쓰면 🔒 잠긴 기능이 풀려요            │
+  │ [ 라이선스 키 입력          ] [검증] [해제]  │
+  │ 현재: FREE                                   │
+  │ [유료 구매하기 ↗] ← 흐림(잠김) · 툴팁 "결제 페이지를 열어요 · 결제 페이지는 아직 준비 중이에요" │
+  │ 무료 · 유료 연 $39 · 기기 1대                │
+  │ 배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요 │
+  └──────────────────────────────────────────────┘
+  ```
+  유료면 버튼 글만 [구독 관리 ↗]. 링크가 실제 값이면 흐림 · 툴팁 꼬리가 없고 누르면 밖 페이지가 열린다.
+- 포커스 순서: 키 칸 → [검증] → [해제] → 구매 버튼(잠겨도 포커스를 받는다).
+
 ### 4.11 도구 탭 (2026-11-11 · 12 · 16 사용자 결정 D · Q2-1 · Q3-1 · Q4 · E1 · D1 · T-D1–T-D8)
 
 결정 · 이유 · 철회 기록은 ROADMAP "도구 탭". 아직 코드 없음 — 도구 탭 PR(체크 B.19)에서 만든다. 와이어 · 숫자는 V2 · V3 뒤(창 560 · 기본 글자 12px — §8) 기준이다. 이 절에서 **T-P{n}(원칙)** 표시는 사용자 결정이 아니라 명세를 쓰며 정한 것이다(ROADMAP "명세에서 정할 것"을 정함 — 바꾸려면 사용자에게 묻는다).
@@ -1802,7 +1823,7 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 - [ ] 다크(#10 · #42 · #56 · #57): `dark.hint` → "라이트 색을 뒤집어 다크 모드 값을 채워요"(40자 넘던 둘째 절은 툴팁으로 — UW-P11), `dark.hintTip` → "고르개 이름은 피그마 변수 컬렉션 · 모드 이름이에요. 색상 · 채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 것은 건너뛰어요. 다크용 색은 dark/… 이름으로 따로 만들어요.", `dark.done` → "{modePart}다크 값 {n}개를 채웠어요 · 새 dark/ 색 {c}개{skipPart}", `dark.prereqNoModes` → "모드가 있는 컬렉션(보통 Semantic)을 골라 주세요", `dark.prereqPick` → "컬렉션과 라이트 모드를 골라 주세요"(전제 띠이자 [다크 만들기] 잠금 사유 — UW-P19, 같은 띠의 `dark.prereqNoVars` "…만들어 주세요"와 맞춤), `dark.modeAdded` → "다크 모드는 추가했어요 · "(가운데 마침표 — `ui.ts` 2408), `dark.modeAddedShort` → "다크 모드를 추가했어요 · "(뒤 `dark.done` 해요체와 섞임 — UW-P17), `wizard.seq.dark` → "다크 값 {realiased}개 채움"(`ui.ts` 3443 — "연결" 아님, #57), `wizard.seq.darkSkip` → " · 건너뜀 {n}개(값을 직접 넣은 색)", `dark.errNoCol` → "컬렉션을 찾을 수 없어요", `dark.errAddModePlan` → "플랜에서 모드를 더 만들 수 없을 수 있어요", `dark.errSameMode` → "라이트와 다크가 같은 모드예요 — 라이트에 다른 모드를 골라 주세요"
 - [ ] 오류 띠(#15 · #17 · #19 · #48 — 끝 마침표를 지워 만들기 화면 결과의 `{message} — {action}`(`ui.ts` 3472)이 "…요. — …"가 되지 않게): `err.font` → "글꼴을 불러오지 못했어요", `err.prop` → "속성 값이 맞지 않아요(예: 게시하지 않은 컴포넌트)", `err.propAction` → "컴포넌트를 게시하거나 대상 레이어를 확인해 주세요", `err.readonly` → "편집 권한이 없거나 읽기 전용 파일이에요", `err.readonlyAction` → "편집할 수 있는 파일에서 다시 시도해 주세요", `err.network` → "네트워크 오류가 났어요", `err.networkAction` → "인터넷 상태를 확인하고 다시 시도해 주세요", `err.storage` → "이 기기에 설정을 저장하지 못했어요", `err.storageAction` → "잠시 뒤 다시 시도해 주세요", `err.unknownAction` → "선택을 확인하고 다시 시도해 주세요", `err.badHex` → "색 코드가 맞지 않아요: {value}"
 - [ ] 끝맺음 · 마침표(#18 — UW-D1 · #19): `palette.invalidHex` → "기준 색을 #RRGGBB 형식으로 입력해 주세요", `palette.invalidHex2` → "보조색을 #RRGGBB 형식으로 입력해 주세요", `license.needKey` → "라이선스 키를 입력해 주세요", `extract.skipHidden` → "숨긴 레이어는 건너뛰었어요 — 보이게 한 뒤 다시 읽어 주세요"(40자 안 — UW-P11), `extract.skipGradient` → "그라디언트 · 이미지 채움은 변수로 만들 수 없어 건너뛰었어요", `extract.skipFraction` → "소수 값(26.67px 등)은 단계 값이 아니라서 변수에서 뺐어요", `component.noEligible` → "선택 아래에 등록할 수 있는 프레임이 없어요", `vm.dNoUses` → "선택 안에서는 쓰이지 않아요", `similar.noMaster` → "원본 프레임을 찾을 수 없어요", `textStyle.warnMixed` → "부분 서식(혼합) 글자는 건너뛰었어요"(`test/figma.test.mjs` 3367의 부분 문자열 "부분 서식"은 그대로), 한 문장 툴팁 `component.classifyHelp` → "이미 만든 컴포넌트를 이름이 같은 것끼리 변형 세트로 묶어요" · `component.genMissingHelp` → "선택한 변형 세트의 빠진 조합을 첫 변형을 복제해 채워요"(마침표만 뺌). 여러 문장 툴팁(`component.scanHelp` · `component.registerHelp` · `similar.scanHelp` · `similar.componentizeHelp` · `license.clearTip` · `dark.hintTip`)은 마침표 유지
-- [ ] 라이선스(#18 · #27 · #29 · #43 · #46): `license.verify` → "키 확인", `license.clear` → "이 기기에서 해제", `common.verifying` → "키를 확인하는 중…", `license.setupHint` → "배포 전이라 키 확인 · 구독 링크는 아직 동작하지 않아요", `license.clearTip` → "이 기기의 활성화를 반납해요. 새 기기에서 같은 키를 다시 확인하면 돼요.", `license.manageTip` → "무료면 결제 페이지로, 구독 중이면 결제 수단 · 기기 활성화를 관리하는 페이지로 열어요", `license.priceHint` → "유료 연 $39 · 기기 1대", `license.err.server.expired` → "구독이 끝났어요 — 결제 · 구독 관리에서 갱신해 주세요", `license.err.server.invalid` → "키가 맞지 않아요 — 키를 다시 확인해 주세요", `license.err.server.limit` → "기기 한도를 넘었어요 — 다른 기기에서 해제한 뒤 다시 확인해 주세요"(공백 포함 38자 — 버튼 이름은 툴팁 `license.clearTip`이 말함), `license.noteApplied` → "라이선스 키를 확인했어요"(`code.ts` 1488 — "적용", #8), `license.err.server.server` → "키 확인 서버에 문제가 있어요 — 잠시 뒤 다시 시도해 주세요"
+- [ ] 라이선스(#18 · #27 · #29 · #43 · #46): `license.verify` → "키 확인", `license.clear` → "이 기기에서 해제", `common.verifying` → "키를 확인하는 중…", `license.setupHint` → "배포 전이라 키 확인 · 구독 링크는 아직 동작하지 않아요", `license.clearTip` → "이 기기의 활성화를 반납해요. 새 기기에서 같은 키를 다시 확인하면 돼요.", `license.manageTip` → (B.21에서 "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요"로 이미 바꿈 — 확인만), `license.priceHint` → "유료 연 $39 · 기기 1대", `license.err.server.expired` → "구독이 끝났어요 — [유료 구매하기]에서 다시 구독해 주세요"(B.21 — 만료되면 무료가 되어 버튼 글이 [유료 구매하기]다), `license.err.server.invalid` → "키가 맞지 않아요 — 키를 다시 확인해 주세요", `license.err.server.limit` → "기기 한도를 넘었어요 — 다른 기기에서 해제한 뒤 다시 확인해 주세요"(공백 포함 38자 — 버튼 이름은 툴팁 `license.clearTip`이 말함), `license.noteApplied` → "라이선스 키를 확인했어요"(`code.ts` 1488 — "적용", #8), `license.err.server.server` → "키 확인 서버에 문제가 있어요 — 잠시 뒤 다시 시도해 주세요"
 - [ ] 버튼 가리킴(#27): `reasonHelp.deleted-var` → "첫 화면 ‘연결 풀기’로 정리해요"
 - [ ] 실패 꼬리(#32 — 글만, 원문 오류 툴팁은 PR 2): `apply.failed` → "연결하지 못했어요 — 다시 시도해 주세요", `newVar.failed` → "만들지 못했어요 — 다시 시도해 주세요", `newVar.dupFailed` → "복제하지 못했어요 — 다시 시도해 주세요", `del.failed` → "지우지 못했어요 — 다시 시도해 주세요", `edit.saveFailed` → "저장하지 못했어요 — 다시 시도해 주세요", 사유 이름 `v4.unbindFail.error` · `textStyle.renameSkip.error` → "피그마 오류"
 - [ ] 줄 높이 · 기준 크기(#33 · #34): `textStyle.noteLhPx` → "{name}: 역할마다 줄 높이 원본이 달라 px로 적었어요"(텍스트 스타일 이름의 역할 — §2.4 예외, `tree.test` 허용 목록 그대로), `textStyle.noteKeepLh` → "{name}: 줄 높이 변수 연결을 지켰어요 — {n}%로 고치지 않았어요", `textStyle.noteLhPct` → "{role}: 줄 높이 {n}% 유지 — 변수 연결 안 함"(`figma.test` 3833의 "연결 안 함"은 그대로), 자간 짝 `textStyle.noteLsPx` → "{name}: 역할마다 자간 원본이 달라 px로 적었어요" · `textStyle.noteKeepLs` → "{name}: 자간 변수 연결을 지켰어요 — {n}%로 고치지 않았어요"(`figma.test` 3939의 "자간 변수 연결을 지켰어요"는 그대로) · `textStyle.noteLsPct`는 그대로, `create.sumBase` → " · 기준 크기 {base}px로 바꾼 값 {n}개({examples}{morePart})"(B.19 verify가 `palette.invalidHex` 글을 그대로 보면 그 줄도 함께 — 그때는 PR 2로. `palette.lowChroma`는 테스트가 봐서 PR 2)
@@ -1847,3 +1868,12 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 - [ ] verify · 테스트(표의 줄)
 - [ ] 4검사 · 화면 시안(바뀌는 화면 — 연결 결과 상태 줄 · 건너뛴 곳 화면(칩 · 머리 · [레이어 선택]) · ＋ 메뉴 · 만들기 화면 아래 고정 줄 · 무료 상자 · 이름 다시 짓기 팝업 읽는 중 · 0개) 사용자 확인 → 구현 → 실제 화면 스크린샷 대조 → Figma 실기 확인(Windows 피그마가 있으면 "Ctrl+Z")
 - [ ] 명세 정리(병합 뒤): 이 부록 · 점검 파일의 갈 곳 칸을 닫는다. ROADMAP "UX 라이팅 검수" 항목 체크. 스토어 소개(ROADMAP "배포 전 남은 일" 11)의 기능 이름도 이 용어표로
+
+### B.21 라이선스 구매 버튼 PR (2026-11-17 사용자 결정 B · §4.10 "라이선스 카드의 구매 버튼")
+
+- [ ] `ui.ts`: `#licenseLinkRow` 숨김(1996) 없앰 → 링크가 자리표시자면 `setLock($('btnLicenseLink'), 'prereq', t('license.linkPending'))` + 툴팁 꼬리 " · {사유}"
+- [ ] `ui.ts`: 티어에 따라 버튼 글 · 툴팁(`license.buy` · `license.buyTip` / `license.manage` · `license.manageTip`) — 처음 그릴 때와 `LICENSE_STATE`로 `isPaid`가 바뀔 때
+- [ ] i18n: 새 키 `license.buy` "유료 구매하기 ↗" · `license.buyTip` "결제 페이지를 열어요" · `license.linkPending` "결제 페이지는 아직 준비 중이에요", 글 바꿈 `license.manage` "구독 관리 ↗" · `license.manageTip` "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요". `ui.html` 기본 글(무료 글)도 맞춘다 · `verify:i18n` 0
+- [ ] 테스트(`verify-bind-flow` 또는 UI 단위): 무료 + 자리표시자 → 버튼 보임 · `aria-disabled` · 글 "유료 구매하기 ↗" · 누르면 상태 줄 사유 · `OPEN_LICENSE_LINK` 안 보냄 / 유료 → 글 "구독 관리 ↗"
+- [ ] 4검사 · 스크린샷(무료 · 유료)
+- [ ] 실기 확인(사용자, 피그마): ⚙ 설정 › 라이선스에 [유료 구매하기 ↗]가 흐리게 보이고, 누르면 상태 줄에 "결제 페이지는 아직 준비 중이에요"
