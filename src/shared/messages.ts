@@ -196,7 +196,7 @@ export interface VarUpdateError {
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT'; nodeIds?: string[]; reqId?: number } // reqId: 만들기 화면 요청 번호(결과에 그대로 돌려줌, IA v4 §4.3) · nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number; globalOnly?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리 · globalOnly: Global만(Semantic을 만들지 않음 — 무료도 됨, IA v4 §4.3 무료 규칙)
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
   // 매칭은 언제나 "같은 값"(IA v3 §2.11 — 숫자 소수 2자리, 색 #RRGGBB + 양쪽 불투명). 허용오차는 없앴다.
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
@@ -271,8 +271,8 @@ export type CodeToUi =
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
   // 변수 고치기 응답 — applied: 바꾼 것('name' 또는 modeId), 순서대로. 변수 표는 따로 보내지 않는다(UI가 다시 읽는다).
   | { type: 'VARIABLE_APPLIED'; reqId: number; applied: number; skipped: number; skipReasons: Record<string, number>; name: string } // applied · skipped = 레이어 수
-  | { type: 'VARIABLE_CREATED'; reqId: number; id: string; manualUsed: number } // manualUsed: 지금까지 직접 만든 수(무료 개수 제한, §4.9)
-  | { type: 'VARIABLE_DUPLICATED'; reqId: number; newId: string; manualUsed: number }
+  | { type: 'VARIABLE_CREATED'; reqId: number; id: string }
+  | { type: 'VARIABLE_DUPLICATED'; reqId: number; newId: string }
   | { type: 'VARIABLE_DELETED'; reqId: number; id: string }
   | { type: 'VARIABLE_UPDATED'; reqId: number; ok: boolean; applied: string[]; error?: VarUpdateError }
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
@@ -310,8 +310,6 @@ export type CodeToUi =
       tierColorVars?: number;
       /** 계층으로 인식되지 않은 컬렉션의 변수 수 — 있으면 '계층 지정' 안내. */
       otherVars?: number;
-      /** 지금까지 직접 만든 변수 수(새 변수 + 복제, 무료 개수 제한 §4.9). */
-      manualUsed?: number;
     }
   | {
       type: 'LICENSE_STATUS';
@@ -348,7 +346,7 @@ export type CodeToUi =
   | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
   | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[]; placeFailed?: string[] } // placeFailed: 제자리에 못 둔 원본 이름(원본은 그대로, §4.7)
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }
-  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'freeLimit' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 무료 한도 · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
+  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'paid' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 유료(무료의 플러그인 Semantic 컬렉션 — §4.9 F2) · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {

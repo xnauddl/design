@@ -5617,6 +5617,50 @@ test('보는 순서 1 → 3 → 2 → 4 — 같은 값이면 디자이너 변수
   assert.equal(dry2.candidates[0].variableId, auto.id);
 });
 
+test('무료 자동 연결은 새 Semantic을 만들지 않는다 — 맞는 Semantic이 없으면 Global에 · 있으면 그대로 · 유료는 새 Semantic (IA v4 §2.3-7 · F6)', async () => {
+  const figma = installFigma();
+  await createTokens(
+    [
+      { name: 'spacing/52', category: 'gap', sources: ['gap'], value: 52 },
+      { name: 'spacing/10', category: 'gap', sources: ['gap'], value: 10 },
+    ],
+    16,
+  );
+  const mk = (id, gap) => ({
+    type: 'FRAME', id, name: id, fills: [], layoutMode: 'VERTICAL', itemSpacing: gap, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', boundVariables: {},
+    setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
+  });
+  const g52 = findVar(figma, 'Global', 'spacing/52');
+  // 무료 찾기(preview) — 새 역할 후보 없이 Global(계층 1)에 붙는 후보
+  const free = [mk('a', 52), mk('b', 10)];
+  const dryFree = await bindSelection(free, false, {}, { noNewRoles: true });
+  assert.equal(dryFree.candidates.length, 2);
+  for (const c of dryFree.candidates) {
+    assert.equal(c.tier, 1);
+    assert.equal(c.newRole, undefined);
+    assert.ok(!c.variableId.startsWith('new:'));
+  }
+  assert.equal(dryFree.candidates.find((c) => c.nodeId === 'a').variableId, g52.id);
+  // 무료 실제 연결 — Global에 바로, 새 Semantic 0개(N 배지 · newRoles 꼬리 없음)
+  const rFree = await bindSelection(free, true, {}, { noNewRoles: true });
+  assert.equal(rFree.bound, 2);
+  assert.ok(!rFree.newRoles);
+  assert.equal(free[0].boundVariables.itemSpacing.id, g52.id);
+  assert.equal(findVar(figma, 'Semantic', 'spacing/gap'), undefined);
+  // 유료(옵션 없음) — 지금처럼 새 Semantic을 만들어 붙인다
+  const paid = [mk('c', 52)];
+  const rPaid = await bindSelection(paid);
+  assert.equal(rPaid.newRoles, 1);
+  const v = findVar(figma, 'Semantic', 'spacing/gap');
+  assert.ok(v);
+  assert.equal(paid[0].boundVariables.itemSpacing.id, v.id);
+  // 맞는 Semantic이 있으면 무료도 그것에 연결한다(보는 순서 2)
+  const again = [mk('d', 52)];
+  const dry2 = await bindSelection(again, false, {}, { noNewRoles: true });
+  assert.equal(dry2.candidates[0].variableId, v.id);
+});
+
 test('새 역할 — 곳 수 많은 값이 기본 이름, 나머지는 크기 꼬리(12.5), 모든 모드에 별칭, 역할을 만들면 다시 쓴다', async () => {
   const figma = installFigma();
   await createTokens(

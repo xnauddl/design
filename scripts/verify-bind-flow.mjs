@@ -123,9 +123,31 @@ const VARS = [
   { id: 'tx', name: 'color/text/default', collectionId: 's', type: 'COLOR', values: { l: { kind: 'alias', aliasId: 'g9', aliasName: 'color/gray/900' }, d: { kind: 'alias', aliasId: 'g0', aliasName: 'color/gray/0' } }, scopes: [], description: '' },
 ];
 const usageResult = (reqId, usage, extra = {}) => ({ type: 'USAGE_RESULT', reqId, usage, libraryVars: [], deleted: { count: 0, nodeIds: [] }, scanned: 40, ...extra });
+/* 만들기 카드(IA v4 §4.1 상태 6 · B.18) — 카드가 보낸 추출 · 미리보기에 답한다. */
+const MC_TOKENS = [
+  { name: 'color/101828', category: 'color', value: '#101828', sources: ['fills'], count: 31 },
+  { name: 'color/FFFFFF', category: 'color', value: '#FFFFFF', sources: ['fills'], count: 24 },
+  { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 22 },
+  { name: 'spacing/4', category: 'gap', value: 4, sources: ['itemSpacing'], count: 18 },
+  { name: 'radius/8', category: 'radius', value: 8, sources: ['topLeftRadius'], count: 3 },
+  { name: 'font-size/16', category: 'fontSize', value: 16, sources: ['fontSize'], count: 9 },
+];
+/** 카드의 마지막 EXTRACT에 tokens로 답하고, 이어지는 미리보기에 states로 답한다(roles = r). */
+async function cardAnswer(p, tokens = MC_TOKENS, states = null, roles = 4) {
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens });
+  await p.waitForTimeout(20);
+  const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  if (pv && pv.reqId > ex.reqId) {
+    const st = states ?? Object.fromEntries(pv.tokens.map((tk) => [tk.name, { state: 'new' }]));
+    await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: pv.tokens.length, updated: 0, summary: '', roles, skippedManual: 0, tokenStates: st, roleRows: [] });
+  }
+  await p.waitForTimeout(40);
+  return pv;
+}
 /** 카드 안 카드 찾기(ia-v4 §2.8 · B.12) — 보이는 카드(.step · .sel-card · .modal) 안에서 테두리나 그림자 + 둥근 모서리 + 배경을 모두 가진 요소. */
 const nestedCards = (p) => p.evaluate(() => {
-  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker';
+  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.mk-row .sw,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker';
   document.activeElement?.blur?.();
   const clear = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
   const isCard = (e) => {
@@ -255,7 +277,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.click('.modal button >> text=만들기');
   const cv = (await sent(p, 'CREATE_VARIABLE')).at(-1);
   check('9 [만들기] → CREATE_VARIABLE(컬렉션 · 이름 · 값 · 용도 GAP)', cv?.collectionId === 'g' && cv.name === 'spacing/12' && cv.varType === 'FLOAT' && cv.values.m?.value === 12 && JSON.stringify(cv.scopes) === '["GAP"]', JSON.stringify(cv));
-  await recv(p, { type: 'VARIABLE_CREATED', reqId: cv.reqId, id: 'sp12', manualUsed: 1 });
+  await recv(p, { type: 'VARIABLE_CREATED', reqId: cv.reqId, id: 'sp12' });
   check('9 만든 뒤 팝업 닫힘', (await p.$('.modal')) === null);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...VARS, { id: 'sp12', name: 'spacing/12', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: '12' } }, scopes: ['GAP'], description: '' }] });
   check('9 새 변수로 포커스', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'sp12');
@@ -264,7 +286,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.click('.ctx-menu button >> text=복제');
   const dv = (await sent(p, 'DUPLICATE_VARIABLE')).at(-1);
   check('9 복제 → DUPLICATE_VARIABLE', dv?.id === 'sp8');
-  await recv(p, { type: 'VARIABLE_DUPLICATED', reqId: dv.reqId, newId: 'sp8c', manualUsed: 2 });
+  await recv(p, { type: 'VARIABLE_DUPLICATED', reqId: dv.reqId, newId: 'sp8c' });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...VARS, { id: 'sp8c', name: 'spacing/8-copy', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: '8' } }, scopes: ['GAP'], description: '' }] });
   check('9 복제 뒤 상세 열림 · 이름 칸 포커스', (await p.$('.modal')) !== null && (await p.evaluate(() => document.activeElement?.value)) === 'spacing/8-copy');
   await p.keyboard.press('Escape');
@@ -564,10 +586,11 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await goSub(p, 'pick');
-  await p.focus('#btnColorVars');
-  check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnColorVars');
-  check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnColorVars', 'aria-disabled')) === 'true');
-  await p.click('#btnColorVars', { force: true });
+  // 무료 규칙 PR 뒤 [색 변수 만들기]는 무료(F8) — 유료 잠금의 예는 [팔레트 생성]
+  await p.focus('#btnPalette');
+  check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnPalette');
+  check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnPalette', 'aria-disabled')) === 'true');
+  await p.click('#btnPalette', { force: true });
   check('10 누르면 공통 상태 줄에 유료 사유', (await p.textContent('#statusText')).includes('유료 기능이에요') && (await p.textContent('#statusAction')) === '라이선스 →');
   check('10 잠긴 버튼은 동작하지 않음', (await count(p, 'CREATE_TOKENS')) === 0);
   await p.keyboard.press('Tab'); // 포커스 이동은 메시지를 지우지 않는다
@@ -1309,19 +1332,41 @@ async function saveAndGet(p) {
   await p.waitForTimeout(30);
   check('17 무료 — 텍스트 스타일 후보를 읽지 않음', (await sent(p, 'SCAN_TEXT_STYLES')).length === 0);
   const ex = (await sent(p, 'EXTRACT')).at(-1);
-  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }, { name: 'radius/8', category: 'radius', value: 8, sources: ['topLeftRadius'], count: 1 }] });
   await p.waitForTimeout(30);
-  check('17 무료 — 잠금 상자 · 스위치 없음 · [연결 · 이름 정리 실행] · 다크 잠금', (await visible(p, '#makeFree')) && (await p.$$eval('#makeTree .bv-switch', (e) => e.length)) === 0 && (await p.textContent('#btnMakeRun')) === '연결 · 이름 정리 실행' && (await locked(p, '#makeOptDark')));
-  await p.click('#makeOptLink');
-  check('17 무료 — 바로 연결 · 이름 정리 둘 다 끄면 잠금 사유', (await lockMsg(p, '#btnMakeRun')) === '무료로는 연결 · 이름 정리만 할 수 있어요');
-  await p.click('#makeOptRename');
+  // 무료 규칙(F4 — §4.3 "무료 — 무료 규칙 PR 뒤"): 미리보기는 globalOnly 없이(Semantic 탭 줄 · r을 받으려고)
+  const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  check('17 무료 — 미리보기는 globalOnly 없이', !!pv && pv.globalOnly === undefined, JSON.stringify(pv));
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 2, updated: 0, summary: '', roles: 1, skippedManual: 0, tokenStates: {}, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
+  await p.waitForTimeout(30);
+  check('17 무료 — 두 줄 라벨 상자 "무료: Global 변수만" / "🔒 Semantic · 텍스트 스타일 · 다크 모드 · 라이선스 →"', (await visible(p, '#makeFree')) && (await p.$eval('#makeFree', (e) => e.innerText.replace(/\s+/g, ' ').trim())) === '무료: Global 변수만 🔒 Semantic · 텍스트 스타일 · 다크 모드 · 라이선스 →', await p.$eval('#makeFree', (e) => e.innerText));
+  check('17 무료 — Global 탭 스위치 · 모두 켜기 · 끄기 · 도구 줄 "켠 값만 변수로 만들어요"', (await p.$$eval('#makeTree .bv-switch', (e) => e.length)) > 0 && (await visible(p, '#makeAllOn')) && (await p.textContent('#makeTopText')) === '켠 값만 변수로 만들어요');
+  check('17 무료 — 만들 수 "Global 2개" · [변수 2개 만들기] · 다크 잠금', (await p.textContent('#makeCount')) === 'Global 2개' && (await p.textContent('#btnMakeRun')) === '변수 2개 만들기' && !(await locked(p, '#btnMakeRun')) && (await locked(p, '#makeOptDark')), await p.textContent('#makeCount'));
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(20);
+  check('17 무료 Semantic 탭 — 보기만(스위치 없음) · "🔒 Semantic은 유료예요 · 라이선스 →" · ⓘ 없음', (await p.$$eval('#makeTree .bv-switch', (e) => e.length)) === 0 && (await p.textContent('#makeTopText')) === '🔒 Semantic은 유료예요 · ' && (await visible(p, '#makeSemLic')) && !(await visible(p, '#makeInfo')) && !(await visible(p, '#makeAllOn')));
+  await p.click('#makeTab-global');
+  await p.click('#makeAllOff');
+  await p.waitForTimeout(30);
+  check('17 무료 — Global 모두 끄면 [변수 만들기] 잠금(사유 "만들 값을 켜 주세요")', (await lockMsg(p, '#btnMakeRun')) === '만들 값을 켜 주세요');
+  await p.click('#makeAllOn');
+  await p.waitForTimeout(300);
+  const pv2 = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv2.reqId, preview: true, created: 2, updated: 0, summary: '', roles: 1, skippedManual: 0, tokenStates: {}, roleRows: [] });
+  await p.waitForTimeout(30);
+  await p.click('#makeOptLink'); // 바로 연결 끔
+  await p.click('#makeOptRename'); // 이름 정리 켬
   await p.click('#btnMakeRun');
   await p.waitForTimeout(30);
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  check('17 무료 실행 — 만들기(Global만 · globalOnly) 먼저', !!cr && cr.globalOnly === true && cr.tokens.length === 2 && typeof cr.reqId === 'number', JSON.stringify(cr));
+  await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 2, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(60);
   const rn = (await sent(p, 'RENAME')).at(-1);
-  check('17 무료 실행 — 만들기 없이 이름 정리만(기준 nodeIds · reqId)', (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).length === 0 && rn?.apply === true && rn.nodeIds?.[0] === 'w3' && typeof rn.reqId === 'number');
+  check('17 무료 실행 — 이어 이름 정리(기준 nodeIds · reqId) · 다크 없음', rn?.apply === true && rn.nodeIds?.[0] === 'w3' && typeof rn.reqId === 'number' && (await sent(p, 'GENERATE_DARK_MODE')).length === 0);
   await recv(p, { type: 'RENAME_RESULT', reqId: rn.reqId, changes: [{ id: 'a', before: 'Frame', after: 'card' }], nodes: [], applied: true });
   await p.waitForTimeout(100);
-  check('17 무료 다 됨 — "이름 1개 정리 · 변수는 만들지 않았어요 · 연결은 아직 안 했어요" + [연결하기 →]', (await p.textContent('#statusText')) === '이름 1개 정리 · 변수는 만들지 않았어요 · 연결은 아직 안 했어요' && (await p.textContent('#statusAction')) === '연결하기 →', await p.textContent('#statusText'));
+  check('17 무료 다 됨 — "Global 2개 · 이름 1개 정리 · 연결은 아직 안 했어요" + [연결하기 →](무료 꼬리 없음)', (await p.textContent('#statusText')) === 'Global 2개 · 이름 1개 정리 · 연결은 아직 안 했어요' && (await p.textContent('#statusAction')) === '연결하기 →', await p.textContent('#statusText'));
   await p.close();
 }
 
@@ -1444,7 +1489,7 @@ async function saveAndGet(p) {
   await p.close();
 }
 {
-  // (c) 상태 6 — 로컬 변수 0개: 카드에 버튼 없음 · 텍스트 스타일 후보가 있으면 [{t}곳 연결]만(주 버튼)
+  // (c) 상태 6 — 로컬 변수 0개: 만들기 카드(무료 규칙 F3). 텍스트 스타일 후보가 있으면 맨 아래 [{t}곳 연결] — 만들기 버튼이 있으면 보조, 없으면 주 버튼
   const p = await open(480, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -1453,15 +1498,13 @@ async function saveAndGet(p) {
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
   await p.waitForTimeout(60);
   const first = '#selCards .sel-card >> nth=0';
-  check('20 (c) 상태 6 카드 — "이 파일엔 아직 변수가 없어요" · 카드 안 버튼 없음', (await p.textContent(first)).includes('이 파일엔 아직 변수가 없어요') && (await p.locator(first).locator('button').count()) === 0, await p.textContent(first));
+  check('20 (c) 상태 6 카드 — 읽는 중엔 제목 + "선택을 읽는 중…"만(버튼 없음)', (await p.textContent(first)).includes('이 파일엔 아직 변수가 없어요') && (await p.textContent(first)).includes('선택을 읽는 중') && (await p.locator(first).locator('button').count()) === 0, await p.textContent(first));
   const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
-  if (pt) {
-    const ap6 = (await sent(p, 'APPLY')).at(-1);
-    if (ap6) await recv(p, { ...preview(ap6.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2 } } });
-    await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
-    await p.waitForTimeout(60);
-    check('20 (c) 텍스트 스타일 후보 → [2곳 연결]만 · 주 버튼', JSON.stringify(await p.locator(first).locator('button').allTextContents()) === JSON.stringify(['2곳 연결']) && (await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))));
-  }
+  const ap6 = (await sent(p, 'APPLY')).at(-1);
+  if (ap6) await recv(p, { ...preview(ap6.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2 } } });
+  await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
+  await cardAnswer(p, [{ name: 'font-size/16', category: 'fontSize', value: 16, sources: ['fontSize'], count: 2 }]);
+  check('20 (c) 고른 토큰 0개 — "기본으로 만들 값이 없어요 · 외 1개 보기" · [2곳 연결] 주 버튼', (await p.textContent(first)).includes('기본으로 만들 값이 없어요') && (await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))), await p.textContent(first));
   await p.close();
 }
 
@@ -1495,7 +1538,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
   await p.close();
 }
 {
-  // 상태 6 — 선택 없음 · 찾기 대기는 보조 → 만들 값 있음은 주 버튼 → [{t}곳 연결]이면 보조 → 카드 3이 있어도 주 버튼 → 찾은 값 0은 보조
+  // 상태 6 — 만들기 카드(무료 규칙 F3): 할 일 [변수 만들기]는 상태 6에서 늘 보조(카드 주 버튼이 하나)
   const p = await open(480, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -1506,27 +1549,23 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
   const us = (await sent(p, 'SCAN_USAGE')).at(-1).reqId;
   await recv(p, usageResult(us, {}));
   await p.waitForTimeout(60);
-  check('21 상태 6 · 찾기 대기 → 보조', (await p.textContent('#selCards')).includes('이 파일엔 아직 변수가 없어요') && !(await makeHot(p)));
+  check('21 상태 6 · 읽는 중 → 보조', (await p.textContent('#selCards')).includes('이 파일엔 아직 변수가 없어요') && !(await makeHot(p)));
   const ap = (await sent(p, 'APPLY')).at(-1);
   const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
   await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2, color: 1 } } });
   if (pt) await recv(p, tsPrev(pt.reqId));
-  await p.waitForTimeout(80);
-  check('21 상태 6 · 만들 값 있음 → [변수 만들기] 주 버튼', (await makeHot(p)) && (await primaries(p)) === 1);
+  await cardAnswer(p);
+  check('21 상태 6 · 만들 값 있음 → [변수 만들기] 보조 · 주 버튼은 카드의 [Global {g}개 모두 만들기] 하나', !(await makeHot(p)) && (await primaries(p)) === 1 && (await p.$eval('[data-k="mkAll"]', (b) => b.classList.contains('primary'))));
   if (pt) {
     await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
     await p.waitForTimeout(80);
-    check('21 상태 6 + [{t}곳 연결] 주 버튼 → [변수 만들기] 보조 · 주 버튼 1개', !(await makeHot(p)) && (await primaries(p)) === 1);
+    check('21 상태 6 + [{t}곳 연결] → 보조(카드 주 버튼은 만들기 버튼 하나)', !(await makeHot(p)) && (await primaries(p)) === 1 && !(await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))));
     await recv(p, tsPrev(pt.reqId));
     await p.waitForTimeout(60);
   }
   await recv(p, usageResult(us, {}, { deleted: { count: 3, nodeIds: ['x'] } }));
   await p.waitForTimeout(80);
-  check('21 상태 6 + 카드 3(삭제된 변수) → [변수 만들기] 주 버튼 · 카드 3 버튼은 보조', (await makeHot(p)) && (await p.$$eval('#selCards .sel-card', (e) => e.length)) >= 2 && (await primaries(p)) === 1);
-  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: {} });
-  if (pt) await recv(p, tsPrev(pt.reqId));
-  await p.waitForTimeout(80);
-  check('21 상태 6 · 찾은 값 0 → 보조', !(await makeHot(p)));
+  check('21 상태 6 + 카드 3(삭제된 변수) → [변수 만들기] 보조 · 카드 3 버튼은 보조', !(await makeHot(p)) && (await p.$$eval('#selCards .sel-card', (e) => e.length)) >= 2 && (await primaries(p)) === 1);
   await p.close();
 }
 {
@@ -1861,6 +1900,263 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   check('23 베리언트 결과 머리 띠 — "빈 변형" · "3개" · "처리 중 문제" · "1개"(콜론 없음) · mono 아님 · 항목 굵기 400',
     vr.length === 2 && vr[0].name === '빈 변형' && vr[0].cnt === '3개' && vr[1].name === '처리 중 문제' && vr[1].cnt === '1개' && vr.every((g) => !/monospace|Menlo/.test(g.ff)) && vw === '400', JSON.stringify({ vr, vw }));
   check('23 제목 줄에 결과 개수 없음', (await p.$eval('#structureCard h2', (e) => e.textContent.replace(/\s+/g, ''))) === '컴포넌트베타');
+  await p.close();
+}
+
+/* ---------- 24 무료 규칙 · 첫 화면 만들기 카드(ia-v4 B.18 — §4.1 "만들기 카드" · §4.3a · §4.9 · F1–F10) ---------- */
+/** 로컬 변수 0개 파일 · 선택 1개 → 찾기 · 쓰는 변수 응답까지. 만들기 카드의 추출은 응답하지 않은 채 돌려준다. */
+async function openZero(tier = 'free', { table = { collections: [], vars: [] }, prereq = { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 } } = {}) {
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier, unlimited: tier === 'paid', source: 'dev' });
+  await recv(p, prereq);
+  await recv(p, { type: 'VAR_TABLE', ...table });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['f1'], firstName: 'Flightin website' });
+  await p.waitForTimeout(450);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  if (ap) await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2, color: 2 } } });
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(40);
+  return p;
+}
+const cardRows = (p) => p.$$eval('#selCards .mk-row', (e) => e.map((r) => r.innerText.replace(/\s+/g, ' ').trim()));
+const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replace(/\s+/g, ' ').trim());
+{
+  // 무료 처음 모습(시안 ①) — 카드 읽기는 찾기와 함께 · 추출 · 미리보기는 조용한 읽기(OPS 밖) · 미리보기는 globalOnly 없이
+  const p = await openZero('free');
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  check('24 상태 6 — 찾기와 함께 추출 EXTRACT{reqId, nodeIds(기준)}', !!ex && typeof ex.reqId === 'number' && ex.nodeIds?.[0] === 'f1', JSON.stringify(ex));
+  check('24 기억이 없는 카드 — 결과 전엔 제목 + "선택을 읽는 중…"만', (await cardText(p)) === '이 파일엔 아직 변수가 없어요 선택을 읽는 중…', await cardText(p));
+  check('24 추출은 진행 테두리 대상이 아님(OPS 밖)', !(await p.$eval('#btnExpand', (b) => b.classList.contains('busy'))));
+  const pv = await cardAnswer(p);
+  check('24 미리보기 — 기본으로 켜지는 토큰(글자 종류 제외) · 이름 정리 뒤 · globalOnly 없음', !!pv && pv.preview === true && pv.globalOnly === undefined && pv.tokens.length === 5 && !pv.tokens.some((tk) => tk.category === 'fontSize') && !pv.tokens.some((tk) => tk.name === 'color/101828'), JSON.stringify(pv?.tokens?.map((tk) => tk.name)));
+  const rows = await cardRows(p);
+  check('24 무료 처음 — 제목 · 둘째 줄 · 라벨 · 값 줄 4개(Layer 많은 순) · 줄마다 [＋ 만들기]', (await cardText(p)).startsWith('이 파일엔 아직 변수가 없어요 찾은 값으로 Global 변수를 만들어요 · 개수 제한은 없어요 Flightin website에서 많이 쓴 값') && rows.length === 4 && rows[0].startsWith('#101828') && rows[0].includes('Layer 31') && rows.every((r) => r.endsWith('＋ 만들기')) && !rows.some((r) => r.includes('color/101828')), JSON.stringify(rows));
+  check('24 무료 처음 — [외 1개 보기] · 주 버튼 [Global 5개 모두 만들기] · 🔒 줄 "🔒 Semantic 4개 · 텍스트 스타일 · 다크 모드 · 라이선스 →"', (await p.textContent('[data-k="mkMore"]')) === '외 1개 보기' && (await p.textContent('[data-k="mkAll"]')) === 'Global 5개 모두 만들기' && (await p.$eval('[data-k="mkAll"]', (b) => b.classList.contains('primary'))) && (await p.$eval('.mk-lock', (e) => e.innerText.replace(/\s+/g, ' ').trim())) === '🔒 Semantic 4개 · 텍스트 스타일 · 다크 모드 · 라이선스 →', await p.$eval('.mk-lock', (e) => e.innerText));
+  check('24 할 일 [변수 만들기]는 상태 6에서 보조', !(await p.$eval('#btnGoMake', (b) => b.classList.contains('primary'))));
+  const rowStyle = await p.$eval('.mk-row', (e) => { const s = getComputedStyle(e); return { b: s.borderTopWidth + s.borderLeftWidth + s.borderRightWidth, r: s.borderTopLeftRadius, bg: s.backgroundColor, bb: s.borderBottomWidth }; });
+  check('24 카드 안 카드 없음 — 값 줄은 아래 구분선만(테두리 · 둥근 모서리 · 행 배경 0)', rowStyle.b === '0px0px0px' && rowStyle.r === '0px' && (rowStyle.bg === 'rgba(0, 0, 0, 0)' || rowStyle.bg === 'transparent') && rowStyle.bb === '1px', JSON.stringify(rowStyle));
+  const bad = await nestedCards(p);
+  check('24 카드 안 카드 0 — 만들기 카드', bad.length === 0, bad.join(' · '));
+  // [＋ 만들기] — 그 토큰 하나 · globalOnly · OPS write(작업 이름 "변수 만들기")
+  await p.click('[data-k="mk:color/blue/950"], .mk-row >> nth=0 >> button');
+  await p.waitForTimeout(20);
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  check('24 [＋ 만들기] → CREATE_TOKENS{preview 아님 · 토큰 하나 · globalOnly · reqId}', !!cr && cr.tokens.length === 1 && cr.globalOnly === true && typeof cr.reqId === 'number', JSON.stringify(cr));
+  check('24 만드는 동안 카드 버튼 쓰기 잠금(사유 "변수 만들기")', (await locked(p, '[data-k="mkAll"]')) && (await p.getAttribute('[data-k="mkAll"]', 'data-lock-msg')).includes('변수 만들기'));
+  const exBefore = (await sent(p, 'EXTRACT')).length;
+  const semBefore = (await sent(p, 'CREATE_SEMANTICS')).length;
+  await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 1, updated: 0, summary: 'x', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(40);
+  check('24 만든 직후 — 공통 상태 줄 "Global 변수 1개를 만들었어요 · ⌘Z로 되돌리기"', (await p.textContent('#statusText')) === 'Global 변수 1개를 만들었어요 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
+  check('24 카드 응답은 메인 처리기를 타지 않음(#createStatus · CREATE_SEMANTICS 없음)', (await sent(p, 'CREATE_SEMANTICS')).length === semBefore && !(await p.textContent('#createStatus')).includes('x'));
+  check('24 만든 뒤 다시 읽기(작업 직후) — 찾기 · 추출', (await sent(p, 'EXTRACT')).length === exBefore + 1);
+  check('24 일부만 만듦(남긴 카드) — 제목 "Global 변수 1개를 만들었어요" · 만든 줄 ✓ 만듦 · 나머지는 처음 모습', (await p.textContent('#selCards .sel-card .t')) === 'Global 변수 1개를 만들었어요' && (await cardRows(p))[0].endsWith('✓ 만듦') && (await cardRows(p))[1].endsWith('＋ 만들기') && (await p.textContent('[data-k="mkAll"]')) === 'Global 4개 모두 만들기', JSON.stringify(await cardRows(p)));
+  check('24 다시 읽는 동안 — 예전 줄 · 숫자 그대로, 버튼만 잠금(사유 "선택을 읽는 중…")', (await locked(p, '[data-k="mkAll"]')) && (await p.getAttribute('[data-k="mkAll"]', 'data-lock-msg')) === '선택을 읽는 중…');
+  // 다시 읽은 결과 — 로컬 변수가 생겨도(상태 7) 같은 기준이면 카드를 남긴다
+  await recv(p, { type: 'PREREQ_STATE', ...PREREQ, hasBindable: true, tierVars: 1, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS.slice(0, 1), vars: [{ id: 'nv1', name: 'color/blue/950', collectionId: 'g', type: 'COLOR', values: { m: { kind: 'color', hex: '#101828' } }, scopes: [], description: '' }] });
+  const names = pv.tokens.map((tk) => tk.name);
+  const st1 = Object.fromEntries(names.map((n, i) => [n, i === 0 ? { state: 'reuse', varName: n } : { state: 'new' }]));
+  await cardAnswer(p, MC_TOKENS, st1);
+  check('24 남긴 카드 — 상태 7이어도 카드 1 자리가 만들기 카드', (await p.textContent('#selCards .sel-card .t')) === 'Global 변수 1개를 만들었어요' && !(await locked(p, '[data-k="mkAll"]')), await p.textContent('#selCards .sel-card .t'));
+  // [Global {g}개 모두 만들기] — new 토큰만
+  await p.click('[data-k="mkAll"]');
+  const cr2 = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  check('24 [Global 4개 모두 만들기] → new 토큰 4개만 · globalOnly', cr2.tokens.length === 4 && cr2.globalOnly === true && !cr2.tokens.some((tk) => tk.name === names[0]), JSON.stringify(cr2.tokens.map((tk) => tk.name)));
+  await recv(p, { type: 'CREATE_RESULT', reqId: cr2.reqId, created: 4, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(40);
+  check('24 만든 직후 모두 만듦 — 제목 · 둘째 줄 연결 안내 · 🔒 Semantic 4개 · [{o}곳 연결 →]은 아직 없음', (await p.textContent('#selCards .sel-card .t')) === 'Global 변수 5개를 만들었어요' && (await cardText(p)).includes('같은 값을 쓰는 레이어에 연결해요 · Semantic 변수는 유료예요') && (await p.$eval('.mk-lock', (e) => e.innerText.replace(/\s+/g, ' ').trim())) === '🔒 Semantic 4개 · 라이선스 →' && (await p.$('[data-k="mkLink"]')) === null && (await p.$('[data-k="mkAll"]')) === null, await cardText(p));
+  // 다시 읽은 찾기 결과가 오면 [{o}곳 연결 →]가 생긴다
+  const ap2 = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, { ...preview(ap2.reqId) });
+  await recv(p, tsPrev(ap2.reqId));
+  await cardAnswer(p, MC_TOKENS, Object.fromEntries(names.map((n) => [n, { state: 'reuse', varName: n }])));
+  check('24 만든 뒤(다시 읽은 뒤) — 줄 모두 ✓ 만듦 · 주 버튼 [2곳 연결 →]', (await cardRows(p)).every((r) => r.endsWith('✓ 만듦')) && (await p.textContent('[data-k="mkLink"]')) === '2곳 연결 →' && (await p.$eval('[data-k="mkLink"]', (b) => b.classList.contains('primary'))), JSON.stringify(await cardRows(p)));
+  await p.click('[data-k="mkLink"]');
+  check('24 [{o}곳 연결 →] → 연결 화면', await visible(p, '#subHead'));
+  await p.close();
+}
+{
+  // 만들기 실패 · 추출 실패(카드 자리만 찾기 실패 모습 — F-D3)
+  const p = await openZero('free');
+  await cardAnswer(p, MC_TOKENS, null, 0);
+  check('24 r = 0 — 🔒 줄 "🔒 텍스트 스타일 · 다크 모드 · 라이선스 →"', (await p.$eval('.mk-lock', (e) => e.innerText.replace(/\s+/g, ' ').trim())) === '🔒 텍스트 스타일 · 다크 모드 · 라이선스 →');
+  await p.click('[data-k="mkAll"]');
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'CREATE_TOKENS', reqId: cr.reqId });
+  await p.waitForTimeout(30);
+  check('24 만들기 실패 — 공통 상태 줄 "변수 만들기 실패 · [보기]" · 줄 · 숫자는 그대로', (await p.textContent('#statusText')) === '변수 만들기 실패' && (await p.textContent('#statusAction')) === '보기' && (await p.textContent('#selCards .sel-card .t')) === '이 파일엔 아직 변수가 없어요' && (await p.textContent('[data-k="mkAll"]')) === 'Global 5개 모두 만들기', await p.textContent('#statusText'));
+  check('24 만들기 실패를 #createStatus로 보내지 않음', !(await p.textContent('#createStatus')).includes('boom'));
+  // 추출 실패 — 카드 자리만 "선택을 읽지 못했어요 · [다시 읽기]"
+  await p.click('#tabbtn-variables');
+  await p.click('#tabbtn-select');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'ERROR', message: 'x', op: 'EXTRACT', reqId: ex.reqId });
+  await p.waitForTimeout(30);
+  check('24 추출 실패 — 카드 자리 "선택을 읽지 못했어요" + [다시 읽기]', (await cardText(p)) === '선택을 읽지 못했어요 다시 읽기', await cardText(p));
+  const apN = (await sent(p, 'APPLY')).length;
+  await p.click('[data-k="mkReread"]');
+  await p.waitForTimeout(20);
+  check('24 [다시 읽기] — 찾기 결과가 지금 기준이면 추출만(찾기 다시 안 보냄) · 읽는 중 카드', (await sent(p, 'APPLY')).length === apN && (await cardText(p)).includes('선택을 읽는 중…'), String((await sent(p, 'APPLY')).length - apN));
+  await cardAnswer(p);
+  check('24 다시 읽기 성공 → 만들기 카드로 돌아옴', (await cardRows(p)).length === 4);
+  await p.close();
+}
+{
+  // 유료 · 추출 0개
+  const p = await openZero('paid');
+  await cardAnswer(p);
+  check('24 유료 — 둘째 줄 · 줄에 버튼 없음 · [외 1개 보기] · 주 버튼 [Global 5 · Semantic 4 만들기 →] · 🔒 줄 없음', (await cardText(p)).includes('찾은 값으로 Global · Semantic 변수를 만들고 연결해요') && (await p.$$('.mk-row button')).length === 0 && (await p.textContent('[data-k="mkGo"]')) === 'Global 5 · Semantic 4 만들기 →' && (await p.$('.mk-lock')) === null, await cardText(p));
+  await p.click('[data-k="mkGo"]');
+  check('24 유료 주 버튼 → 만들기 화면(이동만 · 만들지 않음)', (await visible(p, '#subHead')) && (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).length === 0);
+  await p.close();
+  const p2 = await openZero('paid');
+  await cardAnswer(p2, MC_TOKENS, null, 0);
+  check('24 유료 r = 0 — [Global 5개 만들기 →]', (await p2.textContent('[data-k="mkGo"]')) === 'Global 5개 만들기 →');
+  await p2.close();
+  const p3 = await openZero('free');
+  await cardAnswer(p3, []);
+  check('24 추출 0개 — 제목 + "이 선택에서 찾은 값이 없어요"만', (await cardText(p3)) === '이 파일엔 아직 변수가 없어요 이 선택에서 찾은 값이 없어요', await cardText(p3));
+  await p3.close();
+}
+{
+  // 무료 새 변수 · 복제(F2 · F9 · F10)
+  const RATIO = { id: 'u', name: 'Tokens', tier: 2, modes: [{ modeId: 'um', name: 'Mode 1' }], defaultModeId: 'um', tierWhy: { kind: 'ratio', alias: 4, counted: 4 } };
+  const UVARS = [{ id: 'u1', name: 'color/brand', collectionId: 'u', type: 'COLOR', values: { um: { kind: 'alias', aliasId: 'g9', aliasName: 'color/gray/900' } }, scopes: [], description: '' }];
+  const varsPage = async (collections, vars) => {
+    const p = await open(480, 'variables');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+    await recv(p, PREREQ);
+    await recv(p, { type: 'VAR_TABLE', collections, vars });
+    await p.waitForTimeout(450);
+    const u = (await sent(p, 'SCAN_USAGE')).at(-1);
+    if (u) await recv(p, usageResult(u.reqId, {}));
+    await p.waitForTimeout(40);
+    return p;
+  };
+  const openNew = async (p) => { await p.click('#btnAddVar'); await p.click('.ctx-menu button >> text=새 변수'); await p.waitForTimeout(30); };
+  const p = await varsPage(COLS, VARS);
+  await openNew(p);
+  check('24 새 변수 — 사이드바에서 고른 적 없음 → 플러그인 Semantic이 아닌 첫 컬렉션(G Global) · 잠금 없음', (await p.textContent('.modal dd.ed-plain')) === 'G Global' && !(await locked(p, '.modal .m-foot button.primary, .modal button >> text=만들기')), await p.textContent('.modal dd.ed-plain'));
+  await p.keyboard.press('Escape');
+  await p.click('#varSide [data-key="side:col:s"]');
+  await openNew(p);
+  const saveSel = '.modal button:has-text("만들기")';
+  check('24 Semantic을 직접 고른 뒤 — 팝업 안 알림 줄 "Semantic 변수는 유료예요 · 라이선스 →" · [만들기 🔒] 유료 잠금 · 포커스 이름 칸', (await p.textContent('.modal .ed-alert.paid')).replace(/\s+/g, ' ').trim() === 'Semantic 변수는 유료예요 · 라이선스 →' && (await p.textContent(saveSel)) === '만들기 🔒' && (await locked(p, saveSel)) && (await p.evaluate(() => document.activeElement?.getAttribute('aria-label'))) === '이름(전체 경로)', await p.textContent('.modal .ed-alert.paid'));
+  await p.fill('.modal .ed-field input >> nth=0', 'color/x');
+  check('24 칸을 고쳐도 사유 줄은 그대로', await visible(p, '.modal .ed-alert.paid'));
+  await p.click(saveSel, { force: true });
+  check('24 잠긴 [만들기]를 눌러도 CREATE_VARIABLE 없음 · 공통 상태 줄에 띄우지 않음 · 사유 줄 하나', (await sent(p, 'CREATE_VARIABLE')).length === 0 && !(await p.textContent('#statusText')).includes('유료') && (await p.$$('.modal .ed-alert.paid')).length === 1);
+  await p.click('.modal .ed-alert.paid button');
+  await p.waitForTimeout(30);
+  check('24 팝업의 [라이선스 →] → 팝업 닫고 설정 › 키 입력 칸', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.id)) === 'licenseKey');
+  // 복제 — 원본이 플러그인 Semantic이면 늘 잠금
+  await p.click('#tabbtn-variables');
+  await p.waitForTimeout(30);
+  await rightClick(p, '.vt-row[data-id="tx"]');
+  const dupItem = await p.$eval('.ctx-menu', (m) => { const b = [...m.querySelectorAll('button')].find((x) => x.childNodes[0].textContent === '복제'); return { dis: b.getAttribute('aria-disabled') === 'true' || b.disabled, txt: b.textContent }; });
+  check('24 우클릭 › 복제(플러그인 Semantic 변수) — 잠금 + 사유 "Semantic 변수는 유료예요"', dupItem.dis && dupItem.txt.includes('Semantic 변수는 유료예요'), JSON.stringify(dupItem));
+  await p.keyboard.press('Escape');
+  // 플러그인이 거절(ERROR code 'paid') — 새 변수는 팝업 안 사유 줄
+  await p.click('#varSide [data-key="side:col:g"]');
+  await openNew(p);
+  await p.fill('.modal .ed-field input >> nth=0', 'spacing/20');
+  await p.fill('.modal .ed-field input >> nth=1', '20');
+  await p.click(saveSel);
+  const cv = (await sent(p, 'CREATE_VARIABLE')).at(-1);
+  await recv(p, { type: 'ERROR', message: 'semantic collection is paid', op: 'CREATE_VARIABLE', reqId: cv.reqId, code: 'paid' });
+  await p.waitForTimeout(20);
+  check('24 플러그인 ERROR{code: paid} → 팝업 안 사유 줄 + [만들기 🔒]', (await visible(p, '.modal .ed-alert.paid')) && (await p.textContent(saveSel)) === '만들기 🔒');
+  await p.keyboard.press('Escape');
+  await p.close();
+  // Semantic만 있는 파일 → 새 Variables
+  const p2 = await varsPage([COLS[1]], VARS.filter((v) => v.collectionId === 's'));
+  await openNew(p2);
+  check('24 Semantic만 있는 파일 → "Variables (새로 만듦)" · 잠금 없음 · 값 칸 "Mode 1"', (await p2.textContent('.modal dd.ed-plain')) === 'Variables (새로 만듦)' && !(await p2.$('.modal .ed-alert.paid:not([hidden])')) && (await p2.textContent('.modal')).includes('Mode 1'), await p2.textContent('.modal dd.ed-plain'));
+  await p2.fill('.modal .ed-field input >> nth=0', 'spacing/4');
+  await p2.fill('.modal .ed-field input >> nth=1', '4');
+  await p2.click(saveSel);
+  const cv2 = (await sent(p2, 'CREATE_VARIABLE')).at(-1);
+  check('24 새 Variables — collectionId 없이 · 기본 모드 값(*)', !!cv2 && cv2.collectionId === undefined && cv2.values['*']?.value === 4, JSON.stringify(cv2));
+  await p2.close();
+  // 별칭 비율로 Semantic인 사용자 컬렉션 — 잠그지 않고 ②에서 건너뛰지 않는다(F10)
+  const p3 = await varsPage([COLS[1], RATIO, COLS[0]], [...VARS, ...UVARS]);
+  await openNew(p3);
+  check('24 별칭 비율 Semantic 사용자 컬렉션 — 기본 컬렉션 ②에서 건너뛰지 않음 · 잠금 없음', (await p3.textContent('.modal dd.ed-plain')).endsWith('Tokens') && !(await p3.$('.modal .ed-alert.paid:not([hidden])')), await p3.textContent('.modal dd.ed-plain'));
+  await p3.keyboard.press('Escape');
+  await p3.click('#varSide [data-key="side:col:u"]');
+  await rightClick(p3, '.vt-row[data-id="u1"]');
+  const dup3 = await p3.$eval('.ctx-menu', (m) => { const b = [...m.querySelectorAll('button')].find((x) => x.childNodes[0].textContent === '복제'); return b.getAttribute('aria-disabled') === 'true' || b.disabled; });
+  check('24 별칭 비율 Semantic 사용자 컬렉션의 복제는 잠그지 않음', !dup3);
+  await p3.keyboard.press('Escape');
+  // F7 — 이미 있는 Semantic 변수 고치기 · 삭제는 무료
+  await p3.click('#varSide [data-key="side:col:s"]');
+  await p3.focus('.vt-row[data-id="tx"]');
+  await p3.keyboard.press('Enter');
+  await p3.fill('.modal .ed-field input >> nth=0', 'color/text/strong');
+  await p3.click('.modal button:has-text("저장")');
+  check('24 무료 — 플러그인 Semantic 변수 고치기(UPDATE_VARIABLE)는 된다(F7)', (await sent(p3, 'UPDATE_VARIABLE')).length === 1);
+  await p3.evaluate(() => document.querySelector('.modal-backdrop')?.remove());
+  await p3.close();
+  const p4 = await varsPage(COLS, VARS);
+  await rightClick(p4, '.vt-row[data-id="tx"]');
+  await p4.click('.ctx-menu button >> text=삭제');
+  await p4.click('.modal button.danger');
+  check('24 무료 — 플러그인 Semantic 변수 삭제(DELETE_VARIABLE)는 된다(F7)', (await sent(p4, 'DELETE_VARIABLE')).at(-1)?.id === 'tx');
+  await p4.close();
+}
+{
+  // 무료 값을 직접 고르기 › 색 · 토큰(F8) — Global만 · Semantic 0 · CREATE_SEMANTICS 없음
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['k1'] });
+  await goSub(p, 'pick');
+  await p.waitForTimeout(40);
+  check('24 무료 색 — 색이 없으면 [색 변수 만들기]는 빈 상태 잠금(유료 잠금 아님) · [선택에서 추출] 주 버튼', (await p.getAttribute('#btnColorVars', 'data-lock')) === 'prereq' && (await p.$eval('#btnExtract', (b) => b.classList.contains('primary'))) && (await p.textContent('#colorVarsLock')) === '' && (await p.textContent('#paletteLock')) === '');
+  await p.click('#btnExtract');
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', warnings: [], selection: 1, tokens: [{ name: 'color/101828', category: 'color', value: '#101828', sources: ['fills'], count: 3 }, { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2 }], ...(ex?.reqId ? { reqId: ex.reqId } : {}) });
+  await p.waitForTimeout(60);
+  check('24 무료 색 — [색 변수 만들기] 열림 · 주 버튼 · 🔒 없음 · [팔레트 생성 🔒] 그대로', !(await locked(p, '#btnColorVars')) && (await p.$eval('#btnColorVars', (b) => b.classList.contains('primary'))) && (await p.textContent('#paletteBtnLock')) === '🔒');
+  const rl = await p.$eval('#colorTable select.r-role', (s) => ({ dis: s.getAttribute('aria-disabled'), tip: s.title, lk: s.previousElementSibling?.textContent }));
+  check('24 무료 색 — 줄의 Semantic 고르개 유료 잠금(왼쪽 🔒 · 사유 "Semantic 변수는 유료예요")', rl.dis === 'true' && rl.tip === 'Semantic 변수는 유료예요' && rl.lk === '🔒', JSON.stringify(rl));
+  await p.click('#colorTable select.r-role', { force: true });
+  check('24 잠긴 Semantic 고르개를 누르면 상태 줄 "Semantic 변수는 유료예요 · 라이선스 →"', (await p.textContent('#statusText')) === 'Semantic 변수는 유료예요' && (await p.textContent('#statusAction')) === '라이선스 →');
+  await p.click('#btnColorVars');
+  const cr = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  check('24 무료 [색 변수 만들기] → CREATE_TOKENS{globalOnly}', cr?.globalOnly === true && !cr.preview, JSON.stringify(cr));
+  await recv(p, { type: 'CREATE_RESULT', created: 1, updated: 0, summary: 'Global 1개', roles: 0 });
+  await p.waitForTimeout(40);
+  check('24 무료 — 만든 뒤 CREATE_SEMANTICS를 보내지 않음', (await sent(p, 'CREATE_SEMANTICS')).length === 0);
+  await p.evaluate(() => document.querySelectorAll('.steps > *')[1]?.click());
+  await p.waitForTimeout(30);
+  check('24 무료 토큰 — [미리보기] 열림 · 🔒 없음', !(await locked(p, '#btnCreate')) && !(await p.$eval('#btnCreate', (b) => b.disabled)) && (await p.textContent('#createLock')) === '');
+  await p.click('#btnCreate');
+  const tp = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  check('24 무료 토큰 [미리보기] → CREATE_TOKENS{preview · globalOnly}', tp?.preview === true && tp.globalOnly === true, JSON.stringify(tp));
+  await p.close();
+}
+{
+  // 무료 연결 — N 배지 · newRoles 꼬리 없음(플러그인이 새 Semantic 후보를 보내지 않는다 — test/figma.test.mjs) · 준비 현황 › Semantic 매핑
+  const p = await open(480, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.waitForTimeout(300);
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button >> nth=0');
+  await p.waitForTimeout(30);
+  const semRow = await p.$('[data-step="semantics"], .pstep[data-id="semantics"]');
+  if (semRow) {
+    await semRow.click();
+    await p.waitForTimeout(30);
+    check('24 무료 준비 현황 › Semantic 매핑 → 상태 줄 "Semantic 매핑은 유료예요 · 라이선스 →" · 포커스 [미리보기]', (await p.textContent('#statusText')) === 'Semantic 매핑은 유료예요' && (await p.textContent('#statusAction')) === '라이선스 →' && (await p.evaluate(() => document.activeElement?.id)) === 'btnCreate', await p.textContent('#statusText'));
+  } else check('24 준비 현황 Semantic 매핑 줄 찾기', false, await p.$eval('body', (b) => b.innerHTML.slice(0, 200)));
   await p.close();
 }
 
