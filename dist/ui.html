@@ -215,6 +215,25 @@
     .sel-card.warn { background: var(--danger-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--danger); }
     .sel-card .acts { display: flex; gap: 6px; flex: 0 0 auto; }
+    /* 만들기 카드(IA v4 §4.1 상태 6) — 카드 하나, 값 줄은 아래 구분선 한 줄만(카드 안 카드 없음 — §2.8) */
+    .sel-card.mk { display: block; }
+    .mk .s { line-height: 1.45; }
+    .mk-lab { font-size: 11px; color: var(--text-2); margin: 10px 0 2px; }
+    .mk-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .mk-row .sw { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); flex: 0 0 auto; }
+    .mk-row .sw.n { border-radius: 3px; background: var(--surface-2); box-shadow: none; font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+    .mk-row .v { font-family: var(--mono); font-size: 11.5px; width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mk-row .nm { flex: 1 1 auto; min-width: 0; color: var(--text-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mk-row .c { color: var(--text-2); font-size: 11px; flex: 0 0 auto; text-align: right; min-width: 52px; }
+    .mk-row .st { width: 72px; flex: 0 0 auto; text-align: center; font-size: 11px; }
+    .mk-row .st.ok { color: var(--ok); }
+    .mk-row button { height: 24px; min-height: 24px; padding: 0 8px; font-size: 11px; width: 72px; flex: 0 0 auto; }
+    .mk-foot { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; color: var(--text-2); }
+    .mk-foot .grow { flex: 1 1 auto; }
+    .mk-lock { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; margin-top: 6px; font-size: 11px; color: var(--text-2); }
+    .mk-lock button.link-btn, .mk .s button.link-btn { font-size: 11px; min-height: 20px; }
+    .mk-ts { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text-2); }
+    .mk-ts .grow { flex: 1 1 auto; }
     .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: 6px; min-height: 48px; border-top: 1px solid var(--border); background: var(--bg, #fff); color: var(--text-2); margin-top: 8px; }
     .sub-head { display: flex; align-items: center; gap: 8px; min-height: 40px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
     .sub-head[hidden] { display: none; }
@@ -571,6 +590,11 @@
     .ed-pnone { padding: 8px; color: var(--text-2); font-size: 11px; }
     .ed-alert { padding: 5px 8px; border-radius: 5px; font-size: 11px; background: var(--surface-2); color: var(--text-2); }
     .ed-alert.err { background: var(--danger-subtle); color: var(--danger); }
+    .r-lkw { display: inline-flex; align-items: center; flex: 0 0 auto; }
+    .r-lk { font-size: 11px; margin-right: 4px; flex: 0 0 auto; }
+    .r-role.lk { color: var(--muted); opacity: .7; }
+    .ed-alert.paid { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
+    .ed-alert.paid button.link-btn { min-height: 18px; font-size: 11px; }
     .ed-confirm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; }
     .ed-confirm span { flex: 1 1 auto; }
     .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
@@ -694,8 +718,9 @@
     button.bv-switch[aria-checked="mixed"] .bv-track { background: var(--accent); }
     button.bv-switch[aria-checked="mixed"] .bv-track::after { left: 8px; width: 12px; height: 4px; top: 6px; border-radius: 2px; }
     button.bv-switch[aria-disabled="true"] { opacity: .45; cursor: default; }
-    .make-free { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; font-size: 11px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
-    .make-free .grow { flex: 1 1 auto; }
+    .make-free { margin: 2px 0 6px; font-size: 11px; line-height: 1.5; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
+    .make-free .mfb2 { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
+    .make-free .mfb2 button.link-btn, .mk-bar #makeSemLic { min-height: 18px; font-size: 11px; }
     .make-more { padding: 10px 2px 2px; font-size: 11px; color: var(--text-2); }
     .mk-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--border); padding: 0 2px; margin: 0 0 2px; }
     .mk-tabs button { height: 36px; min-height: 36px; padding: 0; border: none; border-radius: 0; background: none; font-size: 12.5px; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 5px; }
@@ -749,16 +774,6 @@
     /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
     .list-head { margin: 0 0 6px; }
     .list-head .lh-row { display: flex; align-items: center; gap: 4px; }
-    /* 쓰는 변수 필터 줄 — 옅은 배경 띠 + 아래 구분선(카드 모양 아님, CLAUDE.md) */
-    .uses-bar { display: flex; align-items: center; gap: 6px; height: 28px; margin-top: 6px; padding: 0 4px 0 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; min-width: 0; }
-    .uses-bar[hidden] { display: none; }
-    .uses-bar .ub-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .uses-bar .ub-diff { color: var(--warn); white-space: nowrap; flex: 0 0 auto; }
-    .uses-bar .ub-rebase { flex: 0 0 auto; white-space: nowrap; }
-    .uses-bar .grow { flex: 1 1 auto; }
-    /* 필터 중 줄: 이름 · 값 140 · "{n}곳" */
-    .vt-row.vt-row.uses { grid-template-columns: minmax(0, 1fr) 140px 38px; }
-    .vt-row .vr-n { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
     .chip-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; min-width: 0; }
     .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
     .chip-row::-webkit-scrollbar { display: none; }
@@ -961,14 +976,6 @@
       <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
      </div>
-     <!-- 쓰는 변수 필터 줄(IA v4 §4.6) — 선택 탭 카드 2 [보기 →]로 켬, 필터 중에만 보임 -->
-     <div class="uses-bar" id="usesFilterBar" hidden>
-      <span class="ub-name" id="usesFilterName"></span>
-      <span class="ub-diff" id="usesFilterDiff" hidden></span>
-      <button class="link link-btn ub-rebase" id="usesFilterRebase" type="button" hidden></button>
-      <span class="grow"></span>
-      <button class="icon-btn" id="usesFilterX" type="button">✕</button>
-     </div>
     </div>
     <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
     <div class="vl-split">
@@ -1081,14 +1088,14 @@
    <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
    <div class="step bind-v4" id="makeScreen" style="display:none">
       <div class="status warn" id="makeWarn" hidden></div>
-      <div class="make-free" id="makeFree" hidden>🔒 <span data-i18n="make.freeBox">무료는 변수를 만들지 않아요 · 아래는 유료에서 만들 변수예요</span><span class="grow"></span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div>
+      <div class="make-free" id="makeFree" hidden><div data-i18n="make.freeBox">무료: Global 변수만</div><div class="mfb2"><span aria-hidden="true">🔒</span><span data-i18n="make.freeBoxPaid">Semantic · 텍스트 스타일 · 다크 모드</span><span aria-hidden="true">·</span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div></div>
       <div class="mk-tabs" id="makeTabs" role="tablist" data-i18n-aria-label="make.tabsAria" aria-label="만들 것" hidden>
         <button type="button" role="tab" id="makeTab-global" data-mtab="global" aria-controls="makePanel" aria-selected="true">Global<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-semantic" data-mtab="semantic" aria-controls="makePanel" aria-selected="false" tabindex="-1">Semantic<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
       </div>
       <div id="makePanel">
-        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="link link-btn" id="makeSemLic" type="button" data-i18n="make.license" hidden>라이선스 →</button><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
         <div class="bind-empty" id="makeEmpty" hidden></div>
         <div class="make-tabnote" id="makeTabNote" hidden></div>
         <div id="makeTree" class="tree" role="treegrid" aria-label="Global"></div>
@@ -1569,7 +1576,6 @@
     "newVar.failed": "\uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "newVar.dupFailed": "\uBCF5\uC81C\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "newVar.newCollection": "Variables (\uC0C8\uB85C \uB9CC\uB4E6)",
-    "newVar.freeLimit": "\uBB34\uB8CC\uB85C\uB294 {n}\uAC1C\uAE4C\uC9C0 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694",
     "del.title": "{name} \uBCC0\uC218\uB97C \uC9C0\uC6B8\uAE4C\uC694?",
     "del.aliases": "\uC774 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 {m}\uAC1C\uB294 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uB97C \uAC00\uB9AC\uD0A4\uAC8C \uB3FC\uC694",
     "del.layers": "\uC5F0\uACB0\uB41C \uB808\uC774\uC5B4 \xB7 \uC2A4\uD0C0\uC77C\uC740 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uAC00 \uB3FC\uC694",
@@ -1691,14 +1697,11 @@
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
-    "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
-    "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.jumped": "{name}(\uC73C)\uB85C \uC62E\uACBC\uC5B4\uC694",
     "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
     "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
     "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
     "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
-    "list.dValue": "\uAC12",
     "list.dUses": "\uC4F0\uC778 \uACF3",
     "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
     "list.find": "\uCC3E\uAE30",
@@ -1718,7 +1721,6 @@
     "v4.reading": "\uC120\uD0DD\uC744 \uC77D\uB294 \uC911\u2026",
     "v4.libOnly": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB9CC \uC368\uC694 \xB7 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
-    "v4.kindPlaces": "{kind} {n}\uACF3",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
@@ -1757,17 +1759,9 @@
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
     "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
-    "v4.viewArrow": "\uBCF4\uAE30 \u2192",
-    "v4.usesFilter": "\uC4F0\uB294 \uBCC0\uC218 \xB7 {name}",
-    "v4.usesFilterClear": "\uD544\uD130 \uC9C0\uC6B0\uAE30",
-    "v4.usesSideAria": "{name}, {badge}, \uC4F0\uB294 \uBCC0\uC218 {num}\uAC1C",
-    "v4.libBadgeTip": "\uB2E4\uB978 \uD30C\uC77C\uC758 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218",
-    "v4.usesViewOff": "\uC4F0\uB294 \uBCC0\uC218 \uD544\uD130\uC5D0\uC11C\uB294 \uC904\uB85C\uB9CC \uBCF4\uC5EC\uC694",
-    "v4.usesNone": "\uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
     "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
     "v4.places": "{n}\uACF3",
-    "v4.detail": "\uC0C1\uC138\u2026",
     "v4.deletedN": "\uC0AD\uC81C\uB41C \uBCC0\uC218 {n}\uACF3",
     "v4.select": "\uC120\uD0DD",
     "v4.unbind": "\uC5F0\uACB0 \uD480\uAE30",
@@ -1797,13 +1791,38 @@
     "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.subRight": "\uC5D0\uC11C \uCC3E\uC740 \uAC12",
     "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
-    "make.freeBox": "\uBB34\uB8CC\uB294 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694 \xB7 \uC544\uB798\uB294 \uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uBCC0\uC218\uC608\uC694",
+    "make.freeBox": "\uBB34\uB8CC: Global \uBCC0\uC218\uB9CC",
+    "make.freeBoxPaid": "Semantic \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
+    "make.freeSemTop": "\u{1F512} Semantic\uC740 \uC720\uB8CC\uC608\uC694",
+    "make.globalN": "Global {g}\uAC1C",
+    // 무료 규칙(IA v4 §4.9 F2 · §4.3a F8)
+    "paid.semantic": "Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
+    "paid.semMap": "Semantic \uB9E4\uD551\uC740 \uC720\uB8CC\uC608\uC694",
+    // 선택 탭 만들기 카드(IA v4 §4.1 "만들기 카드" — 상태 6)
+    "mkc.subFree": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uAC1C\uC218 \uC81C\uD55C\uC740 \uC5C6\uC5B4\uC694",
+    "mkc.subPaid": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \xB7 Semantic \uBCC0\uC218\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
+    "mkc.label": "{name}\uC5D0\uC11C \uB9CE\uC774 \uC4F4 \uAC12",
+    "mkc.make": "\uFF0B \uB9CC\uB4E4\uAE30",
+    "mkc.makeAria": "{name} \uB9CC\uB4E4\uAE30",
+    "mkc.made": "\u2713 \uB9CC\uB4E6",
+    "mkc.created": "Global \uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "mkc.more": "\uC678 {k}\uAC1C \uBCF4\uAE30",
+    "mkc.makeAll": "Global {g}\uAC1C \uBAA8\uB450 \uB9CC\uB4E4\uAE30",
+    "mkc.goGR": "Global {g} \xB7 Semantic {r} \uB9CC\uB4E4\uAE30 \u2192",
+    "mkc.goG": "Global {g}\uAC1C \uB9CC\uB4E4\uAE30 \u2192",
+    "mkc.lockFull": "\u{1F512} Semantic {r}\uAC1C \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
+    "mkc.lockNoSem": "\u{1F512} \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
+    "mkc.lockAfter": "\u{1F512} Semantic {r}\uAC1C",
+    "mkc.titleMade": "Global \uBCC0\uC218 {c}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "mkc.subAfter": "\uAC19\uC740 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
+    "mkc.link": "{o}\uACF3 \uC5F0\uACB0 \u2192",
+    "mkc.noDefault": "\uAE30\uBCF8\uC73C\uB85C \uB9CC\uB4E4 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "mkc.readFailed": "\uC120\uD0DD\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "op.makeCard": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.license": "\uB77C\uC774\uC120\uC2A4 \u2192",
     "make.tabsAria": "\uB9CC\uB4E4 \uAC83",
     "make.semTop": "\uCF20 Global\uC744 \uB530\uB77C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
     "make.tsTop": "\uCF20 \uC2A4\uD0C0\uC77C\uB9CC \uB4F1\uB85D\uD574\uC694",
-    "make.freeTop": "\uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uAC12\uC774\uC5D0\uC694",
-    "make.freeSemNote": "\uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694",
     "make.semNone": "\uCF20 Global\uC774 \uC5C6\uC5B4 \uB9CC\uB4E4 Semantic\uC774 \uC5C6\uC5B4\uC694",
     "make.semZero": "\uB9CC\uB4E4 Semantic\uC774 \uC5C6\uC5B4\uC694",
     "make.more": "\uACA9\uC790 \uC815\uB9AC \xB7 \uD14C\uB9C8 \xB7 \uD0C0\uC774\uD3EC\uAE4C\uC9C0 \uACE0\uB974\uB824\uBA74",
@@ -1816,9 +1835,6 @@
     "make.run": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.runN": "\uBCC0\uC218 {g}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
-    "make.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "make.freeCount": "\uAE30\uC874 \uBCC0\uC218\uB85C \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694",
-    "make.freeNeedOpt": "\uBB34\uB8CC\uB85C\uB294 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD560 \uC218 \uC788\uC5B4\uC694",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
     "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
@@ -1859,7 +1875,6 @@
     "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
     "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
     "make.done.manual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {m}",
-    "make.done.free": "\uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "make.done.notLinked": "\uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
     "common.view": "\uBCF4\uAE30",
     "textStyle.linkNow": "\uB808\uC774\uC5B4\uC5D0 \uBC14\uB85C \uC5F0\uACB0",
@@ -3448,7 +3463,6 @@
     const ex = expand(scopes);
     return TARGET_SCOPES[target].some((s) => ex.has(s));
   }
-  var FREE_MANUAL_CREATE_LIMIT = 20;
 
   // src/lib/varTable.ts
   function groupPath(name) {
@@ -4237,7 +4251,7 @@
   var MAKE_STEP_ORDER = ["create", "dark", "textStyles", "bind", "rename"];
   function planMake(i) {
     const out = [];
-    if (i.isPaid && i.globalsOn > 0) out.push("create");
+    if (i.globalsOn > 0) out.push("create");
     if (i.isPaid && i.dark) out.push("dark");
     if (i.isPaid && i.stylesOn > 0) out.push("textStyles");
     if (i.link) out.push("bind");
@@ -4255,16 +4269,18 @@
   function makeDoneText(totals, opts) {
     var _a3, _b;
     const parts = [];
-    if (totals.created) parts.push(t("make.done.create", { g: totals.created.g, r: totals.created.r }));
+    if (totals.created) parts.push(makeCreatedText(totals.created, opts.isPaid));
     if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
     if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
     if ((_b = (_a3 = totals.styles) == null ? void 0 : _a3.missing) == null ? void 0 : _b.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
     if (totals.bound != null) parts.push(t("make.done.bind", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("make.done.rename", { c: totals.renamed }));
     if (totals.created && totals.created.m > 0) parts.push(t("make.done.manual", { m: totals.created.m }));
-    if (!opts.isPaid) parts.push(t("make.done.free"));
     if (opts.linkOff) parts.push(t("make.done.notLinked"));
     return parts.join(" \xB7 ");
+  }
+  function makeCreatedText(c, isPaid2) {
+    return isPaid2 ? t("make.done.create", { g: c.g, r: c.r }) : t("make.globalN", { g: c.g });
   }
 
   // src/ui.ts
@@ -4283,6 +4299,7 @@
   }
   var tokens = [];
   var isPaid = false;
+  var pickGlobalOnly = () => isPaid ? {} : { globalOnly: true };
   var colorsFromPalette = false;
   var colorsCreated = false;
   var hasColorVars = false;
@@ -4544,7 +4561,7 @@
     const nothing = others.length > 0 && sel === 0 && !tokens.some((t2) => t2.category === "color");
     for (const id of ["btnCreate", "btnCreateApply"]) {
       const el = $(id);
-      el.disabled = nothing || !isPaid;
+      el.disabled = nothing;
     }
   }
   var brandColor = $("brand");
@@ -4662,6 +4679,22 @@
     "color/icon/brand"
   ];
   function roleSelect(value) {
+    const sel = roleSelectEl(value);
+    if (isPaid) return sel;
+    const w = document.createElement("span");
+    w.className = "r-lkw";
+    const l = document.createElement("span");
+    l.className = "r-lk";
+    l.textContent = PAID_LOCK;
+    l.setAttribute("aria-hidden", "true");
+    setLock(sel, "paid");
+    sel.dataset.paidMsg = t("paid.semantic");
+    sel.title = t("paid.semantic");
+    sel.classList.add("lk");
+    w.append(l, sel);
+    return w;
+  }
+  function roleSelectEl(value) {
     const sel = document.createElement("select");
     sel.className = "r-role";
     const none = document.createElement("option");
@@ -4706,7 +4739,8 @@
     renderChunked($("colorTable"), colors, (tok) => {
       var _a3;
       const role = roleSelect((_a3 = roleByName.get(tok.name)) != null ? _a3 : "");
-      role.dataset.name = tok.name;
+      const roleSel = role instanceof HTMLSelectElement ? role : role.querySelector("select");
+      roleSel.dataset.name = tok.name;
       const used = tok.count ? " \xB7 " + t("make.layers", { n: tok.count }) : "";
       const card2 = resultCard({
         title: tok.name,
@@ -4715,7 +4749,7 @@
         summaryMono: true,
         metaEl: role
       });
-      role.addEventListener("change", updateColorSummary);
+      roleSel.addEventListener("change", updateColorSummary);
       addSwatch(card2, tok.value);
       return card2;
     });
@@ -4836,13 +4870,13 @@
     renderTokens();
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
-    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true });
+    send(__spreadValues({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true }, pickGlobalOnly()));
   });
   $("btnCreateApply").addEventListener("click", () => {
     if (!tokens.length) return;
     const base = Number($("base").value) || 16;
     createFrom = "tokens";
-    send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base });
+    send(__spreadValues({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base }, pickGlobalOnly()));
   });
   var basePreviewTimer = 0;
   var settingsSaveTimer = 0;
@@ -4870,7 +4904,7 @@
     basePreviewTimer = window.setTimeout(() => {
       if (!tokens.length) return;
       createFrom = "tokens";
-      send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base: Number($("base").value) || 16, preview: true });
+      send(__spreadValues({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base: Number($("base").value) || 16, preview: true }, pickGlobalOnly()));
     }, 350);
   });
   $("btnColorVars").addEventListener("click", () => {
@@ -4878,11 +4912,11 @@
     if (!colors.length) return;
     setSemMapText(colorAuthoritativeRoles(Number($("base").value) || 16));
     createFrom = "colors";
-    send(__spreadValues({
+    send(__spreadValues(__spreadValues({
       type: "CREATE_TOKENS",
       tokens: colors,
       base: Number($("base").value) || 16
-    }, colorsFromPalette ? { replacePalette: true } : {}));
+    }, colorsFromPalette ? { replacePalette: true } : {}), pickGlobalOnly()));
     setStatus("colorStatus", t("common.applyingVars"), "");
   });
   $("btnSemantics").addEventListener("click", () => {
@@ -5283,6 +5317,7 @@
     bindPreviewed = true;
     selFindFor = bindPreviewSel ? bindPreviewSel.join(",") : null;
     selFindInFlight = false;
+    mcNoLinkUntilFind = false;
     renderBindTree();
     if (activeTab === "select" && selSub === "bind" && bindTsOnly() && !bindTsRows.length) showSelSub("home");
     renderSelHome();
@@ -5446,9 +5481,7 @@
     ...COMPONENT_FIELDS,
     "btnPalette",
     "btnPaletteRun",
-    "btnColorVars",
-    "btnCreate",
-    "btnCreateApply",
+    // [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
     "btnScanText",
     "btnTextStyles",
     // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
@@ -5463,9 +5496,10 @@
       setLock(el, isPaid ? null : "paid");
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteLock", "paletteBtnLock", "colorVarsLock", "componentLock", "darkLock", "createLock", "semLock", "tsLock"]) {
+    for (const id of ["paletteBtnLock", "componentLock", "darkLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
+    for (const id of ["paletteLock", "colorVarsLock", "createLock"]) $(id).textContent = "";
     refreshDarkModes();
     setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
@@ -5475,7 +5509,7 @@
   var similarScanned = false;
   var baseLocked = (el) => !!el.dataset.baseLock;
   function setEmptyLock(el, msg) {
-    if (!isPaid) return;
+    if (el.dataset.baseLock === "paid") return;
     setLock(el, msg ? "prereq" : null, msg != null ? msg : "");
   }
   function setCardPrimary(all, order) {
@@ -5549,7 +5583,10 @@
     var _a3;
     closeReadiness();
     const target = PIPELINE_TARGET[id];
-    if (id === "semantics") showStatusLine(t("list.semanticsNote"));
+    if (id === "semantics") {
+      if (isPaid) showStatusLine(t("list.semanticsNote"));
+      else showStatusLine(t("paid.semMap"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+    }
     if (target.make === null) {
       showTab("select");
       showSelSub(target.apply === "rename" && curSel.count ? "rename" : "home");
@@ -5572,6 +5609,7 @@
     steps.forEach((s, i) => {
       const row = document.createElement("div");
       row.className = `pstep ${s.status}`;
+      row.dataset.step = s.id;
       row.tabIndex = 0;
       row.setAttribute("role", "button");
       const dot = document.createElement("span");
@@ -5776,6 +5814,7 @@
     if (!msg) return;
     opReceived(msg);
     if (makeTakes(msg)) return;
+    if (mcTakes(msg)) return;
     switch (msg.type) {
       case "EXTRACT_RESULT": {
         tokens = msg.tokens;
@@ -5798,7 +5837,7 @@
           renderTokens();
           const base = Number($("base").value) || 16;
           createFrom = "tokens";
-          send({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true });
+          send(__spreadValues({ type: "CREATE_TOKENS", tokens: tokensToCreate(), base, preview: true }, pickGlobalOnly()));
         }
         break;
       }
@@ -5836,7 +5875,7 @@
           colorsCreated = true;
           const semMap = textToSemanticMap($("semMap").value);
           semStatusTarget = "colorStatus";
-          if (!wizardRunning && Object.keys(semMap).length) {
+          if (!wizardRunning && isPaid && Object.keys(semMap).length) {
             semStatusPrefix = msg.summary;
             send({ type: "CREATE_SEMANTICS", map: semMap });
           }
@@ -5845,7 +5884,7 @@
         } else {
           setStatus("createStatus", msg.summary, "ok");
           applyBtn.style.display = "none";
-          if (!wizardRunning) {
+          if (!wizardRunning && isPaid) {
             const semMap = textToSemanticMap($("semMap").value);
             semStatusTarget = "createStatus";
             if (Object.keys(semMap).length) {
@@ -6023,7 +6062,6 @@
       case "PREREQ_STATE":
         prereqKnown = true;
         prereqInFlight = false;
-        if (typeof msg.manualUsed === "number") manualUsed = msg.manualUsed;
         reentry.release();
         hasColorVars = msg.hasColorVars;
         hasScaleVars = msg.hasScaleVars;
@@ -6788,10 +6826,10 @@
           return {
             key: `g:${tk.name}`,
             indent: 24,
-            off: !on && isPaid,
+            off: !on,
             cells,
             right: [mkLayers(tk.count)],
-            sw: !isPaid ? null : { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
+            sw: { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
               mkOn.set(tk.name, !on);
               mkPreviewSoon();
               renderMakeScreen();
@@ -6806,7 +6844,7 @@
           countText: t("tree.count", { n: list.length }),
           indent: 0,
           children: rows,
-          sw: !isPaid ? null : { state: hs, label: t("tree.headAria", { name: KIND_HEAD[k] }), onToggle: () => {
+          sw: { state: hs, label: t("tree.headAria", { name: KIND_HEAD[k] }), onToggle: () => {
             const to = headToggleTarget(hs);
             for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to);
             mkPreviewSoon();
@@ -7015,13 +7053,14 @@
     $("makeFree").hidden = isPaid || !showTree;
     let topText = t("make.top");
     let info = "";
-    let links = isPaid;
+    let links = true;
+    const semLic = !skeleton && !isPaid && tab === "semantic";
     if (skeleton) {
       topText = t("v4.reading");
       links = false;
-    } else if (!isPaid) {
-      topText = t("make.freeTop");
-      if (tab === "semantic") info = t("make.freeSemNote");
+    } else if (semLic) {
+      topText = t("make.freeSemTop") + " \xB7 ";
+      links = false;
     } else if (tab === "semantic") {
       topText = t("make.semTop");
       info = t("make.semNote");
@@ -7031,6 +7070,7 @@
       info = t("make.tsNote");
     }
     $("makeTopText").textContent = topText;
+    $("makeSemLic").hidden = !semLic;
     const infoBtn = $("makeInfo");
     if (infoBtn.hidden !== !info || infoBtn.dataset.tip !== info) hideUiTip();
     infoBtn.hidden = !info;
@@ -7051,7 +7091,7 @@
     let noteText = "";
     if (showTree && tab === "semantic") {
       const st = mkSemState();
-      if (st === "none") noteText = t(isPaid ? "make.semNone" : "make.semZero");
+      if (st === "none") noteText = t("make.semNone");
       else if (st === "counting") noteText = t("make.counting");
       else if (st === "zero") noteText = t("make.semZero");
     } else if (showTree && tab === "ts" && mkTsFor !== baseKey()) noteText = t("make.counting");
@@ -7155,19 +7195,11 @@
       $("makeProgFill").style.width = `${Math.round(done.length / Math.max(1, steps.length) * 100)}%`;
       return;
     }
-    const link = $("makeOptLink").checked;
-    const ren = $("makeOptRename").checked;
-    if (!isPaid) {
-      run.textContent = t("make.runFree");
-      $("makeCount").textContent = t("make.freeCount");
-      setLock(run, !baseline ? "prereq" : !link && !ren ? "prereq" : null, !baseline ? t("status.noSelection") : t("make.freeNeedOpt"));
-      return;
-    }
     const gOn = mkGlobalsOn().length;
     const tsOn = mkTsOnList().length;
     const tsTail = tsOn ? t("make.countStyles", { t: tsOn }) : "";
     let count = "";
-    if (gOn) count = mkPreview ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
+    if (gOn) count = mkPreview ? (isPaid ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) : t("make.globalN", { g: mkPreview.g })) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
     $("makeCount").textContent = count ? count + tsTail : tsTail.replace(/^ · /, "");
     $("makeCount").title = (_a3 = $("makeCount").textContent) != null ? _a3 : "";
     run.textContent = gOn ? mkPreview ? t("make.runN", { g: mkPreview.g }) : t("make.run") : tsOn ? t("make.runStyles", { t: tsOn }) : t("make.run");
@@ -7216,7 +7248,7 @@
       try {
         if (id === "create") {
           const rid = mkNextReq();
-          const r = await wizardRequest({ type: "CREATE_TOKENS", tokens: toks, base, reqId: rid }, ["CREATE_RESULT"], rid);
+          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: toks, base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
           totals.created = { g: r.created + r.updated, r: (_a3 = r.roles) != null ? _a3 : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
@@ -7278,7 +7310,7 @@
     opWizardEnd(stay ? "fail" : stopped ? "cancel" : "ok");
     if (stopped && !stay) {
       const last = finishedSteps[finishedSteps.length - 1];
-      mkCancelNote = last ? t("make.cancelledUpTo", { step: t(`wizard.step.${last}`) }) + (totals.created ? ` (${t("make.done.create", { g: totals.created.g, r: totals.created.r })}${totals.styles ? " \xB7 " + t("make.done.styles", { s: totals.styles.s }) : ""})` : "") : t("make.cancelled");
+      mkCancelNote = last ? t("make.cancelledUpTo", { step: t(`wizard.step.${last}`) }) + (totals.created ? ` (${makeCreatedText(totals.created, isPaid)}${totals.styles ? " \xB7 " + t("make.done.styles", { s: totals.styles.s }) : ""})` : "") : t("make.cancelled");
       renderMakeScreen();
       return;
     }
@@ -7312,9 +7344,8 @@
     if (e.currentTarget.getAttribute("aria-disabled") === "true") return;
     showPick(void 0, "make");
   });
-  $("makeLicense").addEventListener("click", () => {
-    showTab("settings");
-  });
+  $("makeLicense").addEventListener("click", () => goToLicense());
+  $("makeSemLic").addEventListener("click", () => goToLicense());
   function mkSetAll(on) {
     if (mkTab === "ts") {
       if (on) mkTsOff.clear();
@@ -8217,14 +8248,23 @@ ${opts.tip}` : text;
     var _a3;
     const el = (_a3 = e.target) == null ? void 0 : _a3.closest('[aria-disabled="true"]');
     if (!el) return;
+    if (e.type === "mousedown") {
+      if (el.tagName === "SELECT") e.preventDefault();
+      return;
+    }
     if (e.type === "keydown") {
       const k = e.key;
+      if (el.tagName === "SELECT" && k !== "Tab" && k !== "Escape" && k !== "Enter" && k !== " ") {
+        e.preventDefault();
+        return;
+      }
       if (k !== "Enter" && k !== " ") return;
     }
     e.preventDefault();
     e.stopImmediatePropagation();
     if (e.type === "click" || e.type === "keydown") {
-      if (el.dataset.lock === "paid") showPaidReason();
+      if (el.dataset.lock === "paid" && el.dataset.paidMsg) showStatusLine(el.dataset.paidMsg, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+      else if (el.dataset.lock === "paid") showPaidReason();
       else if (el.dataset.lock === "edit") edLockedSave();
       else if (el.dataset.wait && el.dataset.waitTarget) setStatus(el.dataset.waitTarget, el.dataset.wait, "warn");
       else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
@@ -8232,6 +8272,7 @@ ${opts.tip}` : text;
   }
   document.addEventListener("click", onLockedActivate, true);
   document.addEventListener("keydown", onLockedActivate, true);
+  document.addEventListener("mousedown", onLockedActivate, true);
   var isMini = false;
   var miniFailure = null;
   var miniOkTimer = null;
@@ -8374,6 +8415,7 @@ ${opts.tip}` : text;
     const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
     const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
     for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
+    if (activeTab === "select" && selSub === "home" && (mcKeep() || mcNeed())) renderSelHome();
     tsrRender();
     const other = link ? null : otherWriteOp();
     const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
@@ -8391,9 +8433,14 @@ ${opts.tip}` : text;
   var opBusy = () => opWizard || opPending.size > 0;
   var opProgress = () => opProg;
   var opSilent = false;
+  var opCardCreate = false;
+  var OP_MAKE_CARD = { results: ["CREATE_RESULT"], label: "op.makeCard", go: () => {
+    showTab("select");
+    showSelSub("home");
+  }, write: true };
   function opSent(msg) {
     if (wizardRunning || opSilent) return;
-    const def = OPS[msg.type];
+    const def = opCardCreate && msg.type === "CREATE_TOKENS" ? OP_MAKE_CARD : OPS[msg.type];
     if (!def) return;
     opPending.set(msg.type, def);
     if (msg.type === "APPLY_SELECTED" || msg.type === "APPLY") opProg = null;
@@ -8551,7 +8598,6 @@ ${opts.tip}` : text;
   var screenKey = () => activeTab === "select" ? `select:${selSub}` : activeTab;
   function showTab(name) {
     var _a3;
-    if (usesFilter && name === "select") usesFilter = false;
     const changed = name !== activeTab;
     if (changed) screenScroll.set(screenKey(), window.scrollY);
     if (changed && activeTab === "select" && selSub === "bind" && hasBindPreview()) bindLeftSince = true;
@@ -9049,7 +9095,6 @@ ${opts.tip}` : text;
   var deletedUse = { count: 0, nodeIds: [] };
   var vmUsageReq = 0;
   var vmUsageInFlight = false;
-  var vmUsageVisible = false;
   var vmUsageSig = "";
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
@@ -9061,7 +9106,6 @@ ${opts.tip}` : text;
   var localVarCount = () => vmVars.length;
   function varScreen() {
     if (!vmTableKnown) return "loading";
-    if (usesFilter) return "list";
     if (localVarCount() === 0) return "empty";
     return "list";
   }
@@ -9070,9 +9114,12 @@ ${opts.tip}` : text;
     $("varLoading").style.display = scr === "loading" ? "" : "none";
     $("varEmpty").style.display = scr === "empty" ? "" : "none";
     $("varList").style.display = scr === "list" ? "" : "none";
-    setLock($("btnVarEmptyMake"), curSel.count ? null : "prereq", t("status.noSelection"));
+    updateVarEmptyLock();
     if (scr === "list") renderVarList();
     renderSelHome();
+  }
+  function updateVarEmptyLock() {
+    setLock($("btnVarEmptyMake"), curSel.count ? null : "prereq", t("status.noSelection"));
   }
   function syncManagerVisibility(read) {
     const want = activeTab === "variables";
@@ -9100,6 +9147,7 @@ ${opts.tip}` : text;
   function onSelectionForList(m) {
     var _a3, _b;
     curSel = { ids: (_a3 = m.ids) != null ? _a3 : [], count: m.count, scanned: m.scanned, name: (_b = m.firstName) != null ? _b : "" };
+    updateVarEmptyLock();
     if (m.selfSelect) {
       renderSelBase();
       return;
@@ -9111,6 +9159,11 @@ ${opts.tip}` : text;
   }
   function setBaseline(b) {
     baseline = b;
+    if (mcMemo && (!b || mcMemo.base !== b.ids.join(","))) {
+      mcMemo = null;
+      mcJust.clear();
+    }
+    if (mcFor !== baseKey()) mcInFlight = false;
     selFindInFlight = false;
     renderSelBase();
     if (vmUsageTimer) {
@@ -9129,51 +9182,44 @@ ${opts.tip}` : text;
       else renderMakeScreen();
     }
     if (!b) {
-      usesFilter = false;
       usageMap = null;
       libVars = [];
       deletedUse = { count: 0, nodeIds: [] };
       vmUsageSig = "";
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     if (b.scanned > BIG_SELECTION || wizardRunning) {
       usageMap = null;
       selFindFor = null;
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     usageMap = null;
-    if (vmOpen && usesFilter) renderVarScreen();
     renderSelHome();
     if (!usageVisible() || isMini) return;
     vmUsageTimer = setTimeout(() => {
       vmUsageTimer = null;
       requestManagerUsage("selection");
       readSelFind();
+      mcRead();
     }, AUTO_SCAN_DELAY);
   }
   var vmUsageTimer = null;
   function requestManagerUsage(why = "quiet") {
     if (!baseline) {
       usageMap = null;
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     const auto = why !== "user";
     if (auto && (baseline.scanned > BIG_SELECTION || wizardRunning)) {
-      if (vmOpen) renderVarScreen();
       renderSelHome();
       return;
     }
     if (vmUsageInFlight && why !== "user") return;
     vmUsageReq = ++bindReqSeq;
     vmUsageInFlight = true;
-    vmUsageVisible = why === "selection" || why === "user";
-    if (vmUsageVisible && vmOpen && varScreen() === "list") renderVarList();
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
   }
   function onUsageResult(msg) {
@@ -9185,8 +9231,6 @@ ${opts.tip}` : text;
     }
     if (msg.reqId !== vmUsageReq) return;
     vmUsageInFlight = false;
-    const wasVisible = vmUsageVisible;
-    vmUsageVisible = false;
     const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
     const changed = sig !== vmUsageSig || usageMap === null;
     vmUsageSig = sig;
@@ -9195,7 +9239,6 @@ ${opts.tip}` : text;
       libVars = msg.libraryVars;
       deletedUse = msg.deleted;
     }
-    if (changed || wasVisible) renderVarScreen();
     renderSelHome();
     reentry.release();
   }
@@ -9240,107 +9283,10 @@ ${opts.tip}` : text;
     return sideSel;
   }
   var focusSideKey = null;
-  var usesFilter = false;
-  var usesSel = null;
-  var usesCollapsed = /* @__PURE__ */ new Set();
-  var usesPlaces = (id) => {
-    var _a3, _b;
-    return (_b = (_a3 = usageMap == null ? void 0 : usageMap.get(id)) == null ? void 0 : _a3.places) != null ? _b : 0;
-  };
-  var usedLocal = () => usageMap ? vmVars.filter((v) => usesPlaces(v.id) > 0) : [];
-  var usedLib = () => usageMap ? libVars.filter((l) => usesPlaces(l.id) > 0) : [];
-  var listVars = () => usesFilter ? usedLocal() : vmVars;
-  var collapsedSet = () => usesFilter ? usesCollapsed : grpCollapsed;
-  function usesSides() {
-    const sides = sidebarCollections(vmCols, usedLocal(), null, /* @__PURE__ */ new Set()).filter((x) => x.total > 0);
-    return { sides, lib: usedLib().length };
-  }
-  function usesCurrentSel() {
-    const { sides, lib } = usesSides();
-    const cur = usesSel;
-    const ok = cur && (cur.kind === "col" && sides.some((x) => x.collection.id === cur.id) || cur.kind === "lib" && lib > 0);
-    if (!ok) usesSel = sides[0] ? { kind: "col", id: sides[0].collection.id } : lib > 0 ? { kind: "lib" } : null;
-    return usesSel != null ? usesSel : { kind: "lib" };
-  }
-  var listSel = () => usesFilter ? usesCurrentSel() : currentSel();
-  function libGroups() {
-    const by = /* @__PURE__ */ new Map();
-    for (const l of usedLib()) {
-      const cut = l.name.lastIndexOf("/");
-      const path = cut < 0 ? "" : l.name.slice(0, cut);
-      const key = `lib|${l.collection}|${path}`;
-      let g = by.get(key);
-      if (!g) {
-        g = { key, label: path ? `${l.collection} \u203A ${path}` : l.collection, col: l.collection, path, rows: [] };
-        by.set(key, g);
-      }
-      g.rows.push(l);
-    }
-    return [...by.values()].sort((a, b) => a.col.localeCompare(b.col) || a.path.localeCompare(b.path));
-  }
-  function openUsesFilter() {
-    if (!baseline) return;
-    usesFilter = true;
-    usesSel = null;
-    usesCollapsed.clear();
-    query = "";
-    $("varSearch").value = "";
-    focusKey = null;
-    showTab("variables");
-    renderVarScreen();
-    requestAnimationFrame(() => window.scrollTo(0, 0));
-    usesFocusFirst();
-  }
-  function usesFocusFirst() {
-    var _a3, _b, _c;
-    const items = gridItems();
-    const el = (_b = (_a3 = items[0]) != null ? _a3 : $("varTree").querySelector("button")) != null ? _b : $("usesFilterX");
-    if (items[0]) {
-      items.forEach((x) => x.tabIndex = -1);
-      items[0].tabIndex = 0;
-      focusKey = (_c = items[0].dataset.key) != null ? _c : null;
-    }
-    el.focus({ preventScroll: true });
-  }
-  function closeUsesFilter() {
-    usesFilter = false;
-    usesSel = null;
-    focusKey = null;
-    if (varScreen() === "list") focusSideKey = `side:${sideSelKey(currentSel())}`;
-    renderVarScreen();
-    if (varScreen() === "empty") $("btnVarEmptyMake").focus();
-  }
-  $("usesFilterX").addEventListener("click", closeUsesFilter);
-  $("usesFilterRebase").addEventListener("click", () => {
-    rebaseToCurrent();
-    if (usesFilter) $("usesFilterX").focus();
-  });
-  function renderUsesBar() {
-    const bar = $("usesFilterBar");
-    bar.hidden = !usesFilter;
-    if (!usesFilter) return;
-    const nm = $("usesFilterName");
-    nm.textContent = t("v4.usesFilter", { name: baseLabel() });
-    nm.title = nm.textContent;
-    const diff = baseDiffers();
-    $("usesFilterDiff").hidden = !diff;
-    $("usesFilterDiff").textContent = `\xB7 ${t("v4.baseDiff")}`;
-    $("usesFilterRebase").hidden = !diff;
-    $("usesFilterRebase").textContent = t("list.rebase");
-    const x = $("usesFilterX");
-    x.setAttribute("aria-label", t("v4.usesFilterClear"));
-    x.title = t("v4.usesFilterClear");
-  }
   function pickSide(sel, focus = true) {
     if (query) clearSearch(false);
-    if (usesFilter) {
-      usesSel = sel;
-      focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
-      focusKey = null;
-      renderVarList();
-      return;
-    }
     sideSel = sel;
+    sideUserPick = sel.kind === "col" ? sel.id : null;
     focusSideKey = focus ? `side:${sideSelKey(sel)}` : null;
     focusKey = null;
     renderVarList();
@@ -9351,8 +9297,7 @@ ${opts.tip}` : text;
     nav.setAttribute("role", "listbox");
     const hadFocus = nav.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.key) != null ? _a3 : null : null;
     clearMount(nav);
-    const uf = usesFilter ? usesSides() : null;
-    const sides = uf ? uf.sides : sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
+    const sides = sidebarCollections(vmCols, vmVars, null, /* @__PURE__ */ new Set());
     const selKey = query.trim() ? "" : sideSelKey(sel);
     for (const side of sides) {
       const c = side.collection;
@@ -9364,7 +9309,7 @@ ${opts.tip}` : text;
       d.setAttribute("aria-selected", String(selKey === key));
       const badge = tierBadge(c);
       const why = tierWhyText(c);
-      d.setAttribute("aria-label", (uf ? t("v4.usesSideAria", { name: c.name, badge, num: String(side.total) }) : t("list.sideColAria", { name: c.name, badge, num: String(side.total) })) + (why ? `, ${why}` : ""));
+      d.setAttribute("aria-label", t("list.sideColAria", { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ""));
       d.tabIndex = -1;
       const b = document.createElement("span");
       b.className = "vs-badge";
@@ -9380,31 +9325,6 @@ ${opts.tip}` : text;
       n.textContent = String(side.total);
       d.append(b, nm, n);
       const pick = () => pickSide({ kind: "col", id: c.id });
-      d.addEventListener("click", pick);
-      d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
-      nav.appendChild(d);
-    }
-    if (uf && uf.lib > 0) {
-      const d = document.createElement("div");
-      d.className = "vs-item lv1";
-      d.dataset.key = "side:lib";
-      d.setAttribute("role", "option");
-      d.setAttribute("aria-selected", String(selKey === "lib"));
-      d.setAttribute("aria-label", t("v4.usesSideAria", { name: t("v4.libName"), badge: "L", num: String(uf.lib) }));
-      d.tabIndex = -1;
-      const b = document.createElement("span");
-      b.className = "vs-badge";
-      b.setAttribute("aria-hidden", "true");
-      b.textContent = "L";
-      b.title = t("v4.libBadgeTip");
-      const nm = document.createElement("span");
-      nm.className = "vs-name";
-      nm.textContent = t("v4.libName");
-      const n = document.createElement("span");
-      n.className = "vs-num";
-      n.textContent = String(uf.lib);
-      d.append(b, nm, n);
-      const pick = () => pickSide({ kind: "lib" });
       d.addEventListener("click", pick);
       d.addEventListener("keydown", (ev) => sideKey(ev, d, pick));
       nav.appendChild(d);
@@ -9488,18 +9408,6 @@ ${opts.tip}` : text;
     return null;
   }
   var swatchHtml = (hex) => hex ? `<span class="bf-swatch" style="background:${escapeHtml(hex)}"></span>` : "";
-  function valueEl(cell) {
-    const span = document.createElement("span");
-    span.className = "val";
-    if (!cell) {
-      span.textContent = "\u2014";
-      return span;
-    }
-    if (cell.kind === "alias") span.innerHTML = `${swatchHtml(resolveSwatch(cell))}\u2192 ${escapeHtml(cell.aliasName)}${cell.remote ? ' <span class="lib-tag">LIB</span>' : ""}`;
-    else if (cell.kind === "color") span.innerHTML = `${swatchHtml(cell.hex)}${escapeHtml(cell.hex.toUpperCase())}`;
-    else span.textContent = cell.text;
-    return span;
-  }
   function cellText(cell) {
     if (!cell) return "\u2014";
     if (cell.kind === "alias") return `\u2192 ${leafName(cell.aliasName)}`;
@@ -9534,8 +9442,7 @@ ${opts.tip}` : text;
   }
   function renderVarList() {
     if (!vmOpen || varScreen() !== "list") return;
-    renderUsesBar();
-    const sel = listSel();
+    const sel = currentSel();
     renderSidebar(sel);
     const tree = $("varTree");
     const prevScroll = window.scrollY;
@@ -9545,25 +9452,15 @@ ${opts.tip}` : text;
     $("varSide").classList.toggle("dim", searching);
     $("btnSearchClear").hidden = !query;
     const colId = sel.kind === "col" ? sel.id : null;
-    const uf = usesFilter;
-    const groups = uf && !usageMap ? [] : paletteGroups(vmCols, listVars(), colId, query);
+    const groups = paletteGroups(vmCols, vmVars, colId, query);
     lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
     const lines = [];
-    const set = collapsedSet();
-    if (uf && usageMap && sel.kind === "lib" && !searching) {
-      for (const g of libGroups()) {
-        const open = !set.has(g.key);
-        lines.push(groupHeadEl({ key: g.key, label: g.label, collectionId: "", head: true, kind: "other", rows: [] }, open));
-        if (open) for (const l of g.rows) lines.push(libRowEl(l));
-      }
-    }
     for (const g of groups) {
       const col = vmCols.find((c) => c.id === g.collectionId);
-      const open = !set.has(g.key);
+      const open = !grpCollapsed.has(g.key);
       if (g.head) lines.push(groupHeadEl(g, open));
       if (!open) continue;
-      if (uf) for (const v of g.rows) lines.push(varRowEl(v, usesPlaces(v.id)));
-      else if ((col == null ? void 0 : col.tier) === 1) {
+      if ((col == null ? void 0 : col.tier) === 1) {
         const colors = g.rows.filter((v) => v.type === "COLOR");
         const others = g.rows.filter((v) => v.type !== "COLOR");
         if (others.length) lines.push(paletteLineEl(others, "pill"));
@@ -9573,24 +9470,7 @@ ${opts.tip}` : text;
     if (!lines.length) {
       const d = document.createElement("div");
       d.className = "vt-empty";
-      const btn = (label, run) => {
-        const b = document.createElement("button");
-        b.className = "link link-btn";
-        b.type = "button";
-        b.textContent = label;
-        b.addEventListener("click", run);
-        return b;
-      };
-      if (uf && !usageMap) {
-        if (baseline && baseline.scanned > BIG_SELECTION && !vmUsageInFlight) d.append(t("list.big"), " \xB7 ", btn(t("list.read"), () => {
-          requestManagerUsage("user");
-          renderVarList();
-          $("usesFilterX").focus();
-        }));
-        else d.textContent = t("v4.reading");
-      } else if (uf && !searching && !usedLocal().length && !usedLib().length) {
-        d.append(t("v4.usesNone"), " \xB7 ", btn(t("v4.usesFilterClear"), closeUsesFilter));
-      } else if (searching) {
+      if (searching) {
         d.append(t("list.noMatch", { q: query.trim() }), " \xB7 ");
         const b = document.createElement("button");
         b.className = "link link-btn";
@@ -9631,9 +9511,8 @@ ${opts.tip}` : text;
     d.append(tw, lb);
     const toggle = () => {
       var _a3, _b;
-      const set = collapsedSet();
-      if (open) set.add(g.key);
-      else set.delete(g.key);
+      if (open) grpCollapsed.add(g.key);
+      else grpCollapsed.delete(g.key);
       focusKey = (_a3 = d.dataset.key) != null ? _a3 : null;
       renderVarList();
       (_b = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _b.focus();
@@ -9682,9 +9561,9 @@ ${opts.tip}` : text;
     }
     return line;
   }
-  function varRowEl(v, places) {
+  function varRowEl(v) {
     const d = document.createElement("div");
-    d.className = places != null ? "vt-row uses" : "vt-row";
+    d.className = "vt-row";
     d.dataset.key = `v:${v.id}`;
     d.dataset.id = v.id;
     d.setAttribute("role", "row");
@@ -9701,65 +9580,7 @@ ${opts.tip}` : text;
     d.title = `${v.name} / ${cellTipText(cell)}`;
     d.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
     d.append(nm, val);
-    if (places != null) d.appendChild(placesEl(places));
     wireItem(d, v);
-    return d;
-  }
-  function placesEl(n) {
-    const c = document.createElement("span");
-    c.className = "vr-n";
-    c.textContent = t("v4.places", { n });
-    return c;
-  }
-  function libRowEl(l) {
-    var _a3;
-    const d = document.createElement("div");
-    d.className = "vt-row uses";
-    d.dataset.key = `v:${l.id}`;
-    d.setAttribute("role", "row");
-    const nm = document.createElement("span");
-    nm.className = "nm";
-    nm.textContent = leafName(l.name);
-    const val = document.createElement("span");
-    val.className = "vr-val";
-    const pill = document.createElement("span");
-    pill.className = `vr-pill${((_a3 = l.value) == null ? void 0 : _a3.kind) === "alias" ? " alias" : ""}`;
-    pill.innerHTML = `${l.type === "COLOR" ? swatchHtml(resolveSwatch(l.value)) : ""}${escapeHtml(cellText(l.value))}`;
-    val.appendChild(pill);
-    d.title = `${l.name} / ${cellTipText(l.value)}`;
-    d.setAttribute("aria-label", `${l.name}, ${cellTipText(l.value)}`);
-    d.append(nm, val, placesEl(usesPlaces(l.id)));
-    const open = () => openDetail({ lib: l }, d);
-    d.addEventListener("click", (e) => {
-      var _a4;
-      focusKey = (_a4 = d.dataset.key) != null ? _a4 : null;
-      gridItems().forEach((x) => x.tabIndex = -1);
-      d.tabIndex = 0;
-      if (e.detail > 1) return;
-      open();
-    });
-    d.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      openMenu(e.clientX, e.clientY, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], d);
-    });
-    d.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter" || ev.key === " ") {
-        ev.preventDefault();
-        open();
-        return;
-      }
-      if (ev.key === "ContextMenu" || ev.key === "F10" && ev.shiftKey) {
-        ev.preventDefault();
-        const r = d.getBoundingClientRect();
-        openMenu(r.left + 16, r.bottom, [{ label: t("v4.detail"), onSelect: open, focusElsewhere: true }], d);
-        return;
-      }
-      gridKey(ev, d);
-    });
-    d.addEventListener("focus", () => {
-      if (d.matches(":focus-visible")) showItemTip(d);
-    });
-    d.addEventListener("blur", hideItemTip);
     return d;
   }
   function wireItem(el, v) {
@@ -9917,8 +9738,8 @@ ${opts.tip}` : text;
       } });
     }
     items.push({ label: t("vm.detail"), onSelect: () => openDetail({ local: v }, el), focusElsewhere: true });
-    const limit = manualLimitReason();
-    items.push({ label: t("vm.duplicate"), disabled: !!limit, note: limit != null ? limit : void 0, onSelect: () => duplicateVar(v) });
+    const lock = dupPaidReason(v);
+    items.push({ label: t("vm.duplicate"), disabled: !!lock, note: lock != null ? lock : void 0, onSelect: () => duplicateVar(v) });
     items.push({ label: t("vm.delete"), separatorBefore: true, onSelect: () => confirmDeleteVar(v, el), focusElsewhere: true });
     openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, el, () => el.classList.remove("menu-open"));
   }
@@ -9972,37 +9793,7 @@ ${opts.tip}` : text;
     return { box: usesBox, list: usesList, run };
   }
   function openDetail(ref, returnEl, focusName = false) {
-    if (ref.local) {
-      openEditor(ref.local, focusName);
-      return;
-    }
-    const l = ref.lib;
-    const title = document.createElement("span");
-    title.innerHTML = `${l.type === "COLOR" ? swatchHtml(resolveSwatch(l.value)) : ""}<span class="vm-val">${escapeHtml(l.name)}</span> <span class="lib-tag">LIB</span>`;
-    const body = document.createElement("div");
-    const dl = document.createElement("dl");
-    const row = (k, val) => {
-      const dt = document.createElement("dt");
-      dt.textContent = k;
-      const dd = document.createElement("dd");
-      if (typeof val === "string") dd.textContent = val;
-      else dd.appendChild(val);
-      dl.append(dt, dd);
-    };
-    row(t("vm.dCollection"), t("list.libCollection", { name: l.collection }));
-    row(t("list.dValue"), valueEl(l.value));
-    const uses = usesBlock(l.id);
-    row(t("list.dUses"), uses.box);
-    body.appendChild(dl);
-    const n = document.createElement("div");
-    n.className = "hint";
-    n.textContent = t("list.libManaged");
-    body.appendChild(n);
-    const close = modalButton(t("common.close"), () => requestCloseModal("button"), true);
-    const box = openModal(title, body, [close], () => focusAfterDetail(l.id).el, void 0, { focus: close });
-    detailBox = box;
-    detailUsesEl = uses.list;
-    uses.run();
+    openEditor(ref.local, focusName);
   }
   function onVarUsers(msg) {
     if (msg.reqId !== detailReq || !detailUsesEl || !detailBox || !modalEl) return;
@@ -10110,7 +9901,7 @@ ${opts.tip}` : text;
     return null;
   }
   function edChrome() {
-    var _a3, _b, _c, _d, _e, _f;
+    var _a3, _b, _c, _d, _e, _f, _g;
     const e = ed;
     if (!e) return;
     const st = edState(e);
@@ -10194,6 +9985,15 @@ ${opts.tip}` : text;
     e.confirmRow.hidden = !e.confirm;
     e.btnClose.textContent = e.create || st.changed ? t("common.cancel") : t("common.close");
     e.btnSave.textContent = e.create ? e.create.reqId ? t("newVar.creating") : t("newVar.create") : saving ? t("edit.savingBtn") : t("edit.save");
+    const paid = !!((_g = e.create) == null ? void 0 : _g.paidLocked);
+    if (e.paidAlert) e.paidAlert.hidden = !paid;
+    if (paid) {
+      e.btnSave.textContent = `${t("newVar.create")} \u{1F512}`;
+      e.btnSave.setAttribute("aria-disabled", "true");
+      e.btnSave.dataset.lock = "edit";
+      e.btnSave.title = t("paid.semantic");
+      return;
+    }
     const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
     if (locked) {
       e.btnSave.setAttribute("aria-disabled", "true");
@@ -10204,21 +10004,35 @@ ${opts.tip}` : text;
     }
     e.btnSave.title = bindLinking ? t("bind.waitLink") : "";
   }
+  function edPaidPing(e) {
+    const a = e.paidAlert;
+    if (!a) return;
+    const txt = a.querySelector(".ed-paid-text");
+    if (!txt) return;
+    txt.textContent = "";
+    requestAnimationFrame(() => {
+      txt.textContent = t("paid.semantic") + " \xB7 ";
+    });
+  }
   function edEdited() {
     if (!ed) return;
     ed.event = null;
     edChrome();
   }
   function edLockedSave() {
-    var _a3;
+    var _a3, _b;
     const e = ed;
+    if ((_a3 = e == null ? void 0 : e.create) == null ? void 0 : _a3.paidLocked) {
+      edPaidPing(e);
+      return;
+    }
     if (!e || e.saving || e.sticky) return;
     const st = edState(e);
     if (bindLinking) e.event = { text: t("bind.waitLink"), err: false };
     else if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
     else if (st.hasErr) {
       e.event = { text: t("edit.checkInput"), err: true };
-      (_a3 = st.firstErr) == null ? void 0 : _a3.focus();
+      (_b = st.firstErr) == null ? void 0 : _b.focus();
     }
     edChrome();
   }
@@ -10654,7 +10468,8 @@ ${opts.tip}` : text;
       row(t("newVar.type"), typeSel);
     }
     const fields = [];
-    for (const m of (_a3 = col == null ? void 0 : col.modes) != null ? _a3 : []) {
+    const modes = (_a3 = col == null ? void 0 : col.modes) != null ? _a3 : create ? [{ modeId: "*", name: "Mode 1" }] : [];
+    for (const m of modes) {
       const dd = row(m.name, "");
       const f = { modeId: m.modeId, modeName: m.name, base: void 0, mode: "value", text: "", bool: false, aliasId: null, touched: false, needValue: false, figmaErr: null, dd, ctl: null, ddBtn: null };
       edResetField(f, v.values[m.modeId], v.type);
@@ -10692,6 +10507,26 @@ ${opts.tip}` : text;
     alert.className = "ed-alert";
     alert.setAttribute("role", "status");
     alert.hidden = true;
+    let paidAlert;
+    if (create) {
+      paidAlert = document.createElement("div");
+      paidAlert.className = "ed-alert paid";
+      paidAlert.setAttribute("role", "status");
+      paidAlert.setAttribute("aria-live", "polite");
+      paidAlert.hidden = true;
+      const pt = document.createElement("span");
+      pt.className = "ed-paid-text";
+      pt.textContent = t("paid.semantic") + " \xB7 ";
+      const lic = document.createElement("button");
+      lic.type = "button";
+      lic.className = "link link-btn";
+      lic.textContent = t("status.paidAction");
+      lic.addEventListener("click", () => {
+        closeModal();
+        goToLicense();
+      });
+      paidAlert.append(pt, lic);
+    }
     const confirmRow = document.createElement("div");
     confirmRow.className = "ed-confirm";
     confirmRow.hidden = true;
@@ -10702,7 +10537,7 @@ ${opts.tip}` : text;
     confirmRow.append(cq, btnDiscard, btnKeep);
     const btnClose = modalButton(create ? t("common.cancel") : t("common.close"), () => requestCloseModal("button"));
     const btnSave = modalButton(create ? t("newVar.create") : t("edit.save"), () => edSave(), true);
-    const e = __spreadValues({
+    const e = __spreadValues(__spreadValues({
       v,
       nameText: v.name,
       nameFigmaErr: null,
@@ -10728,7 +10563,7 @@ ${opts.tip}` : text;
       btnClose,
       btnSave,
       usesRun: uses.run
-    }, create ? { create: __spreadProps(__spreadValues({}, create), { reqId: null }), newScopes: () => {
+    }, paidAlert ? { paidAlert } : {}), create ? { create: __spreadProps(__spreadValues({}, create), { reqId: null }), newScopes: () => {
       var _a4;
       return (_a4 = scopesForNew(normalizeVarName(e.nameText), e.v.type)) != null ? _a4 : ["ALL_SCOPES"];
     } } : {});
@@ -10758,7 +10593,7 @@ ${opts.tip}` : text;
     const box = openModal(titleWrap, body, [btnClose, btnSave], () => edAfterClose(e), () => edCleanup(e), {
       focus: focusName ? nameInput : btnClose,
       beforeClose: (how) => edBeforeClose(e, how),
-      footTop: [alert, confirmRow]
+      footTop: paidAlert ? [paidAlert, alert, confirmRow] : [alert, confirmRow]
     });
     detailBox = box;
     detailUsesEl = uses.list;
@@ -10814,9 +10649,13 @@ ${opts.tip}` : text;
     return target;
   }
   function edSave() {
-    var _a3;
+    var _a3, _b;
     const e = ed;
     if (!e || e.saving || e.sticky) return;
+    if ((_a3 = e.create) == null ? void 0 : _a3.paidLocked) {
+      edPaidPing(e);
+      return;
+    }
     if (e.create) {
       edCreate(e);
       return;
@@ -10833,7 +10672,7 @@ ${opts.tip}` : text;
       const d = edDraft(f, e.v.type);
       if (!d.changed || !d.value) continue;
       values[f.modeId] = d.value;
-      baseValues[f.modeId] = (_a3 = f.base) != null ? _a3 : null;
+      baseValues[f.modeId] = (_b = f.base) != null ? _b : null;
     }
     const reqId = ++bindReqSeq;
     e.saving = { reqId, awaitingTable: false };
@@ -10994,12 +10833,12 @@ ${opts.tip}` : text;
       showStatusLine(t("list.libVar"));
       return;
     }
-    const undo = { sel: sideSel, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey, uses: usesFilter ? { sel: usesSel, collapsed: new Set(usesCollapsed) } : null };
-    usesFilter = false;
+    const undo = { sel: sideSel, userPick: sideUserPick, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey };
     showTab("variables");
     query = "";
     $("varSearch").value = "";
     sideSel = { kind: "col", id: v.collectionId };
+    sideUserPick = v.collectionId;
     const cut = v.name.lastIndexOf("/");
     grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`);
     focusKey = `v:${v.id}`;
@@ -11018,14 +10857,9 @@ ${opts.tip}` : text;
           var _a3;
           if (activeTab !== "variables") showTab("variables");
           sideSel = undo.sel;
+          sideUserPick = undo.userPick;
           grpCollapsed.clear();
           undo.collapsed.forEach((k) => grpCollapsed.add(k));
-          if (undo.uses && baseline) {
-            usesFilter = true;
-            usesSel = undo.uses.sel;
-            usesCollapsed.clear();
-            undo.uses.collapsed.forEach((k) => usesCollapsed.add(k));
-          }
           query = undo.query;
           $("varSearch").value = query;
           focusKey = undo.focusKey;
@@ -11036,10 +10870,21 @@ ${opts.tip}` : text;
       }
     });
   }
-  var manualUsed = 0;
-  function manualLimitReason() {
-    if (isPaid) return null;
-    return manualUsed >= FREE_MANUAL_CREATE_LIMIT ? t("newVar.freeLimit", { n: FREE_MANUAL_CREATE_LIMIT }) : null;
+  var sideUserPick = null;
+  var isPluginSemantic = (c) => {
+    var _a3;
+    return !!c && c.tier === 2 && ((_a3 = c.tierWhy) == null ? void 0 : _a3.kind) === "owned";
+  };
+  function dupPaidReason(v) {
+    return !isPaid && isPluginSemantic(vmCols.find((c) => c.id === v.collectionId)) ? t("paid.semantic") : null;
+  }
+  function newVarCollection() {
+    if (isPaid) {
+      const sel = currentSel();
+      return sel.kind === "col" ? vmCols.find((c) => c.id === sel.id) : void 0;
+    }
+    const picked = localVarCount() > 0 && sideUserPick ? vmCols.find((c) => c.id === sideUserPick) : void 0;
+    return picked != null ? picked : orderCollections(vmCols).find((c) => !isPluginSemantic(c));
   }
   var afterTable = null;
   function runAfterTable() {
@@ -11051,6 +10896,7 @@ ${opts.tip}` : text;
       if (!v) return;
       afterTable = null;
       revealVar(v);
+      sideUserPick = v.collectionId;
       openEditor(v, true);
       return;
     }
@@ -11059,8 +10905,10 @@ ${opts.tip}` : text;
       const v = id ? vmVars.find((x) => x.id === id) : void 0;
       if (id && !v) return;
       afterTable = null;
-      if (v) revealVar(v);
-      else {
+      if (v) {
+        revealVar(v);
+        if (job.pick) sideUserPick = v.collectionId;
+      } else {
         focusKey = job.focus;
         renderVarList();
       }
@@ -11079,31 +10927,19 @@ ${opts.tip}` : text;
     $("varSearch").value = "";
     const cut = v.name.lastIndexOf("/");
     const gk = `${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`;
-    if (usesFilter) {
-      usesSel = { kind: "col", id: v.collectionId };
-      usesCollapsed.delete(gk);
-    } else {
-      sideSel = { kind: "col", id: v.collectionId };
-      grpCollapsed.delete(gk);
-    }
+    sideSel = { kind: "col", id: v.collectionId };
+    grpCollapsed.delete(gk);
     focusKey = `v:${v.id}`;
     renderVarList();
   }
   function openNewVar(opener) {
     var _a3, _b, _c, _d;
-    const lock = manualLimitReason();
-    if (lock) {
-      showStatusLine(lock, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
-      return;
-    }
-    const fsel = usesFilter ? usesCurrentSel() : null;
-    const sel = (fsel == null ? void 0 : fsel.kind) === "col" ? fsel : currentSel();
-    const col = sel.kind === "col" ? vmCols.find((c) => c.id === sel.id) : void 0;
+    const col = newVarCollection();
     const first = (_b = paletteGroups(vmCols, vmVars, (_a3 = col == null ? void 0 : col.id) != null ? _a3 : null, "")[0]) == null ? void 0 : _b.rows[0];
     const type = (_c = first == null ? void 0 : first.type) != null ? _c : "FLOAT";
     const v = { id: "__new", name: "", collectionId: (_d = col == null ? void 0 : col.id) != null ? _d : "__new", type, values: {}, scopes: [], description: "" };
     const label = col ? `${tierBadge(col)} ${col.name}` : t("newVar.newCollection");
-    openEditor(v, true, { collectionId: col == null ? void 0 : col.id, label, opener });
+    openEditor(v, true, { collectionId: col == null ? void 0 : col.id, label, opener, paidLocked: !isPaid && isPluginSemantic(col) });
   }
   function edCreate(e) {
     var _a3, _b, _c;
@@ -11147,19 +10983,21 @@ ${opts.tip}` : text;
     edChrome();
   }
   function onVariableCreated(msg) {
-    manualUsed = msg.manualUsed;
     const e = ed;
     if (!(e == null ? void 0 : e.create) || e.create.reqId !== msg.reqId) return;
-    usesFilter = false;
-    afterTable = { focus: `v:${msg.id}` };
+    afterTable = { focus: `v:${msg.id}`, pick: true };
     e.create.opener = null;
     closeModal();
     showStatusLine(t("newVar.created"), { cls: "ok" });
   }
   var dupReq = 0;
   function duplicateVar(v) {
-    var _a3;
-    const lock = (_a3 = writeLockReason()) != null ? _a3 : manualLimitReason();
+    const paid = dupPaidReason(v);
+    if (paid) {
+      showStatusLine(paid, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+      return;
+    }
+    const lock = writeLockReason();
     if (lock) {
       showStatusLine(lock, { cls: "warn" });
       return;
@@ -11168,9 +11006,7 @@ ${opts.tip}` : text;
     send({ type: "DUPLICATE_VARIABLE", reqId: dupReq, id: v.id });
   }
   function onVariableDuplicated(msg) {
-    manualUsed = msg.manualUsed;
     if (msg.reqId !== dupReq) return;
-    usesFilter = false;
     afterTable = { openDetail: msg.newId };
   }
   var delReq = 0;
@@ -11229,9 +11065,10 @@ ${opts.tip}` : text;
         e.event = { text: t("edit.nameRejected"), err: true, tip: msg.message };
         edChrome();
         e.nameInput.focus();
-      } else if (msg.code === "freeLimit") {
-        e.event = { text: t("newVar.freeLimit", { n: FREE_MANUAL_CREATE_LIMIT }), err: true };
+      } else if (msg.code === "paid") {
+        e.create.paidLocked = true;
         edChrome();
+        edPaidPing(e);
       } else {
         e.event = { text: t("newVar.failed"), err: true, tip: msg.message };
         edChrome();
@@ -11239,7 +11076,8 @@ ${opts.tip}` : text;
       return true;
     }
     if (msg.op === "DUPLICATE_VARIABLE" && msg.reqId === dupReq) {
-      showStatusLine(msg.code === "freeLimit" ? t("newVar.freeLimit", { n: FREE_MANUAL_CREATE_LIMIT }) : msg.code === "deleted" ? t("edit.deleted") : t("newVar.dupFailed"), { cls: "warn", tip: msg.message });
+      if (msg.code === "paid") showStatusLine(t("paid.semantic"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+      else showStatusLine(msg.code === "deleted" ? t("edit.deleted") : t("newVar.dupFailed"), { cls: "warn", tip: msg.message });
       return true;
     }
     if (msg.op === "DELETE_VARIABLE" && msg.reqId === delReq) {
@@ -11294,7 +11132,7 @@ ${opts.tip}` : text;
     openMenu(r.left, r.bottom + 2, [
       { label: t("list.readiness", { n: readinessDone(), total: 7 }) + "\u2026", onSelect: () => openReadiness(btn), focusElsewhere: true },
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
-      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, disabled: usesFilter, note: usesFilter ? t("v4.usesViewOff") : void 0, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
+      { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
       { label: t("list.menuExpandAll"), onSelect: () => setAllGroups(true) },
       { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) },
       // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
@@ -11304,21 +11142,20 @@ ${opts.tip}` : text;
   function openAddMenu() {
     const btn = $("btnAddVar");
     const r = btn.getBoundingClientRect();
-    const limit = manualLimitReason();
     openMenu(r.left, r.bottom + 2, [
-      { label: t("list.addNew"), disabled: !!limit, note: limit != null ? limit : void 0, onSelect: () => openNewVar(btn), focusElsewhere: true },
+      { label: t("list.addNew"), onSelect: () => openNewVar(btn), focusElsewhere: true },
+      // 메뉴 줄은 잠그지 않는다(§4.9 F2)
       { label: t("list.addFromSel"), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => showMakeScreen(), focusElsewhere: true },
       { label: t("list.addDark"), onSelect: () => showPick("theme", "vars"), focusElsewhere: true },
       { label: t("list.addTextStyles"), onSelect: () => showPick("type", "vars"), focusElsewhere: true }
     ], btn);
   }
   function setAllGroups(open) {
-    const sel = listSel();
-    const set = collapsedSet();
-    const keys = sel.kind === "lib" && !query.trim() ? libGroups().map((g) => g.key) : paletteGroups(vmCols, listVars(), sel.kind === "col" ? sel.id : null, query).map((g) => g.key);
+    const sel = currentSel();
+    const keys = paletteGroups(vmCols, vmVars, sel.kind === "col" ? sel.id : null, query).map((g) => g.key);
     for (const k of keys) {
-      if (open) set.delete(k);
-      else set.add(k);
+      if (open) grpCollapsed.delete(k);
+      else grpCollapsed.add(k);
     }
     renderVarList();
   }
@@ -11441,6 +11278,7 @@ ${opts.tip}` : text;
     if (!baseline) return;
     requestManagerUsage(why === "work" ? "work" : "quiet");
     if (find) readSelFind(why === "work" || why === "reentry" || selFindDeferred || selFindFor !== baseKey());
+    if (why === "work" || why === "reentry" || why === "expand" || mcDeferred || mcFor !== baseKey() || mcFailedFor === baseKey()) mcRead();
   }
   function readSelFind(force = true, user = false) {
     if (!baseline || isMini || activeTab !== "select") return;
@@ -11500,12 +11338,376 @@ ${opts.tip}` : text;
     return b;
   }
   var kindLabel = (k) => KIND_HEAD[k];
+  var mcTokens = [];
+  var mcFor = null;
+  var mcPrevFor = null;
+  var mcStates = {};
+  var mcG = 0;
+  var mcR = null;
+  var mcExtractReq = 0;
+  var mcPreviewReq = 0;
+  var mcCreateReq = 0;
+  var mcInFlight = false;
+  var mcSendBase = "";
+  var mcDeferred = false;
+  var mcFailedFor = null;
+  var mcMemo = null;
+  var mcCreating = null;
+  var mcJust = /* @__PURE__ */ new Set();
+  var mcNoLinkUntilFind = false;
+  var mcLastO = null;
+  var mcFocusNext = null;
+  var mcLinkFocusFrom = null;
+  var mcOwned = /* @__PURE__ */ new Set();
+  var mcNextReq = () => {
+    const id = ++bindReqSeq;
+    mcOwned.add(id);
+    return id;
+  };
+  var mcPicked = () => mcTokens.filter((tk) => {
+    const k = mkKind(tk);
+    return !!k && k !== "text";
+  });
+  var mcState = (name) => {
+    var _a3;
+    return mcJust.has(name) ? "reuse" : (_a3 = mcStates[name]) == null ? void 0 : _a3.state;
+  };
+  var mcRemembered = (name) => !!mcMemo && mcMemo.base === baseKey() && (mcMemo.names.has(name) || mcJust.has(name));
+  var mcMadeCount = () => mcTokens.filter((tk) => mcRemembered(tk.name) && mcState(tk.name) === "reuse").length;
+  var mcNewTokens = () => mcPicked().filter((tk) => mcState(tk.name) === "new");
+  function mcKeep() {
+    if (isPaid || !mcMemo || !baseline || mcMemo.base !== baseKey()) return false;
+    return mcMadeCount() >= 1;
+  }
+  function mcNeed() {
+    if (!baseline) return false;
+    const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
+    return localZero || !isPaid && !!mcMemo && mcMemo.base === baseKey();
+  }
+  function mcRead(user = false) {
+    if (!baseline || isMini || activeTab !== "select" || !mcNeed()) return;
+    if (!user && baseline.scanned > BIG_SELECTION) return;
+    if (bindLinking || opBusy() || wizardRunning) {
+      mcDeferred = true;
+      return;
+    }
+    mcDeferred = false;
+    mcInFlight = true;
+    mcSendBase = baseKey();
+    mcExtractReq = mcNextReq();
+    mcPreviewReq = 0;
+    opSilent = true;
+    send({ type: "EXTRACT", nodeIds: baseline.ids, reqId: mcExtractReq });
+    opSilent = false;
+  }
+  function mcTakes(msg) {
+    const rid = msg.reqId;
+    if (rid == null || !mcOwned.has(rid)) return false;
+    if (msg.type === "EXTRACT_RESULT" && rid === mcExtractReq) onMcExtract(msg);
+    else if (msg.type === "CREATE_RESULT" && msg.preview && rid === mcPreviewReq) onMcPreview(msg);
+    else if (msg.type === "CREATE_RESULT" && !msg.preview && rid === mcCreateReq) onMcCreated(msg);
+    else if (msg.type === "ERROR") {
+      if (rid === mcExtractReq || rid === mcPreviewReq) {
+        mcInFlight = false;
+        if (mcSendBase === baseKey()) mcFailedFor = mcSendBase;
+        renderSelHome();
+      } else if (rid === mcCreateReq) {
+        mcCreateReq = 0;
+        mcCreating = null;
+        showStatusLine(t("status.failed", { op: t("op.makeCard") }), { cls: "warn", tip: msg.message, action: { label: t("common.view"), run: () => {
+          showTab("select");
+          showSelSub("home");
+        } } });
+        renderSelHome();
+      }
+    }
+    return true;
+  }
+  function onMcExtract(msg) {
+    if (mcSendBase !== baseKey()) {
+      mcInFlight = false;
+      return;
+    }
+    const raw = msg.tokens.map((x) => __spreadValues({}, x));
+    huefyTokenColors(raw);
+    mcTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
+    mcFor = mcSendBase;
+    const picked = mcPicked();
+    if (!picked.length) {
+      mcStates = {};
+      mcR = 0;
+      mcG = 0;
+      mcPrevFor = mcFor;
+      mcInFlight = false;
+      mcFailedFor = null;
+      renderSelHome();
+      return;
+    }
+    mcPreviewReq = mcNextReq();
+    opSilent = true;
+    send({ type: "CREATE_TOKENS", tokens: picked, base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
+    opSilent = false;
+  }
+  function onMcPreview(msg) {
+    var _a3, _b;
+    mcInFlight = false;
+    if (mcSendBase !== baseKey()) return;
+    mcStates = (_a3 = msg.tokenStates) != null ? _a3 : {};
+    mcG = msg.created + msg.updated;
+    mcR = (_b = msg.roles) != null ? _b : 0;
+    mcPrevFor = mcFor;
+    mcFailedFor = null;
+    mcJust.clear();
+    if (mcMemo && mcMemo.base === baseKey() && mcMadeCount() === 0) mcMemo = null;
+    renderSelHome();
+  }
+  function mcCreate(toks) {
+    if (!baseline || !toks.length) return;
+    mcCreateReq = mcNextReq();
+    mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
+    opCardCreate = true;
+    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, reqId: mcCreateReq, globalOnly: true });
+    opCardCreate = false;
+    renderSelHome();
+  }
+  function onMcCreated(msg) {
+    var _a3;
+    mcCreateReq = 0;
+    const sent = mcCreating;
+    mcCreating = null;
+    showStatusLine(t("mkc.created", { n: msg.created }), { cls: "ok" });
+    if (!sent || sent.base !== baseKey()) {
+      renderSelHome();
+      return;
+    }
+    if (mcMemo && mcMemo.base === sent.base) for (const n of sent.names) mcMemo.names.add(n);
+    else mcMemo = { base: sent.base, names: new Set(sent.names) };
+    if (!msg.skippedManual) for (const n of sent.names) mcJust.add(n);
+    mcNoLinkUntilFind = true;
+    const act = document.activeElement;
+    if (act && $("selCards").contains(act)) {
+      const rows = mcRows();
+      const from = rows.findIndex((tk) => sent.names.includes(tk.name));
+      const next = (_a3 = rows.slice(from + 1).find((tk) => mcState(tk.name) === "new")) != null ? _a3 : rows.find((tk) => mcState(tk.name) === "new");
+      mcFocusNext = next ? `mk:${next.name}` : mcNewTokens().length ? "mkAll" : "mkLink";
+    }
+    renderSelHome();
+  }
+  function mcRows() {
+    return mcPicked().map((tk, i) => ({ tk, i })).sort((a, b) => {
+      var _a3, _b;
+      return ((_a3 = b.tk.count) != null ? _a3 : 0) - ((_b = a.tk.count) != null ? _b : 0) || a.i - b.i;
+    }).slice(0, 4).map((x) => x.tk);
+  }
+  function mcWriteLock() {
+    if (bindLinking) return t("bind.waitLink");
+    const other = otherWriteOp();
+    return other ? t("bind.waitOp", { op: other }) : null;
+  }
+  function renderMakeCard(put, keep) {
+    var _a3, _b, _c, _d;
+    const base = baseKey();
+    const c = keep ? mcMadeCount() : 0;
+    const title = keep ? t("mkc.titleMade", { c }) : t("v4.noVarsFile");
+    const findHere = selFindFor === base && !selFindInFlight;
+    if (mcFailedFor === base) {
+      if (mcInFlight) {
+        put(selCard({ title, subs: [t("v4.reading")] }));
+        return;
+      }
+      const rd = selBtn(t("v4.reread"), () => {
+        if (selFindFor !== base) {
+          requestManagerUsage("user");
+          readSelFind(true, true);
+        }
+        mcRead(true);
+        renderSelHome();
+      });
+      rd.dataset.k = "mkReread";
+      put(selCard({ title: t("mkc.readFailed"), actions: [rd] }));
+      return;
+    }
+    const ready = mcFor === base && mcPrevFor === base;
+    if (!keep && (!ready || mcInFlight)) {
+      put(selCard({ title, subs: [t("v4.reading")] }));
+      return;
+    }
+    const reading = mcInFlight;
+    const writeLock = (_a3 = mcWriteLock()) != null ? _a3 : mcCreateReq ? t("bind.waitOp", { op: t("op.makeCard") }) : null;
+    const lockBtn = (b) => {
+      setWait(b, writeLock != null ? writeLock : reading ? t("v4.reading") : null);
+      return b;
+    };
+    const card = document.createElement("div");
+    card.className = "sel-card mk";
+    const tt = document.createElement("div");
+    tt.className = "t";
+    tt.textContent = title;
+    card.appendChild(tt);
+    const sub = (content) => {
+      const d = document.createElement("div");
+      d.className = "s";
+      d.append(...content);
+      card.appendChild(d);
+    };
+    const tsLine = (hasMain) => {
+      const n = bindPreviewed && findHere ? tsAllNodes().size : 0;
+      if (!n || reading) return;
+      const row = document.createElement("div");
+      row.className = "mk-ts";
+      const l = document.createElement("span");
+      l.textContent = t("v4.tsPlaces", { t: n });
+      const g2 = document.createElement("span");
+      g2.className = "grow";
+      const b = selBtn(t("v4.linkN", { n }), (el) => {
+        showSelSub("bind", el);
+      }, !hasMain);
+      b.dataset.k = "tsLink";
+      row.append(l, g2, b);
+      card.appendChild(row);
+    };
+    const more = (k2) => {
+      const b = selLink(t("mkc.more", { k: k2 }), (el) => showSelSub("make", el));
+      b.dataset.k = "mkMore";
+      return b;
+    };
+    const lic = () => {
+      const b = selLink(t("status.paidAction"), () => goToLicense());
+      b.dataset.k = "mkLic";
+      return b;
+    };
+    const lockLine = (text) => {
+      const d = document.createElement("div");
+      d.className = "mk-lock";
+      const s1 = document.createElement("span");
+      s1.textContent = `${text} \xB7`;
+      d.append(s1, lic());
+      card.appendChild(d);
+    };
+    const foot = (left, right) => {
+      const d = document.createElement("div");
+      d.className = "mk-foot";
+      const g2 = document.createElement("span");
+      g2.className = "grow";
+      if (left) d.appendChild(left);
+      d.appendChild(g2);
+      if (right) d.appendChild(right);
+      card.appendChild(d);
+    };
+    const picked = mcPicked();
+    if (!mcTokens.length) {
+      sub([t("make.zero")]);
+      tsLine(false);
+      put(card);
+      return;
+    }
+    if (!picked.length) {
+      sub([`${t("mkc.noDefault")} \xB7 `, more(mcTokens.length)]);
+      tsLine(false);
+      put(card);
+      return;
+    }
+    const newToks = mcNewTokens();
+    const g = isPaid ? mcG : newToks.length;
+    const r = mcR != null ? mcR : 0;
+    const after = !isPaid && keep && g === 0;
+    sub([isPaid ? t("mkc.subPaid") : after ? t("mkc.subAfter") : t("mkc.subFree")]);
+    const lab = document.createElement("div");
+    lab.className = "mk-lab";
+    lab.textContent = t("mkc.label", { name: baseLabel() });
+    card.appendChild(lab);
+    const rows = mcRows();
+    for (const tk of rows) {
+      const row = document.createElement("div");
+      row.className = "mk-row";
+      const isColor = typeof tk.value === "string" && /^#[0-9a-f]{6}$/i.test(tk.value);
+      const sw = document.createElement("span");
+      sw.className = isColor ? "sw" : "sw n";
+      if (isColor) {
+        sw.style.background = tk.value;
+        if (tk.alpha != null && tk.alpha < 1) sw.style.opacity = String(tk.alpha);
+      } else sw.textContent = "#";
+      sw.setAttribute("aria-hidden", "true");
+      const v = document.createElement("span");
+      v.className = "v";
+      v.textContent = isColor ? tk.value.toUpperCase() + alphaTail(tk.alpha) : typeof tk.value === "number" && tk.unit === "percent" ? `${tk.value}%` : String(tk.value);
+      const st = mcStates[tk.name];
+      const name = (_b = st == null ? void 0 : st.varName) != null ? _b : tk.name;
+      const nm = document.createElement("span");
+      nm.className = "nm";
+      nm.textContent = name;
+      nm.title = name;
+      const cnt = document.createElement("span");
+      cnt.className = "c";
+      cnt.textContent = t("make.layers", { n: (_c = tk.count) != null ? _c : 0 });
+      row.append(sw, v, nm, cnt);
+      if (!isPaid) {
+        const state2 = mcState(tk.name);
+        if (state2 === "new") {
+          const b = lockBtn(selBtn(t("mkc.make"), () => mcCreate([tk])));
+          b.dataset.k = `mk:${tk.name}`;
+          b.setAttribute("aria-label", t("mkc.makeAria", { name }));
+          row.appendChild(b);
+        } else {
+          const s = document.createElement("span");
+          s.className = "st";
+          if (state2 === "reuse" && mcRemembered(tk.name)) {
+            s.classList.add("ok");
+            s.textContent = t("mkc.made");
+          } else if (state2 === "reuse") s.appendChild(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
+          else if (state2 === "update") s.appendChild(mkTag(t("make.tagHas"), t("make.tagHasTip")));
+          else if (state2 === "manual") s.appendChild(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
+          row.appendChild(s);
+        }
+      }
+      card.appendChild(row);
+    }
+    const k = picked.length - rows.length;
+    if (isPaid) {
+      const go = selBtn(r > 0 ? t("mkc.goGR", { g, r }) : t("mkc.goG", { g }), (el) => showSelSub("make", el), true);
+      go.dataset.k = "mkGo";
+      foot(k > 0 ? more(k) : null, go);
+      tsLine(true);
+      put(card);
+      return;
+    }
+    if (!after) {
+      const all = lockBtn(selBtn(t("mkc.makeAll", { g }), () => mcCreate(mcNewTokens()), true));
+      all.dataset.k = "mkAll";
+      foot(k > 0 ? more(k) : null, all);
+      lockLine(r > 0 ? t("mkc.lockFull", { r }) : t("mkc.lockNoSem"));
+      tsLine(true);
+      put(card);
+      return;
+    }
+    if (r > 0) lockLine(t("mkc.lockAfter", { r }));
+    if (findHere && !mcNoLinkUntilFind) mcLastO = { base, o: bindCardCounts().m };
+    const o = mcNoLinkUntilFind ? 0 : findHere ? (_d = mcLastO == null ? void 0 : mcLastO.o) != null ? _d : 0 : (mcLastO == null ? void 0 : mcLastO.base) === base && (selFindInFlight || reading) ? mcLastO.o : 0;
+    let link = null;
+    if (o > 0) {
+      link = selBtn(t("mkc.link", { o }), (el) => showSelSub("bind", el), true);
+      link.dataset.k = "mkLink";
+      if (!findHere || reading) setWait(link, t("v4.reading"));
+      foot(null, link);
+    }
+    tsLine(!!link);
+    put(card);
+  }
   function renderSelHome() {
     var _a3;
     if (activeTab !== "select" || selSub !== "home" || !curSel) return;
     const head = $("selHead");
     const cards = $("selCards");
-    const hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : "" : null;
+    let hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : "" : null;
+    if (mcFocusNext && hadFocus !== null) {
+      hadFocus = mcFocusNext;
+    }
+    if (hadFocus === null && mcLinkFocusFrom === "btnGoMake" && document.activeElement === $("btnGoMake")) hadFocus = "btnGoMake";
+    mcFocusNext = null;
+    if (mcMemo && isPaid) {
+      mcMemo = null;
+      mcJust.clear();
+    }
     clearMount(head);
     clearMount(cards);
     selMakeHot = false;
@@ -11553,6 +11755,7 @@ ${opts.tip}` : text;
       const rd = selBtn(t("list.read"), () => {
         requestManagerUsage("user");
         readSelFind(true, true);
+        mcRead(true);
       });
       rd.dataset.k = "read";
       const c = selCard({ title: t("list.big"), actions: [rd] });
@@ -11562,6 +11765,7 @@ ${opts.tip}` : text;
     const counts = findReady ? bindCardCounts() : null;
     const reading = () => selCard({ title: t("v4.reading") });
     if (localZero) {
+      mcKick();
       if (!usageReady) {
         put(reading());
         return finishSelFocus(hadFocus);
@@ -11577,20 +11781,13 @@ ${opts.tip}` : text;
         put(selCard({ title: t("v4.libOnly"), subs, actions }));
         renderUsesCard(put);
       } else {
-        const subs = [];
-        const kinds = counts ? counts.noVarByKind.filter((x) => x.kind !== "other") : [];
-        if (counts && counts.noVarByKind.length) subs.push(kinds.map((x) => t("v4.kindPlaces", { kind: kindLabel(x.kind), n: x.n })).join(" \xB7 "));
-        if (findReady && kinds.length) selMakeHot = true;
-        else if (!findReady) subs.push(t("v4.reading"));
-        const actions = [];
-        const allSubs = [...subs];
-        tsOnlyExtra(allSubs, actions);
-        put(selCard({ title: t("v4.noVarsFile"), subs: allSubs, actions }));
+        renderMakeCard(put, mcKeep());
       }
       renderDeletedCard(put);
       return finishSelFocus(hadFocus);
     }
-    renderFindCard(put, counts);
+    if (mcKeep()) renderMakeCard(put, true);
+    else renderFindCard(put, counts);
     renderUsesCard(put);
     renderDeletedCard(put);
     finishSelFocus(hadFocus);
@@ -11601,13 +11798,31 @@ ${opts.tip}` : text;
     $("btnGoMake").classList.toggle("primary", hot);
   }
   function finishSelFocus(key) {
-    var _a3;
+    var _a3, _b, _c;
     updateMakeEmphasis();
-    if (key === null) return;
+    if (key === null) {
+      mcLinkFocusFrom = null;
+      return;
+    }
     const cards = $("selCards");
-    const same = key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
+    const link = cards.querySelector('[data-k="mkLink"]');
+    if (mcLinkFocusFrom !== null) {
+      if (link && key === mcLinkFocusFrom) key = "mkLink";
+      if (link || key !== mcLinkFocusFrom) mcLinkFocusFrom = null;
+    }
+    const same = key === "btnGoMake" ? $("btnGoMake") : key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
     const target = (_a3 = same != null ? same : key === "unbind" ? null : cards.querySelector("button")) != null ? _a3 : $("btnGoMake");
+    if (key === "mkLink" && !same) mcLinkFocusFrom = (_c = (_b = target.dataset.k) != null ? _b : target.id) != null ? _c : "";
     target.focus({ preventScroll: true });
+  }
+  function mcKick() {
+    if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || baseline.scanned > BIG_SELECTION) return;
+    queueMicrotask(() => {
+      if (!mcInFlight && mcFor !== baseKey()) {
+        mcRead();
+        if (mcInFlight) renderSelHome();
+      }
+    });
   }
   function tsOnlyExtra(subs, actions) {
     const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
@@ -11688,9 +11903,7 @@ ${opts.tip}` : text;
     if (lib.length) tierN.set(t("v4.libName"), lib.length);
     const order = ["Component", "Semantic", "Global", t("v4.noTierName"), t("v4.libName")];
     const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(" \xB7 ");
-    const view = selLink(t("v4.viewArrow"), () => openUsesFilter());
-    view.dataset.k = "uses";
-    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub], actions: [view] });
+    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub] });
     card.querySelector(".t").title = t("v4.usesTip");
     put(card);
   }

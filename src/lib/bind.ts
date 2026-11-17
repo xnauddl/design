@@ -395,6 +395,11 @@ export interface BindOptions {
    * (fontSize · lineHeight · letterSpacing · fontFamily)를 찾지도 세지도 않는다(스타일 연결은 연결 화면에서).
    */
   skipTextStyleNode?: (node: TextNode) => boolean;
+  /**
+   * 무료 자동 연결(IA v4 §2.3-7 · F6) — 새 Semantic(보는 순서 4)을 만들지 않는다. 맞는 Semantic(1 → 3 → 2)이
+   * 없는 자리는 새 Semantic이 가리켰을 Global(`globalFor`)에 바로 붙인다(그런 Global도 없으면 지금처럼 건너뜀).
+   */
+  noNewRoles?: boolean;
 }
 
 /** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). */
@@ -434,6 +439,7 @@ export async function bindSelection(
       return ownerCache.get(n);
     },
     skipText: opts.skipTextStyleNode,
+    noNewRoles: !!opts.noNewRoles,
   };
   for (const node of selection) {
     // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
@@ -622,6 +628,8 @@ interface Ctx {
   slots: Slot[];
   owner: (n: SceneNode) => string | undefined;
   skipText?: (node: TextNode) => boolean;
+  /** 무료 — 새 역할 없이 Global에 붙인다(BindOptions.noNewRoles). */
+  noNewRoles?: boolean;
 }
 
 /** 값 · 용도가 맞는 변수들(12.2 전제). */
@@ -739,6 +747,11 @@ function resolveSlots(ctx: Ctx): void {
     if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
     return false;
   });
+  // 무료(F6 — §2.3-7): 새 역할을 만들지 않고 그 Global에 바로 붙인다.
+  if (ctx.noNewRoles) {
+    for (const p of live) emit(p.slot, p.global as VarEntry);
+    return;
+  }
   // 재사용은 순서 2가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
   const names = assignNames(
     live.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),

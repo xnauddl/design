@@ -212,7 +212,6 @@
     "newVar.failed": "\uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "newVar.dupFailed": "\uBCF5\uC81C\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "newVar.newCollection": "Variables (\uC0C8\uB85C \uB9CC\uB4E6)",
-    "newVar.freeLimit": "\uBB34\uB8CC\uB85C\uB294 {n}\uAC1C\uAE4C\uC9C0 \uB9CC\uB4E4 \uC218 \uC788\uC5B4\uC694",
     "del.title": "{name} \uBCC0\uC218\uB97C \uC9C0\uC6B8\uAE4C\uC694?",
     "del.aliases": "\uC774 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 {m}\uAC1C\uB294 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uB97C \uAC00\uB9AC\uD0A4\uAC8C \uB3FC\uC694",
     "del.layers": "\uC5F0\uACB0\uB41C \uB808\uC774\uC5B4 \xB7 \uC2A4\uD0C0\uC77C\uC740 '\uC0AD\uC81C\uB41C \uBCC0\uC218'\uAC00 \uB3FC\uC694",
@@ -334,14 +333,11 @@
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
-    "list.libCollection": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \xB7 {name}",
-    "list.libManaged": "\uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
     "list.jumped": "{name}(\uC73C)\uB85C \uC62E\uACBC\uC5B4\uC694",
     "list.undo": "\u2190 \uB418\uB3CC\uB9AC\uAE30",
     "select.capped": "\uB808\uC774\uC5B4 {found}\uAC1C\uB9CC \uC120\uD0DD\uD588\uC5B4\uC694(\uC804\uCCB4 {requested}\uAC1C)",
     "select.none": "\uC120\uD0DD\uD560 \uB808\uC774\uC5B4\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
     "select.partial": "\uB808\uC774\uC5B4 {found}\uAC1C \uC120\uD0DD \u2014 {missing}\uAC1C\uB294 \uC0AD\uC81C\uB410\uAC70\uB098 \uB2E4\uB978 \uD398\uC774\uC9C0\uC608\uC694",
-    "list.dValue": "\uAC12",
     "list.dUses": "\uC4F0\uC778 \uACF3",
     "list.detailBig": "\uC120\uD0DD\uC774 \uCEE4\uC11C \uC790\uB3D9\uC73C\uB85C \uCC3E\uC9C0 \uC54A\uC544\uC694",
     "list.find": "\uCC3E\uAE30",
@@ -361,7 +357,6 @@
     "v4.reading": "\uC120\uD0DD\uC744 \uC77D\uB294 \uC911\u2026",
     "v4.libOnly": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB9CC \uC368\uC694 \xB7 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
-    "v4.kindPlaces": "{kind} {n}\uACF3",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
@@ -400,17 +395,9 @@
     "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
     "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
-    "v4.viewArrow": "\uBCF4\uAE30 \u2192",
-    "v4.usesFilter": "\uC4F0\uB294 \uBCC0\uC218 \xB7 {name}",
-    "v4.usesFilterClear": "\uD544\uD130 \uC9C0\uC6B0\uAE30",
-    "v4.usesSideAria": "{name}, {badge}, \uC4F0\uB294 \uBCC0\uC218 {num}\uAC1C",
-    "v4.libBadgeTip": "\uB2E4\uB978 \uD30C\uC77C\uC758 \uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218",
-    "v4.usesViewOff": "\uC4F0\uB294 \uBCC0\uC218 \uD544\uD130\uC5D0\uC11C\uB294 \uC904\uB85C\uB9CC \uBCF4\uC5EC\uC694",
-    "v4.usesNone": "\uC4F0\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
     "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
     "v4.places": "{n}\uACF3",
-    "v4.detail": "\uC0C1\uC138\u2026",
     "v4.deletedN": "\uC0AD\uC81C\uB41C \uBCC0\uC218 {n}\uACF3",
     "v4.select": "\uC120\uD0DD",
     "v4.unbind": "\uC5F0\uACB0 \uD480\uAE30",
@@ -440,13 +427,38 @@
     "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.subRight": "\uC5D0\uC11C \uCC3E\uC740 \uAC12",
     "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
-    "make.freeBox": "\uBB34\uB8CC\uB294 \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694 \xB7 \uC544\uB798\uB294 \uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uBCC0\uC218\uC608\uC694",
+    "make.freeBox": "\uBB34\uB8CC: Global \uBCC0\uC218\uB9CC",
+    "make.freeBoxPaid": "Semantic \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
+    "make.freeSemTop": "\u{1F512} Semantic\uC740 \uC720\uB8CC\uC608\uC694",
+    "make.globalN": "Global {g}\uAC1C",
+    // 무료 규칙(IA v4 §4.9 F2 · §4.3a F8)
+    "paid.semantic": "Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
+    "paid.semMap": "Semantic \uB9E4\uD551\uC740 \uC720\uB8CC\uC608\uC694",
+    // 선택 탭 만들기 카드(IA v4 §4.1 "만들기 카드" — 상태 6)
+    "mkc.subFree": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uAC1C\uC218 \uC81C\uD55C\uC740 \uC5C6\uC5B4\uC694",
+    "mkc.subPaid": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \xB7 Semantic \uBCC0\uC218\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
+    "mkc.label": "{name}\uC5D0\uC11C \uB9CE\uC774 \uC4F4 \uAC12",
+    "mkc.make": "\uFF0B \uB9CC\uB4E4\uAE30",
+    "mkc.makeAria": "{name} \uB9CC\uB4E4\uAE30",
+    "mkc.made": "\u2713 \uB9CC\uB4E6",
+    "mkc.created": "Global \uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "mkc.more": "\uC678 {k}\uAC1C \uBCF4\uAE30",
+    "mkc.makeAll": "Global {g}\uAC1C \uBAA8\uB450 \uB9CC\uB4E4\uAE30",
+    "mkc.goGR": "Global {g} \xB7 Semantic {r} \uB9CC\uB4E4\uAE30 \u2192",
+    "mkc.goG": "Global {g}\uAC1C \uB9CC\uB4E4\uAE30 \u2192",
+    "mkc.lockFull": "\u{1F512} Semantic {r}\uAC1C \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
+    "mkc.lockNoSem": "\u{1F512} \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
+    "mkc.lockAfter": "\u{1F512} Semantic {r}\uAC1C",
+    "mkc.titleMade": "Global \uBCC0\uC218 {c}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "mkc.subAfter": "\uAC19\uC740 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
+    "mkc.link": "{o}\uACF3 \uC5F0\uACB0 \u2192",
+    "mkc.noDefault": "\uAE30\uBCF8\uC73C\uB85C \uB9CC\uB4E4 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "mkc.readFailed": "\uC120\uD0DD\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "op.makeCard": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.license": "\uB77C\uC774\uC120\uC2A4 \u2192",
     "make.tabsAria": "\uB9CC\uB4E4 \uAC83",
     "make.semTop": "\uCF20 Global\uC744 \uB530\uB77C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
     "make.tsTop": "\uCF20 \uC2A4\uD0C0\uC77C\uB9CC \uB4F1\uB85D\uD574\uC694",
-    "make.freeTop": "\uC720\uB8CC\uC5D0\uC11C \uB9CC\uB4E4 \uAC12\uC774\uC5D0\uC694",
-    "make.freeSemNote": "\uB808\uC774\uC5B4\uC5D0\uB294 Semantic\uC774 \uBD99\uC5B4\uC694",
     "make.semNone": "\uCF20 Global\uC774 \uC5C6\uC5B4 \uB9CC\uB4E4 Semantic\uC774 \uC5C6\uC5B4\uC694",
     "make.semZero": "\uB9CC\uB4E4 Semantic\uC774 \uC5C6\uC5B4\uC694",
     "make.more": "\uACA9\uC790 \uC815\uB9AC \xB7 \uD14C\uB9C8 \xB7 \uD0C0\uC774\uD3EC\uAE4C\uC9C0 \uACE0\uB974\uB824\uBA74",
@@ -459,9 +471,6 @@
     "make.run": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.runN": "\uBCC0\uC218 {g}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
-    "make.runFree": "\uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC \uC2E4\uD589",
-    "make.freeCount": "\uAE30\uC874 \uBCC0\uC218\uB85C \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD574\uC694",
-    "make.freeNeedOpt": "\uBB34\uB8CC\uB85C\uB294 \uC5F0\uACB0 \xB7 \uC774\uB984 \uC815\uB9AC\uB9CC \uD560 \uC218 \uC788\uC5B4\uC694",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
     "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
@@ -502,7 +511,6 @@
     "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
     "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
     "make.done.manual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {m}",
-    "make.done.free": "\uBCC0\uC218\uB294 \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694",
     "make.done.notLinked": "\uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
     "common.view": "\uBCF4\uAE30",
     "textStyle.linkNow": "\uB808\uC774\uC5B4\uC5D0 \uBC14\uB85C \uC5F0\uACB0",
@@ -3263,7 +3271,8 @@
         if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
         return ownerCache.get(n);
       },
-      skipText: opts.skipTextStyleNode
+      skipText: opts.skipTextStyleNode,
+      noNewRoles: !!opts.noNewRoles
     };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
@@ -3477,6 +3486,10 @@
       if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
       return false;
     });
+    if (ctx.noNewRoles) {
+      for (const p of live) emit(p.slot, p.global);
+      return;
+    }
     const names = assignNames(
       live.map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
       ctx.index.semNames,
@@ -4315,7 +4328,6 @@
     const ex = expand(scopes);
     return TARGET_SCOPES[target].some((s) => ex.has(s));
   }
-  var FREE_MANUAL_CREATE_LIMIT = 20;
   var MANUAL_KEY = "dsl.manual";
   function duplicateName(name, taken) {
     const base = `${name}-copy`;
@@ -9742,25 +9754,11 @@
   }
   var currentTier = () => effective().tier;
   var isPaid = () => currentTier() === "paid";
-  var MANUAL_USED_KEY = "dsl.manualUsed";
-  async function readManualUsed() {
-    try {
-      const n = await figma.clientStorage.getAsync(MANUAL_USED_KEY);
-      return typeof n === "number" && isFinite(n) && n > 0 ? Math.floor(n) : 0;
-    } catch (e) {
-      return 0;
-    }
-  }
-  async function bumpManualUsed() {
-    const n = await readManualUsed() + 1;
-    try {
-      await figma.clientStorage.setAsync(MANUAL_USED_KEY, n);
-    } catch (e) {
-    }
-    return n;
-  }
-  async function manualLimitReached() {
-    return !isPaid() && await readManualUsed() >= FREE_MANUAL_CREATE_LIMIT;
+  async function paidSemanticTarget(collectionId) {
+    var _a;
+    if (isPaid() || !collectionId) return false;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    return ((_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id) === collectionId;
   }
   function requirePaid(feature) {
     if (isPaid()) return true;
@@ -9828,8 +9826,7 @@
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      const manualUsed = await readManualUsed();
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, manualUsed });
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
     } catch (e) {
     }
   }
@@ -9995,17 +9992,17 @@
         commitUndo(figma);
         post({ type: "VARIABLE_DELETED", reqId: msg.reqId, id: msg.id });
       } else {
-        if (await manualLimitReached()) return fail(`free limit ${FREE_MANUAL_CREATE_LIMIT}`, "freeLimit");
         if (msg.type === "CREATE_VARIABLE") {
+          if (await paidSemanticTarget(msg.collectionId)) return fail("semantic collection is paid", "paid");
           const { variable } = await createManualVariable({ collectionId: msg.collectionId, name: msg.name, varType: msg.varType, values: msg.values, scopes: msg.scopes });
-          const manualUsed = await bumpManualUsed();
           commitUndo(figma);
-          post({ type: "VARIABLE_CREATED", reqId: msg.reqId, id: variable.id, manualUsed });
+          post({ type: "VARIABLE_CREATED", reqId: msg.reqId, id: variable.id });
         } else {
+          const src = await figma.variables.getVariableByIdAsync(msg.id);
+          if (src && await paidSemanticTarget(src.variableCollectionId)) return fail("semantic collection is paid", "paid");
           const nv = await duplicateVariable(msg.id);
-          const manualUsed = await bumpManualUsed();
           commitUndo(figma);
-          post({ type: "VARIABLE_DUPLICATED", reqId: msg.reqId, newId: nv.id, manualUsed });
+          post({ type: "VARIABLE_DUPLICATED", reqId: msg.reqId, newId: nv.id });
         }
       }
     } catch (e) {
@@ -10607,11 +10604,11 @@
           break;
         }
         case "CREATE_TOKENS": {
-          if (!msg.preview && !requirePaid("tokens")) break;
+          if (!msg.preview && !msg.globalOnly && !requirePaid("tokens")) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
-          const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName);
+          const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
@@ -10658,9 +10655,9 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              __spreadValues({
+              __spreadValues(__spreadValues({
                 ownerOf: bindOwnerOf(sel)
-              }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {})
+              }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
             );
             post({
               type: "APPLY_RESULT",
