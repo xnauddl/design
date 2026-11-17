@@ -1093,7 +1093,7 @@
 **라이선스 카드의 구매 버튼 (2026-11-17 사용자 결정 B — 체크 B.21)**
 - **늘 보인다.** 지금은 결제 링크(`licenseConfig.ts` `PURCHASE_URL`)가 자리표시자면 버튼 줄 `#licenseLinkRow`를 숨긴다(`licenseLinksConfigured` — `ui.ts` 1996). 그러면 무료 사용자가 어디서 사는지 화면에서 알 수 없고, 출시 전에 이 화면을 확정 · 실기할 수 없다. 그래서 줄을 숨기지 않는다.
 - **버튼은 하나 — 글이 티어에 따라 갈린다**(가는 곳이 갈리는 것은 그대로 — 2026-08-06 결정 "한 버튼"). 무료: [유료 구매하기 ↗](새 키 `license.buy`, 누르면 결제 페이지 `PURCHASE_URL`), 유료: [구독 관리 ↗](`license.manage` 글 바꿈 — 지금 "결제 · 구독 관리 ↗", 누르면 고객 포털 `PORTAL_URL`). 툴팁도 티어마다 — 무료 새 키 `license.buyTip` "결제 페이지를 열어요", 유료 `license.manageTip` 글 바꿈 "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요"(지금 글은 두 티어를 한 문장에 말한다 — 버튼 글이 갈리므로 나눈다). 밖 링크라 글 끝에 " ↗"(§2.4 이동 표시). 가는 곳은 지금처럼 누를 때의 티어로 정한다(`ui.ts` 1989).
-- **링크가 아직 자리표시자면 잠근다**(지금 숨기던 조건 `!licenseLinksConfigured()` 그대로). 전제 잠금(`setLock(…, 'prereq', msg)` — 잠금 모양은 ia-v3 §2 원칙 3: `aria-disabled` · 포커스는 받음)이고 사유는 새 키 `license.linkPending` "결제 페이지와 구독 관리 페이지는 아직 준비 중이에요"(티어와 상관없는 글 — 유료면 버튼이 고객 포털로 가므로 둘을 함께 말한다. 가운뎃점을 쓰지 않는다 — 툴팁 꼬리의 절 구분 " · "와 섞이지 않게(UW-P8), 같은 페이지를 무료 툴팁과 같은 "결제 페이지"로 부른다(UW-P1)). 누르면 공통 상태 줄에 사유(경고, 링크 버튼 없음 — `onLockedActivate`의 `lockMsg`). 밖 페이지는 열지 않는다(`OPEN_LICENSE_LINK`를 보내지 않음 — `onLockedActivate`가 캡처 단계에서 막는다). 잠금은 무료 · 유료 모두에 건다(포털 주소 `PORTAL_URL`은 이미 실제 주소지만 결제 링크와 함께 배포 PR에서 정하므로 같은 조건 하나로 본다 — ROADMAP "배포 전 남은 일" 7). 배포 PR에서 `PURCHASE_URL`을 실제 값으로 바꾸면 잠금이 저절로 풀린다. 이 버튼은 전제 잠금 · 유료 잠금 · 대기 잠금을 거는 다른 코드(`PAID_FIELDS` · `updateGates` · `WAIT_*` · 빈 상태 잠금)에 들지 않는다.
+- **링크가 아직 자리표시자면 잠근다**(지금 숨기던 조건 `!licenseLinksConfigured()` 그대로). 전제 잠금(`setLock(…, 'prereq', msg)` — 잠금 모양은 ia-v3 §2 원칙 3: `aria-disabled` · 포커스는 받음)이고 사유는 새 키 `license.linkPending` "구독 관리 페이지는 아직 준비 중이에요"(2026-11-17 시안 확인 · 사용자 결정 — 짧게 한 글로. 무료 · 유료 같은 글이다). 누르면 공통 상태 줄에 사유(경고, 링크 버튼 없음 — `onLockedActivate`의 `lockMsg`). 밖 페이지는 열지 않는다(`OPEN_LICENSE_LINK`를 보내지 않음 — `onLockedActivate`가 캡처 단계에서 막는다). 잠금은 무료 · 유료 모두에 건다(포털 주소 `PORTAL_URL`은 이미 실제 주소지만 결제 링크와 함께 배포 PR에서 정하므로 같은 조건 하나로 본다 — ROADMAP "배포 전 남은 일" 7). 배포 PR에서 `PURCHASE_URL`을 실제 값으로 바꾸면 잠금이 저절로 풀린다. 이 버튼은 전제 잠금 · 유료 잠금 · 대기 잠금을 거는 다른 코드(`PAID_FIELDS` · `updateGates` · `WAIT_*` · 빈 상태 잠금)에 들지 않는다.
 - **툴팁에 잠금 사유를 붙인다 — 이 버튼만의 예외.** 툴팁(`title`) = 티어 툴팁 + (잠겼으면 " — " + `license.linkPending`). 꼬리 구분은 " — "다 — 유료 툴팁 `license.manageTip`에 나열의 " · "(결제 수단 · 기기 활성화)가 있어 절 구분까지 " · "면 섞인다(UW-P8). 이 버튼만의 예외라 `setWait`의 " · " 꼬리 모양을 따르지 않는다. 다른 전제 잠금(Semantic 매핑 · 빈 상태 잠금 등)은 툴팁에 사유를 붙이지 않고 누를 때 상태 줄로만 알린다. 이 버튼은 배포 전 내내(누르기 전에도) 왜 흐린지 보여야 하고 사유가 사용자 상태(선택 · 변수)가 아니라 배포 상태라 고칠 방법이 화면에 없으므로 툴팁에도 적는다. `setWait`(대기 잠금 — `data-wait`가 붙어 뜻이 섞임)과 `setLockTitle`(유료 꼬리 전용 `baseTip` 백업)은 쓰지 않는다.
 - **그리는 곳은 한 함수**(예: `renderLicenseLink()`): 버튼 글(`license.buy` / `license.manage`) · 툴팁(위 규칙으로 매번 처음부터 만든다 — 꼬리를 떼고 붙이지 않는다) · 잠금(`setLock`)을 정한다. 부르는 때: 처음 그릴 때 — **정적 i18n(`applyStaticI18n`, `ui.ts` 4891) 뒤**(앞에서 정하면 정적 i18n이 `data-i18n` 글로 덮는다), 그리고 `LICENSE_STATUS`로 `isPaid`가 바뀔 때(`ui.ts` 2313–2328 — 키 확인 · 해제 · 만료 모두 이 메시지로 온다).
 - **`ui.html`의 짝은 무료 글로 바꾼다**: `data-i18n="license.buy"` · `data-i18n-title="license.buyTip"`, 인라인 기본 글도 "유료 구매하기 ↗" · "결제 페이지를 열어요"(드리프트 검사 — `verify-i18n`은 인라인 글 = STRINGS를 본다). `license.manage` · `license.manageTip`은 ts에서 `t('license.manage')`처럼 리터럴 키로 써서 미참조 검사에 걸리지 않게 한다.
@@ -1111,7 +1111,7 @@
   │ 배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요 │
   └──────────────────────────────────────────────┘
   ```
-  구매 버튼 툴팁: "결제 페이지를 열어요 — 결제 페이지와 구독 관리 페이지는 아직 준비 중이에요". 유료면 버튼 글 [구독 관리 ↗] · 툴팁 "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요 — 결제 페이지와 구독 관리 페이지는 아직 준비 중이에요". 링크가 실제 값이면 흐림 · 툴팁 꼬리가 없고 누르면 밖 페이지가 열린다.
+  구매 버튼 툴팁: "결제 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요". 유료면 버튼 글 [구독 관리 ↗] · 툴팁 "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요". 링크가 실제 값이면 흐림 · 툴팁 꼬리가 없고 누르면 밖 페이지가 열린다.
 - 포커스 순서: 키 칸 → [검증] → [해제] → 구매 버튼(잠겨도 포커스를 받는다 — 지금 DOM 순서).
 
 ### 4.11 도구 탭 (2026-11-11 · 12 · 16 사용자 결정 D · Q2-1 · Q3-1 · Q4 · E1 · D1 · T-D1–T-D8)
@@ -1878,9 +1878,9 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 
 - [ ] `ui.ts`: `#licenseLinkRow` 숨김(1996) 없앰. `renderLicenseLink()` — 티어별 글 · 툴팁(티어 툴팁 + 잠겼으면 " — " + `license.linkPending`, 매번 처음부터) · 링크가 자리표시자면 `setLock($('btnLicenseLink'), 'prereq', t('license.linkPending'))`. `applyStaticI18n`(4891) 뒤 처음 한 번 + `LICENSE_STATUS`(2313) 때 부른다. `setWait` · `setLockTitle`은 쓰지 않는다
 - [ ] `ui.html` 1308: `data-i18n="license.buy"` · `data-i18n-title="license.buyTip"` · 인라인 기본 글 무료 글로
-- [ ] i18n: 새 키 `license.buy` "유료 구매하기 ↗" · `license.buyTip` "결제 페이지를 열어요" · `license.linkPending` "결제 페이지와 구독 관리 페이지는 아직 준비 중이에요", 글 바꿈 `license.manage` "구독 관리 ↗" · `license.manageTip` "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요" · `verify:i18n` 0
+- [ ] i18n: 새 키 `license.buy` "유료 구매하기 ↗" · `license.buyTip` "결제 페이지를 열어요" · `license.linkPending` "구독 관리 페이지는 아직 준비 중이에요", 글 바꿈 `license.manage` "구독 관리 ↗" · `license.manageTip` "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요" · `verify:i18n` 0
 - [ ] 숨김을 전제로 한 주석 고침: `licenseConfig.ts` `licenseLinksConfigured` 문서 주석 · `ui.html` 1303–1304 · `ui.ts` 1992–1995
 - [ ] 점검 파일 `docs/qa/2026-11-11-ux-writing-audit.md` #42 · #43의 `license.manageTip` 갈 곳에 "B.21과 같은 글(먼저 들어가는 PR)"을 덧붙인다
 - [ ] 테스트(`verify-bind-flow` — `recv(LICENSE_STATUS)` · `__sent`): 무료 + 자리표시자 → 버튼 보임 · `aria-disabled` · 글 "유료 구매하기 ↗" · 툴팁 꼬리 · 누르면 상태 줄 사유 · `OPEN_LICENSE_LINK` 안 보냄 / `LICENSE_STATUS` 유료 → 글 "구독 관리 ↗" · 툴팁 바뀜 · 잠금 그대로
 - [ ] 4검사 · 스크린샷(무료 · 유료)
-- [ ] 실기 확인(사용자, 피그마): ⚙ 설정 › 라이선스에 [유료 구매하기 ↗]가 흐리게 보이고, 누르면 상태 줄에 "결제 페이지와 구독 관리 페이지는 아직 준비 중이에요"
+- [ ] 실기 확인(사용자, 피그마): ⚙ 설정 › 라이선스에 [유료 구매하기 ↗]가 흐리게 보이고, 누르면 상태 줄에 "구독 관리 페이지는 아직 준비 중이에요"
