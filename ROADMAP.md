@@ -277,7 +277,7 @@
 - [x] **검증 페일오픈 차단** — fetch 자체 실패만 `offline`(grace 유지). 서명 불일치·공개키 오설정·5xx·비JSON 응답은 검증 실패로 확정 `(PR #71)`
 - [x] **서명 없는 평문 응답 거부** — `token` 없는 응답을 수용하던 폴백 제거(배포 빌드에도 포함돼 M2.1과 모순이었음) `(PR #71)`
 - [x] **구매·구독 관리 링크 UI** — `OPEN_LICENSE_LINK` → code의 `figma.openExternal`. URL은 code가 `licenseConfig`에서 해석(임의 URL 전달 금지) `(PR #71)`
-- [x] **링크 · 서버가 아직 자리표시자일 때** — 결제 링크가 자리표시자면 구독 버튼을 숨기고(→ 2026-11-17 B.21: 숨기지 않고 잠근다 · 글은 티어별 [유료 구매하기 ↗] / [구독 관리 ↗]), 검증 서버 · 공개키가 아직이면 설정 안내를 띄운다(`licenseLinksConfigured` · `licenseVerifyConfigured` — `src/lib/licenseConfig.ts`). 배포 때 값을 바꾸면 저절로 다시 보인다
+- [x] **링크 · 서버가 아직 자리표시자일 때** — 결제 링크가 자리표시자면 구독 버튼을 숨기고(→ 2026-11-17 B.21: 숨기지 않고 잠근다 · 글은 티어별 [유료 구매하기 ↗] / [구독 관리 ↗]), 검증 서버 · 공개키가 아직이면 설정 안내를 띄운다(`licenseLinksConfigured` · `licenseVerifyConfigured` — `src/lib/licenseConfig.ts`). 배포 때 값을 바꾸면 잠금이 저절로 풀린다(B.21)
 
 ### 출시 단계
 - [x] **M1 — 엔타이틀먼트(기능 게이팅) + 개발용 티어 토글 + 백도어 차단**
