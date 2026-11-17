@@ -2500,13 +2500,13 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 §4.7 "묶기" 5번 4단계 "마스터가 아닌 멤버의 인스턴스에 값 넣기 = 세트 경로와 같은 방법" · "heading 접힘 그룹은 예외" · "인스턴스 자리" 8번 "인스턴스 안도 본다". 출처: `docs/qa/2026-11-17-qa5.md` 불합격 1.
 
-- [ ] `artwork.ts` `memberFitIssue`: INSTANCE 레이어 안으로도 내려가 사진 레이어를 비교(경로는 자식 인덱스로 이어 붙임). 주석 "인스턴스 안은 그 컴포넌트 소관" 고침
-- [ ] `code.ts` [등록] 속성 접힘: 마스터가 아닌 멤버용 **비동기** 만들기를 따로 둔다 — `createInstance` → `keepRoots` 기록 → `copyOverridesAsync`(deps는 세트 경로 `placeExtras`와 같음: `mainOf` · `loadFont` · `isIcon` · `iconFor`=그림 지문 → `iconRegistry.ensure`) → 못 넣은 레이어를 `component.fail.propValue` · `propFailed`에. `replaceMemberAsync`로 바꾸고 결과 처리(`fillKept` · `placeFailed` · 꼬리 빼기)는 지금 그대로. 마스터 자리(`restore`)는 지금의 동기 `makerFor` 그대로. 속성 계획(`plan`)에 `headingSlot` 항목이 하나라도 있으면 그 그룹의 멤버는 지금처럼 동기 `makerFor` + `replaceMember`(`isHeadingCollapseGroup`은 기준으로 쓰지 않음)
-- [ ] 단위 테스트 ① `test/reuse.test.mjs`(이미 `copyOverridesAsync` · `replaceMemberAsync` 목이 있음): 멤버 카드(안쪽 INSTANCE 안 사진 RECTANGLE · 아바타 ELLIPSE + 이름 TEXT)와 같은 메인의 인스턴스(안쪽 사진 · 아바타가 다른 해시) → `copyOverridesAsync` 뒤 안쪽 사진 · 아바타 해시가 멤버와 같음 → `replaceMemberAsync`가 `replaced`
-- [ ] 단위 테스트 ② `test/placement.test.mjs`(`memberFitIssue` 목): 안쪽 INSTANCE 안 사진 해시가 다르면 `component.fit.photoDiff` 이유, 같은 경로에 레이어가 없으면 `component.fit.noPhoto`, 크기가 다르면 `component.fit.photoSize`, 같으면 null
-- [ ] 단위 테스트 ③(회귀) `test/placement.test.mjs`: 덮어쓴 값 옮기기 없이 만든 인스턴스(`createInstance`만 — 안쪽 사진이 마스터 것)를 `replaceMember`에 넣으면 `mismatch`(photoDiff)이고 멤버 원본이 그대로 남음
-- [ ] 기존 heading 접힘 테스트(`test/pure.test.mjs` · `test/reuse.test.mjs`의 `headingSlot` · `isHeadingCollapseGroup` 테스트)가 그대로 통과하는지 확인 — heading 경로는 바꾸지 않는다
-- [ ] REGISTER_COMPONENTS 전체를 도는 테스트는 만들지 않는다 — 지금 목(`installFigma`)에 `createComponentFromNode` · `getMainComponentAsync` · `setProperties` 등이 없어 새 목이 필요하다. 전체 흐름은 실기 확인으로 본다
-- [ ] 4검사
+- [x] `artwork.ts` `memberFitIssue`: INSTANCE 레이어 안으로도 내려가 사진 레이어를 비교(경로는 자식 인덱스로 이어 붙임). 주석 "인스턴스 안은 그 컴포넌트 소관" 고침
+- [x] `code.ts` [등록] 속성 접힘: 마스터가 아닌 멤버용 **비동기** 만들기를 따로 둔다 — `createInstance` → `keepRoots` 기록 → `copyOverridesAsync`(deps는 세트 경로 `placeExtras`와 같음: `mainOf` · `loadFont` · `isIcon` · `iconFor`=그림 지문 → `iconRegistry.ensure`) → 못 넣은 레이어를 `component.fail.propValue` · `propFailed`에. `replaceMemberAsync`로 바꾸고 결과 처리(`fillKept` · `placeFailed` · 꼬리 빼기)는 지금 그대로. 마스터 자리(`restore`)는 지금의 동기 `makerFor` 그대로. 속성 계획(`plan`)에 `headingSlot` 항목이 하나라도 있으면 그 그룹의 멤버는 지금처럼 동기 `makerFor` + `replaceMember`(`isHeadingCollapseGroup`은 기준으로 쓰지 않음)
+- [x] 단위 테스트 ① `test/reuse.test.mjs`(이미 `copyOverridesAsync` · `replaceMemberAsync` 목이 있음): 멤버 카드(안쪽 INSTANCE 안 사진 RECTANGLE · 아바타 ELLIPSE + 이름 TEXT)와 같은 메인의 인스턴스(안쪽 사진 · 아바타가 다른 해시) → `copyOverridesAsync` 뒤 안쪽 사진 · 아바타 해시가 멤버와 같음 → `replaceMemberAsync`가 `replaced`
+- [x] 단위 테스트 ② `test/placement.test.mjs`(`memberFitIssue` 목): 안쪽 INSTANCE 안 사진 해시가 다르면 `component.fit.photoDiff` 이유, 같은 경로에 레이어가 없으면 `component.fit.noPhoto`, 크기가 다르면 `component.fit.photoSize`, 같으면 null
+- [x] 단위 테스트 ③(회귀) `test/placement.test.mjs`: 덮어쓴 값 옮기기 없이 만든 인스턴스(`createInstance`만 — 안쪽 사진이 마스터 것)를 `replaceMember`에 넣으면 `mismatch`(photoDiff)이고 멤버 원본이 그대로 남음
+- [x] 기존 heading 접힘 테스트(`test/pure.test.mjs` · `test/reuse.test.mjs`의 `headingSlot` · `isHeadingCollapseGroup` 테스트)가 그대로 통과하는지 확인 — heading 경로는 바꾸지 않는다
+- [x] REGISTER_COMPONENTS 전체를 도는 테스트는 만들지 않는다(그대로) — 지금 목(`installFigma`)에 `createComponentFromNode` · `getMainComponentAsync` · `setProperties` 등이 없어 새 목이 필요하다. 전체 흐름은 실기 확인으로 본다
+- [x] 4검사
 - [ ] 실기 확인(사용자, 피그마): 원본 `163:1523` 새 복제본으로 묶음 2 다시(`docs/qa/2026-11-11-field-check.md` 2-1~2-5) — 여행자 카드 사진 4장 · 아바타 4개가 원본과 같음
 - 이번 범위 밖(QA #5 불합격 2 · 3 — 다음 PR): 사진 · 아바타 · 아이콘을 하위 컴포넌트로 감싸 노드가 늘어남(256 → 270) · `CardButton` 생김 · 3기능 카드 아이콘 INSTANCE_SWAP 없음 · `HeroButton` 이름 · 카드 2~4 사진 30px 이동과 긴 이름 줄바꿈(이 수정 뒤 실기에서 다시 확인)

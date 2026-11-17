@@ -8873,7 +8873,7 @@
           return;
         }
       }
-      if (n.type === "INSTANCE" || !("children" in n)) return;
+      if (!("children" in n)) return;
       n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
     };
     visit(member, "");
@@ -11476,11 +11476,36 @@
                     };
                   };
                   restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
+                  const slotPlan = plan.some((p) => !!p.headingSlot);
+                  const asyncMakerFor = (member, name) => async () => {
+                    const inst = master.createInstance();
+                    try {
+                      keepRoots.push({ node: inst, name });
+                      const bad = await copyOverridesAsync(member, inst, prefix, {
+                        mainOf: (n) => n.getMainComponentAsync(),
+                        loadFont: (f) => figma.loadFontAsync(f),
+                        isIcon: (n) => iconFrameKeyOf(n) !== void 0,
+                        iconFor: (v) => {
+                          const key = artKeyOf(v);
+                          return key ? iconRegistry.ensure(key, v, v.name) : null;
+                        }
+                      });
+                      for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
+                      if (bad.length) propFailed.push(name);
+                      return inst;
+                    } catch (e) {
+                      try {
+                        if (!inst.removed) inst.remove();
+                      } catch (e2) {
+                      }
+                      throw e;
+                    }
+                  };
                   for (const snap of snaps) {
                     if (snap === masterSnap) continue;
                     const name = snap.n.name;
                     const before = propFailed.length;
-                    const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                    const r = slotPlan ? replaceMember(snap.n, makerFor(snap, name), prefix) : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix);
                     if (r.result === "replaced") continue;
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {

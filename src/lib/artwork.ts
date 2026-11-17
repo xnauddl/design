@@ -209,7 +209,9 @@ export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: strin
         return;
       }
     }
-    if (n.type === 'INSTANCE' || !('children' in n)) return; // 인스턴스 안은 그 컴포넌트 소관
+    // 인스턴스 안도 본다(§4.7 8번 "인스턴스 안도 본다", QA #5 불합격 1) — 안쪽 인스턴스의 사진이
+    // 바뀌어도 통과하던 빈틈. 인스턴스의 자식 순서는 메인 트리와 같아 같은 인덱스 경로로 찾는다.
+    if (!('children' in n)) return;
     (n.children as readonly SceneNode[]).forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
   };
   visit(member, '');

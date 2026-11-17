@@ -686,6 +686,51 @@ test('불합격 6 — 프레임 안 사진(카드): 경로 앞붙이 없음, 같
   assert.equal(memberFitIssue(box.children[1], { width: 200, height: 260, children: [], type: 'FRAME', name: 'x' }, ''), null);
 });
 
+/* ---------- QA #5 불합격 1 — 검사가 인스턴스 안 사진까지 본다 (§4.7 8번 "인스턴스 안도 본다") ---------- */
+
+/** 카드: FRAME > [INSTANCE ArticleImage > RECTANGLE(사진), TEXT]. 안쪽부터 처리해 사진이 이미 인스턴스 안에 있는 모양. */
+const nestedCard = (h, x, { w = 280, hgt = 420 } = {}) =>
+  mk('FRAME', { name: 'Card', x, width: 280, height: 480 }, [
+    mk('INSTANCE', { name: 'ArticleImage', width: w, height: hgt }, [mk('RECTANGLE', { name: 'article-image', width: w, height: hgt, fills: img(h) })]),
+    mk('TEXT', { name: 'name', characters: 'x' }),
+  ]);
+
+test('QA #5 불합격 1 — memberFitIssue: 안쪽 인스턴스 속 사진 해시 · 자리 · 크기를 본다', () => {
+  const page = mk('PAGE', {}, []);
+  const A = nestedCard('p1', 0);
+  const B = nestedCard('p2', 300);
+  page.appendChild(mk('FRAME', { name: 'Row' }, [A, B]));
+  installFigma(page);
+  const comp = figma.createComponentFromNode(A);
+  const inst = comp.createInstance(); // 안쪽 사진은 마스터(p1) 것
+  assert.match(memberFitIssue(inst, B, ''), /사진 다름/, '해시가 다르면 걸린다(예전: 인스턴스 안은 안 봐서 통과)');
+  inst.children[0].children[0].fills = img('p2');
+  assert.equal(memberFitIssue(inst, B, ''), null, '같으면 통과');
+  inst.children[0].children[0].width = 200;
+  assert.match(memberFitIssue(inst, B, ''), /사진 크기/, '안쪽 사진 크기가 다르면 걸린다');
+  inst.children[0].children = [];
+  assert.match(memberFitIssue(inst, B, ''), /사진 자리 없음/, '같은 경로에 레이어가 없으면 걸린다');
+});
+
+test('QA #5 불합격 1 — 회귀: 덮어쓴 값 옮기기 없이 만든 인스턴스는 검사에 걸려 멤버 원본이 그대로', () => {
+  const page = mk('PAGE', {}, []);
+  const A = nestedCard('p1', 0);
+  const B = nestedCard('p2', 300);
+  const row = mk('FRAME', { name: 'Row' }, [A, B]);
+  page.appendChild(row);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(mk('FRAME', { width: 280, height: 480 }, [
+    mk('INSTANCE', { name: 'ArticleImage', width: 280, height: 420 }, [mk('RECTANGLE', { name: 'article-image', width: 280, height: 420, fills: img('p1') })]),
+    mk('TEXT', { name: 'name', characters: 'x' }),
+  ]));
+  const r = replaceMember(B, () => comp.createInstance(), '');
+  assert.equal(r.result, 'mismatch');
+  assert.match(r.why, /사진 다름/);
+  assert.equal(B.removed, false);
+  assert.deepEqual(row.children, [A, B], '사진이 바뀐 인스턴스가 들어가지 않는다');
+  assert.equal(B.children[0].children[0].fills[0].imageHash, 'p2');
+});
+
 /* ---------- QA #3 실기 ③ 불합격 7 — 값 지키기 (§4.7 9번) ---------- */
 
 /** 목 트리: 노드는 id로 찾는다. 묶인 레이어는 기본값(defaults)을 보이고, 인스턴스 setProperties가 값을 덮는다. */

@@ -331,6 +331,50 @@ test('replaceMemberAsync — 기다린 인스턴스를 멤버 자리에(같은 �
   assert.deepEqual(row.children.map((c) => c.name), ['A', 'I', 'Z']);
 });
 
+test('QA #5 불합격 1 — 속성 접힘 멤버: 안쪽 인스턴스 속 사진 · 아바타를 덮어쓴 값 옮기기로 지키고 replaceMemberAsync로 바꾼다', async () => {
+  const w = world();
+  const img = (h) => [{ type: 'IMAGE', imageHash: h, visible: true, scaleMode: 'FILL' }];
+  // 안쪽부터 처리해 이미 생긴 사진 · 아바타 컴포넌트(마스터 = 카드 1의 것)
+  const photo = w.comp('ArticleImage', () => [w.node('RECTANGLE', 'article-image', { width: 280, height: 420, fills: img('p1') })]);
+  const avatar = w.comp('Avatar', () => [w.node('ELLIPSE', 'article-avatar', { width: 60, height: 60, fills: img('a1') })]);
+  const sized = { x: 0, y: 0, width: 280, height: 480, resize(a, b) { this.width = a; this.height = b; } };
+  // 접힘 마스터(카드 1): 이름은 속성에 묶임
+  const card = w.comp('Article-Type2', () => [
+    w.inst('ArticleImage', photo),
+    w.node('FRAME', 'container', {}, [w.inst('Avatar', avatar), w.txt('name', 'John Noah', { characters: 'Text#1:1' })]),
+  ]);
+  // 멤버(카드 2): 안쪽 인스턴스의 사진 · 아바타를 덮어쓴 상태(안쪽 그룹 접힘이 넣은 값)
+  const member = w.node('FRAME', 'card 2', { ...sized }, [
+    w.inst('ArticleImage', photo),
+    w.node('FRAME', 'container', {}, [w.inst('Avatar', avatar), w.txt('name', 'Game som')]),
+  ]);
+  member.children[0].children[0].fills = img('p2');
+  member.children[1].children[0].children[0].fills = img('a2');
+  const row = w.node('FRAME', 'Row', { layoutMode: 'NONE' }, [member]);
+  row.insertChild = function (i, c) { if (c.parent?.children) c.parent.children.splice(c.parent.children.indexOf(c), 1); c.parent = this; this.children.splice(i, 0, c); };
+  row.appendChild = function (c) { this.insertChild(this.children.length, c); };
+  let failed = null;
+  const r = await replaceMemberAsync(member, async () => {
+    const b = Object.assign(w.inst('Article-Type2', card), { ...sized });
+    const texts = [];
+    const collect = (n) => { if (n.type === 'TEXT') texts.push(n); for (const c of n.children ?? []) collect(c); };
+    failed = await copyOverridesAsync(member, b, '', {
+      mainOf: w.mainOf,
+      loadFont: async () => { collect(b); for (const t of texts) t.loaded = true; },
+      iconFor: () => null,
+    });
+    return b;
+  }, '');
+  assert.equal(r.result, 'replaced', '사진을 옮겼으니 8번 검사(인스턴스 안 포함)를 통과');
+  assert.deepEqual(failed, []);
+  const b = row.children[0];
+  assert.equal(b.type, 'INSTANCE');
+  assert.equal(b.children[0].children[0].fills[0].imageHash, 'p2', '안쪽 인스턴스 속 사진은 멤버 것');
+  assert.equal(b.children[1].children[0].children[0].fills[0].imageHash, 'a2', '아바타도 멤버 것');
+  assert.equal(b.children[1].children[1].characters, 'Game som', '묶인 이름은 속성으로');
+  assert.equal(member.removed, true);
+});
+
 /* ---------- 아이콘 등록부 (2번) ---------- */
 
 test('createIconRegistry — 문서의 같은 dsl.icon 아이콘을 먼저 쓰고, 새로 만든 것에는 dsl.icon을 남긴다', () => {
