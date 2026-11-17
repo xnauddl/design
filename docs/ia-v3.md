@@ -2508,5 +2508,5 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [x] 기존 heading 접힘 테스트(`test/pure.test.mjs` · `test/reuse.test.mjs`의 `headingSlot` · `isHeadingCollapseGroup` 테스트)가 그대로 통과하는지 확인 — heading 경로는 바꾸지 않는다
 - [x] REGISTER_COMPONENTS 전체를 도는 테스트는 만들지 않는다(그대로) — 지금 목(`installFigma`)에 `createComponentFromNode` · `getMainComponentAsync` · `setProperties` 등이 없어 새 목이 필요하다. 전체 흐름은 실기 확인으로 본다
 - [x] 4검사
-- [ ] 실기 확인(사용자, 피그마): 원본 `163:1523` 새 복제본으로 묶음 2 다시(`docs/qa/2026-11-11-field-check.md` 2-1~2-5) — 여행자 카드 사진 4장 · 아바타 4개가 원본과 같음
+- [x] 실기 확인(사용자, 피그마, 2026-11-17 — 새 파일 `hIWfciPKCHUps1ZktT1Ljk` · 속성 접힘 경로에서 사진 4 · 아바타 4 원본과 같음, `docs/qa/2026-11-17-qa5.md` 재실기 2): 원본 `163:1523` 새 복제본으로 묶음 2 다시(`docs/qa/2026-11-11-field-check.md` 2-1~2-5) — 여행자 카드 사진 4장 · 아바타 4개가 원본과 같음
 - 이번 범위 밖(QA #5 불합격 2 · 3 — 다음 PR): 사진 · 아바타 · 아이콘을 하위 컴포넌트로 감싸 노드가 늘어남(256 → 270) · `CardButton` 생김 · 3기능 카드 아이콘 INSTANCE_SWAP 없음 · `HeroButton` 이름 · 카드 2~4 사진 30px 이동과 긴 이름 줄바꿈(이 수정 뒤 실기에서 다시 확인)
