@@ -216,7 +216,7 @@ function world() {
   const comps = new Map();
   const parentize = (n) => { for (const c of n.children ?? []) { c.parent = n; parentize(c); } return n; };
   const node = (type, name, props = {}, children) => {
-    const n = { id: `${type[0]}${seq++}`, type, name, visible: true, removed: false, parent: null, componentPropertyReferences: null, width: 10, height: 10, ...props };
+    const n = { id: `${type[0]}${seq++}`, type, name, visible: true, removed: false, parent: null, componentPropertyReferences: null, x: 0, y: 0, width: 10, height: 10, ...props };
     if (children) { n.children = children; parentize(n); }
     n.remove = function () {
       this.removed = true;

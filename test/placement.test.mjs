@@ -731,6 +731,130 @@ test('QA #5 불합격 1 — 회귀: 덮어쓴 값 옮기기 없이 만든 인스
   assert.equal(B.children[0].children[0].fills[0].imageHash, 'p2');
 });
 
+/* ---------- QA #5 재실기 — 안쪽 레이어 자리 · 크기 검사 (§4.7 8번 "안쪽 레이어의 자리 · 크기도 본다", A.17) ---------- */
+
+/** 여행자 카드 모양: FRAME > [RECTANGLE 사진(카드 안 y), TEXT 이름(고정 폭)]. */
+const travelerCard = ({ x = 0, photoY = -30, nameW = 86, hiddenX } = {}) =>
+  mk('FRAME', { name: 'Card', x, width: 280, height: 480 }, [
+    mk('RECTANGLE', { name: 'photo', y: photoY, width: 280, height: 420, fills: img('same') }),
+    mk('TEXT', { name: 'name', x: 16, y: 430, width: nameW, height: 24, characters: 'x' }),
+    ...(hiddenX === undefined ? [] : [mk('TEXT', { name: 'badge', x: hiddenX, y: 8, width: 40, height: 16, visible: false })]),
+  ]);
+
+function travelerSetup(bOpts, aOpts = {}) {
+  const page = mk('PAGE', {}, []);
+  const A = travelerCard({ ...aOpts });
+  const B = travelerCard({ x: 300, ...bOpts });
+  const row = mk('FRAME', { name: 'Row' }, [A, B]);
+  page.appendChild(row);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(A);
+  return { page, row, A, B, comp };
+}
+
+test('A.17 ① 안쪽 사진의 자리(y −30 ↔ −60)가 다르면 자리·크기 다름 → 멤버 원본 그대로', () => {
+  const { page, row, A, B, comp } = travelerSetup({ photoY: -60 });
+  assert.match(memberFitIssue(comp.createInstance(), B, ''), /자리·크기 다름\(photo\)/);
+  page.children.splice(1); // 검사용 인스턴스 치우기
+  const r = replaceMember(B, () => comp.createInstance(), '');
+  assert.equal(r.result, 'mismatch');
+  assert.match(r.why, /자리·크기 다름\(photo\)/);
+  assert.equal(B.removed, false);
+  assert.deepEqual(row.children, [A, B]);
+  assert.deepEqual(page.children, [row], '지운 인스턴스가 남지 않는다');
+});
+
+test('A.17 ② 고정 폭 글자의 폭(86 ↔ 102)이 다르면 같은 결과', () => {
+  const { row, A, B, comp } = travelerSetup({ nameW: 102 });
+  const r = replaceMember(B, () => comp.createInstance(), '');
+  assert.equal(r.result, 'mismatch');
+  assert.match(r.why, /자리·크기 다름\(name\)/);
+  assert.deepEqual(row.children, [A, B]);
+});
+
+test('A.17 ③ 숨긴 레이어는 자리가 달라도 보지 않는다 · ④ 모두 같으면 null', () => {
+  const { B, comp } = travelerSetup({ hiddenX: 200 }, { hiddenX: 10 });
+  assert.equal(memberFitIssue(comp.createInstance(), B, ''), null, '숨긴 badge의 x가 달라도 통과');
+  const s2 = travelerSetup({});
+  assert.equal(memberFitIssue(s2.comp.createInstance(), s2.B, ''), null, '자리 · 크기 · 사진이 모두 같으면 null');
+});
+
+test('A.17 ⑤ 아이콘 프레임(GROUP 안 벡터) ↔ 아이콘 인스턴스 짝: isIcon을 넘기면 그 레이어만 보고 통과', () => {
+  const { page, card } = iconFixture();
+  installFigma(page);
+  const comp = figma.createComponentFromNode(mk('FRAME', { name: 'Card', width: 300, height: 120 }, [
+    mk('INSTANCE', { name: 'icon', x: 20, y: 30, width: 32, height: 32 }, [mk('VECTOR', { name: 'Vector', width: 32, height: 32 })]),
+  ]));
+  const inst = comp.createInstance();
+  assert.equal(memberFitIssue(inst, card, '', { isIcon: (n) => n.name === 'tabler:world' }), null, '아이콘 안 트리는 내려가지 않는다');
+  assert.match(memberFitIssue(inst, card, ''), /자리·크기 다름\(tabler:world\)/, 'isIcon이 없으면 종류가 달라 걸린다');
+  inst.children[0].x = 24;
+  assert.match(memberFitIssue(inst, card, '', { isIcon: (n) => n.name === 'tabler:world' }), /자리·크기 다름\(tabler:world\)/, '아이콘 자신의 자리는 본다');
+});
+
+test('A.17 ⑥ GROUP 루트 멤버: 자리는 루트 기준 — 부모 프레임 안 (100, 200)이어도 모양이 같으면 null', () => {
+  const page = mk('PAGE', {}, []);
+  // GROUP 자식의 x · y는 그룹 밖 프레임 기준(목도 같다).
+  const g = mk('GROUP', { name: 'Badge', x: 100, y: 200, width: 30, height: 30 }, [
+    mk('RECTANGLE', { name: 'bg', x: 100, y: 200, width: 30, height: 30 }),
+    mk('ELLIPSE', { name: 'dot', x: 110, y: 210, width: 10, height: 10 }),
+  ]);
+  page.appendChild(mk('FRAME', { name: 'Box', width: 500, height: 500 }, [g]));
+  installFigma(page);
+  // 목 createComponentFromNode는 자식 좌표를 다시 잡지 않으므로 컴포넌트 기준 좌표로 따로 만든다.
+  const comp = figma.createComponentFromNode(mk('FRAME', { name: 'Badge', width: 30, height: 30 }, [
+    mk('RECTANGLE', { name: 'bg', width: 30, height: 30 }),
+    mk('ELLIPSE', { name: 'dot', x: 10, y: 10, width: 10, height: 10 }),
+  ]));
+  const prefix = shapePrefix(comp, 'GROUP');
+  assert.equal(prefix, '');
+  assert.equal(memberFitIssue(comp.createInstance(), g, prefix), null, '부모 기준 x · y를 쓰면 늘 걸리던 경우');
+  g.children[1].x = 115;
+  assert.match(memberFitIssue(comp.createInstance(), g, prefix), /자리·크기 다름\(dot\)/);
+});
+
+test('A.17 ⑦ 같은 경로에 짝이 없거나 종류가 다르면(원본 FRAME ↔ 마스터의 INSTANCE) 자리·크기 다름', () => {
+  const page = mk('PAGE', {}, []);
+  const member = mk('FRAME', { name: 'Card', width: 200, height: 100 }, [
+    mk('FRAME', { name: 'inner', width: 100, height: 40 }, [mk('TEXT', { name: 't', width: 50, height: 20 })]),
+  ]);
+  page.appendChild(member);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(mk('FRAME', { name: 'Card', width: 200, height: 100 }, [
+    mk('INSTANCE', { name: 'inner', width: 100, height: 40 }, [mk('TEXT', { name: 't', width: 50, height: 20 })]),
+  ]));
+  const isIcon = () => false;
+  assert.match(memberFitIssue(comp.createInstance(), member, '', { isIcon }), /자리·크기 다름\(inner\)/, '아이콘 아닌 비INSTANCE ↔ INSTANCE');
+  const comp2 = figma.createComponentFromNode(mk('FRAME', { name: 'Card', width: 200, height: 100 }, []));
+  assert.match(memberFitIssue(comp2.createInstance(), member, ''), /자리·크기 다름\(inner\)/, '짝 없음');
+});
+
+test('A.17 ⑧ 감싼 도형: 감싼 자식이 resize를 따라오지 않으면 사진이 아니어도 자리·크기 다름', () => {
+  const page = mk('PAGE', {}, []);
+  const a = mk('RECTANGLE', { name: 'bar', width: 100, height: 20, fills: [{ type: 'SOLID' }] });
+  const b = mk('RECTANGLE', { name: 'bar', y: 40, width: 200, height: 20, fills: [{ type: 'SOLID' }] });
+  const box = mk('FRAME', { name: 'Box' }, [a, b]);
+  page.appendChild(box);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(mk('FRAME', { name: 'bar', width: 100, height: 20 }, [mk('RECTANGLE', { name: 'bar', width: 100, height: 20 })]));
+  const prefix = shapePrefix(comp, 'RECTANGLE');
+  assert.equal(prefix, '0');
+  const r = replaceMember(b, () => comp.createInstance(), prefix); // 목: resize는 인스턴스만, 감싼 자식은 그대로
+  assert.equal(r.result, 'mismatch');
+  assert.match(r.why, /자리·크기 다름\(bar\)/);
+  assert.deepEqual(box.children, [a, b]);
+  const r2 = replaceMember(a, () => comp.createInstance(), prefix);
+  assert.equal(r2.result, 'replaced', '같은 크기면 통과');
+});
+
+test('A.17 ⑨ layout: false(heading 경로)면 자리가 달라도 통과 — replaceMember도 replaced', () => {
+  const { row, B, comp } = travelerSetup({ photoY: -60 });
+  assert.equal(memberFitIssue(comp.createInstance(), B, '', { layout: false }), null);
+  const r = replaceMember(B, () => comp.createInstance(), '', { layout: false });
+  assert.equal(r.result, 'replaced');
+  assert.equal(row.children[1].type, 'INSTANCE');
+});
+
 /* ---------- QA #3 실기 ③ 불합격 7 — 값 지키기 (§4.7 9번) ---------- */
 
 /** 목 트리: 노드는 id로 찾는다. 묶인 레이어는 기본값(defaults)을 보이고, 인스턴스 setProperties가 값을 덮는다. */

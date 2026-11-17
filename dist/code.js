@@ -767,6 +767,7 @@
     "component.fit.self": "\uC790\uC2E0",
     "component.fit.photoDiff": "\uC0AC\uC9C4 \uB2E4\uB984({name})",
     "component.fit.photoSize": "\uC0AC\uC9C4 \uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}({name})",
+    "component.fit.layout": "\uC790\uB9AC\xB7\uD06C\uAE30 \uB2E4\uB984({name})",
     "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
     "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
     "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
@@ -8861,12 +8862,50 @@
     return img ? (_a = img.imageHash) != null ? _a : "" : void 0;
   }
   var sameSize = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
-  function memberFitIssue(inst, member, prefix) {
+  function relPos(node, root) {
+    if (node === root) return { x: 0, y: 0 };
+    const T = (n) => {
+      const m = n.absoluteTransform;
+      return Array.isArray(m) && Array.isArray(m[0]) && Array.isArray(m[1]) && m[0].every((v) => typeof v === "number") && m[1].every((v) => typeof v === "number") ? m : null;
+    };
+    const tn = T(node);
+    const tr = T(root);
+    if (tn && tr) {
+      const [[a, b, tx], [c, d, ty]] = tr;
+      const det = a * d - b * c;
+      if (Math.abs(det) > 1e-9) {
+        const dx = tn[0][2] - tx;
+        const dy = tn[1][2] - ty;
+        return { x: (d * dx - b * dy) / det, y: (-c * dx + a * dy) / det };
+      }
+    }
+    let x = 0;
+    let y = 0;
+    let cur = node;
+    while (cur && cur !== root) {
+      const n = cur;
+      x += typeof n.x === "number" ? n.x : 0;
+      y += typeof n.y === "number" ? n.y : 0;
+      cur = cur.parent;
+    }
+    return { x, y };
+  }
+  var rotationOf = (n) => {
+    const r = n.rotation;
+    return typeof r === "number" ? r : 0;
+  };
+  function memberFitIssue(inst, member, prefix, opts = {}) {
     if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
       return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
     }
+    const layoutOn = opts.layout !== false;
+    const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
     let issue = null;
-    const visit = (n, path) => {
+    const layoutIssue = (name) => {
+      issue = t("component.fit.layout", { name });
+    };
+    const visit = (n, path, layout) => {
+      var _a;
       if (issue) return;
       const h = imageHashOf(n);
       if (h !== void 0) {
@@ -8885,13 +8924,45 @@
           return;
         }
       }
+      let down = layout && (path === "" || n.visible !== false);
+      if (down && path === "" && prefix) {
+        if (!instRoot) {
+          layoutIssue(n.name);
+          return;
+        }
+        const off = relPos(instRoot, inst);
+        const posBad = rotationOf(instRoot) === 0 && (!sameSize(off.x, 0) || !sameSize(off.y, 0));
+        if (posBad || !sameSize(instRoot.width, n.width) || !sameSize(instRoot.height, n.height)) {
+          layoutIssue(n.name);
+          return;
+        }
+      }
+      if (down && path !== "") {
+        const hit = nodeAtPath(inst, joinPath(prefix, path));
+        if (!hit) {
+          layoutIssue(n.name);
+          return;
+        }
+        const iconPair = hit.type === "INSTANCE" && n.type !== "INSTANCE" && (VECTOR_TYPES.has(n.type) || !!((_a = opts.isIcon) == null ? void 0 : _a.call(opts, n)));
+        if (!iconPair && hit.type !== n.type) {
+          layoutIssue(n.name);
+          return;
+        }
+        const a = relPos(n, member);
+        const b = instRoot ? relPos(hit, instRoot) : { x: NaN, y: NaN };
+        if (!sameSize(a.x, b.x) || !sameSize(a.y, b.y) || !sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+          layoutIssue(n.name);
+          return;
+        }
+        if (iconPair) down = false;
+      }
       if (!("children" in n)) return;
-      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
+      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i), down));
     };
-    visit(member, "");
+    visit(member, "", layoutOn);
     return issue;
   }
-  function replaceMember(member, make, prefix) {
+  function replaceMember(member, make, prefix, opts = {}) {
     let inst = null;
     try {
       inst = make();
@@ -8905,7 +8976,7 @@
         } catch (e) {
         }
       }
-      const why = memberFitIssue(inst, member, prefix);
+      const why = memberFitIssue(inst, member, prefix, opts);
       if (why) {
         try {
           inst.remove();
@@ -8931,14 +9002,14 @@
     }
     return { result: "replaced" };
   }
-  async function replaceMemberAsync(member, make, prefix) {
+  async function replaceMemberAsync(member, make, prefix, opts = {}) {
     let inst;
     try {
       inst = await make();
     } catch (e) {
       return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
     }
-    return replaceMember(member, () => inst, prefix);
+    return replaceMember(member, () => inst, prefix, opts);
   }
   function ancestorInstance(n) {
     let p = n.parent;
@@ -10267,6 +10338,7 @@
     if (!walk3(node) || vectors === 0) return void 0;
     return `f:${fnv1a(parts.join("|"))}`;
   }
+  var fitOpts = { isIcon: (n) => iconFrameKeyOf(n) !== void 0 };
   function artKeyOf(node) {
     var _a;
     return (_a = vectorKeyOf(node)) != null ? _a : iconFrameKeyOf(node);
@@ -11300,7 +11372,7 @@
                     }
                   };
                   const before = propFailed.length;
-                  const r = await replaceMemberAsync(node, make, prefix);
+                  const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                   if (r.result === "replaced") {
                     any = true;
                     continue;
@@ -11502,7 +11574,7 @@
                     if (snap === masterSnap) continue;
                     const name = snap.n.name;
                     const before = propFailed.length;
-                    const r = slotPlan ? replaceMember(snap.n, makerFor(snap, name), prefix) : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix);
+                    const r = slotPlan ? replaceMember(snap.n, makerFor(snap, name), prefix, { layout: false }) : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix, fitOpts);
                     if (r.result === "replaced") continue;
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
@@ -11589,7 +11661,7 @@
                     }
                   };
                   const before = propFailed.length;
-                  const r = await replaceMemberAsync(node, make, prefix);
+                  const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                   if (r.result === "replaced") continue;
                   if (propFailed.length > before) propFailed.splice(before);
                   if (r.result === "mismatch") {

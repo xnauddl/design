@@ -704,6 +704,9 @@ function iconFrameKeyOf(node: SceneNode): string | undefined {
   return `f:${fnv1a(parts.join('|'))}`;
 }
 
+/** [등록] 넣기 전 검사 인자(§4.7 8번) — 아이콘 프레임 ↔ 아이콘 인스턴스 짝은 자리 · 크기 비교를 안으로 내리지 않는다. */
+const fitOpts = { isIcon: (n: SceneNode) => iconFrameKeyOf(n) !== undefined };
+
 /** 그림 지문 — 날 벡터는 경로 지문, 아이콘 프레임은 아이콘 지문(아이콘 등록부 · 값 옮기기가 쓴다). */
 function artKeyOf(node: SceneNode): string | undefined {
   return vectorKeyOf(node) ?? iconFrameKeyOf(node);
@@ -1897,7 +1900,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') { any = true; continue; }
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 // 이 멤버만 쓰려고 새로 만든 아이콘은 지운다 — 만든 순간 다른 멤버는 아직 쓰지 않았다(쓰던 것은 had로 빠진다).
@@ -2112,8 +2115,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   const name = snap.n.name;
                   const before = propFailed.length;
                   const r = slotPlan
-                    ? replaceMember(snap.n, makerFor(snap, name), prefix)
-                    : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix);
+                    ? replaceMember(snap.n, makerFor(snap, name), prefix, { layout: false }) // heading: 슬롯 짝 — 자리 · 크기 검사 끔(§4.7 8번)
+                    : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix, fitOpts);
                   if (r.result === 'replaced') continue;
                   // 묶지 않은 멤버는 속성 값 꼬리에서 뺀다 — 원본이 그대로라 따질 속성 값이 없다.
                   if (propFailed.length > before) propFailed.splice(before);
@@ -2204,7 +2207,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') continue;
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 if (r.result === 'mismatch') {
