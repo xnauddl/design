@@ -2505,7 +2505,7 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] 단위 테스트 ① `test/reuse.test.mjs`(이미 `copyOverridesAsync` · `replaceMemberAsync` 목이 있음): 멤버 카드(안쪽 INSTANCE 안 사진 RECTANGLE · 아바타 ELLIPSE + 이름 TEXT)와 같은 메인의 인스턴스(안쪽 사진 · 아바타가 다른 해시) → `copyOverridesAsync` 뒤 안쪽 사진 · 아바타 해시가 멤버와 같음 → `replaceMemberAsync`가 `replaced`
 - [ ] 단위 테스트 ② `test/placement.test.mjs`(`memberFitIssue` 목): 안쪽 INSTANCE 안 사진 해시가 다르면 `component.fit.photoDiff` 이유, 같은 경로에 레이어가 없으면 `component.fit.noPhoto`, 크기가 다르면 `component.fit.photoSize`, 같으면 null
 - [ ] 단위 테스트 ③(회귀) `test/placement.test.mjs`: 덮어쓴 값 옮기기 없이 만든 인스턴스(`createInstance`만 — 안쪽 사진이 마스터 것)를 `replaceMember`에 넣으면 `mismatch`(photoDiff)이고 멤버 원본이 그대로 남음
-- [ ] 기존 heading 접힘 테스트(`test/figma.test.mjs`·`test/similar*.test.mjs` 등에서 `headingSlot` · 액션 없는 멤버를 다루는 것)가 그대로 통과하는지 확인 — heading 경로는 바꾸지 않는다
+- [ ] 기존 heading 접힘 테스트(`test/pure.test.mjs` · `test/reuse.test.mjs`의 `headingSlot` · `isHeadingCollapseGroup` 테스트)가 그대로 통과하는지 확인 — heading 경로는 바꾸지 않는다
 - [ ] REGISTER_COMPONENTS 전체를 도는 테스트는 만들지 않는다 — 지금 목(`installFigma`)에 `createComponentFromNode` · `getMainComponentAsync` · `setProperties` 등이 없어 새 목이 필요하다. 전체 흐름은 실기 확인으로 본다
 - [ ] 4검사
 - [ ] 실기 확인(사용자, 피그마): 원본 `163:1523` 새 복제본으로 묶음 2 다시(`docs/qa/2026-11-11-field-check.md` 2-1~2-5) — 여행자 카드 사진 4장 · 아바타 4개가 원본과 같음
