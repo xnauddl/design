@@ -19,7 +19,7 @@ import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
+import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
@@ -847,7 +847,19 @@ function isEffectivelyVisible(node: SceneNode): boolean {
  */
 function sceneComponentEligible(n: SceneNode, index?: ReadonlyMap<string, StructNode>): boolean {
   if (!isEffectivelyVisible(n)) return false;
+  // 아이콘 프레임과 그 안은 후보가 아니다 — 선택 루트도(§4.7 "묶기" 3번). `toStructNode`의 루트 동작은 그대로 두고 게이트에서 본다.
+  if (insideIconFrame(n)) return false;
   return componentEligible(index?.get(n.id) ?? toStructNode(n));
+}
+
+/** 노드 자신이나 조상이 아이콘 프레임인가(§4.7 "묶기" 3번 — 후보 게이트). 96보다 크면 바로 빠진다. */
+function insideIconFrame(n: SceneNode): boolean {
+  let p: BaseNode | null = n;
+  while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') {
+    if (iconFrameKeyOf(p as SceneNode) !== undefined) return true;
+    p = p.parent;
+  }
+  return false;
 }
 
 /** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
@@ -1676,6 +1688,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const collected: SceneNode[] = [];
           const walk = (n: SceneNode, depth: number): void => {
             if (n.visible === false) return; // 숨김은 등록·하위 스캔 제외
+            // 아이콘 프레임은 선택 루트여도 후보가 아니고 그 안으로 내려가지 않는다(§4.7 "묶기" 3번).
+            if (depth === 0 && iconFrameKeyOf(n) !== undefined) return;
             const isContainerRoot = single && depth === 0; // 컨테이너 자신 제외
             if (!isContainerRoot && eligible(n)) collected.push(n);
             // 인스턴스·메인·세트 안은 이미 컴포넌트 체계 — 안쪽 FRAME을 다시 등록하지 않음.
@@ -1745,6 +1759,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const reused: string[] = []; // 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름)
         const reuseKept: string[] = []; // 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버 이름
 
+        // 이번 실행에 만든 페이지인지 기억한다 — 끝에 비었으면 지운다(§4.7 "인스턴스 자리" 7번 — C-D4).
+        const pageCreated = !figma.root.children.some((p) => p.name === COMPONENTS_PAGE);
         const page = await ensureComponentsPage();
         let cursorX = pageStartX(page);
         let sets = 0;
@@ -1799,7 +1815,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 맨 끝 속성 노출은 세트 변형의 값(글자 · 안쪽 인스턴스 · 보이기)을 기본값으로 바꾼다. 노출 전에 만든
         // 인스턴스가 따라가지 않게, 이번 [등록]이 만든 자리 인스턴스와 컴포넌트를 모아 두고 노출 직전에
         // 그 안 모든 인스턴스의 값을 적어, 노출 뒤 되돌린다(§4.7 9번).
-        const keepRoots: { node: SceneNode; name: string }[] = [];
+        const keepRoots: KeepRoot[] = [];
         const instanceOf = (comp: ComponentNode, name: string) => (): InstanceNode => {
           const inst = comp.createInstance();
           keepRoots.push({ node: inst, name });
@@ -1866,12 +1882,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   continue;
                 }
                 let noted = false;
+                let counted = false;
                 // 이 멤버를 위해 이번 실행에 새로 만든 아이콘 — 멤버가 원본으로 남으면 지운다(5번 "아이콘 정리").
                 const newIcons: string[] = [];
                 const make = async (): Promise<InstanceNode> => {
                   const inst = comp.createInstance();
                   try {
-                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const entry: KeepRoot = { node: inst, name };
+                    keepRoots.push(entry); // 9번 값 지키기의 기록 대상
                     const bad = await copyOverridesAsync(node, inst, prefix, {
                       mainOf: (n) => n.getMainComponentAsync(),
                       loadFont: (f) => figma.loadFontAsync(f),
@@ -1888,8 +1906,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     if (!noted) {
                       noted = true;
                       for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
-                      if (bad.length) propFailed.push(name);
+                      if (bad.length) { propFailed.push(name); counted = true; }
                     }
+                    if (counted) entry.counted = true; // 이 자리는 꼬리에 셌다 — 되돌리기 실패로 다시 세지 않는다(9번)
                     return inst;
                   } catch (e) {
                     try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
@@ -2056,11 +2075,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   const images: Record<string, readonly Paint[]> = {};
                   for (const [path, paints] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints;
                   let noted = false; // 속성 값·사진 실패는 멤버마다 한 번만(복사본을 다시 만들 때 겹치지 않게)
+                  let counted = false;
                   return (): InstanceNode => {
                     let inst: InstanceNode | null = null;
                     try {
                       inst = master.createInstance();
-                      keepRoots.push({ node: inst, name });
+                      const entry: KeepRoot = { node: inst, name };
+                      keepRoots.push(entry);
                       const badProps = applyInstancePropValues(inst, ids, vals);
                       // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본 채움 전체(해시·scaleMode·imageTransform)를 이식한다.
                       const img = transplantImageFills(inst, images).failures;
@@ -2068,8 +2089,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                         noted = true;
                         for (const p of badProps) failures.push(t('component.fail.propValue', { name, prop: p }));
                         failures.push(...img.map((f) => `${name}: ${f}`));
-                        if (badProps.length || img.length) propFailed.push(name);
+                        if (badProps.length || img.length) { propFailed.push(name); counted = true; }
                       }
+                      if (counted) entry.counted = true; // 꼬리에 센 자리(9번 — 한 자리는 한 번만)
                       return inst;
                     } catch (e) {
                       // 예상 밖 예외면 만든 인스턴스를 지우고 던진다(어디에도 남기지 않는다).
@@ -2157,7 +2179,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 const make = async (): Promise<InstanceNode> => {
                   const inst = x.comp.createInstance();
                   try {
-                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const entry: KeepRoot = { node: inst, name };
+                    keepRoots.push(entry); // 9번 값 지키기의 기록 대상
                     const bad = await copyOverridesAsync(node, inst, prefix, {
                       mainOf: (n) => n.getMainComponentAsync(),
                       loadFont: (f) => figma.loadFontAsync(f),
@@ -2168,7 +2191,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                       },
                     });
                     for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
-                    if (bad.length) propFailed.push(name);
+                    if (bad.length) { propFailed.push(name); entry.counted = true; }
                     return inst;
                   } catch (e) {
                     try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
@@ -2244,11 +2267,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         // 노출로 기본값이 된 값을 되돌린다. 못 넣은 것은 자리마다 한 번 "속성 값을 못 넣은" 꼬리에(6번과 같다).
         const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
-        for (const [k, props] of keepFailed) {
-          const name = keepRoots[k].name;
-          for (const prop of props) failures.push(t('component.fail.propValue', { name, prop }));
-          propFailed.push(name);
-        }
+        // 한 자리는 한 번만 센다 — 넣을 때 이미 센 자리는 다시 세지 않는다(9번, 자리 = keepRoots 항목).
+        tallyRestoreFailures(keepRoots, keepFailed, propFailed, (name, prop) => failures.push(t('component.fail.propValue', { name, prop })));
+
+        // 끝 정리(§4.7 "인스턴스 자리" 7번 — C-D4): 이번에 만들었는데 쓰이지 않게 된 아이콘, 이번에 만든 빈 Components 페이지.
+        await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
 
         post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
         if (registered || sets || reused.length) commitUndo(figma); // UX2 — 재사용만이어도 ⌘Z 한 번(§4.7 "재사용" 6번)

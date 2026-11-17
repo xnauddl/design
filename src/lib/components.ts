@@ -7,7 +7,7 @@
 import { kebab, pascalCase, capitalize } from './naming';
 import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
-import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots, tabInfo } from './componentLike';
+import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots, tabInfo, isIconFrame } from './componentLike';
 import type { LikeNode, PaintLike, EffectLike } from './componentLike';
 import { VECTOR_TYPES } from './nodePaint'; // 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다
 
@@ -887,6 +887,12 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
     // 숨김은 후보도 아니고 안쪽도 스캔하지 않음(실효 비가시 트리).
     if (n.visible === false) return;
     const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
+    // 아이콘 프레임과 그 안은 후보가 아니다 — 선택 루트도(§4.7 "묶기" 3번). 루트가 아닌 아이콘 프레임은
+    // StructNode가 이미 자식을 비워 넘기지만 루트는 펼친 채라 여기서 본다.
+    if (depth === 0 && isIconFrame(n)) {
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: false });
+      return;
+    }
     all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
     // 이미 등록된 컴포넌트 체계는 서브트리째 스킵(안쪽 FRAME을 새 후보로 잡지 않음).
     if (isClosedComponentSubtree(n)) return;
@@ -1926,6 +1932,28 @@ function assignAxis(subs: Subfamily[], name: string, valueOf: (s: Subfamily) => 
   subs.forEach((s, i) => { s.props[name] = byVal.get(vals[i] as string)!; });
 }
 
+/** 색 하나의 이름(겹침 숫자 없이) — 무채색은 `gray-{단계}`, 빈 값(채움 없음)은 `none`(C-D8 · C-D10). */
+function colorNameOf(hex: string): string {
+  if (!hex) return 'none';
+  const { family, step, achromatic } = classifyColor(hex);
+  return achromatic ? `gray-${step}` : family;
+}
+
+/** 이름이 겹치면 뒤에 온 것의 끝에 `-2` · `-3` …(값 전체를 한 번에 — C-D10). */
+function uniqLabels(names: readonly string[]): string[] {
+  const used = new Set<string>();
+  return names.map((base) => {
+    let name = base;
+    let i = 2;
+    while (used.has(name)) name = `${base}-${i++}`;
+    used.add(name);
+    return name;
+  });
+}
+
+/** Color 축 이름 — `colorAxisLabels`와 같고 빈 값(채움 없음)은 `none`(2026-11-13 C-D8). */
+const colorAxisLabelsOrNone = (distinct: string[]): string[] => uniqLabels(distinct.map(colorNameOf));
+
 const sizeLabel = (distinct: string[]): string[] => {
   const areas = distinct.map(Number);
   const sorted = [...areas].sort((a, b) => a - b);
@@ -1947,7 +1975,8 @@ function familySubfamilies(fam: StructNode[]): Subfamily[] {
   ].join('#');
   const subs = subfamiliesBy(fam, key);
   if (subs.length >= 2) {
-    if (ref != null) assignAxis(subs, 'Color', (s) => colorAt(s.members[s.master], ref) || null, (d) => colorAxisLabels(d));
+    // 채움 없음도 Color 값 `none`(2026-11-13 C-D8) — 축을 버리지 않는다.
+    if (ref != null) assignAxis(subs, 'Color', (s) => colorAt(s.members[s.master], ref), colorAxisLabelsOrNone);
     if (!content) assignAxis(subs, 'Size', (s) => String((s.members[s.master].width ?? 0) * (s.members[s.master].height ?? 0)), sizeLabel);
   }
   finishProps(subs);
@@ -1974,15 +2003,26 @@ function tabSubfamilies(members: StructNode[]): Subfamily[] {
   const famOf = new Map<string, number>();
   fams.forEach((f, i) => f.forEach((m) => famOf.set(m.id, i)));
   const info = new Map(members.map((m) => [m.id, tabInfo(m as LikeNode)!]));
-  const rootVaries = new Set(members.map((m) => m.fillHex ?? '')).size > 1;
-  const colorOf = (m: StructNode): string => (rootVaries ? m.fillHex ?? '' : info.get(m.id)!.selectedColor);
+  // "루트가 기준"은 같은 가족 · 같은 Style 안에서만(2026-11-13 C-D1) — 다른 가족 탭의 루트 채움은 보지 않는다.
+  const fsOf = (m: StructNode): string => `${famOf.get(m.id)}#${info.get(m.id)!.style}`;
+  const rootsBy = new Map<string, Set<string>>();
+  for (const m of members) {
+    const k = fsOf(m);
+    if (!rootsBy.has(k)) rootsBy.set(k, new Set());
+    rootsBy.get(k)!.add(m.fillHex ?? '');
+  }
+  const rootVaries = (m: StructNode): boolean => (rootsBy.get(fsOf(m))?.size ?? 0) > 1;
+  /** 앞 색 — 루트(같은 가족 · Style 안에서 루트 채움이 갈리면) 또는 선택 칸 색. */
+  const colorOf = (m: StructNode): string => (rootVaries(m) ? m.fillHex ?? '' : info.get(m.id)!.selectedColor);
+  /** 뒤 색 — 선택 안 된 칸 글자 색(C-D1). */
+  const backOf = (m: StructNode): string => info.get(m.id)!.unselectedTextColor ?? '';
   // 가족마다 내용(글자 · 그림) 차가 있으면 크기는 축이 아니다(5번 3단계와 같은 규칙).
   const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
   const key = (m: StructNode): string => {
     const t = info.get(m.id)!;
     const fi = famOf.get(m.id)!;
     const content = famContent[fi];
-    return [fi, t.style, t.selected, colorOf(m), content ? '' : `${m.width ?? 0}x${m.height ?? 0}`, padOf(m), innerSig(m, padOf),
+    return [fi, t.style, t.selected, colorOf(m), backOf(m), content ? '' : `${m.width ?? 0}x${m.height ?? 0}`, padOf(m), innerSig(m, padOf),
       content ? '' : innerSig(m, (n) => `${n.width ?? 0}x${n.height ?? 0}`)].join('#');
   };
   const subs = subfamiliesBy(members, key);
@@ -1998,14 +2038,31 @@ function tabSubfamilies(members: StructNode[]): Subfamily[] {
       posBy.get(k)!.add(info.get(head(s).id)!.selected);
     }
     for (const s of subs) if ((posBy.get(famStyle(s))?.size ?? 0) > 1) s.props.Selected = String(info.get(head(s).id)!.selected + 1);
-    // Color: 같은 가족 · Style · 선택 위치인데 색이 다른 소가족이 있을 때만(테마만 다른 탭).
-    const byPos = new Map<string, Set<string>>();
+    // Color: 같은 가족 · Style · 선택 위치인데 색(앞 = 루트 또는 선택 칸 색, 뒤 = 선택 안 된 칸 글자 색)이 다른
+    // 소가족이 있을 때만(테마만 다른 탭). 값 이름은 탭 그룹 전체에서 한 형식(C-D9 · C-D11):
+    // 어느 묶음에서든 두 색이 함께 갈리거나, 묶음마다 갈린 쪽이 다르면 모든 변형이 `{앞}-{뒤}`, 아니면 갈린 쪽 색 이름만.
+    const byPos = new Map<string, { front: Set<string>; back: Set<string> }>();
     for (const s of subs) {
       const k = `${famStyle(s)}#${info.get(head(s).id)!.selected}`;
-      if (!byPos.has(k)) byPos.set(k, new Set());
-      byPos.get(k)!.add(colorOf(head(s)));
+      if (!byPos.has(k)) byPos.set(k, { front: new Set(), back: new Set() });
+      byPos.get(k)!.front.add(colorOf(head(s)));
+      byPos.get(k)!.back.add(backOf(head(s)));
     }
-    if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, 'Color', (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
+    const groupsV = [...byPos.values()];
+    const frontV = groupsV.some((g) => g.front.size > 1);
+    const backV = groupsV.some((g) => g.back.size > 1);
+    if (frontV || backV) {
+      const both = groupsV.some((g) => g.front.size > 1 && g.back.size > 1) || (frontV && backV);
+      if (both) {
+        // 앞 · 뒤를 저마다 색 이름으로 바꿔 붙인 뒤 값 전체를 한 번에 겹침 검사(C-D10).
+        assignAxis(subs, 'Color', (s) => `${colorOf(head(s))}|${backOf(head(s))}`, (d) =>
+          uniqLabels(d.map((v) => { const [f, b] = v.split('|'); return `${colorNameOf(f)}-${colorNameOf(b)}`; })));
+      } else if (frontV) {
+        assignAxis(subs, 'Color', (s) => colorOf(head(s)), colorAxisLabelsOrNone);
+      } else {
+        assignAxis(subs, 'Color', (s) => backOf(head(s)), colorAxisLabelsOrNone);
+      }
+    }
     // Size: 내용 차 없는 가족 안에서 크기만 다를 때.
     const sizeBy = new Map<string, Set<string>>();
     for (const s of subs) {
@@ -2081,6 +2138,22 @@ export function resolvePlanNames(groups: readonly PlanGroup[], existing: readonl
   const taken = new Set<string>([...existing, ...plainNames]);
   const names: string[] = new Array(groups.length).fill('');
   plainIdx.forEach((gi, k) => { names[gi] = plainNames[k]; });
+  // `-Type{n}`의 기본 이름은 이름 그룹마다 한 번 정한다 — 이번 실행의 다른 기본 이름 · 보통 이름과 겹칠 때만
+  // 맥락을 되살린다(`article-list` → `ArticleList`). 숫자로 피하는 것은 `-Type{n}` 뒤 `-k`로만(§4.7 "묶기" 4번).
+  const typedKeys: string[] = [];
+  const typedMembers = new Map<string, StructNode[]>();
+  for (const g of groups) {
+    if (g.tab || g.typeIndex == null) continue;
+    if (!typedMembers.has(g.key)) { typedKeys.push(g.key); typedMembers.set(g.key, g.nameMembers); }
+  }
+  const rawBase = new Map(typedKeys.map((k) => [k, componentBaseName(typedMembers.get(k)!)]));
+  const plainSet = new Set(plainNames);
+  const baseByKey = new Map<string, string>();
+  for (const k of typedKeys) {
+    const b = rawBase.get(k)!;
+    const clash = plainSet.has(b) || typedKeys.some((o) => o !== k && rawBase.get(o) === b);
+    baseByKey.set(k, clash ? contextualName(typedMembers.get(k)!) : b);
+  }
   groups.forEach((g, i) => {
     if (!g.tab && g.typeIndex == null) return;
     let base: string;
@@ -2089,7 +2162,7 @@ export function resolvePlanNames(groups: readonly PlanGroup[], existing: readonl
       base = 'Tab';
       next = (k) => `Tab${k}`;
     } else {
-      base = `${componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
+      base = `${baseByKey.get(g.key) ?? componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
       next = (k) => `${base}-${k}`;
     }
     let name = base;

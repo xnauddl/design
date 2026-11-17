@@ -1483,11 +1483,11 @@
     const g = TEXT_GROUP[field];
     return g ? `${g}/text` : null;
   }
-  function colorUse(nodeType, field, insideIconFrame) {
+  function colorUse(nodeType, field, insideIconFrame2) {
     if (field === "effects") return "shadow";
     if (nodeType === "TEXT" && field === "fills") return "text";
     if (VECTOR_TYPES.has(nodeType)) return "icon";
-    if (insideIconFrame && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
+    if (insideIconFrame2 && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
     return field === "fills" ? "background" : "border";
   }
   function bgKindOf(hex) {
@@ -6907,6 +6907,12 @@
     };
     return ok(n) && vectors > 0;
   }
+  function isIconFrame(n) {
+    if (n.type !== "FRAME" && n.type !== "GROUP") return false;
+    if (n.iconFrame) return true;
+    if (hasImageFill(n)) return false;
+    return isIconLike(n);
+  }
   function shortOneLine(t2) {
     const c = t2.characters;
     if (typeof c !== "string") return false;
@@ -6922,6 +6928,7 @@
     if (cells.length < 3) return null;
     let looks;
     let colors;
+    let textColors;
     let textCells;
     if (cells.every((c) => c.type === "TEXT")) {
       textCells = true;
@@ -6929,6 +6936,7 @@
       if (cells.some((c) => !c.fillHex)) return null;
       looks = cells.map((c) => c.fillHex);
       colors = looks;
+      textColors = looks;
     } else if (cells.every((c) => c.type === "FRAME")) {
       textCells = false;
       const texts = cells.map(cellText);
@@ -6936,6 +6944,7 @@
       if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill(c) && !c.fillHex)) return null;
       looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ""}|${hasVisibleStroke(c) ? "s" : ""}|${texts[i].fillHex}`);
       colors = cells.map((c, i) => hasVisibleFill(c) && c.fillHex ? c.fillHex : texts[i].fillHex);
+      textColors = texts.map((t2) => t2.fillHex);
     } else {
       return null;
     }
@@ -6948,7 +6957,8 @@
     const sel = cells[selected];
     let style = "Text";
     if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf2(sel) > 0 ? "Pill" : "Box";
-    return { style, selected, selectedColor: colors[selected] };
+    const other = selected === 0 ? 1 : 0;
+    return { style, selected, selectedColor: colors[selected], unselectedTextColor: textColors[other] };
   }
   function isTabLike(node) {
     return tabInfo(node) != null;
@@ -7831,6 +7841,10 @@
     const visit = (n, depth, parentId) => {
       if (n.visible === false) return;
       const isContainerRoot = single && depth === 0;
+      if (depth === 0 && isIconFrame(n)) {
+        all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: false });
+        return;
+      }
       all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
       if (isClosedComponentSubtree(n)) return;
       if (tabInfo(n) != null) return;
@@ -8536,6 +8550,22 @@
       s.props[name] = byVal.get(vals[i]);
     });
   }
+  function colorNameOf(hex) {
+    if (!hex) return "none";
+    const { family, step, achromatic } = classifyColor(hex);
+    return achromatic ? `gray-${step}` : family;
+  }
+  function uniqLabels(names) {
+    const used = /* @__PURE__ */ new Set();
+    return names.map((base) => {
+      let name = base;
+      let i = 2;
+      while (used.has(name)) name = `${base}-${i++}`;
+      used.add(name);
+      return name;
+    });
+  }
+  var colorAxisLabelsOrNone = (distinct) => uniqLabels(distinct.map(colorNameOf));
   var sizeLabel = (distinct) => {
     const areas = distinct.map(Number);
     const sorted = [...areas].sort((a, b) => a - b);
@@ -8561,7 +8591,7 @@
     };
     const subs = subfamiliesBy(fam, key);
     if (subs.length >= 2) {
-      if (ref != null) assignAxis(subs, "Color", (s) => colorAt(s.members[s.master], ref) || null, (d) => colorAxisLabels(d));
+      if (ref != null) assignAxis(subs, "Color", (s) => colorAt(s.members[s.master], ref), colorAxisLabelsOrNone);
       if (!content) assignAxis(subs, "Size", (s) => {
         var _a, _b;
         return String(((_a = s.members[s.master].width) != null ? _a : 0) * ((_b = s.members[s.master].height) != null ? _b : 0));
@@ -8585,18 +8615,29 @@
     return { key: reuseNameKey((_b = (_a = ms[0]) == null ? void 0 : _a.name) != null ? _b : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
   }
   function tabSubfamilies(members) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const fams = splitFamilies(members);
     const famOf2 = /* @__PURE__ */ new Map();
     fams.forEach((f, i) => f.forEach((m) => famOf2.set(m.id, i)));
     const info = new Map(members.map((m) => [m.id, tabInfo(m)]));
-    const rootVaries = new Set(members.map((m) => {
-      var _a2;
-      return (_a2 = m.fillHex) != null ? _a2 : "";
-    })).size > 1;
+    const fsOf = (m) => `${famOf2.get(m.id)}#${info.get(m.id).style}`;
+    const rootsBy = /* @__PURE__ */ new Map();
+    for (const m of members) {
+      const k = fsOf(m);
+      if (!rootsBy.has(k)) rootsBy.set(k, /* @__PURE__ */ new Set());
+      rootsBy.get(k).add((_a = m.fillHex) != null ? _a : "");
+    }
+    const rootVaries = (m) => {
+      var _a2, _b2;
+      return ((_b2 = (_a2 = rootsBy.get(fsOf(m))) == null ? void 0 : _a2.size) != null ? _b2 : 0) > 1;
+    };
     const colorOf = (m) => {
       var _a2;
-      return rootVaries ? (_a2 = m.fillHex) != null ? _a2 : "" : info.get(m.id).selectedColor;
+      return rootVaries(m) ? (_a2 = m.fillHex) != null ? _a2 : "" : info.get(m.id).selectedColor;
+    };
+    const backOf = (m) => {
+      var _a2;
+      return (_a2 = info.get(m.id).unselectedTextColor) != null ? _a2 : "";
     };
     const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
     const key = (m) => {
@@ -8609,6 +8650,7 @@
         t2.style,
         t2.selected,
         colorOf(m),
+        backOf(m),
         content ? "" : `${(_a2 = m.width) != null ? _a2 : 0}x${(_b2 = m.height) != null ? _b2 : 0}`,
         padOf(m),
         innerSig(m, padOf),
@@ -8629,21 +8671,37 @@
         if (!posBy.has(k)) posBy.set(k, /* @__PURE__ */ new Set());
         posBy.get(k).add(info.get(head(s).id).selected);
       }
-      for (const s of subs) if (((_b = (_a = posBy.get(famStyle(s))) == null ? void 0 : _a.size) != null ? _b : 0) > 1) s.props.Selected = String(info.get(head(s).id).selected + 1);
+      for (const s of subs) if (((_c = (_b = posBy.get(famStyle(s))) == null ? void 0 : _b.size) != null ? _c : 0) > 1) s.props.Selected = String(info.get(head(s).id).selected + 1);
       const byPos = /* @__PURE__ */ new Map();
       for (const s of subs) {
         const k = `${famStyle(s)}#${info.get(head(s).id).selected}`;
-        if (!byPos.has(k)) byPos.set(k, /* @__PURE__ */ new Set());
-        byPos.get(k).add(colorOf(head(s)));
+        if (!byPos.has(k)) byPos.set(k, { front: /* @__PURE__ */ new Set(), back: /* @__PURE__ */ new Set() });
+        byPos.get(k).front.add(colorOf(head(s)));
+        byPos.get(k).back.add(backOf(head(s)));
       }
-      if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, "Color", (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
+      const groupsV = [...byPos.values()];
+      const frontV = groupsV.some((g) => g.front.size > 1);
+      const backV = groupsV.some((g) => g.back.size > 1);
+      if (frontV || backV) {
+        const both = groupsV.some((g) => g.front.size > 1 && g.back.size > 1) || frontV && backV;
+        if (both) {
+          assignAxis(subs, "Color", (s) => `${colorOf(head(s))}|${backOf(head(s))}`, (d) => uniqLabels(d.map((v) => {
+            const [f, b] = v.split("|");
+            return `${colorNameOf(f)}-${colorNameOf(b)}`;
+          })));
+        } else if (frontV) {
+          assignAxis(subs, "Color", (s) => colorOf(head(s)), colorAxisLabelsOrNone);
+        } else {
+          assignAxis(subs, "Color", (s) => backOf(head(s)), colorAxisLabelsOrNone);
+        }
+      }
       const sizeBy = /* @__PURE__ */ new Map();
       for (const s of subs) {
         const fi = famOf2.get(head(s).id);
         if (famContent[fi]) continue;
         const k = famStyle(s);
         if (!sizeBy.has(k)) sizeBy.set(k, /* @__PURE__ */ new Set());
-        sizeBy.get(k).add(String(((_c = head(s).width) != null ? _c : 0) * ((_d = head(s).height) != null ? _d : 0)));
+        sizeBy.get(k).add(String(((_d = head(s).width) != null ? _d : 0) * ((_e = head(s).height) != null ? _e : 0)));
       }
       const area = (s) => {
         var _a2, _b2;
@@ -8707,7 +8765,25 @@
     plainIdx.forEach((gi, k) => {
       names[gi] = plainNames[k];
     });
+    const typedKeys = [];
+    const typedMembers = /* @__PURE__ */ new Map();
+    for (const g of groups) {
+      if (g.tab || g.typeIndex == null) continue;
+      if (!typedMembers.has(g.key)) {
+        typedKeys.push(g.key);
+        typedMembers.set(g.key, g.nameMembers);
+      }
+    }
+    const rawBase = new Map(typedKeys.map((k) => [k, componentBaseName(typedMembers.get(k))]));
+    const plainSet = new Set(plainNames);
+    const baseByKey = /* @__PURE__ */ new Map();
+    for (const k of typedKeys) {
+      const b = rawBase.get(k);
+      const clash = plainSet.has(b) || typedKeys.some((o) => o !== k && rawBase.get(o) === b);
+      baseByKey.set(k, clash ? contextualName(typedMembers.get(k)) : b);
+    }
     groups.forEach((g, i) => {
+      var _a;
       if (!g.tab && g.typeIndex == null) return;
       let base;
       let next;
@@ -8715,7 +8791,7 @@
         base = "Tab";
         next = (k2) => `Tab${k2}`;
       } else {
-        base = `${componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
+        base = `${(_a = baseByKey.get(g.key)) != null ? _a : componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
         next = (k2) => `${base}-${k2}`;
       }
       let name = base;
@@ -8770,6 +8846,7 @@
     return {
       get: (vectorKey) => lookup(vectorKey),
       created: () => made,
+      madeKeys: () => [...madeKeys],
       discard(vectorKey) {
         if (!madeKeys.has(vectorKey)) return false;
         const comp = byKey.get(vectorKey);
@@ -8805,6 +8882,31 @@
         }
       }
     };
+  }
+  async function cleanupAfterRegister(opts) {
+    let removed = 0;
+    for (const key of opts.registry.madeKeys()) {
+      const comp = opts.registry.get(key);
+      if (!comp || comp.removed) {
+        if (opts.registry.discard(key)) removed++;
+        continue;
+      }
+      let used = true;
+      try {
+        used = (await opts.instancesOf(comp)).some((i) => !i.removed);
+      } catch (e) {
+        used = true;
+      }
+      if (!used && opts.registry.discard(key)) removed++;
+    }
+    const page = opts.page;
+    if (opts.pageCreated && page && !page.removed && page.children.length === 0) {
+      try {
+        page.remove();
+      } catch (e) {
+      }
+    }
+    return removed;
   }
   function swapVectorSlots(master, slots) {
     const failures = [];
@@ -9143,6 +9245,16 @@
     return out;
   }
   var propNameOf = (key) => key.replace(/#[^#]*$/, "") || key;
+  function tallyRestoreFailures(roots, failed, propFailed, onProp) {
+    for (const [k, props] of failed) {
+      const root = roots[k];
+      if (!root) continue;
+      for (const prop of props) onProp(root.name, prop);
+      if (root.counted) continue;
+      root.counted = true;
+      propFailed.push(root.name);
+    }
+  }
   async function restoreOverrides(snaps, getNode, mainOf, loadFont) {
     var _a, _b;
     const failedBy = /* @__PURE__ */ new Map();
@@ -10392,7 +10504,16 @@
   function sceneComponentEligible(n, index) {
     var _a;
     if (!isEffectivelyVisible3(n)) return false;
+    if (insideIconFrame(n)) return false;
     return componentEligible((_a = index == null ? void 0 : index.get(n.id)) != null ? _a : toStructNode(n));
+  }
+  function insideIconFrame(n) {
+    let p = n;
+    while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
+      if (iconFrameKeyOf(p) !== void 0) return true;
+      p = p.parent;
+    }
+    return false;
   }
   function resolvePropTarget(root, p) {
     var _a;
@@ -11103,6 +11224,7 @@
             const collected = [];
             const walk3 = (n, depth) => {
               if (n.visible === false) return;
+              if (depth === 0 && iconFrameKeyOf(n) !== void 0) return;
               const isContainerRoot = single && depth === 0;
               if (!isContainerRoot && eligible(n)) collected.push(n);
               if (n.type === "INSTANCE" || n.type === "COMPONENT" || n.type === "COMPONENT_SET") return;
@@ -11161,6 +11283,7 @@
           }
           const reused = [];
           const reuseKept = [];
+          const pageCreated = !figma.root.children.some((p) => p.name === COMPONENTS_PAGE);
           const page = await ensureComponentsPage();
           let cursorX = pageStartX(page);
           let sets = 0;
@@ -11267,11 +11390,13 @@
                     continue;
                   }
                   let noted = false;
+                  let counted = false;
                   const newIcons = [];
                   const make = async () => {
                     const inst = comp.createInstance();
                     try {
-                      keepRoots.push({ node: inst, name });
+                      const entry = { node: inst, name };
+                      keepRoots.push(entry);
                       const bad = await copyOverridesAsync(node, inst, prefix, {
                         mainOf: (n) => n.getMainComponentAsync(),
                         loadFont: (f) => figma.loadFontAsync(f),
@@ -11288,8 +11413,12 @@
                       if (!noted) {
                         noted = true;
                         for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
-                        if (bad.length) propFailed.push(name);
+                        if (bad.length) {
+                          propFailed.push(name);
+                          counted = true;
+                        }
                       }
+                      if (counted) entry.counted = true;
                       return inst;
                     } catch (e) {
                       try {
@@ -11447,19 +11576,25 @@
                     const images = {};
                     for (const [path, paints2] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints2;
                     let noted = false;
+                    let counted = false;
                     return () => {
                       let inst = null;
                       try {
                         inst = master.createInstance();
-                        keepRoots.push({ node: inst, name });
+                        const entry = { node: inst, name };
+                        keepRoots.push(entry);
                         const badProps = applyInstancePropValues(inst, ids, vals);
                         const img = transplantImageFills(inst, images).failures;
                         if (!noted) {
                           noted = true;
                           for (const p of badProps) failures.push(t("component.fail.propValue", { name, prop: p }));
                           failures.push(...img.map((f) => `${name}: ${f}`));
-                          if (badProps.length || img.length) propFailed.push(name);
+                          if (badProps.length || img.length) {
+                            propFailed.push(name);
+                            counted = true;
+                          }
                         }
+                        if (counted) entry.counted = true;
                         return inst;
                       } catch (e) {
                         if (inst) {
@@ -11542,7 +11677,8 @@
                   const make = async () => {
                     const inst = x.comp.createInstance();
                     try {
-                      keepRoots.push({ node: inst, name });
+                      const entry = { node: inst, name };
+                      keepRoots.push(entry);
                       const bad = await copyOverridesAsync(node, inst, prefix, {
                         mainOf: (n) => n.getMainComponentAsync(),
                         loadFont: (f) => figma.loadFontAsync(f),
@@ -11553,7 +11689,10 @@
                         }
                       });
                       for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
-                      if (bad.length) propFailed.push(name);
+                      if (bad.length) {
+                        propFailed.push(name);
+                        entry.counted = true;
+                      }
                       return inst;
                     } catch (e) {
                       try {
@@ -11641,11 +11780,8 @@
             }
           }
           const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
-          for (const [k, props] of keepFailed) {
-            const name = keepRoots[k].name;
-            for (const prop of props) failures.push(t("component.fail.propValue", { name, prop }));
-            propFailed.push(name);
-          }
+          tallyRestoreFailures(keepRoots, keepFailed, propFailed, (name, prop) => failures.push(t("component.fail.propValue", { name, prop })));
+          await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
           post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
           if (registered || sets || reused.length) commitUndo(figma);
           break;
