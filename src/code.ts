@@ -704,6 +704,9 @@ function iconFrameKeyOf(node: SceneNode): string | undefined {
   return `f:${fnv1a(parts.join('|'))}`;
 }
 
+/** [등록] 넣기 전 검사 인자(§4.7 8번) — 아이콘 프레임 ↔ 아이콘 인스턴스 짝은 자리 · 크기 비교를 안으로 내리지 않는다. */
+const fitOpts = { isIcon: (n: SceneNode) => iconFrameKeyOf(n) !== undefined };
+
 /** 그림 지문 — 날 벡터는 경로 지문, 아이콘 프레임은 아이콘 지문(아이콘 등록부 · 값 옮기기가 쓴다). */
 function artKeyOf(node: SceneNode): string | undefined {
   return vectorKeyOf(node) ?? iconFrameKeyOf(node);
@@ -1897,7 +1900,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') { any = true; continue; }
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 // 이 멤버만 쓰려고 새로 만든 아이콘은 지운다 — 만든 순간 다른 멤버는 아직 쓰지 않았다(쓰던 것은 had로 빠진다).
@@ -2081,11 +2084,39 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 // 마스터 자리 — 원본이 Components 페이지로 옮겨졌으므로 인스턴스 → 복사본 → 빈 자리(5번).
                 restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
                 // 나머지 멤버 — 검사 뒤 넣고 나서 지운다. 걸리면 원본 그대로(8번), 못 넣으면 원본 그대로(5번).
+                // 값 넣기는 세트 경로(⑤ placeExtras)와 같이 덮어쓴 값 옮기기 하나로 — 안쪽 인스턴스 속
+                // 사진 · 글자 · 보이기까지 옮긴다(§4.7 "묶기" 5번 4단계, QA #5 불합격 1). 단 슬롯으로 값을
+                // 읽는 heading 계획은 자식 인덱스 짝 맞추기를 쓸 수 없어 지금 방식(속성 값 + 사진 슬롯) 그대로.
+                const slotPlan = plan.some((p) => !!p.headingSlot);
+                /** 멤버용 비동기 만들기 — 인스턴스 → 9번 기록 대상 → 덮어쓴 값 옮기기. */
+                const asyncMakerFor = (member: SceneNode, name: string) => async (): Promise<InstanceNode> => {
+                  const inst = master.createInstance();
+                  try {
+                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const bad = await copyOverridesAsync(member, inst, prefix, {
+                      mainOf: (n) => n.getMainComponentAsync(),
+                      loadFont: (f) => figma.loadFontAsync(f),
+                      isIcon: (n) => iconFrameKeyOf(n) !== undefined,
+                      iconFor: (v) => {
+                        const key = artKeyOf(v);
+                        return key ? iconRegistry.ensure(key, v, v.name) : null;
+                      },
+                    });
+                    for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
+                    if (bad.length) propFailed.push(name);
+                    return inst;
+                  } catch (e) {
+                    try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
+                    throw e;
+                  }
+                };
                 for (const snap of snaps) {
                   if (snap === masterSnap) continue;
                   const name = snap.n.name;
                   const before = propFailed.length;
-                  const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                  const r = slotPlan
+                    ? replaceMember(snap.n, makerFor(snap, name), prefix, { layout: false }) // heading: 슬롯 짝 — 자리 · 크기 검사 끔(§4.7 8번)
+                    : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix, fitOpts);
                   if (r.result === 'replaced') continue;
                   // 묶지 않은 멤버는 속성 값 꼬리에서 뺀다 — 원본이 그대로라 따질 속성 값이 없다.
                   if (propFailed.length > before) propFailed.splice(before);
@@ -2176,7 +2207,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') continue;
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 if (r.result === 'mismatch') {

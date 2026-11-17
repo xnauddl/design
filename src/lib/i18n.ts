@@ -771,6 +771,7 @@ export const STRINGS: Record<string, string> = {
   'component.fit.self': '자신',
   'component.fit.photoDiff': '사진 다름({name})',
   'component.fit.photoSize': '사진 크기 {w}×{h} ≠ {mw}×{mh}({name})',
+  'component.fit.layout': '자리·크기 다름({name})',
   'component.fail.single': '단독 등록 실패({name}): {error}',
   'component.fail.propsRegister': '속성접힘 등록 실패({set}): {error}',
   'component.fail.iconFallback': '아이콘을 만들지 못해 세트로 등록해요({set})',
