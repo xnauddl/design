@@ -21,12 +21,13 @@ export interface MakePlanInput {
 }
 
 /**
- * 이번 실행에서 도는 단계(§4.3 "실행 순서"). 무료는 연결 · 이름 정리만(만들기 · 다크 · 텍스트 스타일은 유료).
+ * 이번 실행에서 도는 단계(§4.3 "실행 순서"). 무료도 만들기(Global만 — `globalOnly`) · 연결 · 이름 정리를 하고,
+ * 다크 · 텍스트 스타일은 유료다(무료 규칙 — §4.3 "무료 — 무료 규칙 PR 뒤", F4).
  * 텍스트 스타일 단계가 연결보다 먼저인 이유: 스타일이 붙은 글자는 연결이 글자 자리를 건너뛴다(`styled`).
  */
 export function planMake(i: MakePlanInput): MakeStepId[] {
   const out: MakeStepId[] = [];
-  if (i.isPaid && i.globalsOn > 0) out.push('create');
+  if (i.globalsOn > 0) out.push('create');
   if (i.isPaid && i.dark) out.push('dark');
   if (i.isPaid && i.stylesOn > 0) out.push('textStyles');
   if (i.link) out.push('bind');
@@ -68,18 +69,22 @@ export interface MakeTotals {
 
 /**
  * 다 됨 상태 줄 문구(§4.3 실행 상태표 "다 됨"). 한 단계도 하지 않은 부분은 뺀다.
- * 무료는 끝에 " · 변수는 만들지 않았어요", 바로 연결을 껐으면 끝에 " · 연결은 아직 안 했어요".
+ * 무료의 만들기 부분은 "Global {g}개"(Semantic 없음 — F4), 바로 연결을 껐으면 끝에 " · 연결은 아직 안 했어요".
  */
 export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOff: boolean }): string {
   const parts: string[] = [];
-  if (totals.created) parts.push(t('make.done.create', { g: totals.created.g, r: totals.created.r }));
+  if (totals.created) parts.push(makeCreatedText(totals.created, opts.isPaid));
   if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
   if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
   if (totals.styles?.missing?.length) parts.push(t('make.done.missing', { k: totals.styles.missing.length })); // 텍스트 스타일 바로 뒤(§4.3 "글꼴")
   if (totals.bound != null) parts.push(t('make.done.bind', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('make.done.rename', { c: totals.renamed }));
   if (totals.created && totals.created.m > 0) parts.push(t('make.done.manual', { m: totals.created.m }));
-  if (!opts.isPaid) parts.push(t('make.done.free'));
   if (opts.linkOff) parts.push(t('make.done.notLinked'));
   return parts.join(' · ');
+}
+
+/** 만들기 부분 글 — 유료 "Global {g}개 · Semantic {r}개", 무료 "Global {g}개"(다 됨 · 취소됨 괄호 공통 — §4.3). */
+export function makeCreatedText(c: { g: number; r: number }, isPaid: boolean): string {
+  return isPaid ? t('make.done.create', { g: c.g, r: c.r }) : t('make.globalN', { g: c.g });
 }

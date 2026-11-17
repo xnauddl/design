@@ -7,7 +7,6 @@ import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, planTsRename, applyTsRename, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
-import { FREE_MANUAL_CREATE_LIMIT } from './lib/varKind';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
@@ -92,30 +91,12 @@ const currentTier = (): Tier => effective().tier;
 /** Free/Paid 2티어 — 유료면 모든 유료 기능 해금. */
 const isPaid = (): boolean => currentTier() === 'paid';
 
-/* ---------- 새 변수 · 복제 개수(IA v4 §4.9 · §9) ----------
-   무료는 사용자가 직접 만든 수(새 변수 + 복제)만 센다. 기준(파일당 / 기간당 / 누적)은 미정 —
-   지금은 clientStorage 누적 숫자 하나. 기준이 정해지면 이 두 함수만 바꾼다. 유료도 세기는 한다. */
-const MANUAL_USED_KEY = 'dsl.manualUsed';
-async function readManualUsed(): Promise<number> {
-  try {
-    const n = await figma.clientStorage.getAsync(MANUAL_USED_KEY);
-    return typeof n === 'number' && isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  } catch {
-    return 0;
-  }
-}
-async function bumpManualUsed(): Promise<number> {
-  const n = (await readManualUsed()) + 1;
-  try {
-    await figma.clientStorage.setAsync(MANUAL_USED_KEY, n);
-  } catch {
-    /* 못 남겨도 이번에 만든 것은 그대로 */
-  }
-  return n;
-}
-/** 무료 한도에 닿았나(유료는 늘 false). */
-async function manualLimitReached(): Promise<boolean> {
-  return !isPaid() && (await readManualUsed()) >= FREE_MANUAL_CREATE_LIMIT;
+/** 무료와 Semantic 컬렉션(IA v4 §4.9 · F2 · F10) — 무료면 플러그인 Semantic 컬렉션(`ownedCollection(…, 'semantic')`)에
+    새 변수를 만들거나 그 안의 변수를 복제하지 못한다. 별칭 비율로 Semantic 계층인 사용자 컬렉션은 막지 않는다. */
+async function paidSemanticTarget(collectionId: string | undefined): Promise<boolean> {
+  if (isPaid() || !collectionId) return false;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  return ownedCollection(cols, 'semantic')?.id === collectionId;
 }
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
@@ -195,8 +176,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    const manualUsed = await readManualUsed(); // 새 변수 · 복제 무료 개수(§4.9)
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, manualUsed });
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -384,11 +364,11 @@ async function updateVariable(msg: Extract<UiToCode, { type: 'UPDATE_VARIABLE' }
 }
 
 /**
- * 새 변수 · 복제 · 삭제(IA v4 §4.9). 실패는 ERROR{op, reqId, code?} — 이름 거절 'name' · 무료 한도 'freeLimit' · 지워짐 'deleted'.
- * 성공하면 ⌘Z 한 번(commitUndo) 뒤 준비 상태를 다시 보낸다(manualUsed 포함).
+ * 새 변수 · 복제 · 삭제(IA v4 §4.9). 실패는 ERROR{op, reqId, code?} — 이름 거절 'name' · 유료(무료의 플러그인 Semantic 컬렉션 — F2) 'paid' · 지워짐 'deleted'.
+ * 성공하면 ⌘Z 한 번(commitUndo) 뒤 준비 상태를 다시 보낸다.
  */
 async function manualVariableOp(msg: Extract<UiToCode, { type: 'CREATE_VARIABLE' | 'DUPLICATE_VARIABLE' | 'DELETE_VARIABLE' }>): Promise<void> {
-  const fail = (message: string, code?: 'name' | 'freeLimit' | 'deleted'): void =>
+  const fail = (message: string, code?: 'name' | 'paid' | 'deleted'): void =>
     post({ type: 'ERROR', message, op: msg.type, reqId: msg.reqId, ...(code ? { code } : {}) });
   try {
     if (msg.type === 'DELETE_VARIABLE') {
@@ -396,17 +376,17 @@ async function manualVariableOp(msg: Extract<UiToCode, { type: 'CREATE_VARIABLE'
       commitUndo(figma);
       post({ type: 'VARIABLE_DELETED', reqId: msg.reqId, id: msg.id });
     } else {
-      if (await manualLimitReached()) return fail(`free limit ${FREE_MANUAL_CREATE_LIMIT}`, 'freeLimit');
       if (msg.type === 'CREATE_VARIABLE') {
+        if (await paidSemanticTarget(msg.collectionId)) return fail('semantic collection is paid', 'paid');
         const { variable } = await createManualVariable({ collectionId: msg.collectionId, name: msg.name, varType: msg.varType, values: msg.values, scopes: msg.scopes });
-        const manualUsed = await bumpManualUsed();
         commitUndo(figma);
-        post({ type: 'VARIABLE_CREATED', reqId: msg.reqId, id: variable.id, manualUsed });
+        post({ type: 'VARIABLE_CREATED', reqId: msg.reqId, id: variable.id });
       } else {
+        const src = await figma.variables.getVariableByIdAsync(msg.id);
+        if (src && (await paidSemanticTarget(src.variableCollectionId))) return fail('semantic collection is paid', 'paid');
         const nv = await duplicateVariable(msg.id);
-        const manualUsed = await bumpManualUsed();
         commitUndo(figma);
-        post({ type: 'VARIABLE_DUPLICATED', reqId: msg.reqId, newId: nv.id, manualUsed });
+        post({ type: 'VARIABLE_DUPLICATED', reqId: msg.reqId, newId: nv.id });
       }
     }
   } catch (e) {
@@ -1114,15 +1094,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TOKENS': {
-        // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
-        if (!msg.preview && !requirePaid('tokens')) break;
+        // 실제 변수 생성 중 Semantic까지 만드는 것만 Paid(미리보기는 비파괴 읽기라 허용). globalOnly(무료 규칙 — Global만,
+        // `createUsageRoles`를 돌리지 않음)는 무료도 통과한다(IA v4 §4.3 "무료 — 무료 규칙 PR 뒤" · F1 · F4 · F8).
+        if (!msg.preview && !msg.globalOnly && !requirePaid('tokens')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
         // 같은 이름의 직접 만든 변수라 건너뛴 토큰은 그 토큰을 가리킬 역할도 만들지 않는다(§4.9).
         const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
         const roleRows: RoleRow[] = [];
-        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined, s.finalName);
+        const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined, s.finalName);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
@@ -1181,6 +1162,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             ownerOf: bindOwnerOf(sel), // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
             // 만들기 실행의 연결(IA v4 §4.3) — 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다(실제 연결만).
             ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
+            // 무료 자동 연결은 새 Semantic을 만들지 않는다 — 찾기 · 실제 연결 · 카드 1의 m이 같은 규칙(IA v4 §2.3-7 · F6).
+            ...(isPaid() ? {} : { noNewRoles: true }),
           },
         );
         post({
