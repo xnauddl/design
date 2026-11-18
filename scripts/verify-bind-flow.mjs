@@ -375,17 +375,21 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   const heads9 = await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent));
   check('9 건너뛴 곳 모습 — 제목 "건너뛴 곳" · "✓ 연결할 곳은 모두 연결됐어요" · 손볼 곳 / 그대로 둬도 되는 곳 · [연결] 없음', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await p.textContent('#bindEmpty')).includes('✓ 연결할 곳은 모두 연결됐어요') && JSON.stringify(heads9) === JSON.stringify(['손볼 수 있는 곳', '그대로 둬도 되는 곳']) && !(await visible(p, '#bindFoot')) && !(await visible(p, '#bindSkipToggle')), JSON.stringify(heads9));
   // 다시 그려도 포커스는 같은 사유의 [선택 ›](§4.2 "목록을 다시 그릴 때의 포커스")
-  await p.focus('#bindSkips .skip-sel[data-reason="styled"]');
+  // [선택 ›]은 손볼 곳 줄에만(결정 A 확장) — 그래서 손볼 곳 사유(fraction)로 본다
+  await p.focus('#bindSkips .skip-sel[data-reason="fraction"]');
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 }, skips: skips9 });
   await p.waitForTimeout(40);
-  check('9 건너뛴 곳 모습 — 다시 읽어 목록을 다시 그려도 포커스는 같은 사유의 [선택 ›]', (await p.evaluate(() => document.activeElement?.dataset?.reason)) === 'styled', await p.evaluate(() => document.activeElement?.outerHTML?.slice(0, 80)));
+  check('9 건너뛴 곳 모습 — 다시 읽어 목록을 다시 그려도 포커스는 같은 사유의 [선택 ›]', (await p.evaluate(() => document.activeElement?.dataset?.reason)) === 'fraction', await p.evaluate(() => document.activeElement?.outerHTML?.slice(0, 80)));
   // 손볼 곳 0(그대로 둬도 되는 곳만) → ✓ 줄은 카드 1과 같은 allBound
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: { styled: { color: 3 } }, reasons: { styled: 3 }, skips: [skips9[1]] });
   await p.waitForTimeout(40);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-skip-s0.png` : '/dev/null' }).catch(() => {});
   check('9 건너뛴 곳 모습 s = 0 — 제목 "건너뛴 곳" · ✓ "찾은 값은 모두 연결돼 있어요" · 그대로 둬도 되는 곳만', (await p.textContent('#subTitle')) === '건너뛴 곳' && (await emptyText(p)) === '✓ 찾은 값은 모두 연결돼 있어요' && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']), await emptyText(p));
+  check('9 s = 0 — 그대로 둬도 되는 곳만이라 [선택 ›] 0개 · 포커스 ←(사라진 손볼 곳 [선택 ›] — 남은 [선택 ›]이 없음)', (await p.$$eval('#bindSkips .skip-sel', (e) => e.length)) === 0 && (await p.evaluate(() => document.activeElement?.id)) === 'btnSubBack', await p.evaluate(() => document.activeElement?.id));
   // 목록까지 비면 모두 연결된 모습 — 제목 "연결" · allBound · 칩 · 목록 · 버튼 줄 없음, 지워진 [선택 ›]의 포커스는 ←
-  await p.focus('#bindSkips .skip-sel');
+  await recv(p, { ...preview(ap.reqId), candidates: [], counts: { fraction: { gap: 2 }, styled: { color: 3 } }, reasons: { fraction: 2, styled: 3 }, skips: skips9 });
+  await p.waitForTimeout(40);
+  await p.focus('#bindSkips .skip-sel[data-reason="fraction"]');
   await recv(p, { ...preview(ap.reqId), candidates: [], counts: {}, reasons: {}, skips: [] });
   await p.waitForTimeout(40);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-all-done.png` : '/dev/null' }).catch(() => {});
@@ -713,7 +717,7 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 건너뜀 칩 — s = 0이고 스타일 사용 중이 있으면 "건너뛴 곳 ▸"(styled는 s에 안 더함)', (await p.textContent('#bindSkipToggle')) === '건너뛴 곳 ▸', await p.textContent('#bindSkipToggle'));
   await p.click('#bindSkipToggle');
   const chips = await p.$$eval('#bindSkips .skip-name', (e) => e.map((x) => x.textContent));
-  check('B2 건너뛴 곳 목록 — 그대로 둬도 되는 곳 한 묶음 · 줄(스타일 사용 중 · 숨긴 레이어 · 같은 스타일 없음) · [선택 ›]은 레이어 목록 있는 줄만', JSON.stringify(chips) === JSON.stringify(['스타일 사용 중', '숨긴 레이어', '같은 스타일 없음']) && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']) && (await p.$$eval('#bindSkips .skip-sel', (e) => e.length)) === 1, JSON.stringify(chips));
+  check('B2 건너뛴 곳 목록 — 그대로 둬도 되는 곳 한 묶음 · 줄(스타일 사용 중 · 숨긴 레이어 · 같은 스타일 없음) · 그대로 둬도 되는 곳 줄에는 [선택 ›] 없음(결정 A 확장)', JSON.stringify(chips) === JSON.stringify(['스타일 사용 중', '숨긴 레이어', '같은 스타일 없음']) && JSON.stringify(await p.$$eval('#bindSkips .skip-head', (e) => e.map((x) => x.textContent))) === JSON.stringify(['그대로 둬도 되는 곳']) && (await p.$$eval('#bindSkips .skip-sel', (e) => e.length)) === 0, JSON.stringify(chips));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b2-bind.png` : '/dev/null' }).catch(() => {});
   // 연결 — 변수 자리 + 켠 스타일 줄을 한 번에
   await p.click('#btnApplyConfirm');
@@ -2708,6 +2712,181 @@ async function fillBoth(p) {
     check('27g 누르면 상태 줄 "만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요" · CREATE_TEXT_STYLES 0', (await p.textContent('#statusText')) === '만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요' && (await count(p, 'CREATE_TEXT_STYLES')) === 0, await p.textContent('#statusText'));
     await p.close();
   }
+}
+
+{
+  // 27a · 27b · 27c 인스턴스의 메인 컴포넌트(ia-v4 §4.1 · §4.2 · ia-v3 §2.11 11번 · A.18 1)
+  const cm = (field, v, name, mainId, nodeId = 'n1') => ({ nodeId, field, currentValue: '8', variableId: v, variableName: name, tier: 2, ...(mainId ? { mainId } : {}) });
+  const MAINS = [{ id: 'S', name: 'Traveler Card', page: 'Components' }, { id: 'M', name: 'Badge', page: 'Components' }];
+  const CANDS = [cm('itemSpacing', 'vA', 'spacing/a', 'S', 'm1'), cm('paddingLeft', 'vB', 'spacing/b', 'M', 'm2'), cm('paddingTop', 'vC', 'spacing/c', undefined, 'n1')];
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await openSel(p);
+  await found(p, { candidates: CANDS, mains: MAINS, reasons: {}, counts: {} });
+  await p.waitForTimeout(40);
+  const line = await p.evaluate(() => { const e = [...document.querySelectorAll('#selCards .s.mains')][0]; if (!e) return null; const cs = getComputedStyle(e); const sp = e.querySelector('span'); return { text: e.textContent, tip: sp?.title, bw: cs.borderTopWidth, r: cs.borderTopLeftRadius, bg: cs.backgroundColor, below: e.getBoundingClientRect().top >= e.previousElementSibling.getBoundingClientRect().bottom - 1 }; });
+  check('27a 카드 1 — 둘째 줄 아래 "선택 밖 메인 컴포넌트 2개도 함께 연결해요" · 툴팁에 메인 이름 둘', line?.text === '선택 밖 메인 컴포넌트 2개도 함께 연결해요' && line.tip === 'Traveler Card — Components\nBadge — Components' && line.below, JSON.stringify(line));
+  check('27a 카드 안 줄 — 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', line?.bw === '0px' && line.r === '0px' && line.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(line));
+  check('27a 찾기 툴팁 — 메인 컴포넌트 포함', (await p.$eval('#selCards .sel-card .t', (e) => e.title)) === '인스턴스 안쪽 · 숨긴 레이어 제외 — 인스턴스의 메인 컴포넌트는 포함');
+  // 27b 연결 화면
+  await p.click('[data-k="link"]');
+  await p.waitForTimeout(40);
+  const bm = () => p.evaluate(() => { const e = document.getElementById('bindMains'); return e.hidden ? null : e.textContent; });
+  const pos = await p.evaluate(() => { const m = document.getElementById('bindMains').getBoundingClientRect(); const st = document.getElementById('applyStatus').getBoundingClientRect(); const tree = document.getElementById('bindTree').getBoundingClientRect(); return m.top >= tree.bottom - 1 && m.bottom <= st.top + 1; });
+  check('27b 연결 화면 — 아래 고정 줄 위(#applyStatus 위 · 목록 아래) 같은 글', (await bm()) === '선택 밖 메인 컴포넌트 2개도 함께 연결해요' && pos, String(await bm()));
+  const toggle = async (name) => { await p.evaluate((n) => { const r = [...document.querySelectorAll('#bindTree .tr-row')].find((x) => x.textContent.includes(n)); r.querySelector('.bv-switch').click(); }, name); await p.waitForTimeout(20); };
+  await toggle('spacing/b');
+  check('27b 메인 자리만 가진 줄을 끄면 c = 2 → 1', (await bm()) === '선택 밖 메인 컴포넌트 1개도 함께 연결해요', String(await bm()));
+  await p.click('#bindAllOff');
+  await p.waitForTimeout(20);
+  check('27b 모두 끄면 줄 숨김', (await bm()) === null);
+  await p.click('#bindAllOn');
+  await p.waitForTimeout(20);
+  await p.click('#btnApplyConfirm');
+  const as = (await sent(p, 'APPLY_SELECTED')).at(-1);
+  check('27b 보낸 APPLY_SELECTED.items에 mainId', as?.items?.find((i) => i.variableId === 'vA')?.mainId === 'S' && as.items.find((i) => i.variableId === 'vC')?.mainId === undefined, JSON.stringify(as?.items));
+  // 27c 연결 뒤 메인 줄(결정 B)
+  await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 3, skipped: 0, reasons: {}, skips: [], mainsBound: ['S', 'M'] });
+  await p.waitForTimeout(40);
+  check('27c 상태 줄에 "메인 컴포넌트" 없음(v4.linked 글 그대로)', (await p.textContent('#statusText')) === '🔗 3곳 연결 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
+  const doneFind = async (extra = {}) => { const id = await lastReq(p, 'APPLY'); await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {}, ...extra }); await recv(p, tsPrev(id)); await p.waitForTimeout(40); };
+  const boundLine = () => p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'));
+  await p.waitForTimeout(450);
+  await doneFind();
+  check('27c 다음 찾기 ✓ → 카드 1 ✓ 글 아래 회색 "메인 컴포넌트 2개도 함께 연결했어요"', (await boundLine()) === '메인 컴포넌트 2개도 함께 연결했어요' && (await p.textContent('#selCards')).includes('✓ 찾은 값은 모두 연결돼 있어요'), await boundLine());
+  // allLinked(s > 0) — ✓ 제목 바로 아래 · "손볼 곳" 줄 위
+  await doneFind({ counts: { fraction: { gap: 2 } }, reasons: { fraction: 2 }, skips: [{ nodeId: 'x', name: 'X', type: 'FRAME', reason: 'fraction', field: 'paddingLeft' }] });
+  const order = await p.evaluate(() => [...document.querySelectorAll('#selCards .sel-card')[0].querySelectorAll('.t, .s')].map((e) => e.textContent));
+  check('27c allLinked 모습 — 줄이 ✓ 제목 바로 아래 · "손볼 곳" 줄 위', JSON.stringify(order) === JSON.stringify(['✓ 연결할 곳은 모두 연결됐어요', '메인 컴포넌트 2개도 함께 연결했어요', '손볼 곳 2곳']), JSON.stringify(order));
+  // n > 0 → 줄 없음 · 기억 지움 → 그 뒤 ✓여도 줄 없음
+  await doneFind({ candidates: CANDS });
+  check('27c 다음 찾기가 ✓가 아니면 줄 없음', !(await boundLine()).includes('연결했어요'), await boundLine());
+  await doneFind();
+  check('27c 기억을 지운 뒤 ✓가 돼도 줄 없음', !(await boundLine()).includes('연결했어요'), await boundLine());
+  await p.close();
+}
+{
+  // 27b 텍스트 스타일 줄만(메인 안 글자) → c = 1 · textStyles[].mainIds · 27c 목록 기준이 바뀌면 줄 없음 · noTier면 줄 없음
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await openSel(p);
+  await found(p, { candidates: [], mains: [{ id: 'S', name: 'Traveler Card', page: 'Components' }], reasons: {}, counts: {} }, [{ styleId: 'st1', name: 'body/medium', nodeIds: ['t1', 't2'], mainIds: ['S', null] }]);
+  await p.waitForTimeout(40);
+  await p.click('[data-k="link"], [data-k="tsLink"]');
+  await p.waitForTimeout(40);
+  check('27b 메인 안 글자만 가진 텍스트 스타일 줄만 켜도 c = 1', (await p.evaluate(() => document.getElementById('bindMains').hidden ? null : document.getElementById('bindMains').textContent)) === '선택 밖 메인 컴포넌트 1개도 함께 연결해요');
+  await p.click('#btnApplyConfirm');
+  const as = (await sent(p, 'APPLY_SELECTED')).at(-1);
+  check('27b textStyles[].mainIds가 실린다', JSON.stringify(as?.textStyles?.[0]?.mainIds) === JSON.stringify(['S', null]), JSON.stringify(as?.textStyles));
+  await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 0, skipped: 0, reasons: {}, skips: [], textStylesApplied: 2, textStylesSkipped: 0, mainsBound: ['S'] });
+  await p.waitForTimeout(40);
+  // noTier 모습으로 그려지면 줄 없음 · 기억 지움
+  await recv(p, { ...PREREQ, hasBindable: false });
+  await p.waitForTimeout(40);
+  check('27c 카드 1이 noTier 모습 → 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요'), await p.textContent('#selCards'));
+  await recv(p, PREREQ);
+  await p.waitForTimeout(450);
+  {
+    const id0 = await lastReq(p, 'APPLY');
+    await recv(p, { ...preview(id0), candidates: [], reasons: {}, counts: {} });
+    await recv(p, tsPrev(id0));
+    await p.waitForTimeout(40);
+  }
+  check('27c noTier로 지운 기억 — 다시 ✓여도 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요'), await p.textContent('#selCards'));
+  // 다시 연결 → 기억 → 목록 기준을 바꾼다 → ✓여도 줄 없음
+  await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 0, skipped: 0, reasons: {}, skips: [], textStylesApplied: 2, textStylesSkipped: 0, mainsBound: ['S'] });
+  await p.waitForTimeout(40);
+  await recv(p, { ...sel(2, 0), ids: ['z1', 'z2'] });
+  await p.waitForTimeout(450);
+  const id = await lastReq(p, 'APPLY');
+  await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {} });
+  await recv(p, tsPrev(id));
+  await p.waitForTimeout(40);
+  check('27c 목록 기준을 바꾸면 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요') && (await p.textContent('#selCards')).includes('✓'), await p.textContent('#selCards'));
+  await p.close();
+}
+{
+  // 27d 건너뛴 곳(결정 A 확장 — 손볼 곳 예외): 두 줄 · 설명만 · [선택 ›]은 손볼 곳 줄만
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await openSel(p);
+  const sk = [
+    { nodeId: 'f1', name: 'Box', type: 'FRAME', reason: 'fraction', field: 'paddingLeft' },
+    { nodeId: 'h1', name: 'Hidden', type: 'FRAME', reason: 'hidden' },
+    { nodeId: 'l1', name: 'Lib', type: 'INSTANCE', reason: 'library-main' },
+  ];
+  await found(p, { reasons: { fraction: 2, hidden: 1, 'library-main': 4 }, counts: { fraction: { gap: 2 } }, skips: sk, skipLayers: { hidden: 1, 'library-main': 4 } }, [], { noStyle: 1 });
+  await p.waitForTimeout(40);
+  await p.click('[data-k="link"]');
+  await p.waitForTimeout(40);
+  await p.click('#bindSkipToggle');
+  await p.waitForTimeout(30);
+  const rows = await p.$$eval('#bindSkips .skip-row', (rs) => rs.map((r) => {
+    const line = r.querySelector('.skip-line').getBoundingClientRect();
+    const help = r.querySelector('.skip-help');
+    const hb = help?.getBoundingClientRect();
+    const sel = r.querySelector('.skip-sel');
+    const sb = sel?.getBoundingClientRect();
+    const rb = r.getBoundingClientRect();
+    const nm = r.querySelector('.skip-name');
+    const cs = getComputedStyle(r);
+    return {
+      name: nm.textContent, nameOneLine: nm.getBoundingClientRect().height < 20, help: help?.textContent ?? null,
+      twoLine: !help || hb.top >= line.bottom - 1, sel: r.querySelectorAll('.skip-sel').length,
+      selOk: !sb || (sb.bottom <= hb.top + 1 && Math.abs(rb.right - sb.right) < 8),
+      noClip: !help || (help.scrollWidth <= help.clientWidth && getComputedStyle(help).textOverflow !== 'ellipsis'),
+      card: cs.borderTopWidth !== '0px' || cs.borderTopLeftRadius !== '0px' || cs.backgroundColor !== 'rgba(0, 0, 0, 0)',
+    };
+  }));
+  const fixR = rows.find((r) => r.name === '소수 값(정수만)');
+  const keepR = rows.filter((r) => r.name === '숨긴 레이어' || r.name === '라이브러리 컴포넌트');
+  const libR = rows.find((r) => r.name === '라이브러리 컴포넌트');
+  check('27d 설명이 있는 줄은 모두 두 줄(설명이 첫 줄 아래)', rows.filter((r) => r.help).every((r) => r.twoLine) && rows.filter((r) => r.help).length >= 3, JSON.stringify(rows));
+  check('27d 손볼 곳 줄(fraction)에 [선택 ›] 1개 — 첫 줄 오른쪽', fixR?.sel === 1 && fixR.selOk, JSON.stringify(fixR));
+  check('27d 그대로 둬도 되는 곳 줄(숨긴 레이어 · 라이브러리 컴포넌트)에는 [선택 ›] 0개(레이어 항목이 있어도)', keepR.length === 2 && keepR.every((r) => r.sel === 0), JSON.stringify(keepR));
+  check('27d "라이브러리 컴포넌트" 줄 설명', libR?.help === '라이브러리 컴포넌트라 이 파일에서 연결할 수 없어요', JSON.stringify(libR));
+  check('27d 480px — 이름 줄바꿈 없음 · 설명 잘림 없음', rows.every((r) => r.nameOneLine && r.noClip), JSON.stringify(rows));
+  check('27d 줄에 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', rows.every((r) => !r.card));
+  const stops = await p.$$eval('#bindSkips button, #bindSkips [tabindex]:not([tabindex="-1"]), #bindSkips a, #bindSkips input', (e) => e.map((x) => x.className));
+  check('27d 목록 안 탭 정지점은 손볼 곳 줄의 [선택 ›]뿐', stops.length === 1 && stops[0].includes('skip-sel'), JSON.stringify(stops));
+  const bad = await nestedCards(p);
+  check('27d 카드 안 카드 0 — 건너뛴 곳 목록', bad.length === 0, bad.join(' · '));
+  await p.close();
+}
+
+{
+  // 27c 만들기 실행 — 연결 mainsBound ['a'] + 텍스트 스타일 mainsApplied ['a', 'b'] → 다 됨 줄에 메인 없음 · 카드 1 ✓ 아래 2개
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), ids: ['w9'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(40);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [{ name: 'body/medium', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 2, nodeIds: ['t1'] }] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+  await p.waitForTimeout(30);
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(60);
+  const ts = (await sent(p, 'CREATE_TEXT_STYLES')).at(-1);
+  await recv(p, { type: 'TEXT_STYLES_RESULT', reqId: ts.reqId, created: 1, updated: 0, bound: 1, missing: [], notes: [], applied: 2, applySkipped: 0, mainsApplied: ['a', 'b'] });
+  await p.waitForTimeout(60);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId, mainsBound: ['a'] });
+  await p.waitForTimeout(120);
+  check('27c 만들기 다 됨 줄에 "메인 컴포넌트" 없음', (await visible(p, '#selHome')) && !(await p.textContent('#statusText')).includes('메인'), await p.textContent('#statusText'));
+  await p.waitForTimeout(450);
+  const id = await lastReq(p, 'APPLY');
+  await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {} });
+  await recv(p, tsPrev(id));
+  await p.waitForTimeout(40);
+  check('27c 만들기 뒤 카드 1 ✓ 아래 "메인 컴포넌트 2개도 함께 연결했어요"', (await p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'))) === '메인 컴포넌트 2개도 함께 연결했어요', await p.textContent('#selCards'));
+  await p.close();
 }
 
 await browser.close();

@@ -3046,7 +3046,11 @@ test('skipRowCounts — 줄 수 = 칩 수와 같은 셈: 스타일 후보 레이
   // 레이어 단위 줄의 수는 상한 전 레이어 수(skipLayers) — 목록이 200에서 잘려도 실제 수
   const big = skipRowCounts({ hidden: 300 }, [{ nodeId: 'h1', name: 'H', reason: 'hidden' }], new Set(), false, { hidden: 300 });
   assert.equal(big.keep[0].n, 300);
-  assert.equal(big.keep[0].items.length, 1, '[선택 ›] 항목은 실어 온 목록 그대로');
+  assert.equal(big.keep[0].items.length, 1, '레이어 단위 줄 항목은 실어 온 목록 그대로');
+  // 손볼 곳 잘림(A.18 — [선택 ›]은 손볼 곳 줄에만): 곳 수는 상한 전, 항목은 실어 온 목록 그대로(그래서 ui가 잘림 꼬리를 붙인다)
+  const fixBig = skipRowCounts({ fraction: 300 }, [{ nodeId: 'f1', name: 'F', reason: 'fraction', field: 'paddingLeft' }], new Set(), false, { fraction: 300 });
+  assert.equal(fixBig.fix[0].n, 300);
+  assert.equal(fixBig.fix[0].items.length, 1, '손볼 곳 [선택 ›] 항목은 실어 온 목록 그대로');
 });
 
 /* ---------- krdsType.ts — KRDS 텍스트 스타일 이름(docs/text-style-krds.md) ---------- */

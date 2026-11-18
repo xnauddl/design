@@ -211,6 +211,9 @@
     .sel-card .t { font-size: 13px; font-weight: 600; }
     .sel-card .s { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
     .sel-card .s + .s { margin-top: 6px; }
+    /* 메인 컴포넌트 회색 줄(ia-v4 §4.1 · §4.2) — 카드 안 줄이라 바탕 · 테두리 없음(§2.8) */
+    .sel-card .s.mains, .mains-line { font-size: 11px; color: var(--text-2); }
+    .mains-line { padding: 8px 2px 0; }
     .sel-card.ok { background: var(--ok-subtle); border-color: transparent; }
     .sel-card.warn { background: var(--danger-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--danger); }
@@ -443,9 +446,12 @@
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
     .skip-head { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; }
-    .skip-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    /* 건너뛴 곳 줄 — 두 줄(ia-v4 §4.2 "두 줄 · 설명만"): 첫 줄 이름 · 수 · [선택 ›](손볼 곳만), 둘째 줄 설명. 아래 구분선만(§2.8) */
+    .skip-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .skip-row .skip-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .skip-row .skip-name { white-space: nowrap; flex: 0 0 auto; }
     .skip-row .skip-n { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
-    .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .skip-row .skip-help { color: var(--text-2); font-size: 11px; white-space: normal; }
     .skip-row .grow { flex: 1 1 auto; }
     .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
     /* 타이포 목록 — 구분선 줄(카드 안 카드 금지, CLAUDE.md · docs/text-style-krds.md §6) */
@@ -1033,6 +1039,8 @@
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
         <div class="skip-list" id="bindSkips" hidden></div>
       </div>
+      <!-- 선택 밖 메인 컴포넌트 줄(ia-v4 §4.2 "메인 컴포넌트 줄") — 보통 흐름, #applyStatus 바로 위 -->
+      <div class="mains-line" id="bindMains" hidden></div>
       <div class="status" id="applyStatus"></div>
       <div class="sub-foot" id="bindFoot">
         <span class="grow"></span>
@@ -5398,8 +5406,11 @@
   }
   $("btnApplyConfirm").addEventListener("click", () => {
     const eff = bindTsOnly() ? [] : effCandidates();
-    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}));
-    const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds }));
+    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}));
+    const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => {
+      var _a3;
+      return __spreadValues({ styleId: r.styleId, nodeIds: r.nodeIds }, ((_a3 = r.mainIds) == null ? void 0 : _a3.some(Boolean)) ? { mainIds: r.mainIds } : {});
+    });
     if (!items.length && !textStyles.length) return;
     startLink({ items, textStyles });
   });
@@ -5927,7 +5938,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6046,10 +6057,11 @@
           const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
+          bindMains = (_d = msg.mains) != null ? _d : [];
           bindCounts = msg.counts;
           bindVarPending = false;
           bindChecked.clear();
-          renderSkipReasons((_d = msg.reasons) != null ? _d : {});
+          renderSkipReasons((_e = msg.reasons) != null ? _e : {});
           if (silent) {
             const r = carryRowChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
@@ -6061,8 +6073,9 @@
           setStatus("applyStatus", "", "");
           bindFindSettle();
         } else {
-          const n = msg.bound + ((_e = msg.textStylesApplied) != null ? _e : 0);
-          const m = msg.skipped + ((_f = msg.textStylesSkipped) != null ? _f : 0);
+          const n = msg.bound + ((_f = msg.textStylesApplied) != null ? _f : 0);
+          const m = msg.skipped + ((_g = msg.textStylesSkipped) != null ? _g : 0);
+          rememberMainsBound((_h = msg.mainsBound) != null ? _h : []);
           clearBindPreview();
           setStatus("applyStatus", "", "");
           if (activeTab === "select" && selSub === "bind") showSelSub("home");
@@ -6135,8 +6148,8 @@
         break;
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
-        tsExistingNames = ((_g = msg.existing) != null ? _g : []).map((e) => e.name);
-        tsDecimal = (_h = msg.decimalRows) != null ? _h : [];
+        tsExistingNames = ((_i = msg.existing) != null ? _i : []).map((e) => e.name);
+        tsDecimal = (_j = msg.decimalRows) != null ? _j : [];
         tsRead = true;
         if (!msg.styles.length && tsDecimal.length) {
           tsSpecs = [];
@@ -6145,7 +6158,7 @@
         } else if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
-            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_i = msg.fallback) != null ? _i : 0 }) : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_k = msg.fallback) != null ? _k : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -6160,7 +6173,7 @@
         break;
       }
       case "TEXT_STYLES_RESULT": {
-        const why = Object.entries((_j = msg.applyReasons) != null ? _j : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const why = Object.entries((_l = msg.applyReasons) != null ? _l : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setTsStatus(
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
@@ -6191,7 +6204,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_k = msg.tierVars) != null ? _k : 0) + ((_l = msg.otherVars) != null ? _l : 0);
+        prereqLocalVars = ((_m = msg.tierVars) != null ? _m : 0) + ((_n = msg.otherVars) != null ? _n : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -6206,7 +6219,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_m = msg.noteKind) != null ? _m : "ok");
+          setStatus("licenseStatus", msg.note, (_o = msg.noteKind) != null ? _o : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -6230,7 +6243,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_n = msg.autoNamed) != null ? _n : 0);
+        setCompAutoNamed((_p = msg.autoNamed) != null ? _p : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6245,12 +6258,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_o = msg.placeFailed) != null ? _o : [];
-        const cloned = (_p = msg.placeCloned) != null ? _p : [];
-        const propFailed = (_q = msg.propFailed) != null ? _q : [];
-        const fillKept = (_r = msg.fillKept) != null ? _r : [];
-        const reused = (_s = msg.reused) != null ? _s : [];
-        const reuseKept = (_t = msg.reuseKept) != null ? _t : [];
+        const misplaced = (_q = msg.placeFailed) != null ? _q : [];
+        const cloned = (_r = msg.placeCloned) != null ? _r : [];
+        const propFailed = (_s = msg.propFailed) != null ? _s : [];
+        const fillKept = (_t = msg.fillKept) != null ? _t : [];
+        const reused = (_u = msg.reused) != null ? _u : [];
+        const reuseKept = (_v = msg.reuseKept) != null ? _v : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -6316,7 +6329,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_u = msg.placeFailed) != null ? _u : [];
+          const misplaced0 = (_w = msg.placeFailed) != null ? _w : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -6325,7 +6338,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_v = msg.placeFailed) != null ? _v : [];
+        const misplaced = (_x = msg.placeFailed) != null ? _x : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -7445,7 +7458,7 @@
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -7455,6 +7468,8 @@
       showSelSub("home");
       return;
     }
+    const mkBase = baseline ? baseKey() : null;
+    const mkMainsDone = [];
     const link = $("makeOptLink").checked;
     const steps = planMake({ isPaid, globalsOn: mkGlobalsOn().length, stylesOn: mkTsOnList().length, link, rename: $("makeOptRename").checked, dark: isPaid && $("makeOptDark").checked });
     if (!steps.length || !baseline) return;
@@ -7509,6 +7524,7 @@
           const rid = mkNextReq();
           const r = await wizardRequest(__spreadValues({ type: "CREATE_TEXT_STYLES", styles, reqId: rid }, link ? { applyTo: ids } : {}), ["TEXT_STYLES_RESULT"], rid);
           totals.styles = __spreadValues({ s: r.created + r.updated, a: (_c = r.applied) != null ? _c : 0 }, r.missing.length ? { missing: r.missing } : {});
+          mkMainsDone.push(...(_d = r.mainsApplied) != null ? _d : []);
           results.push(__spreadValues({ id, mark: "ok", text: t("wizard.seq.textStyles", { created: r.created, updated: r.updated }) + (r.applied ? t("wizard.seq.textStylesLinked", { a: r.applied }) : "") + (r.missing.length ? t("wizard.seq.textStylesMissing", { k: r.missing.length }) : "") }, r.missing.length ? { tip: r.missing.join("\n") } : {}));
         } else if (id === "bind") {
           wizBindReq = ++bindReqSeq;
@@ -7517,10 +7533,11 @@
             wizBindPending = false;
           });
           totals.bound = r.bound;
-          const reasons = (_d = r.reasons) != null ? _d : {};
+          mkMainsDone.push(...(_e = r.mainsBound) != null ? _e : []);
+          const reasons = (_f = r.reasons) != null ? _f : {};
           if (r.bound) results.push({ id, mark: "ok", text: t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") });
           else {
-            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_e = reasons["already-bound"]) != null ? _e : 0) > 0 && !((_f = reasons["no-match"]) != null ? _f : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_g = reasons["already-bound"]) != null ? _g : 0) > 0 && !((_h = reasons["no-match"]) != null ? _h : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
             results.push({ id, mark: "warn", text: t(zero) });
             stay = true;
           }
@@ -7540,7 +7557,8 @@
         break;
       }
     }
-    const finishedSteps = (_g = mkProg == null ? void 0 : mkProg.done) != null ? _g : [];
+    const finishedSteps = (_i = mkProg == null ? void 0 : mkProg.done) != null ? _i : [];
+    rememberMainsBound(mkMainsDone, mkBase);
     mkRunning = false;
     mkProg = null;
     wizardRunning = false;
@@ -7566,7 +7584,7 @@
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    const doneTip = (_i = (_h = totals.styles) == null ? void 0 : _h.missing) == null ? void 0 : _i.join("\n");
+    const doneTip = (_k = (_j = totals.styles) == null ? void 0 : _j.missing) == null ? void 0 : _k.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");
@@ -7638,6 +7656,26 @@
   var bindCounts;
   var layerLibUse = null;
   var layerLibReq = 0;
+  var bindMains = [];
+  var lastMainsBound = null;
+  function mainUnitIds(cands, rows) {
+    var _a3;
+    const out = /* @__PURE__ */ new Set();
+    for (const c of cands) if (c.mainId) out.add(c.mainId);
+    for (const r of rows) for (const m of (_a3 = r.mainIds) != null ? _a3 : []) if (m) out.add(m);
+    return [...out];
+  }
+  function mainsTip(ids) {
+    const byId = new Map(bindMains.map((m) => [m.id, m]));
+    const lines = ids.map((id) => byId.get(id)).filter((m) => !!m).map((m) => m.page ? `${m.name} \u2014 ${m.page}` : m.name);
+    return lines.slice(0, 10).join("\n") + (lines.length > 10 ? "\n" + t("v4.mainsMore", { n: lines.length - 10 }) : "");
+  }
+  function mainsLineEl(ids) {
+    const sp = document.createElement("span");
+    sp.textContent = t("v4.mainsLine", { c: ids.length });
+    sp.title = mainsTip(ids);
+    return sp;
+  }
   var bindTsRows = [];
   var bindTsSkips = {};
   var bindTsOff = /* @__PURE__ */ new Set();
@@ -7984,6 +8022,15 @@
     const n = bindOnCount();
     $("btnApplyConfirmLabel").textContent = bindPreviewed && hasBindPreview() ? t("bind.linkN", { n }) : t("bind.link");
     $("bindFoot").hidden = !!bindLinking || bindZero();
+    {
+      const eff = bindTsOnly() ? [] : effCandidates();
+      const ids = mainUnitIds(eff.filter((c) => bindChecked.has(candKey(c))), bindTsRows.filter((r) => !bindTsOff.has(r.styleId)));
+      const box = $("bindMains");
+      const show = !bindLinking && !bindFinding && bindPreviewed && hasBindPreview() && !bindZero() && ids.length > 0;
+      box.hidden = !show;
+      if (show) box.replaceChildren(mainsLineEl(ids));
+      else box.replaceChildren();
+    }
     if (!curSel.count && !baseline) setLock(confirm, "prereq", t("status.noSelection"));
     else if (!bindPreviewed) setLock(confirm, "prereq", t("v4.reading"));
     else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
@@ -8001,6 +8048,7 @@
     bindSkipsOpen = false;
     bindTsRows = [];
     bindTsSkips = {};
+    bindMains = [];
     bindVarPending = false;
     bindTsPending = false;
     clearMount($("bindSkips"));
@@ -8137,23 +8185,19 @@
       const ids = [...new Set(items.map((x) => x.nodeId))];
       const r = document.createElement("div");
       r.className = "skip-row";
+      const line = document.createElement("div");
+      line.className = "skip-line";
       const nm = document.createElement("span");
       nm.className = "skip-name";
       nm.textContent = label;
       const n = document.createElement("span");
       n.className = "skip-n";
       n.textContent = count;
-      r.append(nm, n);
-      if (help) {
-        const h = document.createElement("span");
-        h.className = "skip-help";
-        h.textContent = help;
-        r.appendChild(h);
-      }
       const grow = document.createElement("span");
       grow.className = "grow";
-      r.appendChild(grow);
-      if (ids.length && key) {
+      line.append(nm, n, grow);
+      r.appendChild(line);
+      if (ids.length && key && FIX_SKIP_REASONS.includes(key)) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "link link-btn skip-sel";
@@ -8168,7 +8212,13 @@
           selectNodes(ids, "applyStatus");
           setStatus("applyStatus", t("bind.skipSelected", { reason: t("reason." + key), n: ids.length }), "");
         });
-        r.appendChild(btn);
+        line.appendChild(btn);
+      }
+      if (help) {
+        const h = document.createElement("div");
+        h.className = "skip-help";
+        h.textContent = help;
+        r.appendChild(h);
       }
       return r;
     };
@@ -12127,12 +12177,17 @@ ${opts.tip}` : text;
     b.dataset.k = "tsLink";
     actions.push(b);
   }
+  function rememberMainsBound(ids, base = baseline ? baseKey() : null) {
+    const uniq = [...new Set(ids)];
+    lastMainsBound = uniq.length && base ? { base, ids: uniq } : null;
+  }
   function renderFindCard(put, counts) {
     if (prereqKnown && !hasBindable) {
-      const subs = [t("bind.noTier")];
+      lastMainsBound = null;
+      const subs2 = [t("bind.noTier")];
       const actions2 = [];
-      tsOnlyExtra(subs, actions2);
-      put(selCard({ title: t("v4.find0"), subs, actions: actions2 }));
+      tsOnlyExtra(subs2, actions2);
+      put(selCard({ title: t("v4.find0"), subs: subs2, actions: actions2 }));
       if (selFindFor === baseKey() && !selFindInFlight) selMakeHot = true;
       return;
     }
@@ -12141,8 +12196,24 @@ ${opts.tip}` : text;
       return;
     }
     const { m, k, s, n } = counts;
+    const boundMains = () => {
+      if (lastMainsBound && lastMainsBound.base !== baseKey()) lastMainsBound = null;
+      if (!lastMainsBound) return [];
+      const sp = document.createElement("span");
+      sp.textContent = t("v4.allBoundMains", { c: lastMainsBound.ids.length });
+      return [sp];
+    };
+    const mainsSub = (card2) => {
+      for (const el of Array.from(card2.querySelectorAll(".s"))) if (el.querySelector("[data-mains]")) el.classList.add("mains");
+      return card2;
+    };
+    const markMains = (els) => {
+      for (const e of els) e.dataset.mains = "1";
+      return els;
+    };
     if (n === 0 && s === 0) {
-      put(selCard({ title: t("v4.allBound"), cls: "ok" }));
+      const mb = markMains(boundMains());
+      put(mainsSub(selCard({ title: t("v4.allBound"), cls: "ok", subs: mb })));
       return;
     }
     if (n === 0) {
@@ -12152,9 +12223,11 @@ ${opts.tip}` : text;
         renderBindTree();
       });
       v.dataset.k = "skips";
-      put(selCard({ title: t("v4.allLinked"), subs: [t("v4.fixPlaces", { s })], actions: [v] }));
+      const mb = markMains(boundMains());
+      put(mainsSub(selCard({ title: t("v4.allLinked"), subs: [...mb, t("v4.fixPlaces", { s })], actions: [v] })));
       return;
     }
+    lastMainsBound = null;
     const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
     if (k > 0) parts.push(t("v4.noVarPlaces", { k }));
     const sub = document.createElement("span");
@@ -12167,7 +12240,10 @@ ${opts.tip}` : text;
       go.dataset.k = "link";
       actions.push(go);
     } else if (k > 0) selMakeHot = true;
-    const card = selCard({ title: t("v4.findN", { n }), subs: [sub], actions });
+    const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
+    const subs = [sub];
+    if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
+    const card = mainsSub(selCard({ title: t("v4.findN", { n }), subs, actions }));
     card.querySelector(".t").title = t("v4.findTip");
     put(card);
   }
