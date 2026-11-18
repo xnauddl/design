@@ -25,6 +25,10 @@ export const EMITTED_ROLES = [
   'actions', // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
   'article',
   'figure',
+  // 역할 세분화 1차(ia-v4 §4.4 B1–B3) — 폴백 자리에서만, 자식에게는 맥락을 통과시킨다
+  'row', // 이름표 글자 + 값 한 줄
+  'text-group', // 글자만 2개 이상
+  'media', // 사진(+ 작은 아이콘)만 담은 상자
   // 컴포넌트
   'button',
   'chip',

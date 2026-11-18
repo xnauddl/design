@@ -272,7 +272,9 @@ function isFieldLike(node: LikeNode, kids: readonly LikeNode[]): boolean {
   if (shown.length < 2 || shown.length > 4) return false;
   const hasLabel = shown.some((k) => k.type === 'TEXT');
   const hasInput = shown.some(isInputBox);
-  return hasLabel && hasInput;
+  // 글자가 아닌 자식은 모두 입력 높이 안(≤72) — 목록 · 이미지 블록이 끼면 섹션이지 field가 아니다(ia-v4 §4.4 A3).
+  const shortBlocks = shown.every((k) => k.type === 'TEXT' || ((dims(k)?.h ?? Infinity) <= 72));
+  return hasLabel && hasInput && shortBlocks;
 }
 
 function isNavLike(node: LikeNode, depth: number): boolean {
@@ -448,7 +450,7 @@ export function isIconFrame(n: LikeNode): boolean {
   return isIconLike(n);
 }
 
-function shortOneLine(t: LikeNode): boolean {
+export function shortOneLine(t: LikeNode): boolean {
   const c = t.characters;
   if (typeof c !== 'string') return false;
   return !/[\n\r\u2028]/.test(c) && c.trim().length > 0 && c.trim().length <= 24;
