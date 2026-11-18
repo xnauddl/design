@@ -451,6 +451,10 @@
     /* 타이포 목록 — 구분선 줄(카드 안 카드 금지, CLAUDE.md · docs/text-style-krds.md §6) */
     #tsList { gap: 0; }
     #tsList .r-card { border: none; border-bottom: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; margin: 0; }
+    /* 소수 크기 흐린 줄(ia-v4 §4.3 "소수 크기 줄") — 글 · Aa 모두 --muted, 바탕 · 테두리 더하지 않음 */
+    #tsList .r-card.ts-decimal .r-title, #tsList .r-card.ts-decimal .r-sum { color: var(--muted); }
+    .tr.ts-decimal .ts-aa, .tr.ts-decimal .tr-sub, .tr.ts-decimal .bv-tw { color: var(--muted); }
+    .tr.ts-decimal .ts-why { flex: 0 0 auto; white-space: nowrap; }
     /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
     .tsr-all { padding: 0 0 6px; }
     .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
@@ -4948,6 +4952,19 @@
   });
   var DEFAULT_TS_FAMILY = "Inter";
   var tsSpecs = [];
+  var tsDecimal = [];
+  var tsRead = false;
+  function withDecimals(rows, dec) {
+    const out = [];
+    const ds = [...dec].sort((a, b) => b.fontSize - a.fontSize);
+    let i = 0;
+    for (const r of rows) {
+      while (i < ds.length && ds[i].fontSize > r.fontSize) out.push({ decimal: ds[i++] });
+      out.push(r);
+    }
+    while (i < ds.length) out.push({ decimal: ds[i++] });
+    return out;
+  }
   function tsSummary(s) {
     const lh = s.lineHeight > 0 ? s.lineHeightPercent ? `${s.lineHeightPercent}%` : `${s.lineHeight}px` : "AUTO";
     const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
@@ -5039,8 +5056,14 @@
     return card;
   }
   var tsScanNote = { namePart: "", warnings: [] };
+  function decimalCard(c) {
+    const card = resultCard({ title: t("textStyle.decimalRow"), summary: tsSummary(c), summaryMono: true });
+    card.classList.add("ts-decimal");
+    return card;
+  }
   function renderTextStyles() {
-    renderChunked($("tsList"), tsSpecs, textStyleCard);
+    renderChunked($("tsList"), withDecimals(tsSpecs, tsDecimal), (x) => "decimal" in x ? decimalCard(x.decimal) : textStyleCard(x));
+    updateEmptyLocks();
     if (!tsSpecs.length) {
       setTsStatus("", "");
       return;
@@ -5581,6 +5604,7 @@
   }
   var colorsVisible = () => colorRevealed && tokens.some((tk) => tk.category === "color" && typeof tk.value === "string");
   function updateEmptyLocks() {
+    setEmptyLock($("btnTextStyles"), tsRead && !tsSpecs.length && tsDecimal.length ? t("textStyle.noRegistrable") : null);
     const extract = $("btnExtract");
     const colorVars = $("btnColorVars");
     setEmptyLock(colorVars, colorsVisible() ? null : t("color.needColors"));
@@ -5903,7 +5927,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6112,10 +6136,16 @@
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
         tsExistingNames = ((_g = msg.existing) != null ? _g : []).map((e) => e.name);
-        if (msg.styles.length) {
+        tsDecimal = (_h = msg.decimalRows) != null ? _h : [];
+        tsRead = true;
+        if (!msg.styles.length && tsDecimal.length) {
+          tsSpecs = [];
+          tsScanNote = { namePart: "", warnings: msg.warnings };
+          renderTextStyles();
+        } else if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
-            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_h = msg.fallback) != null ? _h : 0 }) : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_i = msg.fallback) != null ? _i : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -6130,7 +6160,7 @@
         break;
       }
       case "TEXT_STYLES_RESULT": {
-        const why = Object.entries((_i = msg.applyReasons) != null ? _i : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const why = Object.entries((_j = msg.applyReasons) != null ? _j : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setTsStatus(
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
@@ -6161,7 +6191,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_j = msg.tierVars) != null ? _j : 0) + ((_k = msg.otherVars) != null ? _k : 0);
+        prereqLocalVars = ((_k = msg.tierVars) != null ? _k : 0) + ((_l = msg.otherVars) != null ? _l : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -6176,7 +6206,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_l = msg.noteKind) != null ? _l : "ok");
+          setStatus("licenseStatus", msg.note, (_m = msg.noteKind) != null ? _m : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -6200,7 +6230,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_m = msg.autoNamed) != null ? _m : 0);
+        setCompAutoNamed((_n = msg.autoNamed) != null ? _n : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6215,12 +6245,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_n = msg.placeFailed) != null ? _n : [];
-        const cloned = (_o = msg.placeCloned) != null ? _o : [];
-        const propFailed = (_p = msg.propFailed) != null ? _p : [];
-        const fillKept = (_q = msg.fillKept) != null ? _q : [];
-        const reused = (_r = msg.reused) != null ? _r : [];
-        const reuseKept = (_s = msg.reuseKept) != null ? _s : [];
+        const misplaced = (_o = msg.placeFailed) != null ? _o : [];
+        const cloned = (_p = msg.placeCloned) != null ? _p : [];
+        const propFailed = (_q = msg.propFailed) != null ? _q : [];
+        const fillKept = (_r = msg.fillKept) != null ? _r : [];
+        const reused = (_s = msg.reused) != null ? _s : [];
+        const reuseKept = (_t = msg.reuseKept) != null ? _t : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -6286,7 +6316,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_t = msg.placeFailed) != null ? _t : [];
+          const misplaced0 = (_u = msg.placeFailed) != null ? _u : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -6295,7 +6325,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
+        const misplaced = (_v = msg.placeFailed) != null ? _v : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -6802,6 +6832,7 @@
   var mkPreviewTimer = null;
   var mkPreviewTagsOnly = false;
   var mkTs = [];
+  var mkTsDecimal = [];
   var mkTsExisting = [];
   var mkTsFor = null;
   var mkScanReq = 0;
@@ -6953,14 +6984,15 @@
     renderMakeScreen();
   }
   function onMakeScan(msg) {
-    var _a3;
+    var _a3, _b;
     if (mkEditSig) {
       mkTsPending = msg;
       return;
     }
     mkTsReading = false;
     mkTs = msg.styles;
-    mkTsExisting = (_a3 = msg.existing) != null ? _a3 : [];
+    mkTsDecimal = (_a3 = msg.decimalRows) != null ? _a3 : [];
+    mkTsExisting = (_b = msg.existing) != null ? _b : [];
     const sigs = new Set(mkTs.map(tsSig));
     for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
     mkTsFor = baseKey();
@@ -6986,7 +7018,7 @@
   function mkTabsVisible() {
     const out = [];
     if (mkTokens.length) out.push("global", "semantic");
-    if (isPaid && (mkTs.length || mkTsReading && mkTsFor !== baseKey())) out.push("ts");
+    if (isPaid && (mkTs.length || mkTsDecimal.length || mkTsReading && mkTsFor !== baseKey())) out.push("ts");
     return out;
   }
   function mkSemState() {
@@ -7065,7 +7097,24 @@
       }
     } else {
       if (!isPaid || mkTsFor !== baseKey()) return items;
-      for (const s of mkTs) {
+      for (const x of withDecimals(mkTs, mkTsDecimal)) {
+        if ("decimal" in x) {
+          const c = x.decimal;
+          const aa2 = document.createElement("span");
+          aa2.className = "ts-aa";
+          aa2.setAttribute("aria-hidden", "true");
+          aa2.textContent = "Aa";
+          const sum = tsSummary(c);
+          const sub2 = document.createElement("span");
+          sub2.className = "tr-sub";
+          sub2.textContent = sum;
+          const why = document.createElement("span");
+          why.className = "tr-sub ts-why";
+          why.textContent = t("textStyle.decimalRow");
+          items.push({ key: `td:${tsSig(c)}`, indent: 0, cls: "ts-decimal", cells: [aa2, sub2], right: [mkLayers(c.count), why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
+          continue;
+        }
+        const s = x;
         const sig = tsSig(s);
         const on = !mkTsOff.has(sig);
         const aa = document.createElement("span");
@@ -7201,7 +7250,7 @@
         emptyText = t("list.big");
         emptyAction = [t("list.read"), () => readMake(true)];
       } else if (!mkRunning && (mkFor !== baseKey() || mkReading)) skeleton = true;
-      else if (!mkTokens.length && !mkTs.length) emptyText = t("make.zero");
+      else if (!mkTokens.length && !mkTs.length && !(isPaid && mkTsDecimal.length)) emptyText = t("make.zero");
     }
     empty.hidden = !emptyText;
     if (emptyText) {
@@ -7255,6 +7304,7 @@
     } else if (tab === "ts") {
       topText = t("make.tsTop");
       info = t("make.tsNote");
+      if (!mkTs.length) links = false;
     }
     $("makeTopText").textContent = topText;
     $("makeSemLic").hidden = !semLic;

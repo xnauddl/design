@@ -7,7 +7,7 @@ import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
-import { type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
+import { type StyleCluster, type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
 import { headState, headToggleTarget, mergeSameNameTokens, buildRenameTree, type RenameTreeItem } from './lib/treeState';
 import { renderTree, focusRow, type TreeItem } from './treeList';
 import { type Tier } from './lib/entitlements';
@@ -930,9 +930,25 @@ const DEFAULT_TS_FAMILY = 'Inter';
 
 /** 편집 중인 스타일 목록 — 카드가 곧 편집기라 이름 외에는 이 배열이 단일 출처다. */
 let tsSpecs: TextStyleSpec[] = [];
+/** 앵커 없는 소수 크기 후보(TEXT_STYLE_CANDIDATES.decimalRows) — 만들지 않는 흐린 카드(ia-v4 §4.3 "소수 크기 줄"). 수에 넣지 않는다. */
+let tsDecimal: StyleCluster[] = [];
+/** 후보 읽기를 했는가 — [등록] 0개 잠금(`textStyle.noRegistrable`)은 "읽었는데 흐린 줄만 있음"일 때만. */
+let tsRead = false;
+/** 크기 순서 제자리에 흐린 줄을 끼운 목록(보통 줄 순서는 그대로). */
+function withDecimals<T extends { fontSize: number }, D extends { fontSize: number }>(rows: readonly T[], dec: readonly D[]): (T | { decimal: D })[] {
+  const out: (T | { decimal: D })[] = [];
+  const ds = [...dec].sort((a, b) => b.fontSize - a.fontSize);
+  let i = 0;
+  for (const r of rows) {
+    while (i < ds.length && ds[i].fontSize > r.fontSize) out.push({ decimal: ds[i++] });
+    out.push(r);
+  }
+  while (i < ds.length) out.push({ decimal: ds[i++] });
+  return out;
+}
 
 /** 요약 한 줄 — "Inter · 32 / 120% / 0 · Bold". 행간·자간은 원본 단위로 보여준다. */
-function tsSummary(s: TextStyleSpec): string {
+function tsSummary(s: Pick<TextStyleSpec, 'family' | 'fontSize' | 'lineHeight' | 'lineHeightPercent' | 'letterSpacing' | 'letterSpacingPercent' | 'style'>): string {
   const lh = s.lineHeight > 0 ? (s.lineHeightPercent ? `${s.lineHeightPercent}%` : `${s.lineHeight}px`) : 'AUTO';
   const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
   return `${s.family} · ${s.fontSize} / ${lh} / ${ls} · ${s.style}`;
@@ -1040,8 +1056,16 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
 /** 스캔만 알 수 있는 부가 정보 — 표를 편집해도 그 스캔의 사실이라 남는다(이름 출처·경고). */
 let tsScanNote = { namePart: '', warnings: [] as string[] };
 
+/** 소수 크기 흐린 카드(ia-v4 §4.3 "소수 크기 줄") — 이름 입력 자리에 회색 사유, 아래 줄 값 요약. 입력 · [삭제] 없음. */
+function decimalCard(c: StyleCluster): HTMLElement {
+  const card = resultCard({ title: t('textStyle.decimalRow'), summary: tsSummary(c), summaryMono: true });
+  card.classList.add('ts-decimal');
+  return card;
+}
+
 function renderTextStyles(): void {
-  renderChunked($('tsList'), tsSpecs, textStyleCard);
+  renderChunked($('tsList'), withDecimals(tsSpecs, tsDecimal), (x) => ('decimal' in x ? decimalCard(x.decimal) : textStyleCard(x)));
+  updateEmptyLocks(); // [등록] 0개 잠금(흐린 줄만 있음)
   if (!tsSpecs.length) {
     setTsStatus('', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
     return;
@@ -1673,6 +1697,8 @@ function setCardPrimary(all: HTMLElement[], order: HTMLElement[]): void {
 /** 색 단계의 보이는 색이 있는지 — 색 목록이 숨어 있으면(토큰 단계 [미리보기]만으로 추출) 보지 못한 색이다. */
 const colorsVisible = (): boolean => colorRevealed && tokens.some((tk) => tk.category === 'color' && typeof tk.value === 'string');
 function updateEmptyLocks(): void {
+  // 타이포 [등록] — 읽었는데 흐린 줄(소수 크기)만 있으면 0개 잠금(ia-v4 §4.3 "소수 크기 줄"). 유료 잠금이 먼저(setEmptyLock이 건너뜀).
+  setEmptyLock($('btnTextStyles'), tsRead && !tsSpecs.length && tsDecimal.length ? t('textStyle.noRegistrable') : null);
   // 색
   const extract = $('btnExtract');
   const colorVars = $('btnColorVars');
@@ -2329,7 +2355,14 @@ window.onmessage = (event: MessageEvent) => {
       // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
       tsExistingNames = (msg.existing ?? []).map((e) => e.name); // 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프)
-      if (msg.styles.length) {
+      tsDecimal = msg.decimalRows ?? []; // 소수 크기 흐린 줄 — 이름 채우기 응답도 이 값대로 다시 그린다
+      tsRead = true;
+      if (!msg.styles.length && tsDecimal.length) {
+        // 흐린 줄뿐 — 기본 램프로 가지 않는다(textStyle.fallbackRamp 없음). [등록]은 0개 잠금.
+        tsSpecs = [];
+        tsScanNote = { namePart: '', warnings: msg.warnings };
+        renderTextStyles();
+      } else if (msg.styles.length) {
         tsSpecs = msg.styles.map((x) => ({ ...x }));
         // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
         // `왼쪽 글자 0`이 실패처럼 읽힌다. 와이어 상태 줄: 신규 · 등록됨 · 왼쪽 글자 · 크기 순.
@@ -3097,6 +3130,8 @@ let mkPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 let mkPreviewTagsOnly = false;
 /** 텍스트 스타일 후보(유료). */
 let mkTs: TextStyleSpec[] = [];
+/** 앵커 없는 소수 크기 후보 — 흐린 줄(ia-v4 §4.3 "소수 크기 줄"). 켠 목록 · 탭 수 · 실행 수에 넣지 않는다. */
+let mkTsDecimal: StyleCluster[] = [];
 let mkTsExisting: ExistingStyleSig[] = [];
 let mkTsFor: string | null = null;
 let mkScanReq = 0;
@@ -3225,6 +3260,7 @@ function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): 
   if (mkEditSig) { mkTsPending = msg; return; } // 고치는 동안은 칸을 닫을 때까지 미룬다
   mkTsReading = false;
   mkTs = msg.styles;
+  mkTsDecimal = msg.decimalRows ?? [];
   mkTsExisting = msg.existing ?? [];
   const sigs = new Set(mkTs.map(tsSig));
   for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
@@ -3254,7 +3290,7 @@ function mkLayers(n: number | undefined): HTMLElement {
 function mkTabsVisible(): MkTab[] {
   const out: MkTab[] = [];
   if (mkTokens.length) out.push('global', 'semantic');
-  if (isPaid && (mkTs.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
+  if (isPaid && (mkTs.length || mkTsDecimal.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
   return out;
 }
 /** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · zero r = 0 · rows. */
@@ -3311,7 +3347,25 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
     }
   } else {
     if (!isPaid || mkTsFor !== baseKey()) return items;
-    for (const s of mkTs) {
+    for (const x of withDecimals(mkTs, mkTsDecimal)) {
+      if ('decimal' in x) {
+        // 흐린 줄 — "Aa" · (이름 칩 없음) · 값 요약 · "Layer {n}" · 스위치 자리에 사유. 고치기 · 켜기 없음.
+        const c = x.decimal;
+        const aa = document.createElement('span');
+        aa.className = 'ts-aa';
+        aa.setAttribute('aria-hidden', 'true');
+        aa.textContent = 'Aa';
+        const sum = tsSummary(c);
+        const sub = document.createElement('span');
+        sub.className = 'tr-sub';
+        sub.textContent = sum;
+        const why = document.createElement('span');
+        why.className = 'tr-sub ts-why';
+        why.textContent = t('textStyle.decimalRow');
+        items.push({ key: `td:${tsSig(c)}`, indent: 0, cls: 'ts-decimal', cells: [aa, sub], right: [mkLayers(c.count), why], aria: `${sum} · ${t('textStyle.decimalRow')}` });
+        continue;
+      }
+      const s = x;
       const sig = tsSig(s);
       const on = !mkTsOff.has(sig);
       const aa = document.createElement('span');
@@ -3420,7 +3474,7 @@ function renderMakeScreen(): void {
     if (!baseline && !mkRunning) { emptyText = t('v4.noSel'); emptyAction = [t('v4.backHome'), subBack]; }
     else if (!mkRunning && mkFor !== baseKey() && !mkReading && baseline && baseline.scanned > BIG_SELECTION) { emptyText = t('list.big'); emptyAction = [t('list.read'), () => readMake(true)]; }
     else if (!mkRunning && (mkFor !== baseKey() || mkReading)) skeleton = true;
-    else if (!mkTokens.length && !mkTs.length) emptyText = t('make.zero');
+    else if (!mkTokens.length && !mkTs.length && !(isPaid && mkTsDecimal.length)) emptyText = t('make.zero');
   }
   empty.hidden = !emptyText;
   if (emptyText) {
@@ -3464,7 +3518,7 @@ function renderMakeScreen(): void {
   if (skeleton) { topText = t('v4.reading'); links = false; }
   else if (semLic) { topText = t('make.freeSemTop') + ' · '; links = false; }
   else if (tab === 'semantic') { topText = t('make.semTop'); info = t('make.semNote'); links = false; }
-  else if (tab === 'ts') { topText = t('make.tsTop'); info = t('make.tsNote'); }
+  else if (tab === 'ts') { topText = t('make.tsTop'); info = t('make.tsNote'); if (!mkTs.length) links = false; } // 흐린 줄뿐이면 켤 것이 없다
   $('makeTopText').textContent = topText;
   $('makeSemLic').hidden = !semLic;
   const infoBtn = $('makeInfo');

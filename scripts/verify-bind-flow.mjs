@@ -2601,6 +2601,115 @@ async function fillBoth(p) {
   await p.close();
 }
 
+{
+  // 27f 소수 크기 흐린 줄(ia-v4 §4.3 "소수 크기 줄" · A.18 3) — 만들기 화면 Text Style 탭
+  const S24 = { name: 'heading/medium', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 3, nodeIds: ['t1'] };
+  const D2667 = { fontSize: 26.67, lineHeight: 36, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'SemiBold', count: 4, uiCount: 0, sample: 'Title', styleIds: [], nodeIds: ['t2'] };
+  const openMake = async (styles) => {
+    const p = await open(480, 'select');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card' });
+    await goSub(p, 'make');
+    await p.waitForTimeout(50);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 }] });
+    await p.waitForTimeout(40);
+    const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+    await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles, decimalRows: [D2667] });
+    await p.waitForTimeout(50);
+    return p;
+  };
+  {
+    const p = await openMake([S24]);
+    check('27f 탭 수 — Text Style 1(흐린 줄은 세지 않음)', (await tabsOf(p)).includes('Text Style1'), JSON.stringify(await tabsOf(p)));
+    await p.click('#makeTab-ts');
+    await p.waitForTimeout(30);
+    const rows = await p.$$eval('#makeTree .tr-row', (e) => e.map((r) => ({ k: r.dataset.tkey, dec: r.classList.contains('ts-decimal'), sw: !!r.querySelector('.bv-switch'), txt: r.textContent, aria: r.getAttribute('aria-label'), col: getComputedStyle(r.querySelector('.ts-aa')).color })));
+    check('27f Text Style 탭 줄 2개 — 26.67 흐린 줄이 크기 순서 제자리(먼저) · 스위치 없음 · 오른쪽 글',
+      rows.length === 2 && rows[0].dec && !rows[0].sw && rows[0].txt.includes('글자 크기가 소수라 만들지 않아요') && rows[0].txt.includes('26.67') && rows[0].txt.includes('Layer 4') && !rows[1].dec && rows[1].sw, JSON.stringify(rows));
+    check('27f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(146, 152, 161)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
+    check('27f 아래 줄 · 실행 수는 스타일 1개', (await p.textContent('#makeCount')).includes('스타일 1개'), await p.textContent('#makeCount'));
+    // 키보드 — 화살표가 흐린 줄에도 멈추고 Enter · Space는 아무 일 없음
+    await p.focus('#makeTree .tr-row[data-tkey^="t:"]');
+    await p.keyboard.press('ArrowUp');
+    await p.waitForTimeout(20);
+    const onDec = await p.evaluate(() => document.activeElement?.closest?.('.tr-row')?.classList.contains('ts-decimal') ?? document.activeElement?.classList.contains('ts-decimal'));
+    await p.keyboard.press('Enter');
+    await p.keyboard.press(' ');
+    await p.waitForTimeout(20);
+    check('27f 화살표가 흐린 줄에 멈춤 · Enter · Space 아무 일 없음(고치기 칸 없음 · 줄 그대로)', onDec && (await p.$$eval('#makeTree input.tr-edit', (e) => e.length)) === 0 && (await p.$$eval('#makeTree .tr-row', (e) => e.length)) === 2);
+    const bad = await nestedCards(p);
+    check('27f 카드 안 카드 0 — Text Style 탭', bad.length === 0, bad.join(' · '));
+    await p.close();
+  }
+  {
+    // 소수 크기만 — 탭 수 0 · 빈 상태 없음 · 모두 켜기 · 끄기 없음
+    const p = await openMake([]);
+    check('27g 만들기 화면 소수 크기만 — Text Style 탭 수 0', (await tabsOf(p)).includes('Text Style0'), JSON.stringify(await tabsOf(p)));
+    await p.click('#makeTab-ts');
+    await p.waitForTimeout(30);
+    check('27g Text Style 탭(소수 크기만) — 흐린 줄 하나 · 빈 상태 없음 · 모두 켜기 · 끄기 없음', (await p.$$eval('#makeTree .tr-row.ts-decimal', (e) => e.length)) === 1 && !(await visible(p, '#makeEmpty')) && !(await visible(p, '#makeAllOn')) && !(await visible(p, '#makeAllOff')));
+    await p.close();
+  }
+}
+{
+  // 27f · 27g 값을 직접 고르기 › 타이포 #tsList 흐린 카드 · [등록] 0개 잠금
+  const D2667 = { fontSize: 26.67, lineHeight: 36, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'SemiBold', count: 4, uiCount: 0, sample: 'Title', styleIds: [], nodeIds: ['t2'] };
+  const openTs = async () => {
+    const p = await open(480, 'variables');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasTextStyles: true });
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await p.click('#btnAddVar');
+    await p.click('.ctx-menu button >> text=텍스트 스타일 만들기…');
+    await p.waitForTimeout(40);
+    return p;
+  };
+  {
+    const p = await openTs();
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', ...(sc?.reqId != null ? { reqId: sc.reqId } : {}), warnings: [], existing: [], decimalRows: [D2667], styles: [
+      { name: 'heading/large', fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 3, nodeIds: ['t1'] },
+      { name: 'body/medium', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 12, nodeIds: ['t3'] },
+    ] });
+    await p.waitForTimeout(60);
+    const cards = await p.$$eval('#tsList .r-card', (e) => e.map((c) => ({ dec: c.classList.contains('ts-decimal'), inputs: c.querySelectorAll('input').length, del: c.querySelectorAll('.link').length, title: c.querySelector('.r-title')?.textContent, col: getComputedStyle(c.querySelector('.r-title')).color })));
+    check('27f #tsList — 흐린 카드가 크기 순서 제자리(가운데) · 이름 입력 · [삭제] 없음 · 회색 사유',
+      cards.length === 3 && cards[1].dec && cards[1].inputs === 0 && cards[1].del === 0 && cards[1].title === '글자 크기가 소수라 만들지 않아요' && cards[1].col === 'rgb(146, 152, 161)' && !cards[0].dec && !cards[2].dec, JSON.stringify(cards));
+    check('27f #tsStatus 수 — 신규 2(흐린 줄은 세지 않음)', (await p.textContent('#tsStatus')).startsWith('신규 2'), await p.textContent('#tsStatus'));
+    check('27f [등록] 잠금 없음(만들 스타일 있음)', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true');
+    // [왼쪽 글자로 이름 채우기] 뒤 — 응답의 decimalRows대로 다시 그림(빠진 줄은 없어짐)
+    await p.click('#btnTsRowLabels');
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', warnings: [], labeled: 1, fallback: 1, decimalRows: [], styles: [
+      { name: 'H1', fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 3, nodeIds: ['t1'] },
+      { name: 'body/medium', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 12, nodeIds: ['t3'] },
+    ] });
+    await p.waitForTimeout(60);
+    check('27f 이름 채우기 뒤 — 응답에 없는 흐린 줄은 없어짐', (await p.$$eval('#tsList .r-card.ts-decimal', (e) => e.length)) === 0 && (await p.$$eval('#tsList .r-card', (e) => e.length)) === 2);
+    await p.close();
+  }
+  {
+    const p = await openTs();
+    // 읽기 전에 누르면 지금처럼 needSpecs
+    await p.click('#btnTextStyles', { force: true });
+    await p.waitForTimeout(20);
+    check('27g 읽기 전 [등록] — 잠금 없음 · needSpecs', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true' && (await p.textContent('#tsStatus')) === '먼저 ‘스캔’으로 스타일을 읽어 주세요', await p.textContent('#tsStatus'));
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', ...(sc?.reqId != null ? { reqId: sc.reqId } : {}), warnings: [], existing: [], styles: [], decimalRows: [D2667] });
+    await p.waitForTimeout(60);
+    check('27g 소수 크기만 — 램프로 가지 않음 · fallbackRamp 없음 · 흐린 카드 하나', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 1 && (await p.$$eval('#tsList .r-card.ts-decimal', (e) => e.length)) === 1 && !(await p.textContent('#tsStatus')).includes('기본 램프'));
+    check('27g [등록] aria-disabled', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) === 'true');
+    await p.click('#btnTextStyles', { force: true });
+    await p.waitForTimeout(20);
+    check('27g 누르면 상태 줄 "만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요" · CREATE_TEXT_STYLES 0', (await p.textContent('#statusText')) === '만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요' && (await count(p, 'CREATE_TEXT_STYLES')) === 0, await p.textContent('#statusText'));
+    await p.close();
+  }
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);
