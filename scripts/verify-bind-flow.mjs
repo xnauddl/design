@@ -60,6 +60,18 @@ async function goSub(p, sub) {
 const recv = (p, m) => p.evaluate((m) => window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: m } })), m);
 const sent = (p, type) => p.evaluate((t) => window.__sent.filter((m) => m && m.type === t), type);
 const lastReq = async (p, type) => (await sent(p, type)).at(-1)?.reqId;
+/** 컴포넌트 화면 찾기 — 버튼을 눌러 보낸 reqId로 응답한다(ia-v4 §4.5 — 비운 뒤 늦게 온 응답은 버림). 잠겨 있으면 유료 · 목록 기준을 먼저 준다. */
+async function compFound(p, nodes) {
+  if (await locked(p, '#btnScanComp')) await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  if (await locked(p, '#btnScanComp')) await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await p.click('#btnScanComp');
+  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes, reqId: await lastReq(p, 'SCAN_COMPONENT_CANDIDATES') });
+}
+async function similarFound(p, msg) {
+  if (await locked(p, '#btnScanSimilar')) await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await p.click('#btnScanSimilar');
+  await recv(p, { ...msg, reqId: await lastReq(p, 'SCAN_SIMILAR') });
+}
 /** 우클릭 메뉴 열기 — 510 높이에서는 행이 아래에 있어, 클릭 전 스크롤이 메뉴를 닫지 않게 먼저 화면 안으로. */
 async function rightClick(p, selector) {
   await p.$eval(selector, (e) => e.scrollIntoView({ block: 'center' }));
@@ -1116,12 +1128,12 @@ async function saveAndGet(p) {
       && s1.text.indexOf('구조가 달라 원본을 둔') < s1.text.indexOf('복사본을 둔')
       && s1.cls.includes('warn'), JSON.stringify(s1));
   // 후보 트리 — 재사용할 줄은 종류 배지 대신 [재사용] + 기존 컴포넌트 이름(세트면 "{세트} · {변형}")
-  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+  await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
     { id: 'a', name: 'Item Button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, group: 'ItemButton2', variant: 'Variant=1', reuse: { name: 'ItemButton · Variant=1' }, defaultOn: true },
     { id: 'b', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
     { id: 'c', name: 'hero-button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Button', defaultOn: true },
-  ] });
+  ]);
   const rows = await p.$$eval('#compTree .tag', (els) => els.map((e) => ({ text: e.textContent, cls: e.className, row: e.closest('.r-card')?.textContent ?? '' })));
   const reuseRow = rows.find((r) => r.text === '재사용');
   check('13 후보 트리 배지 [재사용] + 기존 이름(접미사 이름 안 보임)',
@@ -1140,7 +1152,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 1, instances: 2, images: 0, warnings: [], placeFailed: [] });
   s1 = await st();
   check('13 COMPONENTIZE_RESULT 상태 줄 "원본 Card · …"', s1.text.startsWith('원본 Card · 인스턴스 2개'), JSON.stringify(s1));
-  check('13 [하나의 컴포넌트로 합치기] 툴팁에 "마스터" 없음', !(await p.getAttribute('#btnComponentize', 'data-tip')).includes('마스터'), await p.getAttribute('#btnComponentize', 'data-tip'));
+  check('13 [하나로 합치기] 툴팁에 "마스터" 없음', !(await p.getAttribute('#btnComponentize', 'data-tip')).includes('마스터'), await p.getAttribute('#btnComponentize', 'data-tip'));
   await p.close();
 }
 
@@ -1612,11 +1624,11 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 {
   const p = await open(480, 'layer');
   await goSub(p, 'structure');
-  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+  await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
     { id: 'a', name: 'Item Button', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Button', defaultOn: true },
     { id: 'b', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
-  ] });
+  ]);
   await p.waitForTimeout(60);
   check('22 컴포넌트 트리 — 행 ≥1', (await p.$$eval('#compTree .r-card', (e) => e.length)) >= 1);
   const row = await rowShape(p, '#compTree .r-card');
@@ -1858,12 +1870,12 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   const h2 = await p.$eval('#structureCard h2', (e) => e.textContent.replace(/\s+/g, ''));
   check('23 제목 줄 = "컴포넌트베타"(개수 · "닮은 프레임" 없음)', h2 === '컴포넌트베타', h2);
   const btns = await p.evaluate(() => ['btnScanComp', 'btnScanSimilar', 'btnRegisterComp', 'btnComponentize', 'btnClassifyVariants', 'btnGenMissing'].map((id) => document.getElementById(id).textContent.trim()));
-  check('23 버튼 글 — 컴포넌트 후보 찾기 · 닮은 프레임 찾기 · 등록 · 하나의 컴포넌트로 합치기 · 변형 세트로 묶기 · 빠진 변형 채우기', JSON.stringify(btns) === JSON.stringify(['컴포넌트 후보 찾기', '닮은 프레임 찾기', '등록', '하나의 컴포넌트로 합치기', '변형 세트로 묶기', '빠진 변형 채우기']), JSON.stringify(btns));
-  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: [
+  check('23 버튼 글 — 컴포넌트 후보 찾기 · 닮은 프레임 찾기 · 등록 · 하나로 합치기 · 변형 세트로 묶기 · 빠진 변형 채우기', JSON.stringify(btns) === JSON.stringify(['컴포넌트 후보 찾기', '닮은 프레임 찾기', '등록', '하나로 합치기', '변형 세트로 묶기', '빠진 변형 채우기']), JSON.stringify(btns));
+  await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
     { id: 'b1', name: 'Button / primary', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, group: 'Button', variant: 'Type=primary', defaultOn: true },
     { id: 'lk', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
-  ] });
+  ]);
   await p.waitForTimeout(60);
   check('23 후보 받음 → [등록] 풀림 · #btnRegisterComp.primary', !(await locked(p, '#btnRegisterComp')) && JSON.stringify(await prim()) === JSON.stringify(['btnRegisterComp']), JSON.stringify(await prim()));
   const ctg = await p.$eval('#compTreeGroup', (e) => ({ name: e.firstElementChild?.textContent, cnt: e.querySelector('.r-gcnt')?.textContent, bg: getComputedStyle(e).backgroundColor }));
@@ -1878,17 +1890,18 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   check('23 전체 끔 → [등록] 잠김 · 사유 "등록할 후보를 체크해 주세요" · 주 버튼 하나', (await locked(p, '#btnRegisterComp')) && (await lockMsg(p, '#btnRegisterComp')) === '등록할 후보를 체크해 주세요' && (await prim()).length === 1 && !(await prim()).includes('btnRegisterComp'), JSON.stringify(await prim()));
   const meta = (id, name) => ({ id, name, textFilled: 3, textTotal: 3, images: 1, emptyLayers: 0, score: 1 });
   const simMsg = (metas) => ({ type: 'SIMILAR_CANDIDATES', metas, recommendedMasterId: metas[0]?.id ?? null, varying: [], imageVarying: [], excluded: [] });
-  await recv(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
+  await similarFound(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
   await p.waitForTimeout(40);
   const sg = await p.$eval('#similarGroup', (e) => ({ name: e.firstElementChild?.textContent, cnt: e.querySelector('.r-gcnt')?.textContent }));
   check('23 SIMILAR_CANDIDATES(2개) → [합치기] 풀림 · #similarGroup "닮은 프레임" + "2개" · 추천 줄 태그 "원본 추천" · 주 버튼 하나',
     !(await locked(p, '#btnComponentize')) && sg.name === '닮은 프레임' && sg.cnt === '2개' && (await p.textContent('#similarList .tag')) === '원본 추천' && (await prim()).length === 1, JSON.stringify({ sg, prim: await prim() }));
   const badComp = await nestedCards(p);
   check('23 카드 안 카드 0 — 머리 띠를 단 컴포넌트 화면', badComp.length === 0, badComp.join(' · '));
-  await recv(p, simMsg([meta('ca', 'Card A')]));
+  await similarFound(p, simMsg([meta('ca', 'Card A')]));
   await p.waitForTimeout(40);
   check('23 SIMILAR_CANDIDATES(1개) → [합치기] 잠김 · 사유 similar.needTwo', (await locked(p, '#btnComponentize')) && (await lockMsg(p, '#btnComponentize')) === '구조가 같은 프레임이 2개 이상 있어야 해요');
-  await recv(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
+  await similarFound(p, simMsg([meta('ca', 'Card A'), meta('cb', 'Card B')]));
+  await p.click('#btnComponentize'); // 쓰기 작업 — 결과를 받으면 다시 읽고 두 목록을 비운다(§4.5 "목록 비우기")
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card A', properties: 1, instances: 1, images: 0, warnings: [], placeFailed: [] });
   await p.waitForTimeout(40);
   check('23 COMPONENTIZE_RESULT 뒤 → [합치기] 다시 잠김(사유 needScan) · 상태 줄 "원본 Card A · …"', (await locked(p, '#btnComponentize')) && (await lockMsg(p, '#btnComponentize')) === '먼저 ‘닮은 프레임 찾기’를 눌러 주세요' && (await p.textContent('#structureStatus')).startsWith('원본 Card A · '), await p.textContent('#structureStatus'));
@@ -2161,27 +2174,403 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
   await p.close();
 }
 
+/* ---------- 25 Components 정리 PR(ia-v3 A.15 · ia-v4 §2.5 · §2.8 · §4.3a-2 · §4.5 · §4.11 T-P29 ④ — C-D5 · C-D7 · C-D12 · C-D13 · C-D14) ---------- */
+const COMP_NODES = [
+  { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
+  { id: 'b1', name: 'Button / primary', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, group: 'Button', variant: 'Type=primary', defaultOn: true },
+  { id: 'lk', name: 'Like', type: 'FRAME', depth: 1, parentId: 'r', eligible: true, single: 'Like' },
+];
+const simMeta = (id, name) => ({ id, name, textFilled: 3, textTotal: 3, images: 1, emptyLayers: 0, score: 1 });
+const SIM2 = { type: 'SIMILAR_CANDIDATES', metas: [simMeta('ca', 'Card A'), simMeta('cb', 'Card B')], recommendedMasterId: 'ca', varying: [], imageVarying: [], excluded: [] };
+/** 카드 안 보이는 주 버튼 — id가 없는 [다시 시도]는 'retry'. */
+const shownPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.filter((x) => x.getClientRects().length).map((x) => (x.classList.contains('retry-btn') ? 'retry' : x.id)));
+const compRows = (p) => p.$$eval('#compTree .r-card', (e) => e.length);
+const simRows = (p) => p.$$eval('#similarList .r-card', (e) => e.length);
+const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.contains('retry-btn') ? 'retry' : document.activeElement?.id ?? ''));
+async function compScreen(extra = {}) {
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card', ...extra });
+  await goSub(p, 'structure');
+  await p.waitForTimeout(60);
+  return p;
+}
+/** 두 목록을 채운다 — 후보 2 · 닮은 프레임 2. */
+async function fillBoth(p) {
+  await compFound(p, COMP_NODES);
+  await similarFound(p, SIM2);
+  await p.waitForTimeout(30);
+}
 {
-  // 25 라이선스 구매 버튼(IA v4 §4.10 · B.21) — 늘 보이고, 결제 링크가 자리표시자면 잠긴다. 글은 티어별.
+  const p = await compScreen();
+  // 들어올 때 포커스(C-D7) — 접힌 카드는 펼친다
+  await p.click('#btnSubBack');
+  await p.evaluate(() => document.getElementById('structureCard').classList.add('collapsed'));
+  await goSub(p, 'structure');
+  await p.waitForTimeout(60);
+  check('25 들어오면 접힌 카드를 펼치고 주 버튼에 포커스([컴포넌트 후보 찾기])', !(await p.$eval('#structureCard', (e) => e.classList.contains('collapsed'))) && (await activeId(p)) === 'btnScanComp', await activeId(p));
+  // 찾기 결과 0 → [등록] 사유 ②
+  await compFound(p, []);
+  await p.waitForTimeout(30);
+  check('25 찾기 결과 0 → [등록] 사유 "등록할 수 있는 프레임이 없어요"', (await locked(p, '#btnRegisterComp')) && (await lockMsg(p, '#btnRegisterComp')) === '등록할 수 있는 프레임이 없어요');
+  check('25 찾기 0 상태 줄 component.noEligible', (await p.textContent('#structureStatus')) === '선택 아래에 등록할 수 있는 프레임이 없어요.', await p.textContent('#structureStatus'));
+  // 찾기 요청에 목록 기준 nodeIds · reqId
+  const sc = (await sent(p, 'SCAN_COMPONENT_CANDIDATES')).at(-1);
+  check('25 [컴포넌트 후보 찾기] → 목록 기준 nodeIds · reqId', JSON.stringify(sc?.nodeIds) === '["w1"]' && typeof sc.reqId === 'number', JSON.stringify(sc));
+  // 기준이 바뀌면 두 목록 비움 + 사유 "찾은 적 없음"
+  await recv(p, { type: 'VARIANTS_RESULT', sets: 1, missing: ['Size=L'], singles: [], failures: [] });
+  await fillBoth(p);
+  check('25 (준비) 두 목록', (await compRows(p)) === 2 && (await simRows(p)) === 2);
+  await recv(p, { ...sel(1, 0), ids: ['w2'] });
+  await p.waitForTimeout(40);
+  check('25 기준이 바뀜 → 두 목록 · 머리 띠 · 전체 체크 줄 비움 · #variantReport도 지움', (await compRows(p)) === 0 && (await simRows(p)) === 0 && !(await visible(p, '#compTreeGroup')) && !(await visible(p, '#similarGroup')) && !(await visible(p, '#compTreeCtrls')) && (await p.$$eval('#variantReport > *', (e) => e.length)) === 0);
+  check('25 기준이 바뀜 → [합치기] 사유 "먼저 ‘닮은 프레임 찾기’를 눌러 주세요" · [등록] 사유 needScan', (await lockMsg(p, '#btnComponentize')) === '먼저 ‘닮은 프레임 찾기’를 눌러 주세요' && (await lockMsg(p, '#btnRegisterComp')) === '먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요');
+  check('25 기준이 바뀜 → 찾기 결과 상태 글도 지움', (await p.textContent('#structureStatus')) === '', await p.textContent('#structureStatus'));
+  // [등록] 뒤 닮은 프레임 목록도 비움
+  await fillBoth(p);
+  await p.click('#btnRegisterComp');
+  await recv(p, { type: 'COMPONENTS_RESULT', registered: 1, skipped: 0, sets: 0, singles: ['Like'], missing: [], failures: [] });
+  await p.waitForTimeout(40);
+  check('25 [등록] 뒤 → 두 목록 비움 · 결과 글은 남음', (await compRows(p)) === 0 && (await simRows(p)) === 0 && (await p.textContent('#structureStatus')).startsWith('컴포넌트 1'), await p.textContent('#structureStatus'));
+  // [합치기] 뒤 후보 목록도 비움
+  await fillBoth(p);
+  await p.click('#btnComponentize');
+  await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card A', properties: 1, instances: 1, images: 0, warnings: [], placeFailed: [] });
+  await p.waitForTimeout(40);
+  check('25 [합치기] 뒤 → 후보 목록도 비움', (await compRows(p)) === 0 && (await simRows(p)) === 0);
+  // [합치기] 인스턴스 0개라도 원본을 만들었으면 비움
+  await fillBoth(p);
+  await p.click('#btnComponentize');
+  await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card A', properties: 0, instances: 0, images: 0, warnings: ['Card B: x'], placeFailed: [] });
+  await p.waitForTimeout(40);
+  check('25 [합치기] 인스턴스 0개 · 원본 만듦 → 두 목록 비움', (await compRows(p)) === 0 && (await simRows(p)) === 0);
+  // [합치기] 원본을 못 찾음(원본 이름이 빈 결과) → 그대로
+  await fillBoth(p);
+  await p.click('#btnComponentize');
+  await recv(p, { type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: ['원본을 찾지 못했어요'], placeFailed: [] });
+  await p.waitForTimeout(40);
+  check('25 [합치기] 원본을 못 찾음 → 닮은 프레임 목록 그대로', (await simRows(p)) === 2 && (await compRows(p)) === 2);
+  // 쓰기 실패(오류) → 목록 그대로
+  await p.click('#btnRegisterComp');
+  await recv(p, { type: 'ERROR', message: '쓰기 실패', op: 'REGISTER_COMPONENTS', reqId: (await sent(p, 'REGISTER_COMPONENTS')).at(-1)?.reqId });
+  await p.waitForTimeout(40);
+  check('25 쓰기 실패(오류) → 두 목록 그대로', (await compRows(p)) === 2 && (await simRows(p)) === 2);
+  // 늦게 온 찾기 응답 · 오류는 버린다(C-D12)
+  await p.click('#btnScanComp');
+  const late = await lastReq(p, 'SCAN_COMPONENT_CANDIDATES');
+  await p.click('#btnScanSimilar');
+  const lateSim = await lastReq(p, 'SCAN_SIMILAR');
+  await recv(p, { ...sel(1, 0), ids: ['w3'] });
+  await p.waitForTimeout(30);
+  check('25 목록을 비울 때 "찾는 중" 글도 지움', !(await p.textContent('#structureStatus')).includes('찾는 중'), await p.textContent('#structureStatus'));
+  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: COMP_NODES, reqId: late });
+  await recv(p, { type: 'ERROR', message: '늦은 오류', op: 'SCAN_SIMILAR', reqId: lateSim });
+  await p.waitForTimeout(30);
+  check('25 비운 뒤 늦게 온 찾기 응답은 그리지 않음 · 상태 줄에 "찾는 중" 없음', (await compRows(p)) === 0 && !(await p.textContent('#structureStatus')).includes('찾는 중'));
+  check('25 비운 뒤 늦게 온 찾기 오류도 #structureStatus에 뜨지 않음', (await p.$$('#structureStatus .ux.danger')).length === 0);
+  // 정리 줄 — 세트만 / 낱개 컴포넌트만
+  await recv(p, { ...sel(1, 0), ids: ['w3'], comps: 0, sets: 1 });
+  await p.waitForTimeout(20);
+  check('25 세트만 선택 → [변형 세트로 묶기] 숨김 · [빠진 변형 채우기] 보임', !(await visible(p, '#btnClassifyVariants')) && (await visible(p, '#btnGenMissing')));
+  await recv(p, { ...sel(1, 0), ids: ['w3'], comps: 2, sets: 0 });
+  await p.waitForTimeout(20);
+  check('25 낱개 컴포넌트만 선택 → [빠진 변형 채우기] 숨김 · [변형 세트로 묶기] 보임', (await visible(p, '#btnClassifyVariants')) && !(await visible(p, '#btnGenMissing')));
+  // 툴팁(C-D3 · UW-D4)
+  const tip = await p.getAttribute('#btnRegisterComp', 'data-tip');
+  check('25 [등록] 툴팁 — "마스터" 없음 · "메인 컴포넌트" 있음', !tip.includes('마스터') && tip.includes('메인 컴포넌트'), tip);
+  check('25 [하나로 합치기] 버튼 글(C-D13)', (await p.textContent('#btnComponentize')).trim() === '하나로 합치기');
+  // 기준 없음 → 찾기 두 버튼 잠금 · 사유 · 포커스 ←
+  await p.focus('#btnScanComp');
+  await recv(p, { ...sel(0, 0), count: 0, ids: [] });
+  await p.waitForTimeout(40);
+  check('25 기준 없음 → 찾기 두 버튼 잠금 · 주 버튼 없음 · 포커스 ←', (await locked(p, '#btnScanComp')) && (await locked(p, '#btnScanSimilar')) && (await shownPrimaries(p, '#structureCard')).length === 0 && (await activeId(p)) === 'btnSubBack', JSON.stringify({ prim: await shownPrimaries(p, '#structureCard'), a: await activeId(p) }));
+  check('25 기준 없음 → 사유 "선택이 없어요 — 캔버스에서 레이어를 선택하세요" · 목록 자리 sel.noneHere', (await lockMsg(p, '#btnScanSimilar')) === '선택이 없어요 — 캔버스에서 레이어를 선택하세요' && (await p.textContent('#compTree')).includes('선택이 없어요'));
+  const bad = await nestedCards(p);
+  check('25 카드 안 카드 0 — 컴포넌트 화면', bad.length === 0, bad.join(' · '));
+  check('25 콘솔 오류 없음', pageErrors.length === 0, pageErrors.join(' | '));
+  await p.close();
+}
+{
+  // 다른 화면 쓰기(연결) 뒤 두 목록 비움 · #variantReport는 남음
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await openSel(p);
+  const a = await sent(p, 'APPLY');
+  await recv(p, { ...preview(a[0].reqId), candidates: B2_CANDS });
+  await recv(p, tsPrev(a[0].reqId, B2_TS));
+  await goSub(p, 'structure');
+  await p.waitForTimeout(40);
+  await fillBoth(p);
+  await recv(p, { type: 'VARIANTS_RESULT', sets: 1, missing: ['Size=L'], singles: [], failures: [] });
+  await p.click('#btnSubBack');
+  await p.click('[data-k="link"]');
+  await p.waitForTimeout(40);
+  await p.click('#btnApplyConfirm');
+  const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, skips: [], reqId: req.reqId, textStylesApplied: 0, textStylesSkipped: 0 });
+  await p.waitForTimeout(80);
+  check('25 다른 화면 쓰기(연결) 뒤 → 두 목록 비움', (await compRows(p)) === 0 && (await simRows(p)) === 0);
+  check('25 #variantReport는 다른 화면 쓰기 뒤에도 남음', (await p.$$eval('#variantReport .r-card', (e) => e.length)) >= 1);
+  await p.close();
+}
+{
+  // C-D14 — 컴포넌트 카드: 오류 상자의 [다시 시도]가 유일한 주 버튼 · 찾기 [다시 시도]
+  const p = await compScreen();
+  await compFound(p, COMP_NODES);
+  await p.waitForTimeout(30);
+  check('25 (준비) 주 버튼 [등록]', JSON.stringify(await shownPrimaries(p, '#structureCard')) === '["btnRegisterComp"]');
+  await p.click('#btnScanSimilar');
+  const s1 = await lastReq(p, 'SCAN_SIMILAR');
+  await recv(p, { type: 'ERROR', message: '찾기 실패', op: 'SCAN_SIMILAR', reqId: s1 });
+  await p.waitForTimeout(30);
+  check('25 [닮은 프레임 찾기] 오류 → #structureStatus 빨강 띠 · 주 버튼은 [다시 시도] 하나', (await p.$$('#structureStatus .ux.danger')).length === 1 && JSON.stringify(await shownPrimaries(p, '#structureCard')) === '["retry"]', JSON.stringify(await shownPrimaries(p, '#structureCard')));
+  check('25 숨은 색 카드 #colorStatus에 오류 없음', (await p.$$('#colorStatus .ux.danger')).length === 0);
+  await p.click('#compAll');
+  await p.waitForTimeout(20);
+  check('25 오류 동안 체크를 바꿔도 주 버튼은 [다시 시도] 하나 · 상자 그대로', JSON.stringify(await shownPrimaries(p, '#structureCard')) === '["retry"]' && (await p.$$('#structureStatus .ux.danger')).length === 1);
+  await p.click('#structureStatus .retry-btn');
+  await p.waitForTimeout(20);
+  const s2 = await lastReq(p, 'SCAN_SIMILAR');
+  check('25 찾기 [다시 시도] → 상자 바로 사라짐 · "…찾는 중…" · 포커스 [닮은 프레임 찾기] · 새 reqId · 목록 기준', (await p.$$('#structureStatus .ux.danger')).length === 0 && (await p.textContent('#structureStatus')) === '닮은 프레임을 찾는 중…' && (await activeId(p)) === 'btnScanSimilar' && s2 !== s1 && JSON.stringify((await sent(p, 'SCAN_SIMILAR')).at(-1).nodeIds) === '["w1"]', JSON.stringify({ a: await activeId(p), s1, s2 }));
+  await recv(p, { ...SIM2, reqId: s2 });
+  await p.waitForTimeout(30);
+  check('25 다시 찾은 응답이 그려짐', (await simRows(p)) === 2);
+  // [하나로 합치기] 오류 → 다른 결과로 상자가 사라지면 판정 주 버튼 · 포커스도
+  await p.click('#btnComponentize');
+  await recv(p, { type: 'ERROR', message: '합치기 실패', op: 'COMPONENTIZE_SIMILAR' });
+  await p.waitForTimeout(30);
+  check('25 [하나로 합치기] 오류 → 주 버튼 [다시 시도] 하나', JSON.stringify(await shownPrimaries(p, '#structureCard')) === '["retry"]', JSON.stringify(await shownPrimaries(p, '#structureCard')));
+  await p.focus('#structureStatus .retry-btn');
+  await p.click('#btnScanComp');
+  await p.waitForTimeout(20);
+  check('25 다른 결과로 상태 글이 바뀌면 상자가 사라지고 주 버튼은 판정 버튼 하나', (await p.$$('#structureStatus .ux.danger')).length === 0 && (await shownPrimaries(p, '#structureCard')).length === 1 && !(await shownPrimaries(p, '#structureCard')).includes('retry'), JSON.stringify(await shownPrimaries(p, '#structureCard')));
+  await recv(p, { type: 'COMPONENT_CANDIDATES', nodes: COMP_NODES, reqId: await lastReq(p, 'SCAN_COMPONENT_CANDIDATES') });
+  await p.click('#btnComponentize');
+  await recv(p, { type: 'ERROR', message: '합치기 실패', op: 'COMPONENTIZE_SIMILAR' });
+  await p.waitForTimeout(20);
+  await p.focus('#structureStatus .retry-btn');
+  await recv(p, { type: 'VARIANTS_RESULT', sets: 1, missing: [], singles: [], failures: [] });
+  await p.waitForTimeout(30);
+  const judged = await shownPrimaries(p, '#structureCard');
+  check('25 상자가 사라질 때 포커스가 [다시 시도]에 있었으면 판정 주 버튼으로', judged.length === 1 && (await activeId(p)) === judged[0], JSON.stringify({ judged, a: await activeId(p) }));
+  // 다시 할 수 없는 오류 → 원래 주 버튼 그대로
+  await recv(p, { type: 'ERROR', message: 'read-only document', op: 'REGISTER_COMPONENTS' });
+  await p.waitForTimeout(20);
+  check('25 다시 할 수 없는 오류(버튼 없음) → 원래 주 버튼 그대로', (await p.$$('#structureStatus .retry-btn')).length === 0 && JSON.stringify(await shownPrimaries(p, '#structureCard')) === JSON.stringify(judged), JSON.stringify(await shownPrimaries(p, '#structureCard')));
+  // 오류 상자가 뜬 채 기준이 바뀌면 상자 지움 · 판정 주 버튼
+  await p.click('#btnScanComp');
+  await recv(p, { type: 'ERROR', message: '찾기 실패', op: 'SCAN_COMPONENT_CANDIDATES', reqId: await lastReq(p, 'SCAN_COMPONENT_CANDIDATES') });
+  await p.waitForTimeout(20);
+  check('25 (준비) 후보 찾기 오류 → [다시 시도]', JSON.stringify(await shownPrimaries(p, '#structureCard')) === '["retry"]');
+  await recv(p, { ...sel(1, 0), ids: ['w9'] });
+  await p.waitForTimeout(30);
+  check('25 오류 상자가 뜬 채 기준이 바뀜 → 상자 지움 · 주 버튼 [컴포넌트 후보 찾기]', (await p.$$('#structureStatus .ux.danger')).length === 0 && JSON.stringify(await shownPrimaries(p, '#structureCard')) === '["btnScanComp"]', JSON.stringify(await shownPrimaries(p, '#structureCard')));
+  await p.close();
+}
+{
+  // C-D14 — 연결 실패: 아래 고정 [{o}곳 연결]은 보조, 다시 연결 결과 뒤 되돌아옴
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await openSel(p);
+  const a = await sent(p, 'APPLY');
+  await recv(p, { ...preview(a[0].reqId), candidates: B2_CANDS });
+  await recv(p, tsPrev(a[0].reqId, B2_TS));
+  await p.click('[data-k="link"]');
+  await p.waitForTimeout(40);
+  await p.click('#btnApplyConfirm');
+  await recv(p, { type: 'ERROR', message: '연결 실패', op: 'APPLY_SELECTED' });
+  await p.waitForTimeout(40);
+  check('25 연결 실패 → #btnApplyConfirm에 primary 없음 · 주 버튼은 [다시 시도] 하나', !(await p.$eval('#btnApplyConfirm', (e) => e.classList.contains('primary'))) && JSON.stringify(await shownPrimaries(p, '#applyStatus')) === '["retry"]', JSON.stringify(await shownPrimaries(p, '#tab-select')));
+  await p.click('#applyStatus .retry-btn');
+  const req = (await sent(p, 'APPLY_SELECTED')).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, skips: [], reqId: req.reqId, textStylesApplied: 0, textStylesSkipped: 0 });
+  await p.waitForTimeout(80);
+  check('25 다시 연결 결과 뒤 → #btnApplyConfirm primary 되돌아옴', await p.$eval('#btnApplyConfirm', (e) => e.classList.contains('primary')));
+  await p.close();
+}
+{
+  // C-D14 — 라이선스 카드 · 내보내기 팝업(주 버튼 하나)
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnSettings');
+  await p.waitForTimeout(40);
+  // B.21 뒤 [결제 · 구독 관리]는 늘 보이고 배포 전에는 잠겨 있다 — 오류 길만 보려고 잠금을 잠시 푼다(링크 준비 뒤 모습)
+  await p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); b.removeAttribute('aria-disabled'); delete b.dataset.lock; delete b.dataset.baseLock; });
+  await p.click('#btnLicenseLink');
+  await recv(p, { type: 'ERROR', message: '열지 못했어요', op: 'OPEN_LICENSE_LINK' });
+  await p.waitForTimeout(30);
+  const licCard = await p.$eval('#licenseStatus', (e) => e.closest('.step')?.id || '');
+  const licPrim = await p.$eval('#licenseStatus', (e) => Array.from(e.closest('.step').querySelectorAll('button.primary')).filter((x) => x.getClientRects().length).map((x) => (x.classList.contains('retry-btn') ? 'retry' : x.id)));
+  check('25 라이선스 오류 → 그 카드의 주 버튼은 [다시 시도] 하나(결제 · 구독 관리는 보조)', JSON.stringify(licPrim) === '["retry"]', JSON.stringify({ licCard, licPrim }));
+  await p.click('#btnSettings');
+  await p.click('#tabbtn-variables');
+  await p.waitForTimeout(200);
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button >> text=코드로 내보내기…');
+  await p.waitForTimeout(40);
+  check('25 내보내기 팝업 — 주 버튼은 [내보내기] 하나([닫기]는 보조)', JSON.stringify(await shownPrimaries(p, '.modal')) === '["btnExport"]', JSON.stringify(await shownPrimaries(p, '.modal')));
+  await p.click('#btnExport');
+  await recv(p, { type: 'ERROR', message: '내보내기 실패', op: 'EXPORT' });
+  await p.waitForTimeout(30);
+  check('25 내보내기 오류 → 팝업의 주 버튼은 [다시 시도] 하나', JSON.stringify(await shownPrimaries(p, '.modal')) === '["retry"]', JSON.stringify(await shownPrimaries(p, '.modal')));
+  await p.click('.modal .m-foot button');
+  await p.waitForTimeout(30);
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button >> text=코드로 내보내기…');
+  await p.waitForTimeout(40);
+  check('25 닫았다 다시 열면 상자 없음 · [내보내기] 주 버튼', (await p.$$('.modal .ux.danger')).length === 0 && JSON.stringify(await shownPrimaries(p, '.modal')) === '["btnExport"]', JSON.stringify(await shownPrimaries(p, '.modal')));
+  await p.close();
+}
+{
+  // 이름 다시 짓기 오류(APPLY_TS_RENAME) → 팝업 안 알림 줄(B.19 오류 갈래 · T-P29 ④)
+  const p = await open(480, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasTextStyles: true });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.waitForTimeout(200);
+  const openTsr = async () => { await p.click('#btnVarMore'); await p.click('.ctx-menu button >> text=텍스트 스타일 이름 다시 짓기…'); await p.waitForTimeout(30); };
+  await openTsr();
+  const sr = (await sent(p, 'SCAN_TS_RENAME')).at(-1);
+  const rows = [{ id: 's1', from: 'body', to: 'body/large', sig: 'a' }, { id: 's2', from: 'h1', to: 'heading/xlarge', sig: 'b' }];
+  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows });
+  await p.waitForTimeout(30);
+  const applyBtn = p.locator('.modal button', { hasText: '이름 바꾸기' });
+  await applyBtn.click();
+  const a1 = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
+  await recv(p, { type: 'ERROR', message: '바꾸지 못했어요', op: 'APPLY_TS_RENAME', reqId: a1.reqId });
+  await p.waitForTimeout(30);
+  const pos = await p.$eval('.modal .tsr-note', (e) => ({ shown: !e.hidden && !!e.querySelector('.ux.danger'), next: e.nextElementSibling?.className ?? '', inBody: !!e.closest('.tsr-body') }));
+  check('25 이름 다시 짓기 오류 → 팝업 안 알림 줄(.tsr-body 밖 · 버튼 줄 바로 위)', pos.shown && pos.next === 'm-foot' && !pos.inBody, JSON.stringify(pos));
+  check('25 [k개 이름 바꾸기] 다시 누를 수 있음(tsrBusy 풀림) · 팝업 primary는 [다시 시도] 하나', (await applyBtn.getAttribute('aria-disabled')) !== 'true' && JSON.stringify(await shownPrimaries(p, '.modal')) === '["retry"]', JSON.stringify(await shownPrimaries(p, '.modal')));
+  check('25 이름 다시 짓기 오류 — 숨은 #colorStatus에 오류 없음', (await p.$$('#colorStatus .ux.danger')).length === 0);
+  await p.click('.modal .bv-switch[data-id="s2"]');
+  await p.waitForTimeout(20);
+  check('25 스위치를 바꿔도 상자 그대로', (await p.$$('.modal .tsr-note .ux.danger')).length === 1);
+  await p.click('.modal .tsr-note .retry-btn');
+  await p.waitForTimeout(20);
+  const a2 = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
+  check('25 [다시 시도] → 새 reqId · 켠 줄만 · 상자 사라짐 · 포커스 [닫기]', a2.reqId !== a1.reqId && JSON.stringify(a2.items.map((i) => i.id)) === '["s1"]' && (await p.$$('.modal .tsr-note .ux.danger')).length === 0 && (await p.evaluate(() => document.activeElement?.textContent)) === '닫기', JSON.stringify({ a2, f: await p.evaluate(() => document.activeElement?.textContent) }));
+  await recv(p, { type: 'ERROR', message: '바꾸지 못했어요', op: 'APPLY_TS_RENAME', reqId: a2.reqId });
+  await p.waitForTimeout(20);
+  await p.click('.modal [data-all="off"]');
+  const n0 = (await sent(p, 'APPLY_TS_RENAME')).length;
+  await p.click('.modal .tsr-note .retry-btn');
+  await p.waitForTimeout(20);
+  check('25 켠 줄을 모두 끄고 [다시 시도] → 보내지 않음 · 상자 · 포커스 그대로', (await sent(p, 'APPLY_TS_RENAME')).length === n0 && (await p.$$('.modal .tsr-note .ux.danger')).length === 1 && (await activeId(p)) === 'retry');
+  await p.click('.modal .m-foot button >> text=닫기');
+  await p.waitForTimeout(20);
+  await openTsr();
+  check('25 닫았다 다시 열면 상자 없음', (await p.$$('.modal .tsr-note .ux.danger')).length === 0);
+  await p.close();
+}
+{
+  // 오류 자리 폴백 — 이름 정리 [이름 바꾸기] · 변수 탭 레이어 선택
+  const p = await open(480, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 0), ids: ['r0'], firstName: 'Product card' });
+  await p.click('#btnGoRename');
+  await p.waitForTimeout(30);
+  const rq = (await sent(p, 'RENAME')).at(-1);
+  await recv(p, { type: 'RENAME_RESULT', reqId: rq.reqId, applied: false, changes: [], nodes: [
+    { id: 'r0', name: 'Product card', type: 'FRAME', depth: 0, parentId: null, keep: 'root' },
+    { id: 'a', name: 'Frame 12', type: 'FRAME', depth: 1, parentId: 'r0', after: 'card-header', role: 'card-header' },
+  ] });
+  await p.waitForTimeout(30);
+  await p.click('#btnRename');
+  const ra = (await sent(p, 'RENAME_APPLY')).at(-1);
+  await recv(p, { type: 'ERROR', message: '이름 바꾸기 실패', op: 'RENAME_APPLY', reqId: ra.reqId });
+  await p.waitForTimeout(30);
+  check('25 이름 정리 [이름 바꾸기] 오류 → #renameStatus · 주 버튼 [다시 시도] 하나', (await p.$$('#renameStatus .ux.danger')).length === 1 && (await p.$$('#colorStatus .ux.danger')).length === 0 && (await p.$eval('#renameStatus', (e) => Array.from(e.closest('.step').querySelectorAll('button.primary')).filter((x) => x.getClientRects().length).map((x) => (x.classList.contains('retry-btn') ? 'retry' : x.id)).join(','))) === 'retry');
+  await p.close();
+}
+{
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, sel(1, 0));
+  await p.waitForTimeout(300);
+  await p.click('#varSide [data-key="side:col:s"]');
+  await p.focus('.vt-row[data-id="tx"]');
+  await p.keyboard.press('Enter');
+  const fq = (await sent(p, 'FIND_VAR_USERS')).at(-1);
+  await recv(p, { type: 'VAR_USERS', reqId: fq.reqId, layers: [{ id: 'n1', name: 'Title' }], totalLayers: 1, places: 1 });
+  await p.click('.modal .var-use');
+  const errs0 = pageErrors.length;
+  await recv(p, { type: 'ERROR', message: '선택 실패', op: 'SELECT_NODES' });
+  await p.waitForTimeout(30);
+  check('25 변수 탭 레이어 선택 오류 → 공통 상태 줄 · 콘솔 오류 없음', (await p.textContent('#statusText')) === '선택 실패' && pageErrors.length === errs0, JSON.stringify({ t: await p.textContent('#statusText'), e: pageErrors.slice(errs0) }));
+  await p.close();
+}
+{
+  // 만들기 화면 실행(마법사)이 보낸 요청의 오류는 카드에 띄우지 않음
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w2'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+  await p.waitForTimeout(30);
+  const before = await p.evaluate(() => Array.from(document.querySelectorAll('#colorCard button.primary, #createCard button.primary')).map((b) => b.id).join(','));
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  await recv(p, { type: 'ERROR', message: '만들기 실패', op: 'CREATE_TOKENS', reqId: cr.reqId });
+  await p.waitForTimeout(80);
+  const res = await p.$$eval('#makeResults .tr-head', (e) => e.map((x) => x.textContent));
+  const after = await p.evaluate(() => Array.from(document.querySelectorAll('#colorCard button.primary, #createCard button.primary')).map((b) => b.id).join(','));
+  check('25 마법사 단계 오류 → 만들기 화면 결과에 실패 · 카드 상태 자리에 오류 상자 없음 · 카드 primary 그대로', (await visible(p, '#makeResults')) && res.length > 0 && (await p.$$('.status .ux.danger')).length === 0 && before === after, JSON.stringify({ res, before, after }));
+  await p.close();
+}
+
+{
+  // 이름 없는 레이어 안내(C-D15 — ia-v4 §4.5 · ia-v3 A.15 "실기 확인 뒤 더함")
+  const p = await compScreen();
+  const scanWith = async (nodes, autoNamed) => { await p.click('#btnScanComp'); await recv(p, { type: 'COMPONENT_CANDIDATES', nodes, autoNamed, reqId: await lastReq(p, 'SCAN_COMPONENT_CANDIDATES') }); await p.waitForTimeout(40); };
+  const line = () => p.$eval('#compAutoNamed', (e) => (e.hidden || !e.getClientRects().length ? null : e.textContent));
+  await scanWith(COMP_NODES, 2);
+  check('25 찾기 응답 autoNamed 2 → 후보 목록 아래 안내 줄 "이름 없는 레이어 2개 — …"', (await line()) === '이름 없는 레이어 2개 — ‘이름 정리’를 먼저 하면 후보가 돼요' && (await p.$eval('#compAutoNamed', (e) => e.previousElementSibling?.id)) === 'compTree', String(await line()));
+  const look = await p.$eval('#compAutoNamed', (e) => { const c = getComputedStyle(e); return { bw: c.borderTopWidth, bg: c.backgroundColor }; });
+  check('25 안내 줄 = 글 한 줄(테두리 · 배경 없음)', look.bw === '0px' && look.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(look));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/cd15.png` : '/dev/null' }).catch(() => {});
+  await scanWith(COMP_NODES, 0);
+  check('25 autoNamed 0 → 안내 줄 없음', (await line()) === null);
+  await scanWith([], 3);
+  check('25 후보 0 + autoNamed 3 → component.noEligible 경고 + 안내 줄 · [등록] 사유 "등록할 수 있는 프레임이 없어요"', (await p.textContent('#structureStatus')) === '선택 아래에 등록할 수 있는 프레임이 없어요.' && (await line()) === '이름 없는 레이어 3개 — ‘이름 정리’를 먼저 하면 후보가 돼요' && (await lockMsg(p, '#btnRegisterComp')) === '등록할 수 있는 프레임이 없어요');
+  await recv(p, { ...sel(1, 0), ids: ['w7'] });
+  await p.waitForTimeout(30);
+  check('25 기준이 바뀌면 안내 줄도 지움', (await line()) === null);
+  await p.close();
+}
+
+{
+  // 26 라이선스 구매 버튼(IA v4 §4.10 · B.21) — 늘 보이고, 결제 링크가 자리표시자면 잠긴다. 글은 티어별.
   const p = await open(480, 'settings');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'none' });
   await p.waitForTimeout(30);
   const lk = () => p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); const r = b.getBoundingClientRect(); return { text: b.textContent, title: b.title, dis: b.getAttribute('aria-disabled'), shown: r.width > 0 && r.height > 0 && getComputedStyle(document.getElementById('licenseLinkRow')).display !== 'none' }; });
   const f = await lk();
   const col = await p.evaluate(() => { const cs = getComputedStyle(document.getElementById('btnLicenseLink')); return { c: cs.color, b: cs.backgroundColor }; });
-  check('25 잠긴 주 버튼 모양(B.23) — 글자 --muted · 바탕 --surface-2', col.c === 'rgb(146, 152, 161)' && col.b === 'rgb(244, 245, 246)', JSON.stringify(col));
-  check('25 무료 · 자리표시자 → [유료 구매하기 ↗] 보임 · 잠김 · 툴팁 꼬리', f.shown && f.text === '유료 구매하기 ↗' && f.dis === 'true' && f.title === '결제 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(f));
+  check('26 잠긴 주 버튼 모양(B.23) — 글자 --muted · 바탕 --surface-2', col.c === 'rgb(146, 152, 161)' && col.b === 'rgb(244, 245, 246)', JSON.stringify(col));
+  check('26 무료 · 자리표시자 → [유료 구매하기 ↗] 보임 · 잠김 · 툴팁 꼬리', f.shown && f.text === '유료 구매하기 ↗' && f.dis === 'true' && f.title === '결제 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(f));
   await p.evaluate(() => { window.__sent.length = 0; });
   await p.click('#btnLicenseLink', { force: true });
   await p.waitForTimeout(30);
-  check('25 잠긴 구매 버튼 누름 → 상태 줄 사유 · OPEN_LICENSE_LINK 안 보냄', (await p.textContent('#statusText')) === '구독 관리 페이지는 아직 준비 중이에요' && (await sent(p, 'OPEN_LICENSE_LINK')).length === 0, await p.textContent('#statusText'));
+  check('26 잠긴 구매 버튼 누름 → 상태 줄 사유 · OPEN_LICENSE_LINK 안 보냄', (await p.textContent('#statusText')) === '구독 관리 페이지는 아직 준비 중이에요' && (await sent(p, 'OPEN_LICENSE_LINK')).length === 0, await p.textContent('#statusText'));
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'key', status: 'active' });
   await p.waitForTimeout(30);
   const pd = await lk();
-  check('25 유료 → [구독 관리 ↗] · 툴팁 바뀜 · 잠금 그대로', pd.text === '구독 관리 ↗' && pd.dis === 'true' && pd.title === '결제 수단 · 기기 활성화를 관리하는 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(pd));
+  check('26 유료 → [구독 관리 ↗] · 툴팁 바뀜 · 잠금 그대로', pd.text === '구독 관리 ↗' && pd.dis === 'true' && pd.title === '결제 수단 · 기기 활성화를 관리하는 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(pd));
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'none' });
   await p.waitForTimeout(30);
-  check('25 다시 무료 → [유료 구매하기 ↗]', (await lk()).text === '유료 구매하기 ↗');
+  check('26 다시 무료 → [유료 구매하기 ↗]', (await lk()).text === '유료 구매하기 ↗');
   await p.close();
 }
 

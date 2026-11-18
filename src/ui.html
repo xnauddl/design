@@ -1061,8 +1061,8 @@
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나의 컴포넌트로 합치기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나로 합치기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1070,6 +1070,8 @@
       <!-- 목록 머리 띠 + 개수(ia-v4 §4.3a-3) -->
       <div class="r-group r-ghead" id="compTreeGroup" style="display:none"><span data-i18n="structure.groupComp">컴포넌트 후보</span><span class="r-gcnt" id="compTreeCount"></span></div>
       <div id="compTree" class="results"></div>
+      <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
+      <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
       <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
       <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.

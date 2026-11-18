@@ -50,6 +50,8 @@ import {
   ensureDarkMode,
   DARK_MODE_NAME,
   createIconRegistry,
+  cleanupAfterRegister,
+  tallyRestoreFailures,
   swapVectorSlots,
   transplantImageFills,
   applyVariableToNodes,
@@ -4277,6 +4279,66 @@ test('createIconRegistry — 지문별 1개 · 복제본을 멤버 트리 밖으
   assert.equal(reg.get('k1'), a);
   assert.equal(reg.get('없는키'), null);
   assert.deepEqual(failures, []);
+});
+
+/* [등록] 끝 정리(ia-v3 §4.7 "인스턴스 자리" 7번 — 2026-11-13 사용자 결정 C-D4, A.15) */
+function registerCleanupFixture(pageName = 'Components') {
+  const { mk, page } = sceneMock();
+  page.name = pageName;
+  const doc = mk({ name: 'doc', type: 'DOCUMENT' });
+  doc.appendChild(page);
+  const reg = createIconRegistry({ page, place: (c) => page.appendChild(c), uniqueName: (b) => b, onFailure: () => {} });
+  // 문서 전체 인스턴스 — mainComponent로 센다(피그마 getInstancesAsync 대신)
+  const all = [];
+  const instancesOf = async (comp) => all.filter((i) => i.mainComponent === comp && !i.removed);
+  const use = (comp, parent) => { const inst = comp.createInstance(); parent.appendChild(inst); all.push(inst); return inst; };
+  return { mk, page, doc, reg, instancesOf, use };
+}
+
+test('[등록] 끝 정리 — 마스터를 못 만들면 새로 만든 아이콘 · 이번에 만든 Components 페이지를 지운다(아이콘 0)', async () => {
+  const { mk, page, doc, reg, instancesOf } = registerCleanupFixture();
+  reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star'); // 마스터 만들기 전에 만든 아이콘 — 마스터 실패로 아무도 안 씀
+  assert.equal(reg.created(), 1);
+  const removed = await cleanupAfterRegister({ registry: reg, page, pageCreated: true, instancesOf });
+  assert.equal(removed, 1);
+  assert.equal(reg.created(), 0, '"아이콘 n"에서 빠진다');
+  assert.equal(page.removed, true, '이번에 만든 빈 페이지는 지운다');
+  assert.ok(!doc.children.includes(page));
+});
+
+test('[등록] 끝 정리 — 전부터 있던 빈 Components 페이지는 남긴다', async () => {
+  const { mk, page, reg, instancesOf } = registerCleanupFixture();
+  reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star');
+  await cleanupAfterRegister({ registry: reg, page, pageCreated: false, instancesOf });
+  assert.equal(page.children.length, 0);
+  assert.equal(page.removed, false);
+});
+
+test('[등록] 끝 정리 — 원본으로 남은 나머지 멤버 몫 아이콘은 지우고, 쓰이는 아이콘 · 컴포넌트가 있는 페이지는 남긴다', async () => {
+  const { mk, page, reg, instancesOf, use } = registerCleanupFixture();
+  const heart = reg.ensure('heart', mk({ name: 'heart', type: 'VECTOR' }), 'Heart'); // 마스터가 씀
+  const star = reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star'); // 넣지 못해 원본으로 남은 멤버 몫
+  const master = mk({ name: 'Card', type: 'COMPONENT' });
+  page.appendChild(master);
+  use(heart, master);
+  const removed = await cleanupAfterRegister({ registry: reg, page, pageCreated: true, instancesOf });
+  assert.equal(removed, 1);
+  assert.equal(star.removed, true);
+  assert.equal(heart.removed, false);
+  assert.equal(reg.created(), 1);
+  assert.equal(page.removed, false);
+});
+
+test('[등록] 속성 값 꼬리 — 한 자리는 한 번만(넣을 때 센 자리의 되돌리기 실패는 다시 세지 않음) · 이름이 같은 다른 자리는 따로', () => {
+  const roots = [{ node: {}, name: 'Card', counted: true }, { node: {}, name: 'Card' }, { node: {}, name: 'Card' }];
+  const propFailed = ['Card']; // 0번 자리를 넣을 때 셌다
+  const diag = [];
+  tallyRestoreFailures(roots, new Map([[0, ['Title', 'Body']]]), propFailed, (n, p) => diag.push(`${n}:${p}`));
+  assert.deepEqual(propFailed, ['Card'], '같은 자리 두 번 실패 → 1');
+  assert.deepEqual(diag, ['Card:Title', 'Card:Body'], '진단은 속성마다');
+  const tail = [];
+  tallyRestoreFailures(roots, new Map([[1, ['Title']], [2, ['Title']]]), tail, () => {});
+  assert.deepEqual(tail, ['Card', 'Card'], '이름이 같은 두 자리가 따로 실패 → 2');
 });
 
 test('swapVectorSlots — 벡터 자리를 아이콘 인스턴스로(자리·이름·크기 유지)', () => {

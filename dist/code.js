@@ -19,6 +19,18 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
 
   // src/shared/messages.ts
   function post(msg) {
@@ -92,7 +104,7 @@
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 닮은 프레임 컴포넌트화
     "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
-    "similar.componentizeBtn": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uAE30",
+    "similar.componentizeBtn": "\uD558\uB098\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -687,13 +699,14 @@
     "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
     "component.genMissingBtn": "\uBE60\uC9C4 \uBCC0\uD615 \uCC44\uC6B0\uAE30",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
-    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components \uD398\uC774\uC9C0\uC5D0 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD558\uACE0, \uC6D0\uB798 \uC790\uB9AC\uC5D0\uB294 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uB0A8\uAE34 \uC778\uC2A4\uD134\uC2A4\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
     "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
     "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.autoNamed": "\uC774\uB984 \uC5C6\uB294 \uB808\uC774\uC5B4 {n}\uAC1C \u2014 \u2018\uC774\uB984 \uC815\uB9AC\u2019\uB97C \uBA3C\uC800 \uD558\uBA74 \uD6C4\uBCF4\uAC00 \uB3FC\uC694",
     "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
@@ -1487,11 +1500,11 @@
     const g = TEXT_GROUP[field];
     return g ? `${g}/text` : null;
   }
-  function colorUse(nodeType, field, insideIconFrame) {
+  function colorUse(nodeType, field, insideIconFrame2) {
     if (field === "effects") return "shadow";
     if (nodeType === "TEXT" && field === "fills") return "text";
     if (VECTOR_TYPES.has(nodeType)) return "icon";
-    if (insideIconFrame && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
+    if (insideIconFrame2 && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
     return field === "fills" ? "background" : "border";
   }
   function bgKindOf(hex) {
@@ -2337,6 +2350,12 @@
   function limitDepth(segs, maxDepth = 8) {
     if (segs.length <= maxDepth) return segs;
     return segs.slice(segs.length - maxDepth);
+  }
+  var DEFAULT_NAME_RE = /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( ?\d+)?( copy( \d+)?)?$/;
+  function isDefaultName(name) {
+    const n = name.trim();
+    if (!n) return true;
+    return DEFAULT_NAME_RE.test(n);
   }
   var PRIMITIVE_NS = /* @__PURE__ */ new Set([
     "color",
@@ -6941,6 +6960,12 @@
     };
     return ok(n) && vectors > 0;
   }
+  function isIconFrame(n) {
+    if (n.type !== "FRAME" && n.type !== "GROUP") return false;
+    if (n.iconFrame) return true;
+    if (hasImageFill(n)) return false;
+    return isIconLike(n);
+  }
   function shortOneLine(t2) {
     const c = t2.characters;
     if (typeof c !== "string") return false;
@@ -6956,6 +6981,7 @@
     if (cells.length < 3) return null;
     let looks;
     let colors;
+    let textColors;
     let textCells;
     if (cells.every((c) => c.type === "TEXT")) {
       textCells = true;
@@ -6963,6 +6989,7 @@
       if (cells.some((c) => !c.fillHex)) return null;
       looks = cells.map((c) => c.fillHex);
       colors = looks;
+      textColors = looks;
     } else if (cells.every((c) => c.type === "FRAME")) {
       textCells = false;
       const texts = cells.map(cellText);
@@ -6970,6 +6997,7 @@
       if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill(c) && !c.fillHex)) return null;
       looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ""}|${hasVisibleStroke(c) ? "s" : ""}|${texts[i].fillHex}`);
       colors = cells.map((c, i) => hasVisibleFill(c) && c.fillHex ? c.fillHex : texts[i].fillHex);
+      textColors = texts.map((t2) => t2.fillHex);
     } else {
       return null;
     }
@@ -6982,7 +7010,8 @@
     const sel = cells[selected];
     let style = "Text";
     if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf2(sel) > 0 ? "Pill" : "Box";
-    return { style, selected, selectedColor: colors[selected] };
+    const other = selected === 0 ? 1 : 0;
+    return { style, selected, selectedColor: colors[selected], unselectedTextColor: textColors[other] };
   }
   function isTabLike(node) {
     return tabInfo(node) != null;
@@ -7858,6 +7887,9 @@
   function isClosedComponentSubtree(node) {
     return node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "COMPONENT_SET";
   }
+  function isAutoNamedCandidate(n) {
+    return isDefaultName(n.name) && tabInfo(n) == null;
+  }
   function scanComponentCandidates(selection2) {
     var _a, _b;
     const single = selection2.length === 1;
@@ -7865,14 +7897,20 @@
     const visit = (n, depth, parentId) => {
       if (n.visible === false) return;
       const isContainerRoot = single && depth === 0;
-      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
+      if (depth === 0 && isIconFrame(n)) {
+        all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: false });
+        return;
+      }
+      const structural = !isContainerRoot && componentEligible(n);
+      const autoNamed = structural && isAutoNamedCandidate(n);
+      all.push(__spreadValues({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: structural && !autoNamed }, autoNamed ? { autoNamed: true } : {}));
       if (isClosedComponentSubtree(n)) return;
       if (tabInfo(n) != null) return;
       if (n.children) for (const c of n.children) visit(c, depth + 1, n.id);
     };
     for (const n of selection2) visit(n, 0, null);
     const byId = new Map(all.map((c) => [c.id, c]));
-    const keep = new Set(all.filter((c) => c.eligible).map((c) => c.id));
+    const keep = new Set(all.filter((c) => c.eligible || c.autoNamed).map((c) => c.id));
     for (const c of all) {
       if (!c.eligible) continue;
       let p = c.parentId;
@@ -7882,6 +7920,27 @@
       }
     }
     return all.filter((c) => keep.has(c.id));
+  }
+  function gateComponentCandidates(candidates, visible) {
+    var _a, _b;
+    const gated = candidates.map((c) => visible(c.id) ? c : __spreadProps(__spreadValues({}, c), { eligible: false, autoNamed: false }));
+    const autoNamed = gated.filter((c) => c.autoNamed).length;
+    const byCand = new Map(gated.map((c) => [c.id, c]));
+    const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
+    for (const c of gated) {
+      if (!c.eligible) continue;
+      let p = c.parentId;
+      while (p && !keepIds.has(p)) {
+        keepIds.add(p);
+        p = (_b = (_a = byCand.get(p)) == null ? void 0 : _a.parentId) != null ? _b : null;
+      }
+    }
+    const nodes = gated.filter((c) => keepIds.has(c.id)).map((c) => {
+      if (!("autoNamed" in c)) return c;
+      const _a2 = c, { autoNamed: _drop } = _a2, rest = __objRest(_a2, ["autoNamed"]);
+      return rest;
+    });
+    return { nodes, autoNamed };
   }
   function artworkKey(n) {
     var _a;
@@ -8571,20 +8630,52 @@
       s.props[name] = byVal.get(vals[i]);
     });
   }
+  function colorNameOf(hex) {
+    if (!hex) return "none";
+    const { family, step, achromatic } = classifyColor(hex);
+    return achromatic ? `gray-${step}` : family;
+  }
+  function uniqLabels(names) {
+    const used = /* @__PURE__ */ new Set();
+    return names.map((base) => {
+      let name = base;
+      let i = 2;
+      while (used.has(name)) name = `${base}-${i++}`;
+      used.add(name);
+      return name;
+    });
+  }
+  var colorAxisLabelsOrNone = (distinct) => uniqLabels(distinct.map(colorNameOf));
   var sizeLabel = (distinct) => {
     const areas = distinct.map(Number);
     const sorted = [...areas].sort((a, b) => a - b);
     const grades = tshirtRoles(sorted);
     return areas.map((a) => grades[sorted.indexOf(a)]);
   };
+  function assignSizeAxis(subs, sizeKey, content) {
+    const groups = [];
+    for (const s of subs) {
+      const head = s.members[s.master];
+      const k = sizeKey(head);
+      if (!groups.some((g) => g.key === k)) groups.push({ key: k, rep: head, order: groups.length });
+    }
+    if (groups.length < 2) return;
+    const n = (v) => v != null ? v : 0;
+    const area = (m) => n(m.width) * n(m.height);
+    const pad = (m) => n(m.paddingTop) + n(m.paddingRight) + n(m.paddingBottom) + n(m.paddingLeft);
+    const gap = (m) => n(m.itemSpacing) + n(m.counterAxisSpacing);
+    const sorted = [...groups].sort((a, b) => (content ? 0 : area(a.rep) - area(b.rep)) || n(a.rep.height) - n(b.rep.height) || pad(a.rep) - pad(b.rep) || gap(a.rep) - gap(b.rep) || a.order - b.order);
+    const labels = tshirtRoles(sorted.map((_, i) => i));
+    const byKey = new Map(sorted.map((g, i) => [g.key, labels[i]]));
+    for (const s of subs) s.props.Size = byKey.get(sizeKey(s.members[s.master]));
+  }
   function familySubfamilies(fam) {
     if (fam.length === 1) return [{ members: fam, master: 0, props: {} }];
     const content = fam.some((m, i) => i > 0 && pairDiff(fam[0], m).content);
     const { ref } = colorRefPath(fam);
-    const key = (m) => {
+    const sizeKey = (m) => {
       var _a, _b;
       return [
-        ref == null ? "" : colorAt(m, ref),
         content ? "" : `${(_a = m.width) != null ? _a : 0}x${(_b = m.height) != null ? _b : 0}`,
         padOf(m),
         innerSig(m, padOf),
@@ -8594,13 +8685,11 @@
         })
       ].join("#");
     };
+    const key = (m) => `${ref == null ? "" : colorAt(m, ref)}#${sizeKey(m)}`;
     const subs = subfamiliesBy(fam, key);
     if (subs.length >= 2) {
-      if (ref != null) assignAxis(subs, "Color", (s) => colorAt(s.members[s.master], ref) || null, (d) => colorAxisLabels(d));
-      if (!content) assignAxis(subs, "Size", (s) => {
-        var _a, _b;
-        return String(((_a = s.members[s.master].width) != null ? _a : 0) * ((_b = s.members[s.master].height) != null ? _b : 0));
-      }, sizeLabel);
+      if (ref != null) assignAxis(subs, "Color", (s) => colorAt(s.members[s.master], ref), colorAxisLabelsOrNone);
+      assignSizeAxis(subs, sizeKey, content);
     }
     finishProps(subs);
     return subs;
@@ -8620,18 +8709,29 @@
     return { key: reuseNameKey((_d = (_c = (_a = ms[0]) == null ? void 0 : _a.nameKey) != null ? _c : (_b = ms[0]) == null ? void 0 : _b.name) != null ? _d : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
   }
   function tabSubfamilies(members) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const fams = splitFamilies(members);
     const famOf2 = /* @__PURE__ */ new Map();
     fams.forEach((f, i) => f.forEach((m) => famOf2.set(m.id, i)));
     const info = new Map(members.map((m) => [m.id, tabInfo(m)]));
-    const rootVaries = new Set(members.map((m) => {
-      var _a2;
-      return (_a2 = m.fillHex) != null ? _a2 : "";
-    })).size > 1;
+    const fsOf = (m) => `${famOf2.get(m.id)}#${info.get(m.id).style}`;
+    const rootsBy = /* @__PURE__ */ new Map();
+    for (const m of members) {
+      const k = fsOf(m);
+      if (!rootsBy.has(k)) rootsBy.set(k, /* @__PURE__ */ new Set());
+      rootsBy.get(k).add((_a = m.fillHex) != null ? _a : "");
+    }
+    const rootVaries = (m) => {
+      var _a2, _b2;
+      return ((_b2 = (_a2 = rootsBy.get(fsOf(m))) == null ? void 0 : _a2.size) != null ? _b2 : 0) > 1;
+    };
     const colorOf = (m) => {
       var _a2;
-      return rootVaries ? (_a2 = m.fillHex) != null ? _a2 : "" : info.get(m.id).selectedColor;
+      return rootVaries(m) ? (_a2 = m.fillHex) != null ? _a2 : "" : info.get(m.id).selectedColor;
+    };
+    const backOf = (m) => {
+      var _a2;
+      return (_a2 = info.get(m.id).unselectedTextColor) != null ? _a2 : "";
     };
     const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
     const key = (m) => {
@@ -8644,6 +8744,7 @@
         t2.style,
         t2.selected,
         colorOf(m),
+        backOf(m),
         content ? "" : `${(_a2 = m.width) != null ? _a2 : 0}x${(_b2 = m.height) != null ? _b2 : 0}`,
         padOf(m),
         innerSig(m, padOf),
@@ -8664,21 +8765,37 @@
         if (!posBy.has(k)) posBy.set(k, /* @__PURE__ */ new Set());
         posBy.get(k).add(info.get(head(s).id).selected);
       }
-      for (const s of subs) if (((_b = (_a = posBy.get(famStyle(s))) == null ? void 0 : _a.size) != null ? _b : 0) > 1) s.props.Selected = String(info.get(head(s).id).selected + 1);
+      for (const s of subs) if (((_c = (_b = posBy.get(famStyle(s))) == null ? void 0 : _b.size) != null ? _c : 0) > 1) s.props.Selected = String(info.get(head(s).id).selected + 1);
       const byPos = /* @__PURE__ */ new Map();
       for (const s of subs) {
         const k = `${famStyle(s)}#${info.get(head(s).id).selected}`;
-        if (!byPos.has(k)) byPos.set(k, /* @__PURE__ */ new Set());
-        byPos.get(k).add(colorOf(head(s)));
+        if (!byPos.has(k)) byPos.set(k, { front: /* @__PURE__ */ new Set(), back: /* @__PURE__ */ new Set() });
+        byPos.get(k).front.add(colorOf(head(s)));
+        byPos.get(k).back.add(backOf(head(s)));
       }
-      if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, "Color", (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
+      const groupsV = [...byPos.values()];
+      const frontV = groupsV.some((g) => g.front.size > 1);
+      const backV = groupsV.some((g) => g.back.size > 1);
+      if (frontV || backV) {
+        const both = groupsV.some((g) => g.front.size > 1 && g.back.size > 1) || frontV && backV;
+        if (both) {
+          assignAxis(subs, "Color", (s) => `${colorOf(head(s))}|${backOf(head(s))}`, (d) => uniqLabels(d.map((v) => {
+            const [f, b] = v.split("|");
+            return `${colorNameOf(f)}-${colorNameOf(b)}`;
+          })));
+        } else if (frontV) {
+          assignAxis(subs, "Color", (s) => colorOf(head(s)), colorAxisLabelsOrNone);
+        } else {
+          assignAxis(subs, "Color", (s) => backOf(head(s)), colorAxisLabelsOrNone);
+        }
+      }
       const sizeBy = /* @__PURE__ */ new Map();
       for (const s of subs) {
         const fi = famOf2.get(head(s).id);
         if (famContent[fi]) continue;
         const k = famStyle(s);
         if (!sizeBy.has(k)) sizeBy.set(k, /* @__PURE__ */ new Set());
-        sizeBy.get(k).add(String(((_c = head(s).width) != null ? _c : 0) * ((_d = head(s).height) != null ? _d : 0)));
+        sizeBy.get(k).add(String(((_d = head(s).width) != null ? _d : 0) * ((_e = head(s).height) != null ? _e : 0)));
       }
       const area = (s) => {
         var _a2, _b2;
@@ -8742,7 +8859,25 @@
     plainIdx.forEach((gi, k) => {
       names[gi] = plainNames[k];
     });
+    const typedKeys = [];
+    const typedMembers = /* @__PURE__ */ new Map();
+    for (const g of groups) {
+      if (g.tab || g.typeIndex == null) continue;
+      if (!typedMembers.has(g.key)) {
+        typedKeys.push(g.key);
+        typedMembers.set(g.key, g.nameMembers);
+      }
+    }
+    const rawBase = new Map(typedKeys.map((k) => [k, componentBaseName(typedMembers.get(k))]));
+    const plainSet = new Set(plainNames);
+    const baseByKey = /* @__PURE__ */ new Map();
+    for (const k of typedKeys) {
+      const b = rawBase.get(k);
+      const clash = plainSet.has(b) || typedKeys.some((o) => o !== k && rawBase.get(o) === b);
+      baseByKey.set(k, clash ? contextualName(typedMembers.get(k)) : b);
+    }
     groups.forEach((g, i) => {
+      var _a;
       if (!g.tab && g.typeIndex == null) return;
       let base;
       let next;
@@ -8750,7 +8885,7 @@
         base = "Tab";
         next = (k2) => `Tab${k2}`;
       } else {
-        base = `${componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
+        base = `${(_a = baseByKey.get(g.key)) != null ? _a : componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
         next = (k2) => `${base}-${k2}`;
       }
       let name = base;
@@ -8805,6 +8940,7 @@
     return {
       get: (vectorKey) => lookup(vectorKey),
       created: () => made,
+      madeKeys: () => [...madeKeys],
       discard(vectorKey) {
         if (!madeKeys.has(vectorKey)) return false;
         const comp = byKey.get(vectorKey);
@@ -8840,6 +8976,31 @@
         }
       }
     };
+  }
+  async function cleanupAfterRegister(opts) {
+    let removed = 0;
+    for (const key of opts.registry.madeKeys()) {
+      const comp = opts.registry.get(key);
+      if (!comp || comp.removed) {
+        if (opts.registry.discard(key)) removed++;
+        continue;
+      }
+      let used = true;
+      try {
+        used = (await opts.instancesOf(comp)).some((i) => !i.removed);
+      } catch (e) {
+        used = true;
+      }
+      if (!used && opts.registry.discard(key)) removed++;
+    }
+    const page = opts.page;
+    if (opts.pageCreated && page && !page.removed && page.children.length === 0) {
+      try {
+        page.remove();
+      } catch (e) {
+      }
+    }
+    return removed;
   }
   function swapVectorSlots(master, slots) {
     const failures = [];
@@ -9248,6 +9409,16 @@
     return out;
   }
   var propNameOf = (key) => key.replace(/#[^#]*$/, "") || key;
+  function tallyRestoreFailures(roots, failed, propFailed, onProp) {
+    for (const [k, props] of failed) {
+      const root = roots[k];
+      if (!root) continue;
+      for (const prop of props) onProp(root.name, prop);
+      if (root.counted) continue;
+      root.counted = true;
+      propFailed.push(root.name);
+    }
+  }
   async function restoreOverrides(snaps, getNode, mainOf, loadFont) {
     var _a, _b;
     const failedBy = /* @__PURE__ */ new Map();
@@ -10509,7 +10680,18 @@
   function sceneComponentEligible(n, index) {
     var _a;
     if (!isEffectivelyVisible3(n)) return false;
-    return componentEligible((_a = index == null ? void 0 : index.get(n.id)) != null ? _a : toStructNode(n));
+    if (insideIconFrame(n)) return false;
+    const st = (_a = index == null ? void 0 : index.get(n.id)) != null ? _a : toStructNode(n);
+    if (isAutoNamedCandidate(__spreadProps(__spreadValues({}, st), { name: n.name }))) return false;
+    return componentEligible(st);
+  }
+  function insideIconFrame(n) {
+    let p = n;
+    while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
+      if (iconFrameKeyOf(p) !== void 0) return true;
+      p = p.parent;
+    }
+    return false;
   }
   function resolvePropTarget(root, p) {
     var _a;
@@ -10711,7 +10893,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -11125,7 +11307,7 @@
         }
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requireComponents()) break;
-          const roots = selection().filter(isEffectivelyVisible3);
+          const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible3);
           const rootStructs = roots.map((n) => toStructNode(n));
           const candidates = scanComponentCandidates(rootStructs);
           const scanIndex = /* @__PURE__ */ new Map();
@@ -11143,22 +11325,10 @@
             if ("children" in n) for (const c of n.children) index(c);
           };
           for (const r of roots) index(r);
-          const gated = candidates.map((c) => {
-            const live = liveById.get(c.id);
-            if (!live || !isEffectivelyVisible3(live)) return __spreadProps(__spreadValues({}, c), { eligible: false });
-            return c;
+          const { nodes: pruned, autoNamed } = gateComponentCandidates(candidates, (id) => {
+            const live = liveById.get(id);
+            return !!live && isEffectivelyVisible3(live);
           });
-          const byCand = new Map(gated.map((c) => [c.id, c]));
-          const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
-          for (const c of gated) {
-            if (!c.eligible) continue;
-            let p = c.parentId;
-            while (p && !keepIds.has(p)) {
-              keepIds.add(p);
-              p = (_c = (_b = byCand.get(p)) == null ? void 0 : _b.parentId) != null ? _c : null;
-            }
-          }
-          const pruned = gated.filter((c) => keepIds.has(c.id));
           let nodes = pruned;
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
@@ -11196,7 +11366,7 @@
           } catch (e) {
             console.warn("component preview label failed", e);
           }
-          post({ type: "COMPONENT_CANDIDATES", nodes });
+          post({ type: "COMPONENT_CANDIDATES", nodes, autoNamed, reqId: msg.reqId });
           break;
         }
         case "REGISTER_COMPONENTS": {
@@ -11221,6 +11391,7 @@
             const collected = [];
             const walk3 = (n, depth) => {
               if (n.visible === false) return;
+              if (depth === 0 && iconFrameKeyOf(n) !== void 0) return;
               const isContainerRoot = single && depth === 0;
               if (!isContainerRoot && eligible(n)) collected.push(n);
               if (n.type === "INSTANCE" || n.type === "COMPONENT" || n.type === "COMPONENT_SET") return;
@@ -11279,6 +11450,7 @@
           }
           const reused = [];
           const reuseKept = [];
+          const pageCreated = !figma.root.children.some((p) => p.name === COMPONENTS_PAGE);
           const page = await ensureComponentsPage();
           let cursorX = pageStartX(page);
           let sets = 0;
@@ -11358,7 +11530,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_d = msg.names) != null ? _d : {};
+          const shownNames = (_b = msg.names) != null ? _b : {};
           const groupNames = groups.map((g, gi) => {
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
@@ -11385,11 +11557,13 @@
                     continue;
                   }
                   let noted = false;
+                  let counted = false;
                   const newIcons = [];
                   const make = async () => {
                     const inst = comp.createInstance();
                     try {
-                      keepRoots.push({ node: inst, name });
+                      const entry = { node: inst, name };
+                      keepRoots.push(entry);
                       const bad = await copyOverridesAsync(node, inst, prefix, {
                         mainOf: (n) => n.getMainComponentAsync(),
                         loadFont: (f) => figma.loadFontAsync(f),
@@ -11406,8 +11580,12 @@
                       if (!noted) {
                         noted = true;
                         for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
-                        if (bad.length) propFailed.push(name);
+                        if (bad.length) {
+                          propFailed.push(name);
+                          counted = true;
+                        }
                       }
+                      if (counted) entry.counted = true;
                       return inst;
                     } catch (e) {
                       try {
@@ -11427,7 +11605,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_e = r.why) != null ? _e : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_c = r.why) != null ? _c : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -11507,7 +11685,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_f = snaps[preferLive]) != null ? _f : snaps[0];
+                  const masterSnap = (_d = snaps[preferLive]) != null ? _d : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -11528,7 +11706,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_h = (_g = structs[preferLive]) == null ? void 0 : _g.type) != null ? _h : "");
+                  const prefix = shapePrefix(master, (_f = (_e = structs[preferLive]) == null ? void 0 : _e.type) != null ? _f : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -11565,19 +11743,25 @@
                     const images = {};
                     for (const [path, paints2] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints2;
                     let noted = false;
+                    let counted = false;
                     return () => {
                       let inst = null;
                       try {
                         inst = master.createInstance();
-                        keepRoots.push({ node: inst, name });
+                        const entry = { node: inst, name };
+                        keepRoots.push(entry);
                         const badProps = applyInstancePropValues(inst, ids, vals);
                         const img = transplantImageFills(inst, images).failures;
                         if (!noted) {
                           noted = true;
                           for (const p of badProps) failures.push(t("component.fail.propValue", { name, prop: p }));
                           failures.push(...img.map((f) => `${name}: ${f}`));
-                          if (badProps.length || img.length) propFailed.push(name);
+                          if (badProps.length || img.length) {
+                            propFailed.push(name);
+                            counted = true;
+                          }
                         }
+                        if (counted) entry.counted = true;
                         return inst;
                       } catch (e) {
                         if (inst) {
@@ -11625,7 +11809,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_i = r.why) != null ? _i : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_g = r.why) != null ? _g : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -11642,7 +11826,7 @@
               const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_j = sf.members[sf.master]) != null ? _j : sf.members[0];
+                const head = (_h = sf.members[sf.master]) != null ? _h : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
@@ -11685,7 +11869,8 @@
                   const make = async () => {
                     const inst = x.comp.createInstance();
                     try {
-                      keepRoots.push({ node: inst, name });
+                      const entry = { node: inst, name };
+                      keepRoots.push(entry);
                       const bad = await copyOverridesAsync(node, inst, prefix, {
                         mainOf: (n) => n.getMainComponentAsync(),
                         loadFont: (f) => figma.loadFontAsync(f),
@@ -11696,7 +11881,10 @@
                         }
                       });
                       for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
-                      if (bad.length) propFailed.push(name);
+                      if (bad.length) {
+                        propFailed.push(name);
+                        entry.counted = true;
+                      }
                       return inst;
                     } catch (e) {
                       try {
@@ -11729,7 +11917,7 @@
               }
               let set;
               try {
-                const home = (_k = pageOf(made[0].comp)) != null ? _k : figma.currentPage;
+                const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -11784,11 +11972,8 @@
             }
           }
           const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
-          for (const [k, props] of keepFailed) {
-            const name = keepRoots[k].name;
-            for (const prop of props) failures.push(t("component.fail.propValue", { name, prop }));
-            propFailed.push(name);
-          }
+          tallyRestoreFailures(keepRoots, keepFailed, propFailed, (name, prop) => failures.push(t("component.fail.propValue", { name, prop })));
+          await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
           post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
           if (registered || sets || reused.length) commitUndo(figma);
           break;
@@ -11820,7 +12005,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_l = nodes[0].parent) != null ? _l : figma.currentPage;
+              const parent = (_j = nodes[0].parent) != null ? _j : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {
@@ -11942,10 +12127,11 @@
           break;
         }
         case "SCAN_SIMILAR": {
-          const frames = selection().filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
+          const frames = (await resolveRoots(msg.nodeIds)).filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
           const r = await scanSimilar(frames);
           post({
             type: "SIMILAR_CANDIDATES",
+            reqId: msg.reqId,
             metas: r.metas,
             recommendedMasterId: r.recommendedMasterId,
             varying: r.varying,

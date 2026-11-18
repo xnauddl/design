@@ -4,10 +4,10 @@
    이름 분석(속성=값 추론)·그룹화·빈 조합 산출. 실제 createComponentFromNode·
    combineAsVariants 적용은 code.ts.
    ============================================================ */
-import { kebab, pascalCase, capitalize } from './naming';
+import { kebab, pascalCase, capitalize, isDefaultName } from './naming';
 import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
-import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots, tabInfo } from './componentLike';
+import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots, tabInfo, isIconFrame } from './componentLike';
 import type { LikeNode, PaintLike, EffectLike } from './componentLike';
 import { VECTOR_TYPES } from './nodePaint'; // 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다
 
@@ -827,6 +827,11 @@ export interface ComponentCandidateNode {
   reuse?: { name: string };
   /** 처음 열 때 체크(§4.7 "묶기" 6번) — 반복 이름 · 접힘 · 버튼 · 칩 · 탭. UI는 이것만 본다. */
   defaultOn?: boolean;
+  /**
+   * Figma 자동 이름이라 뺀 레이어(§4.7 "묶기" 6번 — 2026-11-18 C-D15). 자동 이름만 아니면 eligible이었다. code.ts가
+   * 숨김 게이트 뒤 · 고아 맥락 가지치기 전에 센 뒤 지운다(UI로는 보내지 않는다).
+   */
+  autoNamed?: boolean;
 }
 
 /**
@@ -863,6 +868,11 @@ function isClosedComponentSubtree(node: ScanNode): boolean {
   return node.type === 'INSTANCE' || node.type === 'COMPONENT' || node.type === 'COMPONENT_SET';
 }
 
+/** Figma 자동 이름이라 후보에서 빼는 레이어인가(§4.7 "묶기" 6번 — C-D15). 탭은 예외(role:tab). 스캔 · [등록] 게이트가 함께 쓴다. */
+export function isAutoNamedCandidate(n: ScanNode): boolean {
+  return isDefaultName(n.name) && tabInfo(n) == null;
+}
+
 /**
  * 선택 하위를 순회해 등록 후보 트리를 만든다 — 영향(eligible) + 그 조상 체인만 유지.
  * 역할 없는 말단(텍스트·장식 도형…)은 잡음이라 제외하되, 위치 맥락은 조상으로 보존.
@@ -887,7 +897,16 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
     // 숨김은 후보도 아니고 안쪽도 스캔하지 않음(실효 비가시 트리).
     if (n.visible === false) return;
     const isContainerRoot = single && depth === 0; // 컨테이너 자신 → 등록 제외
-    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: !isContainerRoot && componentEligible(n) });
+    // 아이콘 프레임과 그 안은 후보가 아니다 — 선택 루트도(§4.7 "묶기" 3번). 루트가 아닌 아이콘 프레임은
+    // StructNode가 이미 자식을 비워 넘기지만 루트는 펼친 채라 여기서 본다.
+    if (depth === 0 && isIconFrame(n)) {
+      all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: false });
+      return;
+    }
+    const structural = !isContainerRoot && componentEligible(n);
+    // Figma 자동 이름은 후보가 아니다(C-D15 — 탭은 예외: 이름과 상관없이 role:tab). 표시만 달고 안으로는 내려간다.
+    const autoNamed = structural && isAutoNamedCandidate(n);
+    all.push({ id: n.id, name: n.name, type: n.type, depth, parentId, eligible: structural && !autoNamed, ...(autoNamed ? { autoNamed: true } : {}) });
     // 이미 등록된 컴포넌트 체계는 서브트리째 스킵(안쪽 FRAME을 새 후보로 잡지 않음).
     if (isClosedComponentSubtree(n)) return;
     // 탭의 칸은 후보가 아니다(§4.7 "묶기" 1번) — 선택 칸이 버튼처럼 보여도.
@@ -897,7 +916,8 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
   for (const n of selection) visit(n, 0, null);
 
   const byId = new Map(all.map((c) => [c.id, c]));
-  const keep = new Set<string>(all.filter((c) => c.eligible).map((c) => c.id));
+  // 남김: eligible 후보 · 그 조상 · 자동 이름 표시 레이어(code.ts가 센 뒤 가지치기로 뺀다 — C-D15).
+  const keep = new Set<string>(all.filter((c) => c.eligible || c.autoNamed).map((c) => c.id));
   for (const c of all) {
     if (!c.eligible) continue;
     let p = c.parentId;
@@ -907,6 +927,36 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
     }
   }
   return all.filter((c) => keep.has(c.id));
+}
+
+/**
+ * 스캔 결과를 플러그인 쪽 게이트로 거른다(§4.7 "묶기" 6번 — C-D15 셈 순서): ① 숨은 조상 아래 레이어는 eligible · 자동 이름
+ * 표시를 모두 지운다 ② 그 뒤 자동 이름 표시 수를 센다(고아 맥락 가지치기 **전**) ③ eligible 후보와 그 조상만 남긴다
+ * ④ 레이어별 `autoNamed` 표시를 지운다(응답에는 수만 싣는다).
+ */
+export function gateComponentCandidates(
+  candidates: readonly ComponentCandidateNode[],
+  visible: (id: string) => boolean,
+): { nodes: ComponentCandidateNode[]; autoNamed: number } {
+  const gated = candidates.map((c) => (visible(c.id) ? c : { ...c, eligible: false, autoNamed: false }));
+  const autoNamed = gated.filter((c) => c.autoNamed).length;
+  const byCand = new Map(gated.map((c) => [c.id, c]));
+  const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
+  for (const c of gated) {
+    if (!c.eligible) continue;
+    let p = c.parentId;
+    while (p && !keepIds.has(p)) {
+      keepIds.add(p);
+      p = byCand.get(p)?.parentId ?? null;
+    }
+  }
+  const nodes = gated.filter((c) => keepIds.has(c.id)).map((c) => {
+    if (!('autoNamed' in c)) return c;
+    const { autoNamed: _drop, ...rest } = c;
+    void _drop;
+    return rest;
+  });
+  return { nodes, autoNamed };
 }
 
 /* ---------- 이름 기반 그룹화(등록): 같은 이름 자식을 베리언트 세트로 ---------- */
@@ -1931,6 +1981,28 @@ function assignAxis(subs: Subfamily[], name: string, valueOf: (s: Subfamily) => 
   subs.forEach((s, i) => { s.props[name] = byVal.get(vals[i] as string)!; });
 }
 
+/** 색 하나의 이름(겹침 숫자 없이) — 무채색은 `gray-{단계}`, 빈 값(채움 없음)은 `none`(C-D8 · C-D10). */
+function colorNameOf(hex: string): string {
+  if (!hex) return 'none';
+  const { family, step, achromatic } = classifyColor(hex);
+  return achromatic ? `gray-${step}` : family;
+}
+
+/** 이름이 겹치면 뒤에 온 것의 끝에 `-2` · `-3` …(값 전체를 한 번에 — C-D10). */
+function uniqLabels(names: readonly string[]): string[] {
+  const used = new Set<string>();
+  return names.map((base) => {
+    let name = base;
+    let i = 2;
+    while (used.has(name)) name = `${base}-${i++}`;
+    used.add(name);
+    return name;
+  });
+}
+
+/** Color 축 이름 — `colorAxisLabels`와 같고 빈 값(채움 없음)은 `none`(2026-11-13 C-D8). */
+const colorAxisLabelsOrNone = (distinct: string[]): string[] => uniqLabels(distinct.map(colorNameOf));
+
 const sizeLabel = (distinct: string[]): string[] => {
   const areas = distinct.map(Number);
   const sorted = [...areas].sort((a, b) => a - b);
@@ -1938,22 +2010,48 @@ const sizeLabel = (distinct: string[]): string[] => {
   return areas.map((a) => grades[sorted.indexOf(a)]);
 };
 
+/**
+ * Size 축(§4.7 "묶기" 5번 — 2026-11-18 C-D16). 크기 차뿐 아니라 여백 · 간격 차로 갈린 소가족도 Size로 나눈다(내용 차가
+ * 있어도). 묶음 = 소가족 열쇠에서 Color를 뺀 것. 순서: (내용 차 없으면 루트 넓이) → 루트 높이 → 루트 패딩 합 → 간격 합 →
+ * 문서 순서, 묶음의 대표는 문서 순 첫 마스터. 이름은 `tshirtRoles`(`sizeLabel`과 같은 규칙).
+ */
+function assignSizeAxis(subs: Subfamily[], sizeKey: (m: StructNode) => string, content: boolean): void {
+  const groups: { key: string; rep: StructNode; order: number }[] = [];
+  for (const s of subs) {
+    const head = s.members[s.master];
+    const k = sizeKey(head);
+    if (!groups.some((g) => g.key === k)) groups.push({ key: k, rep: head, order: groups.length });
+  }
+  if (groups.length < 2) return;
+  const n = (v: number | undefined): number => v ?? 0;
+  const area = (m: StructNode): number => n(m.width) * n(m.height);
+  const pad = (m: StructNode): number => n(m.paddingTop) + n(m.paddingRight) + n(m.paddingBottom) + n(m.paddingLeft);
+  const gap = (m: StructNode): number => n(m.itemSpacing) + n(m.counterAxisSpacing);
+  const sorted = [...groups].sort((a, b) =>
+    (content ? 0 : area(a.rep) - area(b.rep)) || n(a.rep.height) - n(b.rep.height) || pad(a.rep) - pad(b.rep) || gap(a.rep) - gap(b.rep) || a.order - b.order);
+  const labels = tshirtRoles(sorted.map((_, i) => i));
+  const byKey = new Map(sorted.map((g, i) => [g.key, labels[i]]));
+  for (const s of subs) s.props.Size = byKey.get(sizeKey(s.members[s.master]))!;
+}
+
 /** 가족 하나의 소가족(§4.7 "묶기" 5번 3단계 · 축). */
 function familySubfamilies(fam: StructNode[]): Subfamily[] {
   if (fam.length === 1) return [{ members: fam, master: 0, props: {} }];
   const content = fam.some((m, i) => i > 0 && pairDiff(fam[0], m).content);
   const { ref } = colorRefPath(fam);
-  const key = (m: StructNode): string => [
-    ref == null ? '' : colorAt(m, ref),
+  /** 소가족 열쇠에서 Color 값을 뺀 나머지 — 같은 것끼리 같은 Size 값(2026-11-18 C-D16). */
+  const sizeKey = (m: StructNode): string => [
     content ? '' : `${m.width ?? 0}x${m.height ?? 0}`,
     padOf(m),
     innerSig(m, padOf),
     content ? '' : innerSig(m, (n) => `${n.width ?? 0}x${n.height ?? 0}`),
   ].join('#');
+  const key = (m: StructNode): string => `${ref == null ? '' : colorAt(m, ref)}#${sizeKey(m)}`;
   const subs = subfamiliesBy(fam, key);
   if (subs.length >= 2) {
-    if (ref != null) assignAxis(subs, 'Color', (s) => colorAt(s.members[s.master], ref) || null, (d) => colorAxisLabels(d));
-    if (!content) assignAxis(subs, 'Size', (s) => String((s.members[s.master].width ?? 0) * (s.members[s.master].height ?? 0)), sizeLabel);
+    // 채움 없음도 Color 값 `none`(2026-11-13 C-D8) — 축을 버리지 않는다.
+    if (ref != null) assignAxis(subs, 'Color', (s) => colorAt(s.members[s.master], ref), colorAxisLabelsOrNone);
+    assignSizeAxis(subs, sizeKey, content);
   }
   finishProps(subs);
   return subs;
@@ -1979,15 +2077,26 @@ function tabSubfamilies(members: StructNode[]): Subfamily[] {
   const famOf = new Map<string, number>();
   fams.forEach((f, i) => f.forEach((m) => famOf.set(m.id, i)));
   const info = new Map(members.map((m) => [m.id, tabInfo(m as LikeNode)!]));
-  const rootVaries = new Set(members.map((m) => m.fillHex ?? '')).size > 1;
-  const colorOf = (m: StructNode): string => (rootVaries ? m.fillHex ?? '' : info.get(m.id)!.selectedColor);
+  // "루트가 기준"은 같은 가족 · 같은 Style 안에서만(2026-11-13 C-D1) — 다른 가족 탭의 루트 채움은 보지 않는다.
+  const fsOf = (m: StructNode): string => `${famOf.get(m.id)}#${info.get(m.id)!.style}`;
+  const rootsBy = new Map<string, Set<string>>();
+  for (const m of members) {
+    const k = fsOf(m);
+    if (!rootsBy.has(k)) rootsBy.set(k, new Set());
+    rootsBy.get(k)!.add(m.fillHex ?? '');
+  }
+  const rootVaries = (m: StructNode): boolean => (rootsBy.get(fsOf(m))?.size ?? 0) > 1;
+  /** 앞 색 — 루트(같은 가족 · Style 안에서 루트 채움이 갈리면) 또는 선택 칸 색. */
+  const colorOf = (m: StructNode): string => (rootVaries(m) ? m.fillHex ?? '' : info.get(m.id)!.selectedColor);
+  /** 뒤 색 — 선택 안 된 칸 글자 색(C-D1). */
+  const backOf = (m: StructNode): string => info.get(m.id)!.unselectedTextColor ?? '';
   // 가족마다 내용(글자 · 그림) 차가 있으면 크기는 축이 아니다(5번 3단계와 같은 규칙).
   const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
   const key = (m: StructNode): string => {
     const t = info.get(m.id)!;
     const fi = famOf.get(m.id)!;
     const content = famContent[fi];
-    return [fi, t.style, t.selected, colorOf(m), content ? '' : `${m.width ?? 0}x${m.height ?? 0}`, padOf(m), innerSig(m, padOf),
+    return [fi, t.style, t.selected, colorOf(m), backOf(m), content ? '' : `${m.width ?? 0}x${m.height ?? 0}`, padOf(m), innerSig(m, padOf),
       content ? '' : innerSig(m, (n) => `${n.width ?? 0}x${n.height ?? 0}`)].join('#');
   };
   const subs = subfamiliesBy(members, key);
@@ -2003,14 +2112,31 @@ function tabSubfamilies(members: StructNode[]): Subfamily[] {
       posBy.get(k)!.add(info.get(head(s).id)!.selected);
     }
     for (const s of subs) if ((posBy.get(famStyle(s))?.size ?? 0) > 1) s.props.Selected = String(info.get(head(s).id)!.selected + 1);
-    // Color: 같은 가족 · Style · 선택 위치인데 색이 다른 소가족이 있을 때만(테마만 다른 탭).
-    const byPos = new Map<string, Set<string>>();
+    // Color: 같은 가족 · Style · 선택 위치인데 색(앞 = 루트 또는 선택 칸 색, 뒤 = 선택 안 된 칸 글자 색)이 다른
+    // 소가족이 있을 때만(테마만 다른 탭). 값 이름은 탭 그룹 전체에서 한 형식(C-D9 · C-D11):
+    // 어느 묶음에서든 두 색이 함께 갈리거나, 묶음마다 갈린 쪽이 다르면 모든 변형이 `{앞}-{뒤}`, 아니면 갈린 쪽 색 이름만.
+    const byPos = new Map<string, { front: Set<string>; back: Set<string> }>();
     for (const s of subs) {
       const k = `${famStyle(s)}#${info.get(head(s).id)!.selected}`;
-      if (!byPos.has(k)) byPos.set(k, new Set());
-      byPos.get(k)!.add(colorOf(head(s)));
+      if (!byPos.has(k)) byPos.set(k, { front: new Set(), back: new Set() });
+      byPos.get(k)!.front.add(colorOf(head(s)));
+      byPos.get(k)!.back.add(backOf(head(s)));
     }
-    if ([...byPos.values()].some((v) => v.size > 1)) assignAxis(subs, 'Color', (s) => colorOf(head(s)) || null, (d) => colorAxisLabels(d));
+    const groupsV = [...byPos.values()];
+    const frontV = groupsV.some((g) => g.front.size > 1);
+    const backV = groupsV.some((g) => g.back.size > 1);
+    if (frontV || backV) {
+      const both = groupsV.some((g) => g.front.size > 1 && g.back.size > 1) || (frontV && backV);
+      if (both) {
+        // 앞 · 뒤를 저마다 색 이름으로 바꿔 붙인 뒤 값 전체를 한 번에 겹침 검사(C-D10).
+        assignAxis(subs, 'Color', (s) => `${colorOf(head(s))}|${backOf(head(s))}`, (d) =>
+          uniqLabels(d.map((v) => { const [f, b] = v.split('|'); return `${colorNameOf(f)}-${colorNameOf(b)}`; })));
+      } else if (frontV) {
+        assignAxis(subs, 'Color', (s) => colorOf(head(s)), colorAxisLabelsOrNone);
+      } else {
+        assignAxis(subs, 'Color', (s) => backOf(head(s)), colorAxisLabelsOrNone);
+      }
+    }
     // Size: 내용 차 없는 가족 안에서 크기만 다를 때.
     const sizeBy = new Map<string, Set<string>>();
     for (const s of subs) {
@@ -2086,6 +2212,22 @@ export function resolvePlanNames(groups: readonly PlanGroup[], existing: readonl
   const taken = new Set<string>([...existing, ...plainNames]);
   const names: string[] = new Array(groups.length).fill('');
   plainIdx.forEach((gi, k) => { names[gi] = plainNames[k]; });
+  // `-Type{n}`의 기본 이름은 이름 그룹마다 한 번 정한다 — 이번 실행의 다른 기본 이름 · 보통 이름과 겹칠 때만
+  // 맥락을 되살린다(`article-list` → `ArticleList`). 숫자로 피하는 것은 `-Type{n}` 뒤 `-k`로만(§4.7 "묶기" 4번).
+  const typedKeys: string[] = [];
+  const typedMembers = new Map<string, StructNode[]>();
+  for (const g of groups) {
+    if (g.tab || g.typeIndex == null) continue;
+    if (!typedMembers.has(g.key)) { typedKeys.push(g.key); typedMembers.set(g.key, g.nameMembers); }
+  }
+  const rawBase = new Map(typedKeys.map((k) => [k, componentBaseName(typedMembers.get(k)!)]));
+  const plainSet = new Set(plainNames);
+  const baseByKey = new Map<string, string>();
+  for (const k of typedKeys) {
+    const b = rawBase.get(k)!;
+    const clash = plainSet.has(b) || typedKeys.some((o) => o !== k && rawBase.get(o) === b);
+    baseByKey.set(k, clash ? contextualName(typedMembers.get(k)!) : b);
+  }
   groups.forEach((g, i) => {
     if (!g.tab && g.typeIndex == null) return;
     let base: string;
@@ -2094,7 +2236,7 @@ export function resolvePlanNames(groups: readonly PlanGroup[], existing: readonl
       base = 'Tab';
       next = (k) => `Tab${k}`;
     } else {
-      base = `${componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
+      base = `${baseByKey.get(g.key) ?? componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
       next = (k) => `${base}-${k}`;
     }
     let name = base;

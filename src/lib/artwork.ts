@@ -37,6 +37,8 @@ export interface IconRegistry {
    * 원본으로 남았을 때). 문서에 있던 아이콘이나 이번에 만들지 않은 지문이면 아무것도 하지 않고 false.
    */
   discard(vectorKey: string): boolean;
+  /** 이번 실행에 새로 만든 아이콘 지문(만든 순서) — [등록] 끝 정리(§4.7 "인스턴스 자리" 7번 — C-D4)가 쓴다. */
+  madeKeys(): string[];
 }
 
 /**
@@ -74,6 +76,7 @@ export function createIconRegistry(opts: {
   return {
     get: (vectorKey) => lookup(vectorKey),
     created: () => made,
+    madeKeys: () => [...madeKeys],
     discard(vectorKey) {
       if (!madeKeys.has(vectorKey)) return false;
       const comp = byKey.get(vectorKey);
@@ -106,6 +109,40 @@ export function createIconRegistry(opts: {
       }
     },
   };
+}
+
+/**
+ * [등록] 끝 정리(§4.7 "인스턴스 자리" 7번 — 2026-11-13 사용자 결정 C-D4). ① 이번 실행에 새로 만든 아이콘 중
+ * 어디에도 쓰이지 않게 된 것(인스턴스 0)을 지운다 — 마스터를 못 만든 그룹 · 소가족 마스터 실패 · 원본으로 남은
+ * 나머지 멤버 몫 등. 다른 곳이 쓰고 있으면 남긴다. 지운 아이콘은 등록부의 만든 수("아이콘 n")에서 빠진다.
+ * ② 그 뒤 Components 페이지가 비었고 이번 실행에 만든 페이지면 지운다(전부터 있던 페이지는 비어도 둔다).
+ * 그래서 아무것도 못 만들면 파일에 남는 것이 없다. 지운 아이콘 수를 돌려준다.
+ */
+export async function cleanupAfterRegister(opts: {
+  registry: IconRegistry;
+  page: (BaseNode & ChildrenMixin) | null;
+  /** 이번 실행에 만든 Components 페이지인가. */
+  pageCreated: boolean;
+  /** 아이콘 컴포넌트를 쓰는 인스턴스(문서 전체 — 피그마 `getInstancesAsync`). */
+  instancesOf: (comp: ComponentNode) => Promise<readonly SceneNode[]>;
+}): Promise<number> {
+  let removed = 0;
+  for (const key of opts.registry.madeKeys()) {
+    const comp = opts.registry.get(key);
+    if (!comp || comp.removed) { if (opts.registry.discard(key)) removed++; continue; }
+    let used = true;
+    try {
+      used = (await opts.instancesOf(comp)).some((i) => !i.removed);
+    } catch {
+      used = true; // 읽지 못하면 남긴다 — 쓰는 아이콘을 지우지 않게
+    }
+    if (!used && opts.registry.discard(key)) removed++;
+  }
+  const page = opts.page;
+  if (opts.pageCreated && page && !(page as SceneNode).removed && page.children.length === 0) {
+    try { (page as unknown as { remove(): void }).remove(); } catch { /* 지우지 못하면 빈 페이지가 남을 뿐 */ }
+  }
+  return removed;
 }
 
 export interface VectorSlot {
@@ -582,6 +619,34 @@ export async function snapshotOverrides(root: SceneNode, place: number, mainOf: 
 
 /** 속성 키("이름#id")에서 화면에 보일 속성 이름. */
 const propNameOf = (key: string): string => key.replace(/#[^#]*$/, '') || key;
+
+/** 값 지키기 기록 대상 자리(§4.7 "인스턴스 자리" 9번) — 자리 인스턴스 · 컴포넌트. `counted`: 이미 " · 속성 값을 못 넣은" 꼬리에 센 자리. */
+export interface KeepRoot {
+  node: SceneNode;
+  name: string;
+  counted?: boolean;
+}
+
+/**
+ * 노출 뒤 되돌리기 실패를 센다(§4.7 "인스턴스 자리" 9번 "한 자리는 한 번만 센다"). 실패 진단은 속성마다 남기고,
+ * 꼬리(`propFailed`)에는 자리마다 한 번 — 넣을 때 이미 센 자리(`counted`)는 다시 세지 않는다. 자리는 `keepRoots`
+ * 항목 단위로 기억하고 이름으로 거르지 않는다(이름이 같은 다른 자리를 함께 빼거나 빠뜨리지 않게).
+ */
+export function tallyRestoreFailures(
+  roots: KeepRoot[],
+  failed: ReadonlyMap<number, readonly string[]>,
+  propFailed: string[],
+  onProp: (name: string, prop: string) => void,
+): void {
+  for (const [k, props] of failed) {
+    const root = roots[k];
+    if (!root) continue;
+    for (const prop of props) onProp(root.name, prop);
+    if (root.counted) continue;
+    root.counted = true;
+    propFailed.push(root.name);
+  }
+}
 
 /**
  * 속성 노출 뒤 기록과 달라진 값을 되돌린다(§4.7 9번). 바깥 인스턴스부터(depth 오름차순) — 바깥의

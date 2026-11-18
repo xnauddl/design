@@ -1061,8 +1061,8 @@
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나의 컴포넌트로 합치기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나로 합치기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1070,6 +1070,8 @@
       <!-- 목록 머리 띠 + 개수(ia-v4 §4.3a-3) -->
       <div class="r-group r-ghead" id="compTreeGroup" style="display:none"><span data-i18n="structure.groupComp">컴포넌트 후보</span><span class="r-gcnt" id="compTreeCount"></span></div>
       <div id="compTree" class="results"></div>
+      <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
+      <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
       <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
       <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
@@ -1456,7 +1458,7 @@
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 닮은 프레임 컴포넌트화
     "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
-    "similar.componentizeBtn": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uAE30",
+    "similar.componentizeBtn": "\uD558\uB098\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -2051,13 +2053,14 @@
     "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
     "component.genMissingBtn": "\uBE60\uC9C4 \uBCC0\uD615 \uCC44\uC6B0\uAE30",
     "component.scanHelp": "\uC120\uD0DD \uC544\uB798\uC5D0\uC11C \uBC84\uD2BC\xB7\uCE74\uB4DC \uAC19\uC740 \uACE0\uC2E0\uB8B0 \uAD6C\uC870 \uD6C4\uBCF4\uB97C \uCC3E\uC544\uC694. \uC228\uAE40\xB7\uBD80\uBAA8 \uCEE8\uD14C\uC774\uB108\uB294 \uBE7C\uC694.",
-    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components\uC5D0 \uB4F1\uB85D\uD558\uACE0 \uC790\uB9AC\uC5D4 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uC6D0\uBCF8\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uB9C8\uC2A4\uD130\uB97C \uB530\uB77C\uC694.",
+    "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components \uD398\uC774\uC9C0\uC5D0 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD558\uACE0, \uC6D0\uB798 \uC790\uB9AC\uC5D0\uB294 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uB0A8\uAE34 \uC778\uC2A4\uD134\uC2A4\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
     "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
     "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
     "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.autoNamed": "\uC774\uB984 \uC5C6\uB294 \uB808\uC774\uC5B4 {n}\uAC1C \u2014 \u2018\uC774\uB984 \uC815\uB9AC\u2019\uB97C \uBA3C\uC800 \uD558\uBA74 \uD6C4\uBCF4\uAC00 \uB3FC\uC694",
     "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
@@ -5080,6 +5083,8 @@
   var tsrApplyBtn = null;
   var tsrOpener = null;
   var tsrCloseBtn = null;
+  var tsrNote = null;
+  var tsrModal = null;
   var tsrBusy = false;
   $("btnTsRename").addEventListener("click", (e) => {
     const b = e.currentTarget;
@@ -5109,11 +5114,17 @@
     tsrApplyBtn = apply;
     const close = modalButton(t("common.close"), () => requestCloseModal("button"));
     tsrCloseBtn = close;
-    openModal(title, body, [close, apply], () => tsrOpener, () => {
+    const note = document.createElement("div");
+    note.className = "tsr-note";
+    note.hidden = true;
+    tsrNote = note;
+    tsrModal = openModal(title, body, [close, apply], () => tsrOpener, () => {
       tsrBody = null;
       tsrApplyBtn = null;
       tsrTitle = null;
-    }, { focus: close });
+      tsrNote = null;
+      tsrModal = null;
+    }, { focus: close, footTop: [note] });
     tsrReq = ++bindReqSeq;
     send({ type: "SCAN_TS_RENAME", reqId: tsrReq });
     tsrRender();
@@ -5230,6 +5241,34 @@
     tsrRender();
     tsrApplyReq = ++bindReqSeq;
     send({ type: "APPLY_TS_RENAME", reqId: tsrApplyReq, items });
+  }
+  function onTsRenameError(msg) {
+    if (msg.reqId != null && msg.reqId !== tsrApplyReq) return;
+    tsrBusy = false;
+    if (!tsrNote || !tsrModal) {
+      tsrRender();
+      return;
+    }
+    const f = explainError(msg.message);
+    const note = tsrNote;
+    const modal = tsrModal;
+    const clear = () => {
+      note.replaceChildren();
+      note.hidden = true;
+      releasePrimaries(modal);
+    };
+    const { box, retry } = errorBox(f, f.retryable ? () => {
+      const before = tsrApplyReq;
+      tsrApply();
+      if (tsrApplyReq === before) return;
+      clear();
+      tsrCloseBtn == null ? void 0 : tsrCloseBtn.focus({ preventScroll: true });
+    } : null);
+    note.replaceChildren(box);
+    note.hidden = false;
+    releasePrimaries(modal);
+    if (retry) holdPrimaries(modal, retry);
+    tsrRender();
   }
   function onTsRenamed(msg) {
     if (msg.reqId !== tsrApplyReq) return;
@@ -5370,6 +5409,7 @@
   var PaidRequiredError = class extends Error {
   };
   var wizardWaiter = null;
+  var wizardErrorMsg = null;
   var wizBindReq = 0;
   var wizBindPending = false;
   window.addEventListener("message", (event) => {
@@ -5379,6 +5419,7 @@
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
       const w = wizardWaiter;
       wizardWaiter = null;
+      if (m.type === "ERROR") wizardErrorMsg = m;
       w.reject(m.type === "PREMIUM_REQUIRED" ? new PaidRequiredError() : new Error(m.message));
       return;
     }
@@ -5519,7 +5560,18 @@
   function setCardPrimary(all, order) {
     var _a3;
     const pick = (_a3 = order.find((el) => !baseLocked(el))) != null ? _a3 : null;
-    for (const el of all) el.classList.toggle("primary", el === pick);
+    const card = all[0] ? cardOf(all[0]) : null;
+    const held = !!retryIn(card);
+    for (const el of all) {
+      if (held) {
+        el.classList.remove("primary");
+        if (el === pick) el.dataset.primaryHeld = "1";
+        else delete el.dataset.primaryHeld;
+      } else {
+        el.classList.toggle("primary", el === pick);
+        delete el.dataset.primaryHeld;
+      }
+    }
   }
   var colorsVisible = () => colorRevealed && tokens.some((tk) => tk.category === "color" && typeof tk.value === "string");
   function updateEmptyLocks() {
@@ -5533,15 +5585,21 @@
     const merge = $("btnComponentize");
     const eligible = compEligibleCount();
     const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
+    const noBase = !baseline;
+    const prevActive = document.activeElement;
+    const lockedBefore = prevActive === scan || prevActive === similar ? baseLocked(prevActive) : true;
+    setEmptyLock(scan, noBase ? t("status.noSelection") : null);
+    setEmptyLock(similar, noBase ? t("status.noSelection") : null);
     setEmptyLock(
       reg,
-      !compCandidates.length ? t("component.needScan") : !eligible ? t("component.noEligibleShort") : !checked ? t("component.noChecked") : null
+      !compScanned ? t("component.needScan") : !eligible ? t("component.noEligibleShort") : !checked ? t("component.noChecked") : null
     );
     const canMerge = similarMemberIds.length >= 2 && !!similarMasterId;
     setEmptyLock(merge, canMerge ? null : t(similarScanned ? "similar.needTwo" : "similar.needScan"));
     const first = eligible > 0 ? reg : canMerge ? merge : scan;
     const order = isPaid ? [first, merge, scan] : [first, similar];
     setCardPrimary([scan, similar, reg, merge], order);
+    if (!lockedBefore && baseLocked(prevActive)) compFocusPrimary();
   }
   function setLockTitle(el, locked) {
     var _a3;
@@ -5637,10 +5695,20 @@
       box.appendChild(row);
     });
   }
-  $("btnScanComp").addEventListener("click", () => {
-    setStatus("structureStatus", t("component.scanning"), "");
-    send({ type: "SCAN_COMPONENT_CANDIDATES" });
-  });
+  var compScanReq = 0;
+  var similarScanReq = 0;
+  var structStatusFind = false;
+  function setFindStatus(text, cls) {
+    setStatus("structureStatus", text, cls);
+    structStatusFind = true;
+  }
+  function startCompScan() {
+    var _a3;
+    setFindStatus(t("component.scanning"), "");
+    compScanReq = ++bindReqSeq;
+    send({ type: "SCAN_COMPONENT_CANDIDATES", nodeIds: (_a3 = baseline == null ? void 0 : baseline.ids) != null ? _a3 : [], reqId: compScanReq });
+  }
+  $("btnScanComp").addEventListener("click", startCompScan);
   var allVars = [];
   var varsLoaded = false;
   function refreshDarkOptions() {
@@ -5742,10 +5810,13 @@
   });
   var similarMemberIds = [];
   var similarMasterId = null;
-  $("btnScanSimilar").addEventListener("click", () => {
-    setStatus("structureStatus", t("similar.scanning"), "");
-    send({ type: "SCAN_SIMILAR" });
-  });
+  function startSimilarScan() {
+    var _a3;
+    setFindStatus(t("similar.scanning"), "");
+    similarScanReq = ++bindReqSeq;
+    send({ type: "SCAN_SIMILAR", nodeIds: (_a3 = baseline == null ? void 0 : baseline.ids) != null ? _a3 : [], reqId: similarScanReq });
+  }
+  $("btnScanSimilar").addEventListener("click", startSimilarScan);
   $("btnComponentize").addEventListener("click", () => {
     if (similarMemberIds.length < 2 || !similarMasterId) return;
     setStatus("structureStatus", t("similar.componentizing"), "");
@@ -5774,6 +5845,12 @@
   });
   function refreshVariantRow(comps, sets) {
     $("variantRow").hidden = comps === 0 && sets === 0;
+    const classify = $("btnClassifyVariants");
+    const gen = $("btnGenMissing");
+    const lost = classify.hidden !== (comps === 0) && document.activeElement === classify || gen.hidden !== (sets === 0) && document.activeElement === gen;
+    classify.hidden = comps === 0;
+    gen.hidden = sets === 0;
+    if (lost) compFocusPrimary();
   }
   $("btnClassifyVariants").addEventListener("click", () => {
     setStatus("structureStatus", t("component.classifying"), "");
@@ -5820,7 +5897,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6112,26 +6189,32 @@
         break;
       }
       case "COMPONENT_CANDIDATES": {
+        if (msg.reqId !== compScanReq) break;
+        compScanReq = 0;
+        const hadFocus = compFocusInLists();
+        compScanned = true;
         compCandidates = msg.nodes;
+        setCompAutoNamed((_m = msg.autoNamed) != null ? _m : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
         renderVariantReport([]);
         if (!compCandidates.length || !compEligibleCount()) {
-          setStatus("structureStatus", t("component.noEligible"), "warn");
+          setFindStatus(t("component.noEligible"), "warn");
         } else {
           updateCompRegister();
         }
+        refreshTreeEmptyStates();
+        if (hadFocus) compFocusPrimary();
         break;
       }
       case "COMPONENTS_RESULT": {
-        clearCompPreview();
-        const misplaced = (_m = msg.placeFailed) != null ? _m : [];
-        const cloned = (_n = msg.placeCloned) != null ? _n : [];
-        const propFailed = (_o = msg.propFailed) != null ? _o : [];
-        const fillKept = (_p = msg.fillKept) != null ? _p : [];
-        const reused = (_q = msg.reused) != null ? _q : [];
-        const reuseKept = (_r = msg.reuseKept) != null ? _r : [];
+        const misplaced = (_n = msg.placeFailed) != null ? _n : [];
+        const cloned = (_o = msg.placeCloned) != null ? _o : [];
+        const propFailed = (_p = msg.propFailed) != null ? _p : [];
+        const fillKept = (_q = msg.fillKept) != null ? _q : [];
+        const reused = (_r = msg.reused) != null ? _r : [];
+        const reuseKept = (_s = msg.reuseKept) != null ? _s : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -6191,11 +6274,13 @@
         break;
       }
       case "SIMILAR_CANDIDATES":
+        if (msg.reqId !== similarScanReq) break;
+        similarScanReq = 0;
         renderSimilar(msg);
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_s = msg.placeFailed) != null ? _s : [];
+          const misplaced0 = (_t = msg.placeFailed) != null ? _t : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -6204,18 +6289,11 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_t = msg.placeFailed) != null ? _t : [];
+        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
         setStatus("structureStatus", `${parts.join(" \xB7 ")}${warn}${placeFailedText(misplaced)}`, msg.warnings.length ? "warn" : "ok");
-        similarMemberIds = [];
-        similarMasterId = null;
-        similarScanned = false;
-        $("similarList").innerHTML = "";
-        $("similarGroupCount").textContent = "";
-        $("similarGroup").style.display = "none";
-        updateEmptyLocks();
         break;
       }
       case "PREMIUM_REQUIRED": {
@@ -6247,7 +6325,20 @@
           selFindInFlight = false;
           renderSelHome();
         }
-        const statusId = msg.op === "SELECT_NODES" ? selectStatusTarget : resolveStatusId(msg.op && OP_STATUS[msg.op] || "colorStatus");
+        if (msg.op === "SCAN_COMPONENT_CANDIDATES" || msg.op === "SCAN_SIMILAR") {
+          const want = msg.op === "SCAN_COMPONENT_CANDIDATES" ? compScanReq : similarScanReq;
+          if (!want || msg.reqId != null && msg.reqId !== want) break;
+          if (msg.op === "SCAN_COMPONENT_CANDIDATES") compScanReq = 0;
+          else similarScanReq = 0;
+        }
+        if (msg.op === "APPLY_TS_RENAME") {
+          onTsRenameError(msg);
+          break;
+        }
+        const fromWizard = wizardErrorMsg === msg;
+        if (fromWizard) wizardErrorMsg = null;
+        const mapped = msg.op === "SELECT_NODES" ? selectStatusTarget : msg.op ? OP_STATUS[msg.op] : void 0;
+        const statusId = mapped && mapped !== STATUS_LINE ? resolveStatusId(mapped) : STATUS_LINE;
         if (msg.op === "APPLY") hideApplyProgress();
         if (msg.op === "APPLY_SELECTED" && bindLinking) {
           bindLinking = 0;
@@ -6255,11 +6346,17 @@
           flushLinkSelClear();
           onBindLinkingChanged();
         }
+        if (fromWizard) break;
+        if (statusId === STATUS_LINE) {
+          showStatusLine(explainError(msg.message).message, { cls: "warn", tip: msg.message });
+          break;
+        }
         showError(statusId, explainError(msg.message), msg.op);
         break;
       }
     }
   };
+  var STATUS_LINE = "list";
   var OP_STATUS = {
     EXTRACT: "colorStatus",
     CREATE_TOKENS: "createStatus",
@@ -6280,16 +6377,66 @@
     REGISTER_COMPONENTS: "structureStatus",
     CLASSIFY_VARIANTS: "structureStatus",
     GENERATE_MISSING_VARIANTS: "structureStatus",
+    SCAN_SIMILAR: "structureStatus",
+    // 컴포넌트 화면 여섯 작업 모두(ia-v4 §4.5 "상태 줄")
+    COMPONENTIZE_SIMILAR: "structureStatus",
+    RENAME_APPLY: "renameStatus",
+    // 이름 정리 [이름 바꾸기]
+    GENERATE_DARK_MODE: "darkStatus",
+    // 도구 탭 PR 뒤에는 다크 화면 상태 줄(§4.11 T-P7)
+    UNBIND_DELETED: STATUS_LINE,
+    // 선택 탭 삭제된 변수 카드 — 결과 DELETED_UNBOUND와 같은 자리
+    OPEN_LICENSE_LINK: "licenseStatus",
     SET_LICENSE: "licenseStatus",
     LICENSE_VERIFIED: "licenseStatus",
     CLEAR_LICENSE: "licenseStatus",
     GET_LICENSE: "licenseStatus"
   };
-  function showError(id, f, op) {
-    const el = $(id);
-    el.className = "status";
-    el.innerHTML = "";
-    if (id === "licenseStatus") el.removeAttribute("title");
+  var RETRY_CLS = "retry-btn";
+  function cardOf(el) {
+    var _a3, _b;
+    return (_b = (_a3 = el.closest(".step, .modal")) != null ? _a3 : el.closest(".tool-panel")) != null ? _b : el.parentElement;
+  }
+  function retryIn(card) {
+    var _a3;
+    return (_a3 = card == null ? void 0 : card.querySelector(`.ux.danger .${RETRY_CLS}`)) != null ? _a3 : null;
+  }
+  function holdPrimaries(card, keep) {
+    for (const b of Array.from(card.querySelectorAll("button.primary"))) {
+      if (b === keep) continue;
+      b.classList.remove("primary");
+      b.dataset.primaryHeld = "1";
+    }
+  }
+  function releasePrimaries(card) {
+    for (const b of Array.from(card.querySelectorAll("[data-primary-held]"))) {
+      b.classList.add("primary");
+      delete b.dataset.primaryHeld;
+    }
+  }
+  function cardPrimary(card) {
+    var _a3;
+    if (!card) return null;
+    const retry = retryIn(card);
+    if (retry) return retry;
+    return (_a3 = Array.from(card.querySelectorAll("button.primary")).find((b) => !baseLocked(b) && b.offsetParent !== null)) != null ? _a3 : null;
+  }
+  function focusAfterRetryGone(card) {
+    var _a3;
+    const next = (_a3 = cardPrimary(card)) != null ? _a3 : !$("subHead").hidden && (card == null ? void 0 : card.closest("#tab-select")) ? $("btnSubBack") : null;
+    next == null ? void 0 : next.focus({ preventScroll: true });
+  }
+  function dropErrorBox(el) {
+    if (!el.querySelector(".ux.danger")) return;
+    const retry = el.querySelector(`.${RETRY_CLS}`);
+    const hadFocus = !!retry && document.activeElement === retry;
+    el.replaceChildren();
+    const card = cardOf(el);
+    if (card && !retryIn(card)) releasePrimaries(card);
+    updateEmptyLocks();
+    if (hadFocus) focusAfterRetryGone(card);
+  }
+  function errorBox(f, onRetry) {
     const box = document.createElement("div");
     box.className = "ux danger";
     const h = document.createElement("div");
@@ -6305,28 +6452,50 @@
       g.textContent = f.action;
       box.appendChild(g);
     }
-    const linkRetry = op === "APPLY_SELECTED" ? lastLinkItems : null;
-    const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
-    if (f.retryable && (linkRetry || retry)) {
-      const btn = document.createElement("button");
-      btn.className = "primary";
-      btn.textContent = t("common.retry");
-      btn.addEventListener("click", () => {
-        var _a3;
-        if (linkRetry) {
-          startLink(linkRetry);
-          return;
-        }
-        if (!retry) return;
-        if (bindLinking && ((_a3 = OPS[retry.type]) == null ? void 0 : _a3.write)) {
-          setStatus(id, t("bind.waitLink"), "warn");
-          return;
-        }
-        send(retry);
-      });
-      box.appendChild(btn);
+    let retry = null;
+    if (onRetry) {
+      retry = document.createElement("button");
+      retry.className = `primary ${RETRY_CLS}`;
+      retry.textContent = t("common.retry");
+      retry.addEventListener("click", onRetry);
+      box.appendChild(retry);
     }
+    return { box, retry };
+  }
+  function showError(id, f, op) {
+    const el = $(id);
+    dropErrorBox(el);
+    el.className = "status";
+    el.innerHTML = "";
+    if (id === "licenseStatus") el.removeAttribute("title");
+    const linkRetry = op === "APPLY_SELECTED" ? lastLinkItems : null;
+    const scanRetry = op === "SCAN_COMPONENT_CANDIDATES" ? "comp" : op === "SCAN_SIMILAR" ? "similar" : null;
+    const retry = linkRetry || scanRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
+    const onRetry = f.retryable && (linkRetry || scanRetry || retry) ? () => {
+      var _a3;
+      if (linkRetry) {
+        startLink(linkRetry);
+        return;
+      }
+      if (scanRetry) {
+        const btn = scanRetry === "comp" ? $("btnScanComp") : $("btnScanSimilar");
+        if (scanRetry === "comp") startCompScan();
+        else startSimilarScan();
+        btn.focus({ preventScroll: true });
+        return;
+      }
+      if (!retry) return;
+      if (bindLinking && ((_a3 = OPS[retry.type]) == null ? void 0 : _a3.write)) {
+        setStatus(id, t("bind.waitLink"), "warn");
+        return;
+      }
+      send(retry);
+    } : null;
+    const { box, retry: retryBtn } = errorBox(f, onRetry);
     el.appendChild(box);
+    const card = cardOf(el);
+    if (retryBtn && card) holdPrimaries(card, retryBtn);
+    if (id === "structureStatus") structStatusFind = true;
   }
   function baseDepth(rows) {
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
@@ -7823,18 +7992,50 @@
       const all = $("compAll");
       all.checked = sel === total && total > 0;
       all.indeterminate = sel > 0 && sel < total;
-      setStatus("structureStatus", total === 0 ? t("component.noEligibleShort") : t("component.candidates", { total, sel }), "");
+      if (!$("structureStatus").querySelector(".ux.danger")) setFindStatus(total === 0 ? t("component.noEligibleShort") : t("component.candidates", { total, sel }), "");
     }
     updateEmptyLocks();
   }
-  function clearCompPreview() {
+  function setCompAutoNamed(n) {
+    const el = $("compAutoNamed");
+    el.textContent = n > 0 ? t("component.autoNamed", { n }) : "";
+    el.hidden = n <= 0;
+  }
+  var compScanned = false;
+  function clearCompLists() {
+    const hadFocus = compFocusInLists();
+    compScanReq = 0;
+    similarScanReq = 0;
+    compScanned = false;
     compCandidates = [];
     compChecked.clear();
     clearMount($("compTree"));
+    setCompAutoNamed(0);
     $("compTreeCount").textContent = "";
     $("compTreeGroup").style.display = "none";
     $("compTreeCtrls").style.display = "none";
+    similarMemberIds = [];
+    similarMasterId = null;
+    similarScanned = false;
+    clearMount($("similarList"));
+    $("similarGroupCount").textContent = "";
+    $("similarGroup").style.display = "none";
+    if (structStatusFind) setStatus("structureStatus", "", "");
     updateEmptyLocks();
+    refreshTreeEmptyStates();
+    if (hadFocus) compFocusPrimary();
+  }
+  function compFocusInLists() {
+    if (activeTab !== "select" || selSub !== "structure") return false;
+    const a = document.activeElement;
+    if (!a || a === document.body) return true;
+    return ["compTree", "similarList", "compTreeCtrls"].some((id) => $(id).contains(a));
+  }
+  function compFocusPrimary() {
+    var _a3;
+    if (activeTab !== "select" || selSub !== "structure") return;
+    const card = $("structureCard");
+    ((_a3 = cardPrimary(card)) != null ? _a3 : $("btnSubBack")).focus({ preventScroll: true });
   }
   function makeVariantReportRow(l) {
     if (l.head) {
@@ -7864,7 +8065,7 @@
   }
   function refreshTreeEmptyStates() {
     if (compCandidates.length === 0) {
-      if (lastSelCount === 0) renderEmptyState($("compTree"), t("sel.noneHere"), "");
+      if (!baseline) renderEmptyState($("compTree"), t("sel.noneHere"), "");
       else clearMount($("compTree"));
     }
     renderMakeNoSel();
@@ -7986,6 +8187,8 @@
     return card;
   }
   function renderSimilar(msg) {
+    const hadFocus = compFocusInLists();
+    if (hadFocus) queueMicrotask(compFocusPrimary);
     similarMemberIds = msg.metas.map((m) => m.id);
     similarMasterId = msg.recommendedMasterId;
     similarScanned = true;
@@ -7996,7 +8199,7 @@
     renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
     if (!msg.metas.length) {
       const why = msg.excluded.length ? msg.excluded[0].reason : t("similar.needTwo");
-      setStatus("structureStatus", t("similar.none", { why }), "warn");
+      setFindStatus(t("similar.none", { why }), "warn");
       return;
     }
     const texts = msg.varying.filter((v) => v.type === "TEXT").length;
@@ -8007,7 +8210,7 @@
     if (msg.imageVarying.length) opened.push(t("similar.openImage", { n: msg.imageVarying.length }));
     const openPart = opened.length ? t("similar.opened", { list: opened.join(" \xB7 ") }) : t("similar.noVarying");
     const skipPart = msg.excluded.length ? t("similar.excluded", { n: msg.excluded.length, why: msg.excluded[0].reason }) : "";
-    setStatus("structureStatus", t("similar.scanned", { n: msg.metas.length, openPart, skipPart }), "ok");
+    setFindStatus(t("similar.scanned", { n: msg.metas.length, openPart, skipPart }), "ok");
   }
   function updateApplyProgress(done, total) {
     $("applyProgress").style.display = "";
@@ -8028,6 +8231,8 @@
   }
   function setStatus(id, text, cls, tip) {
     const el = $(id);
+    dropErrorBox(el);
+    if (id === "structureStatus") structStatusFind = false;
     el.textContent = text;
     el.className = `status ${cls}`;
     if (tip) el.title = tip;
@@ -8532,6 +8737,7 @@ ${opts.tip}` : text;
     reentry.release();
   }
   function readScreen(why) {
+    if (why === "work") clearCompLists();
     if (isMini) return;
     if (activeTab !== "settings" || why === "work") requestPrereq();
     if (activeTab === "variables") {
@@ -8677,6 +8883,12 @@ ${opts.tip}` : text;
       renameFor = null;
       renameNodes = [];
       readRename();
+    }
+    if (changed && sub === "structure") {
+      $("structureCard").classList.remove("collapsed");
+      updateEmptyLocks();
+      refreshTreeEmptyStates();
+      compFocusPrimary();
     }
     bindFocusFirst();
   }
@@ -9171,7 +9383,15 @@ ${opts.tip}` : text;
     setBaseline(curSel.count ? __spreadValues({}, curSel) : null);
   }
   function setBaseline(b) {
+    const prevKey = baseKey();
     baseline = b;
+    if (baseKey() !== prevKey) {
+      clearCompLists();
+      renderVariantReport([]);
+    } else {
+      updateEmptyLocks();
+      refreshTreeEmptyStates();
+    }
     if (mcMemo && (!b || mcMemo.base !== b.ids.join(","))) {
       mcMemo = null;
       mcJust.clear();
@@ -11130,7 +11350,11 @@ ${opts.tip}` : text;
     const body = document.createElement("div");
     body.appendChild(content);
     content.hidden = false;
-    openModal(title, body, [modalButton(t("common.close"), closeModal, true)], returnFocus, () => {
+    openModal(title, body, [modalButton(t("common.close"), closeModal)], returnFocus, () => {
+      for (const st of Array.from(content.querySelectorAll(".status"))) {
+        if (st.querySelector(".ux.danger")) setStatus(st.id, "", "");
+      }
+      releasePrimaries(content);
       content.hidden = true;
       $("popupStore").appendChild(content);
     });

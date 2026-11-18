@@ -1111,6 +1111,9 @@ let tsrTitle: HTMLElement | null = null;
 let tsrApplyBtn: HTMLButtonElement | null = null;
 let tsrOpener: HTMLElement | null = null;
 let tsrCloseBtn: HTMLElement | null = null;
+/** 팝업 안 알림 줄 — `.tsr-body` 밖, 버튼 줄 바로 위(APPLY_TS_RENAME 오류 · ia-v4 §4.11 T-P29 ④). */
+let tsrNote: HTMLElement | null = null;
+let tsrModal: HTMLElement | null = null;
 let tsrBusy = false;
 $('btnTsRename').addEventListener('click', (e) => {
   const b = e.currentTarget as HTMLElement;
@@ -1134,7 +1137,11 @@ function openTsRename(opener: HTMLElement): void {
   tsrApplyBtn = apply;
   const close = modalButton(t('common.close'), () => requestCloseModal('button'));
   tsrCloseBtn = close;
-  openModal(title, body, [close, apply], () => tsrOpener, () => { tsrBody = null; tsrApplyBtn = null; tsrTitle = null; }, { focus: close });
+  const note = document.createElement('div');
+  note.className = 'tsr-note';
+  note.hidden = true;
+  tsrNote = note;
+  tsrModal = openModal(title, body, [close, apply], () => tsrOpener, () => { tsrBody = null; tsrApplyBtn = null; tsrTitle = null; tsrNote = null; tsrModal = null; }, { focus: close, footTop: [note] });
   tsrReq = ++bindReqSeq;
   send({ type: 'SCAN_TS_RENAME', reqId: tsrReq });
   tsrRender();
@@ -1236,6 +1243,34 @@ function tsrApply(): void {
   tsrRender();
   tsrApplyReq = ++bindReqSeq;
   send({ type: 'APPLY_TS_RENAME', reqId: tsrApplyReq, items });
+}
+/** 이름 다시 짓기 오류(ERROR{op: 'APPLY_TS_RENAME'}) — `tsrBusy`를 풀고 팝업은 그대로, 팝업 안 알림 줄에 오류 +
+ *  [다시 시도](ia-v4 §2.8 · §4.11 T-P29 ④ · B.19). [다시 시도]가 있는 동안 [{k}개 이름 바꾸기]는 보조(C-D14). */
+function onTsRenameError(msg: Extract<CodeToUi, { type: 'ERROR' }>): void {
+  if (msg.reqId != null && msg.reqId !== tsrApplyReq) return;
+  tsrBusy = false;
+  if (!tsrNote || !tsrModal) { tsrRender(); return; } // 팝업을 닫은 뒤 — 보일 자리가 없다
+  const f = explainError(msg.message);
+  const note = tsrNote;
+  const modal = tsrModal;
+  const clear = (): void => {
+    note.replaceChildren();
+    note.hidden = true;
+    releasePrimaries(modal);
+  };
+  const { box, retry } = errorBox(f, f.retryable ? (): void => {
+    // 지금 켠 줄 · 새 reqId로 다시 보낸다(tsrApply). 보낼 수 없으면(켠 줄 0 · 쓰기 잠금 · 바꿀 줄 없음) 상자 · 포커스 그대로.
+    const before = tsrApplyReq;
+    tsrApply();
+    if (tsrApplyReq === before) return;
+    clear();
+    tsrCloseBtn?.focus({ preventScroll: true }); // 다시 보내는 동안 [{k}개 이름 바꾸기]는 잠김
+  } : null);
+  note.replaceChildren(box);
+  note.hidden = false;
+  releasePrimaries(modal);
+  if (retry) holdPrimaries(modal, retry);
+  tsrRender();
 }
 function onTsRenamed(msg: Extract<CodeToUi, { type: 'TS_RENAMED' }>): void {
   if (msg.reqId !== tsrApplyReq) return;
@@ -1402,6 +1437,8 @@ let wizardRunning = false;
 class PaidRequiredError extends Error {}
 
 let wizardWaiter: { types: string[]; reqId?: number; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
+/** 마법사 단계가 받아 실패로 끝낸 ERROR — 메인 처리기는 이것을 카드 상태 자리에 띄우지 않는다(ia-v4 §2.8). */
+let wizardErrorMsg: CodeToUi | null = null;
 /** 마법사 연결 요청의 reqId — 메인 처리기는 이 결과로 연결 화면을 다시 그리지 않는다(§4.3). */
 let wizBindReq = 0;
 /** 마법사 연결이 응답을 기다리는 중. */
@@ -1416,6 +1453,7 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
     const w = wizardWaiter;
     wizardWaiter = null;
+    if (m.type === 'ERROR') wizardErrorMsg = m; // 메인 처리기가 같은 ERROR를 카드에 그리지 않게
     w.reject(m.type === 'PREMIUM_REQUIRED' ? new PaidRequiredError() : new Error(m.message));
     return;
   }
@@ -1617,7 +1655,19 @@ function setEmptyLock(el: HTMLElement, msg: string | null): void {
 /** 후보 가운데 처음으로 잠기지 않은 버튼 하나에 primary — 나머지는 끈다. */
 function setCardPrimary(all: HTMLElement[], order: HTMLElement[]): void {
   const pick = order.find((el) => !baseLocked(el)) ?? null;
-  for (const el of all) el.classList.toggle('primary', el === pick);
+  // 그 카드에 [다시 시도]가 있는 오류 상자가 떠 있으면 primary를 달지 않고 판정만 기억한다(C-D14 — 상자가 사라질 때 되돌림).
+  const card = all[0] ? cardOf(all[0]) : null;
+  const held = !!retryIn(card);
+  for (const el of all) {
+    if (held) {
+      el.classList.remove('primary');
+      if (el === pick) el.dataset.primaryHeld = '1';
+      else delete el.dataset.primaryHeld;
+    } else {
+      el.classList.toggle('primary', el === pick);
+      delete el.dataset.primaryHeld;
+    }
+  }
 }
 /** 색 단계의 보이는 색이 있는지 — 색 목록이 숨어 있으면(토큰 단계 [미리보기]만으로 추출) 보지 못한 색이다. */
 const colorsVisible = (): boolean => colorRevealed && tokens.some((tk) => tk.category === 'color' && typeof tk.value === 'string');
@@ -1634,8 +1684,14 @@ function updateEmptyLocks(): void {
   const merge = $('btnComponentize');
   const eligible = compEligibleCount();
   const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
+  // 목록 기준이 없으면 찾기 두 버튼도 잠근다(ia-v4 §4.5 "선택 없음" — 유료 잠금이 먼저, 무료 [닮은 프레임 찾기]도).
+  const noBase = !baseline;
+  const prevActive = document.activeElement;
+  const lockedBefore = prevActive === scan || prevActive === similar ? baseLocked(prevActive as HTMLElement) : true;
+  setEmptyLock(scan, noBase ? t('status.noSelection') : null);
+  setEmptyLock(similar, noBase ? t('status.noSelection') : null);
   setEmptyLock(reg,
-    !compCandidates.length ? t('component.needScan')
+    !compScanned ? t('component.needScan')
       : !eligible ? t('component.noEligibleShort')
         : !checked ? t('component.noChecked') : null);
   const canMerge = similarMemberIds.length >= 2 && !!similarMasterId;
@@ -1646,6 +1702,8 @@ function updateEmptyLocks(): void {
   // 유료에서 고른 버튼이 잠겼으면(후보는 있는데 체크 0) 누를 수 있는 다음 버튼으로 — [합치기] · [컴포넌트 후보 찾기].
   const order = isPaid ? [first, merge, scan] : [first, similar];
   setCardPrimary([scan, similar, reg, merge], order);
+  // 포커스가 있던 찾기 버튼이 잠기면 그 모습의 주 버튼, 없으면 ←(ia-v4 §4.5 "선택 없음" · C-D7).
+  if (!lockedBefore && baseLocked(prevActive as HTMLElement)) compFocusPrimary();
 }
 
 /** 유료 잠금 사유를 툴팁으로. 원래 문구(기능 설명)는 dataset에 1회 백업해 보존·복원한다.
@@ -1758,10 +1816,23 @@ function renderPipeline(): void {
 }
 
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
-$('btnScanComp').addEventListener('click', () => {
-  setStatus('structureStatus', t('component.scanning'), '');
-  send({ type: 'SCAN_COMPONENT_CANDIDATES' });
-});
+/* 찾기 요청 — 목록 기준의 nodeIds(ia-v4 §2.5) · reqId(§4.5 "비운 뒤 늦게 온 찾기 응답은 버린다"). 목록을 비우면
+   기다리던 reqId를 지워, 비우기 전에 보낸 응답 · 오류(C-D12)는 그리지 않는다. */
+/** 기다리는 [컴포넌트 후보 찾기] · [닮은 프레임 찾기]의 reqId — 0이면 없음. */
+let compScanReq = 0;
+let similarScanReq = 0;
+/** 상태 자리 글이 찾기 쪽(찾는 중 · 찾기 결과 · 오류)인가 — 목록을 비울 때 함께 지운다(쓰기 결과 글은 남김). */
+let structStatusFind = false;
+function setFindStatus(text: string, cls: 'ok' | 'warn' | ''): void {
+  setStatus('structureStatus', text, cls);
+  structStatusFind = true;
+}
+function startCompScan(): void {
+  setFindStatus(t('component.scanning'), '');
+  compScanReq = ++bindReqSeq; // 다른 화면의 reqId와 겹치지 않게 같은 순번(makeTakes · mcTakes가 reqId로 가로챈다)
+  send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: baseline?.ids ?? [], reqId: compScanReq });
+}
+$('btnScanComp').addEventListener('click', startCompScan);
 
 /* ---------- 다크 테마 생성 ---------- */
 // 문서의 3계층 변수 목록 — 다크 카드가 컬렉션·모드 선택지를 여기서 읽는다(값 편집은 Figma Variables 몫).
@@ -1897,10 +1968,12 @@ $('btnGenDark').addEventListener('click', () => {
 let similarMemberIds: string[] = [];
 let similarMasterId: string | null = null;
 
-$('btnScanSimilar').addEventListener('click', () => {
-  setStatus('structureStatus', t('similar.scanning'), '');
-  send({ type: 'SCAN_SIMILAR' });
-});
+function startSimilarScan(): void {
+  setFindStatus(t('similar.scanning'), '');
+  similarScanReq = ++bindReqSeq;
+  send({ type: 'SCAN_SIMILAR', nodeIds: baseline?.ids ?? [], reqId: similarScanReq });
+}
+$('btnScanSimilar').addEventListener('click', startSimilarScan);
 
 $('btnComponentize').addEventListener('click', () => {
   if (similarMemberIds.length < 2 || !similarMasterId) return; // 빈 상태는 잠금(updateEmptyLocks)이 사유를 띄운다
@@ -1942,6 +2015,13 @@ $('compAll').addEventListener('change', (e) => {
  */
 function refreshVariantRow(comps: number, sets: number): void {
   $('variantRow').hidden = comps === 0 && sets === 0;
+  // [변형 세트로 묶기]는 낱개 컴포넌트가 있을 때만, [빠진 변형 채우기]는 세트가 있을 때만(ia-v4 §4.5).
+  const classify = $('btnClassifyVariants');
+  const gen = $('btnGenMissing');
+  const lost = (classify.hidden !== (comps === 0) && document.activeElement === classify) || (gen.hidden !== (sets === 0) && document.activeElement === gen);
+  classify.hidden = comps === 0;
+  gen.hidden = sets === 0;
+  if (lost) compFocusPrimary();
 }
 
 $('btnClassifyVariants').addEventListener('click', () => {
@@ -2350,9 +2430,15 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'COMPONENT_CANDIDATES': {
+      // 목록을 비운 뒤 늦게 온, 비우기 전에 보낸 찾기 응답은 버린다(ia-v4 §4.5 — reqId 대조).
+      if (msg.reqId !== compScanReq) break;
+      compScanReq = 0;
+      const hadFocus = compFocusInLists();
       // #1: 하위 등록 후보를 트리로. 기본 체크는 code.ts가 정한 `defaultOn`만 본다(§4.7 "묶기" 6번 —
       // 반복 이름 · 속성 접힘 · 버튼 · 칩 · 탭). 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 둔다.
+      compScanned = true; // 찾은 적 있음 — 결과가 0개여도 [등록] 사유는 ②(ia-v4 §4.3a-2)
       compCandidates = msg.nodes;
+      setCompAutoNamed(msg.autoNamed ?? 0); // 이름 없는 레이어 안내(C-D15 — ia-v4 §4.5)
       compChecked.clear();
       for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
       renderCompTree();
@@ -2361,14 +2447,16 @@ window.onmessage = (event: MessageEvent) => {
       renderVariantReport([]);
       // 스캔 완료 시 반드시 ‘스캔 중’을 덮어쓴다(후보 0·비eligible만 있어도).
       if (!compCandidates.length || !compEligibleCount()) {
-        setStatus('structureStatus', t('component.noEligible'), 'warn');
+        setFindStatus(t('component.noEligible'), 'warn');
       } else {
         updateCompRegister();
       }
+      refreshTreeEmptyStates();
+      if (hadFocus) compFocusPrimary();
       break;
     }
     case 'COMPONENTS_RESULT': {
-      clearCompPreview(); // 등록으로 노드 구조 변경 → 후보 무효화
+      // 후보 · 닮은 프레임 목록은 작업 직후 다시 읽는 때에 비웠다(opReceived → readScreen('work') — §4.5 "목록 비우기").
       const misplaced = msg.placeFailed ?? [];
       const cloned = msg.placeCloned ?? [];
       const propFailed = msg.propFailed ?? [];
@@ -2450,6 +2538,9 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'SIMILAR_CANDIDATES':
+      // 비운 뒤 늦게 온, 비우기 전에 보낸 응답은 버린다(ia-v4 §4.5).
+      if (msg.reqId !== similarScanReq) break;
+      similarScanReq = 0;
       renderSimilar(msg);
       break;
     case 'COMPONENTIZE_RESULT': {
@@ -2471,14 +2562,7 @@ window.onmessage = (event: MessageEvent) => {
       const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
       const warn = others > 0 && firstOther ? t('similar.resKept', { n: others, warning: firstOther }) : '';
       setStatus('structureStatus', `${parts.join(' · ')}${warn}${placeFailedText(misplaced)}`, msg.warnings.length ? 'warn' : 'ok');
-      // 교체된 프레임은 더 이상 대상이 아니다 — 목록을 비워 이중 실행을 막는다.
-      similarMemberIds = [];
-      similarMasterId = null;
-      similarScanned = false; // 합친 뒤 — 다시 ‘닮은 프레임 찾기’부터(잠금 사유 similar.needScan)
-      $('similarList').innerHTML = '';
-      $('similarGroupCount').textContent = '';
-      $('similarGroup').style.display = 'none';
-      updateEmptyLocks();
+      // 교체된 프레임은 더 이상 대상이 아니다 — 두 목록은 작업 직후 다시 읽는 때에 비웠다(§4.5 "목록 비우기").
       break;
     }
     case 'PREMIUM_REQUIRED': {
@@ -2513,11 +2597,22 @@ window.onmessage = (event: MessageEvent) => {
         selFindInFlight = false;
         renderSelHome();
       }
+      // 컴포넌트 화면 찾기 — 목록을 비운 뒤 늦게 온, 비우기 전에 보낸 찾기의 오류는 보이지 않는다(C-D12 — reqId 대조).
+      if (msg.op === 'SCAN_COMPONENT_CANDIDATES' || msg.op === 'SCAN_SIMILAR') {
+        const want = msg.op === 'SCAN_COMPONENT_CANDIDATES' ? compScanReq : similarScanReq;
+        if (!want || (msg.reqId != null && msg.reqId !== want)) break;
+        if (msg.op === 'SCAN_COMPONENT_CANDIDATES') compScanReq = 0; else similarScanReq = 0;
+      }
+      // 텍스트 스타일 이름 다시 짓기 — 팝업 안 알림 줄(ia-v4 §2.8 · §4.11 T-P29 ④, B.19 APPLY_TS_RENAME 오류 갈래).
+      if (msg.op === 'APPLY_TS_RENAME') { onTsRenameError(msg); break; }
+      // 만들기 화면 실행(마법사)이 보낸 요청의 오류는 만들기 화면 결과에만 — 카드 상태 자리에는 띄우지 않는다(ia-v4 §2.8).
+      const fromWizard = wizardErrorMsg === msg;
+      if (fromWizard) wizardErrorMsg = null;
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
       // 레이어 선택은 부른 자리가 여럿이라 표를 못 쓴다 — 마지막으로 부른 쪽을 따른다.
-      const statusId = msg.op === 'SELECT_NODES'
-        ? selectStatusTarget
-        : resolveStatusId((msg.op && OP_STATUS[msg.op]) || 'colorStatus');
+      // 상태 자리가 없는 작업(삭제된 변수 연결 풀기 · 변수 탭 레이어 선택 · 그 밖의 읽기)은 공통 상태 줄(ia-v4 §2.8).
+      const mapped = msg.op === 'SELECT_NODES' ? selectStatusTarget : msg.op ? OP_STATUS[msg.op] : undefined;
+      const statusId = mapped && mapped !== STATUS_LINE ? resolveStatusId(mapped) : STATUS_LINE;
       if (msg.op === 'APPLY') hideApplyProgress();
       if (msg.op === 'APPLY_SELECTED' && bindLinking) {
         // 연결 실패 — 진행 줄을 닫고 잠금을 푼다(ERROR에는 reqId가 없지만 연결은 한 번에 하나뿐).
@@ -2526,6 +2621,8 @@ window.onmessage = (event: MessageEvent) => {
         flushLinkSelClear();
         onBindLinkingChanged();
       }
+      if (fromWizard) break;
+      if (statusId === STATUS_LINE) { showStatusLine(explainError(msg.message).message, { cls: 'warn', tip: msg.message }); break; }
       showError(statusId, explainError(msg.message), msg.op);
       break;
     }
@@ -2533,6 +2630,9 @@ window.onmessage = (event: MessageEvent) => {
 };
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
+/** 상태 자리 대신 공통 상태 줄(`showStatusLine`)로 — 카드가 아니라 C-D14 대상이 아니다(ia-v4 §2.8). */
+const STATUS_LINE = 'list';
+/** 그 작업을 시작한 화면의 상태 자리(ia-v4 §2.8 "오류 상자가 뜨는 곳"). 없는 작업은 공통 상태 줄. */
 const OP_STATUS: Record<string, string> = {
   EXTRACT: 'colorStatus',
   CREATE_TOKENS: 'createStatus',
@@ -2552,17 +2652,72 @@ const OP_STATUS: Record<string, string> = {
   REGISTER_COMPONENTS: 'structureStatus',
   CLASSIFY_VARIANTS: 'structureStatus',
   GENERATE_MISSING_VARIANTS: 'structureStatus',
+  SCAN_SIMILAR: 'structureStatus', // 컴포넌트 화면 여섯 작업 모두(ia-v4 §4.5 "상태 줄")
+  COMPONENTIZE_SIMILAR: 'structureStatus',
+  RENAME_APPLY: 'renameStatus', // 이름 정리 [이름 바꾸기]
+  GENERATE_DARK_MODE: 'darkStatus', // 도구 탭 PR 뒤에는 다크 화면 상태 줄(§4.11 T-P7)
+  UNBIND_DELETED: STATUS_LINE, // 선택 탭 삭제된 변수 카드 — 결과 DELETED_UNBOUND와 같은 자리
+  OPEN_LICENSE_LINK: 'licenseStatus',
   SET_LICENSE: 'licenseStatus',
   LICENSE_VERIFIED: 'licenseStatus',
   CLEAR_LICENSE: 'licenseStatus',
   GET_LICENSE: 'licenseStatus',
 };
 
-function showError(id: string, f: FriendlyError, op?: string): void {
-  const el = $(id);
-  el.className = 'status';
-  el.innerHTML = '';
-  if (id === 'licenseStatus') el.removeAttribute('title'); // 이전 알림의 툴팁(noteTip)이 오류 박스에 남지 않게
+/* ---------- 오류 상자의 [다시 시도]가 그 카드의 유일한 주 버튼(2026-11-17 사용자 결정 C-D14 — ia-v4 §4.3a-2) ----------
+   공통 오류 상자(빨강 띠)에 [다시 시도]가 있는 동안은 그 카드(상태 자리를 담은 `.step` · `.modal`, 카드가 없는 화면은
+   그 화면 패널)의 다른 버튼에서 `primary`를 떼고(잠긴 버튼 포함) `data-primary-held`로 기억한다. 상자가 사라질 때
+   (같은 상태 자리를 덮는 setStatus · 다음 showError · 컴포넌트 목록 비우기 · 내보내기 팝업 닫기) 되돌리고 다시 판정한다. */
+const RETRY_CLS = 'retry-btn';
+/** 상태 자리 · 버튼이 속한 카드. */
+function cardOf(el: HTMLElement): HTMLElement | null {
+  return el.closest<HTMLElement>('.step, .modal') ?? el.closest<HTMLElement>('.tool-panel') ?? el.parentElement;
+}
+/** 그 카드에 떠 있는 오류 상자의 [다시 시도]. */
+function retryIn(card: ParentNode | null): HTMLElement | null {
+  return card?.querySelector<HTMLElement>(`.ux.danger .${RETRY_CLS}`) ?? null;
+}
+function holdPrimaries(card: HTMLElement, keep: HTMLElement): void {
+  for (const b of Array.from(card.querySelectorAll<HTMLElement>('button.primary'))) {
+    if (b === keep) continue;
+    b.classList.remove('primary');
+    b.dataset.primaryHeld = '1';
+  }
+}
+function releasePrimaries(card: HTMLElement): void {
+  for (const b of Array.from(card.querySelectorAll<HTMLElement>('[data-primary-held]'))) {
+    b.classList.add('primary');
+    delete b.dataset.primaryHeld;
+  }
+}
+/** 그 카드의 주 버튼(오류 동안은 [다시 시도]) — 잠기지 않은 것만. */
+function cardPrimary(card: HTMLElement | null): HTMLElement | null {
+  if (!card) return null;
+  const retry = retryIn(card);
+  if (retry) return retry;
+  return Array.from(card.querySelectorAll<HTMLElement>('button.primary')).find((b) => !baseLocked(b) && b.offsetParent !== null) ?? null;
+}
+/** 상자가 사라질 때 [다시 시도]에 있던 포커스 — 판정 주 버튼, 없으면 그 화면에 들어올 때의 자리(하위 화면은 ←). */
+function focusAfterRetryGone(card: HTMLElement | null): void {
+  const next = cardPrimary(card) ?? (!$('subHead').hidden && card?.closest('#tab-select') ? $('btnSubBack') : null);
+  next?.focus({ preventScroll: true });
+}
+/**
+ * 상태 자리의 오류 상자를 걷는다(글을 바꾸기 전에 부른다). [다시 시도]가 있었으면 그 카드의 `primary`를 되돌리고
+ * 다시 판정한다(`updateEmptyLocks`). 포커스가 [다시 시도]에 있었으면 판정 주 버튼으로.
+ */
+function dropErrorBox(el: HTMLElement): void {
+  if (!el.querySelector('.ux.danger')) return;
+  const retry = el.querySelector<HTMLElement>(`.${RETRY_CLS}`);
+  const hadFocus = !!retry && document.activeElement === retry;
+  el.replaceChildren();
+  const card = cardOf(el);
+  if (card && !retryIn(card)) releasePrimaries(card);
+  updateEmptyLocks();
+  if (hadFocus) focusAfterRetryGone(card);
+}
+/** 빨강 띠 오류 상자 — 제목 · 할 일 · (있으면) [다시 시도]. */
+function errorBox(f: FriendlyError, onRetry: (() => void) | null): { box: HTMLElement; retry: HTMLButtonElement | null } {
   // 에러 = 빨강 콜아웃 박스(캐논 108:2 패턴) + (가능하면) 다시 시도.
   const box = document.createElement('div');
   box.className = 'ux danger';
@@ -2579,24 +2734,49 @@ function showError(id: string, f: FriendlyError, op?: string): void {
     g.textContent = f.action;
     box.appendChild(g);
   }
+  let retry: HTMLButtonElement | null = null;
+  if (onRetry) {
+    retry = document.createElement('button');
+    retry.className = `primary ${RETRY_CLS}`;
+    retry.textContent = t('common.retry');
+    retry.addEventListener('click', onRetry);
+    box.appendChild(retry);
+  }
+  return { box, retry };
+}
+
+function showError(id: string, f: FriendlyError, op?: string): void {
+  const el = $(id);
+  dropErrorBox(el);
+  el.className = 'status';
+  el.innerHTML = '';
+  if (id === 'licenseStatus') el.removeAttribute('title'); // 이전 알림의 툴팁(noteTip)이 오류 박스에 남지 않게
   // [다시 시도] — 연결 오류는 마지막 연결 자리(lastLinkItems)로 연결 길을 다시 탄다(§4.6 "연결 중의 다른 일").
+  // 컴포넌트 화면 찾기는 찾기 버튼과 같은 함수로 지금 목록 기준 · 새 reqId로(ia-v4 §4.3a-2 "찾기의 [다시 시도]").
   // 오류의 종류가 마지막 요청과 다르면 무엇을 다시 할지 모르므로 숨긴다.
   const linkRetry = op === 'APPLY_SELECTED' ? lastLinkItems : null;
-  const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
-  if (f.retryable && (linkRetry || retry)) {
-    const btn = document.createElement('button');
-    btn.className = 'primary';
-    btn.textContent = t('common.retry');
-    btn.addEventListener('click', () => {
-      if (linkRetry) { startLink(linkRetry); return; }
-      if (!retry) return;
-      // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
-      if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
-      send(retry);
-    });
-    box.appendChild(btn);
-  }
+  const scanRetry = op === 'SCAN_COMPONENT_CANDIDATES' ? 'comp' : op === 'SCAN_SIMILAR' ? 'similar' : null;
+  const retry = linkRetry || scanRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
+  const onRetry = f.retryable && (linkRetry || scanRetry || retry) ? (): void => {
+    if (linkRetry) { startLink(linkRetry); return; }
+    if (scanRetry) {
+      // 상태 글이 "…찾는 중…"으로 바뀌어 상자가 바로 사라진다 — 포커스는 다시 실행한 찾기 버튼.
+      const btn = scanRetry === 'comp' ? $('btnScanComp') : $('btnScanSimilar');
+      if (scanRetry === 'comp') startCompScan(); else startSimilarScan();
+      btn.focus({ preventScroll: true });
+      return;
+    }
+    if (!retry) return;
+    // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
+    if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
+    send(retry);
+  } : null;
+  const { box, retry: retryBtn } = errorBox(f, onRetry);
   el.appendChild(box);
+  // C-D14 — [다시 시도]가 있는 동안 그 카드의 다른 주 버튼은 보조 모양(잠긴 버튼 포함).
+  const card = cardOf(el);
+  if (retryBtn && card) holdPrimaries(card, retryBtn);
+  if (id === 'structureStatus') structStatusFind = true; // 목록을 비울 때 함께 지운다(§4.5 "비우는 것")
 }
 
 /* ============================================================
@@ -4027,19 +4207,60 @@ function updateCompRegister(): void {
     const all = $('compAll') as HTMLInputElement;
     all.checked = sel === total && total > 0;
     all.indeterminate = sel > 0 && sel < total;
-    setStatus('structureStatus', total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
+    // 오류 상자가 떠 있는 동안은 덮지 않는다 — 체크를 바꿔도 [다시 시도]가 주 버튼(C-D14 · ia-v4 §4.3a-2).
+    if (!$('structureStatus').querySelector('.ux.danger')) setFindStatus(total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
   }
   updateEmptyLocks(); // 체크 바꿈 · 후보 트리 — [등록] 잠금 · 주 버튼
 }
 
-function clearCompPreview(): void {
+/** 이름 없는 레이어 안내 줄(2026-11-18 C-D15 — ia-v4 §4.5): Figma 자동 이름이라 뺀 레이어 수, 0이면 숨김. */
+function setCompAutoNamed(n: number): void {
+  const el = $('compAutoNamed');
+  el.textContent = n > 0 ? t('component.autoNamed', { n }) : '';
+  el.hidden = n <= 0;
+}
+/** 찾은 적 있는지(ia-v4 §4.3a-2 [등록] 잠금 ①②) — 결과가 0개여도 참, 목록을 비우면 거짓. */
+let compScanned = false;
+/**
+ * 목록 비우기(2026-11-13 C-D5 — ia-v4 §4.5): 목록 기준이 바뀌거나 쓰기 작업이 끝나면(다시 읽는 때) 후보 · 닮은 프레임
+ * 목록을 모두 비운다 — 머리 띠 · 개수 · 목록 · 전체 체크 줄, 찾기 결과 상태 글 · 찾는 중 글 · 오류 상자(C-D14)도.
+ * 쓰기 작업의 결과 글과 `#variantReport`는 남긴다. 기다리던 찾기는 버린다(reqId — C-D12).
+ */
+function clearCompLists(): void {
+  const hadFocus = compFocusInLists();
+  compScanReq = 0;
+  similarScanReq = 0;
+  compScanned = false;
   compCandidates = [];
   compChecked.clear();
   clearMount($('compTree'));
+  setCompAutoNamed(0);
   $('compTreeCount').textContent = '';
   $('compTreeGroup').style.display = 'none';
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
+  similarMemberIds = [];
+  similarMasterId = null;
+  similarScanned = false;
+  clearMount($('similarList'));
+  $('similarGroupCount').textContent = '';
+  $('similarGroup').style.display = 'none';
+  if (structStatusFind) setStatus('structureStatus', '', '');
   updateEmptyLocks();
+  refreshTreeEmptyStates();
+  if (hadFocus) compFocusPrimary();
+}
+/** 포커스가 컴포넌트 화면의 목록(후보 트리 · 닮은 프레임 · 전체 체크) 안이거나 문서 맨 앞(지워진 요소)에 있는가. */
+function compFocusInLists(): boolean {
+  if (activeTab !== 'select' || selSub !== 'structure') return false;
+  const a = document.activeElement;
+  if (!a || a === document.body) return true;
+  return ['compTree', 'similarList', 'compTreeCtrls'].some((id) => $(id).contains(a));
+}
+/** 컴포넌트 화면의 주 버튼으로(C-D7 — 오류 동안은 [다시 시도], 주 버튼이 없으면 ←). 화면에 있을 때만. */
+function compFocusPrimary(): void {
+  if (activeTab !== 'select' || selSub !== 'structure') return;
+  const card = $('structureCard');
+  (cardPrimary(card) ?? $('btnSubBack')).focus({ preventScroll: true });
 }
 
 /* ---------- 등록/분류 결과 리포트(#variantReport) ----------
@@ -4104,8 +4325,9 @@ function renderVariantReport(sections: VariantReportSection[]): void {
     무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
 function refreshTreeEmptyStates(): void {
   // 선택 표시줄이 없으므로 선택이 없으면 목록 자리에서 알린다(§4.1). 연결 화면은 빈 상태 상자가 맡는다(renderBindEmpty).
+  // "선택 없음"은 목록 기준으로 본다(ia-v4 §4.5 — 플러그인이 만든 선택만 있어도 기준이 있으면 선택 있음).
   if (compCandidates.length === 0) {
-    if (lastSelCount === 0) renderEmptyState($('compTree'), t('sel.noneHere'), '');
+    if (!baseline) renderEmptyState($('compTree'), t('sel.noneHere'), '');
     else clearMount($('compTree'));
   }
   renderMakeNoSel();
@@ -4254,6 +4476,8 @@ function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement
 
 /** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */
 function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
+  const hadFocus = compFocusInLists();
+  if (hadFocus) queueMicrotask(compFocusPrimary);
   similarMemberIds = msg.metas.map((m) => m.id);
   similarMasterId = msg.recommendedMasterId;
   similarScanned = true;
@@ -4267,7 +4491,7 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   if (!msg.metas.length) {
     // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
     const why = msg.excluded.length ? msg.excluded[0].reason : t('similar.needTwo');
-    setStatus('structureStatus', t('similar.none', { why }), 'warn');
+    setFindStatus(t('similar.none', { why }), 'warn');
     return;
   }
 
@@ -4279,7 +4503,7 @@ function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): 
   if (msg.imageVarying.length) opened.push(t('similar.openImage', { n: msg.imageVarying.length }));
   const openPart = opened.length ? t('similar.opened', { list: opened.join(' · ') }) : t('similar.noVarying');
   const skipPart = msg.excluded.length ? t('similar.excluded', { n: msg.excluded.length, why: msg.excluded[0].reason }) : '';
-  setStatus('structureStatus', t('similar.scanned', { n: msg.metas.length, openPart, skipPart }), 'ok');
+  setFindStatus(t('similar.scanned', { n: msg.metas.length, openPart, skipPart }), 'ok');
 }
 
 function updateApplyProgress(done: number, total: number): void {
@@ -4303,6 +4527,8 @@ function hideApplyProgress(): void {
 
 function setStatus(id: string, text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
   const el = $(id);
+  dropErrorBox(el); // 오류 상자가 사라진다 — C-D14로 뗀 주 버튼을 되돌린다(ia-v4 §4.3a-2 "상자가 사라지는 때")
+  if (id === 'structureStatus') structStatusFind = false; // 찾기 글이면 부른 쪽이 다시 표시한다(setFindStatus)
   el.textContent = text;
   el.className = `status ${cls}`;
   // 툴팁은 쓸 때마다 새로 — 옛 목록 · 라이선스 원문 사유(noteTip, 부른 쪽이 뒤에 단다)가 다음 문구에 남지 않게.
@@ -4854,6 +5080,9 @@ function opWizardEnd(result: 'ok' | 'fail' | 'cancel'): void {
    변수 › 만들기 = 준비 상태 + 다크 카드용 컬렉션, 레이어 = 준비 상태, 설정 = 없음(계층은 팝업을 열 때 읽는다). */
 type ReadWhy = 'enter' | 'work' | 'reentry' | 'expand';
 function readScreen(why: ReadWhy): void {
+  // 쓰기 작업 직후(어느 화면의 쓰기든) — 컴포넌트 화면의 두 목록을 비운다(C-D5 · ia-v4 §4.5 "비우는 때 = 다시 읽는 때").
+  // 컴포넌트 화면은 다시 찾지 않는다(C-D6 · §7).
+  if (why === 'work') clearCompLists();
   if (isMini) return; // 최소화 상태에서는 다시 읽지 않는다
   if (activeTab !== 'settings' || why === 'work') requestPrereq();
   if (activeTab === 'variables') {
@@ -4999,6 +5228,13 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
   if (changed && sub === 'bind') { bindFocusPending = true; bindTreeFresh = true; $('bindTree').dataset.focusKey = ''; if (bindPreviewed) renderBindTree(); }
   if (changed && sub === 'make') { mkFocusPending = true; mkTreeFresh = true; mkTab = null; mkCancelNote = ''; if (!mkRunning && !mkResults) readMake(); else renderMakeScreen(); }
   if (changed && sub === 'rename') { renameFocusPending = true; renameTreeFresh = true; renameFor = null; renameNodes = []; readRename(); }
+  if (changed && sub === 'structure') {
+    // 들어올 때(C-D7 — 원칙, ia-v4 §4.5 "포커스"): 접힌 카드는 먼저 펼치고, 그 모습의 주 버튼(오류 동안은 [다시 시도]), 없으면 ←.
+    $('structureCard').classList.remove('collapsed');
+    updateEmptyLocks();
+    refreshTreeEmptyStates();
+    compFocusPrimary();
+  }
   bindFocusFirst();
 }
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
@@ -5484,7 +5720,11 @@ function rebaseToCurrent(): void {
   setBaseline(curSel.count ? { ...curSel } : null);
 }
 function setBaseline(b: SelInfo | null): void {
+  const prevKey = baseKey();
   baseline = b;
+  // 목록 기준이 바뀌면 컴포넌트 화면의 두 목록을 비우고(C-D5) 베리언트 결과도 지운다(ia-v4 §4.5 "비우지 않는 것"의 예외).
+  if (baseKey() !== prevKey) { clearCompLists(); renderVariantReport([]); }
+  else { updateEmptyLocks(); refreshTreeEmptyStates(); }
   // 만들기 카드의 기억은 목록 기준이 바뀌면 지운다(§4.1 "끝나는 때" ①).
   if (mcMemo && (!b || mcMemo.base !== b.ids.join(','))) { mcMemo = null; mcJust.clear(); }
   if (mcFor !== baseKey()) mcInFlight = false; // 앞 기준의 카드 읽기는 버린다(응답은 기준으로 걸러진다)
@@ -7359,7 +7599,13 @@ function openPopupFrom(storeId: string, title: string, returnFocus: HTMLElement)
   const body = document.createElement('div');
   body.appendChild(content);
   content.hidden = false;
-  openModal(title, body, [modalButton(t('common.close'), closeModal, true)], returnFocus, () => {
+  // [닫기]는 보조 — 팝업의 주 버튼은 본문의 [내보내기] 하나(ia-v4 §4.3a-2 "팝업의 주 버튼은 하나" — C-D14 따름 원칙).
+  openModal(title, body, [modalButton(t('common.close'), closeModal)], returnFocus, () => {
+    // 팝업을 닫으면 오류 상자를 지운다 — 다시 열면 상자 없이 [내보내기]가 주 버튼(§4.3a-2 "상자가 사라지는 때" ③).
+    for (const st of Array.from(content.querySelectorAll<HTMLElement>('.status'))) {
+      if (st.querySelector('.ux.danger')) setStatus(st.id, '', '');
+    }
+    releasePrimaries(content);
     content.hidden = true;
     $('popupStore').appendChild(content); // 팝업이 지워지기 전에 원래 자리로
   });

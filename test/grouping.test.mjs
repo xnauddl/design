@@ -12,6 +12,9 @@ import {
   reusePlanFor,
   structFingerprint,
   scanComponentCandidates,
+  gateComponentCandidates,
+  isAutoNamedCandidate,
+  isDefaultName,
 } from '../dist/pure.mjs';
 
 const visible = [{ visible: true, type: 'SOLID' }];
@@ -38,8 +41,8 @@ const pill = (id = 'pill', active = 1, fill = '#3d5fdb') => ({
 });
 
 test('탭 판정 — 메뉴형(글자 칸) · 알약형(틀 칸)은 탭, 버튼 · 내비 · 카드보다 먼저', () => {
-  assert.deepEqual(tabInfo(menu()), { style: 'Text', selected: 0, selectedColor: '#000000' });
-  assert.deepEqual(tabInfo(pill()), { style: 'Pill', selected: 1, selectedColor: '#3d5fdb' });
+  assert.deepEqual(tabInfo(menu()), { style: 'Text', selected: 0, selectedColor: '#000000', unselectedTextColor: '#7a7a7a' });
+  assert.deepEqual(tabInfo(pill()), { style: 'Pill', selected: 1, selectedColor: '#3d5fdb', unselectedTextColor: '#a3a3a3' });
   assert.equal(highConfidenceComponentRole(menu()), 'tab');
   assert.equal(highConfidenceComponentRole(pill()), 'tab');
 });
@@ -255,4 +258,180 @@ test('아이콘 프레임 보이기 차 → 가족과 함께 재사용 키도 �
   const props = t.subfamilies.map((s) => s.props);
   assert.equal(props[0].Size, 'default'); // 메뉴(다른 Style)에는 붙지 않는다
   assert.notEqual(props[1].Size, props[2].Size);
+});
+
+/* ---------- Components 정리 PR (ia-v3 A.15 — C-D1 · C-D8 · C-D9 · C-D10 · C-D11) ---------- */
+
+/** 글자 칸 메뉴 — 선택 칸 글자 색 · 선택 안 된 칸 글자 색 · 루트 채움을 고른다. */
+const menuC = (id, sel, unsel, rootFill = null, active = 0) => ({
+  id, name: 'nav', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 440, height: 20,
+  ...(rootFill ? { fillHex: rootFill, fills: visible } : {}),
+  children: ['About', 'Services', 'Offers', 'Seats'].map((c, i) => text(`${id}-${i}`, c, i === active ? sel : unsel)),
+});
+const colors = (g) => g.subfamilies.map((s) => s.props.Color);
+
+test('탭 Color(C-D1) — 루트가 기준은 같은 가족 · Style 안에서만: 다른 가족 탭의 루트 채움이 달라도 알약 색 유지', () => {
+  const g = planRegisterGroups([pill('a', 1, '#3d5fdb'), pill('b', 1, '#e0362c'), menuC('m', '#000000', '#7a7a7a', '#ffffff')], noAncestors)[0];
+  assert.equal(g.subfamilies.length, 3, '알약 둘이 한 소가족으로 접히지 않는다');
+  const [a, b] = g.subfamilies.filter((s) => s.props.Style === 'Pill');
+  assert.equal(a.props.Color, 'indigo');
+  assert.equal(b.props.Color, 'red');
+  assert.ok(!g.subfamilies.some((s) => 'Variant' in s.props));
+});
+
+test('탭 Color(C-D1) — 선택 안 된 칸 글자 색만 다른 메뉴 → Color=gray-500 · gray-0', () => {
+  const g = planRegisterGroups([menuC('a', '#000000', '#7a7a7a'), menuC('b', '#000000', '#ffffff')], noAncestors)[0];
+  assert.deepEqual(colors(g), ['gray-500', 'gray-0']);
+});
+
+test('탭 Color(C-D9) — 두 색이 함께 갈리는 메뉴 → `{앞}-{뒤}` (Color=blue-gray-500)', () => {
+  const g = planRegisterGroups([menuC('a', '#2563eb', '#7a7a7a'), menuC('b', '#000000', '#ffffff')], noAncestors)[0];
+  assert.deepEqual(colors(g), ['blue-gray-500', 'gray-1000-gray-0']);
+});
+
+test('탭 Color(C-D11) — 한 묶음은 두 색이, 다른 묶음은 앞 색만 갈리면 두 묶음 모두 `{앞}-{뒤}`', () => {
+  // 묶음 1: 선택 1 메뉴 둘(두 색 함께), 묶음 2: 선택 3 메뉴 둘(앞 색만)
+  const g = planRegisterGroups([
+    menuC('a', '#2563eb', '#7a7a7a', null, 0), menuC('b', '#000000', '#ffffff', null, 0),
+    menuC('c', '#2563eb', '#7a7a7a', null, 2), menuC('d', '#e0362c', '#7a7a7a', null, 2),
+  ], noAncestors)[0];
+  assert.equal(g.subfamilies.length, 4);
+  // 같은 색 쌍은 같은 값, 묶음 2(앞 색만 갈림)도 뒤 색을 붙인다
+  assert.deepEqual(colors(g), ['blue-gray-500', 'gray-1000-gray-0', 'blue-gray-500', 'red-gray-500']);
+  assert.ok(g.subfamilies.every((s) => 'Selected' in s.props));
+});
+
+test('탭 Color(C-D8 · C-D10) — 채움 없는 탭이 섞이면 `none` 자리(Color=none-gray-500)', () => {
+  const p = (id, root, unsel) => ({ ...pill(id, 1, '#3d5fdb'), ...(root ? { fillHex: root, fills: visible } : { fillHex: undefined, fills: [] }),
+    children: pill(id, 1, '#3d5fdb').children.map((c, i) => (i === 1 ? c : { ...c, children: [text(`${c.id}t`, c.children[0].characters, unsel)] })) });
+  const g = planRegisterGroups([p('a', null, '#7a7a7a'), p('b', '#2563eb', '#ffffff')], noAncestors)[0];
+  assert.deepEqual(colors(g), ['none-gray-500', 'blue-gray-0']);
+});
+
+test('탭 Color(C-D10) — 색 쌍이 달라도 이름이 같아지면 값 전체에 `-2`', () => {
+  const g = planRegisterGroups([menuC('a', '#2563eb', '#7a7a7a'), menuC('b', '#1e40af', '#6b7280'), menuC('c', '#000000', '#ffffff')], noAncestors)[0];
+  assert.deepEqual(colors(g), ['blue-gray-500', 'blue-gray-500-2', 'gray-1000-gray-0']);
+});
+
+test('채움 없는 멤버(C-D8) — 버튼: Color=none · Color=blue, Variant 없음 / 루트가 기준인 탭: Color=none', () => {
+  const btn = (id, fill) => ({ id, name: 'cta', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 40, cornerRadius: 8,
+    ...(fill ? { fillHex: fill, fills: visible } : { strokes: visible }), children: [text(`${id}t`, 'Go', '#111111')] });
+  const g = planRegisterGroups([btn('a', null), btn('b', '#2563eb')], noAncestors);
+  assert.equal(g.length, 1);
+  assert.deepEqual(g[0].subfamilies.map((s) => s.props), [{ Color: 'none' }, { Color: 'blue' }]);
+  const p = (id, root) => ({ ...pill(id, 1, '#3d5fdb'), ...(root ? { fillHex: root, fills: visible } : { fillHex: undefined, fills: [] }) });
+  const t = planRegisterGroups([p('a', null), p('b', '#ffffff')], noAncestors)[0];
+  assert.deepEqual(colors(t), ['none', 'gray-0']);
+  assert.ok(!t.subfamilies.some((s) => 'Variant' in s.props));
+});
+
+test('`-Type{n}` 기본 이름 — 겹칠 때만 맥락을 되살리고 숫자는 `-Type{n}` 뒤 `-k`로만', () => {
+  const mk = (id, name, two) => ({ id, name, type: 'FRAME', layoutMode: two ? 'VERTICAL' : 'HORIZONTAL', width: 400, height: 100,
+    children: two ? [text(`${id}a`, 'x'), text(`${id}b`, 'y')] : [text(`${id}a`, 'x')] });
+  const both = planRegisterGroups([mk('a1', 'article-list', false), mk('a2', 'article-list', true), mk('p1', 'profile-list', false), mk('p2', 'profile-list', true)], noAncestors);
+  assert.deepEqual(resolvePlanNames(both), ['ArticleList-Type1', 'ArticleList-Type2', 'ProfileList-Type1', 'ProfileList-Type2']);
+  const one = planRegisterGroups([mk('a1', 'article-list', false), mk('a2', 'article-list', true)], noAncestors);
+  assert.deepEqual(resolvePlanNames(one), ['List-Type1', 'List-Type2']);
+  assert.deepEqual(resolvePlanNames(one, ['List-Type1']), ['List-Type1-2', 'List-Type2']);
+});
+
+test('아이콘 프레임을 직접 여럿 골라도 후보가 아니다 — 96 이하 아이콘 배지 여럿 → 후보 0', () => {
+  const badge = (id) => ({ id, name: 'badge', type: 'FRAME', width: 48, height: 48, cornerRadius: 24, fillHex: '#5576ee', fills: visible,
+    children: [{ id: `${id}e`, name: 'Ellipse', type: 'ELLIPSE', width: 40, height: 40 }, vec(`${id}v`, 'k', 24, 24)] });
+  assert.equal(highConfidenceComponentRole(badge('x')), 'card', '아이콘 배지는 card 조건도 만족한다');
+  const cands = scanComponentCandidates([badge('a'), badge('b'), badge('c')]);
+  assert.equal(cands.filter((c) => c.eligible).length, 0);
+});
+
+test('단위 보충 — Box 탭(선으로 선택 표시) → Style=Box · 막대 레이어로 밑줄을 그린 탭은 탭 아님 · 단독 칩 defaultOn', () => {
+  const boxCell = (id, label, selected) => ({ id, name: 'cell', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 100, height: 40,
+    ...(selected ? { strokes: visible } : {}), fills: [], children: [text(`${id}t`, label, '#111111')] });
+  const box = { id: 'box', name: 'seg', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 300, height: 40,
+    children: ['One', 'Two', 'Three'].map((l, i) => boxCell(`box-${i}`, l, i === 0)) };
+  assert.equal(tabInfo(box)?.style, 'Box');
+  const fillBox = { ...box, children: ['One', 'Two', 'Three'].map((l, i) => ({ ...boxCell(`fb-${i}`, l, false), ...(i === 1 ? { fillHex: '#eeeeee', fills: visible } : {}) })) };
+  assert.equal(tabInfo(fillBox)?.style, 'Box', '모서리 없는 채움으로 선택 표시');
+  // 칸과 따로 놓인 막대 레이어로 밑줄 — 칸 모양이 모두 같아 선택 칸이 없다
+  const bar = { id: 'bar', name: 'tabs', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 300, height: 40,
+    children: [...['One', 'Two', 'Three'].map((l, i) => boxCell(`bar-${i}`, l, false)), { id: 'bar-u', name: 'underline', type: 'RECTANGLE', width: 100, height: 2, fillHex: '#2563eb', fills: visible }] };
+  assert.equal(tabInfo(bar), null);
+  const chip = { id: 'chip', name: 'chip', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 64, height: 28, cornerRadius: 14, fillHex: '#eeeeee', fills: visible,
+    paddingLeft: 12, paddingRight: 12, children: [text('chipt', 'Tag', '#111111')] };
+  assert.equal(highConfidenceComponentRole(chip), 'chip');
+  const g = planRegisterGroups([chip], noAncestors)[0];
+  assert.equal(defaultOnFor(g, chip), true);
+});
+
+/* ---------- 실기 확인 뒤 더함(2026-11-18 C-D15 · C-D16 — ia-v3 A.15) ---------- */
+
+test('isDefaultName(C-D15) — 번호 앞 빈칸 없는 꼴 · 도형 연산 · copy는 자동 이름, 소문자 · 구조어 · 사람 이름은 아님', () => {
+  for (const n of ['Frame23', 'Exclude', 'Exclude 2', 'Union', 'Frame 12 copy']) assert.equal(isDefaultName(n), true, n);
+  for (const n of ['frame', 'container', 'Button']) assert.equal(isDefaultName(n), false, n);
+});
+
+const chipLike = (id, name, fill) => ({ id, name, type: 'FRAME', layoutMode: 'HORIZONTAL', width: 64, height: 28, cornerRadius: 14, fillHex: fill, fills: visible,
+  paddingLeft: 12, paddingRight: 12, children: [text(`${id}t`, 'Tag', '#ffffff')] });
+const btnLike = (id, name = 'button') => ({ id, name, type: 'FRAME', layoutMode: 'HORIZONTAL', width: 120, height: 44, cornerRadius: 8, fillHex: '#3d5fdb', fills: visible,
+  paddingLeft: 32, paddingRight: 32, paddingTop: 12, paddingBottom: 12, children: [text(`${id}t`, 'Contact', '#ffffff')] });
+
+test('자동 이름 후보 제외(C-D15) — 배지 Frame23 셋 · Exclude는 표시만, 후보는 button 하나', () => {
+  const badges = [chipLike('a', 'Frame23', '#3d5fdb'), chipLike('b', 'Frame23', '#e0362c'), chipLike('c', 'Frame23', '#14b8a6')];
+  const ex = { id: 'x', name: 'Exclude', type: 'BOOLEAN_OPERATION', role: 'icon', width: 24, height: 24 };
+  assert.ok(badges.every((b) => highConfidenceComponentRole(b) != null), '배지는 구조로는 후보');
+  const out = scanComponentCandidates([...badges, ex, btnLike('btn')]);
+  assert.deepEqual(out.filter((c) => c.eligible).map((c) => c.id), ['btn']);
+  assert.deepEqual(out.filter((c) => c.autoNamed).map((c) => c.id), ['a', 'b', 'c', 'x']);
+  assert.equal(out.length, 5);
+});
+
+test('자동 이름(C-D15) — 구조로 후보가 아닌 자동 이름 FRAME 안의 button은 후보 · 탭 · 구조어 · 단일 루트는 표시 없음', () => {
+  const wrap = { id: 'w', name: 'Frame 7', type: 'FRAME', width: 600, height: 300, children: [btnLike('in')] };
+  const o1 = scanComponentCandidates([wrap, btnLike('other')]);
+  assert.ok(o1.find((c) => c.id === 'in')?.eligible);
+  const w = o1.find((c) => c.id === 'w');
+  assert.ok(w && !w.eligible && !w.autoNamed, '흐린 맥락 줄 · 표시 없음');
+  const tab = { ...pill('t5'), name: 'Frame 5' };
+  const o2 = scanComponentCandidates([tab, btnLike('b2')]);
+  assert.ok(o2.find((c) => c.id === 't5')?.eligible && !o2.find((c) => c.id === 't5')?.autoNamed, '탭은 자동 이름이어도 후보');
+  const cont = { ...btnLike('ct'), name: 'container' };
+  const o3 = scanComponentCandidates([cont, btnLike('b3')]);
+  assert.ok(o3.find((c) => c.id === 'ct')?.eligible && !o3.find((c) => c.id === 'ct')?.autoNamed, 'C-D2 구조어는 트리에 그대로');
+  const root = { id: 'r3', name: 'Frame 3', type: 'FRAME', width: 900, height: 600, children: [btnLike('b4')] };
+  const o4 = scanComponentCandidates([root]);
+  assert.ok(!o4.find((c) => c.id === 'r3')?.autoNamed, '컨테이너 루트는 표시 없음');
+});
+
+test('자동 이름 셈(C-D15 · code.ts 셈 순서) — 숨은 조상 아래는 세지 않고, 센 뒤 가지치기 · 표시 지움', () => {
+  const holder = { id: 'h', name: 'Frame 9', type: 'FRAME', width: 600, height: 300, children: [chipLike('in1', 'Frame23', '#3d5fdb'), btnLike('ok')] };
+  const cands = scanComponentCandidates([chipLike('a', 'Frame23', '#3d5fdb'), chipLike('hid', 'Frame23', '#e0362c'), holder]);
+  const r = gateComponentCandidates(cands, (id) => id !== 'hid');
+  assert.equal(r.autoNamed, 2, 'a · in1 (숨은 hid는 빼고)');
+  assert.deepEqual(r.nodes.map((c) => c.id), ['h', 'ok'], '표시 레이어는 트리에서 빠지고 안쪽 후보의 조상만 맥락 줄');
+  assert.ok(r.nodes.every((c) => !('autoNamed' in c)), '레이어별 표시는 지움');
+});
+
+test('Size 축 — 여백 · 간격 차(C-D16): 실기 버튼 셋 → Color=indigo, Size=md · Color=none, Size=md · Color=indigo, Size=lg', () => {
+  const b = (id, fill, pt, pl, w, h, label, textHex) => ({ id, name: 'button', type: 'FRAME', layoutMode: 'HORIZONTAL', width: w, height: h, cornerRadius: 8,
+    paddingTop: pt, paddingBottom: pt, paddingLeft: pl, paddingRight: pl, itemSpacing: 8, counterAxisSpacing: 0,
+    ...(fill ? { fillHex: fill, fills: visible } : { fills: [], strokes: visible }), children: [text(`${id}t`, label, textHex)] });
+  const g = planRegisterGroups([b('1', '#3D5FDB', 12, 32, 126, 44, 'Contact', '#FFFFFF'), b('2', null, 12, 32, 135, 47, 'View All', '#3D5FDB'), b('3', '#3D5FDB', 13, 24, 180, 48, 'Subscribe Now', '#FFFFFF')], noAncestors);
+  assert.equal(g.length, 1);
+  assert.deepEqual(g[0].subfamilies.map((s) => s.props), [{ Color: 'indigo', Size: 'md' }, { Color: 'none', Size: 'md' }, { Color: 'indigo', Size: 'lg' }]);
+});
+
+test('Size 축(C-D16) — 크기만 다른 버튼은 넓이 순위 그대로 · 간격만 다른 칩 둘(글자 다름) → md · lg', () => {
+  const btn = (id, w) => ({ id, name: 'cta', type: 'FRAME', layoutMode: 'HORIZONTAL', width: w, height: 40, fillHex: '#111111', fills: visible, cornerRadius: 8, children: [text(`${id}t`, 'Go', '#ffffff')] });
+  const s1 = planRegisterGroups([btn('a', 120), btn('b', 80)], noAncestors)[0];
+  assert.deepEqual(s1.subfamilies.map((s) => s.props), [{ Size: 'lg' }, { Size: 'md' }]);
+  const chip = (id, gap, label) => ({ ...chipLike(id, 'tag', '#eeeeee'), itemSpacing: gap, children: [text(`${id}t`, label, '#111111'), text(`${id}u`, 'x', '#111111')] });
+  const s2 = planRegisterGroups([chip('a', 4, 'One'), chip('b', 8, 'Two')], noAncestors)[0];
+  assert.deepEqual(s2.subfamilies.map((s) => s.props), [{ Size: 'md' }, { Size: 'lg' }]);
+});
+
+test('[등록] 게이트(C-D15 — 스캔 없는 [등록] · nodeIds) — Frame23 배지 셋은 걸러져 세트가 되지 않음 · 탭은 통과', () => {
+  const badges = [chipLike('a', 'Frame23', '#3d5fdb'), chipLike('b', 'Frame23', '#e0362c'), chipLike('c', 'Frame23', '#14b8a6')];
+  const valid = badges.filter((n) => !isAutoNamedCandidate(n));
+  assert.equal(valid.length, 0);
+  assert.equal(planRegisterGroups(valid, noAncestors).length, 0, '세트 없음');
+  assert.equal(isAutoNamedCandidate({ ...pill('t'), name: 'Frame 5' }), false);
 });
