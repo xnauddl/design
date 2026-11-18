@@ -2504,7 +2504,7 @@ test('renameSelection — 선택 루트가 일반 컨테이너면 보존(고신�
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.has('page'), false); // 일반 루트는 그대로
   assert.equal(root.name, 'Desktop');
-  assert.equal(after.get('v1'), 'desktop-icon'); // 보존된 루트 'Desktop'이 자식 맥락으로
+  assert.equal(after.get('v1'), 'icon'); // 보존된 루트 'Desktop'이 자식 맥락(보이는 이름에서는 뗌 — IA v4 §4.4)
 });
 
 test('renameSelection — HTML 랜드마크 nav: 가로 링크행(텍스트 3개↑) → nav', async () => {
@@ -2565,8 +2565,8 @@ test('renameSelection — HTML 랜드마크 aside: 페이지 가로 스플릿의
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', layoutMode: 'HORIZONTAL', width: 1440, height: 900, children: [side, body] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('side'), 'desktop-aside'); // 부모 폭 대비 200/1440 ≈ 0.14 ≤ 0.35 → aside
-  assert.notEqual(after.get('body'), 'desktop-aside'); // 넓은 쪽은 aside 아님
+  assert.equal(after.get('side'), 'aside'); // 부모 폭 대비 200/1440 ≈ 0.14 ≤ 0.35 → aside
+  assert.notEqual(after.get('body'), 'aside'); // 넓은 쪽은 aside 아님
 });
 
 test('renameSelection — aside: 납작한 툴바의 작은 자식은 aside 아님', async () => {
@@ -2808,7 +2808,7 @@ test('renameSelection — 썸네일: 카드 맥락이 아니면 image 유지', a
   const root = { type: 'FRAME', id: 'root', name: 'Desktop', children: [img] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('img'), 'desktop-image'); // 카드/항목 맥락 없음 → thumbnail 아님
+  assert.equal(after.get('img'), 'image'); // 카드/항목 맥락 없음 → thumbnail 아님
 });
 
 test('renameSelection — 오버레이/모달: 풀블리드 반투명 → overlay, 그 위 패널 → modal', async () => {
@@ -2828,8 +2828,8 @@ test('renameSelection — 오버레이/모달: 풀블리드 반투명 → overla
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [scrim, panel] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('scrim'), 'desktop-overlay'); // 부모를 덮는 반투명 면
-  assert.equal(after.get('panel'), 'desktop-modal'); // 오버레이 뒤 컨테이너 → card 아님
+  assert.equal(after.get('scrim'), 'overlay'); // 부모를 덮는 반투명 면
+  assert.equal(after.get('panel'), 'modal'); // 오버레이 뒤 컨테이너 → card 아님
 });
 
 test('renameSelection — 모달: 배경막 뒤라도 전폭 header는 modal 아님', async () => {
@@ -2851,9 +2851,9 @@ test('renameSelection — 모달: 배경막 뒤라도 전폭 header는 modal 아
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [scrim, header, panel] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('scrim'), 'desktop-overlay');
-  assert.equal(after.get('panel'), 'desktop-modal'); // 인셋 패널만 modal
-  assert.notEqual(after.get('hd'), 'desktop-modal'); // 전폭이라 패널 아님
+  assert.equal(after.get('scrim'), 'overlay');
+  assert.equal(after.get('panel'), 'modal'); // 인셋 패널만 modal
+  assert.notEqual(after.get('hd'), 'modal'); // 전폭이라 패널 아님
 });
 
 test('renameSelection — 오버레이: 패널 없는 반투명 배경은 overlay 아님', async () => {
@@ -2870,7 +2870,7 @@ test('renameSelection — 오버레이: 패널 없는 반투명 배경은 overla
   };
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [wash] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
-  assert.equal(new Map(changes.map((c) => [c.id, c.after])).get('wash'), 'desktop-background');
+  assert.equal(new Map(changes.map((c) => [c.id, c.after])).get('wash'), 'background');
   // 그라데이션 워시는 패널이 뒤따라도 배경막이 아니다(단색 스크림만 인정).
   const gradPage = {
     type: 'FRAME', id: 'gp', name: 'Desktop', width: 1440, height: 900,
@@ -2878,8 +2878,8 @@ test('renameSelection — 오버레이: 패널 없는 반투명 배경은 overla
   };
   const r2 = await renameSelection([gradPage], { apply: true, maxDepth: 3 });
   const after2 = new Map(r2.changes.map((c) => [c.id, c.after]));
-  assert.notEqual(after2.get('grad'), 'desktop-overlay');
-  assert.notEqual(after2.get('hero'), 'desktop-modal');
+  assert.notEqual(after2.get('grad'), 'overlay');
+  assert.notEqual(after2.get('hero'), 'modal');
 });
 
 test('renameSelection — 오버레이: 불투명한 풀블리드 면은 overlay 아님', async () => {
@@ -2891,7 +2891,7 @@ test('renameSelection — 오버레이: 불투명한 풀블리드 면은 overlay
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [bg] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('bg'), 'desktop-background');
+  assert.equal(after.get('bg'), 'background');
 });
 
 test('renameSelection — 프로그레스: 알약형 트랙 + 채움 바 → progress / indicator', async () => {
@@ -2977,9 +2977,111 @@ test('renameSelection — 페이지 섹션 스택은 list가 아니라 랜드마
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.has('page'), false); // 선택 루트 이름 보존(list로 덮이지 않음)
-  assert.equal(after.get('s1'), 'desktop-header'); // 보존된 루트가 맥락으로
-  assert.equal(after.get('s5'), 'desktop-footer');
-  assert.equal(after.get('s2'), 'desktop-section');
+  assert.equal(after.get('s1'), 'header'); // 보존된 루트가 맥락(보이는 이름에서는 뗌 — IA v4 §4.4)
+  assert.equal(after.get('s5'), 'footer');
+  assert.equal(after.get('s2'), 'section');
+});
+
+/* ---------- 맨 위 이름은 보이는 이름에 붙이지 않는다 (IA v4 §4.4 · B.22, 2026-11-18) ---------- */
+
+/** 세로 페이지 스택(5섹션, 각 섹션 안 벡터) — 루트 이름만 바꿔 쓴다. pd=true면 pluginData 목을 단다. */
+function stackPage(rootName, prefix = '', pd = false) {
+  const store = new Map();
+  const withPd = (n) => {
+    if (!pd) return n;
+    n.setPluginData = function (k, v) { store.set(`${this.id}|${k}`, v); };
+    n.getPluginData = function (k) { return store.get(`${this.id}|${k}`) ?? ''; };
+    for (const c of n.children ?? []) withPd(c);
+    return n;
+  };
+  const mk = (id, h) => ({
+    type: 'FRAME', id: prefix + id, name: `Frame ${id}`, width: 1440, height: h,
+    children: [{ type: 'VECTOR', id: prefix + id + 'v', name: 'Vector' }],
+  });
+  const page = withPd({
+    type: 'FRAME', id: prefix + 'page', name: rootName, width: 1440, height: 3400, layoutMode: 'VERTICAL',
+    children: [mk('s1', 600), mk('s2', 700), mk('s3', 800), mk('s4', 650), mk('s5', 650)],
+  });
+  return { page, store };
+}
+
+test('B.22 ① 루트 "Flightin website (DSL 실기)" → 보이는 이름에서 dsl- 를 떼고 떼기 전 이름을 nameKey로', async () => {
+  installFigma();
+  const { page } = stackPage('Flightin website (DSL 실기)');
+  const { changes, nodes } = await renameSelection([page], { apply: false, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  const key = new Map(nodes.map((n) => [n.id, n.nameKey]));
+  assert.equal(after.get('s1'), 'header');
+  assert.equal(after.get('s2'), 'section');
+  assert.equal(after.get('s5'), 'footer');
+  assert.equal(key.get('s1'), 'dsl-header');
+  assert.equal(changes.find((c) => c.id === 's1').nameKey, 'dsl-header');
+  // section 아래 벡터: 맥락은 떼기 전 이름(dsl-section → pickScope 'dsl')이라 판정 dsl-icon → 보이는 이름 icon
+  assert.equal(after.get('s2v'), 'icon');
+  assert.equal(key.get('s2v'), 'dsl-icon');
+  // header 아래는 header 맥락(역할) — 떼지 않음
+  assert.equal(after.get('s1v'), 'header-icon');
+  assert.equal(key.get('s1v'), undefined);
+  assert.equal(key.get('page'), undefined, '루트 자신은 그대로');
+});
+
+test('B.22 ② 루트 "원본-copy" → copy- 없음 · ⑦ 한글 루트는 지금 그대로(떼지 않음)', async () => {
+  installFigma();
+  const { page } = stackPage('원본-copy');
+  const { changes } = await renameSelection([page], { apply: false, maxDepth: 3 });
+  assert.equal(changes.some((c) => c.after.startsWith('copy-')), false);
+  assert.equal(new Map(changes.map((c) => [c.id, c.after])).get('s1'), 'header');
+  installFigma();
+  const { page: ko } = stackPage('홈 화면');
+  const r = await renameSelection([ko], { apply: false, maxDepth: 3 });
+  assert.equal(r.nodes.some((n) => n.nameKey), false, 'R이 없으면 nameKey도 없다');
+  assert.equal(new Map(r.changes.map((c) => [c.id, c.after])).get('s1'), 'header');
+});
+
+test('B.22 ③ 루트 이름이 역할 낱말(Pricing card)이면 떼지 않는다 · ⑤ 여럿 선택은 루트마다', async () => {
+  installFigma();
+  const root = {
+    type: 'FRAME', id: 'pc', name: 'Pricing card',
+    children: [{ type: 'VECTOR', id: 'pv', name: 'Vector 1' }],
+  };
+  const { changes, nodes } = await renameSelection([root], { apply: false, maxDepth: 3 });
+  assert.equal(new Map(changes.map((c) => [c.id, c.after])).get('pv'), 'card-icon');
+  assert.equal(nodes.some((n) => n.nameKey), false);
+  installFigma();
+  const a = stackPage('Desktop', 'a-').page;
+  const b = stackPage('Mobile view', 'b-').page;
+  const r = await renameSelection([a, b], { apply: false, maxDepth: 3 });
+  const key = new Map(r.nodes.map((n) => [n.id, n.nameKey]));
+  assert.equal(key.get('a-s1'), 'desktop-header');
+  assert.equal(key.get('b-s1'), 'view-header');
+  const after = new Map(r.changes.map((c) => [c.id, c.after]));
+  assert.equal(after.get('a-s1'), 'header');
+  assert.equal(after.get('b-s1'), 'header');
+});
+
+test('B.22 ⑥ 역할은 그대로 — 떼어도 dsRole은 지금과 같다', async () => {
+  installFigma();
+  const { page } = stackPage('Desktop');
+  const { nodes } = await renameSelection([page], { apply: false, maxDepth: 3 });
+  const role = new Map(nodes.map((n) => [n.id, n.role]));
+  assert.equal(role.get('s1'), 'header');
+  assert.equal(role.get('s2'), 'section');
+  assert.equal(role.get('s5'), 'footer');
+});
+
+test('B.22 ⑧ apply면 뗀 노드에 dsNameKey · 떼지 않은 노드는 없음 · ⑧-2 두 번 정리해도 남는다', async () => {
+  installFigma();
+  const { page, store } = stackPage('Flightin website (DSL 실기)', '', true);
+  await renameSelection([page], { apply: true, maxDepth: 3 });
+  assert.equal(store.get('s1|dsNameKey'), 'dsl-header');
+  assert.equal(store.get('s2v|dsNameKey'), 'dsl-icon');
+  assert.equal(store.get('s1v|dsNameKey') ?? '', '', 'header-icon은 떼지 않았다');
+  assert.equal(page.children[0].name, 'header');
+  // 다시 정리: 이름은 이미 header라 after가 없지만 nameKey는 싣고 기록도 그대로
+  const r2 = await renameSelection([page], { apply: true, maxDepth: 3 });
+  assert.equal(r2.changes.some((c) => c.id === 's1'), false);
+  assert.equal(r2.nodes.find((n) => n.id === 's1').nameKey, 'dsl-header');
+  assert.equal(store.get('s1|dsNameKey'), 'dsl-header');
 });
 
 test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음', async () => {
@@ -2998,8 +3100,8 @@ test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음
   };
   const { changes } = await renameSelection([dash], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('c1'), 'dashboard-card'); // 첫 자식이지만 header 아님
-  assert.equal(after.get('c2'), 'dashboard-card'); // 마지막 자식이지만 footer 아님
+  assert.equal(after.get('c1'), 'card'); // 첫 자식이지만 header 아님
+  assert.equal(after.get('c2'), 'card'); // 마지막 자식이지만 footer 아님
 });
 
 test('renameSelection — 넓은 커버 이미지가 있어도 카드는 field가 아니라 card', async () => {
@@ -3068,9 +3170,9 @@ test('renameSelection — 랜드마크 슬롯은 숨김·TEXT 형제를 세지 �
   };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('hd'), 'desktop-header'); // 유령 프레임이 header 자리를 뺏지 않음
-  assert.equal(after.get('mn'), 'desktop-main');
-  assert.equal(after.get('ft'), 'desktop-footer'); // 뒤의 TEXT가 footer 자리를 삼키지 않음
+  assert.equal(after.get('hd'), 'header'); // 유령 프레임이 header 자리를 뺏지 않음
+  assert.equal(after.get('mn'), 'main');
+  assert.equal(after.get('ft'), 'footer'); // 뒤의 TEXT가 footer 자리를 삼키지 않음
 });
 
 test('renameSelection — 히어로 섹션 안에는 header/footer 랜드마크가 생기지 않음', async () => {
@@ -3107,9 +3209,9 @@ test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 화�
   };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('h'), 'desktop-header');
-  assert.equal(after.get('m'), 'desktop-main');
-  assert.equal(after.get('f'), 'desktop-footer');
+  assert.equal(after.get('h'), 'header');
+  assert.equal(after.get('m'), 'main');
+  assert.equal(after.get('f'), 'footer');
 });
 
 test('renameSelection — 카드 가로 스플릿의 좁은 열은 aside 아님', async () => {
@@ -3170,9 +3272,9 @@ test('renameSelection — 모바일 Home 화면은 세로 랜드마크 유지', 
   };
   const { changes } = await renameSelection([home], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('h'), 'home-header');
-  assert.equal(after.get('m'), 'home-main');
-  assert.equal(after.get('f'), 'home-footer');
+  assert.equal(after.get('h'), 'header');
+  assert.equal(after.get('m'), 'main');
+  assert.equal(after.get('f'), 'footer');
 });
 
 test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
@@ -3193,7 +3295,7 @@ test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
   const root = { type: 'FRAME', id: 'root', name: 'Desktop', width: 1440, height: 900, children: [card] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('card'), 'desktop-card');
+  assert.equal(after.get('card'), 'card');
   assert.notEqual(after.get('row'), 'card-nav'); // depth 2의 행은 페이지 랜드마크가 아님
 });
 
@@ -3210,7 +3312,7 @@ test('renameSelection — nav의 링크 자식은 nav-item', async () => {
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [nav] };
   const { changes } = await renameSelection([page], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('nav'), 'desktop-nav');
+  assert.equal(after.get('nav'), 'nav');
   assert.equal(after.get('l1'), 'nav-item'); // 의미 없는 wrapper가 아니라 nav-item(DS 표준 Nav Item)
 });
 
@@ -3230,7 +3332,7 @@ test('renameSelection — 자식 역할은 부모에게 부여된 역할에서�
   const root = { type: 'FRAME', id: 'root', name: 'Desktop', width: 1440, height: 900, children: [card] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('card'), 'desktop-card');
+  assert.equal(after.get('card'), 'card');
   assert.notEqual(after.get('r1'), 'card-item'); // 부여된 역할이 list가 아니므로 item 아님
 });
 

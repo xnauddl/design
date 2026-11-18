@@ -11,11 +11,11 @@ import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig }
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
-import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
+import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
-import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
+import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
@@ -587,6 +587,17 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
+/** 이름 정리가 남긴 떼기 전 이름(`dsNameKey`)이 지금 이름에 맞으면 그 키(ia-v4 §4.4), 아니면 undefined. */
+function readNameKey(node: SceneNode): string | undefined {
+  const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
+  if (typeof fn !== 'function') return undefined;
+  try {
+    return nameKeyFor(node.name, fn.call(node, NAME_KEY));
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * 리네임이 남긴 역할(`dsRole`)을 읽는다 — 등록이 머리명사로 쓴다. 없으면 undefined
  * (사람이 지은 이름이거나 리네임 전). API가 없는 노드도 안전하게 통과.
@@ -734,9 +745,11 @@ function toStructNode(node: SceneNode, isRoot = true): StructNode {
       mainComponentKey = null;
     }
   }
+  const nameKey = readNameKey(node);
   return {
     id: node.id,
     name: node.name,
+    ...(nameKey ? { nameKey } : {}),
     type: node.type,
     imageHash: imageHashOf(node),
     vectorKey: vectorKeyOf(node),
@@ -1314,7 +1327,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 이름과 함께 dsRole도 기록 — 말단 후보 자격·등록 머리명사가 readRole에 의존한다.
         const changes: RenameChange[] = [];
         let roleWrites = 0; // 이름은 그대로면서 역할만 새로 기록된 노드 수(undo 묶음 판단용)
-        for (const { id, before: expectedBefore, after, role } of msg.items) {
+        for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
@@ -1332,6 +1345,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (role ? writeRole(node as SceneNode, role) : writeRoleFromName(node as SceneNode, after)) {
             roleWrites++;
           }
+          // 떼기 전 이름(ia-v4 §4.4) — 있으면 기록, 없으면 지운다. 바뀌었으면 역할 기록처럼 센다(undo 묶음).
+          if (writeNameKey(node as SceneNode, nameKey ?? null)) roleWrites++;
           // node.name은 위(before !== after)에서 이미 썼다 — origin/main이 여기 둔 대입은
           // 그 줄과 겹쳐서 걷는다.
           if (before === after) continue;

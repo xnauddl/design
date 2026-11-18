@@ -2870,12 +2870,12 @@ $('btnRename').addEventListener('click', () => {
   if ($('btnRename').getAttribute('aria-disabled') === 'true') return;
   const items = renameRows()
     .filter((n) => !renameOff.has(n.id))
-    .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role }));
+    .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role, ...(n.nameKey ? { nameKey: n.nameKey } : {}) }));
   if (!items.length) return;
   // 이름이 그대로인 노드도 역할은 남긴다(§4.4 — 세지 않음). 「컴포넌트 등록」의 말단 후보가 이 기록을 읽는다.
   const roleOnly = renameNodes
-    .filter((n) => n.after === undefined && n.role)
-    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+    .filter((n) => n.after === undefined && (n.role || n.nameKey))
+    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role, ...(n.nameKey ? { nameKey: n.nameKey } : {}) }));
   renameApplyReq = ++bindReqSeq;
   send({ type: 'RENAME_APPLY', items: [...items, ...roleOnly], reqId: renameApplyReq });
 });

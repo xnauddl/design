@@ -915,6 +915,11 @@ export function scanComponentCandidates(selection: readonly ScanNode[]): Compone
  * 크기(width/height)·색(fillHex)은 변형 축(Size/Color) 도출에 쓴다.
  */
 export interface StructNode extends ScanNode {
+  /**
+   * 이름 키(ia-v4 §4.4) — 이름 정리가 루트 접두사를 뗀 레이어의 떼기 전 이름(`dsNameKey`가 `-{지금 이름}`으로 끝날 때).
+   * 없으면 `name`. 묶기(`groupByExactName`)와 재사용 키 이름 부분만 읽는다 — 그 밖은 지금 이름 `name`.
+   */
+  nameKey?: string;
   width?: number;
   height?: number;
   paddingTop?: number;
@@ -1220,7 +1225,7 @@ export function groupByExactName(children: readonly StructNode[]): StructGroup[]
   const map = new Map<string, StructNode[]>();
   const order: string[] = [];
   for (const c of children) {
-    const k = exactNameKey(c.name);
+    const k = exactNameKey(c.nameKey ?? c.name);
     if (!k) continue; // 빈 이름 제외
     if (GENERIC_GROUP_NAMES.has(k)) continue; // 일반 구조어는 이름이 같아도 같은 컴포넌트가 아니다
     if (!map.has(k)) {
@@ -1519,7 +1524,7 @@ export function structFingerprint(root: StructNode, exact: boolean, textColor = 
 }
 
 /** 재사용 키 `{종류}:{이름 키}:{구조 지문}` — 접힘은 접힘 지문, 단독 · 변형은 정확 지문. */
-export function reuseKey(kind: ReuseKind, member: StructNode, nameKey: string = reuseNameKey(member.name)): string {
+export function reuseKey(kind: ReuseKind, member: StructNode, nameKey: string = reuseNameKey(member.nameKey ?? member.name)): string {
   return `${kind}:${nameKey}:${structFingerprint(member, kind !== 'collapse', kind === 'variant')}`;
 }
 
@@ -1965,7 +1970,7 @@ function legacySubfamilies(members: StructNode[]): Subfamily[] {
 /** 멤버 묶음 하나를 지금 규칙으로 계획(재사용 하위 호환 · 테스트). */
 export function planOfMembers(members: readonly StructNode[]): PlanGroup {
   const ms = [...members];
-  return { key: reuseNameKey(ms[0]?.name ?? ''), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
+  return { key: reuseNameKey(ms[0]?.nameKey ?? ms[0]?.name ?? ''), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
 }
 
 /** 탭 그룹의 소가족 · 축(§4.7 "묶기" 2번). 칸 색은 Color 기준에 넣지 않고 탭 규칙(선택 위치 · 선택 칸 색)으로 본다. */

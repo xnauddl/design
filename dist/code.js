@@ -2296,6 +2296,11 @@
   ];
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
   var ROLE_KEY = "dsRole";
+  var NAME_KEY = "dsNameKey";
+  function nameKeyFor(name, stored) {
+    if (!stored || !name) return void 0;
+    return stored.length > name.length + 1 && stored.endsWith("-" + name) ? stored : void 0;
+  }
   var ROLE_SET = new Set(ROLE_VOCAB);
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
@@ -6121,13 +6126,13 @@
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
     const safeOpts = __spreadProps(__spreadValues({}, opts), { maxDepth: normalizeMaxDepth(opts.maxDepth) });
-    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null, 0);
+    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null, 0, null);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
   function normalizeMaxDepth(v) {
     return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims, ctxDepth) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims, ctxDepth, rootPrefix) {
     var _a, _b;
     const total = nodes.length;
     const slotOf = /* @__PURE__ */ new Map();
@@ -6160,20 +6165,29 @@
       let contextForChildren = before;
       let ctxDepthForChildren = 0;
       let after;
+      let nameKey;
+      let prefixForChildren = rootPrefix;
+      if (depth === 0) {
+        const sc = decided.keep === "root" ? pickScope(before) : null;
+        prefixForChildren = sc && !isKnownRole(sc) ? sc : null;
+      }
       if (!decided.skip && decided.name) {
-        if (decided.name !== before) {
-          after = decided.name;
-          col.changes.push({ id: node.id, before, after });
+        const visible = stripRootPrefix(decided.name, rootPrefix);
+        if (visible !== decided.name) nameKey = decided.name;
+        if (visible !== before) {
+          after = visible;
+          col.changes.push(__spreadValues({ id: node.id, before, after }, nameKey ? { nameKey } : {}));
           if (opts.apply) node.name = after;
         }
         if (opts.apply && decided.role) writeRole(node, decided.role);
+        if (opts.apply) writeNameKey(node, nameKey != null ? nameKey : null);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
         if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
       }
-      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
+      col.nodes.push(__spreadValues({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role }, nameKey ? { nameKey } : {}));
       if ("children" in node && !isSkippedSubtree(node)) {
         const childDims = decided.passthrough ? parentDims : dims(node);
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_b = decided.role) != null ? _b : null, childDims, ctxDepthForChildren);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_b = decided.role) != null ? _b : null, childDims, ctxDepthForChildren, prefixForChildren);
       }
     }
   }
@@ -6204,6 +6218,22 @@
       const read = node.getPluginData;
       if (typeof read === "function" && read.call(node, ROLE_KEY) === role) return false;
       fn.call(node, ROLE_KEY, role);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function stripRootPrefix(name, prefix) {
+    return prefix && name.startsWith(prefix + "-") && name.length > prefix.length + 1 ? name.slice(prefix.length + 1) : name;
+  }
+  function writeNameKey(node, key) {
+    const n = node;
+    if (typeof n.setPluginData !== "function") return false;
+    try {
+      const cur = typeof n.getPluginData === "function" ? n.getPluginData.call(node, NAME_KEY) : "";
+      const next = key != null ? key : "";
+      if (cur === next) return false;
+      n.setPluginData.call(node, NAME_KEY, next);
       return true;
     } catch (e) {
       return false;
@@ -8024,10 +8054,11 @@
     "figure"
   ]);
   function groupByExactName(children) {
+    var _a;
     const map = /* @__PURE__ */ new Map();
     const order = [];
     for (const c of children) {
-      const k = exactNameKey(c.name);
+      const k = exactNameKey((_a = c.nameKey) != null ? _a : c.name);
       if (!k) continue;
       if (GENERIC_GROUP_NAMES.has(k)) continue;
       if (!map.has(k)) {
@@ -8224,7 +8255,7 @@
     };
     return hash2(enc(root));
   }
-  function reuseKey(kind, member, nameKey = reuseNameKey(member.name)) {
+  function reuseKey(kind, member, nameKey = reuseNameKey(((_a) => (_a = member.nameKey) != null ? _a : member.name)())) {
     return `${kind}:${nameKey}:${structFingerprint(member, kind !== "collapse", kind === "variant")}`;
   }
   function isHeadingCollapseGroup(members) {
@@ -8584,9 +8615,9 @@
     });
   }
   function planOfMembers(members) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const ms = [...members];
-    return { key: reuseNameKey((_b = (_a = ms[0]) == null ? void 0 : _a.name) != null ? _b : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
+    return { key: reuseNameKey((_d = (_c = (_a = ms[0]) == null ? void 0 : _a.nameKey) != null ? _c : (_b = ms[0]) == null ? void 0 : _b.name) != null ? _d : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
   }
   function tabSubfamilies(members) {
     var _a, _b, _c, _d;
@@ -10254,6 +10285,15 @@
     }
     return null;
   }
+  function readNameKey(node) {
+    const fn = node.getPluginData;
+    if (typeof fn !== "function") return void 0;
+    try {
+      return nameKeyFor(node.name, fn.call(node, NAME_KEY));
+    } catch (e) {
+      return void 0;
+    }
+  }
   function readRole(node) {
     const fn = node.getPluginData;
     if (typeof fn !== "function") return void 0;
@@ -10368,9 +10408,11 @@
         mainComponentKey = null;
       }
     }
-    return __spreadProps(__spreadValues({
+    const nameKey = readNameKey(node);
+    return __spreadProps(__spreadValues(__spreadProps(__spreadValues({
       id: node.id,
-      name: node.name,
+      name: node.name
+    }, nameKey ? { nameKey } : {}), {
       type: node.type,
       imageHash: imageHashOf2(node),
       vectorKey: vectorKeyOf(node),
@@ -10400,7 +10442,7 @@
       characters,
       mainComponentKey,
       role: readRole(node)
-    }, iconKey ? { iconFrame: true, vectorKey: iconKey } : {}), {
+    }), iconKey ? { iconFrame: true, vectorKey: iconKey } : {}), {
       // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음. 아이콘 프레임도 그림 하나.
       children: node.type === "INSTANCE" || iconKey ? [] : kids.map((k) => toStructNode(k, false))
     });
@@ -10872,7 +10914,7 @@
         case "RENAME_APPLY": {
           const changes = [];
           let roleWrites = 0;
-          for (const { id, before: expectedBefore, after, role } of msg.items) {
+          for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
@@ -10881,6 +10923,7 @@
             if (role ? writeRole(node, role) : writeRoleFromName(node, after)) {
               roleWrites++;
             }
+            if (writeNameKey(node, nameKey != null ? nameKey : null)) roleWrites++;
             if (before === after) continue;
             changes.push({ id, before, after });
           }

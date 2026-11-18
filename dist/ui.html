@@ -6571,9 +6571,9 @@
   }
   $("btnRename").addEventListener("click", () => {
     if ($("btnRename").getAttribute("aria-disabled") === "true") return;
-    const items = renameRows().filter((n) => !renameOff.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after, role: n.role }));
+    const items = renameRows().filter((n) => !renameOff.has(n.id)).map((n) => __spreadValues({ id: n.id, before: n.name, after: n.after, role: n.role }, n.nameKey ? { nameKey: n.nameKey } : {}));
     if (!items.length) return;
-    const roleOnly = renameNodes.filter((n) => n.after === void 0 && n.role).map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+    const roleOnly = renameNodes.filter((n) => n.after === void 0 && (n.role || n.nameKey)).map((n) => __spreadValues({ id: n.id, before: n.name, after: n.name, role: n.role }, n.nameKey ? { nameKey: n.nameKey } : {}));
     renameApplyReq = ++bindReqSeq;
     send({ type: "RENAME_APPLY", items: [...items, ...roleOnly], reqId: renameApplyReq });
   });

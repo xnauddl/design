@@ -4,6 +4,8 @@
    - 정규화: 뚜렷한 역할(card/list/field/button/header… 등)은 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
      역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과.
      선택 루트(depth 0) 컨테이너는 보존(자식 맥락 앵커) — 단 카드/리스트/필드/버튼처럼 확실한 시멘틱이면 루트도 교체.
+     보존한 루트 이름의 낱말(역할이 아닌 것 — 'website' · 'copy')은 맥락 계산에는 그대로 쓰되, 보이는 이름에서는
+     뗀다(`dsl-header` → `header`). 떼기 전 이름은 `dsNameKey`로 남겨 등록 묶기가 지금과 같게 한다(ia-v4 §4.4).
    - 역할 판정:
      · 전역 고우선: 오버레이/모달 → progress 안 indicator → field 안 input → 버튼/칩 → nav →
        status/thumbnail → 토큰 말단.
@@ -23,7 +25,7 @@
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Instance · 잠긴 레이어는 서브트리째 스킵, Text는 자기 이름만 보존.
    ============================================================ */
-import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, ROLE_KEY } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, ROLE_KEY, NAME_KEY } from './naming';
 import type { ParsedToken } from './naming';
 import type { KeepReason, RenameChange, RenameNode } from '../shared/messages';
 import { hasVisibleFill, hasImageFill, hasColorFill, hasVisibleStroke } from './nodePaint'; // 스와치 판정의 색 채움 = 보이는 단색 · 그라데이션
@@ -81,7 +83,7 @@ export async function renameSelection(
 ): Promise<RenameOutcome> {
   const col: Collect = { changes: [], nodes: [] };
   const safeOpts: Opts = { ...opts, maxDepth: normalizeMaxDepth(opts.maxDepth) };
-  await recurse(selection, null, safeOpts, col, 0, null, null, null, null, 0);
+  await recurse(selection, null, safeOpts, col, 0, null, null, null, null, 0, null);
   return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
 }
 
@@ -100,6 +102,7 @@ async function recurse(
   parentRole: string | null,
   parentDims: { w: number; h: number } | null,
   ctxDepth: number,
+  rootPrefix: string | null,
 ): Promise<void> {
   const total = nodes.length;
   // 랜드마크 슬롯 — 실제로 리네임 대상이 되는 "보이는 컨테이너"만 센다.
@@ -130,24 +133,35 @@ async function recurse(
     let contextForChildren: string | null = before;
     let ctxDepthForChildren = 0;
     let after: string | undefined;
+    let nameKey: string | undefined;
+    // 보존한 선택 루트의 접두사(ia-v4 §4.4) — 루트 이름의 pickScope가 역할 낱말이 아닐 때만. 자식에게 내려보낸다.
+    let prefixForChildren = rootPrefix;
+    if (depth === 0) {
+      const sc = decided.keep === 'root' ? pickScope(before) : null;
+      prefixForChildren = sc && !isKnownRole(sc) ? sc : null;
+    }
 
     if (!decided.skip && decided.name) {
+      // 보이는 이름 = 판정 이름에서 루트 접두사를 뗀 것. 판정 이름은 그대로 맥락으로 쓴다(역할 · 토큰 맥락이 지금과 같게).
+      const visible = stripRootPrefix(decided.name, rootPrefix);
+      if (visible !== decided.name) nameKey = decided.name;
       // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
-      if (decided.name !== before) {
-        after = decided.name;
-        col.changes.push({ id: node.id, before, after });
+      if (visible !== before) {
+        after = visible;
+        col.changes.push({ id: node.id, before, after, ...(nameKey ? { nameKey } : {}) });
         if (opts.apply) node.name = after;
       }
       // 판정한 역할을 노드에 남긴다 — 등록이 머리명사로 읽어 이름 파싱 추측을 없앤다.
       // 이름이 안 바뀐 재실행에서도 기록해 예전 리네임 결과에 값을 채운다(멱등).
       if (opts.apply && decided.role) writeRole(node, decided.role);
+      if (opts.apply) writeNameKey(node, nameKey ?? null);
       // 맥락: 일반 레이아웃(passthrough)은 받은 맥락을 그대로 통과, 그 외엔 내 새 이름.
       contextForChildren = decided.passthrough ? ancestorName : decided.name;
       if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
     }
 
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
-    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
+    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role, ...(nameKey ? { nameKey } : {}) });
 
     // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
     // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
@@ -155,7 +169,7 @@ async function recurse(
       // 자식 역할은 부모에게 "실제로 부여된" 역할에서만 파생한다(구조 재판정 금지) —
       // 그래야 nav처럼 list를 앞지르는 역할이 붙었을 때 자식이 엉뚱하게 item이 되지 않는다.
       const childDims = decided.passthrough ? parentDims : dims(node);
-      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims, ctxDepthForChildren);
+      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims, ctxDepthForChildren, prefixForChildren);
     }
   }
 }
@@ -215,6 +229,29 @@ export function writeRole(node: SceneNode, role: string): boolean {
     return true;
   } catch {
     return false; /* 기록 실패 무시 */
+  }
+}
+
+/** 판정 이름에서 앞의 `{루트 접두사}-`를 뗀다(정확히 접두사뿐이면 그대로 — ia-v4 §4.4). */
+export function stripRootPrefix(name: string, prefix: string | null): string {
+  return prefix && name.startsWith(prefix + '-') && name.length > prefix.length + 1 ? name.slice(prefix.length + 1) : name;
+}
+
+/**
+ * 떼기 전 이름(`dsNameKey`)을 기록하거나(key) 지운다(null). 실제로 바뀐 경우만 쓰고 true —
+ * `RENAME_APPLY`가 undo 묶음 판단(roleWrites)에 센다. API가 없거나 실패하면 false.
+ */
+export function writeNameKey(node: SceneNode, key: string | null): boolean {
+  const n = node as { setPluginData?: (k: string, v: string) => void; getPluginData?: (k: string) => string };
+  if (typeof n.setPluginData !== 'function') return false;
+  try {
+    const cur = typeof n.getPluginData === 'function' ? n.getPluginData.call(node, NAME_KEY) : '';
+    const next = key ?? '';
+    if (cur === next) return false;
+    n.setPluginData.call(node, NAME_KEY, next);
+    return true;
+  } catch {
+    return false;
   }
 }
 
