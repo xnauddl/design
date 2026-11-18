@@ -599,13 +599,15 @@ const reenter = (p) => p.evaluate(() => {
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await goSub(p, 'pick');
-  // 무료 규칙 PR 뒤 [색 변수 만들기]는 무료(F8) — 유료 잠금의 예는 [팔레트 생성]
-  await p.focus('#btnPalette');
-  check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnPalette');
-  check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnPalette', 'aria-disabled')) === 'true');
-  await p.click('#btnPalette', { force: true });
+  // 무료 규칙 PR 뒤 [색 변수 만들기] · 브랜드 팔레트는 무료(F8 · ia-v4 §4.3a) — 유료 잠금의 예는 타이포 [스캔]
+  await p.click('#makeRail [data-make-step="type"]');
+  await p.waitForTimeout(30);
+  await p.focus('#btnScanText');
+  check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnScanText');
+  check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnScanText', 'aria-disabled')) === 'true');
+  await p.click('#btnScanText', { force: true });
   check('10 누르면 공통 상태 줄에 유료 사유', (await p.textContent('#statusText')).includes('유료 기능이에요') && (await p.textContent('#statusAction')) === '라이선스 →');
-  check('10 잠긴 버튼은 동작하지 않음', (await count(p, 'CREATE_TOKENS')) === 0);
+  check('10 잠긴 버튼은 동작하지 않음', (await count(p, 'SCAN_TEXT_STYLES')) === 0);
   await p.keyboard.press('Tab'); // 포커스 이동은 메시지를 지우지 않는다
   check('10 포커스 이동은 상태 줄 메시지를 지우지 않음', await visible(p, '#statusAction'));
   await p.click('#statusAction');
@@ -2136,7 +2138,7 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
   const ex = (await sent(p, 'EXTRACT')).at(-1);
   await recv(p, { type: 'EXTRACT_RESULT', warnings: [], selection: 1, tokens: [{ name: 'color/101828', category: 'color', value: '#101828', sources: ['fills'], count: 3 }, { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2 }], ...(ex?.reqId ? { reqId: ex.reqId } : {}) });
   await p.waitForTimeout(60);
-  check('24 무료 색 — [색 변수 만들기] 열림 · 주 버튼 · 🔒 없음 · [팔레트 생성 🔒] 그대로', !(await locked(p, '#btnColorVars')) && (await p.$eval('#btnColorVars', (b) => b.classList.contains('primary'))) && (await p.textContent('#paletteBtnLock')) === '🔒');
+  check('24 무료 색 — [색 변수 만들기] 열림 · 주 버튼 · 🔒 없음 · [팔레트 생성] 잠금 없음(브랜드 팔레트 무료)', !(await locked(p, '#btnColorVars')) && (await p.$eval('#btnColorVars', (b) => b.classList.contains('primary'))) && (await p.textContent('#paletteBtnLock')) === '' && !(await locked(p, '#btnPalette')));
   const rl = await p.$eval('#colorTable select.r-role', (s) => ({ dis: s.getAttribute('aria-disabled'), tip: s.title, lk: s.previousElementSibling?.textContent }));
   check('24 무료 색 — 줄의 Semantic 고르개 유료 잠금(왼쪽 🔒 · 사유 "Semantic 변수는 유료예요")', rl.dis === 'true' && rl.tip === 'Semantic 변수는 유료예요' && rl.lk === '🔒', JSON.stringify(rl));
   await p.click('#colorTable select.r-role', { force: true });
@@ -2571,6 +2573,31 @@ async function fillBoth(p) {
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'none' });
   await p.waitForTimeout(30);
   check('26 다시 무료 → [유료 구매하기 ↗]', (await lk()).text === '유료 구매하기 ↗');
+  await p.close();
+}
+
+{
+  // 27e 브랜드 팔레트 무료(ia-v4 §4.3a · A.18 4) — 무료에서 [팔레트 생성] · [팔레트 만들기] 열림, [색 변수 만들기]는 Global만
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['k1'] });
+  await goSub(p, 'pick');
+  await p.waitForTimeout(40);
+  check('27e 무료 — [팔레트 생성] · [팔레트 만들기] aria-disabled 없음 · 🔒 빈 글',
+    (await p.getAttribute('#btnPalette', 'aria-disabled')) !== 'true' && (await p.getAttribute('#btnPaletteRun', 'aria-disabled')) !== 'true' && (await p.textContent('#paletteBtnLock')) === '');
+  await p.click('#btnPalette');
+  check('27e [팔레트 생성] → 띠 열림', await visible(p, '#paletteBand'));
+  await p.click('#btnPaletteRun');
+  await p.waitForTimeout(80);
+  check('27e [팔레트 만들기] → 색 목록', (await p.$$eval('#colorTable .r-card', (e) => e.length)) > 10);
+  await p.click('#btnColorVars');
+  const cr = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  check('27e [색 변수 만들기] → CREATE_TOKENS{globalOnly · replacePalette}', cr?.globalOnly === true && cr.replacePalette === true && !cr.preview, JSON.stringify(cr && { g: cr.globalOnly, r: cr.replacePalette }));
+  await recv(p, { type: 'CREATE_RESULT', created: 10, updated: 0, summary: 'Global 10개', roles: 0 });
+  await p.waitForTimeout(40);
+  check('27e 그 뒤 CREATE_SEMANTICS 없음', (await sent(p, 'CREATE_SEMANTICS')).length === 0);
   await p.close();
 }
 

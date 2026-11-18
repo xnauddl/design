@@ -1136,7 +1136,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const roleRows: RoleRow[] = [];
         const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined, s.finalName);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
-        const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
+        // 무료는 Global 안에서만 지운다(Semantic을 건드리지 않음 — ia-v4 §4.3a "브랜드 팔레트 무료").
+        const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name), { globalOnly: !isPaid() }) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
         if (roles) summary += t('create.sumRoles', { n: roles });
         if (pruned) summary += t('create.sumPruned', { n: pruned });

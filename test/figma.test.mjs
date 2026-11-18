@@ -4559,6 +4559,31 @@ test('팔레트 정리 — 플러그인 컬렉션 안에서만 지운다(사용�
   assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === prim.id).length, 1);
 });
 
+test('A.18 팔레트 무료 — prunePaletteColors(globalOnly)는 Global의 옛 팔레트 색만 지우고 Semantic의 같은 이름 색은 남긴다', async () => {
+  const mk = () => {
+    const figma = installFigma();
+    withRoot(figma);
+    const g = figma.variables.createVariableCollection('Global');
+    const sem = figma.variables.createVariableCollection('Semantic');
+    figma.variables.createVariable('color/blue/100', g, 'COLOR').setValueForMode(g.defaultModeId, rgbOf('#ddeeff'));
+    figma.variables.createVariable('color/blue/100', sem, 'COLOR').setValueForMode(sem.defaultModeId, rgbOf('#ddeeff'));
+    return { figma, g, sem };
+  };
+  {
+    const { figma, g, sem } = mk();
+    const removed = await prunePaletteColors(['color/blue/500'], { globalOnly: true });
+    assert.equal(removed, 1);
+    assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === g.id).length, 0);
+    assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === sem.id).length, 1, 'Semantic의 옛 거울은 남는다');
+  }
+  {
+    const { figma } = mk();
+    const removed = await prunePaletteColors(['color/blue/500']);
+    assert.equal(removed, 2, '옵션 없으면 지금처럼 Global · Semantic 둘 다');
+    assert.equal(figma._state.variables.length, 0);
+  }
+});
+
 /* ---------- IA v3 §4.4: 변수 사용 수(보기 전용) — 인스턴스 안쪽 포함, 숨김 제외, 상한 없음 ---------- */
 test('countUsage — 인스턴스 안쪽까지 세고 숨긴 레이어는 뺀다, 곳·레이어 수', async () => {
   const leaf = (id, varId, extra = {}) => ({ type: 'RECTANGLE', id, name: id, visible: true, fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: varId } } }], boundVariables: {}, ...extra });

@@ -533,13 +533,17 @@ export interface SemanticSummary {
 }
 
 /** 팔레트 재적용 시 이전 색 정리: 이번에 (재)생성하는 **hue 패밀리** 안에서 keep에 없는
-   이전 스텝만 삭제(#3). 다른 패밀리·추출 hex 색·사용자 변수는 보존. 반환=삭제 수. */
-export async function prunePaletteColors(keep: string[]): Promise<number> {
+   이전 스텝만 삭제(#3). 다른 패밀리·추출 hex 색·사용자 변수는 보존. 반환=삭제 수.
+   `globalOnly`: 플러그인 Global 컬렉션 안에서만 지운다 — 무료 실행은 Semantic을 만들지도 지우지도 않는다(ia-v4 §4.3a). */
+export async function prunePaletteColors(keep: string[], opts: { globalOnly?: boolean } = {}): Promise<number> {
   const keepSet = new Set(keep);
   // 이번 팔레트가 쓰는 hue 패밀리(이 안에서만 정리 — 무관 색 보존).
   const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f): f is string => f !== null));
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const palIds = ownedIds(cols); // 플러그인 Global · Semantic 안에서만 — 사용자 컬렉션의 색은 지우지 않는다(13.7)
+  // 플러그인 Global · Semantic 안에서만 — 사용자 컬렉션의 색은 지우지 않는다(13.7). globalOnly면 Global만.
+  const palIds = opts.globalOnly
+    ? new Set([ownedCollection(cols, 'global')?.id].filter((x): x is string => !!x))
+    : ownedIds(cols);
   let removed = 0;
   for (const v of await figma.variables.getLocalVariablesAsync()) {
     if (!palIds.has(v.variableCollectionId)) continue;

@@ -4767,11 +4767,12 @@
       v.setValueForMode(modeId, num);
     }
   }
-  async function prunePaletteColors(keep) {
+  async function prunePaletteColors(keep, opts = {}) {
+    var _a;
     const keepSet = new Set(keep);
     const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const palIds = ownedIds(cols);
+    const palIds = opts.globalOnly ? new Set([(_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id].filter((x) => !!x)) : ownedIds(cols);
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
@@ -10908,7 +10909,7 @@
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
           const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName);
-          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
+          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name), { globalOnly: !isPaid() }) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
           if (pruned) summary += t("create.sumPruned", { n: pruned });

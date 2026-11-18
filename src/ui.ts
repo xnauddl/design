@@ -1600,10 +1600,11 @@ const PAID_LOCK = '🔒'; // 와이어의 잠금 배지는 자물쇠 하나 — 
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
-// 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+// 이유를 알 수 없는 막다른 길이 된다. 브랜드 팔레트([팔레트 생성] · [팔레트 만들기])는 무료다
+// (2026-11-18 — ia-v4 §4.3a "브랜드 팔레트 무료": 무료의 [색 변수 만들기]가 Global 색만 만든다).
 const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
-  'btnPalette', 'btnPaletteRun', // [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
+  // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
   'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
   'btnTsRename', // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
@@ -1623,11 +1624,11 @@ function updateGates(): void {
   // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성'·'색 변수 만들기')가 한 툴바에 섞여
   // 있어 카드 배지만으로는 어느 쪽이 잠긴 건지 알 수 없다 → 두 버튼 모두에 자물쇠를 붙인다
   // (와이어 rev k). 400px에서 툴바가 두 줄이 되는 건 감수 — 결론 버튼의 잠금이 먼저다.
-  for (const id of ['paletteBtnLock', 'componentLock', 'darkLock', 'semLock', 'tsLock']) {
+  for (const id of ['componentLock', 'darkLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
-  // 색 변수화 · 토큰 만들기는 무료(F8) — 🔒 없음(색 카드 제목의 🔒도 — F-D9).
-  for (const id of ['paletteLock', 'colorVarsLock', 'createLock']) $(id).textContent = '';
+  // 색 변수화 · 토큰 만들기 · 브랜드 팔레트는 무료(F8 · ia-v4 §4.3a) — 🔒 없음(색 카드 제목의 🔒도 — F-D9).
+  for (const id of ['paletteLock', 'colorVarsLock', 'createLock', 'paletteBtnLock']) $(id).textContent = '';
   // 다크 채우기는 Paid에 더해 컬렉션·모드(라이트 출처)가 있어야 한다. PAID_FIELDS 루프가
   // 방금 disabled를 티어만 보고 덮었으니, 전제를 여기서 다시 적용해야 한다(순서 의존).
   // Dark 모드는 없으면 생성하므로 모드 2개 전제는 더 이상 없다.

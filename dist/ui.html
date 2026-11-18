@@ -5524,9 +5524,7 @@
   var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
   var PAID_FIELDS = [
     ...COMPONENT_FIELDS,
-    "btnPalette",
-    "btnPaletteRun",
-    // [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
+    // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
     "btnScanText",
     "btnTextStyles",
     // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
@@ -5541,10 +5539,10 @@
       setLock(el, isPaid ? null : "paid");
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteBtnLock", "componentLock", "darkLock", "semLock", "tsLock"]) {
+    for (const id of ["componentLock", "darkLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
-    for (const id of ["paletteLock", "colorVarsLock", "createLock"]) $(id).textContent = "";
+    for (const id of ["paletteLock", "colorVarsLock", "createLock", "paletteBtnLock"]) $(id).textContent = "";
     refreshDarkModes();
     setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
