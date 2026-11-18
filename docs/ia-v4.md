@@ -1922,9 +1922,9 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 
 까닭: 잠긴 주 버튼은 `--surface-2` 바탕 + `--text-2` 글자라, 파란 바탕이 회색으로 바뀌어도 글자가 진해 흐려 보이지 않았다(⚙ 설정 › 라이선스 [구독 관리 ↗] 실기). 보조 버튼의 잠금(`--muted` 글자)과도 달랐다. 글자를 `--muted`로 바꿔 잠긴 주 버튼이 보조 버튼 잠금과 같은 옅은 글자가 되게 한다. 바탕(`--surface-2`)은 그대로 — 주 버튼 자리임은 남긴다. 🔒는 이모지라 글자 색이 바뀌지 않는다(유료 잠금 주 버튼 `btnGenDark` · `btnTextStyles`의 🔒는 버튼이 아니라 카드 제목 배지에 있다). 범위 밖(backlog): 클래스 규칙이 잠금 규칙보다 뒤에 있어 잠겨도 `--text-2`로 남는 버튼 — 지금 실제로 잠기는 것은 `button.tr-car`(실행 중 트리 접기 단추, `treeList.ts` 116) 하나다.
 
-- [ ] `ui.html` CSS `button.primary[aria-disabled="true"]`(141 — hover · active 포함) 글자 `var(--text-2)` → `var(--muted)`. 다른 잠금 규칙 · 바탕 · 테두리는 그대로
-- [ ] 영향 범위: 플러그인 전체의 잠긴 주 버튼(유료 잠금 · 전제 잠금 · 대기 잠금 모두 — `.primary`이고 `aria-disabled`인 버튼). 테마는 밝은 하나뿐이다(`ui.html` `:root` — 어두운 테마 토큰 없음)
-- [ ] 대비: `--muted` 글자 / `--surface-2` 바탕은 잠긴(비활성) 컨트롤이라 WCAG 대비 기준 예외(1.4.3 — 비활성 UI 구성 요소). 다만 읽을 수 있는지 스크린샷으로 본다
-- [ ] 검사(`verify-bind-flow` 25번): 무료 + 자리표시자에서 잠긴 `#btnLicenseLink`의 계산된 `color`가 `rgb(146, 152, 161)`(`--muted`), `backgroundColor`가 `rgb(244, 245, 246)`(`--surface-2`)
-- [ ] 4검사 · 스크린샷(라이선스 카드 잠긴 [구독 관리 ↗] · 다른 잠긴 주 버튼 하나)
+- [x] `ui.html` CSS `button.primary[aria-disabled="true"]`(141 — hover · active 포함) 글자 `var(--text-2)` → `var(--muted)`. 다른 잠금 규칙 · 바탕 · 테두리는 그대로
+- [x] 영향 범위: 플러그인 전체의 잠긴 주 버튼(유료 잠금 · 전제 잠금 · 대기 잠금 모두 — `.primary`이고 `aria-disabled`인 버튼). 테마는 밝은 하나뿐이다(`ui.html` `:root` — 어두운 테마 토큰 없음)
+- [x] 대비: `--muted` 글자 / `--surface-2` 바탕은 잠긴(비활성) 컨트롤이라 WCAG 대비 기준 예외(1.4.3 — 비활성 UI 구성 요소). 다만 읽을 수 있는지 스크린샷으로 본다
+- [x] 검사(`verify-bind-flow` 25번): 무료 + 자리표시자에서 잠긴 `#btnLicenseLink`의 계산된 `color`가 `rgb(146, 152, 161)`(`--muted`), `backgroundColor`가 `rgb(244, 245, 246)`(`--surface-2`)
+- [x] 4검사(tsc · `npm test` 674 · `verify:i18n` 0 · `verify-bind-flow` 25번 색 검사 포함 통과) · 스크린샷(라이선스 카드 잠긴 [구독 관리 ↗] — 시안과 같음)
 - [ ] 실기 확인(사용자, 피그마): 잠긴 [유료 구매하기 ↗] · [구독 관리 ↗]가 흐려 보인다

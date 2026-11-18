@@ -138,7 +138,7 @@
     /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다. */
     [aria-disabled="true"] { color: var(--muted); cursor: not-allowed; box-shadow: none; }
     button[aria-disabled="true"], button[aria-disabled="true"]:hover, button[aria-disabled="true"]:active { background: var(--surface); border-color: var(--border); color: var(--muted); }
-    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--muted); } /* 잠긴 주 버튼도 글자는 옅게 — ia-v3 §2 원칙 3 · ia-v4 B.23 */
     label.inline:has(input[aria-disabled="true"]) { color: var(--muted); cursor: not-allowed; }
     button.link {
       border: none; background: none; padding: 0; width: auto;

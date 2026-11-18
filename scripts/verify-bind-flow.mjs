@@ -2168,6 +2168,8 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
   await p.waitForTimeout(30);
   const lk = () => p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); const r = b.getBoundingClientRect(); return { text: b.textContent, title: b.title, dis: b.getAttribute('aria-disabled'), shown: r.width > 0 && r.height > 0 && getComputedStyle(document.getElementById('licenseLinkRow')).display !== 'none' }; });
   const f = await lk();
+  const col = await p.evaluate(() => { const cs = getComputedStyle(document.getElementById('btnLicenseLink')); return { c: cs.color, b: cs.backgroundColor }; });
+  check('25 잠긴 주 버튼 모양(B.23) — 글자 --muted · 바탕 --surface-2', col.c === 'rgb(146, 152, 161)' && col.b === 'rgb(244, 245, 246)', JSON.stringify(col));
   check('25 무료 · 자리표시자 → [유료 구매하기 ↗] 보임 · 잠김 · 툴팁 꼬리', f.shown && f.text === '유료 구매하기 ↗' && f.dis === 'true' && f.title === '결제 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(f));
   await p.evaluate(() => { window.__sent.length = 0; });
   await p.click('#btnLicenseLink', { force: true });
