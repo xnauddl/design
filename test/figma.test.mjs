@@ -35,6 +35,7 @@ import {
   applyRegisteredTextStyles,
   textStyleCandidateTest,
   bindSelection,
+  collectLocalMains,
   createRole,
   bindSelectedItems,
   countUsage,
@@ -7621,4 +7622,181 @@ test('A.18 ⑥ 이미 있는 font-size/26_67은 지우지 않는다', async () =
   assert.ok(findVar(figma, 'Global', 'font-size/26_67'));
   await createSemanticTextStyles([DEC]);
   assert.ok(findVar(figma, 'Global', 'font-size/26_67'));
+});
+
+/* ---------- A.18 결함 1 — 인스턴스의 메인 컴포넌트 연결(ia-v3 §2.11 11번) ---------- */
+const BLUE = '#0066ff';
+const RED = '#ff0000';
+const a18solid = (hex) => [{ type: 'SOLID', visible: true, color: rgbOf(hex) }];
+const mkRect = (id, hex = BLUE, extra = {}) => ({ type: 'RECTANGLE', id, name: id, visible: true, fills: a18solid(hex), strokes: [], effects: [], ...extra });
+const a18parentize = (n) => { for (const c of n.children ?? []) { c.parent = n; a18parentize(c); } return n; };
+const A18PAGE = { type: 'PAGE', id: 'p2', name: 'Components' };
+/** 메인 컴포넌트(다른 페이지) — kids는 메인 안 레이어. */
+const mkMain = (id, kids, extra = {}) => { const m = a18parentize({ type: 'COMPONENT', id, name: id, visible: true, fills: [], strokes: [], effects: [], children: kids, ...extra }); if (!m.parent) m.parent = A18PAGE; return m; };
+/** 인스턴스 — 안쪽은 메인 레이어의 복제(id 앞에 인스턴스 id). */
+const mkInst = (id, main, extra = {}) => {
+  const clone = (n) => { const o = { ...n, id: `${id}:${n.id}`, parent: null }; if (n.children) o.children = n.children.map(clone); else delete o.children; return o; };
+  const kids = (main.children ?? []).map(clone);
+  return a18parentize({ type: 'INSTANCE', id, name: id, visible: true, fills: [], strokes: [], effects: [], children: kids, getMainComponentAsync: async () => main, ...extra });
+};
+const a18Frame = (id, kids, extra = {}) => a18parentize({ type: 'FRAME', id, name: id, visible: true, fills: [], strokes: [], effects: [], layoutMode: 'NONE', children: kids, parent: { type: 'PAGE', id: 'p1', name: 'Page 1' }, ...extra });
+const candIds = (res) => res.candidates.map((c) => `${c.nodeId}${c.mainId ? '@' + c.mainId : ''}`);
+async function mainsWorld() {
+  const figma = installFigma();
+  await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: BLUE }, { name: 'color/ff0000', category: 'color', sources: ['fill'], value: RED }], 16);
+  return figma;
+}
+
+test('A.18 ① 선택 = 인스턴스 하나 → 찾기 후보는 메인 안 레이어(mainId) · 인스턴스 안쪽 후보 0 ② 같은 메인 인스턴스 3개 → mains 1', async () => {
+  await mainsWorld();
+  const M = mkMain('M', [mkRect('mr')]);
+  const F = a18Frame('F', [mkInst('I1', M), mkInst('I2', M), mkInst('I3', M)]);
+  const res = await bindSelection([F], false);
+  assert.deepEqual(candIds(res), ['mr@M']);
+  assert.deepEqual(res.mains, [{ id: 'M', name: 'M', page: 'Components' }]);
+  assert.equal(res.reasons['instance-children'], 3, '인스턴스 안쪽은 지금처럼 센다');
+});
+
+test('A.18 ③ 메인 안 인스턴스 → 그 메인도(중첩) ④ 라이브러리 메인 → 후보 0 · library-main · instance-children 0(자식 없어도)', async () => {
+  await mainsWorld();
+  const N = mkMain('N', [mkRect('nr')]);
+  const M = mkMain('M', [mkRect('mr'), mkInst('J', N)]);
+  let res = await bindSelection([a18Frame('F', [mkInst('I', M)])], false);
+  assert.deepEqual(res.mains.map((m) => m.id), ['M', 'N']);
+  assert.deepEqual(candIds(res), ['mr@M', 'nr@N']);
+  const R = mkMain('R', [mkRect('rr')], { remote: true });
+  const R0 = mkMain('R0', [], { remote: true });
+  res = await bindSelection([a18Frame('F2', [mkInst('L', R), a18parentize({ ...mkInst('L0', R0), children: [] })])], false);
+  assert.deepEqual(candIds(res), []);
+  assert.equal(res.reasons['library-main'], 2);
+  assert.equal(res.reasons['instance-children'], undefined);
+  assert.equal(res.mains, undefined);
+});
+
+test('A.18 ⑤ 메인이 목록 기준 안 → 두 번 걷지 않음 ⑤′ 목록 기준 루트가 메인 안쪽 → 그 레이어 후보 한 번(mainId 없음)', async () => {
+  await mainsWorld();
+  const M = a18parentize({ type: 'COMPONENT', id: 'M', name: 'M', visible: true, fills: [], strokes: [], effects: [], children: [mkRect('mr'), mkRect('mr2')] });
+  const F = a18Frame('F', [M, mkInst('I', M)]);
+  let res = await bindSelection([F], false);
+  assert.deepEqual(candIds(res), ['mr', 'mr2']);
+  assert.equal(res.mains, undefined);
+  const M2 = mkMain('M2', [mkRect('a'), mkRect('b')]);
+  const I2 = mkInst('I2', M2);
+  const prog = [];
+  res = await bindSelection([M2.children[0], I2], false, { onProgress: (d, t) => prog.push([d, t]) });
+  assert.deepEqual(candIds(res), ['a', 'b@M2']);
+  assert.deepEqual(prog.at(-1), [prog.at(-1)[1], prog.at(-1)[1]], '진행률 100%로 끝남');
+});
+
+test('A.18 ⑥ 변형 세트 — 변형 1개 인스턴스 → 변형 3개 모두 후보(mainId = 세트) · mains 1 ⑥′ 다른 변형 인스턴스 둘 → 여전히 1', async () => {
+  await mainsWorld();
+  const V = [1, 2, 3].map((k) => ({ type: 'COMPONENT', id: `V${k}`, name: `size=${k}`, visible: true, fills: [], strokes: [], effects: [], children: [mkRect(`v${k}r`)] }));
+  const S = a18parentize({ type: 'COMPONENT_SET', id: 'S', name: 'Button', visible: true, children: V, parent: A18PAGE });
+  let res = await bindSelection([a18Frame('F', [mkInst('I', V[0])])], false);
+  assert.deepEqual(candIds(res), ['v1r@S', 'v2r@S', 'v3r@S']);
+  assert.deepEqual(res.mains.map((m) => m.id), ['S']);
+  res = await bindSelection([a18Frame('F', [mkInst('I', V[0]), mkInst('J', V[1])])], false);
+  assert.equal(res.mains.length, 1);
+  assert.equal(S.children.length, 3);
+});
+
+test('A.18 ⑦ 숨긴 메인 → hidden ⑦′ 인스턴스 루트 칠이 메인 루트와 같으면 인스턴스 루트 후보 없음, 덮어쓴 다른 색은 그대로', async () => {
+  await mainsWorld();
+  const H = mkMain('H', [mkRect('hr')], { visible: false });
+  let res = await bindSelection([a18Frame('F', [mkInst('I', H)])], false);
+  assert.equal(res.mains, undefined);
+  assert.ok(res.reasons.hidden >= 1);
+  assert.deepEqual(candIds(res), []);
+  const M = mkMain('M', [], { fills: a18solid(BLUE) });
+  res = await bindSelection([a18Frame('F', [mkInst('Isame', M, { fills: a18solid(BLUE) }), mkInst('Idiff', M, { fills: a18solid(RED) })])], false);
+  assert.deepEqual(candIds(res), ['Idiff', 'M@M']);
+});
+
+test('A.18 ⑦″ 숨긴 변형을 쓰는 인스턴스 → 세트는 걷고 그 변형은 hidden · 인스턴스 루트는 지금처럼 후보 · 진행률 분모 = 걷기 수', async () => {
+  await mainsWorld();
+  const V = [1, 2, 3].map((k) => ({ type: 'COMPONENT', id: `V${k}`, name: `v${k}`, visible: k !== 2, fills: a18solid(BLUE), strokes: [], effects: [], children: [mkRect(`v${k}r`)] }));
+  a18parentize({ type: 'COMPONENT_SET', id: 'S', name: 'Set', visible: true, children: V, parent: A18PAGE });
+  const prog = [];
+  const res = await bindSelection([a18Frame('F', [mkInst('I', V[1], { fills: a18solid(BLUE) })])], false, { onProgress: (d, t) => prog.push([d, t]) });
+  assert.deepEqual(res.mains.map((m) => m.id), ['S']);
+  assert.ok(candIds(res).includes('I'), '숨긴 변형을 쓰는 인스턴스 루트는 값이 같아도 후보');
+  assert.ok(!candIds(res).includes('v2r@S'));
+  assert.ok(candIds(res).includes('v1r@S') && candIds(res).includes('v3r@S'));
+  assert.ok(res.reasons.hidden >= 1);
+  const [d, t] = prog.at(-1);
+  assert.equal(d, t, `countNodes(${t})가 걷기 수(${d})와 같다`);
+});
+
+test('A.18 ⑧ 실제 연결 → 메인 레이어에 변수 · 인스턴스 쪽 덮어쓴 값 없음 · mainsBound 1 ⑨ 덮어쓴 채움은 그대로', async () => {
+  await mainsWorld();
+  const M = mkMain('M', [mkRect('mr')]);
+  const I = mkInst('I', M);
+  const J = mkInst('J', M);
+  J.children[0].fills = a18solid(RED); // 덮어쓴 채움
+  const res = await bindSelection([a18Frame('F', [I, J])], true);
+  assert.ok(M.children[0].fills[0].boundVariables?.color, '메인 레이어에 변수');
+  assert.equal(I.children[0].fills[0].boundVariables, undefined, '인스턴스 안쪽은 건드리지 않음');
+  assert.equal(J.children[0].fills[0].boundVariables, undefined);
+  assert.deepEqual(J.children[0].fills, a18solid(RED), '덮어쓴 채움 그대로');
+  assert.deepEqual(res.mainsBound, ['M']);
+});
+
+test('A.18 ⑫ scanTextStyles · ⑩ planExistingTextStyles — 메인 루트를 더하면 메인 안 글자, 인스턴스 안쪽 글자는 instance', async () => {
+  const figma = installFigma();
+  const mt = tsText('mt', 16);
+  const M = mkMain('M', [mt]);
+  const I = mkInst('I', M);
+  const mains = await collectLocalMains([a18Frame('F', [I])]);
+  assert.equal(mains.units.length, 1);
+  assert.ok(mains.mainOf.has('I'));
+  const roots = [a18Frame('F', [I]), ...mains.units.flatMap((u) => u.roots)];
+  const { samples } = await scanTextStyles(roots);
+  assert.ok(samples.some((s) => s.id === 'mt'), '메인 안 글자 표본');
+  await createSemanticTextStyles([BODY]);
+  registerNodes(figma, [mt]);
+  const plan = await planExistingTextStyles(roots);
+  assert.deepEqual(plan.rows.flatMap((r) => r.nodeIds), ['mt']);
+  assert.equal(plan.skipReasons.instance, 1);
+});
+
+test('A.18 ⑬ applyRegisteredTextStyles가 메인 안 글자에 스타일을 붙이고 appliedIds에 그 글자', async () => {
+  const figma = installFigma();
+  const r0 = await createSemanticTextStyles([BODY]);
+  const mt = tsText('mt', 16);
+  const M = mkMain('M', [mt]);
+  registerNodes(figma, [mt]);
+  const ap = await applyRegisteredTextStyles([M], r0.styleIds);
+  assert.equal(ap.applied, 1);
+  assert.deepEqual(ap.appliedIds, ['mt']);
+});
+
+test('A.18 ⑪ 추출이 메인 안 값을 뽑고 "인스턴스 안쪽" 건너뜀은 메인을 더하지 않은 인스턴스만', () => {
+  installFigma();
+  const M = mkMain('M', [mkRect('mr', '#123456')]);
+  const I = mkInst('I', M);
+  I.children[0].fills = []; // 인스턴스 쪽 값은 읽지 않는다
+  const F = a18Frame('F', [I]);
+  const covered = extractFromSelection([F, M], () => undefined, new Set(['I']));
+  assert.ok(covered.tokens.some((t) => t.value === '#123456'));
+  const empty = extractFromSelection([a18Frame('G', [mkInst('L', mkMain('R', [mkRect('rr', '#654321')], { remote: true }))])]);
+  assert.equal(empty.tokens.length, 0);
+  assert.ok(empty.warnings.some((w) => w.includes('인스턴스')), JSON.stringify(empty.warnings));
+});
+
+test('A.18 ⑧′ code.ts APPLY_SELECTED — 메인 안 글자에 텍스트 스타일만 붙여도 mainsBound 1 ⑧″ CREATE_TEXT_STYLES 바로 연결 끔 → mainsApplied 없음', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  await createSemanticTextStyles([BODY]);
+  const body = figma._state.textStyles.find((s) => s.name === 'body');
+  const mt = tsText('mt', 16);
+  mkMain('M', [mt]);
+  registerNodes(figma, [mt]);
+  let out = await p.send({ type: 'APPLY_SELECTED', items: [], textStyles: [{ styleId: body.id, nodeIds: ['mt'], mainIds: ['M'] }], reqId: 3 });
+  const ar = ofType(out, 'APPLY_RESULT')[0];
+  assert.equal(ar.textStylesApplied, 1);
+  assert.deepEqual(ar.mainsBound, ['M']);
+  out = await p.send({ type: 'CREATE_TEXT_STYLES', styles: [{ ...BODY, name: 'body2', fontSize: 17 }] });
+  const tr = ofType(out, 'TEXT_STYLES_RESULT')[0];
+  assert.equal(tr.mainsApplied, undefined);
+  assert.equal(tr.applied, undefined);
 });

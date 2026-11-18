@@ -75,3 +75,8 @@ test('makeDoneText — 텍스트 스타일 알림은 "텍스트 스타일 {s}개
   );
   assert.equal(makeDoneText({ styles: { s: 1, a: 0, missing: [] } }, { isPaid: true, linkOff: false }), '텍스트 스타일 1개');
 });
+
+test('A.18 결정 B — makeDoneText에 메인 컴포넌트 부분이 없다(메인 수는 카드 1 ✓ 아래 줄만)', () => {
+  const s = makeDoneText({ created: { g: 2, r: 1, m: 0 }, styles: { s: 1, a: 3 }, bound: 5, mainsBound: ['a', 'b'] }, { isPaid: true, linkOff: false });
+  assert.ok(!s.includes('메인'), s);
+});

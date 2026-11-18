@@ -2510,7 +2510,7 @@
   var NO_VAR_REASONS = ["no-match"];
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
-  var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
+  var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font", "library-main"];
   function skipRowCounts(reasons, skips, tsNodes, tsOnly = false, layers) {
     if (tsOnly) return { fix: [], keep: [] };
     const rowOf = (key, layer) => {

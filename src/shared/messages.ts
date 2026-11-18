@@ -99,6 +99,15 @@ export interface BindCandidate {
   newRole?: NewRoleRef;
   /** 새 역할이 가리킬 Global 이름(칩 툴팁 "…{Global}을 가리켜요"). */
   newRoleGlobalName?: string;
+  /** 선택 밖 메인 컴포넌트 안 자리면 그 메인 단위 id(세트면 COMPONENT_SET id — ia-v3 §2.11 11번). */
+  mainId?: string;
+}
+
+/** 함께 연결하는 선택 밖 메인 컴포넌트 단위(세트는 하나 — ia-v3 §2.11 11번). */
+export interface MainUnitInfo {
+  id: string;
+  name: string;
+  page: string;
 }
 
 /** 연결할 때 만들 쓰임 역할(§2.12). 값은 globalId Global의 별칭, 용도는 scopes. */
@@ -206,7 +215,7 @@ export type UiToCode =
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
   | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'PREVIEW_TEXT_STYLES'; reqId: number; nodeIds?: string[] } // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다
-  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef }[]; textStyles?: { styleId: string; nodeIds: string[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
   // 변수 고치기(§4.4 고치기, PR 3.5) — 고친 것만. base = 팝업을 열 때(또는 마지막 저장 응답 뒤)의 이름과 고친 모드의 칸(값 없음은 null).
@@ -284,7 +293,7 @@ export type CodeToUi =
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10). tokenStates · roleRows: 미리보기만(IA v4 §4.3 — roleRows.length = roles).
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number; reqId?: number; tokenStates?: Record<string, TokenState>; roleRows?: RoleRow[] }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number } // candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number; mains?: MainUnitInfo[]; mainsBound?: string[] } // mains: 함께 걸은 선택 밖 메인 단위 · mainsBound: 실제로 붙인 메인 단위 id(ia-v3 §2.11 11번). candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩)
   | { type: 'RENAME_RESULT'; changes: RenameChange[]; nodes: RenameNode[]; applied: boolean; reqId?: number } // nodes: 선택형 트리(#13)용 전체 서브트리
   | { type: 'SEMANTICS_RESULT'; created: number; updated: number; aliased: number; missing: string[]; skippedManual?: number } // skippedManual: 직접 만든 변수라 건너뛴 역할 수(§4.9)
@@ -296,8 +305,8 @@ export type CodeToUi =
   | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
   | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[] }
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
-  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number> } // Phase C (notes=경고 아닌 알림)
-  | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
+  | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number>; mainsApplied?: string[] } // Phase C (notes=경고 아닌 알림)
+  | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
   | {

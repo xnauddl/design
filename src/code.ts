@@ -9,7 +9,7 @@ import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAlia
 import { applyVariableToNodes } from './lib/applyVar';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, splitDecimalClusters, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
+import { bindSelection, bindSelectedItems, collectLocalMains, countDeleted, countUsage, findUsers, unbindDeleted, type LocalMains } from './lib/bind';
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
 import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
@@ -89,6 +89,40 @@ function effective(): {
 
 const currentTier = (): Tier => effective().tier;
 /** Free/Paid 2티어 — 유료면 모든 유료 기능 해금. */
+/**
+ * 목록 기준 + 인스턴스의 메인 컴포넌트(ia-v3 §2.11 11번) — 추출 · 텍스트 스타일 세 길이 함께 쓴다.
+ * roots: 목록 기준(메인 루트 안에 든 것은 메인 쪽이 덮으므로 뺀다) + 메인 단위 루트. unitOf: 메인 안 레이어 id → 메인 단위 id.
+ */
+async function withLocalMains(sel: readonly SceneNode[]): Promise<{ mains: LocalMains; roots: SceneNode[]; unitOf: Map<string, string> }> {
+  const mains = await collectLocalMains(sel);
+  const unitRoots = mains.units.flatMap((u) => u.roots);
+  if (!unitRoots.length) return { mains, roots: [...sel], unitOf: new Map() };
+  const rootIds = new Set(unitRoots.map((r) => r.id));
+  const insideUnit = (n: BaseNode): boolean => {
+    for (let p: BaseNode | null = n; p; p = p.parent) if (rootIds.has(p.id)) return true;
+    return false;
+  };
+  const unitOf = new Map<string, string>();
+  for (const u of mains.units) {
+    const stack: SceneNode[] = [...u.roots];
+    while (stack.length) {
+      const n = stack.pop() as SceneNode;
+      if (!unitOf.has(n.id)) unitOf.set(n.id, u.id);
+      if ('children' in n) for (const c of (n as ChildrenMixin).children as readonly SceneNode[]) stack.push(c);
+    }
+  }
+  return { mains, roots: [...sel.filter((r) => !insideUnit(r)), ...unitRoots], unitOf };
+}
+/** 글자 id들의 서로 다른 메인 단위 id(처음 나온 순서). */
+const unitsOfIds = (ids: readonly string[] | undefined, unitOf: ReadonlyMap<string, string>): string[] => {
+  const out: string[] = [];
+  for (const id of ids ?? []) {
+    const u = unitOf.get(id);
+    if (u && !out.includes(u)) out.push(u);
+  }
+  return out;
+};
+
 /** 화면을 지키는 옮기기의 그림 크기 읽기(§4.7 8번 ① — 못 읽으면 null). */
 const KEEP_LOOK_DEPS = {
   imageSize: async (h: string): Promise<{ width: number; height: number } | null> => {
@@ -1126,7 +1160,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
     switch (msg.type) {
       case 'EXTRACT': {
         const sel = await resolveRoots(msg.nodeIds);
-        const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel)); // 쓰임 이름의 주인(§2.12 12.3)
+        // 인스턴스의 메인 컴포넌트 안 값도 뽑는다(ia-v3 §2.11 11번) — 메인을 더한 인스턴스는 "인스턴스 안쪽" 건너뜀을 남기지 않는다.
+        const wm = await withLocalMains(sel);
+        const { tokens, warnings } = extractFromSelection(wm.roots, bindOwnerOf(sel), new Set(wm.mains.mainOf.keys())); // 쓰임 이름의 주인(§2.12 12.3)
         post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         break;
       }
@@ -1218,6 +1254,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
           newRoles: r.newRoles,
           counts: r.counts as Record<string, Record<string, number>> | undefined, // 사유 × 종류(카드 숫자, IA v4 §4.1)
+          ...(r.mains ? { mains: r.mains } : {}), // 함께 걸은 선택 밖 메인 컴포넌트 단위(ia-v3 §2.11 11번)
+          ...(r.mainsBound ? { mainsBound: r.mainsBound } : {}),
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
@@ -1317,7 +1355,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             onBound: (n) => { written = (ts?.applied ?? 0) + n; },
             onCreated: (n) => { made = n; },
           });
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}) });
+          // 붙인 메인 단위(ia-v3 §2.11 11번) — 변수 자리 ∪ 스타일을 붙인 글자(textStyles[].mainIds, nodeIds와 같은 순서)
+          const mainsBound = [...r.mainsBound];
+          if (ts?.appliedIds?.length && msg.textStyles) {
+            const mainOfText = new Map<string, string>();
+            for (const row of msg.textStyles) row.nodeIds.forEach((id, i) => { const m = row.mainIds?.[i]; if (m) mainOfText.set(id, m); });
+            for (const id of ts.appliedIds) { const m = mainOfText.get(id); if (m && !mainsBound.includes(m)) mainsBound.push(m); }
+          }
+          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), ...(mainsBound.length ? { mainsBound } : {}) });
           // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
           if (r.bound || r.newRoles || ts?.applied) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로
@@ -1400,7 +1445,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 이름은 언제나 KRDS 규칙(heading/large… — docs/text-style-krds.md) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
         // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
-        const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
+        // ① 후보 읽기 — 인스턴스의 메인 컴포넌트 안 글자도 표본으로(ia-v3 §2.11 11번)
+        const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
         if (msg.reqId == null) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
         // 앵커 없는 소수 크기 군집은 이름 짓기에서 빼 흐린 줄로(§2.11 11번 "글자 크기도 정수만")
@@ -1446,7 +1492,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!requireTextStyles()) break;
         const r = await createSemanticTextStyles(msg.styles);
         // 바로 연결(IA v4 §4.3 "타이포 등록") — 방금 등록 · 갱신한 스타일만 그 루트들의 글자에 붙인다. 같은 메시지라 ⌘Z 한 번.
-        const ap = msg.applyTo ? await applyRegisteredTextStyles(await resolveRoots(msg.applyTo), r.styleIds) : null;
+        // ② 바로 연결 — 메인 안 글자에도 붙이고, 붙인 글자의 메인 단위를 mainsApplied로(ia-v3 §2.11 11번)
+        const wm = msg.applyTo ? await withLocalMains(await resolveRoots(msg.applyTo)) : null;
+        const ap = wm ? await applyRegisteredTextStyles(wm.roots, r.styleIds) : null;
+        const mainsApplied = wm && ap ? unitsOfIds(ap.appliedIds, wm.unitOf) : [];
         post({
           type: 'TEXT_STYLES_RESULT',
           created: r.created,
@@ -1456,6 +1505,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           notes: r.notes,
           ...(msg.reqId != null ? { reqId: msg.reqId } : {}),
           ...(ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}),
+          ...(mainsApplied.length ? { mainsApplied } : {}),
         });
         commitUndo(figma); // UX2: 변수+스타일 생성(+ 바로 연결)을 단일 Undo로
         await postPrereq(); // 스타일·시맨틱 변수 생성 반영 → 「기존만 연결」 등 전제 게이트 갱신
@@ -1463,8 +1513,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'PREVIEW_TEXT_STYLES': {
         // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다.
-        const r = await planExistingTextStyles(await resolveRoots(msg.nodeIds));
-        post({ type: 'TEXT_STYLES_PREVIEW', reqId: msg.reqId, rows: r.rows, skipReasons: r.skipReasons });
+        // ③ 연결 화면 — 메인 안 글자도 줄에, 글자마다 메인 단위 id(c를 셀 때 — ia-v3 §2.11 11번)
+        const wm = await withLocalMains(await resolveRoots(msg.nodeIds));
+        const r = await planExistingTextStyles(wm.roots);
+        const rows = wm.unitOf.size ? r.rows.map((row) => ({ ...row, mainIds: row.nodeIds.map((id) => wm.unitOf.get(id) ?? null) })) : r.rows;
+        post({ type: 'TEXT_STYLES_PREVIEW', reqId: msg.reqId, rows, skipReasons: r.skipReasons });
         break;
       }
       case 'GET_COLLECTIONS': {

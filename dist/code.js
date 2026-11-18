@@ -2102,6 +2102,7 @@
     }
   }
   function walk(acc, node) {
+    var _a;
     if (node.visible === false) {
       acc.skipped.add(SKIP_HIDDEN);
       return;
@@ -2118,7 +2119,7 @@
     collectOpacity(acc, node);
     collectEffects(acc, node);
     if (node.type === "INSTANCE") {
-      if ("children" in node && node.children.length) acc.skipped.add(SKIP_INSTANCE);
+      if ("children" in node && node.children.length && !((_a = acc.covered) == null ? void 0 : _a.has(node.id))) acc.skipped.add(SKIP_INSTANCE);
       return;
     }
     if ("children" in node) for (const child of node.children) walk(acc, child);
@@ -2131,8 +2132,8 @@
     }
     return true;
   }
-  function extractFromSelection(selection2, ownerOf = () => void 0) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), owner: ownerOf };
+  function extractFromSelection(selection2, ownerOf = () => void 0, coveredInstances) {
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), owner: ownerOf, covered: coveredInstances };
     for (const node of selection2) {
       if (!isEffectivelyVisible(node)) {
         acc.skipped.add(SKIP_HIDDEN);
@@ -3269,20 +3270,104 @@
     }
     return true;
   }
-  function countNodes(sel) {
-    let n = 0;
-    const stack = sel.slice();
-    while (stack.length) {
-      const x = stack.pop();
-      if (x.visible === false) continue;
-      n++;
-      if (x.type === "INSTANCE") continue;
-      if ("children" in x) for (const c of x.children) stack.push(c);
+  var pageOf = (n) => {
+    let p = n;
+    while (p && p.type !== "PAGE") p = p.parent;
+    return p != null ? p : null;
+  };
+  async function collectLocalMains(roots) {
+    var _a;
+    const out = { units: [], mainOf: /* @__PURE__ */ new Map(), remote: /* @__PURE__ */ new Set(), hiddenMains: [] };
+    const rootIds = new Set(roots.map((r) => r.id));
+    const inRoots = (n) => {
+      let p = n;
+      while (p) {
+        if (rootIds.has(p.id)) return true;
+        p = p.parent;
+      }
+      return false;
+    };
+    const seenUnits = /* @__PURE__ */ new Set();
+    const seenNodes = /* @__PURE__ */ new Set();
+    const queue = roots.filter((r) => isEffectivelyVisible2(r));
+    while (queue.length) {
+      const n = queue.shift();
+      if (seenNodes.has(n.id)) continue;
+      seenNodes.add(n.id);
+      if (n.visible === false) continue;
+      if (n.type === "INSTANCE") {
+        let main = null;
+        try {
+          main = await n.getMainComponentAsync();
+        } catch (e) {
+          main = null;
+        }
+        if (!main) continue;
+        if (main.remote) {
+          out.remote.add(n.id);
+          continue;
+        }
+        const parent = main.parent;
+        const unit = parent && parent.type === "COMPONENT_SET" ? parent : main;
+        const unitVisible = isEffectivelyVisible2(unit);
+        if (unitVisible && isEffectivelyVisible2(main)) out.mainOf.set(n.id, main);
+        if (seenUnits.has(unit.id)) continue;
+        seenUnits.add(unit.id);
+        if (inRoots(unit)) continue;
+        if (!unitVisible) {
+          out.hiddenMains.push(unit);
+          continue;
+        }
+        const page = pageOf(unit);
+        if (page && page !== figma.currentPage) {
+          try {
+            await page.loadAsync();
+          } catch (e) {
+          }
+        }
+        const unitRoots = unit.type === "COMPONENT_SET" ? unit.children.filter((c) => c.type === "COMPONENT") : [unit];
+        out.units.push({ id: unit.id, name: unit.name, page: (_a = page == null ? void 0 : page.name) != null ? _a : "", roots: [...unitRoots] });
+        for (const r of unitRoots) queue.push(r);
+        continue;
+      }
+      if ("children" in n) for (const c of n.children) queue.push(c);
     }
+    return out;
+  }
+  function countNodes(sel, units = []) {
+    let n = 0;
+    const visited = /* @__PURE__ */ new Set();
+    const count = (roots) => {
+      const stack = roots.slice().reverse();
+      while (stack.length) {
+        const x = stack.pop();
+        if (visited.has(x.id)) continue;
+        visited.add(x.id);
+        if (x.visible === false) continue;
+        n++;
+        if (x.type === "INSTANCE") continue;
+        if ("children" in x) for (const c of x.children) stack.push(c);
+      }
+    };
+    count(sel);
+    for (const u of units) count(u.roots);
     return n;
   }
+  function sameAsMain(inst, main, field, index) {
+    const a = inst[field];
+    const b = main[field];
+    if (a === void 0 && b === void 0) return false;
+    const pick = (v) => index != null && Array.isArray(v) ? v[index] : v;
+    try {
+      return JSON.stringify(pick(a)) === JSON.stringify(pick(b));
+    } catch (e) {
+      return false;
+    }
+  }
+  var placeFilter = null;
   function note(res, key, node, preview, field) {
     var _a, _b, _c, _d, _e;
+    if (node && field && (placeFilter == null ? void 0 : placeFilter(node, field))) return;
     res.reasons[key] = ((_a = res.reasons[key]) != null ? _a : 0) + 1;
     const kind = fieldKind(field);
     const byKind = (_d = (_c = (_b = res.counts) != null ? _b : res.counts = {})[key]) != null ? _d : _c[key] = {};
@@ -3310,9 +3395,11 @@
   async function bindSelection(selection2, apply = true, hooks = {}, opts = {}) {
     var _a, _b, _c, _d;
     const index = await buildIndex();
-    liveVarIds = await collectLiveVarIds(selection2, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
+    const mains = await collectLocalMains(selection2);
+    const mainRoots = mains.units.flatMap((u) => u.roots);
+    liveVarIds = await collectLiveVarIds([...selection2, ...mainRoots], new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
     const res = { bound: 0, skipped: 0, reasons: {} };
-    const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
+    const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2, mains.units) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const ownerCache = /* @__PURE__ */ new Map();
     const ownerOf = (_a = opts.ownerOf) != null ? _a : dsRoleOwner;
@@ -3326,7 +3413,10 @@
         return ownerCache.get(n);
       },
       skipText: opts.skipTextStyleNode,
-      noNewRoles: !!opts.noNewRoles
+      noNewRoles: !!opts.noNewRoles,
+      mainOf: mains.mainOf,
+      remote: mains.remote,
+      visited: /* @__PURE__ */ new Set()
     };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
@@ -3336,12 +3426,23 @@
       await walk2(node, ctx, hooks, prog, 0, null);
       if (res.cancelled) break;
     }
+    for (const u of mains.hiddenMains) note(res, "hidden", u, preview);
+    for (const u of mains.units) {
+      if (res.cancelled) break;
+      ctx.mainId = u.id;
+      for (const r of u.roots) {
+        await walk2(r, ctx, hooks, prog, 0, null);
+        if (res.cancelled) break;
+      }
+    }
+    ctx.mainId = void 0;
+    if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
     resolveSlots(ctx);
     if (apply && preview.candidates.length) {
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole })),
+        preview.candidates.map((c) => __spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {})),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
@@ -3350,6 +3451,7 @@
       res.skipped += r.skipped;
       for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
       res.newRoles = r.newRoles;
+      if (r.mainsBound.length) res.mainsBound = r.mainsBound;
       for (const c of preview.candidates) {
         const id = c.newRole ? r.createdIds[c.newRole.name] : void 0;
         if (id) c.variableId = id;
@@ -3568,7 +3670,7 @@
     }
   }
   function candOf(s, variableId, variableName, tier, variableValue, variableAlpha) {
-    return __spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+    return __spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
@@ -3578,7 +3680,7 @@
       variableName,
       tier,
       variableValue
-    }), variableAlpha != null ? { variableAlpha } : {});
+    }), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {});
   }
   function entryAlpha(e) {
     return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;
@@ -3594,32 +3696,51 @@
     return scope ? [scope] : ["ALL_SCOPES"];
   };
   async function walk2(node, ctx, hooks, prog, depth, parentId) {
-    var _a;
+    var _a, _b, _c;
     const { res, preview } = ctx;
     if (res.cancelled) return;
+    if (ctx.visited) {
+      if (ctx.visited.has(node.id)) return;
+      ctx.visited.add(node.id);
+    }
     if (node.visible === false) {
       note(res, "hidden", node, preview);
       return;
     }
     preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
-    bindPaints(node, ctx);
-    bindFrame(node, ctx);
-    bindRadius(node, ctx);
-    bindStroke(node, ctx);
-    bindOpacity(node, ctx);
-    bindEffects(node, ctx);
-    await bindText(node, ctx);
+    const slotsBefore = ctx.slots.length;
+    const main = node.type === "INSTANCE" ? (_a = ctx.mainOf) == null ? void 0 : _a.get(node.id) : void 0;
+    const prevFilter = placeFilter;
+    if (main) placeFilter = (n, field) => n === node && !!field && sameAsMain(node, main, field);
+    try {
+      bindPaints(node, ctx);
+      bindFrame(node, ctx);
+      bindRadius(node, ctx);
+      bindStroke(node, ctx);
+      bindOpacity(node, ctx);
+      bindEffects(node, ctx);
+      await bindText(node, ctx);
+    } finally {
+      placeFilter = prevFilter;
+    }
+    if (main) {
+      const kept = ctx.slots.slice(slotsBefore).filter((sl) => !sameAsMain(node, main, sl.field, sl.index));
+      ctx.slots.length = slotsBefore;
+      ctx.slots.push(...kept);
+    }
+    if (ctx.mainId) for (let i = slotsBefore; i < ctx.slots.length; i++) ctx.slots[i].mainId = ctx.mainId;
     prog.done++;
     if (hooks.onProgress && prog.done % prog.every === 0) {
       hooks.onProgress(prog.done, prog.total);
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
-      if ((_a = hooks.shouldCancel) == null ? void 0 : _a.call(hooks)) {
+      if ((_b = hooks.shouldCancel) == null ? void 0 : _b.call(hooks)) {
         res.cancelled = true;
         return;
       }
     }
     if (node.type === "INSTANCE") {
-      if (node.children.length) {
+      if ((_c = ctx.remote) == null ? void 0 : _c.has(node.id)) note(res, "library-main", node, preview);
+      else if (node.children.length) {
         note(res, "instance-children", node, preview);
       }
       return;
@@ -3858,6 +3979,7 @@
         res.reasons[key] = ((_a2 = res.reasons[key]) != null ? _a2 : 0) + 1;
       }
     };
+    const mainsBound = /* @__PURE__ */ new Set();
     const created = /* @__PURE__ */ new Map();
     const createdIds = {};
     const ensureRole = async (spec, global) => {
@@ -3954,7 +4076,8 @@
             if (w) {
               w.arr = arr;
               w.fields++;
-            } else m.set(key, { arr, fields: 1 });
+              if (it.mainId) w.mains.push(it.mainId);
+            } else m.set(key, { arr, fields: 1, mains: it.mainId ? [it.mainId] : [] });
             continue;
           }
           if (TEXT_RANGE_FIELDS.includes(it.field)) {
@@ -3979,6 +4102,7 @@
             await figma.loadFontAsync(node.fontName);
             node.setRangeBoundVariable(0, node.characters.length, field, await target());
             res.bound++;
+            if (it.mainId) mainsBound.add(it.mainId);
             (_e = hooks.onBound) == null ? void 0 : _e.call(hooks, res.bound);
             continue;
           }
@@ -4014,6 +4138,7 @@
           }
           node.setBoundVariable(it.field, await target());
           res.bound++;
+          if (it.mainId) mainsBound.add(it.mainId);
           (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
         } catch (e) {
           fail("error", node, it.field);
@@ -4024,6 +4149,7 @@
           try {
             node[key] = w.arr;
             res.bound += w.fields;
+            for (const id of w.mains) mainsBound.add(id);
             (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
           } catch (e) {
             for (let k = 0; k < w.fields; k++) fail("error", node, key);
@@ -4036,7 +4162,7 @@
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds };
+    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds, mainsBound: [...mainsBound] };
   }
   async function createRole(spec, global) {
     var _a;
@@ -5633,6 +5759,7 @@
     return { rows: [...rows.values()], skipReasons };
   }
   async function applyTextStyleRows(rows) {
+    var _a;
     const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
     const res = { applied: 0, skipped: 0, skipReasons };
     const styleByKey = await textStyleIndex();
@@ -5654,6 +5781,7 @@
         try {
           await attachTextStyle(t2, r.id, loaded);
           res.applied++;
+          ((_a = res.appliedIds) != null ? _a : res.appliedIds = []).push(id);
         } catch (e) {
         }
       }
@@ -5665,7 +5793,7 @@
     return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
   }
   async function applyRegisteredTextStyles(roots, styleIds) {
-    var _a, _b;
+    var _a, _b, _c;
     const applyReasons = { hasStyle: 0, instance: 0, ambiguous: 0 };
     const out = { applied: 0, applySkipped: 0, applyReasons };
     if (!styleIds.length) return out;
@@ -5702,6 +5830,7 @@
     if (rows.size) {
       const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
       out.applied = r.applied;
+      if ((_c = r.appliedIds) == null ? void 0 : _c.length) out.appliedIds = r.appliedIds;
     }
     return out;
   }
@@ -10282,6 +10411,34 @@
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
+  async function withLocalMains(sel) {
+    const mains = await collectLocalMains(sel);
+    const unitRoots = mains.units.flatMap((u) => u.roots);
+    if (!unitRoots.length) return { mains, roots: [...sel], unitOf: /* @__PURE__ */ new Map() };
+    const rootIds = new Set(unitRoots.map((r) => r.id));
+    const insideUnit = (n) => {
+      for (let p = n; p; p = p.parent) if (rootIds.has(p.id)) return true;
+      return false;
+    };
+    const unitOf = /* @__PURE__ */ new Map();
+    for (const u of mains.units) {
+      const stack = [...u.roots];
+      while (stack.length) {
+        const n = stack.pop();
+        if (!unitOf.has(n.id)) unitOf.set(n.id, u.id);
+        if ("children" in n) for (const c of n.children) stack.push(c);
+      }
+    }
+    return { mains, roots: [...sel.filter((r) => !insideUnit(r)), ...unitRoots], unitOf };
+  }
+  var unitsOfIds = (ids, unitOf) => {
+    const out = [];
+    for (const id of ids != null ? ids : []) {
+      const u = unitOf.get(id);
+      if (u && !out.includes(u)) out.push(u);
+    }
+    return out;
+  };
   var KEEP_LOOK_DEPS = {
     imageSize: async (h) => {
       var _a, _b;
@@ -10604,7 +10761,7 @@
     out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
     return out;
   }
-  function pageOf(node) {
+  function pageOf2(node) {
     let n = node;
     while (n && n.type !== "PAGE") n = n.parent;
     return n && n.type === "PAGE" ? n : null;
@@ -11156,12 +11313,13 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     try {
       switch (msg.type) {
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
-          const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel));
+          const wm = await withLocalMains(sel);
+          const { tokens, warnings } = extractFromSelection(wm.roots, bindOwnerOf(sel), new Set(wm.mains.mainOf.keys()));
           post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
@@ -11221,7 +11379,7 @@
                 ownerOf: bindOwnerOf(sel)
               }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
             );
-            post({
+            post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",
               bound: r.bound,
               skipped: r.skipped,
@@ -11240,8 +11398,7 @@
               // UI가 낡은 응답을 가려낸다
               newRoles: r.newRoles,
               counts: r.counts
-              // 사유 × 종류(카드 숫자, IA v4 §4.1)
-            });
+            }, r.mains ? { mains: r.mains } : {}), r.mainsBound ? { mainsBound: r.mainsBound } : {}));
             if (!msg.preview) {
               commitUndo(figma);
               selfSelect = true;
@@ -11330,7 +11487,20 @@
                 made = n;
               }
             });
-            post(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}));
+            const mainsBound = [...r.mainsBound];
+            if (((_b = ts == null ? void 0 : ts.appliedIds) == null ? void 0 : _b.length) && msg.textStyles) {
+              const mainOfText = /* @__PURE__ */ new Map();
+              for (const row of msg.textStyles) row.nodeIds.forEach((id, i) => {
+                var _a2;
+                const m = (_a2 = row.mainIds) == null ? void 0 : _a2[i];
+                if (m) mainOfText.set(id, m);
+              });
+              for (const id of ts.appliedIds) {
+                const m = mainOfText.get(id);
+                if (m && !mainsBound.includes(m)) mainsBound.push(m);
+              }
+            }
+            post(__spreadValues(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), mainsBound.length ? { mainsBound } : {}));
             if (r.bound || r.newRoles || (ts == null ? void 0 : ts.applied)) {
               commitUndo(figma);
               committed = true;
@@ -11390,7 +11560,7 @@
         }
         case "SCAN_TEXT_STYLES": {
           if (!requirePaid("textStyles")) break;
-          const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
+          const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
           if (msg.reqId == null) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
           const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
@@ -11428,22 +11598,29 @@
         case "CREATE_TEXT_STYLES": {
           if (!requireTextStyles()) break;
           const r = await createSemanticTextStyles(msg.styles);
-          const ap = msg.applyTo ? await applyRegisteredTextStyles(await resolveRoots(msg.applyTo), r.styleIds) : null;
-          post(__spreadValues(__spreadValues({
+          const wm = msg.applyTo ? await withLocalMains(await resolveRoots(msg.applyTo)) : null;
+          const ap = wm ? await applyRegisteredTextStyles(wm.roots, r.styleIds) : null;
+          const mainsApplied = wm && ap ? unitsOfIds(ap.appliedIds, wm.unitOf) : [];
+          post(__spreadValues(__spreadValues(__spreadValues({
             type: "TEXT_STYLES_RESULT",
             created: r.created,
             updated: r.updated,
             bound: r.bound,
             missing: r.missing,
             notes: r.notes
-          }, msg.reqId != null ? { reqId: msg.reqId } : {}), ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}));
+          }, msg.reqId != null ? { reqId: msg.reqId } : {}), ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}), mainsApplied.length ? { mainsApplied } : {}));
           commitUndo(figma);
           await postPrereq();
           break;
         }
         case "PREVIEW_TEXT_STYLES": {
-          const r = await planExistingTextStyles(await resolveRoots(msg.nodeIds));
-          post({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows: r.rows, skipReasons: r.skipReasons });
+          const wm = await withLocalMains(await resolveRoots(msg.nodeIds));
+          const r = await planExistingTextStyles(wm.roots);
+          const rows = wm.unitOf.size ? r.rows.map((row) => __spreadProps(__spreadValues({}, row), { mainIds: row.nodeIds.map((id) => {
+            var _a2;
+            return (_a2 = wm.unitOf.get(id)) != null ? _a2 : null;
+          }) })) : r.rows;
+          post({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows, skipReasons: r.skipReasons });
           break;
         }
         case "GET_COLLECTIONS": {
@@ -11794,7 +11971,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_b = msg.names) != null ? _b : {};
+          const shownNames = (_c = msg.names) != null ? _c : {};
           const groupNames = groups.map((g, gi) => {
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
@@ -11870,7 +12047,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_c = r.why) != null ? _c : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -11950,7 +12127,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_d = snaps[preferLive]) != null ? _d : snaps[0];
+                  const masterSnap = (_e = snaps[preferLive]) != null ? _e : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -11971,7 +12148,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_f = (_e = structs[preferLive]) == null ? void 0 : _e.type) != null ? _f : "");
+                  const prefix = shapePrefix(master, (_g = (_f = structs[preferLive]) == null ? void 0 : _f.type) != null ? _g : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -12075,7 +12252,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_g = r.why) != null ? _g : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_h = r.why) != null ? _h : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -12092,7 +12269,7 @@
               const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_h = sf.members[sf.master]) != null ? _h : sf.members[0];
+                const head = (_i = sf.members[sf.master]) != null ? _i : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
@@ -12184,7 +12361,7 @@
               }
               let set;
               try {
-                const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
+                const home = (_j = pageOf2(made[0].comp)) != null ? _j : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -12272,7 +12449,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_j = nodes[0].parent) != null ? _j : figma.currentPage;
+              const parent = (_k = nodes[0].parent) != null ? _k : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

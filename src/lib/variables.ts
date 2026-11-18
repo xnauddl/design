@@ -1548,6 +1548,8 @@ export interface ApplyTextStylesResult {
   applied: number;
   skipped: number;
   skipReasons: Record<TextStyleSkipReason, number>;
+  /** 스타일을 붙인 글자 id(applyTextStyleRows만 — 메인 단위 수를 셀 때). */
+  appliedIds?: string[];
 }
 
 /** 텍스트 스타일 비교 키 — 스타일이 정하는 모든 글자 속성(§2.11). 숫자는 소수 2자리. */
@@ -1736,6 +1738,7 @@ export async function applyTextStyleRows(rows: readonly { styleId: string; nodeI
       try {
         await attachTextStyle(t as TextNode, r.id, loaded);
         res.applied++;
+        (res.appliedIds ??= []).push(id);
       } catch {
         /* 폰트를 못 불러옴 */
       }
@@ -1756,6 +1759,8 @@ export async function textStyleCandidateTest(): Promise<(t: TextNode) => boolean
 /** 타이포 등록 · 바로 연결 결과(IA v4 §4.3 "타이포 등록"). */
 export interface ApplyRegisteredResult {
   applied: number;
+  /** 스타일을 붙인 글자 id(메인 단위 수를 셀 때 — ia-v3 §2.11 11번 ②). */
+  appliedIds?: string[];
   applySkipped: number;
   applyReasons: Record<TextStyleApplySkipReason, number>;
 }
@@ -1801,6 +1806,7 @@ export async function applyRegisteredTextStyles(roots: readonly SceneNode[], sty
   if (rows.size) {
     const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
     out.applied = r.applied;
+    if (r.appliedIds?.length) out.appliedIds = r.appliedIds;
   }
   return out;
 }
