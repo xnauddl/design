@@ -3,6 +3,7 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { pickScope as pickScopePure, highConfidenceComponentRole as hcRolePure, isKnownRole as isKnownRolePure } from '../dist/pure.mjs';
 import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles, nameColorsByHue, resolveGlobalNames, isExtractOnlyColorName } from '../dist/pure.mjs';
 import {
   extractFromSelection,
@@ -46,6 +47,8 @@ import {
   renameSelection,
   writeRole,
   writeRoleFromName,
+  stripRootPrefix,
+  pickOwner,
   generateDarkMode,
   ensureDarkMode,
   DARK_MODE_NAME,
@@ -2402,19 +2405,19 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
     children: [{
       type: 'FRAME', id: 'row', name: 'Frame 5', layoutMode: 'NONE', width: 1240, height: 20, // 자유 배치 행
       children: [
-        { type: 'FRAME', id: 'logo', name: 'Frame 6', layoutMode: 'GRID', width: 20, height: 20,
+        { type: 'FRAME', id: 'logo', name: 'Frame 6', layoutMode: 'GRID', x: 0, width: 20, height: 20,
           children: [{ type: 'ELLIPSE', id: 'dot', name: 'Ellipse 1', width: 4, height: 4 }] },
-        { type: 'FRAME', id: 'nav', name: 'Frame 7', layoutMode: 'HORIZONTAL', width: 300, height: 20,
+        { type: 'FRAME', id: 'nav', name: 'Frame 7', layoutMode: 'HORIZONTAL', x: 400, width: 300, height: 20,
           children: [txt('n1', 'About'), txt('n2', 'Services'), txt('n3', 'Offers')] },
         // QA#1 불합격: header > row > container(H) > 첫 자식 — 깊은 중첩의 첫 자리는 logo가 아니다.
-        { type: 'FRAME', id: 'util', name: 'Frame 10', layoutMode: 'HORIZONTAL', width: 200, height: 20,
+        { type: 'FRAME', id: 'util', name: 'Frame 10', layoutMode: 'HORIZONTAL', x: 860, width: 200, height: 20,
           children: [
-            { type: 'FRAME', id: 'sup', name: 'Frame 11', layoutMode: 'HORIZONTAL', width: 60, height: 20,
+            { type: 'FRAME', id: 'sup', name: 'Frame 11', layoutMode: 'HORIZONTAL', x: 0, width: 60, height: 20,
               children: [txt('s1', 'Support'), { type: 'VECTOR', id: 'sv', name: 'Vector 3', width: 8, height: 8 }] },
-            { type: 'FRAME', id: 'lang', name: 'Frame 12', layoutMode: 'HORIZONTAL', width: 80, height: 20,
+            { type: 'FRAME', id: 'lang', name: 'Frame 12', layoutMode: 'HORIZONTAL', x: 70, width: 80, height: 20,
               children: [{ type: 'VECTOR', id: 'lv', name: 'Vector 4', width: 8, height: 8 }, txt('l1', 'Language')] },
           ] },
-        { type: 'FRAME', id: 'act', name: 'Frame 8', layoutMode: 'HORIZONTAL', width: 144, height: 20,
+        { type: 'FRAME', id: 'act', name: 'Frame 8', layoutMode: 'HORIZONTAL', x: 1096, width: 144, height: 20,
           children: [txt('a1', 'Sign In'), txt('a2', 'Sign Up')] },
       ],
     }],
@@ -2431,9 +2434,10 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
   assert.equal(after.get('nav'), 'header-nav'); // 헤더 안이면 깊이 3이어도 nav
   assert.equal(after.get('act'), 'header-actions'); // 마지막 자리의 텍스트 2개
   // 중첩 컨테이너(ctxDepth 2)의 첫·끝 자리는 logo/actions가 아니라 일반 구조어로 남는다.
-  for (const id of ['util', 'sup', 'lang']) {
-    assert.ok(['container', 'wrapper'].includes(after.get(id)), `${id} → ${after.get(id)}`);
-  }
+  assert.ok(['container', 'wrapper'].includes(after.get('util')), `util → ${after.get('util')}`);
+  // 글자 1개 + 아이콘인 가로 묶음은 글자 버튼(ia-v4 §4.4 A2 — B.24에서 바뀜, 전에는 container/wrapper)
+  assert.equal(after.get('sup'), 'header-button');
+  assert.equal(after.get('lang'), 'header-button');
   assert.equal(after.get('hero'), 'hero'); // 본문 첫 블록
   assert.equal(after.get('s2'), 'section');
   assert.equal(after.get('ft'), 'footer');
@@ -2679,8 +2683,9 @@ test('renameSelection — 일반 레이아웃은 plain 역할명으로 정리하
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('card'), 'card'); // 카드는 정규화
-  assert.equal(after.get('wrap'), 'wrapper'); // 'Frame 8' → 맥락 없는 plain wrapper
-  assert.equal(after.get('img'), 'card-image'); // 맥락(card)이 wrapper를 통과해 손주에 전파
+  // 사진 하나를 담은 상자는 media(ia-v4 §4.4 B3 — B.24에서 바뀜, 전에는 plain wrapper). 맥락은 그대로 통과.
+  assert.equal(after.get('wrap'), 'card-media');
+  assert.equal(after.get('img'), 'card-image'); // 맥락(card)이 media를 통과해 손주에 전파
 });
 
 test('renameSelection — 필드: 세로 스택 라벨+입력박스 → field', async () => {
@@ -7532,3 +7537,216 @@ test('A.14b 만들기 경로 — createUsageRoles 그림자 2% · 4% · 5% → d
     assert.equal(roleTarget(figma, findVar(figma, 'Semantic', name).id), findVar(figma, 'Global', `color/000000-a${a}`).id, name);
   }
 });
+
+/* ---------- 역할 세분화 1차 (IA v4 §4.4 · B.24, 2026-11-18) ---------- */
+const vis = [{ type: 'SOLID', visible: true }];
+const imgFill = [{ type: 'IMAGE', visible: true }];
+const T = (id, ch, extra = {}) => ({ type: 'TEXT', id, name: ch, characters: ch, width: 40, height: 20, ...extra });
+const V = (id, extra = {}) => ({ type: 'VECTOR', id, name: 'Vector', width: 12, height: 12, ...extra });
+const withPd = (n, pd = {}) => {
+  const store = new Map(Object.entries(pd));
+  n.getPluginData = (k) => store.get(k) ?? '';
+  n.setPluginData = (k, v) => store.set(k, v);
+  n._pd = store;
+  return n;
+};
+/** 루트(보존) 아래 card 맥락에 노드를 넣어 돌린다. */
+async function inCard(child, extraKids = []) {
+  const card = { type: 'FRAME', id: 'card', name: 'Frame 1', cornerRadius: 12, fills: vis, width: 300, height: 400,
+    children: [child, T('title', 'Title'), ...extraKids] };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [card] };
+  return renameSelection([root], { apply: true, maxDepth: 5 });
+}
+
+test('B.24 ① 아이콘 프레임 — 모양 이름 그대로 · 자동/전 정리 이름은 {맥락}-icon · 안은 정리 안 함', async () => {
+  installFigma();
+  const mk = (name, pd) => withPd({ type: 'FRAME', id: 'ic', name, width: 28, height: 28, children: [V('v1')] }, pd);
+  // 모양 이름 → 그대로(바꿀 줄 아님), dsRole icon 기록, 남아 있던 dsNameKey 지움
+  let ic = mk('arrow_left', { dsNameKey: 'dsl-arrow_left' });
+  let r = await inCard(ic);
+  assert.ok(!r.changes.some((c) => c.id === 'ic'));
+  assert.equal(ic._pd.get('dsRole'), 'icon');
+  assert.equal(ic._pd.get('dsNameKey') ?? '', '');
+  assert.ok(!r.nodes.some((n) => n.id === 'v1'), '안쪽 벡터는 트리에 없음');
+  // 자동 이름 · 구조 폴백 · Icon → card-icon
+  for (const name of ['Frame 12', 'container', 'Icon']) {
+    ic = mk(name);
+    r = await inCard(ic);
+    assert.equal(r.changes.find((c) => c.id === 'ic')?.after, 'card-icon', name);
+  }
+  // 전에 붙인 이름 ⓑ: list-item + dsRole item → card-icon
+  ic = mk('list-item', { dsRole: 'item' });
+  r = await inCard(ic);
+  assert.equal(r.changes.find((c) => c.id === 'ic')?.after, 'card-icon');
+  // 사람 이름(dsRole 없음)은 그대로
+  for (const name of ['image', 'logo', 'leading-icon']) {
+    ic = mk(name);
+    r = await inCard(ic);
+    assert.ok(!r.changes.some((c) => c.id === 'ic'), name);
+  }
+  // search-icon은 두 번 정리해도 그대로(멱등)
+  ic = mk('search-icon');
+  await inCard(ic);
+  r = await inCard(ic);
+  assert.ok(!r.changes.some((c) => c.id === 'ic'));
+  // list 직속이어도 icon(item 아님)
+  const list = { type: 'FRAME', id: 'list', name: 'Frame 3', layoutMode: 'HORIZONTAL', width: 100, height: 28,
+    children: [0, 1, 2].map((i) => ({ type: 'FRAME', id: `li${i}`, name: `Frame ${20 + i}`, width: 28, height: 28, children: [V(`lv${i}`)] })) };
+  r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [list] }], { apply: false, maxDepth: 5 });
+  assert.equal(r.changes.find((c) => c.id === 'li0')?.after, 'list-icon');
+  // LINE만 담은 프레임은 아이콘 프레임 아님
+  const lineWrap = { type: 'FRAME', id: 'lw', name: 'Frame 9', width: 20, height: 2, children: [{ type: 'LINE', id: 'ln', name: 'Line 1', width: 20, height: 0, strokes: vis }] };
+  r = await inCard(lineWrap);
+  assert.notEqual(r.changes.find((c) => c.id === 'lw')?.after, 'card-icon');
+});
+
+test('B.24 ① 루트 접두사 이름 bk-header-icon + dsRole icon → 맥락 + icon', async () => {
+  installFigma();
+  const ic = withPd({ type: 'FRAME', id: 'ic', name: 'bk-header-icon', width: 24, height: 24, children: [V('v')] }, { dsRole: 'icon' });
+  const header = { type: 'FRAME', id: 'hd', name: 'Frame 2', layoutMode: 'VERTICAL', width: 1440, height: 80, children: [
+    { type: 'FRAME', id: 'row', name: 'Frame 5', layoutMode: 'HORIZONTAL', x: 0, width: 1440, height: 40, children: [ic] }] };
+  const body = { type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4000, children: [V('bv')] };
+  const page = { type: 'FRAME', id: 'page', name: 'PC_main_BK', layoutMode: 'VERTICAL', width: 1440, height: 4080, children: [header, body] };
+  const r = await renameSelection([page], { apply: false, maxDepth: 5 });
+  assert.equal(r.changes.find((c) => c.id === 'ic')?.after, 'header-icon');
+});
+
+test('B.24 ② 글자 버튼 — 숨긴 앞뒤 아이콘 + 글자 1개 → button · list/nav 직속은 item · 줄바꿈은 아님 · 모바일 상단 바는 header', async () => {
+  installFigma();
+  const btn = (id, ch = '더보기') => ({ type: 'FRAME', id, name: 'button', layoutMode: 'HORIZONTAL', width: 160, height: 48, children: [
+    { type: 'FRAME', id: `${id}-l`, name: 'arrow_left', visible: false, width: 20, height: 20, children: [V(`${id}-lv`)] },
+    T(`${id}-t`, ch),
+    { type: 'FRAME', id: `${id}-r`, name: 'arro_right', visible: false, width: 20, height: 20, children: [V(`${id}-rv`)] },
+  ] });
+  let r = await inCard(btn('b'));
+  assert.equal(r.changes.find((c) => c.id === 'b')?.after, 'card-button');
+  r = await inCard(btn('b2', '두 줄\n글자'));
+  assert.notEqual(r.changes.find((c) => c.id === 'b2')?.after, 'card-button');
+  const list = { type: 'FRAME', id: 'list', name: 'Frame 3', layoutMode: 'HORIZONTAL', width: 500, height: 48, children: [btn('x1'), btn('x2'), btn('x3')] };
+  r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [list] }], { apply: false, maxDepth: 5 });
+  // 깊이 1 가로 글자 칸 줄은 지금 규칙상 nav일 수 있다 — 어느 쪽이든 직속은 item(A2를 쓰지 않음)
+  assert.ok(['list', 'nav'].includes(r.changes.find((c) => c.id === 'list')?.after));
+  assert.match(r.changes.find((c) => c.id === 'x1')?.after, /^(list|nav)-item$/);
+  // 모바일 화면 깊이 1 상단 바
+  const bar = { type: 'FRAME', id: 'bar', name: 'Frame 2', layoutMode: 'HORIZONTAL', width: 375, height: 56, children: [
+    { type: 'FRAME', id: 'bk', name: 'back', width: 24, height: 24, children: [V('bkv')] }, T('ttl', '설정'),
+    { type: 'FRAME', id: 'mn', name: 'menu', width: 24, height: 24, children: [V('mnv')] }] };
+  const content = { type: 'FRAME', id: 'ct', name: 'Frame 3', layoutMode: 'VERTICAL', width: 375, height: 700, children: [V('cv')] };
+  const tab = { type: 'FRAME', id: 'tb', name: 'Frame 4', layoutMode: 'VERTICAL', width: 375, height: 56, children: [V('tv')] };
+  const screen = { type: 'FRAME', id: 'scr', name: 'Frame 1', layoutMode: 'VERTICAL', width: 375, height: 812, children: [bar, content, tab] };
+  r = await renameSelection([screen], { apply: false, maxDepth: 5 });
+  assert.equal(r.changes.find((c) => c.id === 'bar')?.after, 'header');
+});
+
+test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 · [라벨 + 입력 상자]는 field (rename · componentLike)', async () => {
+  installFigma();
+  const item = (i) => ({ type: 'FRAME', id: `p${i}`, name: `Frame ${30 + i}`, width: 292, height: 490, children: [T(`pt${i}`, 'x')] });
+  const list = { type: 'FRAME', id: 'lst', name: '3타입', layoutMode: 'HORIZONTAL', width: 1264, height: 490, children: [item(0), item(1), item(2)] };
+  const more = { type: 'FRAME', id: 'more', name: 'button', layoutMode: 'HORIZONTAL', width: 248, height: 48, strokes: vis, children: [T('mt', '더보기')] };
+  const sec = { type: 'FRAME', id: 'sec', name: '#새로', layoutMode: 'VERTICAL', width: 2182, height: 881, children: [T('st', '새로 나왔어요!', { fontSize: 36, width: 220, height: 47 }), list, more] };
+  const r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 2182, height: 3000, children: [sec] }], { apply: false, maxDepth: 5 });
+  const a = new Map(r.changes.map((c) => [c.id, c.after]));
+  assert.notEqual(a.get('sec'), 'field');
+  assert.ok(!String(a.get('lst')).startsWith('field'));
+  assert.ok(!String(a.get('more')).startsWith('field'));
+  assert.notEqual(hcRolePure(sec), 'field');
+  const field = { type: 'FRAME', id: 'fd', name: 'Frame 1', layoutMode: 'VERTICAL', width: 300, height: 70, children: [
+    T('lb', 'Email'), { type: 'FRAME', id: 'in', name: 'Frame 2', width: 300, height: 44, strokes: vis, children: [T('ph', 'you@x')] }] };
+  const r2 = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [field] }], { apply: false, maxDepth: 5 });
+  assert.equal(r2.changes.find((c) => c.id === 'fd')?.after, 'field');
+  assert.equal(hcRolePure(field), 'field');
+});
+
+test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서가 뒤집혀도 actions는 가장 오른쪽', async () => {
+  installFigma();
+  const links = { type: 'FRAME', id: 'links', name: 'top-inner', layoutMode: 'HORIZONTAL', x: 1412, width: 188, height: 24, children: [T('l1', '로그인'), T('l2', '회원가입')] };
+  const logo = { type: 'FRAME', id: 'logo', name: 'Frame 6', x: 320, width: 130, height: 40, children: [V('lv', { width: 120, height: 40 })] };
+  const row = { type: 'FRAME', id: 'row', name: 'Frame 5', x: 0, width: 1920, height: 40, children: [links, logo] };
+  const header = { type: 'FRAME', id: 'hd', name: 'Frame 2', layoutMode: 'VERTICAL', width: 1920, height: 150, children: [row] };
+  const body = { type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1920, height: 4000, children: [V('bv')] };
+  const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL', width: 1920, height: 4150, children: [header, body] };
+  const r = await renameSelection([page], { apply: false, maxDepth: 5 });
+  const a = new Map(r.changes.map((c) => [c.id, c.after]));
+  assert.notEqual(a.get('links'), 'header-logo');
+  assert.equal(a.get('links'), 'header-actions'); // 가장 오른쪽 + 글자 2개
+  assert.equal(a.get('logo'), 'header-logo'); // 가장 왼쪽 · 왼쪽 1/3
+});
+
+test('B.24 ⑤ row — 이름표 + 값 나란히 · 좁으면 아님 · 값 글자 3개 이상이면 아님 · 페이지 번호 아님', async () => {
+  installFigma();
+  const price = { type: 'INSTANCE', id: 'pv', name: '금액', x: 228, y: 0, width: 124, height: 23, children: [T('pvt', '9,999원')] };
+  const row = { type: 'FRAME', id: 'row', name: '구독', width: 352, height: 28, children: [T('lab', '구독', { x: 0, y: 2 }), price] };
+  let r = await inCard(row);
+  assert.equal(r.changes.find((c) => c.id === 'row')?.after, 'card-row');
+  const narrow = { type: 'FRAME', id: 'nr', name: 'Frame 5', width: 60, height: 28, children: [T('a', '구독', { x: 0, y: 0 }), T('b', '1', { x: 40, y: 0 })] };
+  r = await inCard(narrow);
+  assert.notEqual(r.changes.find((c) => c.id === 'nr')?.after, 'card-row');
+  const big = { type: 'FRAME', id: 'bg', name: 'Frame 6', width: 400, height: 40, children: [T('c', '메뉴', { x: 0, y: 0 }),
+    { type: 'FRAME', id: 'nav3', name: 'Frame 7', x: 100, y: 0, width: 300, height: 40, children: [T('d1', 'a'), T('d2', 'b'), T('d3', 'c')] }] };
+  r = await inCard(big);
+  assert.notEqual(r.changes.find((c) => c.id === 'bg')?.after, 'card-row');
+  const pg = { type: 'FRAME', id: 'pg', name: 'swiper-num', layoutMode: 'HORIZONTAL', width: 60, height: 20, children: [T('p1', '01'), T('p2', '/ 03')] };
+  r = await inCard(pg);
+  assert.ok(!['card-row', 'card-text-group'].includes(r.changes.find((c) => c.id === 'pg')?.after));
+});
+
+test('B.24 ⑥ text-group — 글자 2개 세로 · 가로 3개(오토레이아웃 · 자유 배치)는 아님', async () => {
+  installFigma();
+  const tg = { type: 'FRAME', id: 'tg', name: '상품명', layoutMode: 'VERTICAL', width: 292, height: 42, children: [T('b', 'Vipp'), T('n', '소파')] };
+  let r = await inCard(tg);
+  assert.equal(r.changes.find((c) => c.id === 'tg')?.after, 'card-text-group');
+  const h3 = { type: 'FRAME', id: 'h3', name: 'menu', layoutMode: 'HORIZONTAL', width: 300, height: 20, children: [T('a', 'A'), T('b2', 'B'), T('c', 'C')] };
+  r = await inCard(h3);
+  assert.notEqual(r.changes.find((c) => c.id === 'h3')?.after, 'card-text-group');
+  const free3 = { type: 'FRAME', id: 'f3', name: 'menu', width: 300, height: 20, children: [T('x', 'A', { x: 0, y: 0 }), T('y', 'B', { x: 100, y: 0 }), T('z', 'C', { x: 200, y: 0 })] };
+  r = await inCard(free3);
+  assert.notEqual(r.changes.find((c) => c.id === 'f3')?.after, 'card-text-group');
+});
+
+test('B.24 ⑦ media — 사진 + 아이콘 프레임 · 원형 사진만이면 아님', async () => {
+  installFigma();
+  const box = { type: 'FRAME', id: 'box', name: 'img_box', width: 292, height: 292, children: [
+    { type: 'RECTANGLE', id: 'ph', name: 'image 18', width: 292, height: 292, fills: imgFill },
+    { type: 'FRAME', id: 'ht', name: 'heart', width: 28, height: 28, children: [V('hv')] }] };
+  let r = await inCard(box);
+  const a = new Map(r.changes.map((c) => [c.id, c.after]));
+  assert.equal(a.get('box'), 'card-media');
+  assert.ok(!a.has('ht'), 'heart는 모양 이름 그대로');
+  const av = { type: 'FRAME', id: 'av', name: 'Frame 4', width: 40, height: 40, children: [{ type: 'ELLIPSE', id: 'e', name: 'Ellipse 1', width: 40, height: 40, fills: imgFill }] };
+  r = await inCard(av);
+  assert.notEqual(r.changes.find((c) => c.id === 'av')?.after, 'card-media');
+  // 글자를 얹은 사진 배너를 담은 줄은 media 아님
+  const strip = { type: 'FRAME', id: 'strip', name: 'main-visual', layoutMode: 'HORIZONTAL', width: 1920, height: 700, children: [
+    { type: 'FRAME', id: 'bn', name: 'Banner_01', width: 1280, height: 700, fills: imgFill, children: [T('bt', 'Galaxy')] }] };
+  r = await inCard(strip);
+  assert.notEqual(r.changes.find((c) => c.id === 'strip')?.after, 'card-media');
+});
+
+test('B.24 ⑧ 앞 판정(list 직속 → item)이 붙던 노드는 B1–B3 조건이어도 그대로', async () => {
+  installFigma();
+  const it = (i) => ({ type: 'FRAME', id: `it${i}`, name: `Frame ${i}`, layoutMode: 'VERTICAL', width: 100, height: 40, children: [T(`a${i}`, 'x'), T(`b${i}`, 'y')] });
+  const list = { type: 'FRAME', id: 'list', name: 'Frame 3', layoutMode: 'HORIZONTAL', width: 320, height: 40, children: [it(0), it(1), it(2)] };
+  const r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [list] }], { apply: false, maxDepth: 5 });
+  assert.match(r.changes.find((c) => c.id === 'it0')?.after, /^(list|nav)-item$/); // text-group이 아니라 item
+});
+
+test('B.24 ⑨–⑬ 맥락 통과 · 판넬 역할 되읽기 · 접두사 · 쓰임 주인 · 토큰 맥락', async () => {
+  installFigma();
+  // ⑨ card > media > 사진 → 사진 이름은 지금과 같음(card-image)
+  const box = { type: 'FRAME', id: 'box', name: 'img', width: 300, height: 200, children: [{ type: 'RECTANGLE', id: 'ph', name: 'image', width: 300, height: 200, fills: imgFill }] };
+  const r = await inCard(box);
+  assert.equal(r.changes.find((c) => c.id === 'ph')?.after, 'card-image');
+  // ⑩ writeRoleFromName 두 낱말 역할
+  const n = withPd({ type: 'FRAME', id: 'n', name: 'x' });
+  writeRoleFromName(n, 'item-text-group');
+  assert.equal(n._pd.get('dsRole'), 'text-group');
+  // ⑪ 루트 접두사 text + 역할 그 자체
+  assert.equal(stripRootPrefix('text-group', 'text', 'text-group'), 'text-group');
+  assert.equal(stripRootPrefix('text-header', 'text', 'header'), 'header');
+  // ⑫ 쓰임 이름 주인 아님
+  for (const role of ['row', 'text-group', 'media']) assert.equal(pickOwner(role, undefined, isKnownRolePure), undefined, role);
+  assert.equal(pickOwner('icon', undefined, isKnownRolePure), 'icon');
+  // ⑬ 맥락에서 새 역할은 보통 낱말
+  assert.equal(pickScopePure('card-media'), 'card');
+});
+
