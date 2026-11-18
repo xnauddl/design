@@ -6324,7 +6324,7 @@
     if (layoutOf(node) !== "vertical") return false;
     const shown = kids.filter(isVisible);
     if (shown.length < 2 || shown.length > 4) return false;
-    const hasLabel = shown.some((k) => k.type === "TEXT");
+    const hasLabel = shown.some((k) => k.type === "TEXT" && shortOneLine(k));
     const hasInput = shown.some(isInputBox);
     const shortBlocks = shown.every((k) => {
       var _a, _b;
@@ -6917,7 +6917,7 @@
     if (layoutOf2(node) !== "vertical") return false;
     const shown = kids.filter(isVisible2);
     if (shown.length < 2 || shown.length > 4) return false;
-    const hasLabel = shown.some((k) => k.type === "TEXT");
+    const hasLabel = shown.some((k) => k.type === "TEXT" && shortOneLine(k));
     const hasInput = shown.some(isInputBox2);
     const shortBlocks = shown.every((k) => {
       var _a, _b;

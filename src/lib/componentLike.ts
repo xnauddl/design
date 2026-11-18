@@ -270,7 +270,8 @@ function isFieldLike(node: LikeNode, kids: readonly LikeNode[]): boolean {
   if (layoutOf(node) !== 'vertical') return false;
   const shown = kids.filter(isVisible);
   if (shown.length < 2 || shown.length > 4) return false;
-  const hasLabel = shown.some((k) => k.type === 'TEXT');
+  // 이름표 = 짧은 한 줄 글자(두 줄 안내 글은 이름표 아님 — ia-v4 §4.4 A3 실기 2).
+  const hasLabel = shown.some((k) => k.type === 'TEXT' && shortOneLine(k as unknown as Parameters<typeof shortOneLine>[0]));
   const hasInput = shown.some(isInputBox);
   // 글자가 아닌 자식은 모두 입력 높이 안(≤72) — 목록 · 이미지 블록이 끼면 섹션이지 field가 아니다(ia-v4 §4.4 A3).
   const shortBlocks = shown.every((k) => k.type === 'TEXT' || ((dims(k)?.h ?? Infinity) <= 72));

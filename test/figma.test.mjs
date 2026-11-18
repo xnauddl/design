@@ -7655,6 +7655,18 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   const r2 = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [field] }], { apply: false, maxDepth: 5 });
   assert.equal(r2.changes.find((c) => c.id === 'fd')?.after, 'field');
   assert.equal(hcRolePure(field), 'field');
+  // 실기 2: [두 줄 안내 글 + 76×30 테두리 버튼] → field 아님, 버튼은 button
+  const app = { type: 'FRAME', id: 'app', name: 'Frame 29', layoutMode: 'VERTICAL', width: 151, height: 70, children: [
+    T('desc', '일상구독 앱을 다운받고\n다양한 혜택을 만나보세요.', { width: 135, height: 32 }),
+    { type: 'FRAME', id: 'ab', name: 'button', layoutMode: 'HORIZONTAL', width: 76, height: 30, cornerRadius: 4, strokes: vis, paddingLeft: 8, paddingRight: 8, children: [
+      { type: 'FRAME', id: 'abl', name: 'arrow_left', visible: false, width: 12, height: 12, children: [V('ablv')] },
+      T('abt', '앱다운로드'),
+      { type: 'FRAME', id: 'abr', name: 'arro_right', visible: false, width: 12, height: 12, children: [V('abrv')] }] }] };
+  const r3 = await inCard(app);
+  const a3 = new Map(r3.changes.map((c) => [c.id, c.after]));
+  assert.ok(!String(a3.get('app')).endsWith('field'), a3.get('app'));
+  assert.equal(a3.get('ab'), 'card-button');
+  assert.notEqual(hcRolePure(app), 'field');
 });
 
 test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서가 뒤집혀도 actions는 가장 오른쪽', async () => {
