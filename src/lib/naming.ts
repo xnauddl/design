@@ -193,7 +193,7 @@ function limitDepth(segs: string[], maxDepth = 8): string[] {
  * 대소문자는 Figma 기본 표기(PascalCase)에 맞춰 정확히 일치 — 의도적 소문자명은 보존.
  */
 const DEFAULT_NAME_RE =
-  /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
+  /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( ?\d+)?( copy( \d+)?)?$/;
 
 export function isDefaultName(name: string): boolean {
   const n = name.trim();

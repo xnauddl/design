@@ -2430,6 +2430,7 @@ window.onmessage = (event: MessageEvent) => {
       // 반복 이름 · 속성 접힘 · 버튼 · 칩 · 탭). 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 둔다.
       compScanned = true; // 찾은 적 있음 — 결과가 0개여도 [등록] 사유는 ②(ia-v4 §4.3a-2)
       compCandidates = msg.nodes;
+      setCompAutoNamed(msg.autoNamed ?? 0); // 이름 없는 레이어 안내(C-D15 — ia-v4 §4.5)
       compChecked.clear();
       for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
       renderCompTree();
@@ -4204,6 +4205,12 @@ function updateCompRegister(): void {
   updateEmptyLocks(); // 체크 바꿈 · 후보 트리 — [등록] 잠금 · 주 버튼
 }
 
+/** 이름 없는 레이어 안내 줄(2026-11-18 C-D15 — ia-v4 §4.5): Figma 자동 이름이라 뺀 레이어 수, 0이면 숨김. */
+function setCompAutoNamed(n: number): void {
+  const el = $('compAutoNamed');
+  el.textContent = n > 0 ? t('component.autoNamed', { n }) : '';
+  el.hidden = n <= 0;
+}
 /** 찾은 적 있는지(ia-v4 §4.3a-2 [등록] 잠금 ①②) — 결과가 0개여도 참, 목록을 비우면 거짓. */
 let compScanned = false;
 /**
@@ -4219,6 +4226,7 @@ function clearCompLists(): void {
   compCandidates = [];
   compChecked.clear();
   clearMount($('compTree'));
+  setCompAutoNamed(0);
   $('compTreeCount').textContent = '';
   $('compTreeGroup').style.display = 'none';
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';

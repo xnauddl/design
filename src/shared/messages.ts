@@ -332,7 +332,7 @@ export type CodeToUi =
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
-  | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[]; reqId?: number } // #1: 등록 후보 트리(영향+조상)
+  | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[]; autoNamed?: number; reqId?: number } // #1: 등록 후보 트리(영향+조상)
   // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[]; fillKept?: string[]; reused?: string[]; reuseKept?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번). fillKept: 사진·크기 검사로 묶지 않은 멤버(§4.7 8번). reused: 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름) · reuseKept: 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버(§4.7 "재사용")
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)

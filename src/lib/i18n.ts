@@ -698,6 +698,7 @@ export const STRINGS: Record<string, string> = {
   'similar.componentizeHelp': '고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.',
   'similar.needScan': '먼저 ‘닮은 프레임 찾기’를 눌러 주세요',
   'component.needScan': '먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요',
+  'component.autoNamed': '이름 없는 레이어 {n}개 — ‘이름 정리’를 먼저 하면 후보가 돼요',
   'component.fromName': '원래 이름 {name}',
   // 내보내기
   'export.title': '코드로 내보내기',

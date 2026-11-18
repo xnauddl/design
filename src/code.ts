@@ -21,7 +21,7 @@ import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
 import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
@@ -849,7 +849,10 @@ function sceneComponentEligible(n: SceneNode, index?: ReadonlyMap<string, Struct
   if (!isEffectivelyVisible(n)) return false;
   // 아이콘 프레임과 그 안은 후보가 아니다 — 선택 루트도(§4.7 "묶기" 3번). `toStructNode`의 루트 동작은 그대로 두고 게이트에서 본다.
   if (insideIconFrame(n)) return false;
-  return componentEligible(index?.get(n.id) ?? toStructNode(n));
+  const st = index?.get(n.id) ?? toStructNode(n);
+  // Figma 자동 이름은 후보가 아니다(C-D15 — 탭 제외, 스캔 없는 [등록] · nodeIds 모두).
+  if (isAutoNamedCandidate({ ...st, name: n.name })) return false;
+  return componentEligible(st);
 }
 
 /** 노드 자신이나 조상이 아이콘 프레임인가(§4.7 "묶기" 3번 — 후보 게이트). 96보다 크면 바로 빠진다. */
@@ -1593,24 +1596,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if ('children' in n) for (const c of n.children as readonly SceneNode[]) index(c);
         };
         for (const r of roots) index(r);
-        // eligible 재확인(조상 숨김 — 순수 스캔은 선택 서브트리만 보아 놓칠 수 있음).
-        const gated = candidates.map((c) => {
-          const live = liveById.get(c.id);
-          if (!live || !isEffectivelyVisible(live)) return { ...c, eligible: false };
-          return c;
+        // eligible 재확인(조상 숨김 — 순수 스캔은 선택 서브트리만 보아 놓칠 수 있음) → 자동 이름 수를 센 뒤(C-D15)
+        // 고아 맥락 조상 제거 → 레이어별 자동 이름 표시 지움(gateComponentCandidates).
+        const { nodes: pruned, autoNamed } = gateComponentCandidates(candidates, (id) => {
+          const live = liveById.get(id);
+          return !!live && isEffectivelyVisible(live);
         });
-        // eligible이 빠진 뒤 고아 맥락 조상 제거.
-        const byCand = new Map(gated.map((c) => [c.id, c]));
-        const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
-        for (const c of gated) {
-          if (!c.eligible) continue;
-          let p = c.parentId;
-          while (p && !keepIds.has(p)) {
-            keepIds.add(p);
-            p = byCand.get(p)?.parentId ?? null;
-          }
-        }
-        const pruned = gated.filter((c) => keepIds.has(c.id));
         // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
         // 반복(2개+) → 구조 차이면 group+variant(자동체크), 속성(텍스트/스왑/불리언)만 다르면
         // propsOnly+single(자동체크·단품 접힘). 단독(1개) → single(PascalCase).
@@ -1658,7 +1649,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 미리보기 라벨 실패해도 후보는 반환(스캔 중 고정 방지).
           console.warn('component preview label failed', e);
         }
-        post({ type: 'COMPONENT_CANDIDATES', nodes, reqId: msg.reqId });
+        post({ type: 'COMPONENT_CANDIDATES', nodes, autoNamed, reqId: msg.reqId });
         break;
       }
       case 'REGISTER_COMPONENTS': {

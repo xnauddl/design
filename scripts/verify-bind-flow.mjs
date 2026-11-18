@@ -2528,6 +2528,26 @@ async function fillBoth(p) {
   await p.close();
 }
 
+{
+  // 이름 없는 레이어 안내(C-D15 — ia-v4 §4.5 · ia-v3 A.15 "실기 확인 뒤 더함")
+  const p = await compScreen();
+  const scanWith = async (nodes, autoNamed) => { await p.click('#btnScanComp'); await recv(p, { type: 'COMPONENT_CANDIDATES', nodes, autoNamed, reqId: await lastReq(p, 'SCAN_COMPONENT_CANDIDATES') }); await p.waitForTimeout(40); };
+  const line = () => p.$eval('#compAutoNamed', (e) => (e.hidden || !e.getClientRects().length ? null : e.textContent));
+  await scanWith(COMP_NODES, 2);
+  check('25 찾기 응답 autoNamed 2 → 후보 목록 아래 안내 줄 "이름 없는 레이어 2개 — …"', (await line()) === '이름 없는 레이어 2개 — ‘이름 정리’를 먼저 하면 후보가 돼요' && (await p.$eval('#compAutoNamed', (e) => e.previousElementSibling?.id)) === 'compTree', String(await line()));
+  const look = await p.$eval('#compAutoNamed', (e) => { const c = getComputedStyle(e); return { bw: c.borderTopWidth, bg: c.backgroundColor }; });
+  check('25 안내 줄 = 글 한 줄(테두리 · 배경 없음)', look.bw === '0px' && look.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(look));
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/cd15.png` : '/dev/null' }).catch(() => {});
+  await scanWith(COMP_NODES, 0);
+  check('25 autoNamed 0 → 안내 줄 없음', (await line()) === null);
+  await scanWith([], 3);
+  check('25 후보 0 + autoNamed 3 → component.noEligible 경고 + 안내 줄 · [등록] 사유 "등록할 수 있는 프레임이 없어요"', (await p.textContent('#structureStatus')) === '선택 아래에 등록할 수 있는 프레임이 없어요.' && (await line()) === '이름 없는 레이어 3개 — ‘이름 정리’를 먼저 하면 후보가 돼요' && (await lockMsg(p, '#btnRegisterComp')) === '등록할 수 있는 프레임이 없어요');
+  await recv(p, { ...sel(1, 0), ids: ['w7'] });
+  await p.waitForTimeout(30);
+  check('25 기준이 바뀌면 안내 줄도 지움', (await line()) === null);
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);

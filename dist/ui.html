@@ -1070,6 +1070,8 @@
       <!-- 목록 머리 띠 + 개수(ia-v4 §4.3a-3) -->
       <div class="r-group r-ghead" id="compTreeGroup" style="display:none"><span data-i18n="structure.groupComp">컴포넌트 후보</span><span class="r-gcnt" id="compTreeCount"></span></div>
       <div id="compTree" class="results"></div>
+      <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
+      <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
       <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
       <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
@@ -2058,6 +2060,7 @@
     "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
     "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "component.autoNamed": "\uC774\uB984 \uC5C6\uB294 \uB808\uC774\uC5B4 {n}\uAC1C \u2014 \u2018\uC774\uB984 \uC815\uB9AC\u2019\uB97C \uBA3C\uC800 \uD558\uBA74 \uD6C4\uBCF4\uAC00 \uB3FC\uC694",
     "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
     // 내보내기
     "export.title": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30",
@@ -5883,7 +5886,7 @@
   if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6179,6 +6182,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
+        setCompAutoNamed((_m = msg.autoNamed) != null ? _m : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6193,12 +6197,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_m = msg.placeFailed) != null ? _m : [];
-        const cloned = (_n = msg.placeCloned) != null ? _n : [];
-        const propFailed = (_o = msg.propFailed) != null ? _o : [];
-        const fillKept = (_p = msg.fillKept) != null ? _p : [];
-        const reused = (_q = msg.reused) != null ? _q : [];
-        const reuseKept = (_r = msg.reuseKept) != null ? _r : [];
+        const misplaced = (_n = msg.placeFailed) != null ? _n : [];
+        const cloned = (_o = msg.placeCloned) != null ? _o : [];
+        const propFailed = (_p = msg.propFailed) != null ? _p : [];
+        const fillKept = (_q = msg.fillKept) != null ? _q : [];
+        const reused = (_r = msg.reused) != null ? _r : [];
+        const reuseKept = (_s = msg.reuseKept) != null ? _s : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -6264,7 +6268,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_s = msg.placeFailed) != null ? _s : [];
+          const misplaced0 = (_t = msg.placeFailed) != null ? _t : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -6273,7 +6277,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_t = msg.placeFailed) != null ? _t : [];
+        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -7980,6 +7984,11 @@
     }
     updateEmptyLocks();
   }
+  function setCompAutoNamed(n) {
+    const el = $("compAutoNamed");
+    el.textContent = n > 0 ? t("component.autoNamed", { n }) : "";
+    el.hidden = n <= 0;
+  }
   var compScanned = false;
   function clearCompLists() {
     const hadFocus = compFocusInLists();
@@ -7989,6 +7998,7 @@
     compCandidates = [];
     compChecked.clear();
     clearMount($("compTree"));
+    setCompAutoNamed(0);
     $("compTreeCount").textContent = "";
     $("compTreeGroup").style.display = "none";
     $("compTreeCtrls").style.display = "none";

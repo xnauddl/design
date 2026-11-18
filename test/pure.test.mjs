@@ -878,7 +878,7 @@ test('scanComponentCandidates(#1) — 채움·모서리·그림자를 잃으면 
     { id: 'bd', name: 'Body', type: 'TEXT' },
   ];
   const card = (extra) => ({
-    id: 'c', name: 'Frame 12', type: 'FRAME', layoutMode: 'VERTICAL',
+    id: 'c', name: 'product-card', type: 'FRAME', layoutMode: 'VERTICAL',
     width: 240, height: 260, children: kids, ...extra,
   });
   const eligibleOf = (node) => {
