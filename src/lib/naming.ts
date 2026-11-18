@@ -107,6 +107,17 @@ export function isKnownRole(seg: string): boolean {
   return ROLE_SET.has(seg);
 }
 
+/** 세분화 1차 역할(ia-v4 §4.4 B1–B3) — 자식에게 맥락을 통과시키는 이름 전용 역할. */
+const REFINED_ROLES = new Set(['row', 'text-group', 'media']);
+
+/**
+ * 맥락 판정용 역할 낱말인지 — 역할 어휘이되 세분화 1차 역할은 보통 낱말로 본다.
+ * `pickScope` · 페이지 부모 · 루트 접두사 검사가 쓴다(맥락이 세분화 전과 같게 — ia-v4 §4.4).
+ */
+export function isScopeRole(seg: string): boolean {
+  return ROLE_SET.has(seg) && !REFINED_ROLES.has(seg);
+}
+
 export type Role = (typeof ROLE_VOCAB)[number];
 
 /** 임의 문자열 → kebab-case 소문자. 카멜/공백/슬래시를 '-'로 정규화.
@@ -295,7 +306,7 @@ export function pickScope(name: string): string | null {
     .split('-')
     .filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
   if (!segs.length) return null;
-  const known = segs.filter(isKnownRole);
+  const known = segs.filter(isScopeRole);
   return known.length ? known[known.length - 1] : segs[segs.length - 1];
 }
 

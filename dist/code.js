@@ -2325,6 +2325,10 @@
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
   }
+  var REFINED_ROLES = /* @__PURE__ */ new Set(["row", "text-group", "media"]);
+  function isScopeRole(seg) {
+    return ROLE_SET.has(seg) && !REFINED_ROLES.has(seg);
+  }
   function kebab(input) {
     return input.replace(/([a-z0-9])([A-Z])/g, "$1-$2").replace(/[\s/]+/g, "-").replace(/_/g, (_m, i, s) => /\d/.test(s[i - 1] || "") && /\d/.test(s[i + 1] || "") ? "_" : "-").replace(/[^a-zA-Z0-9_-]+/g, "-").replace(/-+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
   }
@@ -2435,7 +2439,7 @@
   function pickScope(name) {
     const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
     if (!segs.length) return null;
-    const known = segs.filter(isKnownRole);
+    const known = segs.filter(isScopeRole);
     return known.length ? known[known.length - 1] : segs[segs.length - 1];
   }
 
