@@ -1427,7 +1427,7 @@
   }
 
   // src/lib/usageRoles.ts
-  var STRUCTURAL = /* @__PURE__ */ new Set(["container", "wrapper", "shape", "group", "content", "body"]);
+  var STRUCTURAL = /* @__PURE__ */ new Set(["container", "wrapper", "shape", "group", "content", "body", "row", "text-group", "media"]);
   function pickOwner(dsRole, highConfidence, known) {
     if (dsRole && known(dsRole) && !STRUCTURAL.has(dsRole)) return dsRole;
     return highConfidence != null ? highConfidence : void 0;
@@ -2267,6 +2267,13 @@
     // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
     "article",
     "figure",
+    // 역할 세분화 1차(ia-v4 §4.4 B1–B3) — 폴백 자리에서만, 자식에게는 맥락을 통과시킨다
+    "row",
+    // 이름표 글자 + 값 한 줄
+    "text-group",
+    // 글자만 2개 이상
+    "media",
+    // 사진(+ 작은 아이콘)만 담은 상자
     // 컴포넌트
     "button",
     "chip",
@@ -6831,7 +6838,11 @@
     if (shown.length < 2 || shown.length > 4) return false;
     const hasLabel = shown.some((k) => k.type === "TEXT");
     const hasInput = shown.some(isInputBox2);
-    return hasLabel && hasInput;
+    const shortBlocks = shown.every((k) => {
+      var _a, _b;
+      return k.type === "TEXT" || ((_b = (_a = dims2(k)) == null ? void 0 : _a.h) != null ? _b : Infinity) <= 72;
+    });
+    return hasLabel && hasInput && shortBlocks;
   }
   function isNavLike2(node, depth) {
     var _a;
