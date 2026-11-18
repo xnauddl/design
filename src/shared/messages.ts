@@ -43,6 +43,8 @@ export interface RenameChange {
   id: string;
   before: string;
   after: string;
+  /** 보이는 이름에서 루트 접두사를 뗐으면 떼기 전 이름(ia-v4 §4.4) — 적용 때 `dsNameKey`로 남긴다. */
+  nameKey?: string;
 }
 
 /**
@@ -67,6 +69,8 @@ export interface RenameNode {
   keep?: KeepReason;
   /** 이 이름을 만든 역할(card·thumbnail…). 적용 때 `dsRole`로 남겨 등록이 읽는다. */
   role?: string;
+  /** 판정 이름 ≠ 보이는 이름(루트 접두사를 뗌)이면 판정 이름 — 이름이 그대로인 다시 정리에서도 싣는다(ia-v4 §4.4). */
+  nameKey?: string;
 }
 
 /**
@@ -196,7 +200,7 @@ export interface VarUpdateError {
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT'; nodeIds?: string[]; reqId?: number } // reqId: 만들기 화면 요청 번호(결과에 그대로 돌려줌, IA v4 §4.3) · nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number; globalOnly?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리 · globalOnly: Global만(Semantic을 만들지 않음 — 무료도 됨, IA v4 §4.3 무료 규칙)
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
   // 매칭은 언제나 "같은 값"(IA v3 §2.11 — 숫자 소수 2자리, 색 #RRGGBB + 양쪽 불투명). 허용오차는 없앴다.
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
@@ -226,7 +230,7 @@ export type UiToCode =
   | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[]; reqId?: number }
   | { type: 'UNBIND_DELETED'; reqId: number; nodeIds?: string[] } // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3)
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
-  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
+  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
   | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
@@ -249,7 +253,7 @@ export type UiToCode =
   // URL은 code가 licenseConfig에서 해석한다(임의 URL 전달 금지 — 열린 리다이렉트 방지).
   | { type: 'OPEN_LICENSE_LINK'; target: 'purchase' | 'portal' }
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
-  | { type: 'SCAN_COMPONENT_CANDIDATES' } // #1(Paid): 선택 하위 순회 → 등록 후보 트리
+  | { type: 'SCAN_COMPONENT_CANDIDATES'; nodeIds?: string[]; reqId?: number } // #1(Paid): 목록 기준(nodeIds — ia-v4 §2.5) 하위 순회 → 등록 후보 트리. reqId는 응답에 돌려받아 비운 뒤 늦게 온 응답을 버린다(§4.5)
   // names: 트리가 보여 준 노드별 이름(WYSIWYG). 이름 충돌 해소는 후보 전체를 봐야 같은 답이
   // 나오는데 등록은 체크한 것만 받으므로, 미리보기의 결론을 그대로 실어 보낸다.
   | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[]; names?: Record<string, string> } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
@@ -260,7 +264,7 @@ export type UiToCode =
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
   | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 추가) 자동 채움
-  | { type: 'SCAN_SIMILAR' } // 닮은 프레임: 선택 프레임 정렬 미리보기(읽기 전용 → Free)
+  | { type: 'SCAN_SIMILAR'; nodeIds?: string[]; reqId?: number } // 닮은 프레임: 목록 기준(nodeIds) 프레임 정렬 미리보기(읽기 전용 → Free). reqId는 응답에 돌려받는다
   | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] }; // 닮은 프레임(Paid): 마스터 컴포넌트화 + 나머지를 오버라이드 인스턴스로 교체
 
 /** code → UI 응답. */
@@ -274,8 +278,8 @@ export type CodeToUi =
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
   // 변수 고치기 응답 — applied: 바꾼 것('name' 또는 modeId), 순서대로. 변수 표는 따로 보내지 않는다(UI가 다시 읽는다).
   | { type: 'VARIABLE_APPLIED'; reqId: number; applied: number; skipped: number; skipReasons: Record<string, number>; name: string } // applied · skipped = 레이어 수
-  | { type: 'VARIABLE_CREATED'; reqId: number; id: string; manualUsed: number } // manualUsed: 지금까지 직접 만든 수(무료 개수 제한, §4.9)
-  | { type: 'VARIABLE_DUPLICATED'; reqId: number; newId: string; manualUsed: number }
+  | { type: 'VARIABLE_CREATED'; reqId: number; id: string }
+  | { type: 'VARIABLE_DUPLICATED'; reqId: number; newId: string }
   | { type: 'VARIABLE_DELETED'; reqId: number; id: string }
   | { type: 'VARIABLE_UPDATED'; reqId: number; ok: boolean; applied: string[]; error?: VarUpdateError }
   | { type: 'USAGE_RESULT'; reqId: number; usage: Record<string, { places: number; layers: number }>; libraryVars: LibraryVar[]; deleted: { count: number; nodeIds: string[] }; scanned: number }
@@ -315,8 +319,6 @@ export type CodeToUi =
       tierColorVars?: number;
       /** 계층으로 인식되지 않은 컬렉션의 변수 수 — 있으면 '계층 지정' 안내. */
       otherVars?: number;
-      /** 지금까지 직접 만든 변수 수(새 변수 + 복제, 무료 개수 제한 §4.9). */
-      manualUsed?: number;
     }
   | {
       type: 'LICENSE_STATUS';
@@ -339,7 +341,7 @@ export type CodeToUi =
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string } // 토큰 코드 내보내기 결과
-  | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[] } // #1: 등록 후보 트리(영향+조상)
+  | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[]; autoNamed?: number; reqId?: number } // #1: 등록 후보 트리(영향+조상)
   // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
   | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[]; fillKept?: string[]; reused?: string[]; reuseKept?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번). fillKept: 사진·크기 검사로 묶지 않은 멤버(§4.7 8번). reused: 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름) · reuseKept: 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버(§4.7 "재사용")
   | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
@@ -350,10 +352,10 @@ export type CodeToUi =
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }
   // 닮은 프레임 스캔 결과 — metas는 완전성 점수 내림차순(맨 앞이 추천 마스터).
   // varying/imageVarying는 "무엇이 속성으로 열리는지" 미리 보여주는 용도.
-  | { type: 'SIMILAR_CANDIDATES'; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
+  | { type: 'SIMILAR_CANDIDATES'; reqId?: number; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
   | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[]; placeFailed?: string[] } // placeFailed: 제자리에 못 둔 원본 이름(원본은 그대로, §4.7)
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }
-  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'freeLimit' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 무료 한도 · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
+  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'paid' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 유료(무료의 플러그인 Semantic 컬렉션 — §4.9 F2) · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {

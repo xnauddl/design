@@ -13,7 +13,7 @@ import { colorKey } from './tokens';
 import { classifyColor } from './colorName';
 
 /** 주인으로 쓰지 않는 구조 폴백 역할(12.3 ①). */
-const STRUCTURAL = new Set(['container', 'wrapper', 'shape', 'group', 'content', 'body']);
+const STRUCTURAL = new Set(['container', 'wrapper', 'shape', 'group', 'content', 'body', 'row', 'text-group', 'media']); // 세분화 1차 역할도 주인 아님(ia-v4 §4.4)
 
 /**
  * 레이어의 주인(역할) — ① 이름 정리가 남긴 역할(어휘 안 · 구조 폴백 아님) ② 고신뢰 판정 ③ 없음.

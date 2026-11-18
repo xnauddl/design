@@ -14,6 +14,9 @@
      LICENSE_AUD          (var)    licenseConfig.LICENSE_AUD 와 동일(= pluginId).
      ADMIN_KEYS           (secret, 선택) 쉼표 구분 오너 관리자 키 — LS 없이 장기 paid 토큰 발급(테스트용).
      TOKEN_TTL_DAYS       (var, 선택) 토큰 수명(기본 30). 플러그인이 주기적으로 재검증.
+     LS_STORE_ID          (var)    우리 LemonSqueezy 스토어 id. 이 스토어의 키만 받는다.
+     LS_PRODUCT_ID        (var)    우리 상품 id. 이 상품의 키만 받는다(다른 판매자 · 다른 상품의 LS 키 거부).
+                                   둘 중 하나라도 비어 있으면 모든 키 검증을 거부한다(설정 누락 — 실패 쪽으로 닫음).
    ============================================================ */
 
 const LS_VALIDATE = 'https://api.lemonsqueezy.com/v1/licenses/validate';
@@ -69,6 +72,19 @@ async function issueToken(env, licenseExpiryMs) {
   return signJwt(payload, JSON.parse(env.LICENSE_PRIVATE_JWK));
 }
 
+/** 우리 스토어 · 상품 설정(문자열). 비어 있으면 null — 그때는 키 검증을 거부한다. */
+function productConfig(env) {
+  const store = String(env.LS_STORE_ID ?? '').trim();
+  const product = String(env.LS_PRODUCT_ID ?? '').trim();
+  return store && product ? { store, product } : null;
+}
+
+/** LS 응답의 키가 우리 스토어 · 상품 것인가. LS는 activate · validate 응답의 meta에 store_id · product_id(숫자)를 준다. */
+function isOwnProduct(data, cfg) {
+  const meta = (data && data.meta) || {};
+  return String(meta.store_id ?? '') === cfg.store && String(meta.product_id ?? '') === cfg.product;
+}
+
 async function lsCall(url, params) {
   const r = await fetch(url, {
     method: 'POST',
@@ -115,6 +131,10 @@ export default {
       return json({ token });
     }
 
+    // 우리 스토어 · 상품 설정이 없으면 어떤 키도 받지 않는다(설정 누락으로 아무 LS 키나 통과하는 일을 막음).
+    const cfg = productConfig(env);
+    if (!cfg) return json({ valid: false, error: '검증 서버 설정 누락(LS_STORE_ID · LS_PRODUCT_ID)', code: 'server' }, 500);
+
     try {
       // 1) 기존 기기: 저장된 instance_id로 validate(특정 활성 인스턴스에 바인딩).
       let data = null;
@@ -144,6 +164,14 @@ export default {
           lk.activation_usage >= lk.activation_limit;
         const code = lk.status === 'expired' ? 'expired' : atLimit ? 'limit' : 'invalid';
         return json({ valid: false, error: msg, code }, 200);
+      }
+      // 다른 판매자 · 다른 상품의 LemonSqueezy 키는 거부한다. 방금 activate로 슬롯을 잡았으면 되돌린다(best-effort —
+      // 남의 키의 활성화 슬롯을 우리가 쓰지 않게).
+      if (!isOwnProduct(data, cfg)) {
+        if (data.activated === true && newInstanceId) {
+          try { await lsCall(LS_DEACTIVATE, { license_key: key, instance_id: newInstanceId }); } catch { /* best-effort */ }
+        }
+        return json({ valid: false, error: '이 플러그인의 라이선스 키가 아닙니다.', code: 'invalid' }, 200);
       }
       // 라이선스 만료(구독 종료일). 형식 불량(NaN)은 0(만료 없음)으로 처리해 토큰 시각이 오염되지 않게 한다.
       const parsedExpiry = lk.expires_at ? Date.parse(lk.expires_at) : 0;

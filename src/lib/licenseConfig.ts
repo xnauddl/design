@@ -26,7 +26,7 @@ export const PORTAL_URL = 'https://app.lemonsqueezy.com/my-orders';
 
 /**
  * 아직 자리표시자인가 — 결제 링크를 눌러도 없는 페이지로 가는 상태.
- * UI가 이걸로 구독 버튼을 숨긴다(배포 시 URL을 갈아끼우면 자동으로 다시 노출).
+ * UI가 이걸로 구매 버튼을 잠근다(숨기지 않음 — ia-v4 §4.10 · B.21. 배포 시 URL을 갈아끼우면 저절로 풀린다).
  */
 export function licenseLinksConfigured(): boolean {
   return !PURCHASE_URL.includes('PLACEHOLDER') && !PURCHASE_URL.includes('example.');

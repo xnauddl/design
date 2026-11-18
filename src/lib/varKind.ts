@@ -127,8 +127,6 @@ export function targetAllowed(scopes: readonly string[], target: ApplyTarget): b
   return TARGET_SCOPES[target].some((s) => ex.has(s));
 }
 
-/** 무료의 새 변수 · 복제 개수 제한(§4.9 · §9) — 사용자 기준 누적 20개(2026-11-09 결정). */
-export const FREE_MANUAL_CREATE_LIMIT = 20;
 /** 직접 만든 변수 표시(§4.9). */
 export const MANUAL_KEY = 'dsl.manual';
 

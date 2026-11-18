@@ -25,6 +25,10 @@ export const EMITTED_ROLES = [
   'actions', // 헤더 끝의 링크/버튼 2~3개(Sign in · Sign up)
   'article',
   'figure',
+  // 역할 세분화 1차(ia-v4 §4.4 B1–B3) — 폴백 자리에서만, 자식에게는 맥락을 통과시킨다
+  'row', // 이름표 글자 + 값 한 줄
+  'text-group', // 글자만 2개 이상
+  'media', // 사진(+ 작은 아이콘)만 담은 상자
   // 컴포넌트
   'button',
   'chip',
@@ -83,12 +87,35 @@ export const ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES] as const;
  */
 export const ROLE_KEY = 'dsRole';
 
+/**
+ * 이름 정리가 보이는 이름에서 루트 접두사를 뗐을 때(ia-v4 §4.4 "맨 위 이름은 보이는 이름에 붙이지 않는다")
+ * 떼기 전 이름을 남기는 pluginData 키. [등록]의 이름 키(`StructNode.nameKey`)가 읽어 묶기 · 재사용 키를 지금과 같게 한다.
+ */
+export const NAME_KEY = 'dsNameKey';
+
+/** `dsNameKey`가 지금 이름에 맞는 키인가 — `-{지금 이름}`으로 끝나야 한다(대소문자까지 정확, 두 마디 이상). */
+export function nameKeyFor(name: string, stored: string | null | undefined): string | undefined {
+  if (!stored || !name) return undefined;
+  return stored.length > name.length + 1 && stored.endsWith('-' + name) ? stored : undefined;
+}
+
 /** 역할 어휘 집합(맥락 추출 시 의미 있는 세그먼트 판별용). */
 const ROLE_SET: ReadonlySet<string> = new Set(ROLE_VOCAB);
 
 /** 세그먼트가 알려진 역할 어휘인지. */
 export function isKnownRole(seg: string): boolean {
   return ROLE_SET.has(seg);
+}
+
+/** 세분화 1차 역할(ia-v4 §4.4 B1–B3) — 자식에게 맥락을 통과시키는 이름 전용 역할. */
+const REFINED_ROLES = new Set(['row', 'text-group', 'media']);
+
+/**
+ * 맥락 판정용 역할 낱말인지 — 역할 어휘이되 세분화 1차 역할은 보통 낱말로 본다.
+ * `pickScope` · 페이지 부모 · 루트 접두사 검사가 쓴다(맥락이 세분화 전과 같게 — ia-v4 §4.4).
+ */
+export function isScopeRole(seg: string): boolean {
+  return ROLE_SET.has(seg) && !REFINED_ROLES.has(seg);
 }
 
 export type Role = (typeof ROLE_VOCAB)[number];
@@ -193,7 +220,7 @@ function limitDepth(segs: string[], maxDepth = 8): string[] {
  * 대소문자는 Figma 기본 표기(PascalCase)에 맞춰 정확히 일치 — 의도적 소문자명은 보존.
  */
 const DEFAULT_NAME_RE =
-  /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( \d+)?( copy( \d+)?)?$/;
+  /^(Frame|Group|Rectangle|Ellipse|Line|Polygon|Star|Vector|Component|Instance|Slice|Section|Union|Subtract|Intersect|Exclude|Mask|Arrow)( ?\d+)?( copy( \d+)?)?$/;
 
 export function isDefaultName(name: string): boolean {
   const n = name.trim();
@@ -279,7 +306,7 @@ export function pickScope(name: string): string | null {
     .split('-')
     .filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
   if (!segs.length) return null;
-  const known = segs.filter(isKnownRole);
+  const known = segs.filter(isScopeRole);
   return known.length ? known[known.length - 1] : segs[segs.length - 1];
 }
 

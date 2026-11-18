@@ -270,9 +270,12 @@ function isFieldLike(node: LikeNode, kids: readonly LikeNode[]): boolean {
   if (layoutOf(node) !== 'vertical') return false;
   const shown = kids.filter(isVisible);
   if (shown.length < 2 || shown.length > 4) return false;
-  const hasLabel = shown.some((k) => k.type === 'TEXT');
+  // 이름표 = 짧은 한 줄 글자(두 줄 안내 글은 이름표 아님 — ia-v4 §4.4 A3 실기 2).
+  const hasLabel = shown.some((k) => k.type === 'TEXT' && shortOneLine(k as unknown as Parameters<typeof shortOneLine>[0]));
   const hasInput = shown.some(isInputBox);
-  return hasLabel && hasInput;
+  // 글자가 아닌 자식은 모두 입력 높이 안(≤72) — 목록 · 이미지 블록이 끼면 섹션이지 field가 아니다(ia-v4 §4.4 A3).
+  const shortBlocks = shown.every((k) => k.type === 'TEXT' || ((dims(k)?.h ?? Infinity) <= 72));
+  return hasLabel && hasInput && shortBlocks;
 }
 
 function isNavLike(node: LikeNode, depth: number): boolean {
@@ -406,6 +409,8 @@ export interface TabInfo {
   selected: number;
   /** 선택 칸 색 — 글자 칸은 글자 색, 틀 칸은 칸 채움(없으면 안쪽 글자 색). */
   selectedColor: string;
+  /** 선택 안 된 칸의 글자 색(§4.7 "묶기" 2번 — C-D1). 나머지 칸끼리는 모양이 같으므로 첫 나머지 칸의 글자 색. */
+  unselectedTextColor: string;
 }
 
 /** 칸 안의 보이는 직접 TEXT 하나(틀 칸 조건). 아니면 null. 그 밖의 자식은 아이콘(그림)만 허용. */
@@ -434,7 +439,19 @@ function isIconLike(n: LikeNode): boolean {
   return ok(n) && vectors > 0;
 }
 
-function shortOneLine(t: LikeNode): boolean {
+/**
+ * 아이콘 프레임인가(§4.7 "묶기" 3번 — `code.ts` `iconFrameKeyOf`와 같은 조건): FRAME · GROUP, 96 이하,
+ * 자손에 벡터 1개 이상, 자손이 벡터 · 원 · 사각형과 그것을 담은 GROUP · FRAME뿐(글자 · 사진 · 인스턴스 없음).
+ * 선택 루트(자식을 비우지 않은 StructNode)에도 쓴다 — 후보 게이트가 루트도 본다.
+ */
+export function isIconFrame(n: LikeNode): boolean {
+  if (n.type !== 'FRAME' && n.type !== 'GROUP') return false;
+  if (n.iconFrame) return true;
+  if (hasImageFill(n)) return false;
+  return isIconLike(n);
+}
+
+export function shortOneLine(t: LikeNode): boolean {
   const c = t.characters;
   if (typeof c !== 'string') return false;
   return !/[\n\r\u2028]/.test(c) && c.trim().length > 0 && c.trim().length <= 24;
@@ -450,6 +467,7 @@ export function tabInfo(node: LikeNode): TabInfo | null {
   if (cells.length < 3) return null;
   let looks: string[];
   let colors: string[];
+  let textColors: string[];
   let textCells: boolean;
   if (cells.every((c) => c.type === 'TEXT')) {
     textCells = true;
@@ -457,6 +475,7 @@ export function tabInfo(node: LikeNode): TabInfo | null {
     if (cells.some((c) => !c.fillHex)) return null; // 섞인 색 · 없음
     looks = cells.map((c) => c.fillHex as string);
     colors = looks;
+    textColors = looks;
   } else if (cells.every((c) => c.type === 'FRAME')) {
     textCells = false;
     const texts = cells.map(cellText);
@@ -465,6 +484,7 @@ export function tabInfo(node: LikeNode): TabInfo | null {
     if (cells.some((c) => typeof c.fills === 'symbol' || (hasVisibleFill(c) && !c.fillHex))) return null;
     looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ''}|${hasVisibleStroke(c) ? 's' : ''}|${texts[i]!.fillHex}`);
     colors = cells.map((c, i) => (hasVisibleFill(c) && c.fillHex ? c.fillHex : (texts[i]!.fillHex as string)));
+    textColors = texts.map((t) => t!.fillHex as string);
   } else {
     return null;
   }
@@ -479,7 +499,8 @@ export function tabInfo(node: LikeNode): TabInfo | null {
   const sel = cells[selected];
   let style: TabStyle = 'Text';
   if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf(sel) > 0 ? 'Pill' : 'Box';
-  return { style, selected, selectedColor: colors[selected] };
+  const other = selected === 0 ? 1 : 0;
+  return { style, selected, selectedColor: colors[selected], unselectedTextColor: textColors[other] };
 }
 
 function isTabLike(node: LikeNode): boolean {

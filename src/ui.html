@@ -138,7 +138,7 @@
     /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다. */
     [aria-disabled="true"] { color: var(--muted); cursor: not-allowed; box-shadow: none; }
     button[aria-disabled="true"], button[aria-disabled="true"]:hover, button[aria-disabled="true"]:active { background: var(--surface); border-color: var(--border); color: var(--muted); }
-    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--muted); } /* 잠긴 주 버튼도 글자는 옅게 — ia-v3 §2 원칙 3 · ia-v4 B.23 */
     label.inline:has(input[aria-disabled="true"]) { color: var(--muted); cursor: not-allowed; }
     button.link {
       border: none; background: none; padding: 0; width: auto;
@@ -215,6 +215,25 @@
     .sel-card.warn { background: var(--danger-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--danger); }
     .sel-card .acts { display: flex; gap: 6px; flex: 0 0 auto; }
+    /* 만들기 카드(IA v4 §4.1 상태 6) — 카드 하나, 값 줄은 아래 구분선 한 줄만(카드 안 카드 없음 — §2.8) */
+    .sel-card.mk { display: block; }
+    .mk .s { line-height: 1.45; }
+    .mk-lab { font-size: 11px; color: var(--text-2); margin: 10px 0 2px; }
+    .mk-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .mk-row .sw { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); flex: 0 0 auto; }
+    .mk-row .sw.n { border-radius: 3px; background: var(--surface-2); box-shadow: none; font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+    .mk-row .v { font-family: var(--mono); font-size: 11.5px; width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mk-row .nm { flex: 1 1 auto; min-width: 0; color: var(--text-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mk-row .c { color: var(--text-2); font-size: 11px; flex: 0 0 auto; text-align: right; min-width: 52px; }
+    .mk-row .st { width: 72px; flex: 0 0 auto; text-align: center; font-size: 11px; }
+    .mk-row .st.ok { color: var(--ok); }
+    .mk-row button { height: 24px; min-height: 24px; padding: 0 8px; font-size: 11px; width: 72px; flex: 0 0 auto; }
+    .mk-foot { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 11.5px; color: var(--text-2); }
+    .mk-foot .grow { flex: 1 1 auto; }
+    .mk-lock { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; margin-top: 6px; font-size: 11px; color: var(--text-2); }
+    .mk-lock button.link-btn, .mk .s button.link-btn { font-size: 11px; min-height: 20px; }
+    .mk-ts { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text-2); }
+    .mk-ts .grow { flex: 1 1 auto; }
     .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: 6px; min-height: 48px; border-top: 1px solid var(--border); background: var(--bg, #fff); color: var(--text-2); margin-top: 8px; }
     .sub-head { display: flex; align-items: center; gap: 8px; min-height: 40px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
     .sub-head[hidden] { display: none; }
@@ -576,6 +595,11 @@
     .ed-pnone { padding: 8px; color: var(--text-2); font-size: 11px; }
     .ed-alert { padding: 5px 8px; border-radius: 5px; font-size: 11px; background: var(--surface-2); color: var(--text-2); }
     .ed-alert.err { background: var(--danger-subtle); color: var(--danger); }
+    .r-lkw { display: inline-flex; align-items: center; flex: 0 0 auto; }
+    .r-lk { font-size: 11px; margin-right: 4px; flex: 0 0 auto; }
+    .r-role.lk { color: var(--muted); opacity: .7; }
+    .ed-alert.paid { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
+    .ed-alert.paid button.link-btn { min-height: 18px; font-size: 11px; }
     .ed-confirm { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11px; }
     .ed-confirm span { flex: 1 1 auto; }
     .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
@@ -701,8 +725,9 @@
     button.bv-switch[aria-checked="mixed"] .bv-track { background: var(--accent); }
     button.bv-switch[aria-checked="mixed"] .bv-track::after { left: 8px; width: 12px; height: 4px; top: 6px; border-radius: 2px; }
     button.bv-switch[aria-disabled="true"] { opacity: .45; cursor: default; }
-    .make-free { display: flex; gap: 6px; align-items: center; margin: 2px 0 6px; font-size: 11px; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
-    .make-free .grow { flex: 1 1 auto; }
+    .make-free { margin: 2px 0 6px; font-size: 11px; line-height: 1.5; background: var(--surface-2); border-radius: 6px; padding: 6px 8px; color: var(--text-2); }
+    .make-free .mfb2 { display: flex; align-items: center; flex-wrap: wrap; gap: 0 4px; }
+    .make-free .mfb2 button.link-btn, .mk-bar #makeSemLic { min-height: 18px; font-size: 11px; }
     .make-more { padding: 10px 2px 2px; font-size: 11px; color: var(--text-2); }
     .mk-tabs { display: flex; gap: 18px; border-bottom: 1px solid var(--border); padding: 0 2px; margin: 0 0 2px; }
     .mk-tabs button { height: 36px; min-height: 36px; padding: 0; border: none; border-radius: 0; background: none; font-size: 12.5px; color: var(--text-2); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; align-items: center; gap: 5px; }
@@ -756,16 +781,6 @@
     /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
     .list-head { margin: 0 0 6px; }
     .list-head .lh-row { display: flex; align-items: center; gap: 4px; }
-    /* 쓰는 변수 필터 줄 — 옅은 배경 띠 + 아래 구분선(카드 모양 아님, CLAUDE.md) */
-    .uses-bar { display: flex; align-items: center; gap: 6px; height: 28px; margin-top: 6px; padding: 0 4px 0 8px; background: var(--surface-2); border-bottom: 1px solid var(--border); color: var(--text-2); font-size: 11.5px; min-width: 0; }
-    .uses-bar[hidden] { display: none; }
-    .uses-bar .ub-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .uses-bar .ub-diff { color: var(--warn); white-space: nowrap; flex: 0 0 auto; }
-    .uses-bar .ub-rebase { flex: 0 0 auto; white-space: nowrap; }
-    .uses-bar .grow { flex: 1 1 auto; }
-    /* 필터 중 줄: 이름 · 값 140 · "{n}곳" */
-    .vt-row.vt-row.uses { grid-template-columns: minmax(0, 1fr) 140px 38px; }
-    .vt-row .vr-n { text-align: right; color: var(--text-2); font-variant-numeric: tabular-nums; font-size: 11px; white-space: nowrap; }
     .chip-bar { display: flex; align-items: center; gap: 4px; margin: 0 0 6px; min-width: 0; }
     .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
     .chip-row::-webkit-scrollbar { display: none; }
@@ -968,14 +983,6 @@
       <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
       <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
      </div>
-     <!-- 쓰는 변수 필터 줄(IA v4 §4.6) — 선택 탭 카드 2 [보기 →]로 켬, 필터 중에만 보임 -->
-     <div class="uses-bar" id="usesFilterBar" hidden>
-      <span class="ub-name" id="usesFilterName"></span>
-      <span class="ub-diff" id="usesFilterDiff" hidden></span>
-      <button class="link link-btn ub-rebase" id="usesFilterRebase" type="button" hidden></button>
-      <span class="grow"></span>
-      <button class="icon-btn" id="usesFilterX" type="button">✕</button>
-     </div>
     </div>
     <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
     <div class="vl-split">
@@ -1061,8 +1068,8 @@
       <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
       <div class="toolbar toolbar-2">
         <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components에 등록하고 자리엔 인스턴스를 남겨요. 원본의 연결과 값은 마스터를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나의 컴포넌트로 합치기</button>
+        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.">등록</button>
+        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나로 합치기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1070,6 +1077,8 @@
       <!-- 목록 머리 띠 + 개수(ia-v4 §4.3a-3) -->
       <div class="r-group r-ghead" id="compTreeGroup" style="display:none"><span data-i18n="structure.groupComp">컴포넌트 후보</span><span class="r-gcnt" id="compTreeCount"></span></div>
       <div id="compTree" class="results"></div>
+      <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
+      <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
       <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
       <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
@@ -1088,14 +1097,14 @@
    <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
    <div class="step bind-v4" id="makeScreen" style="display:none">
       <div class="status warn" id="makeWarn" hidden></div>
-      <div class="make-free" id="makeFree" hidden>🔒 <span data-i18n="make.freeBox">무료는 변수를 만들지 않아요 · 아래는 유료에서 만들 변수예요</span><span class="grow"></span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div>
+      <div class="make-free" id="makeFree" hidden><div data-i18n="make.freeBox">무료: Global 변수만</div><div class="mfb2"><span aria-hidden="true">🔒</span><span data-i18n="make.freeBoxPaid">Semantic · 텍스트 스타일 · 다크 모드</span><span aria-hidden="true">·</span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div></div>
       <div class="mk-tabs" id="makeTabs" role="tablist" data-i18n-aria-label="make.tabsAria" aria-label="만들 것" hidden>
         <button type="button" role="tab" id="makeTab-global" data-mtab="global" aria-controls="makePanel" aria-selected="true">Global<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-semantic" data-mtab="semantic" aria-controls="makePanel" aria-selected="false" tabindex="-1">Semantic<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
       </div>
       <div id="makePanel">
-        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="link link-btn" id="makeSemLic" type="button" data-i18n="make.license" hidden>라이선스 →</button><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
         <div class="bind-empty" id="makeEmpty" hidden></div>
         <div class="make-tabnote" id="makeTabNote" hidden></div>
         <div id="makeTree" class="tree" role="treegrid" aria-label="Global"></div>
@@ -1301,11 +1310,11 @@
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
-           licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
+           licenseConfig가 아직 자리표시자면 ui.ts가 이 버튼을 숨기지 않고 잠근다(ia-v4 §4.10 · B.21 — 없는 페이지로 보내지 않고 사유를 보인다). -->
       <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
            Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요" data-i18n="license.manage">결제 · 구독 관리 ↗</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.buyTip" title="결제 페이지를 열어요" data-i18n="license.buy">유료 구매하기 ↗</button>
       </div>
       <div class="hint" id="licenseLinkHint" data-i18n="license.priceHint">무료 · 유료 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none" data-i18n="license.setupHint">배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요</div>

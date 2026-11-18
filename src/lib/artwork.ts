@@ -37,6 +37,8 @@ export interface IconRegistry {
    * 원본으로 남았을 때). 문서에 있던 아이콘이나 이번에 만들지 않은 지문이면 아무것도 하지 않고 false.
    */
   discard(vectorKey: string): boolean;
+  /** 이번 실행에 새로 만든 아이콘 지문(만든 순서) — [등록] 끝 정리(§4.7 "인스턴스 자리" 7번 — C-D4)가 쓴다. */
+  madeKeys(): string[];
 }
 
 /**
@@ -74,6 +76,7 @@ export function createIconRegistry(opts: {
   return {
     get: (vectorKey) => lookup(vectorKey),
     created: () => made,
+    madeKeys: () => [...madeKeys],
     discard(vectorKey) {
       if (!madeKeys.has(vectorKey)) return false;
       const comp = byKey.get(vectorKey);
@@ -106,6 +109,40 @@ export function createIconRegistry(opts: {
       }
     },
   };
+}
+
+/**
+ * [등록] 끝 정리(§4.7 "인스턴스 자리" 7번 — 2026-11-13 사용자 결정 C-D4). ① 이번 실행에 새로 만든 아이콘 중
+ * 어디에도 쓰이지 않게 된 것(인스턴스 0)을 지운다 — 마스터를 못 만든 그룹 · 소가족 마스터 실패 · 원본으로 남은
+ * 나머지 멤버 몫 등. 다른 곳이 쓰고 있으면 남긴다. 지운 아이콘은 등록부의 만든 수("아이콘 n")에서 빠진다.
+ * ② 그 뒤 Components 페이지가 비었고 이번 실행에 만든 페이지면 지운다(전부터 있던 페이지는 비어도 둔다).
+ * 그래서 아무것도 못 만들면 파일에 남는 것이 없다. 지운 아이콘 수를 돌려준다.
+ */
+export async function cleanupAfterRegister(opts: {
+  registry: IconRegistry;
+  page: (BaseNode & ChildrenMixin) | null;
+  /** 이번 실행에 만든 Components 페이지인가. */
+  pageCreated: boolean;
+  /** 아이콘 컴포넌트를 쓰는 인스턴스(문서 전체 — 피그마 `getInstancesAsync`). */
+  instancesOf: (comp: ComponentNode) => Promise<readonly SceneNode[]>;
+}): Promise<number> {
+  let removed = 0;
+  for (const key of opts.registry.madeKeys()) {
+    const comp = opts.registry.get(key);
+    if (!comp || comp.removed) { if (opts.registry.discard(key)) removed++; continue; }
+    let used = true;
+    try {
+      used = (await opts.instancesOf(comp)).some((i) => !i.removed);
+    } catch {
+      used = true; // 읽지 못하면 남긴다 — 쓰는 아이콘을 지우지 않게
+    }
+    if (!used && opts.registry.discard(key)) removed++;
+  }
+  const page = opts.page;
+  if (opts.pageCreated && page && !(page as SceneNode).removed && page.children.length === 0) {
+    try { (page as unknown as { remove(): void }).remove(); } catch { /* 지우지 못하면 빈 페이지가 남을 뿐 */ }
+  }
+  return removed;
 }
 
 export interface VectorSlot {
@@ -185,18 +222,72 @@ function imageHashOf(n: SceneNode): string | undefined {
 
 const sameSize = (a: number, b: number) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
 
+/** 검사 선택 인자(§4.7 8번 "안쪽 레이어의 자리 · 크기도 본다"). */
+export interface FitOpts {
+  /** 안쪽 레이어 자리 · 크기 검사(기본 켬). heading 접힘 경로는 끈다(슬롯 짝이라 인덱스 비교가 어긋남). */
+  layout?: boolean;
+  /** 아이콘 프레임인가 — 날 벡터처럼 아이콘 인스턴스 짝이면 그 레이어만 보고 안으로 내려가지 않는다. */
+  isIcon?: (node: SceneNode) => boolean;
+}
+
 /**
- * 인스턴스가 멤버의 사진·크기를 지키는가(§4.7 8번 검사). 다르면 그 까닭(진단용), 같으면 null.
+ * `node`의 자리를 `root` 좌표계로 옮긴 값(루트 기준 x · y). 부모 기준 x · y는 GROUP 자식이면 그룹 밖 프레임
+ * 기준이라 GROUP 루트 멤버와 인스턴스가 늘 다르게 나온다 — 그래서 `absoluteTransform`을 루트의 역변환으로 옮긴다.
+ * `absoluteTransform`이 없으면(목) 부모 기준 x · y를 루트 직전까지 더하고, x · y가 없으면 0.
+ */
+function relPos(node: SceneNode, root: SceneNode): { x: number; y: number } {
+  if (node === root) return { x: 0, y: 0 };
+  const T = (n: SceneNode) => {
+    const m = (n as { absoluteTransform?: Transform }).absoluteTransform;
+    return Array.isArray(m) && Array.isArray(m[0]) && Array.isArray(m[1]) && m[0].every((v) => typeof v === 'number') && m[1].every((v) => typeof v === 'number') ? m : null;
+  };
+  const tn = T(node);
+  const tr = T(root);
+  if (tn && tr) {
+    const [[a, b, tx], [c, d, ty]] = tr;
+    const det = a * d - b * c;
+    if (Math.abs(det) > 1e-9) {
+      const dx = tn[0][2] - tx;
+      const dy = tn[1][2] - ty;
+      return { x: (d * dx - b * dy) / det, y: (-c * dx + a * dy) / det };
+    }
+  }
+  let x = 0;
+  let y = 0;
+  let cur: BaseNode | null = node;
+  while (cur && cur !== root) {
+    const n = cur as { x?: unknown; y?: unknown };
+    x += typeof n.x === 'number' ? n.x : 0;
+    y += typeof n.y === 'number' ? n.y : 0;
+    cur = cur.parent;
+  }
+  return { x, y };
+}
+
+const rotationOf = (n: SceneNode): number => {
+  const r = (n as { rotation?: unknown }).rotation;
+  return typeof r === 'number' ? r : 0;
+};
+
+/**
+ * 인스턴스가 멤버의 사진 · 자리 · 크기를 지키는가(§4.7 8번 검사). 다르면 그 까닭(진단용), 같으면 null.
  * - 인스턴스 자신의 크기 = 멤버 크기
  * - 멤버 안 사진 채움이 있는 모든 레이어(자신 포함)마다, 인스턴스의 같은 경로(`prefix` 앞붙이) 레이어의
- *   이미지 해시와 크기가 같다
+ *   이미지 해시와 크기가 같다(숨긴 레이어도, 인스턴스 안도)
+ * - (layout 켬) 멤버 루트가 아닌 **보이는** 레이어마다 같은 경로 레이어가 있고 종류가 같으며, 루트 기준 자리와
+ *   크기가 같다. 날 벡터 · 아이콘 프레임 ↔ 아이콘 인스턴스 짝은 그 레이어만 보고 안으로 내려가지 않는다.
+ *   감싼 도형(앞붙이 '0')은 감싼 자식의 크기 = 멤버 크기, 회전 0이면 자리 (0, 0).
+ * 같은 레이어에서는 사진 검사가 먼저다.
  */
-export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: string): string | null {
+export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: string, opts: FitOpts = {}): string | null {
   if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
     return t('component.fit.size', { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
   }
+  const layoutOn = opts.layout !== false;
+  const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
   let issue: string | null = null;
-  const visit = (n: SceneNode, path: string): void => {
+  const layoutIssue = (name: string) => { issue = t('component.fit.layout', { name }); };
+  const visit = (n: SceneNode, path: string, layout: boolean): void => {
     if (issue) return;
     const h = imageHashOf(n);
     if (h !== undefined) {
@@ -209,10 +300,35 @@ export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: strin
         return;
       }
     }
-    if (n.type === 'INSTANCE' || !('children' in n)) return; // 인스턴스 안은 그 컴포넌트 소관
-    (n.children as readonly SceneNode[]).forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
+    // 숨긴 레이어와 그 아래는 자리 · 크기를 보지 않는다(사진 검사는 그대로).
+    let down = layout && (path === '' || n.visible !== false);
+    // 감싼 도형(루트 ↔ 감싼 자식 '0'): resize를 따라오지 않으면(제약 없음) 사진이 아닌 도형도 어긋난다.
+    if (down && path === '' && prefix) {
+      if (!instRoot) { layoutIssue(n.name); return; }
+      const off = relPos(instRoot, inst);
+      const posBad = rotationOf(instRoot) === 0 && (!sameSize(off.x, 0) || !sameSize(off.y, 0));
+      if (posBad || !sameSize(instRoot.width, n.width) || !sameSize(instRoot.height, n.height)) { layoutIssue(n.name); return; }
+    }
+    if (down && path !== '') {
+      const hit = nodeAtPath(inst, joinPath(prefix, path));
+      if (!hit) { layoutIssue(n.name); return; }
+      const iconPair = hit.type === 'INSTANCE' && n.type !== 'INSTANCE' && (VECTOR_TYPES.has(n.type) || !!opts.isIcon?.(n));
+      if (!iconPair && hit.type !== n.type) { layoutIssue(n.name); return; }
+      const a = relPos(n, member);
+      const b = instRoot ? relPos(hit, instRoot) : { x: NaN, y: NaN };
+      if (!sameSize(a.x, b.x) || !sameSize(a.y, b.y) || !sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+        layoutIssue(n.name);
+        return;
+      }
+      // 아이콘 인스턴스 안 트리는 멤버와 다르다 — 자리 · 크기 비교는 내려가지 않는다(사진은 내려간다).
+      if (iconPair) down = false;
+    }
+    // 인스턴스 안도 본다(§4.7 8번 "인스턴스 안도 본다", QA #5 불합격 1) — 안쪽 인스턴스의 사진이
+    // 바뀌어도 통과하던 빈틈. 인스턴스의 자식 순서는 메인 트리와 같아 같은 인덱스 경로로 찾는다.
+    if (!('children' in n)) return;
+    (n.children as readonly SceneNode[]).forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i), down));
   };
-  visit(member, '');
+  visit(member, '', layoutOn);
   return issue;
 }
 
@@ -225,7 +341,7 @@ export type MemberResult = { result: 'replaced' | 'mismatch' | 'placeFailed'; wh
  * 3. 멤버 자리에 넣고(표지 없이 — 멤버가 아직 자리에 있다) 멤버를 지운다. 못 넣으면 멤버 그대로('placeFailed')
  * 어느 실패든 페이지 맨 위에 인스턴스를 남기지 않는다.
  */
-export function replaceMember(member: SceneNode, make: () => InstanceNode, prefix: string): MemberResult {
+export function replaceMember(member: SceneNode, make: () => InstanceNode, prefix: string, opts: FitOpts = {}): MemberResult {
   let inst: InstanceNode | null = null;
   try {
     inst = make();
@@ -236,7 +352,7 @@ export function replaceMember(member: SceneNode, make: () => InstanceNode, prefi
     if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
       try { inst.resize(member.width, member.height); } catch { /* 검사가 가른다 */ }
     }
-    const why = memberFitIssue(inst, member, prefix);
+    const why = memberFitIssue(inst, member, prefix, opts);
     if (why) {
       try { inst.remove(); } catch { /* 이미 사라짐 */ }
       return { result: 'mismatch', why };
@@ -256,16 +372,16 @@ export function replaceMember(member: SceneNode, make: () => InstanceNode, prefi
 
 /**
  * `replaceMember`의 비동기판(§4.7 "재사용" 5번) — 값 넣기 안에서 글꼴 불러오기 · `getMainComponentAsync`를
- * 기다려야 하므로 `make`가 Promise를 돌려준다. 순서와 실패 처리는 같다(resize → 사진·크기 검사 → 넣기 → 지움).
+ * 기다려야 하므로 `make`가 Promise를 돌려준다. 순서와 실패 처리는 같다(resize → 사진 · 자리 · 크기 검사 → 넣기 → 지움).
  */
-export async function replaceMemberAsync(member: SceneNode, make: () => Promise<InstanceNode>, prefix: string): Promise<MemberResult> {
+export async function replaceMemberAsync(member: SceneNode, make: () => Promise<InstanceNode>, prefix: string, opts: FitOpts = {}): Promise<MemberResult> {
   let inst: InstanceNode;
   try {
     inst = await make();
   } catch (e) {
     return { result: 'placeFailed', why: t('component.fail.instanceMake', { error: e instanceof Error ? e.message : String(e) }) };
   }
-  return replaceMember(member, () => inst, prefix);
+  return replaceMember(member, () => inst, prefix, opts);
 }
 
 /** 그 레이어를 품은 가장 가까운 **조상** 인스턴스(자기 자신은 뺀다). */
@@ -503,6 +619,34 @@ export async function snapshotOverrides(root: SceneNode, place: number, mainOf: 
 
 /** 속성 키("이름#id")에서 화면에 보일 속성 이름. */
 const propNameOf = (key: string): string => key.replace(/#[^#]*$/, '') || key;
+
+/** 값 지키기 기록 대상 자리(§4.7 "인스턴스 자리" 9번) — 자리 인스턴스 · 컴포넌트. `counted`: 이미 " · 속성 값을 못 넣은" 꼬리에 센 자리. */
+export interface KeepRoot {
+  node: SceneNode;
+  name: string;
+  counted?: boolean;
+}
+
+/**
+ * 노출 뒤 되돌리기 실패를 센다(§4.7 "인스턴스 자리" 9번 "한 자리는 한 번만 센다"). 실패 진단은 속성마다 남기고,
+ * 꼬리(`propFailed`)에는 자리마다 한 번 — 넣을 때 이미 센 자리(`counted`)는 다시 세지 않는다. 자리는 `keepRoots`
+ * 항목 단위로 기억하고 이름으로 거르지 않는다(이름이 같은 다른 자리를 함께 빼거나 빠뜨리지 않게).
+ */
+export function tallyRestoreFailures(
+  roots: KeepRoot[],
+  failed: ReadonlyMap<number, readonly string[]>,
+  propFailed: string[],
+  onProp: (name: string, prop: string) => void,
+): void {
+  for (const [k, props] of failed) {
+    const root = roots[k];
+    if (!root) continue;
+    for (const prop of props) onProp(root.name, prop);
+    if (root.counted) continue;
+    root.counted = true;
+    propFailed.push(root.name);
+  }
+}
 
 /**
  * 속성 노출 뒤 기록과 달라진 값을 되돌린다(§4.7 9번). 바깥 인스턴스부터(depth 오름차순) — 바깥의

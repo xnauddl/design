@@ -34,11 +34,11 @@ export {
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult, RoleVarRenameResult, TsRenameResult } from './variables';
 export { judgeUnused, collectAliasIds, scanUnusedVariables, deleteUnusedVariables } from './unusedVars';
 export { bindSelection, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
-export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName } from './usageRoles';
+export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName, pickOwner } from './usageRoles';
 export type { BindResult } from './bind';
-export { renameSelection, writeRole, writeRoleFromName } from './rename';
+export { renameSelection, writeRole, writeRoleFromName, stripRootPrefix } from './rename';
 export type { RenameOutcome } from './rename';
-export { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides } from './artwork';
+export { createIconRegistry, cleanupAfterRegister, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, tallyRestoreFailures } from './artwork';
 export type { IconRegistry, VectorSlot, MemberResult, CopyDeps } from './artwork';
 export { scanSimilar, componentizeSimilar, componentizeResultMessage } from './similarApply';
 export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, tallyFill } from './placement';

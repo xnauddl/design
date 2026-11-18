@@ -7,23 +7,22 @@ import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, planTsRename, applyTsRename, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
-import { FREE_MANUAL_CREATE_LIMIT } from './lib/varKind';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
 import { deleteUnusedVariables, scanUnusedVariables } from './lib/unusedVars'; // 안 쓰는 변수 찾기(docs/unused-vars.md)
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
-import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
+import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
-import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
+import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
-import { createIconRegistry, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
+import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
 import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
@@ -94,30 +93,12 @@ const currentTier = (): Tier => effective().tier;
 /** Free/Paid 2티어 — 유료면 모든 유료 기능 해금. */
 const isPaid = (): boolean => currentTier() === 'paid';
 
-/* ---------- 새 변수 · 복제 개수(IA v4 §4.9 · §9) ----------
-   무료는 사용자가 직접 만든 수(새 변수 + 복제)만 센다. 기준(파일당 / 기간당 / 누적)은 미정 —
-   지금은 clientStorage 누적 숫자 하나. 기준이 정해지면 이 두 함수만 바꾼다. 유료도 세기는 한다. */
-const MANUAL_USED_KEY = 'dsl.manualUsed';
-async function readManualUsed(): Promise<number> {
-  try {
-    const n = await figma.clientStorage.getAsync(MANUAL_USED_KEY);
-    return typeof n === 'number' && isFinite(n) && n > 0 ? Math.floor(n) : 0;
-  } catch {
-    return 0;
-  }
-}
-async function bumpManualUsed(): Promise<number> {
-  const n = (await readManualUsed()) + 1;
-  try {
-    await figma.clientStorage.setAsync(MANUAL_USED_KEY, n);
-  } catch {
-    /* 못 남겨도 이번에 만든 것은 그대로 */
-  }
-  return n;
-}
-/** 무료 한도에 닿았나(유료는 늘 false). */
-async function manualLimitReached(): Promise<boolean> {
-  return !isPaid() && (await readManualUsed()) >= FREE_MANUAL_CREATE_LIMIT;
+/** 무료와 Semantic 컬렉션(IA v4 §4.9 · F2 · F10) — 무료면 플러그인 Semantic 컬렉션(`ownedCollection(…, 'semantic')`)에
+    새 변수를 만들거나 그 안의 변수를 복제하지 못한다. 별칭 비율로 Semantic 계층인 사용자 컬렉션은 막지 않는다. */
+async function paidSemanticTarget(collectionId: string | undefined): Promise<boolean> {
+  if (isPaid() || !collectionId) return false;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  return ownedCollection(cols, 'semantic')?.id === collectionId;
 }
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
@@ -197,8 +178,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    const manualUsed = await readManualUsed(); // 새 변수 · 복제 무료 개수(§4.9)
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, manualUsed });
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -386,11 +366,11 @@ async function updateVariable(msg: Extract<UiToCode, { type: 'UPDATE_VARIABLE' }
 }
 
 /**
- * 새 변수 · 복제 · 삭제(IA v4 §4.9). 실패는 ERROR{op, reqId, code?} — 이름 거절 'name' · 무료 한도 'freeLimit' · 지워짐 'deleted'.
- * 성공하면 ⌘Z 한 번(commitUndo) 뒤 준비 상태를 다시 보낸다(manualUsed 포함).
+ * 새 변수 · 복제 · 삭제(IA v4 §4.9). 실패는 ERROR{op, reqId, code?} — 이름 거절 'name' · 유료(무료의 플러그인 Semantic 컬렉션 — F2) 'paid' · 지워짐 'deleted'.
+ * 성공하면 ⌘Z 한 번(commitUndo) 뒤 준비 상태를 다시 보낸다.
  */
 async function manualVariableOp(msg: Extract<UiToCode, { type: 'CREATE_VARIABLE' | 'DUPLICATE_VARIABLE' | 'DELETE_VARIABLE' }>): Promise<void> {
-  const fail = (message: string, code?: 'name' | 'freeLimit' | 'deleted'): void =>
+  const fail = (message: string, code?: 'name' | 'paid' | 'deleted'): void =>
     post({ type: 'ERROR', message, op: msg.type, reqId: msg.reqId, ...(code ? { code } : {}) });
   try {
     if (msg.type === 'DELETE_VARIABLE') {
@@ -398,17 +378,17 @@ async function manualVariableOp(msg: Extract<UiToCode, { type: 'CREATE_VARIABLE'
       commitUndo(figma);
       post({ type: 'VARIABLE_DELETED', reqId: msg.reqId, id: msg.id });
     } else {
-      if (await manualLimitReached()) return fail(`free limit ${FREE_MANUAL_CREATE_LIMIT}`, 'freeLimit');
       if (msg.type === 'CREATE_VARIABLE') {
+        if (await paidSemanticTarget(msg.collectionId)) return fail('semantic collection is paid', 'paid');
         const { variable } = await createManualVariable({ collectionId: msg.collectionId, name: msg.name, varType: msg.varType, values: msg.values, scopes: msg.scopes });
-        const manualUsed = await bumpManualUsed();
         commitUndo(figma);
-        post({ type: 'VARIABLE_CREATED', reqId: msg.reqId, id: variable.id, manualUsed });
+        post({ type: 'VARIABLE_CREATED', reqId: msg.reqId, id: variable.id });
       } else {
+        const src = await figma.variables.getVariableByIdAsync(msg.id);
+        if (src && (await paidSemanticTarget(src.variableCollectionId))) return fail('semantic collection is paid', 'paid');
         const nv = await duplicateVariable(msg.id);
-        const manualUsed = await bumpManualUsed();
         commitUndo(figma);
-        post({ type: 'VARIABLE_DUPLICATED', reqId: msg.reqId, newId: nv.id, manualUsed });
+        post({ type: 'VARIABLE_DUPLICATED', reqId: msg.reqId, newId: nv.id });
       }
     }
   } catch (e) {
@@ -609,6 +589,17 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
+/** 이름 정리가 남긴 떼기 전 이름(`dsNameKey`)이 지금 이름에 맞으면 그 키(ia-v4 §4.4), 아니면 undefined. */
+function readNameKey(node: SceneNode): string | undefined {
+  const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
+  if (typeof fn !== 'function') return undefined;
+  try {
+    return nameKeyFor(node.name, fn.call(node, NAME_KEY));
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * 리네임이 남긴 역할(`dsRole`)을 읽는다 — 등록이 머리명사로 쓴다. 없으면 undefined
  * (사람이 지은 이름이거나 리네임 전). API가 없는 노드도 안전하게 통과.
@@ -726,6 +717,9 @@ function iconFrameKeyOf(node: SceneNode): string | undefined {
   return `f:${fnv1a(parts.join('|'))}`;
 }
 
+/** [등록] 넣기 전 검사 인자(§4.7 8번) — 아이콘 프레임 ↔ 아이콘 인스턴스 짝은 자리 · 크기 비교를 안으로 내리지 않는다. */
+const fitOpts = { isIcon: (n: SceneNode) => iconFrameKeyOf(n) !== undefined };
+
 /** 그림 지문 — 날 벡터는 경로 지문, 아이콘 프레임은 아이콘 지문(아이콘 등록부 · 값 옮기기가 쓴다). */
 function artKeyOf(node: SceneNode): string | undefined {
   return vectorKeyOf(node) ?? iconFrameKeyOf(node);
@@ -753,9 +747,11 @@ function toStructNode(node: SceneNode, isRoot = true): StructNode {
       mainComponentKey = null;
     }
   }
+  const nameKey = readNameKey(node);
   return {
     id: node.id,
     name: node.name,
+    ...(nameKey ? { nameKey } : {}),
     type: node.type,
     imageHash: imageHashOf(node),
     vectorKey: vectorKeyOf(node),
@@ -869,7 +865,22 @@ function isEffectivelyVisible(node: SceneNode): boolean {
  */
 function sceneComponentEligible(n: SceneNode, index?: ReadonlyMap<string, StructNode>): boolean {
   if (!isEffectivelyVisible(n)) return false;
-  return componentEligible(index?.get(n.id) ?? toStructNode(n));
+  // 아이콘 프레임과 그 안은 후보가 아니다 — 선택 루트도(§4.7 "묶기" 3번). `toStructNode`의 루트 동작은 그대로 두고 게이트에서 본다.
+  if (insideIconFrame(n)) return false;
+  const st = index?.get(n.id) ?? toStructNode(n);
+  // Figma 자동 이름은 후보가 아니다(C-D15 — 탭 제외, 스캔 없는 [등록] · nodeIds 모두).
+  if (isAutoNamedCandidate({ ...st, name: n.name })) return false;
+  return componentEligible(st);
+}
+
+/** 노드 자신이나 조상이 아이콘 프레임인가(§4.7 "묶기" 3번 — 후보 게이트). 96보다 크면 바로 빠진다. */
+function insideIconFrame(n: SceneNode): boolean {
+  let p: BaseNode | null = n;
+  while (p && p.type !== 'PAGE' && p.type !== 'DOCUMENT') {
+    if (iconFrameKeyOf(p as SceneNode) !== undefined) return true;
+    p = p.parent;
+  }
+  return false;
 }
 
 /** 계획의 layerPath(우선) 또는 layerName으로 대상 레이어 찾기. */
@@ -1116,15 +1127,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_TOKENS': {
-        // 실제 변수 생성만 Paid(미리보기는 비파괴 읽기라 백엔드는 허용 — UI가 무료 티어에서 버튼을 잠근다).
-        if (!msg.preview && !requirePaid('tokens')) break;
+        // 실제 변수 생성 중 Semantic까지 만드는 것만 Paid(미리보기는 비파괴 읽기라 허용). globalOnly(무료 규칙 — Global만,
+        // `createUsageRoles`를 돌리지 않음)는 무료도 통과한다(IA v4 §4.3 "무료 — 무료 규칙 PR 뒤" · F1 · F4 · F8).
+        if (!msg.preview && !msg.globalOnly && !requirePaid('tokens')) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
         // 같은 이름의 직접 만든 변수라 건너뛴 토큰은 그 토큰을 가리킬 역할도 만들지 않는다(§4.9).
         const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
         const roleRows: RoleRow[] = [];
-        const roles = await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined, s.finalName);
+        const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : undefined, s.finalName);
         // 팔레트 재적용(replacePalette): 이번 팔레트에 없는 이전 팔레트 색 변수 정리(사용자 변수 보존).
         const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t) => t.name)) : 0;
         let summary = t('create.sumGlobals', { n: s.globals, c: s.created, u: s.updated });
@@ -1183,6 +1195,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             ownerOf: bindOwnerOf(sel), // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
             // 만들기 실행의 연결(IA v4 §4.3) — 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다(실제 연결만).
             ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
+            // 무료 자동 연결은 새 Semantic을 만들지 않는다 — 찾기 · 실제 연결 · 카드 1의 m이 같은 규칙(IA v4 §2.3-7 · F6).
+            ...(isPaid() ? {} : { noNewRoles: true }),
           },
         );
         post({
@@ -1334,7 +1348,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 이름과 함께 dsRole도 기록 — 말단 후보 자격·등록 머리명사가 readRole에 의존한다.
         const changes: RenameChange[] = [];
         let roleWrites = 0; // 이름은 그대로면서 역할만 새로 기록된 노드 수(undo 묶음 판단용)
-        for (const { id, before: expectedBefore, after, role } of msg.items) {
+        for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
@@ -1352,6 +1366,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (role ? writeRole(node as SceneNode, role) : writeRoleFromName(node as SceneNode, after)) {
             roleWrites++;
           }
+          // 떼기 전 이름(ia-v4 §4.4) — 있으면 기록, 없으면 지운다. 바뀌었으면 역할 기록처럼 센다(undo 묶음).
+          if (writeNameKey(node as SceneNode, nameKey ?? null)) roleWrites++;
           // node.name은 위(before !== after)에서 이미 썼다 — origin/main이 여기 둔 대입은
           // 그 줄과 겹쳐서 걷는다.
           if (before === after) continue;
@@ -1584,8 +1600,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
         if (!requireComponents()) break;
-        // 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
-        const roots = selection().filter(isEffectivelyVisible);
+        // 목록 기준의 nodeIds(ia-v4 §2.5) — 없으면 지금 선택. 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
+        const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible);
         // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
         // toStructNode가 인스턴스 내부를 펼치지 않으므로 스캔 범위는 그대로다.
         const rootStructs = roots.map((n) => toStructNode(n));
@@ -1604,24 +1620,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if ('children' in n) for (const c of n.children as readonly SceneNode[]) index(c);
         };
         for (const r of roots) index(r);
-        // eligible 재확인(조상 숨김 — 순수 스캔은 선택 서브트리만 보아 놓칠 수 있음).
-        const gated = candidates.map((c) => {
-          const live = liveById.get(c.id);
-          if (!live || !isEffectivelyVisible(live)) return { ...c, eligible: false };
-          return c;
+        // eligible 재확인(조상 숨김 — 순수 스캔은 선택 서브트리만 보아 놓칠 수 있음) → 자동 이름 수를 센 뒤(C-D15)
+        // 고아 맥락 조상 제거 → 레이어별 자동 이름 표시 지움(gateComponentCandidates).
+        const { nodes: pruned, autoNamed } = gateComponentCandidates(candidates, (id) => {
+          const live = liveById.get(id);
+          return !!live && isEffectivelyVisible(live);
         });
-        // eligible이 빠진 뒤 고아 맥락 조상 제거.
-        const byCand = new Map(gated.map((c) => [c.id, c]));
-        const keepIds = new Set(gated.filter((c) => c.eligible).map((c) => c.id));
-        for (const c of gated) {
-          if (!c.eligible) continue;
-          let p = c.parentId;
-          while (p && !keepIds.has(p)) {
-            keepIds.add(p);
-            p = byCand.get(p)?.parentId ?? null;
-          }
-        }
-        const pruned = gated.filter((c) => keepIds.has(c.id));
         // **전체 eligible 후보**를 정확한 이름으로 묶어 미리보기 라벨 주입(깊이 무관, 등록과 동일 규칙).
         // 반복(2개+) → 구조 차이면 group+variant(자동체크), 속성(텍스트/스왑/불리언)만 다르면
         // propsOnly+single(자동체크·단품 접힘). 단독(1개) → single(PascalCase).
@@ -1669,7 +1673,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 미리보기 라벨 실패해도 후보는 반환(스캔 중 고정 방지).
           console.warn('component preview label failed', e);
         }
-        post({ type: 'COMPONENT_CANDIDATES', nodes });
+        post({ type: 'COMPONENT_CANDIDATES', nodes, autoNamed, reqId: msg.reqId });
         break;
       }
       case 'REGISTER_COMPONENTS': {
@@ -1699,6 +1703,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const collected: SceneNode[] = [];
           const walk = (n: SceneNode, depth: number): void => {
             if (n.visible === false) return; // 숨김은 등록·하위 스캔 제외
+            // 아이콘 프레임은 선택 루트여도 후보가 아니고 그 안으로 내려가지 않는다(§4.7 "묶기" 3번).
+            if (depth === 0 && iconFrameKeyOf(n) !== undefined) return;
             const isContainerRoot = single && depth === 0; // 컨테이너 자신 제외
             if (!isContainerRoot && eligible(n)) collected.push(n);
             // 인스턴스·메인·세트 안은 이미 컴포넌트 체계 — 안쪽 FRAME을 다시 등록하지 않음.
@@ -1768,6 +1774,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const reused: string[] = []; // 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름)
         const reuseKept: string[] = []; // 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버 이름
 
+        // 이번 실행에 만든 페이지인지 기억한다 — 끝에 비었으면 지운다(§4.7 "인스턴스 자리" 7번 — C-D4).
+        const pageCreated = !figma.root.children.some((p) => p.name === COMPONENTS_PAGE);
         const page = await ensureComponentsPage();
         let cursorX = pageStartX(page);
         let sets = 0;
@@ -1822,7 +1830,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 맨 끝 속성 노출은 세트 변형의 값(글자 · 안쪽 인스턴스 · 보이기)을 기본값으로 바꾼다. 노출 전에 만든
         // 인스턴스가 따라가지 않게, 이번 [등록]이 만든 자리 인스턴스와 컴포넌트를 모아 두고 노출 직전에
         // 그 안 모든 인스턴스의 값을 적어, 노출 뒤 되돌린다(§4.7 9번).
-        const keepRoots: { node: SceneNode; name: string }[] = [];
+        const keepRoots: KeepRoot[] = [];
         const instanceOf = (comp: ComponentNode, name: string) => (): InstanceNode => {
           const inst = comp.createInstance();
           keepRoots.push({ node: inst, name });
@@ -1889,12 +1897,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   continue;
                 }
                 let noted = false;
+                let counted = false;
                 // 이 멤버를 위해 이번 실행에 새로 만든 아이콘 — 멤버가 원본으로 남으면 지운다(5번 "아이콘 정리").
                 const newIcons: string[] = [];
                 const make = async (): Promise<InstanceNode> => {
                   const inst = comp.createInstance();
                   try {
-                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const entry: KeepRoot = { node: inst, name };
+                    keepRoots.push(entry); // 9번 값 지키기의 기록 대상
                     const bad = await copyOverridesAsync(node, inst, prefix, {
                       mainOf: (n) => n.getMainComponentAsync(),
                       loadFont: (f) => figma.loadFontAsync(f),
@@ -1911,8 +1921,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     if (!noted) {
                       noted = true;
                       for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
-                      if (bad.length) propFailed.push(name);
+                      if (bad.length) { propFailed.push(name); counted = true; }
                     }
+                    if (counted) entry.counted = true; // 이 자리는 꼬리에 셌다 — 되돌리기 실패로 다시 세지 않는다(9번)
                     return inst;
                   } catch (e) {
                     try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
@@ -1920,7 +1931,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') { any = true; continue; }
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 // 이 멤버만 쓰려고 새로 만든 아이콘은 지운다 — 만든 순간 다른 멤버는 아직 쓰지 않았다(쓰던 것은 had로 빠진다).
@@ -2079,11 +2090,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   const images: Record<string, readonly Paint[]> = {};
                   for (const [path, paints] of Object.entries(snap.images)) images[joinPath(prefix, path)] = paints;
                   let noted = false; // 속성 값·사진 실패는 멤버마다 한 번만(복사본을 다시 만들 때 겹치지 않게)
+                  let counted = false;
                   return (): InstanceNode => {
                     let inst: InstanceNode | null = null;
                     try {
                       inst = master.createInstance();
-                      keepRoots.push({ node: inst, name });
+                      const entry: KeepRoot = { node: inst, name };
+                      keepRoots.push(entry);
                       const badProps = applyInstancePropValues(inst, ids, vals);
                       // 사진은 속성이 아니라 fill 오버라이드 — 멤버 원본 채움 전체(해시·scaleMode·imageTransform)를 이식한다.
                       const img = transplantImageFills(inst, images).failures;
@@ -2091,8 +2104,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                         noted = true;
                         for (const p of badProps) failures.push(t('component.fail.propValue', { name, prop: p }));
                         failures.push(...img.map((f) => `${name}: ${f}`));
-                        if (badProps.length || img.length) propFailed.push(name);
+                        if (badProps.length || img.length) { propFailed.push(name); counted = true; }
                       }
+                      if (counted) entry.counted = true; // 꼬리에 센 자리(9번 — 한 자리는 한 번만)
                       return inst;
                     } catch (e) {
                       // 예상 밖 예외면 만든 인스턴스를 지우고 던진다(어디에도 남기지 않는다).
@@ -2104,11 +2118,39 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 // 마스터 자리 — 원본이 Components 페이지로 옮겨졌으므로 인스턴스 → 복사본 → 빈 자리(5번).
                 restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
                 // 나머지 멤버 — 검사 뒤 넣고 나서 지운다. 걸리면 원본 그대로(8번), 못 넣으면 원본 그대로(5번).
+                // 값 넣기는 세트 경로(⑤ placeExtras)와 같이 덮어쓴 값 옮기기 하나로 — 안쪽 인스턴스 속
+                // 사진 · 글자 · 보이기까지 옮긴다(§4.7 "묶기" 5번 4단계, QA #5 불합격 1). 단 슬롯으로 값을
+                // 읽는 heading 계획은 자식 인덱스 짝 맞추기를 쓸 수 없어 지금 방식(속성 값 + 사진 슬롯) 그대로.
+                const slotPlan = plan.some((p) => !!p.headingSlot);
+                /** 멤버용 비동기 만들기 — 인스턴스 → 9번 기록 대상 → 덮어쓴 값 옮기기. */
+                const asyncMakerFor = (member: SceneNode, name: string) => async (): Promise<InstanceNode> => {
+                  const inst = master.createInstance();
+                  try {
+                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const bad = await copyOverridesAsync(member, inst, prefix, {
+                      mainOf: (n) => n.getMainComponentAsync(),
+                      loadFont: (f) => figma.loadFontAsync(f),
+                      isIcon: (n) => iconFrameKeyOf(n) !== undefined,
+                      iconFor: (v) => {
+                        const key = artKeyOf(v);
+                        return key ? iconRegistry.ensure(key, v, v.name) : null;
+                      },
+                    });
+                    for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
+                    if (bad.length) propFailed.push(name);
+                    return inst;
+                  } catch (e) {
+                    try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
+                    throw e;
+                  }
+                };
                 for (const snap of snaps) {
                   if (snap === masterSnap) continue;
                   const name = snap.n.name;
                   const before = propFailed.length;
-                  const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                  const r = slotPlan
+                    ? replaceMember(snap.n, makerFor(snap, name), prefix, { layout: false }) // heading: 슬롯 짝 — 자리 · 크기 검사 끔(§4.7 8번)
+                    : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix, fitOpts);
                   if (r.result === 'replaced') continue;
                   // 묶지 않은 멤버는 속성 값 꼬리에서 뺀다 — 원본이 그대로라 따질 속성 값이 없다.
                   if (propFailed.length > before) propFailed.splice(before);
@@ -2180,7 +2222,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 const make = async (): Promise<InstanceNode> => {
                   const inst = x.comp.createInstance();
                   try {
-                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const entry: KeepRoot = { node: inst, name };
+                    keepRoots.push(entry); // 9번 값 지키기의 기록 대상
                     const bad = await copyOverridesAsync(node, inst, prefix, {
                       mainOf: (n) => n.getMainComponentAsync(),
                       loadFont: (f) => figma.loadFontAsync(f),
@@ -2191,7 +2234,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                       },
                     });
                     for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
-                    if (bad.length) propFailed.push(name);
+                    if (bad.length) { propFailed.push(name); entry.counted = true; }
                     return inst;
                   } catch (e) {
                     try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
@@ -2199,7 +2242,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') continue;
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 if (r.result === 'mismatch') {
@@ -2267,11 +2310,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         // 노출로 기본값이 된 값을 되돌린다. 못 넣은 것은 자리마다 한 번 "속성 값을 못 넣은" 꼬리에(6번과 같다).
         const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
-        for (const [k, props] of keepFailed) {
-          const name = keepRoots[k].name;
-          for (const prop of props) failures.push(t('component.fail.propValue', { name, prop }));
-          propFailed.push(name);
-        }
+        // 한 자리는 한 번만 센다 — 넣을 때 이미 센 자리는 다시 세지 않는다(9번, 자리 = keepRoots 항목).
+        tallyRestoreFailures(keepRoots, keepFailed, propFailed, (name, prop) => failures.push(t('component.fail.propValue', { name, prop })));
+
+        // 끝 정리(§4.7 "인스턴스 자리" 7번 — C-D4): 이번에 만들었는데 쓰이지 않게 된 아이콘, 이번에 만든 빈 Components 페이지.
+        await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
 
         post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
         if (registered || sets || reused.length) commitUndo(figma); // UX2 — 재사용만이어도 ⌘Z 한 번(§4.7 "재사용" 6번)
@@ -2444,10 +2487,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_SIMILAR': {
         // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천만 보여준다.
-        const frames = selection().filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
+        // 목록 기준의 nodeIds(ia-v4 §2.5) — 없으면 지금 선택.
+        const frames = (await resolveRoots(msg.nodeIds)).filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
         const r = await scanSimilar(frames);
         post({
           type: 'SIMILAR_CANDIDATES',
+          reqId: msg.reqId,
           metas: r.metas,
           recommendedMasterId: r.recommendedMasterId,
           varying: r.varying,

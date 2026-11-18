@@ -2,7 +2,7 @@
    만들기 화면 실행(IA v4 §4.3)의 단계 계획(planMake) · 다크 대상 · 다 됨 문구(makeDoneText). */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAKE_STEP_ORDER, planMake, makeDoneText, pickDarkTarget } from '../dist/pure.mjs';
+import { MAKE_STEP_ORDER, planMake, makeDoneText, makeCreatedText, pickDarkTarget } from '../dist/pure.mjs';
 
 const BASE = { isPaid: true, globalsOn: 5, stylesOn: 2, link: true, rename: false, dark: false };
 
@@ -22,9 +22,10 @@ test('planMake — 켠 Global 0개면 만들기 없음, 켠 스타일 0개면 �
   assert.deepEqual(planMake({ ...BASE, globalsOn: 0, stylesOn: 0, link: false }), []);
 });
 
-test('planMake — 무료는 연결 · 이름 정리만', () => {
-  assert.deepEqual(planMake({ ...BASE, isPaid: false, dark: true, rename: true }), ['bind', 'rename']);
-  assert.deepEqual(planMake({ ...BASE, isPaid: false, link: false }), []);
+test('planMake — 무료도 만들기(Global만) · 다크 · 텍스트 스타일은 없음 (무료 규칙 F4)', () => {
+  assert.deepEqual(planMake({ ...BASE, isPaid: false, dark: true, rename: true }), ['create', 'bind', 'rename']);
+  assert.deepEqual(planMake({ ...BASE, isPaid: false, link: false }), ['create']);
+  assert.deepEqual(planMake({ ...BASE, isPaid: false, globalsOn: 0, link: false }), []);
 });
 
 test('pickDarkTarget — 플러그인 Semantic만(§2.13 13.7) · 출처는 Dark가 아닌 모드 · Dark 있으면 대상으로', () => {
@@ -59,9 +60,12 @@ test('makeDoneText — 한 단계씩 이어 붙이고, 하지 않은 부분은 �
   assert.equal(makeDoneText({ styles: { s: 3, a: 0 } }, { isPaid: true, linkOff: true }), '텍스트 스타일 3개 · 연결은 아직 안 했어요');
 });
 
-test('makeDoneText — 무료 꼬리', () => {
-  assert.equal(makeDoneText({ bound: 4, renamed: 2 }, { isPaid: false, linkOff: false }), '4곳 연결 · 이름 2개 정리 · 변수는 만들지 않았어요');
-  assert.equal(makeDoneText({ renamed: 2 }, { isPaid: false, linkOff: true }), '이름 2개 정리 · 변수는 만들지 않았어요 · 연결은 아직 안 했어요');
+test('makeDoneText — 무료는 만들기 부분 "Global {g}개" · 무료 꼬리 없음 (무료 규칙 F4)', () => {
+  assert.equal(makeDoneText({ created: { g: 12, r: 4, m: 0 }, bound: 85 }, { isPaid: false, linkOff: false }), 'Global 12개 · 85곳 연결');
+  assert.equal(makeDoneText({ bound: 4, renamed: 2 }, { isPaid: false, linkOff: false }), '4곳 연결 · 이름 2개 정리');
+  assert.equal(makeDoneText({ renamed: 2 }, { isPaid: false, linkOff: true }), '이름 2개 정리 · 연결은 아직 안 했어요');
+  assert.equal(makeCreatedText({ g: 3, r: 1 }, false), 'Global 3개');
+  assert.equal(makeCreatedText({ g: 3, r: 1 }, true), 'Global 3개 · Semantic 1개');
 });
 
 test('makeDoneText — 텍스트 스타일 알림은 "텍스트 스타일 {s}개" 바로 뒤 "알림 {k}개" (IA v4 §4.3 "글꼴")', () => {

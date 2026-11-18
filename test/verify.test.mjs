@@ -28,6 +28,8 @@ before(async () => {
     LICENSE_ISS: 'design-system-linker-license',
     LICENSE_AUD: 'design-system-linker',
     TOKEN_TTL_DAYS: '30',
+    LS_STORE_ID: '11',
+    LS_PRODUCT_ID: '22',
   };
 });
 
@@ -39,7 +41,9 @@ beforeEach(() => {
     const name = Object.keys(LS).find((k) => LS[k] === u) || u;
     calls.push(name);
     const h = handlers[name];
-    const body = typeof h === 'function' ? h() : h;
+    let body = typeof h === 'function' ? h() : h;
+    // 성공 응답에 meta가 없으면 우리 스토어 · 상품 meta를 붙인다(대부분 시나리오는 우리 키). 다른 상품 시나리오는 meta를 직접 준다.
+    if (body && (body.valid === true || body.activated === true) && !('meta' in body)) body = { ...body, meta: { store_id: 11, product_id: 22 } };
     return new Response(JSON.stringify(body ?? {}), { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
 });
@@ -236,4 +240,54 @@ test('ADMIN_KEYS는 LS 없이 장기 토큰 발급', async () => {
   assert.deepEqual(calls, [], 'LS를 호출하지 않아야');
   const pl = decodePayload(json.token);
   assert.equal(pl.tier, 'paid');
+});
+
+/* ---------------- 우리 스토어 · 상품의 키만(2026-11-16 배포 준비 1번) ---------------- */
+test('다른 상품의 키(activate 성공) → 거부 + 잡은 슬롯 반납', async () => {
+  handlers.activate = { activated: true, instance: { id: 'other-1' }, license_key: { status: 'active' }, meta: { store_id: 11, product_id: 99 } };
+  handlers.deactivate = { deactivated: true };
+  const res = await worker.fetch(req({ key: 'OTHER' }), env);
+  const json = await res.json();
+  assert.equal(json.valid, false);
+  assert.equal(json.code, 'invalid');
+  assert.ok(!json.token, '다른 상품 키에 토큰을 주면 안 됨');
+  assert.deepEqual(calls, ['activate', 'deactivate'], '방금 잡은 활성화 슬롯을 되돌린다');
+});
+
+test('다른 스토어의 키 → 거부', async () => {
+  handlers.activate = { activated: true, instance: { id: 'x' }, license_key: { status: 'active' }, meta: { store_id: 5, product_id: 22 } };
+  handlers.deactivate = { deactivated: true };
+  const json = await (await worker.fetch(req({ key: 'OTHER' }), env)).json();
+  assert.equal(json.valid, false);
+  assert.ok(!json.token);
+});
+
+test('meta가 없는 성공 응답 → 거부(우리 것인지 알 수 없음)', async () => {
+  handlers.validate = { valid: true, license_key: { status: 'active' }, meta: null };
+  handlers.activate = { activated: false, error: 'x', license_key: { status: 'active' } };
+  const json = await (await worker.fetch(req({ key: 'K', instanceId: 'i' }), env)).json();
+  assert.equal(json.valid, false);
+  assert.ok(!json.token);
+});
+
+test('기존 기기 validate가 다른 상품 키면 거부(반납 호출 없음 — 우리가 잡은 슬롯이 아님)', async () => {
+  handlers.validate = { valid: true, license_key: { status: 'active' }, meta: { store_id: 11, product_id: 99 } };
+  const json = await (await worker.fetch(req({ key: 'K', instanceId: 'i' }), env)).json();
+  assert.equal(json.valid, false);
+  assert.deepEqual(calls, ['validate']);
+});
+
+test('LS_STORE_ID · LS_PRODUCT_ID가 없으면 LS를 부르지 않고 거부(500, code server)', async () => {
+  handlers.activate = { activated: true, instance: { id: 'i' }, license_key: { status: 'active' } };
+  const res = await worker.fetch(req({ key: 'K' }), { ...env, LS_PRODUCT_ID: '' });
+  const json = await res.json();
+  assert.equal(res.status, 500);
+  assert.equal(json.code, 'server');
+  assert.ok(!json.token);
+  assert.deepEqual(calls, [], '설정이 없으면 LS 호출 전에 막는다');
+});
+
+test('ADMIN_KEYS는 스토어 설정과 상관없이 동작(오너 스모크 테스트)', async () => {
+  const json = await (await worker.fetch(req({ key: 'OWNER' }), { ...env, ADMIN_KEYS: 'OWNER', LS_STORE_ID: '' })).json();
+  assert.ok(json.token);
 });

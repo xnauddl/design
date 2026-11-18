@@ -7,6 +7,10 @@ compatibility_date = "2024-09-01"
 LICENSE_ISS = "design-system-linker-license"
 LICENSE_AUD = "design-system-linker"
 TOKEN_TTL_DAYS = "30"
+# 우리 LemonSqueezy 스토어 · 상품 id(대시보드 또는 상품 설정에서 확인). 이 상품의 키만 받는다.
+# 비워 두면 모든 키 검증을 거부한다 — 배포 전에 꼭 채울 것.
+LS_STORE_ID = ""
+LS_PRODUCT_ID = ""
 
 # 비밀(secret)은 커밋하지 말고 wrangler로 주입:
 #   npx wrangler secret put LICENSE_PRIVATE_JWK   # scripts/gen-license-keys.mjs의 private JWK(JSON)
