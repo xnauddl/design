@@ -29,6 +29,14 @@ function button(id, { name = 'Like Button', label = 'Like', icon = 'heart', w = 
   };
 }
 
+test('B.22 ⑫ 재사용 키 — 이름 부분은 nameKey(떼기 전 이름), 없으면 name', () => {
+  const a = { ...button('a'), name: 'button', nameKey: 'dsl-button' };
+  const b = { ...button('b'), name: 'dsl-button' };
+  assert.equal(reuseKey('single', a), reuseKey('single', b), '같은 루트 이름으로 전에 등록한 컴포넌트와 같은 키');
+  assert.match(reuseKey('single', a), /^single:dsl-button:/);
+  assert.equal(reusePlanFor([a]).keys[0], reuseKey('single', b), 'planOfMembers의 key도 nameKey');
+});
+
 test('재사용 키 — 글자 · 사진 해시 · 레이어 이름 · 안쪽 인스턴스 메인은 지문에 넣지 않는다', () => {
   const a = button('a', { label: 'Like', photo: 'h1' });
   const b = button('b', { label: 'Save', photo: 'h2', kids: [vec('bv', 'heart', { name: 'other' }), text('bt', 'caption', 'Save')] });

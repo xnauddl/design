@@ -138,7 +138,7 @@
     /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다. */
     [aria-disabled="true"] { color: var(--muted); cursor: not-allowed; box-shadow: none; }
     button[aria-disabled="true"], button[aria-disabled="true"]:hover, button[aria-disabled="true"]:active { background: var(--surface); border-color: var(--border); color: var(--muted); }
-    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
+    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--surface-2); border-color: var(--border); color: var(--muted); } /* 잠긴 주 버튼도 글자는 옅게 — ia-v3 §2 원칙 3 · ia-v4 B.23 */
     label.inline:has(input[aria-disabled="true"]) { color: var(--muted); cursor: not-allowed; }
     button.link {
       border: none; background: none; padding: 0; width: auto;
@@ -1301,11 +1301,11 @@
       </div>
       <div class="muted" id="licenseInfo"></div>
       <!-- 결제·구독 관리는 LemonSqueezy 위임. 아이프레임에서 외부 링크를 못 열어 code의 openExternal 경유.
-           licenseConfig가 아직 자리표시자면 ui.ts가 이 행과 안내를 숨긴다(없는 페이지로 보내지 않기 위해). -->
+           licenseConfig가 아직 자리표시자면 ui.ts가 이 버튼을 숨기지 않고 잠근다(ia-v4 §4.10 · B.21 — 없는 페이지로 보내지 않고 사유를 보인다). -->
       <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
            Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnLicenseLink" class="primary" data-i18n-title="license.manageTip" title="무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요" data-i18n="license.manage">결제 · 구독 관리 ↗</button>
+        <button id="btnLicenseLink" class="primary" data-i18n-title="license.buyTip" title="결제 페이지를 열어요" data-i18n="license.buy">유료 구매하기 ↗</button>
       </div>
       <div class="hint" id="licenseLinkHint" data-i18n="license.priceHint">무료 · 유료 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none" data-i18n="license.setupHint">배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요</div>
@@ -2076,8 +2076,11 @@
     "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD574\uC694. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB3FC\uC694.",
     "license.hint": "\uC720\uB8CC\uB97C \uC4F0\uBA74 \u{1F512} \uC7A0\uAE34 \uAE30\uB2A5\uC774 \uD480\uB824\uC694",
     // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
-    "license.manage": "\uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC \u2197",
-    "license.manageTip": "\uBB34\uB8CC\uBA74 \uACB0\uC81C \uD398\uC774\uC9C0\uB85C, \uAD6C\uB3C5 \uC911\uC774\uBA74 \uACB0\uC81C\uC218\uB2E8\xB7\uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB85C \uC5F4\uC5B4\uC694",
+    "license.manage": "\uAD6C\uB3C5 \uAD00\uB9AC \u2197",
+    "license.manageTip": "\uACB0\uC81C \uC218\uB2E8 \xB7 \uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB97C \uC5F4\uC5B4\uC694",
+    "license.buy": "\uC720\uB8CC \uAD6C\uB9E4\uD558\uAE30 \u2197",
+    "license.buyTip": "\uACB0\uC81C \uD398\uC774\uC9C0\uB97C \uC5F4\uC5B4\uC694",
+    "license.linkPending": "\uAD6C\uB3C5 \uAD00\uB9AC \uD398\uC774\uC9C0\uB294 \uC544\uC9C1 \uC900\uBE44 \uC911\uC774\uC5D0\uC694",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
     "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)",
     // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
@@ -5807,7 +5810,14 @@
     "click",
     () => send({ type: "OPEN_LICENSE_LINK", target: isPaid ? "portal" : "purchase" })
   );
-  if (!licenseLinksConfigured()) $("licenseLinkRow").style.display = "none";
+  function renderLicenseLink() {
+    const btn = $("btnLicenseLink");
+    btn.textContent = isPaid ? t("license.manage") : t("license.buy");
+    const tip = isPaid ? t("license.manageTip") : t("license.buyTip");
+    const ready = licenseLinksConfigured();
+    btn.title = ready ? tip : `${tip} \u2014 ${t("license.linkPending")}`;
+    setLock(btn, ready ? null : "prereq", t("license.linkPending"));
+  }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
@@ -6088,6 +6098,7 @@
         }
         isPaid = msg.unlimited;
         updateGates();
+        renderLicenseLink();
         break;
       }
       case "EXPORT_RESULT": {
@@ -6560,9 +6571,9 @@
   }
   $("btnRename").addEventListener("click", () => {
     if ($("btnRename").getAttribute("aria-disabled") === "true") return;
-    const items = renameRows().filter((n) => !renameOff.has(n.id)).map((n) => ({ id: n.id, before: n.name, after: n.after, role: n.role }));
+    const items = renameRows().filter((n) => !renameOff.has(n.id)).map((n) => __spreadValues({ id: n.id, before: n.name, after: n.after, role: n.role }, n.nameKey ? { nameKey: n.nameKey } : {}));
     if (!items.length) return;
-    const roleOnly = renameNodes.filter((n) => n.after === void 0 && n.role).map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role }));
+    const roleOnly = renameNodes.filter((n) => n.after === void 0 && (n.role || n.nameKey)).map((n) => __spreadValues({ id: n.id, before: n.name, after: n.name, role: n.role }, n.nameKey ? { nameKey: n.nameKey } : {}));
     renameApplyReq = ++bindReqSeq;
     send({ type: "RENAME_APPLY", items: [...items, ...roleOnly], reqId: renameApplyReq });
   });
@@ -8570,6 +8581,7 @@ ${opts.tip}` : text;
   applyStaticI18n();
   applyCardChrome();
   applyButtonTips();
+  renderLicenseLink();
   syncStickyOffsets();
   if (typeof ResizeObserver !== "undefined") {
     const ro = new ResizeObserver(() => syncStickyOffsets());

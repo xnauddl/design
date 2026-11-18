@@ -43,6 +43,8 @@ export interface RenameChange {
   id: string;
   before: string;
   after: string;
+  /** 보이는 이름에서 루트 접두사를 뗐으면 떼기 전 이름(ia-v4 §4.4) — 적용 때 `dsNameKey`로 남긴다. */
+  nameKey?: string;
 }
 
 /**
@@ -67,6 +69,8 @@ export interface RenameNode {
   keep?: KeepReason;
   /** 이 이름을 만든 역할(card·thumbnail…). 적용 때 `dsRole`로 남겨 등록이 읽는다. */
   role?: string;
+  /** 판정 이름 ≠ 보이는 이름(루트 접두사를 뗌)이면 판정 이름 — 이름이 그대로인 다시 정리에서도 싣는다(ia-v4 §4.4). */
+  nameKey?: string;
 }
 
 /**
@@ -223,7 +227,7 @@ export type UiToCode =
   | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[]; reqId?: number }
   | { type: 'UNBIND_DELETED'; reqId: number; nodeIds?: string[] } // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3)
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
-  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
+  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
   | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
