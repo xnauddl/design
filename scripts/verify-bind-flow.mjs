@@ -19,6 +19,7 @@
        저장(고친 것만 + base), 저장 중 잠금, 성공·일부 실패·다른 곳에서 바뀜·삭제됨·이름 거절, ERROR·10초, 버리기 확인, 닫은 뒤 포커스
     14 컴포넌트(베타): 언제나 하위 탭 셋 · [베타] 배지 · 접근성 이름 · 준비 현황 각주 없음 · 켜기 체크박스 없음 · End
     23 UX 검수 C(IA v4 §4.3a · B.14): 색 Layer · 빈 상태 잠금 · 주 버튼 · 팔레트 띠 · 컴포넌트 문구 · 머리 띠
+    25 라이선스 구매 버튼(IA v4 §4.10 · B.21): 늘 보임 · 자리표시자면 잠금 · 티어별 글 · 툴팁 꼬리
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -2396,7 +2397,8 @@ async function fillBoth(p) {
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.click('#btnSettings');
   await p.waitForTimeout(40);
-  await p.evaluate(() => { document.getElementById('licenseLinkRow').style.display = ''; }); // 배포 전 빌드는 링크 줄을 숨긴다 — 모양만 보려고 보인다
+  // B.21 뒤 [결제 · 구독 관리]는 늘 보이고 배포 전에는 잠겨 있다 — 오류 길만 보려고 잠금을 잠시 푼다(링크 준비 뒤 모습)
+  await p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); b.removeAttribute('aria-disabled'); delete b.dataset.lock; delete b.dataset.baseLock; });
   await p.click('#btnLicenseLink');
   await recv(p, { type: 'ERROR', message: '열지 못했어요', op: 'OPEN_LICENSE_LINK' });
   await p.waitForTimeout(30);
@@ -2545,6 +2547,30 @@ async function fillBoth(p) {
   await recv(p, { ...sel(1, 0), ids: ['w7'] });
   await p.waitForTimeout(30);
   check('25 기준이 바뀌면 안내 줄도 지움', (await line()) === null);
+  await p.close();
+}
+
+{
+  // 26 라이선스 구매 버튼(IA v4 §4.10 · B.21) — 늘 보이고, 결제 링크가 자리표시자면 잠긴다. 글은 티어별.
+  const p = await open(480, 'settings');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'none' });
+  await p.waitForTimeout(30);
+  const lk = () => p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); const r = b.getBoundingClientRect(); return { text: b.textContent, title: b.title, dis: b.getAttribute('aria-disabled'), shown: r.width > 0 && r.height > 0 && getComputedStyle(document.getElementById('licenseLinkRow')).display !== 'none' }; });
+  const f = await lk();
+  const col = await p.evaluate(() => { const cs = getComputedStyle(document.getElementById('btnLicenseLink')); return { c: cs.color, b: cs.backgroundColor }; });
+  check('26 잠긴 주 버튼 모양(B.23) — 글자 --muted · 바탕 --surface-2', col.c === 'rgb(146, 152, 161)' && col.b === 'rgb(244, 245, 246)', JSON.stringify(col));
+  check('26 무료 · 자리표시자 → [유료 구매하기 ↗] 보임 · 잠김 · 툴팁 꼬리', f.shown && f.text === '유료 구매하기 ↗' && f.dis === 'true' && f.title === '결제 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(f));
+  await p.evaluate(() => { window.__sent.length = 0; });
+  await p.click('#btnLicenseLink', { force: true });
+  await p.waitForTimeout(30);
+  check('26 잠긴 구매 버튼 누름 → 상태 줄 사유 · OPEN_LICENSE_LINK 안 보냄', (await p.textContent('#statusText')) === '구독 관리 페이지는 아직 준비 중이에요' && (await sent(p, 'OPEN_LICENSE_LINK')).length === 0, await p.textContent('#statusText'));
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'key', status: 'active' });
+  await p.waitForTimeout(30);
+  const pd = await lk();
+  check('26 유료 → [구독 관리 ↗] · 툴팁 바뀜 · 잠금 그대로', pd.text === '구독 관리 ↗' && pd.dis === 'true' && pd.title === '결제 수단 · 기기 활성화를 관리하는 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(pd));
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'none' });
+  await p.waitForTimeout(30);
+  check('26 다시 무료 → [유료 구매하기 ↗]', (await lk()).text === '유료 구매하기 ↗');
   await p.close();
 }
 

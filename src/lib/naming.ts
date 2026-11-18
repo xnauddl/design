@@ -83,6 +83,18 @@ export const ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES] as const;
  */
 export const ROLE_KEY = 'dsRole';
 
+/**
+ * 이름 정리가 보이는 이름에서 루트 접두사를 뗐을 때(ia-v4 §4.4 "맨 위 이름은 보이는 이름에 붙이지 않는다")
+ * 떼기 전 이름을 남기는 pluginData 키. [등록]의 이름 키(`StructNode.nameKey`)가 읽어 묶기 · 재사용 키를 지금과 같게 한다.
+ */
+export const NAME_KEY = 'dsNameKey';
+
+/** `dsNameKey`가 지금 이름에 맞는 키인가 — `-{지금 이름}`으로 끝나야 한다(대소문자까지 정확, 두 마디 이상). */
+export function nameKeyFor(name: string, stored: string | null | undefined): string | undefined {
+  if (!stored || !name) return undefined;
+  return stored.length > name.length + 1 && stored.endsWith('-' + name) ? stored : undefined;
+}
+
 /** 역할 어휘 집합(맥락 추출 시 의미 있는 세그먼트 판별용). */
 const ROLE_SET: ReadonlySet<string> = new Set(ROLE_VOCAB);
 

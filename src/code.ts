@@ -11,11 +11,11 @@ import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig }
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
-import { renameSelection, writeRole, writeRoleFromName } from './lib/rename';
+import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
-import { pascalCase, ROLE_KEY, isKnownRole } from './lib/naming';
+import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor, isKnownRole } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
@@ -587,6 +587,17 @@ function solidFillHex(node: SceneNode): string | null {
   return null;
 }
 
+/** 이름 정리가 남긴 떼기 전 이름(`dsNameKey`)이 지금 이름에 맞으면 그 키(ia-v4 §4.4), 아니면 undefined. */
+function readNameKey(node: SceneNode): string | undefined {
+  const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
+  if (typeof fn !== 'function') return undefined;
+  try {
+    return nameKeyFor(node.name, fn.call(node, NAME_KEY));
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * 리네임이 남긴 역할(`dsRole`)을 읽는다 — 등록이 머리명사로 쓴다. 없으면 undefined
  * (사람이 지은 이름이거나 리네임 전). API가 없는 노드도 안전하게 통과.
@@ -704,6 +715,9 @@ function iconFrameKeyOf(node: SceneNode): string | undefined {
   return `f:${fnv1a(parts.join('|'))}`;
 }
 
+/** [등록] 넣기 전 검사 인자(§4.7 8번) — 아이콘 프레임 ↔ 아이콘 인스턴스 짝은 자리 · 크기 비교를 안으로 내리지 않는다. */
+const fitOpts = { isIcon: (n: SceneNode) => iconFrameKeyOf(n) !== undefined };
+
 /** 그림 지문 — 날 벡터는 경로 지문, 아이콘 프레임은 아이콘 지문(아이콘 등록부 · 값 옮기기가 쓴다). */
 function artKeyOf(node: SceneNode): string | undefined {
   return vectorKeyOf(node) ?? iconFrameKeyOf(node);
@@ -731,9 +745,11 @@ function toStructNode(node: SceneNode, isRoot = true): StructNode {
       mainComponentKey = null;
     }
   }
+  const nameKey = readNameKey(node);
   return {
     id: node.id,
     name: node.name,
+    ...(nameKey ? { nameKey } : {}),
     type: node.type,
     imageHash: imageHashOf(node),
     vectorKey: vectorKeyOf(node),
@@ -1326,7 +1342,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 이름과 함께 dsRole도 기록 — 말단 후보 자격·등록 머리명사가 readRole에 의존한다.
         const changes: RenameChange[] = [];
         let roleWrites = 0; // 이름은 그대로면서 역할만 새로 기록된 노드 수(undo 묶음 판단용)
-        for (const { id, before: expectedBefore, after, role } of msg.items) {
+        for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
@@ -1344,6 +1360,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (role ? writeRole(node as SceneNode, role) : writeRoleFromName(node as SceneNode, after)) {
             roleWrites++;
           }
+          // 떼기 전 이름(ia-v4 §4.4) — 있으면 기록, 없으면 지운다. 바뀌었으면 역할 기록처럼 센다(undo 묶음).
+          if (writeNameKey(node as SceneNode, nameKey ?? null)) roleWrites++;
           // node.name은 위(before !== after)에서 이미 썼다 — origin/main이 여기 둔 대입은
           // 그 줄과 겹쳐서 걷는다.
           if (before === after) continue;
@@ -1907,7 +1925,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') { any = true; continue; }
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 // 이 멤버만 쓰려고 새로 만든 아이콘은 지운다 — 만든 순간 다른 멤버는 아직 쓰지 않았다(쓰던 것은 had로 빠진다).
@@ -2094,11 +2112,39 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 // 마스터 자리 — 원본이 Components 페이지로 옮겨졌으므로 인스턴스 → 복사본 → 빈 자리(5번).
                 restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
                 // 나머지 멤버 — 검사 뒤 넣고 나서 지운다. 걸리면 원본 그대로(8번), 못 넣으면 원본 그대로(5번).
+                // 값 넣기는 세트 경로(⑤ placeExtras)와 같이 덮어쓴 값 옮기기 하나로 — 안쪽 인스턴스 속
+                // 사진 · 글자 · 보이기까지 옮긴다(§4.7 "묶기" 5번 4단계, QA #5 불합격 1). 단 슬롯으로 값을
+                // 읽는 heading 계획은 자식 인덱스 짝 맞추기를 쓸 수 없어 지금 방식(속성 값 + 사진 슬롯) 그대로.
+                const slotPlan = plan.some((p) => !!p.headingSlot);
+                /** 멤버용 비동기 만들기 — 인스턴스 → 9번 기록 대상 → 덮어쓴 값 옮기기. */
+                const asyncMakerFor = (member: SceneNode, name: string) => async (): Promise<InstanceNode> => {
+                  const inst = master.createInstance();
+                  try {
+                    keepRoots.push({ node: inst, name }); // 9번 값 지키기의 기록 대상
+                    const bad = await copyOverridesAsync(member, inst, prefix, {
+                      mainOf: (n) => n.getMainComponentAsync(),
+                      loadFont: (f) => figma.loadFontAsync(f),
+                      isIcon: (n) => iconFrameKeyOf(n) !== undefined,
+                      iconFor: (v) => {
+                        const key = artKeyOf(v);
+                        return key ? iconRegistry.ensure(key, v, v.name) : null;
+                      },
+                    });
+                    for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
+                    if (bad.length) propFailed.push(name);
+                    return inst;
+                  } catch (e) {
+                    try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
+                    throw e;
+                  }
+                };
                 for (const snap of snaps) {
                   if (snap === masterSnap) continue;
                   const name = snap.n.name;
                   const before = propFailed.length;
-                  const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                  const r = slotPlan
+                    ? replaceMember(snap.n, makerFor(snap, name), prefix, { layout: false }) // heading: 슬롯 짝 — 자리 · 크기 검사 끔(§4.7 8번)
+                    : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix, fitOpts);
                   if (r.result === 'replaced') continue;
                   // 묶지 않은 멤버는 속성 값 꼬리에서 뺀다 — 원본이 그대로라 따질 속성 값이 없다.
                   if (propFailed.length > before) propFailed.splice(before);
@@ -2190,7 +2236,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   }
                 };
                 const before = propFailed.length;
-                const r = await replaceMemberAsync(node, make, prefix);
+                const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                 if (r.result === 'replaced') continue;
                 if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
                 if (r.result === 'mismatch') {

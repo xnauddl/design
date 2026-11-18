@@ -61,6 +61,7 @@ import {
   scanComponentCandidates,
   componentEligible,
   groupByExactName,
+  nameKeyFor,
   recognizeComponentName,
   extractNameProps,
   distinguishingTokens,
@@ -1481,6 +1482,26 @@ test('groupByExactName — 정확한 이름끼리만 묶음(머리명사 병합 
   assert.equal(groups.length, 2);
   assert.deepEqual(groups[0].members.map((m) => m.id), ['a', 'b']); // like-button 그룹
   assert.deepEqual(groups[1].members.map((m) => m.id), ['c']); // artist-button 단독
+});
+
+test('B.22 nameKeyFor — dsNameKey가 -{지금 이름}으로 끝날 때만(대소문자 정확) ⑬', () => {
+  assert.equal(nameKeyFor('image', 'dsl-image'), 'dsl-image');
+  assert.equal(nameKeyFor('Image', 'dsl-image'), undefined, '컴포넌트가 된 원본(대문자)은 지금 이름');
+  assert.equal(nameKeyFor('image', 'image'), undefined);
+  assert.equal(nameKeyFor('card-image', 'dsl-image'), undefined, '사용자가 이름을 바꿨으면 지금 이름');
+  assert.equal(nameKeyFor('image', ''), undefined);
+});
+
+test('B.22 ⑨ groupByExactName — nameKey(dsl-image)가 있으면 그것으로 묶는다 · 없으면 name(기존 그대로) ⑩', () => {
+  const mk = (id, name, nameKey) => ({ id, name, ...(nameKey ? { nameKey } : {}), type: 'FRAME', children: [] });
+  const groups = groupByExactName([mk('a', 'image', 'dsl-image'), mk('b', 'image', 'dsl-image'), mk('c', 'image')]);
+  assert.deepEqual(groups.map((g) => [g.key, g.members.map((m) => m.id)]), [['dsl-image', ['a', 'b']]], 'c(키 없는 image)는 일반 구조어라 빠진다');
+});
+
+test('B.22 ⑪ resolveGroupNames — 겹칠 때 되살리는 맥락은 지금 이름(뗀 이름)에서 → DslImage가 아니라 Image2', () => {
+  const g = (p, n) => Array.from({ length: n }, (_, i) => ({ id: `${p}${i}`, name: 'image', nameKey: `${p}-image`, type: 'FRAME', role: 'image' }));
+  assert.deepEqual(resolveGroupNames([g('dsl', 2), g('copy', 2)]), ['Image', 'Image2']);
+  assert.deepEqual(resolveGroupNames([g('dsl', 2)], ['Image']), ['Image2']);
 });
 
 test('groupByExactName — 일반 구조어(container/item/image…)는 이름이 같아도 묶지 않는다', () => {

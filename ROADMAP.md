@@ -285,7 +285,7 @@
 - [x] **검증 페일오픈 차단** — fetch 자체 실패만 `offline`(grace 유지). 서명 불일치·공개키 오설정·5xx·비JSON 응답은 검증 실패로 확정 `(PR #71)`
 - [x] **서명 없는 평문 응답 거부** — `token` 없는 응답을 수용하던 폴백 제거(배포 빌드에도 포함돼 M2.1과 모순이었음) `(PR #71)`
 - [x] **구매·구독 관리 링크 UI** — `OPEN_LICENSE_LINK` → code의 `figma.openExternal`. URL은 code가 `licenseConfig`에서 해석(임의 URL 전달 금지) `(PR #71)`
-- [x] **링크 · 서버가 아직 자리표시자일 때** — 결제 링크가 자리표시자면 구독 버튼을 숨기고, 검증 서버 · 공개키가 아직이면 설정 안내를 띄운다(`licenseLinksConfigured` · `licenseVerifyConfigured` — `src/lib/licenseConfig.ts`). 배포 때 값을 바꾸면 저절로 다시 보인다
+- [x] **링크 · 서버가 아직 자리표시자일 때** — 결제 링크가 자리표시자면 구독 버튼을 숨기고(→ 2026-11-17 B.21: 숨기지 않고 잠근다 · 글은 티어별 [유료 구매하기 ↗] / [구독 관리 ↗]), 검증 서버 · 공개키가 아직이면 설정 안내를 띄운다(`licenseLinksConfigured` · `licenseVerifyConfigured` — `src/lib/licenseConfig.ts`). 배포 때 값을 바꾸면 잠금이 저절로 풀린다(B.21)
 
 ### 출시 단계
 - [x] **M1 — 엔타이틀먼트(기능 게이팅) + 개발용 티어 토글 + 백도어 차단**
@@ -316,7 +316,7 @@
 - [ ] 4. [사용자] **Cloudflare 계정(무료) 만들기 → 이 컴퓨터에서 `npx wrangler login`** — Worker를 올릴 권한. 배포 명령은 사용자 컴퓨터에서 실행(이 클라우드 세션에서는 Cloudflare 로그인을 하지 않는다)
 - [ ] 5. [사용자 · Claude 안내] **서명 키쌍 만들기** — `node scripts/gen-license-keys.mjs`. 공개키(public JWK)는 Claude에게 넘겨 플러그인에 넣고, **개인키(private JWK)는 채팅 · 저장소에 절대 올리지 않는다** — 바로 6번 secret으로 넣고, 비밀번호 관리자 등 안전한 곳에 따로 보관(잃으면 새 키쌍 + 플러그인 새 버전, 모든 사용자 다시 인증)
 - [ ] 6. [사용자] **Worker 배포** — `cd workers/verify` → `npx wrangler secret put LICENSE_PRIVATE_JWK`(5의 개인키) → (선택) `npx wrangler secret put ADMIN_KEYS`(본인 테스트용 관리자 키) → `npx wrangler deploy` → 나온 `https://….workers.dev` 주소를 Claude에게 알려 줌. (선택) 나중에 서버를 옮겨도 플러그인을 다시 내지 않게 자체 도메인을 붙일 수 있다 — 주소가 바뀌면 플러그인 새 버전이 필요하다
-- [ ] 7. [Claude · 코드] **플러그인에 실제 값 넣기(배포 PR)** — `src/lib/licenseConfig.ts`의 `VERIFY_URL`(6의 주소) · `LICENSE_PUBLIC_JWK`(5의 공개키) · `PURCHASE_URL` · `PORTAL_URL`(3의 주소), `manifest.json` `networkAccess.allowedDomains`를 Worker 도메인으로, 사유 글을 "라이선스 키 확인에만 씁니다 — 디자인 데이터는 보내지 않습니다"처럼. `wrangler.toml`의 `LICENSE_ISS` · `LICENSE_AUD`가 `licenseConfig.ts`와 같은지 확인. 값을 넣으면 숨어 있던 구독 버튼이 저절로 다시 보인다(`licenseLinksConfigured`). 검사 4종 + `dist/` 다시 빌드
+- [ ] 7. [Claude · 코드] **플러그인에 실제 값 넣기(배포 PR)** — `src/lib/licenseConfig.ts`의 `VERIFY_URL`(6의 주소) · `LICENSE_PUBLIC_JWK`(5의 공개키) · `PURCHASE_URL` · `PORTAL_URL`(3의 주소), `manifest.json` `networkAccess.allowedDomains`를 Worker 도메인으로, 사유 글을 "라이선스 키 확인에만 씁니다 — 디자인 데이터는 보내지 않습니다"처럼. `wrangler.toml`의 `LICENSE_ISS` · `LICENSE_AUD`가 `licenseConfig.ts`와 같은지 확인. 값을 넣으면 잠겨 있던 구매 버튼이 저절로 풀린다(`licenseLinksConfigured` — B.21). 검사 4종 + `dist/` 다시 빌드
 - [ ] 8. [사용자 · Claude] **Test mode로 확인** — ① 관리자 키 → 유료 풀림 ② 테스트 결제 키 → 유료 풀림 ③ 같은 키를 두 번째 기기에서 → 거부(기기 1대) ④ [해제] 뒤 다른 기기에서 → 풀림 ⑤ 인터넷을 끊고 → 14일 동안 유지 ⑥ 구독 취소 · 환불된 키 → 거부 ⑦ 다른 스토어 · 다른 상품 키 → 거부(1번 확인) ⑧ Figma 실기에서 ⚙ › 라이선스 화면 문구 · 링크
 - [ ] 9. [사용자] **Live mode로 바꾸기** — 라이브 상품의 체크아웃 · 포털 주소가 Test와 다르면 Claude가 7번 값을 다시 바꾼다(작은 PR). 본인 카드로 실제 결제 1건 → 유료 풀림 확인 → 환불
 - [ ] 10. [사용자 · Claude] **Figma 정책 확인** — 외부 결제 · 라이선스 키 방식이 Community 게시 규칙에 맞는지, 네트워크 사용 사유 · 개인정보 안내(라이선스 확인 요청 = 키 + 플러그인 id만, 디자인 데이터 없음 — 아래 "프라이버시")

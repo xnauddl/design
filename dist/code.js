@@ -725,8 +725,11 @@
     "license.clearTip": "\uC774 \uAE30\uAE30\uC758 \uD65C\uC131\uD654\uB97C \uBC18\uB0A9\uD574\uC694. \uC0C8 \uAE30\uAE30\uC5D0\uC11C \uAC19\uC740 \uD0A4\uB97C \uB2E4\uC2DC \uAC80\uC99D\uD558\uBA74 \uB3FC\uC694.",
     "license.hint": "\uC720\uB8CC\uB97C \uC4F0\uBA74 \u{1F512} \uC7A0\uAE34 \uAE30\uB2A5\uC774 \uD480\uB824\uC694",
     // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
-    "license.manage": "\uACB0\uC81C \xB7 \uAD6C\uB3C5 \uAD00\uB9AC \u2197",
-    "license.manageTip": "\uBB34\uB8CC\uBA74 \uACB0\uC81C \uD398\uC774\uC9C0\uB85C, \uAD6C\uB3C5 \uC911\uC774\uBA74 \uACB0\uC81C\uC218\uB2E8\xB7\uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB85C \uC5F4\uC5B4\uC694",
+    "license.manage": "\uAD6C\uB3C5 \uAD00\uB9AC \u2197",
+    "license.manageTip": "\uACB0\uC81C \uC218\uB2E8 \xB7 \uAE30\uAE30 \uD65C\uC131\uD654\uB97C \uAD00\uB9AC\uD558\uB294 \uD398\uC774\uC9C0\uB97C \uC5F4\uC5B4\uC694",
+    "license.buy": "\uC720\uB8CC \uAD6C\uB9E4\uD558\uAE30 \u2197",
+    "license.buyTip": "\uACB0\uC81C \uD398\uC774\uC9C0\uB97C \uC5F4\uC5B4\uC694",
+    "license.linkPending": "\uAD6C\uB3C5 \uAD00\uB9AC \uD398\uC774\uC9C0\uB294 \uC544\uC9C1 \uC900\uBE44 \uC911\uC774\uC5D0\uC694",
     "license.devTier": "\uAC1C\uBC1C\uC6A9 \uAC15\uC81C \uD2F0\uC5B4",
     "license.devTierNote": "(\uAC80\uC99D\uB41C \uD0A4\uAC00 \uC5C6\uC744 \uB54C\uB9CC \uC801\uC6A9)",
     // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
@@ -780,6 +783,7 @@
     "component.fit.self": "\uC790\uC2E0",
     "component.fit.photoDiff": "\uC0AC\uC9C4 \uB2E4\uB984({name})",
     "component.fit.photoSize": "\uC0AC\uC9C4 \uD06C\uAE30 {w}\xD7{h} \u2260 {mw}\xD7{mh}({name})",
+    "component.fit.layout": "\uC790\uB9AC\xB7\uD06C\uAE30 \uB2E4\uB984({name})",
     "component.fail.single": "\uB2E8\uB3C5 \uB4F1\uB85D \uC2E4\uD328({name}): {error}",
     "component.fail.propsRegister": "\uC18D\uC131\uC811\uD798 \uB4F1\uB85D \uC2E4\uD328({set}): {error}",
     "component.fail.iconFallback": "\uC544\uC774\uCF58\uC744 \uB9CC\uB4E4\uC9C0 \uBABB\uD574 \uC138\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694({set})",
@@ -2305,6 +2309,11 @@
   ];
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
   var ROLE_KEY = "dsRole";
+  var NAME_KEY = "dsNameKey";
+  function nameKeyFor(name, stored) {
+    if (!stored || !name) return void 0;
+    return stored.length > name.length + 1 && stored.endsWith("-" + name) ? stored : void 0;
+  }
   var ROLE_SET = new Set(ROLE_VOCAB);
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
@@ -6136,13 +6145,13 @@
   async function renameSelection(selection2, opts) {
     const col = { changes: [], nodes: [] };
     const safeOpts = __spreadProps(__spreadValues({}, opts), { maxDepth: normalizeMaxDepth(opts.maxDepth) });
-    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null, 0);
+    await recurse(selection2, null, safeOpts, col, 0, null, null, null, null, 0, null);
     return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
   }
   function normalizeMaxDepth(v) {
     return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
   }
-  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims, ctxDepth) {
+  async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims, ctxDepth, rootPrefix) {
     var _a, _b;
     const total = nodes.length;
     const slotOf = /* @__PURE__ */ new Map();
@@ -6175,20 +6184,29 @@
       let contextForChildren = before;
       let ctxDepthForChildren = 0;
       let after;
+      let nameKey;
+      let prefixForChildren = rootPrefix;
+      if (depth === 0) {
+        const sc = decided.keep === "root" ? pickScope(before) : null;
+        prefixForChildren = sc && !isKnownRole(sc) ? sc : null;
+      }
       if (!decided.skip && decided.name) {
-        if (decided.name !== before) {
-          after = decided.name;
-          col.changes.push({ id: node.id, before, after });
+        const visible = stripRootPrefix(decided.name, rootPrefix);
+        if (visible !== decided.name) nameKey = decided.name;
+        if (visible !== before) {
+          after = visible;
+          col.changes.push(__spreadValues({ id: node.id, before, after }, nameKey ? { nameKey } : {}));
           if (opts.apply) node.name = after;
         }
         if (opts.apply && decided.role) writeRole(node, decided.role);
+        if (opts.apply) writeNameKey(node, nameKey != null ? nameKey : null);
         contextForChildren = decided.passthrough ? ancestorName : decided.name;
         if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
       }
-      col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role });
+      col.nodes.push(__spreadValues({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role }, nameKey ? { nameKey } : {}));
       if ("children" in node && !isSkippedSubtree(node)) {
         const childDims = decided.passthrough ? parentDims : dims(node);
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_b = decided.role) != null ? _b : null, childDims, ctxDepthForChildren);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_b = decided.role) != null ? _b : null, childDims, ctxDepthForChildren, prefixForChildren);
       }
     }
   }
@@ -6219,6 +6237,22 @@
       const read = node.getPluginData;
       if (typeof read === "function" && read.call(node, ROLE_KEY) === role) return false;
       fn.call(node, ROLE_KEY, role);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  function stripRootPrefix(name, prefix) {
+    return prefix && name.startsWith(prefix + "-") && name.length > prefix.length + 1 ? name.slice(prefix.length + 1) : name;
+  }
+  function writeNameKey(node, key) {
+    const n = node;
+    if (typeof n.setPluginData !== "function") return false;
+    try {
+      const cur = typeof n.getPluginData === "function" ? n.getPluginData.call(node, NAME_KEY) : "";
+      const next = key != null ? key : "";
+      if (cur === next) return false;
+      n.setPluginData.call(node, NAME_KEY, next);
       return true;
     } catch (e) {
       return false;
@@ -8079,10 +8113,11 @@
     "figure"
   ]);
   function groupByExactName(children) {
+    var _a;
     const map = /* @__PURE__ */ new Map();
     const order = [];
     for (const c of children) {
-      const k = exactNameKey(c.name);
+      const k = exactNameKey((_a = c.nameKey) != null ? _a : c.name);
       if (!k) continue;
       if (GENERIC_GROUP_NAMES.has(k)) continue;
       if (!map.has(k)) {
@@ -8279,7 +8314,7 @@
     };
     return hash2(enc(root));
   }
-  function reuseKey(kind, member, nameKey = reuseNameKey(member.name)) {
+  function reuseKey(kind, member, nameKey = reuseNameKey(((_a) => (_a = member.nameKey) != null ? _a : member.name)())) {
     return `${kind}:${nameKey}:${structFingerprint(member, kind !== "collapse", kind === "variant")}`;
   }
   function isHeadingCollapseGroup(members) {
@@ -8669,9 +8704,9 @@
     });
   }
   function planOfMembers(members) {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const ms = [...members];
-    return { key: reuseNameKey((_b = (_a = ms[0]) == null ? void 0 : _a.name) != null ? _b : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
+    return { key: reuseNameKey((_d = (_c = (_a = ms[0]) == null ? void 0 : _a.nameKey) != null ? _c : (_b = ms[0]) == null ? void 0 : _b.name) != null ? _d : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
   }
   function tabSubfamilies(members) {
     var _a, _b, _c, _d, _e;
@@ -9022,12 +9057,50 @@
     return img ? (_a = img.imageHash) != null ? _a : "" : void 0;
   }
   var sameSize = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
-  function memberFitIssue(inst, member, prefix) {
+  function relPos(node, root) {
+    if (node === root) return { x: 0, y: 0 };
+    const T = (n) => {
+      const m = n.absoluteTransform;
+      return Array.isArray(m) && Array.isArray(m[0]) && Array.isArray(m[1]) && m[0].every((v) => typeof v === "number") && m[1].every((v) => typeof v === "number") ? m : null;
+    };
+    const tn = T(node);
+    const tr = T(root);
+    if (tn && tr) {
+      const [[a, b, tx], [c, d, ty]] = tr;
+      const det = a * d - b * c;
+      if (Math.abs(det) > 1e-9) {
+        const dx = tn[0][2] - tx;
+        const dy = tn[1][2] - ty;
+        return { x: (d * dx - b * dy) / det, y: (-c * dx + a * dy) / det };
+      }
+    }
+    let x = 0;
+    let y = 0;
+    let cur = node;
+    while (cur && cur !== root) {
+      const n = cur;
+      x += typeof n.x === "number" ? n.x : 0;
+      y += typeof n.y === "number" ? n.y : 0;
+      cur = cur.parent;
+    }
+    return { x, y };
+  }
+  var rotationOf = (n) => {
+    const r = n.rotation;
+    return typeof r === "number" ? r : 0;
+  };
+  function memberFitIssue(inst, member, prefix, opts = {}) {
     if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
       return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
     }
+    const layoutOn = opts.layout !== false;
+    const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
     let issue = null;
-    const visit = (n, path) => {
+    const layoutIssue = (name) => {
+      issue = t("component.fit.layout", { name });
+    };
+    const visit = (n, path, layout) => {
+      var _a;
       if (issue) return;
       const h = imageHashOf(n);
       if (h !== void 0) {
@@ -9046,13 +9119,45 @@
           return;
         }
       }
-      if (n.type === "INSTANCE" || !("children" in n)) return;
-      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i)));
+      let down = layout && (path === "" || n.visible !== false);
+      if (down && path === "" && prefix) {
+        if (!instRoot) {
+          layoutIssue(n.name);
+          return;
+        }
+        const off = relPos(instRoot, inst);
+        const posBad = rotationOf(instRoot) === 0 && (!sameSize(off.x, 0) || !sameSize(off.y, 0));
+        if (posBad || !sameSize(instRoot.width, n.width) || !sameSize(instRoot.height, n.height)) {
+          layoutIssue(n.name);
+          return;
+        }
+      }
+      if (down && path !== "") {
+        const hit = nodeAtPath(inst, joinPath(prefix, path));
+        if (!hit) {
+          layoutIssue(n.name);
+          return;
+        }
+        const iconPair = hit.type === "INSTANCE" && n.type !== "INSTANCE" && (VECTOR_TYPES.has(n.type) || !!((_a = opts.isIcon) == null ? void 0 : _a.call(opts, n)));
+        if (!iconPair && hit.type !== n.type) {
+          layoutIssue(n.name);
+          return;
+        }
+        const a = relPos(n, member);
+        const b = instRoot ? relPos(hit, instRoot) : { x: NaN, y: NaN };
+        if (!sameSize(a.x, b.x) || !sameSize(a.y, b.y) || !sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
+          layoutIssue(n.name);
+          return;
+        }
+        if (iconPair) down = false;
+      }
+      if (!("children" in n)) return;
+      n.children.forEach((c, i) => visit(c, path ? `${path}/${i}` : String(i), down));
     };
-    visit(member, "");
+    visit(member, "", layoutOn);
     return issue;
   }
-  function replaceMember(member, make, prefix) {
+  function replaceMember(member, make, prefix, opts = {}) {
     let inst = null;
     try {
       inst = make();
@@ -9066,7 +9171,7 @@
         } catch (e) {
         }
       }
-      const why = memberFitIssue(inst, member, prefix);
+      const why = memberFitIssue(inst, member, prefix, opts);
       if (why) {
         try {
           inst.remove();
@@ -9092,14 +9197,14 @@
     }
     return { result: "replaced" };
   }
-  async function replaceMemberAsync(member, make, prefix) {
+  async function replaceMemberAsync(member, make, prefix, opts = {}) {
     let inst;
     try {
       inst = await make();
     } catch (e) {
       return { result: "placeFailed", why: t("component.fail.instanceMake", { error: e instanceof Error ? e.message : String(e) }) };
     }
-    return replaceMember(member, () => inst, prefix);
+    return replaceMember(member, () => inst, prefix, opts);
   }
   function ancestorInstance(n) {
     let p = n.parent;
@@ -10351,6 +10456,15 @@
     }
     return null;
   }
+  function readNameKey(node) {
+    const fn = node.getPluginData;
+    if (typeof fn !== "function") return void 0;
+    try {
+      return nameKeyFor(node.name, fn.call(node, NAME_KEY));
+    } catch (e) {
+      return void 0;
+    }
+  }
   function readRole(node) {
     const fn = node.getPluginData;
     if (typeof fn !== "function") return void 0;
@@ -10438,6 +10552,7 @@
     if (!walk3(node) || vectors === 0) return void 0;
     return `f:${fnv1a(parts.join("|"))}`;
   }
+  var fitOpts = { isIcon: (n) => iconFrameKeyOf(n) !== void 0 };
   function artKeyOf(node) {
     var _a;
     return (_a = vectorKeyOf(node)) != null ? _a : iconFrameKeyOf(node);
@@ -10464,9 +10579,11 @@
         mainComponentKey = null;
       }
     }
-    return __spreadProps(__spreadValues({
+    const nameKey = readNameKey(node);
+    return __spreadProps(__spreadValues(__spreadProps(__spreadValues({
       id: node.id,
-      name: node.name,
+      name: node.name
+    }, nameKey ? { nameKey } : {}), {
       type: node.type,
       imageHash: imageHashOf2(node),
       vectorKey: vectorKeyOf(node),
@@ -10496,7 +10613,7 @@
       characters,
       mainComponentKey,
       role: readRole(node)
-    }, iconKey ? { iconFrame: true, vectorKey: iconKey } : {}), {
+    }), iconKey ? { iconFrame: true, vectorKey: iconKey } : {}), {
       // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음. 아이콘 프레임도 그림 하나.
       children: node.type === "INSTANCE" || iconKey ? [] : kids.map((k) => toStructNode(k, false))
     });
@@ -10979,7 +11096,7 @@
         case "RENAME_APPLY": {
           const changes = [];
           let roleWrites = 0;
-          for (const { id, before: expectedBefore, after, role } of msg.items) {
+          for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
@@ -10988,6 +11105,7 @@
             if (role ? writeRole(node, role) : writeRoleFromName(node, after)) {
               roleWrites++;
             }
+            if (writeNameKey(node, nameKey != null ? nameKey : null)) roleWrites++;
             if (before === after) continue;
             changes.push({ id, before, after });
           }
@@ -11478,7 +11596,7 @@
                     }
                   };
                   const before = propFailed.length;
-                  const r = await replaceMemberAsync(node, make, prefix);
+                  const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                   if (r.result === "replaced") {
                     any = true;
                     continue;
@@ -11657,11 +11775,36 @@
                     };
                   };
                   restore([{ o: masterOrigin, make: makerFor(masterSnap, masterOrigin.name), label: master.name }]);
+                  const slotPlan = plan.some((p) => !!p.headingSlot);
+                  const asyncMakerFor = (member, name) => async () => {
+                    const inst = master.createInstance();
+                    try {
+                      keepRoots.push({ node: inst, name });
+                      const bad = await copyOverridesAsync(member, inst, prefix, {
+                        mainOf: (n) => n.getMainComponentAsync(),
+                        loadFont: (f) => figma.loadFontAsync(f),
+                        isIcon: (n) => iconFrameKeyOf(n) !== void 0,
+                        iconFor: (v) => {
+                          const key = artKeyOf(v);
+                          return key ? iconRegistry.ensure(key, v, v.name) : null;
+                        }
+                      });
+                      for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
+                      if (bad.length) propFailed.push(name);
+                      return inst;
+                    } catch (e) {
+                      try {
+                        if (!inst.removed) inst.remove();
+                      } catch (e2) {
+                      }
+                      throw e;
+                    }
+                  };
                   for (const snap of snaps) {
                     if (snap === masterSnap) continue;
                     const name = snap.n.name;
                     const before = propFailed.length;
-                    const r = replaceMember(snap.n, makerFor(snap, name), prefix);
+                    const r = slotPlan ? replaceMember(snap.n, makerFor(snap, name), prefix, { layout: false }) : await replaceMemberAsync(snap.n, asyncMakerFor(snap.n, name), prefix, fitOpts);
                     if (r.result === "replaced") continue;
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
@@ -11752,7 +11895,7 @@
                     }
                   };
                   const before = propFailed.length;
-                  const r = await replaceMemberAsync(node, make, prefix);
+                  const r = await replaceMemberAsync(node, make, prefix, fitOpts);
                   if (r.result === "replaced") continue;
                   if (propFailed.length > before) propFailed.splice(before);
                   if (r.result === "mismatch") {

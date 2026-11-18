@@ -55,18 +55,44 @@ function lineToBlock(raw) {
   return blk('paragraph', t);
 }
 
+/* Notion은 통합마다 평균 초당 약 3회로 호출을 제한한다(429). 동기화는 블록 수만큼
+   DELETE를 연달아 보내므로 한도에 걸릴 수 있고, 중간에 멈추면 페이지가 빈 채로 남는다.
+   그래서 429와 일시적 서버 오류(502·503·504)는 기다렸다 다시 보낸다. */
+const MAX_ATTEMPTS = Number(process.env.NOTION_MAX_ATTEMPTS) || 5;
+const RETRY_BASE_MS = Number(process.env.NOTION_RETRY_BASE_MS ?? 1000);
+const RETRYABLE = new Set([429, 502, 503, 504]);
+const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
+
+/** 대기 시간(ms): Retry-After 헤더(초) → 본문 additional_data.retry_after(초) → 지수 백오프. */
+function retryDelay(r, text, attempt) {
+  const sec = Number(r.headers.get('retry-after'));
+  if (sec > 0) return sec * 1000;
+  try {
+    const s = Number(JSON.parse(text)?.additional_data?.retry_after);
+    if (s > 0) return s * 1000;
+  } catch {}
+  return RETRY_BASE_MS * 2 ** (attempt - 1);
+}
+
 async function api(method, path, body) {
-  const r = await fetch('https://api.notion.com/v1' + path, {
-    method,
-    headers: {
-      Authorization: `Bearer ${TOKEN}`,
-      'Notion-Version': NOTION_VERSION,
-      'Content-Type': 'application/json',
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!r.ok) throw new Error(`${method} ${path} → ${r.status} ${await r.text()}`);
-  return r.json();
+  for (let attempt = 1; ; attempt++) {
+    const r = await fetch('https://api.notion.com/v1' + path, {
+      method,
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        'Notion-Version': NOTION_VERSION,
+        'Content-Type': 'application/json',
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (r.ok) return r.json();
+    const text = await r.text();
+    if (!RETRYABLE.has(r.status) || attempt >= MAX_ATTEMPTS)
+      throw new Error(`${method} ${path} → ${r.status} (시도 ${attempt}회) ${text}`);
+    const wait = retryDelay(r, text, attempt);
+    console.warn(`${method} ${path} → ${r.status}, ${wait}ms 뒤 다시 시도 (${attempt}/${MAX_ATTEMPTS})`);
+    await sleep(wait);
+  }
 }
 
 async function listChildren(id) {

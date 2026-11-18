@@ -717,8 +717,11 @@ export const STRINGS: Record<string, string> = {
   'license.clearTip': '이 기기의 활성화를 반납해요. 새 기기에서 같은 키를 다시 검증하면 돼요.',
   'license.hint': '유료를 쓰면 🔒 잠긴 기능이 풀려요',
   // 한 버튼이 티어에 따라 갈린다(결정 2026-08-06) — 라벨은 두 목적지를 함께 적는다.
-  'license.manage': '결제 · 구독 관리 ↗',
-  'license.manageTip': '무료면 결제 페이지로, 구독 중이면 결제수단·기기 활성화를 관리하는 페이지로 열어요',
+  'license.manage': '구독 관리 ↗',
+  'license.manageTip': '결제 수단 · 기기 활성화를 관리하는 페이지를 열어요',
+  'license.buy': '유료 구매하기 ↗',
+  'license.buyTip': '결제 페이지를 열어요',
+  'license.linkPending': '구독 관리 페이지는 아직 준비 중이에요',
   'license.devTier': '개발용 강제 티어',
   'license.devTierNote': '(검증된 키가 없을 때만 적용)',
   // PR 4 — 코드에 직접 쓰던 문구를 옮김(docs/pr4-copy-table.md). 조각을 받는 자리는 {…Part}
@@ -772,6 +775,7 @@ export const STRINGS: Record<string, string> = {
   'component.fit.self': '자신',
   'component.fit.photoDiff': '사진 다름({name})',
   'component.fit.photoSize': '사진 크기 {w}×{h} ≠ {mw}×{mh}({name})',
+  'component.fit.layout': '자리·크기 다름({name})',
   'component.fail.single': '단독 등록 실패({name}): {error}',
   'component.fail.propsRegister': '속성접힘 등록 실패({set}): {error}',
   'component.fail.iconFallback': '아이콘을 만들지 못해 세트로 등록해요({set})',
