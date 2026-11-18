@@ -25,10 +25,11 @@
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Instance · 잠긴 레이어는 서브트리째 스킵, Text는 자기 이름만 보존.
    ============================================================ */
-import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, ROLE_KEY, NAME_KEY } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, isScopeRole, isDefaultName, EMITTED_ROLES, ROLE_KEY, NAME_KEY } from './naming';
+import { isIconFrame, shortOneLine } from './componentLike';
 import type { ParsedToken } from './naming';
 import type { KeepReason, RenameChange, RenameNode } from '../shared/messages';
-import { hasVisibleFill, hasImageFill, hasColorFill, hasVisibleStroke } from './nodePaint'; // 스와치 판정의 색 채움 = 보이는 단색 · 그라데이션
+import { hasVisibleFill, hasImageFill, hasColorFill, hasVisibleStroke, VECTOR_TYPES } from './nodePaint'; // 스와치 판정의 색 채움 = 보이는 단색 · 그라데이션
 
 /** 자식에게 내려보내는 위치 정보(영역 추론용). depth 0 = 선택 루트. */
 interface Pos {
@@ -57,6 +58,12 @@ interface Pos {
    * 이름(node.parent.name)이 아니라 ctx 체인으로 센다: 미리보기에선 부모 이름이 아직 안 바뀐다.
    */
   ctxDepth: number;
+  /** 실제 부모 노드(형제 배열의 주인) — logo · actions 화면 위치용(ia-v4 §4.4 A4). 선택 목록이면 null. */
+  parentNode: SceneNode | null;
+  /** 형제 배열(자신 포함). */
+  siblings: readonly SceneNode[];
+  /** 루트에서 온 접두사(B.22) — 아이콘 프레임의 "전에 붙인 이름" 판정용(A1 ⓑ). */
+  rootPrefix: string | null;
 }
 
 interface Opts {
@@ -83,7 +90,7 @@ export async function renameSelection(
 ): Promise<RenameOutcome> {
   const col: Collect = { changes: [], nodes: [] };
   const safeOpts: Opts = { ...opts, maxDepth: normalizeMaxDepth(opts.maxDepth) };
-  await recurse(selection, null, safeOpts, col, 0, null, null, null, null, 0, null);
+  await recurse(selection, null, safeOpts, col, 0, null, null, null, null, 0, null, null);
   return { changes: col.changes, nodes: col.nodes, applied: opts.apply };
 }
 
@@ -103,6 +110,7 @@ async function recurse(
   parentDims: { w: number; h: number } | null,
   ctxDepth: number,
   rootPrefix: string | null,
+  parentNode: SceneNode | null,
 ): Promise<void> {
   const total = nodes.length;
   // 랜드마크 슬롯 — 실제로 리네임 대상이 되는 "보이는 컨테이너"만 센다.
@@ -128,6 +136,9 @@ async function recurse(
       afterOverlay: overlayAt >= 0 && i > overlayAt,
       hasAvatarSibling,
       ctxDepth,
+      parentNode,
+      siblings: nodes,
+      rootPrefix,
     };
     const decided = await decide(node, ancestorName, pos, opts, parentRole);
     let contextForChildren: string | null = before;
@@ -138,12 +149,13 @@ async function recurse(
     let prefixForChildren = rootPrefix;
     if (depth === 0) {
       const sc = decided.keep === 'root' ? pickScope(before) : null;
-      prefixForChildren = sc && !isKnownRole(sc) ? sc : null;
+      prefixForChildren = sc && !isScopeRole(sc) ? sc : null;
     }
 
     if (!decided.skip && decided.name) {
       // 보이는 이름 = 판정 이름에서 루트 접두사를 뗀 것. 판정 이름은 그대로 맥락으로 쓴다(역할 · 토큰 맥락이 지금과 같게).
-      const visible = stripRootPrefix(decided.name, rootPrefix);
+      // 아이콘 모양 이름을 그대로 두는 경우(A1)는 접두사를 떼지 않는다.
+      const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
       if (visible !== decided.name) nameKey = decided.name;
       // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
       if (visible !== before) {
@@ -165,11 +177,12 @@ async function recurse(
 
     // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
     // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
-    if ('children' in node && !isSkippedSubtree(node)) {
+    // 아이콘 프레임은 안을 정리하지 않는다(인스턴스 안처럼 — ia-v4 §4.4 A1, 깊이 · 판정 역할과 무관).
+    if ('children' in node && !isSkippedSubtree(node) && !isIconFrameNode(node)) {
       // 자식 역할은 부모에게 "실제로 부여된" 역할에서만 파생한다(구조 재판정 금지) —
       // 그래야 nav처럼 list를 앞지르는 역할이 붙었을 때 자식이 엉뚱하게 item이 되지 않는다.
       const childDims = decided.passthrough ? parentDims : dims(node);
-      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims, ctxDepthForChildren, prefixForChildren);
+      await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, decided.role ?? null, childDims, ctxDepthForChildren, prefixForChildren, node);
     }
   }
 }
@@ -180,7 +193,7 @@ async function decide(
   pos: Pos,
   opts: Opts,
   parentRole: string | null,
-): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string; keep?: KeepReason }> {
+): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string; keep?: KeepReason; keepName?: boolean }> {
   // 제외 규칙(이름 유지). 일부 노드는 recurse()에서 서브트리째 중단한다.
   // keep은 미리보기에서 "왜 안 바뀌는지"를 보여 주려고 싣는다 — 조용히 빠지면 버그로 읽힌다.
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true, keep: 'component' };
@@ -208,8 +221,15 @@ async function decide(
   // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
   // 상속 맥락은 자식에게 그대로 통과(passthrough)시켜 의미있는 후손이 카드 맥락을 받게.
   if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
+  // 아이콘 프레임은 모양 이름 그대로 — 뜻 없는 이름일 때만 맥락 + icon(ia-v4 §4.4 A1).
+  if (role === 'icon' && isIconFrameNode(node) && !isMeaninglessIconName(node, pos.rootPrefix)) {
+    return { skip: false, role, name: node.name, keepName: true };
+  }
   const scope = ctxScope === role ? null : ctxScope; // 맥락==역할이면 중복 제거(button-button 방지)
-  return { skip: false, role, name: layerNameFromRole(scope, role, { maxDepth: opts.maxDepth }) };
+  const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
+  // 세분화 1차 역할은 이름만 맥락 + 역할, 자식에게는 받은 맥락을 통과(B1–B3).
+  if (REFINED_PASSTHROUGH.has(role)) return { skip: false, role, name, passthrough: true };
+  return { skip: false, role, name };
 }
 
 /**
@@ -233,7 +253,8 @@ export function writeRole(node: SceneNode, role: string): boolean {
 }
 
 /** 판정 이름에서 앞의 `{루트 접두사}-`를 뗀다(정확히 접두사뿐이면 그대로 — ia-v4 §4.4). */
-export function stripRootPrefix(name: string, prefix: string | null): string {
+export function stripRootPrefix(name: string, prefix: string | null, role?: string): string {
+  if (role && name === role) return name; // 판정 이름이 역할 그 자체면 떼지 않는다(text-group → group 방지)
   return prefix && name.startsWith(prefix + '-') && name.length > prefix.length + 1 ? name.slice(prefix.length + 1) : name;
 }
 
@@ -263,12 +284,16 @@ export function writeNameKey(node: SceneNode, key: string | null): boolean {
  */
 export function writeRoleFromName(node: SceneNode, name: string): boolean {
   const toks = kebab(name).split('-').filter(Boolean);
+  const two = toks.length >= 2 ? toks.slice(-2).join('-') : '';
+  if (two && isKnownRole(two)) return writeRole(node, two); // 두 낱말 역할(text-group) 먼저
   const role = toks[toks.length - 1];
   return role && isKnownRole(role) ? writeRole(node, role) : false;
 }
 
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
 const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
+/** 세분화 1차 역할(ia-v4 §4.4 B1–B3) — 이름은 맥락 + 역할, 자식에게는 받은 맥락 통과. */
+const REFINED_PASSTHROUGH = new Set(['row', 'text-group', 'media']);
 /** 페인트(채움·선)에서 온 색 역할 — 자식 있는 컨테이너의 구조 역할을 덮지 못한다. */
 const PAINT_ROLES = new Set(['background', 'border', 'surface']);
 const hasChildren = (node: SceneNode): boolean => 'children' in node && node.children.length > 0;
@@ -294,6 +319,9 @@ function resolveRole(
   if (isActionsLike(node, pos, ctxScope)) return 'actions'; // 헤더 끝의 링크·버튼 2~3개
   if (isStatusDot(node, pos)) return 'status'; // 아바타 곁의 작은 점(온라인 표시 등)
   if (isThumbnail(node, pos, ctxScope)) return 'thumbnail'; // 카드/항목 맥락의 작은 미리보기
+  // 글자 버튼(A2) — list · nav 직속과 영역 자리는 빼고(지금 판정 그대로).
+  if (parentRole !== 'list' && parentRole !== 'nav' && !atRegionSlot(node, pos, ctxScope, parentRole) && isTextButtonLike(node)) return 'button';
+  if (isIconFrameNode(node)) return 'icon'; // 아이콘 프레임(A1)
   // 토큰 말단이 역할이면 신호로 사용 — 단, 자식이 있는 컨테이너에는 **색 역할**(background/border)을
   // 그대로 쓰지 않는다. 역할 별칭이 바인딩에서 거울을 이기게 되면서 페이지 본문 프레임의 채움이
   // `surface`(→background)에 붙고, 그 한 줄이 랜드마크 판정(main/section)을 덮어 본문이
@@ -345,6 +373,12 @@ function resolveRole(
       const region = regionRole(node, pos, ctxScope, parentRole); // HTML 랜드마크: header/footer/main/aside
       if (region) return region;
       if (isPageSection(pos, ctxScope)) return 'section'; // 역할 없는 페이지 중간 블록
+      // 세분화 1차(B1–B3) — 폴백 자리에서만, FRAME · GROUP만.
+      if (node.type !== 'SECTION') {
+        if (isRowLike(node, kids)) return 'row';
+        if (isTextGroupLike(node, kids)) return 'text-group';
+        if (isMediaLike(kids)) return 'media';
+      }
       return kids.length === 1 ? 'wrapper' : 'container';
     }
     default:
@@ -481,7 +515,7 @@ function isPageSplit(pos: Pos): boolean {
  *    치수를 모르면 이름 판정에만 의존.
  */
 function isPageParent(pos: Pos, ctxScope: string | null): boolean {
-  if (ctxScope && isKnownRole(ctxScope)) return false;
+  if (ctxScope && isScopeRole(ctxScope)) return false;
   const p = pos.parentDims;
   if (!p || p.w <= 0 || p.h <= 0) return true; // 치수 미상 → 이름 판정에만 의존
   return isPageSized(p);
@@ -649,9 +683,12 @@ function isFieldLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
   if (layoutOf(node) !== 'vertical') return false; // 라벨 위, 입력 아래
   const shown = kids.filter(isVisible);
   if (shown.length < 2 || shown.length > 4) return false; // 라벨+입력(+힌트/에러)
-  const hasLabel = shown.some((k) => k.type === 'TEXT');
+  // 이름표 = 짧은 한 줄 글자(두 줄 안내 글은 이름표 아님 — ia-v4 §4.4 A3 실기 2).
+  const hasLabel = shown.some((k) => k.type === 'TEXT' && shortOneLine(k as unknown as Parameters<typeof shortOneLine>[0]));
   const hasInput = shown.some(isInputBox);
-  return hasLabel && hasInput;
+  // 글자가 아닌 자식은 모두 입력 높이 안(≤72) — 목록 · 이미지 블록이 끼면 섹션이지 field가 아니다(A3).
+  const shortBlocks = shown.every((k) => k.type === 'TEXT' || ((dims(k)?.h ?? Infinity) <= 72));
+  return hasLabel && hasInput && shortBlocks;
 }
 
 /**
@@ -694,17 +731,69 @@ function isNavLike(node: SceneNode, depth: number, ctxScope: string | null = nul
 function isLogoLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
   if (ctxScope !== 'header' || pos.ctxDepth > 1) return false;
   if (!isContainerType(node) || !('children' in node) || node.children.length === 0) return false;
-  if (pos.index !== 0 || pos.parentLayout === 'vertical') return false;
+  if (pos.parentLayout === 'vertical') return false;
   const d = dims(node);
   if (!d || d.h > 80 || d.w > 320) return false; // 헤더 높이 안의 작은 묶음만
-  return true;
+  // 레이어 순서가 아니라 화면 위치(A4): 보이는 형제 중 가장 왼쪽 + 가운데가 부모 폭 왼쪽 1/3 안.
+  const box = boxIn(node, pos);
+  const pw = parentWidth(pos);
+  if (!box || pw == null) return false;
+  for (const s of pos.siblings) {
+    if (s === node || !isVisible(s)) continue;
+    const sb = boxIn(s, pos);
+    if (!sb) return false;
+    if (sb.x < box.x - 1) return false;
+  }
+  if (box.x + box.w / 2 > pw / 3) return false;
+  return countVisibleTexts(node, 2) < 2; // 글자 2개 이상은 링크 · 버튼 줄
+}
+
+/** 실제 부모 폭(숫자가 아니면 null). */
+function parentWidth(pos: Pos): number | null {
+  const w = pos.parentNode ? (pos.parentNode as { width?: unknown }).width : undefined;
+  return typeof w === 'number' && w > 0 ? w : null;
+}
+
+/** 실제 부모 기준 x · 폭 — GROUP 부모는 자식 x가 GROUP의 부모 기준이라 부모 x를 뺀다. */
+function boxIn(node: SceneNode, pos: Pos): { x: number; w: number } | null {
+  const x = (node as { x?: unknown }).x;
+  const w = (node as { width?: unknown }).width;
+  if (typeof x !== 'number' || typeof w !== 'number') return null;
+  let ox = 0;
+  if (pos.parentNode && pos.parentNode.type === 'GROUP') {
+    const px = (pos.parentNode as { x?: unknown }).x;
+    if (typeof px !== 'number') return null;
+    ox = px;
+  }
+  return { x: x - ox, w };
+}
+
+/** 보이는 자손 TEXT 수(limit에서 멈춤). */
+function countVisibleTexts(node: SceneNode, limit: number): number {
+  let n = 0;
+  const walk = (x: SceneNode): void => {
+    if (n >= limit || !isVisible(x)) return;
+    if (x.type === 'TEXT') { n++; return; }
+    if ('children' in x) for (const c of x.children) walk(c);
+  };
+  if ('children' in node) for (const c of node.children) walk(c);
+  return n;
 }
 
 /** 헤더 맥락의 가로 행에서 **마지막 자리**의 텍스트·버튼 2~3개 → actions(Sign in · Sign up). 깊이 제한은 logo와 같다. */
 function isActionsLike(node: SceneNode, pos: Pos, ctxScope: string | null): boolean {
   if (ctxScope !== 'header' || pos.ctxDepth > 1) return false;
   if (node.type !== 'FRAME' || layoutOf(node) !== 'horizontal') return false;
-  if (pos.total < 2 || pos.index !== pos.total - 1) return false;
+  if (pos.total < 2) return false;
+  // 레이어 순서가 아니라 화면 위치(A4): 보이는 형제 중 가장 오른쪽.
+  const box = boxIn(node, pos);
+  if (!box || parentWidth(pos) == null) return false;
+  for (const s of pos.siblings) {
+    if (s === node || !isVisible(s)) continue;
+    const sb = boxIn(s, pos);
+    if (!sb) return false;
+    if (sb.x + sb.w > box.x + box.w + 1) return false;
+  }
   const kids = node.children;
   if (kids.length < 2 || kids.length > 3) return false;
   const d = dims(node);
@@ -847,3 +936,139 @@ function isStatusDot(node: SceneNode, pos: Pos): boolean {
   // 원형이어야 한다 — 사각 타입이면 반지름이 반쪽 이상.
   return node.type === 'ELLIPSE' || cornerRadiusOf(node) >= Math.min(d.w, d.h) / 2 - 1;
 }
+
+/* ---------- 역할 세분화 1차(ia-v4 §4.4 A1–A2 · B1–B3) ---------- */
+const ICONISH_VECTORS = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON']);
+
+/** 아이콘 프레임 — `isIconFrame`(LINE 포함 벡터) + LINE이 아닌 벡터 1개 이상. */
+function isIconFrameNode(node: SceneNode): boolean {
+  if (node.type !== 'FRAME' && node.type !== 'GROUP') return false;
+  if (!isIconFrame(node as unknown as Parameters<typeof isIconFrame>[0])) return false;
+  const hasRealVector = (x: SceneNode): boolean =>
+    'children' in x && x.children.some((c) => (VECTOR_TYPES.has(c.type) && c.type !== 'LINE') || hasRealVector(c));
+  return hasRealVector(node);
+}
+
+/** 아이콘 같은 것 — 벡터 계열(LINE 제외) · 아이콘 프레임 · 두 변 48 이하 인스턴스. */
+function isIconish(node: SceneNode): boolean {
+  if (ICONISH_VECTORS.has(node.type)) return true;
+  if (isIconFrameNode(node)) return true;
+  if (node.type === 'INSTANCE') {
+    const d = dims(node);
+    return !!d && d.w <= 48 && d.h <= 48;
+  }
+  return false;
+}
+
+const EMITTED = new Set<string>(EMITTED_ROLES);
+const STRUCT_FALLBACK_NAMES = new Set(['container', 'wrapper', 'shape']);
+
+/** 아이콘 프레임의 지금 이름이 뜻 없는 이름인지(A1 ① 자동 이름 · ② 전에 붙인 이름). */
+function isMeaninglessIconName(node: SceneNode, rootPrefix: string | null): boolean {
+  const name = node.name;
+  if (isDefaultName(name)) return true; // ①
+  if (STRUCT_FALLBACK_NAMES.has(name)) return true; // ⓐ 구조 폴백
+  const toks = kebab(name).split('-').filter(Boolean);
+  if (toks.length === 1 && toks[0] === 'icon') return true; // ⓐ Icon
+  // ⓑ dsRole + 이름이 그 역할로 끝나고 앞 낱말이 출력 역할(맨 앞 한 낱말만 루트 접두사 허용)
+  let role = '';
+  try {
+    const fn = (node as { getPluginData?: (k: string) => string }).getPluginData;
+    role = typeof fn === 'function' ? fn.call(node, ROLE_KEY) || '' : '';
+  } catch {
+    role = '';
+  }
+  if (!role) return false;
+  const rt = kebab(role).split('-').filter(Boolean);
+  if (!rt.length || toks.length < rt.length) return false;
+  if (toks.slice(toks.length - rt.length).join('-') !== rt.join('-')) return false;
+  const head = toks.slice(0, toks.length - rt.length);
+  return head.every((t, i) => EMITTED.has(t) || (i === 0 && rootPrefix != null && t === rootPrefix));
+}
+
+/** 영역 자리인지 — 지금 코드가 hero · 영역 · section을 붙이는 자리면 글자 버튼 판정을 건너뛴다(A2). */
+function atRegionSlot(node: SceneNode, pos: Pos, ctxScope: string | null, parentRole: string | null): boolean {
+  if (!isContainerType(node)) return false;
+  if (parentRole === 'main' && pos.regionIndex === 0 && pos.parentLayout === 'vertical') return true;
+  if (regionRole(node, pos, ctxScope, parentRole)) return true;
+  return isPageSection(pos, ctxScope);
+}
+
+/** 글자 버튼(A2) — 둥근 모서리 · 채움 없이 글자 1개 + 아이콘 자리인 오토레이아웃 프레임. */
+function isTextButtonLike(node: SceneNode): boolean {
+  if (node.type !== 'FRAME' || layoutOf(node) === null) return false;
+  const d = dims(node);
+  if (!d || d.h > 64 || d.w > 400) return false;
+  const kids = node.children;
+  const texts = kids.filter((k) => k.type === 'TEXT' && isVisible(k));
+  if (texts.length !== 1 || !shortOneLine(texts[0] as unknown as Parameters<typeof shortOneLine>[0])) return false;
+  const others = kids.filter((k) => k !== texts[0]);
+  if (!others.every((k) => isIconish(k))) return false; // 숨긴 글자도 여기서 걸러짐(TEXT는 아이콘 아님)
+  if (others.length > 0) return true;
+  if (hasVisibleFill(node) || hasVisibleStroke(node)) return true;
+  const pl = (node as { paddingLeft?: unknown }).paddingLeft;
+  const pr = (node as { paddingRight?: unknown }).paddingRight;
+  return typeof pl === 'number' && typeof pr === 'number' && pl >= 4 && pr >= 4;
+}
+
+const DIGITS_ONLY = /^[\d\s/]+$/;
+const isDigitsText = (t: SceneNode): boolean => typeof (t as { characters?: unknown }).characters === 'string' && DIGITS_ONLY.test((t as TextNode).characters);
+
+/** 세로 범위가 겹치는지(같은 줄). 치수를 모르면 false. */
+function sameLine(a: SceneNode, b: SceneNode): boolean {
+  const ay = (a as { y?: unknown }).y, by = (b as { y?: unknown }).y;
+  const da = dims(a), db = dims(b);
+  if (typeof ay !== 'number' || typeof by !== 'number' || !da || !db) return false;
+  return Math.max(ay, by) < Math.min(ay + da.h, by + db.h);
+}
+
+function xOf(n: SceneNode): number {
+  const x = (n as { x?: unknown }).x;
+  return typeof x === 'number' ? x : 0;
+}
+
+/** 가로로 나란한지 — 이 노드가 가로 오토레이아웃이거나, 아니면 모두 서로 세로 범위가 겹침. */
+function sideBySide(node: SceneNode, items: readonly SceneNode[]): boolean {
+  if (layoutOf(node) === 'horizontal') return true;
+  if (layoutOf(node) === 'vertical') return false;
+  for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) if (!sameLine(items[i], items[j])) return false;
+  return true;
+}
+
+/** B1 row — 이름표 글자 + 값 한 줄. */
+function isRowLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  if (shown.length !== 2) return false;
+  const d = dims(node);
+  if (!d || d.h > 64 || d.w < d.h * 2.5) return false;
+  if (!sideBySide(node, shown)) return false;
+  const [left, right] = xOf(shown[0]) <= xOf(shown[1]) ? [shown[0], shown[1]] : [shown[1], shown[0]];
+  if (left.type !== 'TEXT' || !shortOneLine(left as unknown as Parameters<typeof shortOneLine>[0])) return false;
+  if (right.type === 'TEXT') {
+    if (isDigitsText(left) && isDigitsText(right)) return false; // 페이지 번호
+    return true;
+  }
+  if (right.type !== 'INSTANCE' && right.type !== 'FRAME' && right.type !== 'GROUP') return false;
+  const n = countVisibleTexts(right, 3);
+  return n >= 1 && n <= 2;
+}
+
+/** B2 text-group — 보이는 자식이 모두 글자(2개 이상). 가로 3개 이상 · 숫자뿐은 아님. */
+function isTextGroupLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  if (shown.length < 2 || !shown.every((k) => k.type === 'TEXT')) return false;
+  if (shown.length >= 3 && sideBySide(node, shown)) return false;
+  if (shown.every(isDigitsText)) return false;
+  return true;
+}
+
+/** B3 media — 사진(원 제외) 1개 이상 + 나머지는 아이콘 같은 것. */
+function isMediaLike(kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  // 사진 = 사진 채움 사각형, 또는 보이는 자식 없는 사진 채움 프레임(글자를 얹은 배너는 아님).
+  const isPhoto = (k: SceneNode): boolean =>
+    hasImageFill(k) && (k.type === 'RECTANGLE' || (k.type === 'FRAME' && !k.children.some(isVisible)));
+  if (!shown.some(isPhoto)) return false;
+  return shown.every((k) => isPhoto(k) || isIconish(k));
+}
+
