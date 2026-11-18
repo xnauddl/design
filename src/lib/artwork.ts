@@ -228,6 +228,8 @@ export interface FitOpts {
   layout?: boolean;
   /** 아이콘 프레임인가 — 날 벡터처럼 아이콘 인스턴스 짝이면 그 레이어만 보고 안으로 내려가지 않는다. */
   isIcon?: (node: SceneNode) => boolean;
+  /** 그림 크기(해시 → 크기) — 사진 틀 비교(FILL 채움)에 쓴다. 없으면 `keepLookAsync`가 읽어 둔 것. */
+  imageSize?: (hash: string) => { width: number; height: number } | null;
 }
 
 /**
@@ -269,6 +271,248 @@ const rotationOf = (n: SceneNode): number => {
   return typeof r === 'number' ? r : 0;
 };
 
+/* ---------- 화면을 지키는 옮기기(§4.7 "인스턴스 자리" 8번 — A.18 결함 2) ----------
+   인스턴스 안 레이어의 자리 · 크기는 덮어쓸 수 없지만 채움 · 글자 자동 크기는 덮어쓸 수 있다. 자리만 다른 사진 틀은
+   사진 채움의 자르기(CROP)로, 상자 폭만 다른 글자는 글자 자동 크기로 보이는 모습을 맞춘다.
+   실험(2026-11-18 새 빈 파일): `imageTransform`은 **노드(0–1) → 그림(0–1)** 행렬이고, 인스턴스 안 사각형에 CROP을
+   넣어도 거절되지 않으며 원본과 내보낸 PNG가 같다. 글자 자동 크기 덮어쓰기도 그려진 범위 · 부모 높이가 원본과 같다.
+   두 덮어쓰기 모두 그 컴포넌트에 속성을 노출한 뒤에도 남는다. */
+
+/** 2×3 아핀(피그마 `Transform`과 같은 꼴). */
+export type Affine = [[number, number, number], [number, number, number]];
+export interface Box { x0: number; y0: number; x1: number; y1: number }
+type Size2 = { width: number; height: number };
+
+const visiblePaints = (v: unknown): Paint[] => (Array.isArray(v) ? (v as Paint[]).filter((p) => p.visible !== false) : []);
+const zeroRadius = (n: SceneNode): boolean => {
+  const r = (n as { cornerRadius?: unknown }).cornerRadius;
+  return r === undefined || r === 0;
+};
+const noOwnPaint = (n: SceneNode): boolean =>
+  visiblePaints((n as { strokes?: unknown }).strokes).length === 0 && visiblePaints((n as { effects?: unknown }).effects).length === 0;
+
+/**
+ * 사진 틀이면 그 **사진 잎**(끝까지 따라가 만나는 사진 사각형), 아니면 null(§4.7 8번 ①).
+ * ⓐ RECTANGLE · 보이는 채움이 이미지 하나 · 보이는 선 · 효과 없음 · 모서리 반경 0 · 회전 0
+ * ⓑ 자기 칠 · 선 · 효과가 없는 FRAME · GROUP · INSTANCE(모서리 반경 0 · 회전 0)이고 보이는 자식이 사진 틀 하나뿐이며
+ *    그 자식이 (0, 0)에 같은 크기.
+ */
+export function photoLeafOf(n: SceneNode): SceneNode | null {
+  if (rotationOf(n) !== 0 || !zeroRadius(n) || !noOwnPaint(n)) return null;
+  if (n.type === 'RECTANGLE') {
+    const f = visiblePaints((n as GeometryMixin).fills);
+    return f.length === 1 && f[0].type === 'IMAGE' ? n : null;
+  }
+  if (n.type !== 'FRAME' && n.type !== 'GROUP' && n.type !== 'INSTANCE') return null;
+  if (n.type !== 'GROUP' && visiblePaints((n as GeometryMixin).fills).length) return null;
+  const kids = ((n as ChildrenMixin).children as readonly SceneNode[]).filter((c) => c.visible !== false);
+  if (kids.length !== 1) return null;
+  const c = kids[0];
+  const off = relPos(c, n);
+  if (!sameSize(off.x, 0) || !sameSize(off.y, 0) || !sameSize(c.width, n.width) || !sameSize(c.height, n.height)) return null;
+  return photoLeafOf(c);
+}
+
+/** 레이어 상자를 루트 기준으로 옮겨 내용 자르기가 켜진 조상(루트 포함, 루트 바깥은 보지 않음)과 겹친 부분. 비면 null. */
+export function visibleBox(n: SceneNode, root: SceneNode): Box | null {
+  const p = relPos(n, root);
+  let b: Box = { x0: p.x, y0: p.y, x1: p.x + n.width, y1: p.y + n.height };
+  let cur: BaseNode | null = n.parent;
+  while (cur) {
+    const a = cur as SceneNode;
+    if ((a as { clipsContent?: unknown }).clipsContent === true) {
+      const q = relPos(a, root);
+      b = { x0: Math.max(b.x0, q.x), y0: Math.max(b.y0, q.y), x1: Math.min(b.x1, q.x + a.width), y1: Math.min(b.y1, q.y + a.height) };
+    }
+    if (a === root) break;
+    cur = cur.parent;
+  }
+  return b.x1 - b.x0 > 1e-6 && b.y1 - b.y0 > 1e-6 ? b : null;
+}
+
+const imagePaintOf = (n: SceneNode): ImagePaint | null => {
+  const f = visiblePaints((n as GeometryMixin).fills);
+  return f.length === 1 && f[0].type === 'IMAGE' ? (f[0] as ImagePaint) : null;
+};
+
+/**
+ * 사진 잎 채움의 노드(0–1) → 그림(0–1) 행렬. CROP은 `imageTransform` 그대로, FILL은 그림 크기로 계산한 "덮기"
+ * (배율 = max(폭 / 그림 폭, 높이 / 그림 높이), 가운데). 그 밖(FIT · TILE · 회전 있음 · 크기 모름)은 null.
+ */
+export function imageMatrix(paint: ImagePaint, w: number, h: number, img: Size2 | null): Affine | null {
+  const rot = (paint as { rotation?: unknown }).rotation;
+  if (typeof rot === 'number' && rot !== 0) return null;
+  if (paint.scaleMode === 'CROP') {
+    const m = paint.imageTransform;
+    return m ? [[m[0][0], m[0][1], m[0][2]], [m[1][0], m[1][1], m[1][2]]] : [[1, 0, 0], [0, 1, 0]];
+  }
+  if (paint.scaleMode !== 'FILL' || !img || !(img.width > 0) || !(img.height > 0) || !(w > 0) || !(h > 0)) return null;
+  const s = Math.max(w / img.width, h / img.height);
+  const sw = img.width * s;
+  const sh = img.height * s;
+  return [[w / sw, 0, (sw - w) / (2 * sw)], [0, h / sh, (sh - h) / (2 * sh)]];
+}
+
+/** 노드 단위로 (dx, dy)만큼 민 뒤 `m`을 거친 행렬 — m ∘ (u ↦ u + d). */
+export function shiftMatrix(m: Affine, dx: number, dy: number): Affine {
+  return [
+    [m[0][0], m[0][1], m[0][0] * dx + m[0][1] * dy + m[0][2]],
+    [m[1][0], m[1][1], m[1][0] * dx + m[1][1] * dy + m[1][2]],
+  ];
+}
+
+/** 보이는 영역 네 모서리(루트 기준)가 그 잎에서 가리키는 그림 자리(0–1). */
+export function cornerImagePoints(box: Box, leafPos: { x: number; y: number }, w: number, h: number, m: Affine): [number, number][] {
+  const pts: [number, number][] = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]];
+  return pts.map(([x, y]) => {
+    const u = (x - leafPos.x) / w;
+    const v = (y - leafPos.y) / h;
+    return [m[0][0] * u + m[0][1] * v + m[0][2], m[1][0] * u + m[1][1] * v + m[1][2]];
+  });
+}
+
+const same2 = (a: number, b: number) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
+const same4 = (a: number, b: number) => Math.abs(Math.round(a * 10000) - Math.round(b * 10000)) < 1;
+const sameBox = (a: Box | null, b: Box | null): boolean =>
+  !!a && !!b && same2(a.x0, b.x0) && same2(a.y0, b.y0) && same2(a.x1, b.x1) && same2(a.y1, b.y1);
+
+/** 그림 크기 기억(해시 → 크기) — `keepLookAsync`가 채우고 검사(`memberFitIssue`)가 읽는다. 해시의 그림 크기는 바뀌지 않는다. */
+const IMAGE_SIZES = new Map<string, Size2>();
+
+/**
+ * 짝 사진 틀(멤버 L ↔ 인스턴스 L′, 크기 같음)의 보이는 그림이 같은가(§4.7 8번 ③). 조건 ㉠(보이는 영역 같음)과
+ * 네 모서리의 그림 자리가 소수 넷째 자리까지 같으면 true.
+ */
+function photoFrameSame(a: SceneNode, member: SceneNode, b: SceneNode, instRoot: SceneNode, sizeOf: (h: string) => Size2 | null): boolean {
+  const la = photoLeafOf(a);
+  const lb = photoLeafOf(b);
+  if (!la || !lb) return false;
+  const va = visibleBox(a, member);
+  const vb = visibleBox(b, instRoot);
+  if (!sameBox(va, vb)) return false;
+  const pa = imagePaintOf(la);
+  const pb = imagePaintOf(lb);
+  if (!pa || !pb) return false;
+  const ma = imageMatrix(pa, la.width, la.height, pa.imageHash ? sizeOf(pa.imageHash) : null);
+  const mb = imageMatrix(pb, lb.width, lb.height, pb.imageHash ? sizeOf(pb.imageHash) : null);
+  if (!ma || !mb) return false;
+  const ca = cornerImagePoints(va as Box, relPos(la, member), la.width, la.height, ma);
+  const cb = cornerImagePoints(vb as Box, relPos(lb, instRoot), lb.width, lb.height, mb);
+  return ca.every((p, i) => same4(p[0], cb[i][0]) && same4(p[1], cb[i][1]));
+}
+
+/** 그려진 범위(`absoluteRenderBounds`)를 루트 좌표계로 옮긴 상자. 없으면(빈 글자 · 목) null. */
+function renderBox(n: SceneNode, root: SceneNode): Box | null {
+  const rb = (n as { absoluteRenderBounds?: Rect | null }).absoluteRenderBounds;
+  if (!rb || typeof rb.x !== 'number') return null;
+  const m = (root as { absoluteTransform?: Transform }).absoluteTransform;
+  let ox = 0;
+  let oy = 0;
+  if (Array.isArray(m) && Array.isArray(m[0]) && Array.isArray(m[1])) { ox = m[0][2]; oy = m[1][2]; }
+  return { x0: rb.x - ox, y0: rb.y - oy, x1: rb.x - ox + rb.width, y1: rb.y - oy + rb.height };
+}
+
+/** `keepLookAsync`가 쓰는 것. */
+export interface KeepLookDeps {
+  /** 그림 크기(`figma.getImageByHash(h)?.getSizeAsync()`). 못 읽으면 null. */
+  imageSize: (hash: string) => Promise<Size2 | null>;
+}
+
+/**
+ * 덮어쓴 값 옮기기(`copyOverridesAsync`) 뒤에 부른다(§4.7 "인스턴스 자리" 8번 "화면을 지키는 옮기기").
+ * 멤버와 인스턴스를 같은 경로끼리 맞춰(보이는 레이어만, 감싼 도형이면 `prefix` 앞붙이):
+ * ① 둘 다 사진 틀 · 크기 같음 · 루트 기준 자리만 다름 · 조건 ㉠ ㉡ ㉢ → 인스턴스 사진 잎에 CROP 채움(그 아래로는 내려가지 않음)
+ * ② 둘 다 TEXT · 글자 같음 · 자리나 크기 다름 → 인스턴스 글자에 `textAutoResize = 'WIDTH_AND_HEIGHT'`
+ * 조건이 안 맞으면 옮기지 않는다(검사가 가른다). 넣기가 실패한 레이어 이름 목록을 돌려준다(그림 크기를 못 읽음 포함).
+ */
+export async function keepLookAsync(member: SceneNode, inst: InstanceNode, prefix: string, deps: KeepLookDeps): Promise<string[]> {
+  const failed: string[] = [];
+  const fail = (what: string): void => { if (!failed.includes(what)) failed.push(what); };
+  // 검사(replaceMember)가 하는 resize를 먼저 — 안쪽 자리는 크기에 따라 정해진다.
+  try {
+    if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) inst.resize(member.width, member.height);
+  } catch { /* 검사가 가른다 */ }
+  const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+  if (!instRoot) return failed;
+  const sizeOf = async (h: string): Promise<Size2 | null> => {
+    const hit = IMAGE_SIZES.get(h);
+    if (hit) return hit;
+    let sz: Size2 | null = null;
+    try { sz = await deps.imageSize(h); } catch { sz = null; }
+    if (sz && sz.width > 0 && sz.height > 0) IMAGE_SIZES.set(h, { width: sz.width, height: sz.height });
+    return sz;
+  };
+  const visit = async (a: SceneNode, path: string): Promise<void> => {
+    if (a.removed) return;
+    if (path !== '' && a.visible === false) return;
+    if (path !== '') {
+      const b = nodeAtPath(inst, joinPath(prefix, path));
+      if (!b || b.removed) return;
+      const pa = relPos(a, member);
+      const pb = relPos(b, instRoot);
+      const moved = !sameSize(pa.x, pb.x) || !sameSize(pa.y, pb.y);
+      const resized = !sameSize(a.width, b.width) || !sameSize(a.height, b.height);
+      if (a.type === 'TEXT' && b.type === 'TEXT') {
+        if ((moved || resized) && (a as TextNode).characters === (b as TextNode).characters) {
+          try { (b as TextNode).textAutoResize = 'WIDTH_AND_HEIGHT'; } catch { fail(b.name); }
+        }
+        return;
+      }
+      if (moved && !resized) {
+        const la = photoLeafOf(a);
+        const lb = photoLeafOf(b);
+        if (la && lb) {
+          await putCrop(a, b, la, lb, pa, pb);
+          return; // 사진 틀 아래로는 내려가지 않는다
+        }
+      }
+    }
+    if (!('children' in a)) return;
+    const kids = a.children as readonly SceneNode[];
+    for (let i = 0; i < kids.length; i++) await visit(kids[i], path ? `${path}/${i}` : String(i));
+  };
+  const putCrop = async (a: SceneNode, b: SceneNode, la: SceneNode, lb: SceneNode, pa: { x: number; y: number }, pb: { x: number; y: number }): Promise<void> => {
+    const va = visibleBox(a, member);
+    const vb = visibleBox(b, instRoot);
+    if (!sameBox(va, vb)) return; // ㉠
+    const paint = imagePaintOf(la);
+    if (!paint || (paint.scaleMode !== 'FILL' && paint.scaleMode !== 'CROP')) return; // ㉡
+    const rot = (paint as { rotation?: unknown }).rotation;
+    if (typeof rot === 'number' && rot !== 0) return; // ㉡
+    let img: Size2 | null = null;
+    if (paint.scaleMode === 'FILL') {
+      img = paint.imageHash ? await sizeOf(paint.imageHash) : null;
+      if (!img) { fail(lb.name); return; } // 그림 크기를 못 읽음
+    }
+    const m = imageMatrix(paint, la.width, la.height, img);
+    if (!m) return;
+    // Δ = 멤버 자리 − 인스턴스 자리. 인스턴스 잎의 u는 멤버 잎의 u − Δ/크기를 보인다.
+    const next = shiftMatrix(m, -(pa.x - pb.x) / la.width, -(pa.y - pb.y) / la.height);
+    const corners = cornerImagePoints(vb as Box, relPos(lb, instRoot), lb.width, lb.height, next);
+    if (!corners.every(([x, y]) => x >= -1e-6 && x <= 1 + 1e-6 && y >= -1e-6 && y <= 1 + 1e-6)) return; // ㉢
+    const crop: ImagePaint = {
+      type: 'IMAGE',
+      scaleMode: 'CROP',
+      imageHash: paint.imageHash,
+      imageTransform: next as Transform,
+      ...(paint.opacity !== undefined ? { opacity: paint.opacity } : {}),
+      ...(paint.blendMode !== undefined ? { blendMode: paint.blendMode } : {}),
+      ...(paint.filters !== undefined ? { filters: paint.filters } : {}),
+    };
+    try {
+      const cur = Array.isArray((lb as GeometryMixin).fills) ? ((lb as GeometryMixin).fills as readonly Paint[]) : [];
+      let put = false;
+      const fills = cur.map((p) => {
+        if (!put && p.type === 'IMAGE' && p.visible !== false) { put = true; return crop; }
+        return p;
+      });
+      (lb as GeometryMixin).fills = put ? fills : [crop];
+    } catch { fail(lb.name); }
+  };
+  await visit(member, '');
+  return failed;
+}
+
 /**
  * 인스턴스가 멤버의 사진 · 자리 · 크기를 지키는가(§4.7 8번 검사). 다르면 그 까닭(진단용), 같으면 null.
  * - 인스턴스 자신의 크기 = 멤버 크기
@@ -285,6 +529,7 @@ export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: strin
   }
   const layoutOn = opts.layout !== false;
   const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+  const sizeOf = opts.imageSize ?? ((h: string) => IMAGE_SIZES.get(h) ?? null);
   let issue: string | null = null;
   const layoutIssue = (name: string) => { issue = t('component.fit.layout', { name }); };
   const visit = (n: SceneNode, path: string, layout: boolean): void => {
@@ -317,8 +562,16 @@ export function memberFitIssue(inst: SceneNode, member: SceneNode, prefix: strin
       const a = relPos(n, member);
       const b = instRoot ? relPos(hit, instRoot) : { x: NaN, y: NaN };
       if (!sameSize(a.x, b.x) || !sameSize(a.y, b.y) || !sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
-        layoutIssue(n.name);
-        return;
+        // 화면을 지키는 옮기기(§4.7 8번 ③) — 상자 대신 보이는 모습을 비교한다.
+        const sameDims = sameSize(hit.width, n.width) && sameSize(hit.height, n.height);
+        if (instRoot && sameDims && photoFrameSame(n, member, hit, instRoot, sizeOf)) {
+          down = false; // 사진 틀 아래로는 자리 · 크기 비교를 내려가지 않는다(사진 검사는 내려간다)
+        } else if (instRoot && n.type === 'TEXT' && hit.type === 'TEXT' && renderBox(n, member) && renderBox(hit, instRoot)) {
+          if (!sameBox(renderBox(n, member), renderBox(hit, instRoot))) { layoutIssue(n.name); return; }
+        } else {
+          layoutIssue(n.name);
+          return;
+        }
       }
       // 아이콘 인스턴스 안 트리는 멤버와 다르다 — 자리 · 크기 비교는 내려가지 않는다(사진은 내려간다).
       if (iconPair) down = false;

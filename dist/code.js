@@ -9090,18 +9090,224 @@
     const r = n.rotation;
     return typeof r === "number" ? r : 0;
   };
+  var visiblePaints = (v) => Array.isArray(v) ? v.filter((p) => p.visible !== false) : [];
+  var zeroRadius = (n) => {
+    const r = n.cornerRadius;
+    return r === void 0 || r === 0;
+  };
+  var noOwnPaint = (n) => visiblePaints(n.strokes).length === 0 && visiblePaints(n.effects).length === 0;
+  function photoLeafOf(n) {
+    if (rotationOf(n) !== 0 || !zeroRadius(n) || !noOwnPaint(n)) return null;
+    if (n.type === "RECTANGLE") {
+      const f = visiblePaints(n.fills);
+      return f.length === 1 && f[0].type === "IMAGE" ? n : null;
+    }
+    if (n.type !== "FRAME" && n.type !== "GROUP" && n.type !== "INSTANCE") return null;
+    if (n.type !== "GROUP" && visiblePaints(n.fills).length) return null;
+    const kids = n.children.filter((c2) => c2.visible !== false);
+    if (kids.length !== 1) return null;
+    const c = kids[0];
+    const off = relPos(c, n);
+    if (!sameSize(off.x, 0) || !sameSize(off.y, 0) || !sameSize(c.width, n.width) || !sameSize(c.height, n.height)) return null;
+    return photoLeafOf(c);
+  }
+  function visibleBox(n, root) {
+    const p = relPos(n, root);
+    let b = { x0: p.x, y0: p.y, x1: p.x + n.width, y1: p.y + n.height };
+    let cur = n.parent;
+    while (cur) {
+      const a = cur;
+      if (a.clipsContent === true) {
+        const q = relPos(a, root);
+        b = { x0: Math.max(b.x0, q.x), y0: Math.max(b.y0, q.y), x1: Math.min(b.x1, q.x + a.width), y1: Math.min(b.y1, q.y + a.height) };
+      }
+      if (a === root) break;
+      cur = cur.parent;
+    }
+    return b.x1 - b.x0 > 1e-6 && b.y1 - b.y0 > 1e-6 ? b : null;
+  }
+  var imagePaintOf = (n) => {
+    const f = visiblePaints(n.fills);
+    return f.length === 1 && f[0].type === "IMAGE" ? f[0] : null;
+  };
+  function imageMatrix(paint, w, h, img) {
+    const rot = paint.rotation;
+    if (typeof rot === "number" && rot !== 0) return null;
+    if (paint.scaleMode === "CROP") {
+      const m = paint.imageTransform;
+      return m ? [[m[0][0], m[0][1], m[0][2]], [m[1][0], m[1][1], m[1][2]]] : [[1, 0, 0], [0, 1, 0]];
+    }
+    if (paint.scaleMode !== "FILL" || !img || !(img.width > 0) || !(img.height > 0) || !(w > 0) || !(h > 0)) return null;
+    const s = Math.max(w / img.width, h / img.height);
+    const sw = img.width * s;
+    const sh = img.height * s;
+    return [[w / sw, 0, (sw - w) / (2 * sw)], [0, h / sh, (sh - h) / (2 * sh)]];
+  }
+  function shiftMatrix(m, dx, dy) {
+    return [
+      [m[0][0], m[0][1], m[0][0] * dx + m[0][1] * dy + m[0][2]],
+      [m[1][0], m[1][1], m[1][0] * dx + m[1][1] * dy + m[1][2]]
+    ];
+  }
+  function cornerImagePoints(box, leafPos, w, h, m) {
+    const pts = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]];
+    return pts.map(([x, y]) => {
+      const u = (x - leafPos.x) / w;
+      const v = (y - leafPos.y) / h;
+      return [m[0][0] * u + m[0][1] * v + m[0][2], m[1][0] * u + m[1][1] * v + m[1][2]];
+    });
+  }
+  var same2 = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
+  var same4 = (a, b) => Math.abs(Math.round(a * 1e4) - Math.round(b * 1e4)) < 1;
+  var sameBox = (a, b) => !!a && !!b && same2(a.x0, b.x0) && same2(a.y0, b.y0) && same2(a.x1, b.x1) && same2(a.y1, b.y1);
+  var IMAGE_SIZES = /* @__PURE__ */ new Map();
+  function photoFrameSame(a, member, b, instRoot, sizeOf) {
+    const la = photoLeafOf(a);
+    const lb = photoLeafOf(b);
+    if (!la || !lb) return false;
+    const va = visibleBox(a, member);
+    const vb = visibleBox(b, instRoot);
+    if (!sameBox(va, vb)) return false;
+    const pa = imagePaintOf(la);
+    const pb = imagePaintOf(lb);
+    if (!pa || !pb) return false;
+    const ma = imageMatrix(pa, la.width, la.height, pa.imageHash ? sizeOf(pa.imageHash) : null);
+    const mb = imageMatrix(pb, lb.width, lb.height, pb.imageHash ? sizeOf(pb.imageHash) : null);
+    if (!ma || !mb) return false;
+    const ca = cornerImagePoints(va, relPos(la, member), la.width, la.height, ma);
+    const cb = cornerImagePoints(vb, relPos(lb, instRoot), lb.width, lb.height, mb);
+    return ca.every((p, i) => same4(p[0], cb[i][0]) && same4(p[1], cb[i][1]));
+  }
+  function renderBox(n, root) {
+    const rb = n.absoluteRenderBounds;
+    if (!rb || typeof rb.x !== "number") return null;
+    const m = root.absoluteTransform;
+    let ox = 0;
+    let oy = 0;
+    if (Array.isArray(m) && Array.isArray(m[0]) && Array.isArray(m[1])) {
+      ox = m[0][2];
+      oy = m[1][2];
+    }
+    return { x0: rb.x - ox, y0: rb.y - oy, x1: rb.x - ox + rb.width, y1: rb.y - oy + rb.height };
+  }
+  async function keepLookAsync(member, inst, prefix, deps) {
+    const failed = [];
+    const fail = (what) => {
+      if (!failed.includes(what)) failed.push(what);
+    };
+    try {
+      if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) inst.resize(member.width, member.height);
+    } catch (e) {
+    }
+    const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+    if (!instRoot) return failed;
+    const sizeOf = async (h) => {
+      const hit = IMAGE_SIZES.get(h);
+      if (hit) return hit;
+      let sz = null;
+      try {
+        sz = await deps.imageSize(h);
+      } catch (e) {
+        sz = null;
+      }
+      if (sz && sz.width > 0 && sz.height > 0) IMAGE_SIZES.set(h, { width: sz.width, height: sz.height });
+      return sz;
+    };
+    const visit = async (a, path) => {
+      if (a.removed) return;
+      if (path !== "" && a.visible === false) return;
+      if (path !== "") {
+        const b = nodeAtPath(inst, joinPath(prefix, path));
+        if (!b || b.removed) return;
+        const pa = relPos(a, member);
+        const pb = relPos(b, instRoot);
+        const moved = !sameSize(pa.x, pb.x) || !sameSize(pa.y, pb.y);
+        const resized = !sameSize(a.width, b.width) || !sameSize(a.height, b.height);
+        if (a.type === "TEXT" && b.type === "TEXT") {
+          if ((moved || resized) && a.characters === b.characters) {
+            try {
+              b.textAutoResize = "WIDTH_AND_HEIGHT";
+            } catch (e) {
+              fail(b.name);
+            }
+          }
+          return;
+        }
+        if (moved && !resized) {
+          const la = photoLeafOf(a);
+          const lb = photoLeafOf(b);
+          if (la && lb) {
+            await putCrop(a, b, la, lb, pa, pb);
+            return;
+          }
+        }
+      }
+      if (!("children" in a)) return;
+      const kids = a.children;
+      for (let i = 0; i < kids.length; i++) await visit(kids[i], path ? `${path}/${i}` : String(i));
+    };
+    const putCrop = async (a, b, la, lb, pa, pb) => {
+      const va = visibleBox(a, member);
+      const vb = visibleBox(b, instRoot);
+      if (!sameBox(va, vb)) return;
+      const paint = imagePaintOf(la);
+      if (!paint || paint.scaleMode !== "FILL" && paint.scaleMode !== "CROP") return;
+      const rot = paint.rotation;
+      if (typeof rot === "number" && rot !== 0) return;
+      let img = null;
+      if (paint.scaleMode === "FILL") {
+        img = paint.imageHash ? await sizeOf(paint.imageHash) : null;
+        if (!img) {
+          fail(lb.name);
+          return;
+        }
+      }
+      const m = imageMatrix(paint, la.width, la.height, img);
+      if (!m) return;
+      const next = shiftMatrix(m, -(pa.x - pb.x) / la.width, -(pa.y - pb.y) / la.height);
+      const corners = cornerImagePoints(vb, relPos(lb, instRoot), lb.width, lb.height, next);
+      if (!corners.every(([x, y]) => x >= -1e-6 && x <= 1 + 1e-6 && y >= -1e-6 && y <= 1 + 1e-6)) return;
+      const crop = __spreadValues(__spreadValues(__spreadValues({
+        type: "IMAGE",
+        scaleMode: "CROP",
+        imageHash: paint.imageHash,
+        imageTransform: next
+      }, paint.opacity !== void 0 ? { opacity: paint.opacity } : {}), paint.blendMode !== void 0 ? { blendMode: paint.blendMode } : {}), paint.filters !== void 0 ? { filters: paint.filters } : {});
+      try {
+        const cur = Array.isArray(lb.fills) ? lb.fills : [];
+        let put = false;
+        const fills = cur.map((p) => {
+          if (!put && p.type === "IMAGE" && p.visible !== false) {
+            put = true;
+            return crop;
+          }
+          return p;
+        });
+        lb.fills = put ? fills : [crop];
+      } catch (e) {
+        fail(lb.name);
+      }
+    };
+    await visit(member, "");
+    return failed;
+  }
   function memberFitIssue(inst, member, prefix, opts = {}) {
+    var _a;
     if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
       return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
     }
     const layoutOn = opts.layout !== false;
     const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+    const sizeOf = (_a = opts.imageSize) != null ? _a : (h) => {
+      var _a2;
+      return (_a2 = IMAGE_SIZES.get(h)) != null ? _a2 : null;
+    };
     let issue = null;
     const layoutIssue = (name) => {
       issue = t("component.fit.layout", { name });
     };
     const visit = (n, path, layout) => {
-      var _a;
+      var _a2;
       if (issue) return;
       const h = imageHashOf(n);
       if (h !== void 0) {
@@ -9139,7 +9345,7 @@
           layoutIssue(n.name);
           return;
         }
-        const iconPair = hit.type === "INSTANCE" && n.type !== "INSTANCE" && (VECTOR_TYPES.has(n.type) || !!((_a = opts.isIcon) == null ? void 0 : _a.call(opts, n)));
+        const iconPair = hit.type === "INSTANCE" && n.type !== "INSTANCE" && (VECTOR_TYPES.has(n.type) || !!((_a2 = opts.isIcon) == null ? void 0 : _a2.call(opts, n)));
         if (!iconPair && hit.type !== n.type) {
           layoutIssue(n.name);
           return;
@@ -9147,8 +9353,18 @@
         const a = relPos(n, member);
         const b = instRoot ? relPos(hit, instRoot) : { x: NaN, y: NaN };
         if (!sameSize(a.x, b.x) || !sameSize(a.y, b.y) || !sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
-          layoutIssue(n.name);
-          return;
+          const sameDims = sameSize(hit.width, n.width) && sameSize(hit.height, n.height);
+          if (instRoot && sameDims && photoFrameSame(n, member, hit, instRoot, sizeOf)) {
+            down = false;
+          } else if (instRoot && n.type === "TEXT" && hit.type === "TEXT" && renderBox(n, member) && renderBox(hit, instRoot)) {
+            if (!sameBox(renderBox(n, member), renderBox(hit, instRoot))) {
+              layoutIssue(n.name);
+              return;
+            }
+          } else {
+            layoutIssue(n.name);
+            return;
+          }
         }
         if (iconPair) down = false;
       }
@@ -10030,6 +10246,16 @@
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
+  var KEEP_LOOK_DEPS = {
+    imageSize: async (h) => {
+      var _a, _b;
+      try {
+        return (_b = await ((_a = figma.getImageByHash(h)) == null ? void 0 : _a.getSizeAsync())) != null ? _b : null;
+      } catch (e) {
+        return null;
+      }
+    }
+  };
   var isPaid = () => currentTier() === "paid";
   async function paidSemanticTarget(collectionId) {
     var _a;
@@ -11578,6 +11804,7 @@
                           return icon;
                         }
                       });
+                      for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                       if (!noted) {
                         noted = true;
                         for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
@@ -11790,6 +12017,7 @@
                           return key ? iconRegistry.ensure(key, v, v.name) : null;
                         }
                       });
+                      for (const l of await keepLookAsync(member, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                       for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
                       if (bad.length) propFailed.push(name);
                       return inst;
@@ -11881,6 +12109,7 @@
                           return key ? iconRegistry.ensure(key, v, v.name) : null;
                         }
                       });
+                      for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                       for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
                       if (bad.length) {
                         propFailed.push(name);

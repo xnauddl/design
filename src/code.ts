@@ -19,7 +19,7 @@ import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor, isKnownRole } from './lib/n
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
-import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
+import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
@@ -89,6 +89,12 @@ function effective(): {
 
 const currentTier = (): Tier => effective().tier;
 /** Free/Paid 2티어 — 유료면 모든 유료 기능 해금. */
+/** 화면을 지키는 옮기기의 그림 크기 읽기(§4.7 8번 ① — 못 읽으면 null). */
+const KEEP_LOOK_DEPS = {
+  imageSize: async (h: string): Promise<{ width: number; height: number } | null> => {
+    try { return (await figma.getImageByHash(h)?.getSizeAsync()) ?? null; } catch { return null; }
+  },
+};
 const isPaid = (): boolean => currentTier() === 'paid';
 
 /** 무료와 Semantic 컬렉션(IA v4 §4.9 · F2 · F10) — 무료면 플러그인 Semantic 컬렉션(`ownedCollection(…, 'semantic')`)에
@@ -1913,6 +1919,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                         return icon;
                       },
                     });
+                    // 화면을 지키는 옮기기(§4.7 8번) — 자리만 다른 사진 틀은 자르기로, 폭만 다른 글자는 글자 자동 크기로
+                    for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                     if (!noted) {
                       noted = true;
                       for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
@@ -2131,6 +2139,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                         return key ? iconRegistry.ensure(key, v, v.name) : null;
                       },
                     });
+                    // 화면을 지키는 옮기기(§4.7 8번) — 자리만 다른 사진 틀은 자르기로, 폭만 다른 글자는 글자 자동 크기로
+                    for (const l of await keepLookAsync(member, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                     for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
                     if (bad.length) propFailed.push(name);
                     return inst;
@@ -2228,6 +2238,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                         return key ? iconRegistry.ensure(key, v, v.name) : null;
                       },
                     });
+                    // 화면을 지키는 옮기기(§4.7 8번) — 자리만 다른 사진 틀은 자르기로, 폭만 다른 글자는 글자 자동 크기로
+                    for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                     for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
                     if (bad.length) { propFailed.push(name); entry.counted = true; }
                     return inst;

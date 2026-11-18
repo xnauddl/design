@@ -13,7 +13,7 @@ import {
   reusePairGrade,
   isHeadingCollapseGroup,
 } from '../dist/pure.mjs';
-import { copyOverridesAsync, replaceMemberAsync, createIconRegistry } from '../dist/figma-lib.mjs';
+import { copyOverridesAsync, keepLookAsync, replaceMemberAsync, createIconRegistry } from '../dist/figma-lib.mjs';
 
 /* ---------- 재사용 키 (1번) ---------- */
 
@@ -381,6 +381,37 @@ test('QA #5 불합격 1 — 속성 접힘 멤버: 안쪽 인스턴스 속 사진
   assert.equal(b.children[1].children[0].children[0].fills[0].imageHash, 'a2', '아바타도 멤버 것');
   assert.equal(b.children[1].children[1].characters, 'Game som', '묶인 이름은 속성으로');
   assert.equal(member.removed, true);
+});
+
+test('A.18 결함 2 — 속성 접힘 · 재사용 목: 덮어쓴 값 옮기기 뒤 keepLookAsync가 사진 틀 자리 차이를 자르기로 맞추고 replaced', async () => {
+  const w = world();
+  const img = (h) => [{ type: 'IMAGE', imageHash: h, visible: true, scaleMode: 'FILL' }];
+  const photo = w.comp('ArticleImage', () => [w.node('RECTANGLE', 'article-image', { width: 280, height: 420, fills: img('p1') })]);
+  const sized = { x: 0, y: 0, width: 280, height: 360, clipsContent: true, resize(a, b) { this.width = a; this.height = b; } };
+  // 마스터(카드 1): 사진 틀 y −30
+  const card = w.comp('Article-Type2', () => [Object.assign(w.inst('ArticleImage', photo), { y: -30, width: 280, height: 420 })]);
+  // 멤버(카드 2): 사진 틀 y −60(아래 붙임) · 사진 해시 다름
+  const member = w.node('FRAME', 'card 2', { ...sized }, [Object.assign(w.inst('ArticleImage', photo), { y: -60, width: 280, height: 420 })]);
+  member.children[0].children[0].fills = img('p2');
+  const row = w.node('FRAME', 'Row', { layoutMode: 'NONE' }, [member]);
+  row.insertChild = function (i, c) { if (c.parent?.children) c.parent.children.splice(c.parent.children.indexOf(c), 1); c.parent = this; this.children.splice(i, 0, c); };
+  row.appendChild = function (c) { this.insertChild(this.children.length, c); };
+  let failed = null;
+  let called = 0;
+  const r = await replaceMemberAsync(member, async () => {
+    const b = Object.assign(w.inst('Article-Type2', card), { ...sized });
+    failed = await copyOverridesAsync(member, b, '', { mainOf: w.mainOf, loadFont: async () => {}, iconFor: () => null });
+    called++;
+    for (const l of await keepLookAsync(member, b, '', { imageSize: async () => ({ width: 280, height: 420 }) })) failed.push(l);
+    return b;
+  }, '');
+  assert.equal(called, 1);
+  assert.equal(r.result, 'replaced', '보이는 그림이 같아 검사를 통과');
+  assert.deepEqual(failed, []);
+  const leaf = row.children[0].children[0].children[0];
+  assert.equal(leaf.fills[0].imageHash, 'p2');
+  assert.equal(leaf.fills[0].scaleMode, 'CROP');
+  assert.ok(Math.abs(leaf.fills[0].imageTransform[1][2] - 30 / 420) < 1e-9);
 });
 
 /* ---------- 아이콘 등록부 (2번) ---------- */

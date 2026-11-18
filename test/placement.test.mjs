@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath, snapshotOverrides, restoreOverrides } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath, snapshotOverrides, restoreOverrides, keepLookAsync, photoLeafOf, visibleBox, imageMatrix, shiftMatrix } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -89,12 +89,13 @@ function installFigma(page) {
       node.addComponentProperty = function (pname, ptype, def) { const id = `${pname}#${seq++}`; this.props.push({ id, pname, ptype, def }); return id; };
       node.createInstance = function () {
         const clone = (c) => {
-          const o = mk(c.type, { name: c.name, x: c.x, y: c.y, width: c.width, height: c.height, characters: c.characters, componentPropertyReferences: {}, ...(c.fills ? { fills: c.fills } : {}) });
+          const o = mk(c.type, { name: c.name, x: c.x, y: c.y, width: c.width, height: c.height, characters: c.characters, componentPropertyReferences: {}, ...(c.fills ? { fills: c.fills } : {}), ...(c.clipsContent !== undefined ? { clipsContent: c.clipsContent } : {}), ...(c.visible !== undefined ? { visible: c.visible } : {}) });
           if (c.children) { o.children = c.children.map(clone); for (const k of o.children) k.parent = o; }
           return o;
         };
         const i = mk('INSTANCE', {
           name: this.name, width: this.width, height: this.height, applied: {}, mainId: this.id,
+          ...(this.clipsContent !== undefined ? { clipsContent: this.clipsContent } : {}),
           constraints: { horizontal: 'MIN', vertical: 'MIN' },
           resize(w, h) { this.width = w; this.height = h; },
           setProperties(p) { Object.assign(this.applied, p); },
@@ -945,4 +946,117 @@ test('값 지키기 — 보이기 · 거절된 속성 · 글꼴 실패 · 안 �
   const f2 = await restoreOverrides(s2, w2.getNode, w2.mainOf, async () => { throw new Error('no font'); });
   assert.deepEqual([...f2.entries()], [[7, ['L']]]);
   assert.equal(p2.calls.length, 0);
+});
+
+/* ---------- A.18 결함 2 — 화면을 지키는 옮기기(§4.7 "인스턴스 자리" 8번) ---------- */
+const SIZE = { imageSize: async () => ({ width: 280, height: 420 }) };
+/** 사진 카드: FRAME 280×360(자르기) > 사진(RECTANGLE 또는 감싼 INSTANCE › RECTANGLE) + 이름. */
+const photoCard = ({ x = 0, photoY = -30, clip = true, wrap = false, mode = 'FILL', nameX = 16, nameW = 86 } = {}) => {
+  const leaf = (y) => mk('RECTANGLE', { name: 'photo', y, width: 280, height: 420, fills: [{ type: 'IMAGE', visible: true, imageHash: 'same', scaleMode: mode, imageTransform: [[1, 0, 0], [0, 1, 0]] }], strokes: [], effects: [] });
+  return mk('FRAME', { name: 'Card', x, width: 280, height: 360, clipsContent: clip }, [
+    wrap ? mk('INSTANCE', { name: 'ArticleImage', y: photoY, width: 280, height: 420, fills: [], strokes: [], effects: [] }, [leaf(0)]) : leaf(photoY),
+    mk('TEXT', { name: 'name', x: nameX, y: 330, width: nameW, height: 19, characters: 'Levino gene' }),
+  ]);
+};
+function photoSetup(bOpts, aOpts = {}) {
+  const page = mk('PAGE', {}, []);
+  const A = photoCard({ ...aOpts });
+  const B = photoCard({ x: 300, ...bOpts });
+  const row = mk('FRAME', { name: 'Row' }, [A, B]);
+  page.appendChild(row);
+  installFigma(page);
+  const comp = figma.createComponentFromNode(A);
+  return { page, row, A, B, comp };
+}
+
+test('A.18 ① 카드(280×360 자르기) 사진 y −60 멤버 ↔ 마스터 y −30: keepLookAsync 뒤 검사 통과 · CROP 세로 30/420', async () => {
+  const { B, comp } = photoSetup({ photoY: -60 });
+  const inst = comp.createInstance();
+  assert.match(memberFitIssue(inst, B, ''), /자리·크기 다름\(photo\)/, '옮기기 전에는 걸린다');
+  assert.deepEqual(await keepLookAsync(B, inst, '', SIZE), []);
+  assert.equal(memberFitIssue(inst, B, ''), null);
+  const f = inst.children[0].fills[0];
+  assert.equal(f.scaleMode, 'CROP');
+  assert.equal(f.imageHash, 'same');
+  assert.deepEqual(f.imageTransform[0], [1, 0, 0]);
+  assert.ok(Math.abs(f.imageTransform[1][2] - 30 / 420) < 1e-9 && f.imageTransform[1][1] === 1);
+});
+
+test('A.18 ② 감싼 사진 틀(INSTANCE › RECTANGLE)도 같은 결과 — 잎에 CROP', async () => {
+  const { B, comp } = photoSetup({ photoY: -60, wrap: true }, { wrap: true });
+  const inst = comp.createInstance();
+  assert.deepEqual(await keepLookAsync(B, inst, '', SIZE), []);
+  assert.equal(memberFitIssue(inst, B, ''), null);
+  assert.equal(inst.children[0].children[0].fills[0].scaleMode, 'CROP');
+  assert.ok(Math.abs(inst.children[0].children[0].fills[0].imageTransform[1][2] - 30 / 420) < 1e-9);
+});
+
+test('A.18 ③ 보이는 영역이 다르면(카드 자르기 끔) 옮기지 않고 자리·크기 다름', async () => {
+  const { B, comp } = photoSetup({ photoY: -60, clip: false }, { clip: false });
+  const inst = comp.createInstance();
+  assert.deepEqual(await keepLookAsync(B, inst, '', SIZE), []);
+  assert.equal(inst.children[0].fills[0].scaleMode, 'FILL');
+  assert.match(memberFitIssue(inst, B, ''), /자리·크기 다름\(photo\)/);
+});
+
+test('A.18 ④ FIT 채움이면 옮기지 않고 자리·크기 다름', async () => {
+  const { B, comp } = photoSetup({ photoY: -60, mode: 'FIT' }, { mode: 'FIT' });
+  const inst = comp.createInstance();
+  assert.deepEqual(await keepLookAsync(B, inst, '', SIZE), []);
+  assert.equal(inst.children[0].fills[0].scaleMode, 'FIT');
+  assert.match(memberFitIssue(inst, B, ''), /자리·크기 다름\(photo\)/);
+});
+
+test('A.18 ④′ FILL인데 그림 크기를 못 읽으면 그 잎 이름이 실패 목록에, 검사는 걸린다', async () => {
+  const { B, comp } = photoSetup({ photoY: -60 });
+  const inst = comp.createInstance();
+  // 해시 기억이 앞 테스트로 차 있을 수 있어 다른 해시로
+  B.children[0].fills = [{ ...B.children[0].fills[0], imageHash: 'unknown-size' }];
+  inst.children[0].fills = B.children[0].fills;
+  assert.deepEqual(await keepLookAsync(B, inst, '', { imageSize: async () => null }), ['photo']);
+  assert.match(memberFitIssue(inst, B, ''), /자리·크기 다름\(photo\)/);
+});
+
+/** 그려진 범위 목 — 레이어 절대 자리 + (dx, 3)에서 폭 w · 높이 15. */
+const withRender = (n, dx, w) => Object.defineProperty(n, 'absoluteRenderBounds', { configurable: true, get() { const [x, y] = absXY(this); return { x: x + dx, y: y + 3, width: w, height: 15 }; } });
+
+test('A.18 ⑤ 고정 폭 102 글자(x 8) ↔ FILL 86(x 16): 글자 자동 크기를 넣고, 그려진 범위가 같아지면 null · 다르면(두 줄) 자리·크기 다름', async () => {
+  const { B, comp } = photoSetup({ nameX: 8, nameW: 102 });
+  const inst = comp.createInstance();
+  const t = inst.children[1];
+  let mode = 'HEIGHT';
+  Object.defineProperty(t, 'textAutoResize', { get: () => mode, set: (v) => { mode = v; } });
+  assert.deepEqual(await keepLookAsync(B, inst, '', SIZE), []);
+  assert.equal(mode, 'WIDTH_AND_HEIGHT');
+  withRender(B.children[1], 6.46, 89.67); // 멤버: 8 + 6.46 = 14.46
+  withRender(t, -1.54, 89.67); // 인스턴스: 16 − 1.54 = 14.46
+  assert.equal(memberFitIssue(inst, B, ''), null);
+  withRender(t, 0, 86); // 두 줄로 남은 경우
+  assert.match(memberFitIssue(inst, B, ''), /자리·크기 다름\(name\)/);
+});
+
+test('A.18 ⑥ 글자 자동 크기 넣기가 던지면 실패 목록에 그 이름', async () => {
+  const { B, comp } = photoSetup({ nameX: 8, nameW: 102 });
+  const inst = comp.createInstance();
+  Object.defineProperty(inst.children[1], 'textAutoResize', { get: () => 'HEIGHT', set: () => { throw new Error('rejected'); } });
+  assert.deepEqual(await keepLookAsync(B, inst, '', SIZE), ['name']);
+});
+
+test('A.18 순수 — 사진 틀 판정 · 보이는 영역 · 덮기 행렬 · 민 행렬', () => {
+  const page = mk('PAGE', {}, []);
+  const card = photoCard({ photoY: -60, wrap: true });
+  page.appendChild(card);
+  const wrapper = card.children[0];
+  assert.equal(photoLeafOf(wrapper), wrapper.children[0], '감싼 사진 틀의 잎');
+  assert.equal(photoLeafOf(card.children[1]), null, '글자는 사진 틀이 아니다');
+  wrapper.fills = [{ type: 'SOLID', visible: true }];
+  assert.equal(photoLeafOf(wrapper), null, '자기 칠이 있으면 아니다');
+  assert.deepEqual(visibleBox(wrapper, card), { x0: 0, y0: 0, x1: 280, y1: 360 });
+  // 실험 값: 그림 28×420 → 280×420 사각형 FILL = [[1,0,0],[0,0.1,0.45]]
+  const m = imageMatrix({ type: 'IMAGE', scaleMode: 'FILL' }, 280, 420, { width: 28, height: 420 });
+  assert.deepEqual(m.map((r) => r.map((v) => Math.round(v * 1e6) / 1e6)), [[1, 0, 0], [0, 0.1, 0.45]]);
+  const s = shiftMatrix(m, 0, 30 / 420);
+  assert.ok(Math.abs(s[1][2] - (0.45 + 0.1 * 30 / 420)) < 1e-9, '실험에서 원본과 PNG가 같았던 행렬');
+  assert.equal(imageMatrix({ type: 'IMAGE', scaleMode: 'FIT' }, 280, 420, { width: 28, height: 420 }), null);
+  assert.equal(imageMatrix({ type: 'IMAGE', scaleMode: 'FILL', rotation: 90 }, 280, 420, { width: 28, height: 420 }), null);
 });
