@@ -4,7 +4,7 @@
 import type { VarCollection, VarRow, LibraryVar, VarCell, EditValue } from '../lib/varTable';
 import type { ApplyTarget } from '../lib/varKind';
 import type { DraftToken } from '../lib/tokens';
-import type { TextStyleSpec } from '../lib/textStyles';
+import type { StyleCluster, TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { ExportFormat } from '../lib/exporters';
@@ -291,7 +291,8 @@ export type CodeToUi =
   // labeled/fallback은 「왼쪽 글자로 이름 채우기」를 눌렀을 때만 온다 — 맨 스캔은 전부 크기 순이라
   // `왼쪽 글자 0`을 적어 봐야 실패처럼 읽힐 뿐이다. undefined면 상태줄에서 그 조각을 생략한다.
   // existing: 로컬 텍스트 스타일 전부 — 이름 겹침 잠금(IA v4 §4.3) · 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프 rampToSpecs).
-  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
+  // decimalRows: 앵커 없는 소수 크기 군집 — 만들지 않는 흐린 줄(§2.11 11번 · ia-v4 §4.3 "소수 크기 줄").
+  | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; decimalRows?: StyleCluster[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
   | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
   | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[] }
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").

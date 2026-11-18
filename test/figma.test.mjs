@@ -7557,3 +7557,68 @@ test('A.14b 만들기 경로 — createUsageRoles 그림자 2% · 4% · 5% → d
     assert.equal(roleTarget(figma, findVar(figma, 'Semantic', name).id), findVar(figma, 'Global', `color/000000-a${a}`).id, name);
   }
 });
+
+/* ---------- A.18 결함 4 — 소수 크기 텍스트 스타일은 건너뜀(§2.11 11번 "글자 크기도 정수만") ---------- */
+const DEC = { name: 'heading/large', fontSize: 26.67, lineHeight: 40, letterSpacing: 1, family: 'Inter', style: 'Regular' };
+const INT24 = { name: 'heading/medium', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Regular' };
+const allVarNames = (figma) => figma._state.variables.map((v) => v.name);
+
+test('A.18 ①② 앵커 없는 26.67 스펙 → 스타일 · 글자 크기 · 줄 높이 · 자간 변수 없음 · missDecimal 1, 같은 실행의 24는 지금처럼', async () => {
+  const figma = installFigma();
+  const r = await createSemanticTextStyles([DEC, INT24]);
+  assert.equal(r.created, 1);
+  assert.ok(!figma._state.textStyles.some((s) => s.name === 'heading/large'), '소수 스타일 없음');
+  const names = allVarNames(figma);
+  assert.ok(!names.includes('font-size/26_67') && !names.includes('font-size/heading/large'), JSON.stringify(names));
+  assert.ok(!names.includes('line-height/heading/large') && !names.includes('letter-spacing/heading/large') && !names.includes('line-height/40') && !names.includes('letter-spacing/1'));
+  assert.deepEqual(r.missing.filter((m) => m.includes('소수')), ['heading/large: 글자 크기가 소수라 만들지 않았어요(26.67px)']);
+  assert.equal(r.missing.length, 1);
+  const st24 = figma._state.textStyles.find((s) => s.name === 'heading/medium');
+  assert.ok(st24?.boundVariables.fontSize, '정수 스펙은 만들고 연결');
+  assert.ok(findVar(figma, 'Global', 'font-size/24'));
+  assert.deepEqual(r.styleIds, [st24.id]);
+});
+
+test('A.18 ③ 이름이 같은 스타일이 이미 있고 앵커 없는 스펙이 소수 → 그 스타일 값이 바뀌지 않음 · missDecimal 1', async () => {
+  const figma = installFigma();
+  const st = figma.createTextStyle();
+  Object.assign(st, { name: 'heading/large', fontName: { family: 'Inter', style: 'Regular' }, fontSize: 28, lineHeight: { value: 40, unit: 'PIXELS' }, letterSpacing: { value: 0, unit: 'PIXELS' } });
+  const r = await createSemanticTextStyles([DEC]);
+  assert.equal(st.fontSize, 28);
+  assert.equal(r.updated, 0);
+  assert.equal(r.missing.filter((m) => m.includes('소수')).length, 1);
+});
+
+test('A.18 ④⑤ 앵커된 26.67 스타일 → 이름 · 값 그대로(updated) · 글자 크기 변수 새로 만들지 않음 · missing 0, 앵커 없는 26.67 글자는 바로 연결로 아무 스타일도 받지 않음', async () => {
+  const figma = installFigma();
+  const st = figma.createTextStyle();
+  Object.assign(st, { name: 'old-name', fontName: { family: 'Inter', style: 'Regular' }, fontSize: 26.67, lineHeight: { value: 40, unit: 'PIXELS' }, letterSpacing: { value: 0, unit: 'PIXELS' } });
+  const r = await createSemanticTextStyles([{ ...DEC, name: 'old-name', boundStyleId: st.id, letterSpacing: 0 }]);
+  assert.equal(r.updated, 1);
+  assert.equal(st.fontSize, 26.67);
+  assert.equal(st.name, 'old-name');
+  assert.deepEqual(r.missing, []);
+  assert.ok(!allVarNames(figma).some((n) => n.startsWith('font-size/')), JSON.stringify(allVarNames(figma)));
+  assert.deepEqual(r.styleIds, [st.id]);
+  const anchoredText = tsText('a', 26.67, { lineHeight: { unit: 'PIXELS', value: 40 } });
+  registerNodes(figma, [anchoredText]);
+  const ap = await applyRegisteredTextStyles([anchoredText], r.styleIds);
+  assert.equal(ap.applied, 1, '앵커된 스타일은 지금처럼 붙는다');
+  assert.equal(anchoredText.textStyleId, st.id);
+  // ⑤ 앵커 없는 26.67(스타일을 만들지 않음)
+  const figma2 = installFigma();
+  const r2 = await createSemanticTextStyles([DEC]);
+  const lone = tsText('lone', 26.67, { lineHeight: { unit: 'PIXELS', value: 40 }, letterSpacing: { unit: 'PIXELS', value: 1 } });
+  registerNodes(figma2, [lone]);
+  const ap2 = await applyRegisteredTextStyles([lone], r2.styleIds);
+  assert.equal(ap2.applied, 0);
+  assert.equal(lone.textStyleId, '');
+});
+
+test('A.18 ⑥ 이미 있는 font-size/26_67은 지우지 않는다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'font-size/26_67', category: 'fontSize', sources: ['fontSize'], value: 26.67 }], 16);
+  assert.ok(findVar(figma, 'Global', 'font-size/26_67'));
+  await createSemanticTextStyles([DEC]);
+  assert.ok(findVar(figma, 'Global', 'font-size/26_67'));
+});

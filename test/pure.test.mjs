@@ -111,6 +111,8 @@ import {
   isDarkGlobalName,
   DARK_L_MIN,
   DARK_L_MAX,
+  isIntegerSize,
+  splitDecimalClusters,
 } from '../dist/pure.mjs';
 
 test('rgbToHex / hexToRgb 라운드트립', () => {
@@ -3278,4 +3280,51 @@ test('krdsType — §7 예(이름 다시 짓기 경로 · 쓰인 곳 0)', () => 
     const names = nameKrdsStyles(inputs, { path: 'rename' });
     assert.deepEqual(names, order.map((r) => r[4]));
   }
+});
+
+/* ---------- A.18 결함 4 — 소수 크기 후보 나누기 ---------- */
+test('A.18 isIntegerSize · splitDecimalClusters — 앵커 없는 소수만 decimalRows, 앵커된 소수 · 정수는 이름 짓기로', () => {
+  assert.equal(isIntegerSize(24), true);
+  assert.equal(isIntegerSize(24.001), true, '소수 둘째 자리 반올림');
+  assert.equal(isIntegerSize(26.67), false);
+  const cl = (fontSize, extra = {}) => ({ fontSize, lineHeight: 40, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'Regular', count: 1, uiCount: 0, sample: 't', styleIds: [], ...extra });
+  const c24 = cl(24);
+  const c2667 = cl(26.67);
+  {
+    const { rest, decimalRows } = splitDecimalClusters([c24, c2667], []);
+    assert.deepEqual(rest, [c24]);
+    assert.deepEqual(decimalRows, [c2667]);
+  }
+  const existing = [{ id: 'S:1', name: 'old/large', fontSize: 26.67, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Regular' }];
+  {
+    const { rest, decimalRows } = splitDecimalClusters([c24, c2667], existing);
+    assert.deepEqual(rest, [c24, c2667]);
+    assert.deepEqual(decimalRows, []);
+    const specs = nameTextStyles(rest, existing);
+    assert.equal(specs.find((s) => s.fontSize === 26.67).name, 'old/large', '앵커 이름 그대로');
+  }
+});
+
+test('A.18 이름 짓기 — 소수 크기 군집을 빼면 정수 스타일 이름에 소수 줄 때문에 생기던 꼬리가 없다', () => {
+  const cl = (fontSize) => ({ fontSize, lineHeight: Math.round(fontSize * 1.5), lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'Bold', count: 1, uiCount: 0, sample: 't', styleIds: [] });
+  const withDec = nameTextStyles([cl(26), cl(26.67)]);
+  const { rest } = splitDecimalClusters([cl(26), cl(26.67)], []);
+  const without = nameTextStyles(rest);
+  assert.equal(without.length, 1);
+  assert.ok(!/-/.test(without[0].name.split('/').pop()), `꼬리 없음: ${without[0].name}`);
+  assert.notEqual(withDec.find((s) => s.fontSize === 26).name, undefined);
+});
+
+test('A.18 nameTextStylesWithRowLabels — decimalRows를 돌려주고, 라벨뿐인 소수 크기 표본은 빠지며 다른 스타일 이름은 그대로', () => {
+  const s = (id, fontSize, characters, rowId, indexInParent) => ({ id, layerName: id, fontSize, lineHeight: Math.round(fontSize * 1.5), letterSpacing: 0, family: 'Inter', style: 'Regular', characters, rowId, indexInParent });
+  // 행: 왼쪽 라벨 "H2"(26.67 — 라벨) + 표본 32
+  const samples = [s('l1', 26.67, 'H2', 'r1', 0), s('sp1', 32, 'Specimen text here', 'r1', 1), s('body', 16, 'body text long enough to not be a label', undefined, undefined)];
+  const r = nameTextStylesWithRowLabels(samples, []);
+  assert.deepEqual(r.decimalRows, [], '라벨뿐인 소수 크기 줄은 빠진다');
+  assert.equal(r.styles.find((x) => x.fontSize === 32).name, 'H2');
+  // 표본(오른쪽 아닌 남은 글자)으로 있는 26.67은 decimalRows에
+  const r2 = nameTextStylesWithRowLabels([...samples, s('dec', 26.67, 'free standing decimal sample text', undefined, undefined)], []);
+  assert.equal(r2.decimalRows.length, 1);
+  assert.equal(r2.decimalRows[0].fontSize, 26.67);
+  assert.deepEqual(r2.styles.map((x) => x.name), r.styles.map((x) => x.name), '다른 스타일 이름은 바뀌지 않는다');
 });

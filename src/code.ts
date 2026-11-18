@@ -7,7 +7,7 @@ import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에
 import { extractFromSelection } from './lib/extract';
 import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, planTsRename, applyTsRename, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
-import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, tsSig } from './lib/textStyles';
+import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, splitDecimalClusters, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, countDeleted, countUsage, findUsers, unbindDeleted } from './lib/bind';
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
@@ -1403,12 +1403,14 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
         if (msg.reqId == null) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
-        const styles = nameTextStyles(clusterTextStyles(samples), existing);
+        // 앵커 없는 소수 크기 군집은 이름 짓기에서 빼 흐린 줄로(§2.11 11번 "글자 크기도 정수만")
+        const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
+        const styles = nameTextStyles(rest, existing);
         // existing은 reqId 없는 스캔에도 싣는다 — 기본 램프(rampToSpecs)의 예약 이름(docs/text-style-krds.md §6).
         const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
         if (msg.reqId != null) {
-          post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings, reqId: msg.reqId, existing: existingSigs });
-        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, warnings, existing: existingSigs });
+          post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
+        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, existing: existingSigs });
         break;
       }
       case 'SCAN_TS_RENAME': {
@@ -1437,7 +1439,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         const existing = await scanExistingTextStyles();
         const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles: r.styles, warnings: [], labeled: r.labeled, fallback: r.fallback });
+        post({ type: 'TEXT_STYLE_CANDIDATES', styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
         break;
       }
       case 'CREATE_TEXT_STYLES': {

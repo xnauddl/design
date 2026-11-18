@@ -137,6 +137,7 @@
     "reason.size-fraction": "\uC18C\uC218 \uD06C\uAE30(\uC815\uD655 \uC77C\uCE58\uB9CC)",
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
+    "reason.library-main": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uCEF4\uD3EC\uB10C\uD2B8",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
     "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
@@ -371,7 +372,10 @@
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
-    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
+    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678 \u2014 \uC778\uC2A4\uD134\uC2A4\uC758 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD3EC\uD568",
+    "v4.mainsLine": "\uC120\uD0DD \uBC16 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD574\uC694",
+    "v4.mainsMore": "\uC678 {n}\uAC1C",
+    "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
@@ -390,6 +394,7 @@
     "reasonHelp.hug-fill": "\uC790\uB3D9 \uD06C\uAE30\uB77C \uBCC0\uC218\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
     "reasonHelp.empty-text": "\uBE48 \uAE00\uC790\uC608\uC694",
     "reasonHelp.instance-children": "\uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
+    "reasonHelp.library-main": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uCEF4\uD3EC\uB10C\uD2B8\uB77C \uC774 \uD30C\uC77C\uC5D0\uC11C \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4\uC694",
     "reasonHelp.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uC608\uC694",
     "reasonHelp.no-autolayout": "\uC5EC\uBC31 \xB7 \uAC04\uACA9\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4\uC608\uC694",
     "reasonHelp.size-free-layout": "\uC790\uC720 \uBC30\uCE58\uB77C \uD06C\uAE30\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
@@ -914,6 +919,9 @@
     "textStyle.missFontKeep": "{name}: \uAE00\uAF34 '{font}'\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD574 \uAC12 \xB7 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694",
     "textStyle.missError": "{name}: \uB05D\uAE4C\uC9C0 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694(\uC77C\uBD80 \uAC12\uB9CC \uB4E4\uC5B4\uAC14\uC744 \uC218 \uC788\uC5B4\uC694) \u2014 {error}",
     "textStyle.missVar": "{name}: \uBCC0\uC218 '{var}'\uC774 \uC5C6\uC5B4 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "textStyle.missDecimal": "{name}: \uAE00\uC790 \uD06C\uAE30\uAC00 \uC18C\uC218\uB77C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694({size}px)",
+    "textStyle.decimalRow": "\uAE00\uC790 \uD06C\uAE30\uAC00 \uC18C\uC218\uB77C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
+    "textStyle.noRegistrable": "\uB9CC\uB4E4 \uC218 \uC788\uB294 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \u2014 \uAE00\uC790 \uD06C\uAE30\uAC00 \uBAA8\uB450 \uC18C\uC218\uC608\uC694",
     "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
@@ -2869,7 +2877,11 @@
     for (const [k, c] of map) c.styleIds = [...ids.get(k)];
     return [...map.values()];
   }
-  function nameTextStyles(clusters, existing) {
+  function isIntegerSize(v) {
+    const r = Math.round(v * 100) / 100;
+    return Math.abs(r - Math.round(r)) < 1e-6;
+  }
+  function anchorOfFor(existing) {
     const nameById = /* @__PURE__ */ new Map();
     const sigById = /* @__PURE__ */ new Map();
     const idBySig = /* @__PURE__ */ new Map();
@@ -2879,8 +2891,7 @@
       sigById.set(e.id, k);
       idBySig.set(k, idBySig.has(k) ? null : e.id);
     }
-    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
-    const boundIdOf = (c) => {
+    return (c) => {
       if (!existing) return void 0;
       if (c.styleIds.length === 1) {
         const id = c.styleIds[0];
@@ -2889,6 +2900,20 @@
       const sigId = idBySig.get(sigKey(c));
       return sigId && nameById.has(sigId) ? sigId : void 0;
     };
+  }
+  function splitDecimalClusters(clusters, existing) {
+    const anchorOf = anchorOfFor(existing);
+    const rest = [];
+    const decimalRows = [];
+    for (const c of clusters) (isIntegerSize(c.fontSize) || anchorOf(c) ? rest : decimalRows).push(c);
+    decimalRows.sort((a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight);
+    return { rest, decimalRows };
+  }
+  function nameTextStyles(clusters, existing) {
+    const nameById = /* @__PURE__ */ new Map();
+    for (const e of existing != null ? existing : []) nameById.set(e.id, e.name);
+    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
+    const boundIdOf = anchorOfFor(existing);
     const ordered = [...clusters].sort(
       (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
     );
@@ -3003,7 +3028,8 @@
       }
     }
     const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
-    const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
+    const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(forCluster), existing);
+    const styles = nameTextStyles(rest, existing);
     const used = /* @__PURE__ */ new Set();
     const unique = (n) => {
       const base = n || "text";
@@ -3037,7 +3063,7 @@
       style.name = unique(style.name);
       fallback++;
     }
-    return { styles, labeled, fallback };
+    return { styles, decimalRows, labeled, fallback };
   }
 
   // src/lib/scopes.ts
@@ -5067,14 +5093,23 @@
     });
     return (family) => list.find((v) => directValue(v, modeOf) === family);
   }
-  async function createSemanticTextStyles(specs) {
+  async function createSemanticTextStyles(allSpecs) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
-    if (!specs.length) return res;
+    if (!allSpecs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
     const styleById = new Map(existing.map((s) => [s.id, s]));
     const styleByName = new Map(existing.map((s) => [s.name, s]));
     const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+    const specs = [];
+    for (const spec of allSpecs) {
+      if (!anchoredStyle(spec) && !isIntegerSize(spec.fontSize)) {
+        res.missing.push(t("textStyle.missDecimal", { name: spec.name, size: roundN(spec.fontSize) }));
+        continue;
+      }
+      specs.push(spec);
+    }
+    const decimalAnchor = (st) => !!st && !isIntegerSize(roundN(st.fontSize));
     const renameBlocked = /* @__PURE__ */ new Set();
     const roleRenames = [];
     const roleSpecs = [];
@@ -5162,6 +5197,7 @@
         const st = anchoredStyle(s);
         if (!st) continue;
         if (semNames.has(`font-size/${s.name}`)) continue;
+        if (decimalAnchor(st)) continue;
         const fontSize = roundN(st.fontSize);
         pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
       }
@@ -5242,7 +5278,7 @@
         if (fsVar) {
           style.setBoundVariable("fontSize", fsVar);
           res.bound++;
-        } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
+        } else if (!(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
         if (spec.lineHeight > 0 || isRename) {
           const pctNow = lhPctOf(style.lineHeight);
           if (pctNow > 0) {
@@ -5253,7 +5289,7 @@
             if (lhVar) {
               style.setBoundVariable("lineHeight", lhVar);
               res.bound++;
-            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
+            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
           }
         }
         if (spec.letterSpacing !== 0 || isRename) {
@@ -5266,7 +5302,7 @@
             if (lsVar) {
               style.setBoundVariable("letterSpacing", lsVar);
               res.bound++;
-            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
+            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
           }
         }
         const famVar = familyVarFor(style.fontName.family);
@@ -11357,11 +11393,12 @@
           const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
           if (msg.reqId == null) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
-          const styles = nameTextStyles(clusterTextStyles(samples), existing);
+          const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
+          const styles = nameTextStyles(rest, existing);
           const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
           if (msg.reqId != null) {
-            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, reqId: msg.reqId, existing: existingSigs });
-          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, existing: existingSigs });
+            post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
+          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, existing: existingSigs });
           break;
         }
         case "SCAN_TS_RENAME": {
@@ -11385,7 +11422,7 @@
           }
           const existing = await scanExistingTextStyles();
           const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-          post({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, warnings: [], labeled: r.labeled, fallback: r.fallback });
+          post({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
           break;
         }
         case "CREATE_TEXT_STYLES": {
