@@ -12,6 +12,8 @@ export const EMITTED_ROLES = [
   // 구조 폴백(역할을 못 정했을 때)
   'container',
   'wrapper',
+  'stack-x', // 가로 오토레이아웃 묶음(ia-v3 §2.12 12.12 N-D6) — container처럼 맥락 없음 · 맥락 통과
+  'stack-y', // 세로 오토레이아웃 묶음
   'shape',
   // HTML 랜드마크
   'header',
@@ -294,7 +296,9 @@ function isTokenValue(v: string): boolean {
 }
 
 /** 식별력이 없는 일반 구조 어휘 — 맥락 접두사로 쓰지 않는다(container-header 같은 군더더기 방지). */
-const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'content', 'group', 'section', 'body', 'main', 'shape']);
+const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'stack-x', 'stack-y', 'content', 'group', 'section', 'body', 'main', 'shape']);
+/** 구조 폴백 이름(이름 전체) — 맥락이 없다(ia-v3 §2.12 12.12 N-D6: `stack-x`에서 `x`를 맥락으로 뽑지 않게). */
+const STRUCT_FALLBACK_WHOLE = new Set(['container', 'wrapper', 'stack-x', 'stack-y']);
 
 /**
  * 이름에서 깨끗한 "맥락 1단계"를 뽑는다 — 숫자·단위·hex·일반 구조어를 버리고,
@@ -302,6 +306,8 @@ const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'content', 'grou
  * 예: 'card-header' → 'header' · 'button-primary' → 'button' · 'container' → null · 'wrapper-2' → null.
  */
 export function pickScope(name: string): string | null {
+  // 이름 전체가 구조 폴백 이름이면(같은 부모 안 겹침 꼬리 `-2` 포함) 맥락 없음.
+  if (STRUCT_FALLBACK_WHOLE.has(kebab(name).replace(/(?:-\d+)+$/, ''))) return null;
   const segs = kebab(name)
     .split('-')
     .filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
