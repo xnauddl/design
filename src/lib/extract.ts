@@ -27,6 +27,8 @@ interface Accumulator {
    * 그래서 모으기만 하고, 결과가 빈 경우에만 extractFromSelection이 warnings로 올린다.
    */
   skipped: Set<string>;
+  /** 메인을 함께 읽는 인스턴스 id(ia-v3 §2.11 11번). */
+  covered?: ReadonlySet<string>;
   /**
    * 토큰 키 → 마지막으로 집계한 노드 id. walk가 한 노드를 끝까지 처리한 뒤 자식으로 내려가므로,
    * 같은 노드에서 온 연속 add는 이 비교로 걸러진다(padding 4방향이 count 4가 되지 않게).
@@ -448,7 +450,7 @@ function walk(acc: Accumulator, node: SceneNode): void {
   // 인스턴스 내부는 마스터의 복사본이라 디자이너가 이 화면에서 결정한 값이 아니다 —
   // 인스턴스 자체 속성(크기·채움·효과)만 읽고 하위로는 내려가지 않는다.
   if (node.type === 'INSTANCE') {
-    if ('children' in node && node.children.length) acc.skipped.add(SKIP_INSTANCE);
+    if ('children' in node && node.children.length && !acc.covered?.has(node.id)) acc.skipped.add(SKIP_INSTANCE); // 메인이 더해지지 않은 인스턴스만(라이브러리 · 메인 없음)
     return;
   }
   if ('children' in node) for (const child of node.children) walk(acc, child);
@@ -477,8 +479,10 @@ export function extractFromSelection(
   selection: readonly SceneNode[],
   /** 쓰임 이름의 주인(§2.12 12.3) — code.ts가 이름 정리 역할 → 고신뢰 판정으로 넘긴다. */
   ownerOf: (node: SceneNode) => string | undefined = () => undefined,
+  /** 메인을 함께 읽는 인스턴스 id(ia-v3 §2.11 11번) — 이 인스턴스는 "인스턴스 안쪽 건너뜀"을 남기지 않는다. */
+  coveredInstances?: ReadonlySet<string>,
 ): ExtractResult {
-  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), owner: ownerOf };
+  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), owner: ownerOf, covered: coveredInstances };
   for (const node of selection) {
     if (!isEffectivelyVisible(node)) {
       acc.skipped.add(SKIP_HIDDEN); // 숨긴 그룹 안의 자식을 직접 고른 경우 — walk가 못 거른다

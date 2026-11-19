@@ -211,6 +211,9 @@
     .sel-card .t { font-size: 13px; font-weight: 600; }
     .sel-card .s { font-size: 11.5px; color: var(--text-2); margin-top: 2px; }
     .sel-card .s + .s { margin-top: 6px; }
+    /* 메인 컴포넌트 회색 줄(ia-v4 §4.1 · §4.2) — 카드 안 줄이라 바탕 · 테두리 없음(§2.8) */
+    .sel-card .s.mains, .mains-line { font-size: 11px; color: var(--text-2); }
+    .mains-line { padding: 8px 2px 0; }
     .sel-card.ok { background: var(--ok-subtle); border-color: transparent; }
     .sel-card.warn { background: var(--danger-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--danger); }
@@ -448,14 +451,21 @@
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
     .skip-head { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; }
-    .skip-row { display: flex; align-items: center; gap: 6px; min-height: 30px; padding: 0 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    /* 건너뛴 곳 줄 — 두 줄(ia-v4 §4.2 "두 줄 · 설명만"): 첫 줄 이름 · 수 · [선택 ›](손볼 곳만), 둘째 줄 설명. 아래 구분선만(§2.8) */
+    .skip-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    .skip-row .skip-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .skip-row .skip-name { white-space: nowrap; flex: 0 0 auto; }
     .skip-row .skip-n { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
-    .skip-row .skip-help { color: var(--text-2); font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .skip-row .skip-help { color: var(--text-2); font-size: 11px; white-space: normal; }
     .skip-row .grow { flex: 1 1 auto; }
     .skip-row .skip-sel { flex: 0 0 auto; font-size: 11px; }
     /* 타이포 목록 — 구분선 줄(카드 안 카드 금지, CLAUDE.md · docs/text-style-krds.md §6) */
     #tsList { gap: 0; }
     #tsList .r-card { border: none; border-bottom: 1px solid var(--border); border-radius: 0; background: none; box-shadow: none; margin: 0; }
+    /* 소수 크기 흐린 줄(ia-v4 §4.3 "소수 크기 줄") — 글 · Aa 모두 --muted, 바탕 · 테두리 더하지 않음 */
+    #tsList .r-card.ts-decimal .r-title, #tsList .r-card.ts-decimal .r-sum { color: var(--muted); }
+    .tr.ts-decimal .ts-aa, .tr.ts-decimal .tr-sub, .tr.ts-decimal .bv-tw { color: var(--muted); }
+    .tr.ts-decimal .ts-why { flex: 0 0 auto; white-space: nowrap; }
     /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
     .tsr-all { padding: 0 0 6px; }
     .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
@@ -1036,6 +1046,8 @@
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
         <div class="skip-list" id="bindSkips" hidden></div>
       </div>
+      <!-- 선택 밖 메인 컴포넌트 줄(ia-v4 §4.2 "메인 컴포넌트 줄") — 보통 흐름, #applyStatus 바로 위 -->
+      <div class="mains-line" id="bindMains" hidden></div>
       <div class="status" id="applyStatus"></div>
       <div class="sub-foot" id="bindFoot">
         <span class="grow"></span>
@@ -1498,6 +1510,7 @@
     "reason.size-fraction": "\uC18C\uC218 \uD06C\uAE30(\uC815\uD655 \uC77C\uCE58\uB9CC)",
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
+    "reason.library-main": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uCEF4\uD3EC\uB10C\uD2B8",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
     "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
@@ -1732,7 +1745,10 @@
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
-    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
+    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678 \u2014 \uC778\uC2A4\uD134\uC2A4\uC758 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD3EC\uD568",
+    "v4.mainsLine": "\uC120\uD0DD \uBC16 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD574\uC694",
+    "v4.mainsMore": "\uC678 {n}\uAC1C",
+    "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
@@ -1751,6 +1767,7 @@
     "reasonHelp.hug-fill": "\uC790\uB3D9 \uD06C\uAE30\uB77C \uBCC0\uC218\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
     "reasonHelp.empty-text": "\uBE48 \uAE00\uC790\uC608\uC694",
     "reasonHelp.instance-children": "\uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
+    "reasonHelp.library-main": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uCEF4\uD3EC\uB10C\uD2B8\uB77C \uC774 \uD30C\uC77C\uC5D0\uC11C \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4\uC694",
     "reasonHelp.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uC608\uC694",
     "reasonHelp.no-autolayout": "\uC5EC\uBC31 \xB7 \uAC04\uACA9\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4\uC608\uC694",
     "reasonHelp.size-free-layout": "\uC790\uC720 \uBC30\uCE58\uB77C \uD06C\uAE30\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
@@ -2300,6 +2317,9 @@
     "textStyle.missFontKeep": "{name}: \uAE00\uAF34 '{font}'\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD574 \uAC12 \xB7 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694",
     "textStyle.missError": "{name}: \uB05D\uAE4C\uC9C0 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694(\uC77C\uBD80 \uAC12\uB9CC \uB4E4\uC5B4\uAC14\uC744 \uC218 \uC788\uC5B4\uC694) \u2014 {error}",
     "textStyle.missVar": "{name}: \uBCC0\uC218 '{var}'\uC774 \uC5C6\uC5B4 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "textStyle.missDecimal": "{name}: \uAE00\uC790 \uD06C\uAE30\uAC00 \uC18C\uC218\uB77C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694({size}px)",
+    "textStyle.decimalRow": "\uAE00\uC790 \uD06C\uAE30\uAC00 \uC18C\uC218\uB77C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
+    "textStyle.noRegistrable": "\uB9CC\uB4E4 \uC218 \uC788\uB294 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \u2014 \uAE00\uC790 \uD06C\uAE30\uAC00 \uBAA8\uB450 \uC18C\uC218\uC608\uC694",
     "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
@@ -2530,7 +2550,7 @@
   var NO_VAR_REASONS = ["no-match"];
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
-  var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font"];
+  var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font", "library-main"];
   function skipRowCounts(reasons, skips, tsNodes, tsOnly = false, layers) {
     if (tsOnly) return { fix: [], keep: [] };
     const rowOf = (key, layer) => {
@@ -4979,6 +4999,19 @@
   });
   var DEFAULT_TS_FAMILY = "Inter";
   var tsSpecs = [];
+  var tsDecimal = [];
+  var tsRead = false;
+  function withDecimals(rows, dec) {
+    const out = [];
+    const ds = [...dec].sort((a, b) => b.fontSize - a.fontSize);
+    let i = 0;
+    for (const r of rows) {
+      while (i < ds.length && ds[i].fontSize > r.fontSize) out.push({ decimal: ds[i++] });
+      out.push(r);
+    }
+    while (i < ds.length) out.push({ decimal: ds[i++] });
+    return out;
+  }
   function tsSummary(s) {
     const lh = s.lineHeight > 0 ? s.lineHeightPercent ? `${s.lineHeightPercent}%` : `${s.lineHeight}px` : "AUTO";
     const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
@@ -5070,8 +5103,14 @@
     return card;
   }
   var tsScanNote = { namePart: "", warnings: [] };
+  function decimalCard(c) {
+    const card = resultCard({ title: t("textStyle.decimalRow"), summary: tsSummary(c), summaryMono: true });
+    card.classList.add("ts-decimal");
+    return card;
+  }
   function renderTextStyles() {
-    renderChunked($("tsList"), tsSpecs, textStyleCard);
+    renderChunked($("tsList"), withDecimals(tsSpecs, tsDecimal), (x) => "decimal" in x ? decimalCard(x.decimal) : textStyleCard(x));
+    updateEmptyLocks();
     if (!tsSpecs.length) {
       setTsStatus("", "");
       return;
@@ -5709,8 +5748,11 @@
   }
   $("btnApplyConfirm").addEventListener("click", () => {
     const eff = bindTsOnly() ? [] : effCandidates();
-    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}));
-    const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds }));
+    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}));
+    const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => {
+      var _a3;
+      return __spreadValues({ styleId: r.styleId, nodeIds: r.nodeIds }, ((_a3 = r.mainIds) == null ? void 0 : _a3.some(Boolean)) ? { mainIds: r.mainIds } : {});
+    });
     if (!items.length && !textStyles.length) return;
     startLink({ items, textStyles });
   });
@@ -5866,9 +5908,7 @@
   var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
   var PAID_FIELDS = [
     ...COMPONENT_FIELDS,
-    "btnPalette",
-    "btnPaletteRun",
-    // [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
+    // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
     "btnScanText",
     "btnTextStyles",
     // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
@@ -5883,10 +5923,10 @@
       setLock(el, isPaid ? null : "paid");
       setLockTitle(el, !isPaid);
     }
-    for (const id of ["paletteBtnLock", "componentLock", "darkLock", "semLock", "tsLock"]) {
+    for (const id of ["componentLock", "darkLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
-    for (const id of ["paletteLock", "colorVarsLock", "createLock"]) $(id).textContent = "";
+    for (const id of ["paletteLock", "colorVarsLock", "createLock", "paletteBtnLock"]) $(id).textContent = "";
     refreshDarkModes();
     setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
@@ -5917,6 +5957,7 @@
   }
   var colorsVisible = () => colorRevealed && tokens.some((tk) => tk.category === "color" && typeof tk.value === "string");
   function updateEmptyLocks() {
+    setEmptyLock($("btnTextStyles"), tsRead && !tsSpecs.length && tsDecimal.length ? t("textStyle.noRegistrable") : null);
     const extract = $("btnExtract");
     const colorVars = $("btnColorVars");
     setEmptyLock(colorVars, colorsVisible() ? null : t("color.needColors"));
@@ -6239,7 +6280,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6362,10 +6403,11 @@
           const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
+          bindMains = (_d = msg.mains) != null ? _d : [];
           bindCounts = msg.counts;
           bindVarPending = false;
           bindChecked.clear();
-          renderSkipReasons((_d = msg.reasons) != null ? _d : {});
+          renderSkipReasons((_e = msg.reasons) != null ? _e : {});
           if (silent) {
             const r = carryRowChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
@@ -6377,8 +6419,9 @@
           setStatus("applyStatus", "", "");
           bindFindSettle();
         } else {
-          const n = msg.bound + ((_e = msg.textStylesApplied) != null ? _e : 0);
-          const m = msg.skipped + ((_f = msg.textStylesSkipped) != null ? _f : 0);
+          const n = msg.bound + ((_f = msg.textStylesApplied) != null ? _f : 0);
+          const m = msg.skipped + ((_g = msg.textStylesSkipped) != null ? _g : 0);
+          rememberMainsBound((_h = msg.mainsBound) != null ? _h : []);
           clearBindPreview();
           setStatus("applyStatus", "", "");
           if (activeTab === "select" && selSub === "bind") showSelSub("home");
@@ -6457,11 +6500,17 @@
         break;
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
-        tsExistingNames = ((_g = msg.existing) != null ? _g : []).map((e) => e.name);
-        if (msg.styles.length) {
+        tsExistingNames = ((_i = msg.existing) != null ? _i : []).map((e) => e.name);
+        tsDecimal = (_j = msg.decimalRows) != null ? _j : [];
+        tsRead = true;
+        if (!msg.styles.length && tsDecimal.length) {
+          tsSpecs = [];
+          tsScanNote = { namePart: "", warnings: msg.warnings };
+          renderTextStyles();
+        } else if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
-            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_h = msg.fallback) != null ? _h : 0 }) : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_k = msg.fallback) != null ? _k : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -6476,7 +6525,7 @@
         break;
       }
       case "TEXT_STYLES_RESULT": {
-        const why = Object.entries((_i = msg.applyReasons) != null ? _i : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const why = Object.entries((_l = msg.applyReasons) != null ? _l : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setTsStatus(
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
@@ -6507,7 +6556,7 @@
         hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_j = msg.tierVars) != null ? _j : 0) + ((_k = msg.otherVars) != null ? _k : 0);
+        prereqLocalVars = ((_m = msg.tierVars) != null ? _m : 0) + ((_n = msg.otherVars) != null ? _n : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
         hasTextStyles = msg.hasTextStyles;
@@ -6522,7 +6571,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_l = msg.noteKind) != null ? _l : "ok");
+          setStatus("licenseStatus", msg.note, (_o = msg.noteKind) != null ? _o : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -6546,7 +6595,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_m = msg.autoNamed) != null ? _m : 0);
+        setCompAutoNamed((_p = msg.autoNamed) != null ? _p : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6561,12 +6610,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_n = msg.placeFailed) != null ? _n : [];
-        const cloned = (_o = msg.placeCloned) != null ? _o : [];
-        const propFailed = (_p = msg.propFailed) != null ? _p : [];
-        const fillKept = (_q = msg.fillKept) != null ? _q : [];
-        const reused = (_r = msg.reused) != null ? _r : [];
-        const reuseKept = (_s = msg.reuseKept) != null ? _s : [];
+        const misplaced = (_q = msg.placeFailed) != null ? _q : [];
+        const cloned = (_r = msg.placeCloned) != null ? _r : [];
+        const propFailed = (_s = msg.propFailed) != null ? _s : [];
+        const fillKept = (_t = msg.fillKept) != null ? _t : [];
+        const reused = (_u = msg.reused) != null ? _u : [];
+        const reuseKept = (_v = msg.reuseKept) != null ? _v : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + reusedText(reused) + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.fillKept", fillKept) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures));
@@ -6632,7 +6681,7 @@
         break;
       case "COMPONENTIZE_RESULT": {
         if (!msg.instances) {
-          const misplaced0 = (_t = msg.placeFailed) != null ? _t : [];
+          const misplaced0 = (_w = msg.placeFailed) != null ? _w : [];
           const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
           const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
           setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
@@ -6641,7 +6690,7 @@
         const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
         if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
         if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
+        const misplaced = (_x = msg.placeFailed) != null ? _x : [];
         const others = msg.warnings.length - misplaced.length;
         const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
         const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
@@ -7149,6 +7198,7 @@
   var mkPreviewTimer = null;
   var mkPreviewTagsOnly = false;
   var mkTs = [];
+  var mkTsDecimal = [];
   var mkTsExisting = [];
   var mkTsFor = null;
   var mkScanReq = 0;
@@ -7300,14 +7350,15 @@
     renderMakeScreen();
   }
   function onMakeScan(msg) {
-    var _a3;
+    var _a3, _b;
     if (mkEditSig) {
       mkTsPending = msg;
       return;
     }
     mkTsReading = false;
     mkTs = msg.styles;
-    mkTsExisting = (_a3 = msg.existing) != null ? _a3 : [];
+    mkTsDecimal = (_a3 = msg.decimalRows) != null ? _a3 : [];
+    mkTsExisting = (_b = msg.existing) != null ? _b : [];
     const sigs = new Set(mkTs.map(tsSig));
     for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
     mkTsFor = baseKey();
@@ -7333,7 +7384,7 @@
   function mkTabsVisible() {
     const out = [];
     if (mkTokens.length) out.push("global", "semantic");
-    if (isPaid && (mkTs.length || mkTsReading && mkTsFor !== baseKey())) out.push("ts");
+    if (isPaid && (mkTs.length || mkTsDecimal.length || mkTsReading && mkTsFor !== baseKey())) out.push("ts");
     return out;
   }
   function mkSemState() {
@@ -7412,7 +7463,24 @@
       }
     } else {
       if (!isPaid || mkTsFor !== baseKey()) return items;
-      for (const s of mkTs) {
+      for (const x of withDecimals(mkTs, mkTsDecimal)) {
+        if ("decimal" in x) {
+          const c = x.decimal;
+          const aa2 = document.createElement("span");
+          aa2.className = "ts-aa";
+          aa2.setAttribute("aria-hidden", "true");
+          aa2.textContent = "Aa";
+          const sum = tsSummary(c);
+          const sub2 = document.createElement("span");
+          sub2.className = "tr-sub";
+          sub2.textContent = sum;
+          const why = document.createElement("span");
+          why.className = "tr-sub ts-why";
+          why.textContent = t("textStyle.decimalRow");
+          items.push({ key: `td:${tsSig(c)}`, indent: 0, cls: "ts-decimal", cells: [aa2, sub2], right: [mkLayers(c.count), why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
+          continue;
+        }
+        const s = x;
         const sig = tsSig(s);
         const on = !mkTsOff.has(sig);
         const aa = document.createElement("span");
@@ -7548,7 +7616,7 @@
         emptyText = t("list.big");
         emptyAction = [t("list.read"), () => readMake(true)];
       } else if (!mkRunning && (mkFor !== baseKey() || mkReading)) skeleton = true;
-      else if (!mkTokens.length && !mkTs.length) emptyText = t("make.zero");
+      else if (!mkTokens.length && !mkTs.length && !(isPaid && mkTsDecimal.length)) emptyText = t("make.zero");
     }
     empty.hidden = !emptyText;
     if (emptyText) {
@@ -7602,6 +7670,7 @@
     } else if (tab === "ts") {
       topText = t("make.tsTop");
       info = t("make.tsNote");
+      if (!mkTs.length) links = false;
     }
     $("makeTopText").textContent = topText;
     $("makeSemLic").hidden = !semLic;
@@ -7742,7 +7811,7 @@
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -7752,6 +7821,8 @@
       showSelSub("home");
       return;
     }
+    const mkBase = baseline ? baseKey() : null;
+    const mkMainsDone = [];
     const link = $("makeOptLink").checked;
     const steps = planMake({ isPaid, globalsOn: mkGlobalsOn().length, stylesOn: mkTsOnList().length, link, rename: $("makeOptRename").checked, dark: isPaid && $("makeOptDark").checked });
     if (!steps.length || !baseline) return;
@@ -7806,6 +7877,7 @@
           const rid = mkNextReq();
           const r = await wizardRequest(__spreadValues({ type: "CREATE_TEXT_STYLES", styles, reqId: rid }, link ? { applyTo: ids } : {}), ["TEXT_STYLES_RESULT"], rid);
           totals.styles = __spreadValues({ s: r.created + r.updated, a: (_c = r.applied) != null ? _c : 0 }, r.missing.length ? { missing: r.missing } : {});
+          mkMainsDone.push(...(_d = r.mainsApplied) != null ? _d : []);
           results.push(__spreadValues({ id, mark: "ok", text: t("wizard.seq.textStyles", { created: r.created, updated: r.updated }) + (r.applied ? t("wizard.seq.textStylesLinked", { a: r.applied }) : "") + (r.missing.length ? t("wizard.seq.textStylesMissing", { k: r.missing.length }) : "") }, r.missing.length ? { tip: r.missing.join("\n") } : {}));
         } else if (id === "bind") {
           wizBindReq = ++bindReqSeq;
@@ -7814,10 +7886,11 @@
             wizBindPending = false;
           });
           totals.bound = r.bound;
-          const reasons = (_d = r.reasons) != null ? _d : {};
+          mkMainsDone.push(...(_e = r.mainsBound) != null ? _e : []);
+          const reasons = (_f = r.reasons) != null ? _f : {};
           if (r.bound) results.push({ id, mark: "ok", text: t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") });
           else {
-            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_e = reasons["already-bound"]) != null ? _e : 0) > 0 && !((_f = reasons["no-match"]) != null ? _f : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_g = reasons["already-bound"]) != null ? _g : 0) > 0 && !((_h = reasons["no-match"]) != null ? _h : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
             results.push({ id, mark: "warn", text: t(zero) });
             stay = true;
           }
@@ -7837,7 +7910,8 @@
         break;
       }
     }
-    const finishedSteps = (_g = mkProg == null ? void 0 : mkProg.done) != null ? _g : [];
+    const finishedSteps = (_i = mkProg == null ? void 0 : mkProg.done) != null ? _i : [];
+    rememberMainsBound(mkMainsDone, mkBase);
     mkRunning = false;
     mkProg = null;
     wizardRunning = false;
@@ -7863,7 +7937,7 @@
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    const doneTip = (_i = (_h = totals.styles) == null ? void 0 : _h.missing) == null ? void 0 : _i.join("\n");
+    const doneTip = (_k = (_j = totals.styles) == null ? void 0 : _j.missing) == null ? void 0 : _k.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");
@@ -7935,6 +8009,26 @@
   var bindCounts;
   var layerLibUse = null;
   var layerLibReq = 0;
+  var bindMains = [];
+  var lastMainsBound = null;
+  function mainUnitIds(cands, rows) {
+    var _a3;
+    const out = /* @__PURE__ */ new Set();
+    for (const c of cands) if (c.mainId) out.add(c.mainId);
+    for (const r of rows) for (const m of (_a3 = r.mainIds) != null ? _a3 : []) if (m) out.add(m);
+    return [...out];
+  }
+  function mainsTip(ids) {
+    const byId = new Map(bindMains.map((m) => [m.id, m]));
+    const lines = ids.map((id) => byId.get(id)).filter((m) => !!m).map((m) => m.page ? `${m.name} \u2014 ${m.page}` : m.name);
+    return lines.slice(0, 10).join("\n") + (lines.length > 10 ? "\n" + t("v4.mainsMore", { n: lines.length - 10 }) : "");
+  }
+  function mainsLineEl(ids) {
+    const sp = document.createElement("span");
+    sp.textContent = t("v4.mainsLine", { c: ids.length });
+    sp.title = mainsTip(ids);
+    return sp;
+  }
   var bindTsRows = [];
   var bindTsSkips = {};
   var bindTsOff = /* @__PURE__ */ new Set();
@@ -8281,6 +8375,15 @@
     const n = bindOnCount();
     $("btnApplyConfirmLabel").textContent = bindPreviewed && hasBindPreview() ? t("bind.linkN", { n }) : t("bind.link");
     $("bindFoot").hidden = !!bindLinking || bindZero();
+    {
+      const eff = bindTsOnly() ? [] : effCandidates();
+      const ids = mainUnitIds(eff.filter((c) => bindChecked.has(candKey(c))), bindTsRows.filter((r) => !bindTsOff.has(r.styleId)));
+      const box = $("bindMains");
+      const show = !bindLinking && !bindFinding && bindPreviewed && hasBindPreview() && !bindZero() && ids.length > 0;
+      box.hidden = !show;
+      if (show) box.replaceChildren(mainsLineEl(ids));
+      else box.replaceChildren();
+    }
     if (!curSel.count && !baseline) setLock(confirm, "prereq", t("status.noSelection"));
     else if (!bindPreviewed) setLock(confirm, "prereq", t("v4.reading"));
     else if (!hasBindPreview()) setLock(confirm, "prereq", t("bind.nothing"));
@@ -8298,6 +8401,7 @@
     bindSkipsOpen = false;
     bindTsRows = [];
     bindTsSkips = {};
+    bindMains = [];
     bindVarPending = false;
     bindTsPending = false;
     clearMount($("bindSkips"));
@@ -8434,23 +8538,19 @@
       const ids = [...new Set(items.map((x) => x.nodeId))];
       const r = document.createElement("div");
       r.className = "skip-row";
+      const line = document.createElement("div");
+      line.className = "skip-line";
       const nm = document.createElement("span");
       nm.className = "skip-name";
       nm.textContent = label;
       const n = document.createElement("span");
       n.className = "skip-n";
       n.textContent = count;
-      r.append(nm, n);
-      if (help) {
-        const h = document.createElement("span");
-        h.className = "skip-help";
-        h.textContent = help;
-        r.appendChild(h);
-      }
       const grow = document.createElement("span");
       grow.className = "grow";
-      r.appendChild(grow);
-      if (ids.length && key) {
+      line.append(nm, n, grow);
+      r.appendChild(line);
+      if (ids.length && key && FIX_SKIP_REASONS.includes(key)) {
         const btn = document.createElement("button");
         btn.type = "button";
         btn.className = "link link-btn skip-sel";
@@ -8465,7 +8565,13 @@
           selectNodes(ids, "applyStatus");
           setStatus("applyStatus", t("bind.skipSelected", { reason: t("reason." + key), n: ids.length }), "");
         });
-        r.appendChild(btn);
+        line.appendChild(btn);
+      }
+      if (help) {
+        const h = document.createElement("div");
+        h.className = "skip-help";
+        h.textContent = help;
+        r.appendChild(h);
       }
       return r;
     };
@@ -12434,12 +12540,17 @@ ${opts.tip}` : text;
     b.dataset.k = "tsLink";
     actions.push(b);
   }
+  function rememberMainsBound(ids, base = baseline ? baseKey() : null) {
+    const uniq = [...new Set(ids)];
+    lastMainsBound = uniq.length && base ? { base, ids: uniq } : null;
+  }
   function renderFindCard(put, counts) {
     if (prereqKnown && !hasBindable) {
-      const subs = [t("bind.noTier")];
+      lastMainsBound = null;
+      const subs2 = [t("bind.noTier")];
       const actions2 = [];
-      tsOnlyExtra(subs, actions2);
-      put(selCard({ title: t("v4.find0"), subs, actions: actions2 }));
+      tsOnlyExtra(subs2, actions2);
+      put(selCard({ title: t("v4.find0"), subs: subs2, actions: actions2 }));
       if (selFindFor === baseKey() && !selFindInFlight) selMakeHot = true;
       return;
     }
@@ -12448,8 +12559,24 @@ ${opts.tip}` : text;
       return;
     }
     const { m, k, s, n } = counts;
+    const boundMains = () => {
+      if (lastMainsBound && lastMainsBound.base !== baseKey()) lastMainsBound = null;
+      if (!lastMainsBound) return [];
+      const sp = document.createElement("span");
+      sp.textContent = t("v4.allBoundMains", { c: lastMainsBound.ids.length });
+      return [sp];
+    };
+    const mainsSub = (card2) => {
+      for (const el of Array.from(card2.querySelectorAll(".s"))) if (el.querySelector("[data-mains]")) el.classList.add("mains");
+      return card2;
+    };
+    const markMains = (els) => {
+      for (const e of els) e.dataset.mains = "1";
+      return els;
+    };
     if (n === 0 && s === 0) {
-      put(selCard({ title: t("v4.allBound"), cls: "ok" }));
+      const mb = markMains(boundMains());
+      put(mainsSub(selCard({ title: t("v4.allBound"), cls: "ok", subs: mb })));
       return;
     }
     if (n === 0) {
@@ -12459,9 +12586,11 @@ ${opts.tip}` : text;
         renderBindTree();
       });
       v.dataset.k = "skips";
-      put(selCard({ title: t("v4.allLinked"), subs: [t("v4.fixPlaces", { s })], actions: [v] }));
+      const mb = markMains(boundMains());
+      put(mainsSub(selCard({ title: t("v4.allLinked"), subs: [...mb, t("v4.fixPlaces", { s })], actions: [v] })));
       return;
     }
+    lastMainsBound = null;
     const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
     if (k > 0) parts.push(t("v4.noVarPlaces", { k }));
     const sub = document.createElement("span");
@@ -12474,7 +12603,10 @@ ${opts.tip}` : text;
       go.dataset.k = "link";
       actions.push(go);
     } else if (k > 0) selMakeHot = true;
-    const card = selCard({ title: t("v4.findN", { n }), subs: [sub], actions });
+    const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
+    const subs = [sub];
+    if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
+    const card = mainsSub(selCard({ title: t("v4.findN", { n }), subs, actions }));
     card.querySelector(".t").title = t("v4.findTip");
     put(card);
   }

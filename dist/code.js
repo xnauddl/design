@@ -137,6 +137,7 @@
     "reason.size-fraction": "\uC18C\uC218 \uD06C\uAE30(\uC815\uD655 \uC77C\uCE58\uB9CC)",
     "reason.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4",
     "reason.instance-children": "\uC778\uC2A4\uD134\uC2A4 \uB0B4\uBD80",
+    "reason.library-main": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uCEF4\uD3EC\uB10C\uD2B8",
     "reason.font": "\uD3F0\uD2B8 \uBBF8\uB85C\uB4DC",
     "reason.space-between": "\uC0AC\uC774 \uAC04\uACA9 \uC790\uB3D9",
     "reason.fraction": "\uC18C\uC218 \uAC12(\uC815\uC218\uB9CC)",
@@ -371,7 +372,10 @@
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
-    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678",
+    "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678 \u2014 \uC778\uC2A4\uD134\uC2A4\uC758 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD3EC\uD568",
+    "v4.mainsLine": "\uC120\uD0DD \uBC16 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD574\uC694",
+    "v4.mainsMore": "\uC678 {n}\uAC1C",
+    "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
@@ -390,6 +394,7 @@
     "reasonHelp.hug-fill": "\uC790\uB3D9 \uD06C\uAE30\uB77C \uBCC0\uC218\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
     "reasonHelp.empty-text": "\uBE48 \uAE00\uC790\uC608\uC694",
     "reasonHelp.instance-children": "\uCEF4\uD3EC\uB10C\uD2B8 \uC6D0\uBCF8\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
+    "reasonHelp.library-main": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uCEF4\uD3EC\uB10C\uD2B8\uB77C \uC774 \uD30C\uC77C\uC5D0\uC11C \uC5F0\uACB0\uD560 \uC218 \uC5C6\uC5B4\uC694",
     "reasonHelp.hidden": "\uC228\uAE34 \uB808\uC774\uC5B4\uC608\uC694",
     "reasonHelp.no-autolayout": "\uC5EC\uBC31 \xB7 \uAC04\uACA9\uC774 \uC5C6\uB294 \uB808\uC774\uC5B4\uC608\uC694",
     "reasonHelp.size-free-layout": "\uC790\uC720 \uBC30\uCE58\uB77C \uD06C\uAE30\uB97C \uBD99\uC774\uC9C0 \uC54A\uC544\uC694",
@@ -939,6 +944,9 @@
     "textStyle.missFontKeep": "{name}: \uAE00\uAF34 '{font}'\uC744 \uBD88\uB7EC\uC624\uC9C0 \uBABB\uD574 \uAC12 \xB7 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uAC74\uB108\uB6F0\uC5C8\uC5B4\uC694",
     "textStyle.missError": "{name}: \uB05D\uAE4C\uC9C0 \uB9CC\uB4E4\uC9C0 \uBABB\uD588\uC5B4\uC694(\uC77C\uBD80 \uAC12\uB9CC \uB4E4\uC5B4\uAC14\uC744 \uC218 \uC788\uC5B4\uC694) \u2014 {error}",
     "textStyle.missVar": "{name}: \uBCC0\uC218 '{var}'\uC774 \uC5C6\uC5B4 \uC5F0\uACB0\uD558\uC9C0 \uC54A\uC558\uC5B4\uC694",
+    "textStyle.missDecimal": "{name}: \uAE00\uC790 \uD06C\uAE30\uAC00 \uC18C\uC218\uB77C \uB9CC\uB4E4\uC9C0 \uC54A\uC558\uC5B4\uC694({size}px)",
+    "textStyle.decimalRow": "\uAE00\uC790 \uD06C\uAE30\uAC00 \uC18C\uC218\uB77C \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
+    "textStyle.noRegistrable": "\uB9CC\uB4E4 \uC218 \uC788\uB294 \uC2A4\uD0C0\uC77C\uC774 \uC5C6\uC5B4\uC694 \u2014 \uAE00\uC790 \uD06C\uAE30\uAC00 \uBAA8\uB450 \uC18C\uC218\uC608\uC694",
     "textStyle.noteKeepLh": "{name}: \uD589\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteKeepLs": "{name}: \uC790\uAC04 \uBCC0\uC218 \uC5F0\uACB0\uC744 \uC9C0\uCF30\uC5B4\uC694 \u2014 {n}% \uAD50\uC815 \uBCF4\uB958",
     "textStyle.noteLhPct": "{role}: \uD589\uAC04 {n}% \uC720\uC9C0 \u2014 \uBCC0\uC218 \uC5F0\uACB0 \uC548 \uD568",
@@ -2119,6 +2127,7 @@
     }
   }
   function walk(acc, node) {
+    var _a;
     if (node.visible === false) {
       acc.skipped.add(SKIP_HIDDEN);
       return;
@@ -2135,7 +2144,7 @@
     collectOpacity(acc, node);
     collectEffects(acc, node);
     if (node.type === "INSTANCE") {
-      if ("children" in node && node.children.length) acc.skipped.add(SKIP_INSTANCE);
+      if ("children" in node && node.children.length && !((_a = acc.covered) == null ? void 0 : _a.has(node.id))) acc.skipped.add(SKIP_INSTANCE);
       return;
     }
     if ("children" in node) for (const child of node.children) walk(acc, child);
@@ -2148,8 +2157,8 @@
     }
     return true;
   }
-  function extractFromSelection(selection2, ownerOf = () => void 0) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), owner: ownerOf };
+  function extractFromSelection(selection2, ownerOf = () => void 0, coveredInstances) {
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), owner: ownerOf, covered: coveredInstances };
     for (const node of selection2) {
       if (!isEffectivelyVisible(node)) {
         acc.skipped.add(SKIP_HIDDEN);
@@ -2905,7 +2914,11 @@
     for (const [k, c] of map) c.styleIds = [...ids.get(k)];
     return [...map.values()];
   }
-  function nameTextStyles(clusters, existing) {
+  function isIntegerSize(v) {
+    const r = Math.round(v * 100) / 100;
+    return Math.abs(r - Math.round(r)) < 1e-6;
+  }
+  function anchorOfFor(existing) {
     const nameById = /* @__PURE__ */ new Map();
     const sigById = /* @__PURE__ */ new Map();
     const idBySig = /* @__PURE__ */ new Map();
@@ -2915,8 +2928,7 @@
       sigById.set(e.id, k);
       idBySig.set(k, idBySig.has(k) ? null : e.id);
     }
-    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
-    const boundIdOf = (c) => {
+    return (c) => {
       if (!existing) return void 0;
       if (c.styleIds.length === 1) {
         const id = c.styleIds[0];
@@ -2925,6 +2937,20 @@
       const sigId = idBySig.get(sigKey(c));
       return sigId && nameById.has(sigId) ? sigId : void 0;
     };
+  }
+  function splitDecimalClusters(clusters, existing) {
+    const anchorOf = anchorOfFor(existing);
+    const rest = [];
+    const decimalRows = [];
+    for (const c of clusters) (isIntegerSize(c.fontSize) || anchorOf(c) ? rest : decimalRows).push(c);
+    decimalRows.sort((a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight);
+    return { rest, decimalRows };
+  }
+  function nameTextStyles(clusters, existing) {
+    const nameById = /* @__PURE__ */ new Map();
+    for (const e of existing != null ? existing : []) nameById.set(e.id, e.name);
+    const existingById = new Map((existing != null ? existing : []).map((e) => [e.id, e]));
+    const boundIdOf = anchorOfFor(existing);
     const ordered = [...clusters].sort(
       (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight
     );
@@ -3039,7 +3065,8 @@
       }
     }
     const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
-    const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
+    const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(forCluster), existing);
+    const styles = nameTextStyles(rest, existing);
     const used = /* @__PURE__ */ new Set();
     const unique = (n) => {
       const base = n || "text";
@@ -3073,7 +3100,7 @@
       style.name = unique(style.name);
       fallback++;
     }
-    return { styles, labeled, fallback };
+    return { styles, decimalRows, labeled, fallback };
   }
 
   // src/lib/scopes.ts
@@ -3279,20 +3306,104 @@
     }
     return true;
   }
-  function countNodes(sel) {
-    let n = 0;
-    const stack = sel.slice();
-    while (stack.length) {
-      const x = stack.pop();
-      if (x.visible === false) continue;
-      n++;
-      if (x.type === "INSTANCE") continue;
-      if ("children" in x) for (const c of x.children) stack.push(c);
+  var pageOf = (n) => {
+    let p = n;
+    while (p && p.type !== "PAGE") p = p.parent;
+    return p != null ? p : null;
+  };
+  async function collectLocalMains(roots) {
+    var _a;
+    const out = { units: [], mainOf: /* @__PURE__ */ new Map(), remote: /* @__PURE__ */ new Set(), hiddenMains: [] };
+    const rootIds = new Set(roots.map((r) => r.id));
+    const inRoots = (n) => {
+      let p = n;
+      while (p) {
+        if (rootIds.has(p.id)) return true;
+        p = p.parent;
+      }
+      return false;
+    };
+    const seenUnits = /* @__PURE__ */ new Set();
+    const seenNodes = /* @__PURE__ */ new Set();
+    const queue = roots.filter((r) => isEffectivelyVisible2(r));
+    while (queue.length) {
+      const n = queue.shift();
+      if (seenNodes.has(n.id)) continue;
+      seenNodes.add(n.id);
+      if (n.visible === false) continue;
+      if (n.type === "INSTANCE") {
+        let main = null;
+        try {
+          main = await n.getMainComponentAsync();
+        } catch (e) {
+          main = null;
+        }
+        if (!main) continue;
+        if (main.remote) {
+          out.remote.add(n.id);
+          continue;
+        }
+        const parent = main.parent;
+        const unit = parent && parent.type === "COMPONENT_SET" ? parent : main;
+        const unitVisible = isEffectivelyVisible2(unit);
+        if (unitVisible && isEffectivelyVisible2(main)) out.mainOf.set(n.id, main);
+        if (seenUnits.has(unit.id)) continue;
+        seenUnits.add(unit.id);
+        if (inRoots(unit)) continue;
+        if (!unitVisible) {
+          out.hiddenMains.push(unit);
+          continue;
+        }
+        const page = pageOf(unit);
+        if (page && page !== figma.currentPage) {
+          try {
+            await page.loadAsync();
+          } catch (e) {
+          }
+        }
+        const unitRoots = unit.type === "COMPONENT_SET" ? unit.children.filter((c) => c.type === "COMPONENT") : [unit];
+        out.units.push({ id: unit.id, name: unit.name, page: (_a = page == null ? void 0 : page.name) != null ? _a : "", roots: [...unitRoots] });
+        for (const r of unitRoots) queue.push(r);
+        continue;
+      }
+      if ("children" in n) for (const c of n.children) queue.push(c);
     }
+    return out;
+  }
+  function countNodes(sel, units = []) {
+    let n = 0;
+    const visited = /* @__PURE__ */ new Set();
+    const count = (roots) => {
+      const stack = roots.slice().reverse();
+      while (stack.length) {
+        const x = stack.pop();
+        if (visited.has(x.id)) continue;
+        visited.add(x.id);
+        if (x.visible === false) continue;
+        n++;
+        if (x.type === "INSTANCE") continue;
+        if ("children" in x) for (const c of x.children) stack.push(c);
+      }
+    };
+    count(sel);
+    for (const u of units) count(u.roots);
     return n;
   }
+  function sameAsMain(inst, main, field, index) {
+    const a = inst[field];
+    const b = main[field];
+    if (a === void 0 && b === void 0) return false;
+    const pick = (v) => index != null && Array.isArray(v) ? v[index] : v;
+    try {
+      return JSON.stringify(pick(a)) === JSON.stringify(pick(b));
+    } catch (e) {
+      return false;
+    }
+  }
+  var placeFilter = null;
   function note(res, key, node, preview, field) {
     var _a, _b, _c, _d, _e;
+    if (node && field && (placeFilter == null ? void 0 : placeFilter(node, field))) return;
     res.reasons[key] = ((_a = res.reasons[key]) != null ? _a : 0) + 1;
     const kind = fieldKind(field);
     const byKind = (_d = (_c = (_b = res.counts) != null ? _b : res.counts = {})[key]) != null ? _d : _c[key] = {};
@@ -3320,9 +3431,11 @@
   async function bindSelection(selection2, apply = true, hooks = {}, opts = {}) {
     var _a, _b, _c, _d;
     const index = await buildIndex();
-    liveVarIds = await collectLiveVarIds(selection2, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
+    const mains = await collectLocalMains(selection2);
+    const mainRoots = mains.units.flatMap((u) => u.roots);
+    liveVarIds = await collectLiveVarIds([...selection2, ...mainRoots], new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
     const res = { bound: 0, skipped: 0, reasons: {} };
-    const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2) : 0, every: 50 };
+    const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2, mains.units) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
     const ownerCache = /* @__PURE__ */ new Map();
     const ownerOf = (_a = opts.ownerOf) != null ? _a : dsRoleOwner;
@@ -3336,7 +3449,10 @@
         return ownerCache.get(n);
       },
       skipText: opts.skipTextStyleNode,
-      noNewRoles: !!opts.noNewRoles
+      noNewRoles: !!opts.noNewRoles,
+      mainOf: mains.mainOf,
+      remote: mains.remote,
+      visited: /* @__PURE__ */ new Set()
     };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
@@ -3346,12 +3462,23 @@
       await walk2(node, ctx, hooks, prog, 0, null);
       if (res.cancelled) break;
     }
+    for (const u of mains.hiddenMains) note(res, "hidden", u, preview);
+    for (const u of mains.units) {
+      if (res.cancelled) break;
+      ctx.mainId = u.id;
+      for (const r of u.roots) {
+        await walk2(r, ctx, hooks, prog, 0, null);
+        if (res.cancelled) break;
+      }
+    }
+    ctx.mainId = void 0;
+    if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
     resolveSlots(ctx);
     if (apply && preview.candidates.length) {
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole })),
+        preview.candidates.map((c) => __spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {})),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
@@ -3360,6 +3487,7 @@
       res.skipped += r.skipped;
       for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
       res.newRoles = r.newRoles;
+      if (r.mainsBound.length) res.mainsBound = r.mainsBound;
       for (const c of preview.candidates) {
         const id = c.newRole ? r.createdIds[c.newRole.name] : void 0;
         if (id) c.variableId = id;
@@ -3578,7 +3706,7 @@
     }
   }
   function candOf(s, variableId, variableName, tier, variableValue, variableAlpha) {
-    return __spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+    return __spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
@@ -3588,7 +3716,7 @@
       variableName,
       tier,
       variableValue
-    }), variableAlpha != null ? { variableAlpha } : {});
+    }), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {});
   }
   function entryAlpha(e) {
     return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;
@@ -3604,32 +3732,51 @@
     return scope ? [scope] : ["ALL_SCOPES"];
   };
   async function walk2(node, ctx, hooks, prog, depth, parentId) {
-    var _a;
+    var _a, _b, _c;
     const { res, preview } = ctx;
     if (res.cancelled) return;
+    if (ctx.visited) {
+      if (ctx.visited.has(node.id)) return;
+      ctx.visited.add(node.id);
+    }
     if (node.visible === false) {
       note(res, "hidden", node, preview);
       return;
     }
     preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
-    bindPaints(node, ctx);
-    bindFrame(node, ctx);
-    bindRadius(node, ctx);
-    bindStroke(node, ctx);
-    bindOpacity(node, ctx);
-    bindEffects(node, ctx);
-    await bindText(node, ctx);
+    const slotsBefore = ctx.slots.length;
+    const main = node.type === "INSTANCE" ? (_a = ctx.mainOf) == null ? void 0 : _a.get(node.id) : void 0;
+    const prevFilter = placeFilter;
+    if (main) placeFilter = (n, field) => n === node && !!field && sameAsMain(node, main, field);
+    try {
+      bindPaints(node, ctx);
+      bindFrame(node, ctx);
+      bindRadius(node, ctx);
+      bindStroke(node, ctx);
+      bindOpacity(node, ctx);
+      bindEffects(node, ctx);
+      await bindText(node, ctx);
+    } finally {
+      placeFilter = prevFilter;
+    }
+    if (main) {
+      const kept = ctx.slots.slice(slotsBefore).filter((sl) => !sameAsMain(node, main, sl.field, sl.index));
+      ctx.slots.length = slotsBefore;
+      ctx.slots.push(...kept);
+    }
+    if (ctx.mainId) for (let i = slotsBefore; i < ctx.slots.length; i++) ctx.slots[i].mainId = ctx.mainId;
     prog.done++;
     if (hooks.onProgress && prog.done % prog.every === 0) {
       hooks.onProgress(prog.done, prog.total);
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
-      if ((_a = hooks.shouldCancel) == null ? void 0 : _a.call(hooks)) {
+      if ((_b = hooks.shouldCancel) == null ? void 0 : _b.call(hooks)) {
         res.cancelled = true;
         return;
       }
     }
     if (node.type === "INSTANCE") {
-      if (node.children.length) {
+      if ((_c = ctx.remote) == null ? void 0 : _c.has(node.id)) note(res, "library-main", node, preview);
+      else if (node.children.length) {
         note(res, "instance-children", node, preview);
       }
       return;
@@ -3868,6 +4015,7 @@
         res.reasons[key] = ((_a2 = res.reasons[key]) != null ? _a2 : 0) + 1;
       }
     };
+    const mainsBound = /* @__PURE__ */ new Set();
     const created = /* @__PURE__ */ new Map();
     const createdIds = {};
     const ensureRole = async (spec, global) => {
@@ -3964,7 +4112,8 @@
             if (w) {
               w.arr = arr;
               w.fields++;
-            } else m.set(key, { arr, fields: 1 });
+              if (it.mainId) w.mains.push(it.mainId);
+            } else m.set(key, { arr, fields: 1, mains: it.mainId ? [it.mainId] : [] });
             continue;
           }
           if (TEXT_RANGE_FIELDS.includes(it.field)) {
@@ -3989,6 +4138,7 @@
             await figma.loadFontAsync(node.fontName);
             node.setRangeBoundVariable(0, node.characters.length, field, await target());
             res.bound++;
+            if (it.mainId) mainsBound.add(it.mainId);
             (_e = hooks.onBound) == null ? void 0 : _e.call(hooks, res.bound);
             continue;
           }
@@ -4024,6 +4174,7 @@
           }
           node.setBoundVariable(it.field, await target());
           res.bound++;
+          if (it.mainId) mainsBound.add(it.mainId);
           (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
         } catch (e) {
           fail("error", node, it.field);
@@ -4034,6 +4185,7 @@
           try {
             node[key] = w.arr;
             res.bound += w.fields;
+            for (const id of w.mains) mainsBound.add(id);
             (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
           } catch (e) {
             for (let k = 0; k < w.fields; k++) fail("error", node, key);
@@ -4046,7 +4198,7 @@
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds };
+    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds, mainsBound: [...mainsBound] };
   }
   async function createRole(spec, global) {
     var _a;
@@ -4803,11 +4955,12 @@
       v.setValueForMode(modeId, num);
     }
   }
-  async function prunePaletteColors(keep) {
+  async function prunePaletteColors(keep, opts = {}) {
+    var _a;
     const keepSet = new Set(keep);
     const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f) => f !== null));
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const palIds = ownedIds(cols);
+    const palIds = opts.globalOnly ? new Set([(_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id].filter((x) => !!x)) : ownedIds(cols);
     let removed = 0;
     for (const v of await figma.variables.getLocalVariablesAsync()) {
       if (!palIds.has(v.variableCollectionId)) continue;
@@ -5102,14 +5255,23 @@
     });
     return (family) => list.find((v) => directValue(v, modeOf) === family);
   }
-  async function createSemanticTextStyles(specs) {
+  async function createSemanticTextStyles(allSpecs) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
-    if (!specs.length) return res;
+    if (!allSpecs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
     const styleById = new Map(existing.map((s) => [s.id, s]));
     const styleByName = new Map(existing.map((s) => [s.name, s]));
     const anchoredStyle = (spec) => spec.boundStyleId ? styleById.get(spec.boundStyleId) : void 0;
+    const specs = [];
+    for (const spec of allSpecs) {
+      if (!anchoredStyle(spec) && !isIntegerSize(spec.fontSize)) {
+        res.missing.push(t("textStyle.missDecimal", { name: spec.name, size: roundN(spec.fontSize) }));
+        continue;
+      }
+      specs.push(spec);
+    }
+    const decimalAnchor = (st) => !!st && !isIntegerSize(roundN(st.fontSize));
     const renameBlocked = /* @__PURE__ */ new Set();
     const roleRenames = [];
     const roleSpecs = [];
@@ -5197,6 +5359,7 @@
         const st = anchoredStyle(s);
         if (!st) continue;
         if (semNames.has(`font-size/${s.name}`)) continue;
+        if (decimalAnchor(st)) continue;
         const fontSize = roundN(st.fontSize);
         pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
       }
@@ -5277,7 +5440,7 @@
         if (fsVar) {
           style.setBoundVariable("fontSize", fsVar);
           res.bound++;
-        } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
+        } else if (!(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
         if (spec.lineHeight > 0 || isRename) {
           const pctNow = lhPctOf(style.lineHeight);
           if (pctNow > 0) {
@@ -5288,7 +5451,7 @@
             if (lhVar) {
               style.setBoundVariable("lineHeight", lhVar);
               res.bound++;
-            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
+            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
           }
         }
         if (spec.letterSpacing !== 0 || isRename) {
@@ -5301,7 +5464,7 @@
             if (lsVar) {
               style.setBoundVariable("letterSpacing", lsVar);
               res.bound++;
-            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
+            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
           }
         }
         const famVar = familyVarFor(style.fontName.family);
@@ -5632,6 +5795,7 @@
     return { rows: [...rows.values()], skipReasons };
   }
   async function applyTextStyleRows(rows) {
+    var _a;
     const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
     const res = { applied: 0, skipped: 0, skipReasons };
     const styleByKey = await textStyleIndex();
@@ -5653,6 +5817,7 @@
         try {
           await attachTextStyle(t2, r.id, loaded);
           res.applied++;
+          ((_a = res.appliedIds) != null ? _a : res.appliedIds = []).push(id);
         } catch (e) {
         }
       }
@@ -5664,7 +5829,7 @@
     return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
   }
   async function applyRegisteredTextStyles(roots, styleIds) {
-    var _a, _b;
+    var _a, _b, _c;
     const applyReasons = { hasStyle: 0, instance: 0, ambiguous: 0 };
     const out = { applied: 0, applySkipped: 0, applyReasons };
     if (!styleIds.length) return out;
@@ -5701,6 +5866,7 @@
     if (rows.size) {
       const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
       out.applied = r.applied;
+      if ((_c = r.appliedIds) == null ? void 0 : _c.length) out.appliedIds = r.appliedIds;
     }
     return out;
   }
@@ -9439,18 +9605,224 @@
     const r = n.rotation;
     return typeof r === "number" ? r : 0;
   };
+  var visiblePaints = (v) => Array.isArray(v) ? v.filter((p) => p.visible !== false) : [];
+  var zeroRadius = (n) => {
+    const r = n.cornerRadius;
+    return r === void 0 || r === 0;
+  };
+  var noOwnPaint = (n) => visiblePaints(n.strokes).length === 0 && visiblePaints(n.effects).length === 0;
+  function photoLeafOf(n) {
+    if (rotationOf(n) !== 0 || !zeroRadius(n) || !noOwnPaint(n)) return null;
+    if (n.type === "RECTANGLE") {
+      const f = visiblePaints(n.fills);
+      return f.length === 1 && f[0].type === "IMAGE" ? n : null;
+    }
+    if (n.type !== "FRAME" && n.type !== "GROUP" && n.type !== "INSTANCE") return null;
+    if (n.type !== "GROUP" && visiblePaints(n.fills).length) return null;
+    const kids = n.children.filter((c2) => c2.visible !== false);
+    if (kids.length !== 1) return null;
+    const c = kids[0];
+    const off = relPos(c, n);
+    if (!sameSize(off.x, 0) || !sameSize(off.y, 0) || !sameSize(c.width, n.width) || !sameSize(c.height, n.height)) return null;
+    return photoLeafOf(c);
+  }
+  function visibleBox(n, root) {
+    const p = relPos(n, root);
+    let b = { x0: p.x, y0: p.y, x1: p.x + n.width, y1: p.y + n.height };
+    let cur = n.parent;
+    while (cur) {
+      const a = cur;
+      if (a.clipsContent === true) {
+        const q = relPos(a, root);
+        b = { x0: Math.max(b.x0, q.x), y0: Math.max(b.y0, q.y), x1: Math.min(b.x1, q.x + a.width), y1: Math.min(b.y1, q.y + a.height) };
+      }
+      if (a === root) break;
+      cur = cur.parent;
+    }
+    return b.x1 - b.x0 > 1e-6 && b.y1 - b.y0 > 1e-6 ? b : null;
+  }
+  var imagePaintOf = (n) => {
+    const f = visiblePaints(n.fills);
+    return f.length === 1 && f[0].type === "IMAGE" ? f[0] : null;
+  };
+  function imageMatrix(paint, w, h, img) {
+    const rot = paint.rotation;
+    if (typeof rot === "number" && rot !== 0) return null;
+    if (paint.scaleMode === "CROP") {
+      const m = paint.imageTransform;
+      return m ? [[m[0][0], m[0][1], m[0][2]], [m[1][0], m[1][1], m[1][2]]] : [[1, 0, 0], [0, 1, 0]];
+    }
+    if (paint.scaleMode !== "FILL" || !img || !(img.width > 0) || !(img.height > 0) || !(w > 0) || !(h > 0)) return null;
+    const s = Math.max(w / img.width, h / img.height);
+    const sw = img.width * s;
+    const sh = img.height * s;
+    return [[w / sw, 0, (sw - w) / (2 * sw)], [0, h / sh, (sh - h) / (2 * sh)]];
+  }
+  function shiftMatrix(m, dx, dy) {
+    return [
+      [m[0][0], m[0][1], m[0][0] * dx + m[0][1] * dy + m[0][2]],
+      [m[1][0], m[1][1], m[1][0] * dx + m[1][1] * dy + m[1][2]]
+    ];
+  }
+  function cornerImagePoints(box, leafPos, w, h, m) {
+    const pts = [[box.x0, box.y0], [box.x1, box.y0], [box.x0, box.y1], [box.x1, box.y1]];
+    return pts.map(([x, y]) => {
+      const u = (x - leafPos.x) / w;
+      const v = (y - leafPos.y) / h;
+      return [m[0][0] * u + m[0][1] * v + m[0][2], m[1][0] * u + m[1][1] * v + m[1][2]];
+    });
+  }
+  var same2 = (a, b) => Math.abs(Math.round(a * 100) - Math.round(b * 100)) < 1;
+  var same4 = (a, b) => Math.abs(Math.round(a * 1e4) - Math.round(b * 1e4)) < 1;
+  var sameBox = (a, b) => !!a && !!b && same2(a.x0, b.x0) && same2(a.y0, b.y0) && same2(a.x1, b.x1) && same2(a.y1, b.y1);
+  var IMAGE_SIZES = /* @__PURE__ */ new Map();
+  function photoFrameSame(a, member, b, instRoot, sizeOf) {
+    const la = photoLeafOf(a);
+    const lb = photoLeafOf(b);
+    if (!la || !lb) return false;
+    const va = visibleBox(a, member);
+    const vb = visibleBox(b, instRoot);
+    if (!sameBox(va, vb)) return false;
+    const pa = imagePaintOf(la);
+    const pb = imagePaintOf(lb);
+    if (!pa || !pb) return false;
+    const ma = imageMatrix(pa, la.width, la.height, pa.imageHash ? sizeOf(pa.imageHash) : null);
+    const mb = imageMatrix(pb, lb.width, lb.height, pb.imageHash ? sizeOf(pb.imageHash) : null);
+    if (!ma || !mb) return false;
+    const ca = cornerImagePoints(va, relPos(la, member), la.width, la.height, ma);
+    const cb = cornerImagePoints(vb, relPos(lb, instRoot), lb.width, lb.height, mb);
+    return ca.every((p, i) => same4(p[0], cb[i][0]) && same4(p[1], cb[i][1]));
+  }
+  function renderBox(n, root) {
+    const rb = n.absoluteRenderBounds;
+    if (!rb || typeof rb.x !== "number") return null;
+    const m = root.absoluteTransform;
+    let ox = 0;
+    let oy = 0;
+    if (Array.isArray(m) && Array.isArray(m[0]) && Array.isArray(m[1])) {
+      ox = m[0][2];
+      oy = m[1][2];
+    }
+    return { x0: rb.x - ox, y0: rb.y - oy, x1: rb.x - ox + rb.width, y1: rb.y - oy + rb.height };
+  }
+  async function keepLookAsync(member, inst, prefix, deps) {
+    const failed = [];
+    const fail = (what) => {
+      if (!failed.includes(what)) failed.push(what);
+    };
+    try {
+      if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) inst.resize(member.width, member.height);
+    } catch (e) {
+    }
+    const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+    if (!instRoot) return failed;
+    const sizeOf = async (h) => {
+      const hit = IMAGE_SIZES.get(h);
+      if (hit) return hit;
+      let sz = null;
+      try {
+        sz = await deps.imageSize(h);
+      } catch (e) {
+        sz = null;
+      }
+      if (sz && sz.width > 0 && sz.height > 0) IMAGE_SIZES.set(h, { width: sz.width, height: sz.height });
+      return sz;
+    };
+    const visit = async (a, path) => {
+      if (a.removed) return;
+      if (path !== "" && a.visible === false) return;
+      if (path !== "") {
+        const b = nodeAtPath(inst, joinPath(prefix, path));
+        if (!b || b.removed) return;
+        const pa = relPos(a, member);
+        const pb = relPos(b, instRoot);
+        const moved = !sameSize(pa.x, pb.x) || !sameSize(pa.y, pb.y);
+        const resized = !sameSize(a.width, b.width) || !sameSize(a.height, b.height);
+        if (a.type === "TEXT" && b.type === "TEXT") {
+          if ((moved || resized) && a.characters === b.characters) {
+            try {
+              b.textAutoResize = "WIDTH_AND_HEIGHT";
+            } catch (e) {
+              fail(b.name);
+            }
+          }
+          return;
+        }
+        if (moved && !resized) {
+          const la = photoLeafOf(a);
+          const lb = photoLeafOf(b);
+          if (la && lb) {
+            await putCrop(a, b, la, lb, pa, pb);
+            return;
+          }
+        }
+      }
+      if (!("children" in a)) return;
+      const kids = a.children;
+      for (let i = 0; i < kids.length; i++) await visit(kids[i], path ? `${path}/${i}` : String(i));
+    };
+    const putCrop = async (a, b, la, lb, pa, pb) => {
+      const va = visibleBox(a, member);
+      const vb = visibleBox(b, instRoot);
+      if (!sameBox(va, vb)) return;
+      const paint = imagePaintOf(la);
+      if (!paint || paint.scaleMode !== "FILL" && paint.scaleMode !== "CROP") return;
+      const rot = paint.rotation;
+      if (typeof rot === "number" && rot !== 0) return;
+      let img = null;
+      if (paint.scaleMode === "FILL") {
+        img = paint.imageHash ? await sizeOf(paint.imageHash) : null;
+        if (!img) {
+          fail(lb.name);
+          return;
+        }
+      }
+      const m = imageMatrix(paint, la.width, la.height, img);
+      if (!m) return;
+      const next = shiftMatrix(m, -(pa.x - pb.x) / la.width, -(pa.y - pb.y) / la.height);
+      const corners = cornerImagePoints(vb, relPos(lb, instRoot), lb.width, lb.height, next);
+      if (!corners.every(([x, y]) => x >= -1e-6 && x <= 1 + 1e-6 && y >= -1e-6 && y <= 1 + 1e-6)) return;
+      const crop = __spreadValues(__spreadValues(__spreadValues({
+        type: "IMAGE",
+        scaleMode: "CROP",
+        imageHash: paint.imageHash,
+        imageTransform: next
+      }, paint.opacity !== void 0 ? { opacity: paint.opacity } : {}), paint.blendMode !== void 0 ? { blendMode: paint.blendMode } : {}), paint.filters !== void 0 ? { filters: paint.filters } : {});
+      try {
+        const cur = Array.isArray(lb.fills) ? lb.fills : [];
+        let put = false;
+        const fills = cur.map((p) => {
+          if (!put && p.type === "IMAGE" && p.visible !== false) {
+            put = true;
+            return crop;
+          }
+          return p;
+        });
+        lb.fills = put ? fills : [crop];
+      } catch (e) {
+        fail(lb.name);
+      }
+    };
+    await visit(member, "");
+    return failed;
+  }
   function memberFitIssue(inst, member, prefix, opts = {}) {
+    var _a;
     if (!sameSize(inst.width, member.width) || !sameSize(inst.height, member.height)) {
       return t("component.fit.size", { w: inst.width, h: inst.height, mw: member.width, mh: member.height });
     }
     const layoutOn = opts.layout !== false;
     const instRoot = prefix ? nodeAtPath(inst, prefix) : inst;
+    const sizeOf = (_a = opts.imageSize) != null ? _a : (h) => {
+      var _a2;
+      return (_a2 = IMAGE_SIZES.get(h)) != null ? _a2 : null;
+    };
     let issue = null;
     const layoutIssue = (name) => {
       issue = t("component.fit.layout", { name });
     };
     const visit = (n, path, layout) => {
-      var _a;
+      var _a2;
       if (issue) return;
       const h = imageHashOf(n);
       if (h !== void 0) {
@@ -9488,7 +9860,7 @@
           layoutIssue(n.name);
           return;
         }
-        const iconPair = hit.type === "INSTANCE" && n.type !== "INSTANCE" && (VECTOR_TYPES.has(n.type) || !!((_a = opts.isIcon) == null ? void 0 : _a.call(opts, n)));
+        const iconPair = hit.type === "INSTANCE" && n.type !== "INSTANCE" && (VECTOR_TYPES.has(n.type) || !!((_a2 = opts.isIcon) == null ? void 0 : _a2.call(opts, n)));
         if (!iconPair && hit.type !== n.type) {
           layoutIssue(n.name);
           return;
@@ -9496,8 +9868,18 @@
         const a = relPos(n, member);
         const b = instRoot ? relPos(hit, instRoot) : { x: NaN, y: NaN };
         if (!sameSize(a.x, b.x) || !sameSize(a.y, b.y) || !sameSize(hit.width, n.width) || !sameSize(hit.height, n.height)) {
-          layoutIssue(n.name);
-          return;
+          const sameDims = sameSize(hit.width, n.width) && sameSize(hit.height, n.height);
+          if (instRoot && sameDims && photoFrameSame(n, member, hit, instRoot, sizeOf)) {
+            down = false;
+          } else if (instRoot && n.type === "TEXT" && hit.type === "TEXT" && renderBox(n, member) && renderBox(hit, instRoot)) {
+            if (!sameBox(renderBox(n, member), renderBox(hit, instRoot))) {
+              layoutIssue(n.name);
+              return;
+            }
+          } else {
+            layoutIssue(n.name);
+            return;
+          }
         }
         if (iconPair) down = false;
       }
@@ -10380,6 +10762,44 @@
     return { tier: "free", source: "none" };
   }
   var currentTier = () => effective().tier;
+  async function withLocalMains(sel) {
+    const mains = await collectLocalMains(sel);
+    const unitRoots = mains.units.flatMap((u) => u.roots);
+    if (!unitRoots.length) return { mains, roots: [...sel], unitOf: /* @__PURE__ */ new Map() };
+    const rootIds = new Set(unitRoots.map((r) => r.id));
+    const insideUnit = (n) => {
+      for (let p = n; p; p = p.parent) if (rootIds.has(p.id)) return true;
+      return false;
+    };
+    const unitOf = /* @__PURE__ */ new Map();
+    for (const u of mains.units) {
+      const stack = [...u.roots];
+      while (stack.length) {
+        const n = stack.pop();
+        if (!unitOf.has(n.id)) unitOf.set(n.id, u.id);
+        if ("children" in n) for (const c of n.children) stack.push(c);
+      }
+    }
+    return { mains, roots: [...sel.filter((r) => !insideUnit(r)), ...unitRoots], unitOf };
+  }
+  var unitsOfIds = (ids, unitOf) => {
+    const out = [];
+    for (const id of ids != null ? ids : []) {
+      const u = unitOf.get(id);
+      if (u && !out.includes(u)) out.push(u);
+    }
+    return out;
+  };
+  var KEEP_LOOK_DEPS = {
+    imageSize: async (h) => {
+      var _a, _b;
+      try {
+        return (_b = await ((_a = figma.getImageByHash(h)) == null ? void 0 : _a.getSizeAsync())) != null ? _b : null;
+      } catch (e) {
+        return null;
+      }
+    }
+  };
   var isPaid = () => currentTier() === "paid";
   async function paidSemanticTarget(collectionId) {
     var _a;
@@ -10692,7 +11112,7 @@
     out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
     return out;
   }
-  function pageOf(node) {
+  function pageOf2(node) {
     let n = node;
     while (n && n.type !== "PAGE") n = n.parent;
     return n && n.type === "PAGE" ? n : null;
@@ -11244,12 +11664,13 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     try {
       switch (msg.type) {
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
-          const { tokens, warnings } = extractFromSelection(sel, bindOwnerOf(sel));
+          const wm = await withLocalMains(sel);
+          const { tokens, warnings } = extractFromSelection(wm.roots, bindOwnerOf(sel), new Set(wm.mains.mainOf.keys()));
           post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
@@ -11259,7 +11680,7 @@
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
           const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName);
-          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name)) : 0;
+          const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name), { globalOnly: !isPaid() }) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
           if (pruned) summary += t("create.sumPruned", { n: pruned });
@@ -11309,7 +11730,7 @@
                 ownerOf: bindOwnerOf(sel)
               }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
             );
-            post({
+            post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",
               bound: r.bound,
               skipped: r.skipped,
@@ -11328,8 +11749,7 @@
               // UI가 낡은 응답을 가려낸다
               newRoles: r.newRoles,
               counts: r.counts
-              // 사유 × 종류(카드 숫자, IA v4 §4.1)
-            });
+            }, r.mains ? { mains: r.mains } : {}), r.mainsBound ? { mainsBound: r.mainsBound } : {}));
             if (!msg.preview) {
               commitUndo(figma);
               selfSelect = true;
@@ -11422,7 +11842,20 @@
                 made = n;
               }
             });
-            post(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}));
+            const mainsBound = [...r.mainsBound];
+            if (((_b = ts == null ? void 0 : ts.appliedIds) == null ? void 0 : _b.length) && msg.textStyles) {
+              const mainOfText = /* @__PURE__ */ new Map();
+              for (const row of msg.textStyles) row.nodeIds.forEach((id, i) => {
+                var _a2;
+                const m = (_a2 = row.mainIds) == null ? void 0 : _a2[i];
+                if (m) mainOfText.set(id, m);
+              });
+              for (const id of ts.appliedIds) {
+                const m = mainOfText.get(id);
+                if (m && !mainsBound.includes(m)) mainsBound.push(m);
+              }
+            }
+            post(__spreadValues(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), mainsBound.length ? { mainsBound } : {}));
             if (r.bound || r.newRoles || (ts == null ? void 0 : ts.applied)) {
               commitUndo(figma);
               committed = true;
@@ -11482,14 +11915,15 @@
         }
         case "SCAN_TEXT_STYLES": {
           if (!requirePaid("textStyles")) break;
-          const { samples, warnings } = await scanTextStyles(await resolveRoots(msg.nodeIds));
+          const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
           if (msg.reqId == null) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
-          const styles = nameTextStyles(clusterTextStyles(samples), existing);
+          const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
+          const styles = nameTextStyles(rest, existing);
           const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
           if (msg.reqId != null) {
-            post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, reqId: msg.reqId, existing: existingSigs });
-          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, warnings, existing: existingSigs });
+            post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
+          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, existing: existingSigs });
           break;
         }
         case "SCAN_TS_RENAME": {
@@ -11513,28 +11947,35 @@
           }
           const existing = await scanExistingTextStyles();
           const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-          post({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, warnings: [], labeled: r.labeled, fallback: r.fallback });
+          post({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
           break;
         }
         case "CREATE_TEXT_STYLES": {
           if (!requireTextStyles()) break;
           const r = await createSemanticTextStyles(msg.styles);
-          const ap = msg.applyTo ? await applyRegisteredTextStyles(await resolveRoots(msg.applyTo), r.styleIds) : null;
-          post(__spreadValues(__spreadValues({
+          const wm = msg.applyTo ? await withLocalMains(await resolveRoots(msg.applyTo)) : null;
+          const ap = wm ? await applyRegisteredTextStyles(wm.roots, r.styleIds) : null;
+          const mainsApplied = wm && ap ? unitsOfIds(ap.appliedIds, wm.unitOf) : [];
+          post(__spreadValues(__spreadValues(__spreadValues({
             type: "TEXT_STYLES_RESULT",
             created: r.created,
             updated: r.updated,
             bound: r.bound,
             missing: r.missing,
             notes: r.notes
-          }, msg.reqId != null ? { reqId: msg.reqId } : {}), ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}));
+          }, msg.reqId != null ? { reqId: msg.reqId } : {}), ap ? { applied: ap.applied, applySkipped: ap.applySkipped, applyReasons: ap.applyReasons } : {}), mainsApplied.length ? { mainsApplied } : {}));
           commitUndo(figma);
           await postPrereq();
           break;
         }
         case "PREVIEW_TEXT_STYLES": {
-          const r = await planExistingTextStyles(await resolveRoots(msg.nodeIds));
-          post({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows: r.rows, skipReasons: r.skipReasons });
+          const wm = await withLocalMains(await resolveRoots(msg.nodeIds));
+          const r = await planExistingTextStyles(wm.roots);
+          const rows = wm.unitOf.size ? r.rows.map((row) => __spreadProps(__spreadValues({}, row), { mainIds: row.nodeIds.map((id) => {
+            var _a2;
+            return (_a2 = wm.unitOf.get(id)) != null ? _a2 : null;
+          }) })) : r.rows;
+          post({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows, skipReasons: r.skipReasons });
           break;
         }
         case "GET_COLLECTIONS": {
@@ -11885,7 +12326,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_b = msg.names) != null ? _b : {};
+          const shownNames = (_c = msg.names) != null ? _c : {};
           const groupNames = groups.map((g, gi) => {
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
@@ -11932,6 +12373,7 @@
                           return icon;
                         }
                       });
+                      for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                       if (!noted) {
                         noted = true;
                         for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
@@ -11960,7 +12402,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_c = r.why) != null ? _c : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -12040,7 +12482,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_d = snaps[preferLive]) != null ? _d : snaps[0];
+                  const masterSnap = (_e = snaps[preferLive]) != null ? _e : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -12061,7 +12503,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_f = (_e = structs[preferLive]) == null ? void 0 : _e.type) != null ? _f : "");
+                  const prefix = shapePrefix(master, (_g = (_f = structs[preferLive]) == null ? void 0 : _f.type) != null ? _g : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -12144,6 +12586,7 @@
                           return key ? iconRegistry.ensure(key, v, v.name) : null;
                         }
                       });
+                      for (const l of await keepLookAsync(member, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                       for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
                       if (bad.length) propFailed.push(name);
                       return inst;
@@ -12164,7 +12607,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_g = r.why) != null ? _g : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_h = r.why) != null ? _h : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -12181,7 +12624,7 @@
               const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_h = sf.members[sf.master]) != null ? _h : sf.members[0];
+                const head = (_i = sf.members[sf.master]) != null ? _i : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
@@ -12235,6 +12678,7 @@
                           return key ? iconRegistry.ensure(key, v, v.name) : null;
                         }
                       });
+                      for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
                       for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
                       if (bad.length) {
                         propFailed.push(name);
@@ -12272,7 +12716,7 @@
               }
               let set;
               try {
-                const home = (_i = pageOf(made[0].comp)) != null ? _i : figma.currentPage;
+                const home = (_j = pageOf2(made[0].comp)) != null ? _j : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -12360,7 +12804,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_j = nodes[0].parent) != null ? _j : figma.currentPage;
+              const parent = (_k = nodes[0].parent) != null ? _k : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

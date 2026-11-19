@@ -152,8 +152,20 @@ export function clusterTextStyles(samples: TextSample[]): StyleCluster[] {
    같은 타이포가 또 잡혀도 중복 생성 없이 그 스타일로 인식되고, 이름을 바꾸면 rename된다.
    앵커되지 않은 군집은 기존 스타일 이름 전부를 예약 이름으로 피한다(§3.4 — 겹치면 강제 꼬리).
    스펙 순서는 크기 내림차순 → 쓰인 곳 많은 순 → 행간 큰 순. */
-export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingTextStyle[]): TextStyleSpec[] {
-  // 기존 스타일 인덱스: id→이름·시그니처, 시그니처→id(중복 시그니처는 모호 → 제외).
+/**
+ * 글자 크기가 정수인가(§2.11 11번 "글자 크기도 정수만", docs/text-style-krds.md §0) — 소수 둘째 자리로 반올림한 값이
+ * 1e-6 안에서 정수. 추출의 척도 판정(`extract.ts` `onScale`)과 같은 기준이다.
+ */
+export function isIntegerSize(v: number): boolean {
+  const r = Math.round(v * 100) / 100;
+  return Math.abs(r - Math.round(r)) < 1e-6;
+}
+
+/**
+ * 군집 → 앵커할 기존 스타일 id를 돌려주는 판정(`nameTextStyles`와 소수 크기 나누기가 함께 쓴다).
+ * (1) 노드가 그 스타일에 바인딩되고 시그니처도 일치하거나 (2) 시그니처가 같은 기존 스타일이 정확히 1개.
+ */
+export function anchorOfFor(existing?: ExistingTextStyle[]): (c: StyleCluster) => string | undefined {
   const nameById = new Map<string, string>();
   const sigById = new Map<string, string>();
   const idBySig = new Map<string, string | null>(); // null = 같은 시그니처 2개 이상(모호)
@@ -163,9 +175,7 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
     sigById.set(e.id, k);
     idBySig.set(k, idBySig.has(k) ? null : e.id);
   }
-  const existingById = new Map((existing ?? []).map((e) => [e.id, e]));
-  // 군집 → 앵커할 기존 스타일 id. 노드 바인딩은 시그니처 일치할 때만(오버라이드 어긋남 방지).
-  const boundIdOf = (c: StyleCluster): string | undefined => {
+  return (c) => {
     if (!existing) return undefined;
     if (c.styleIds.length === 1) {
       const id = c.styleIds[0];
@@ -174,6 +184,28 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
     const sigId = idBySig.get(sigKey(c));
     return sigId && nameById.has(sigId) ? sigId : undefined;
   };
+}
+
+/**
+ * 후보 나누기(§2.11 11번 "글자 크기도 정수만" — A.18 3): 앵커가 없는 소수 크기 군집은 `decimalRows`(만들지 않는 흐린 줄),
+ * 나머지(정수 + 앵커된 소수)는 `rest`(이름 짓기로). 이름 짓기 입력에서 소수 군집을 빼야 정수 스타일 이름에 소수 줄 때문에
+ * 생기던 꼬리가 없어진다.
+ */
+export function splitDecimalClusters(clusters: StyleCluster[], existing?: ExistingTextStyle[]): { rest: StyleCluster[]; decimalRows: StyleCluster[] } {
+  const anchorOf = anchorOfFor(existing);
+  const rest: StyleCluster[] = [];
+  const decimalRows: StyleCluster[] = [];
+  for (const c of clusters) (isIntegerSize(c.fontSize) || anchorOf(c) ? rest : decimalRows).push(c);
+  decimalRows.sort((a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight);
+  return { rest, decimalRows };
+}
+
+export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingTextStyle[]): TextStyleSpec[] {
+  const nameById = new Map<string, string>();
+  for (const e of existing ?? []) nameById.set(e.id, e.name);
+  const existingById = new Map((existing ?? []).map((e) => [e.id, e]));
+  // 군집 → 앵커할 기존 스타일 id. 노드 바인딩은 시그니처 일치할 때만(오버라이드 어긋남 방지).
+  const boundIdOf = anchorOfFor(existing);
 
   const ordered = [...clusters].sort(
     (a, b) => b.fontSize - a.fontSize || b.count - a.count || b.lineHeight - a.lineHeight,
@@ -282,6 +314,8 @@ export function pairHorizontalRowLabel(
 
 export interface RowLabelNameResult {
   styles: TextStyleSpec[];
+  /** 앵커 없는 소수 크기 군집 — 만들지 않는 흐린 줄(`splitDecimalClusters`). 라벨 거르기 뒤의 표본으로 만든다. */
+  decimalRows: StyleCluster[];
   /** 라벨 characters로 이름 붙인 스펙 수(앵커 제외). */
   labeled: number;
   /** KRDS 이름(라벨 짝 없음)을 쓴 스펙 수. */
@@ -322,7 +356,8 @@ export function nameTextStylesWithRowLabels(
   }
 
   const forCluster = samples.filter((s) => !s.id || !excludeIds.has(s.id));
-  const styles = nameTextStyles(clusterTextStyles(forCluster), existing);
+  const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(forCluster), existing);
+  const styles = nameTextStyles(rest, existing);
 
   const used = new Set<string>();
   const unique = (n: string): string => {
@@ -360,7 +395,7 @@ export function nameTextStylesWithRowLabels(
     fallback++;
   }
 
-  return { styles, labeled, fallback };
+  return { styles, decimalRows, labeled, fallback };
 }
 
 const STYLE_BY_WEIGHT: Record<number, string> = {

@@ -27,7 +27,7 @@ import { paletteFamilyOf } from './palette';
 import { resolveGlobalNames, type FileGlobal, type GlobalNameReq, type GlobalNameResult } from './colorName'; // Global 이름 · 덮지 않음(§2.12 12.11)
 import { AUTO_ROLE_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
-import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig } from './textStyles';
+import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig, isIntegerSize } from './textStyles';
 import { nameKrdsStyles, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
 import { dsRoleOwner } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
@@ -533,13 +533,17 @@ export interface SemanticSummary {
 }
 
 /** 팔레트 재적용 시 이전 색 정리: 이번에 (재)생성하는 **hue 패밀리** 안에서 keep에 없는
-   이전 스텝만 삭제(#3). 다른 패밀리·추출 hex 색·사용자 변수는 보존. 반환=삭제 수. */
-export async function prunePaletteColors(keep: string[]): Promise<number> {
+   이전 스텝만 삭제(#3). 다른 패밀리·추출 hex 색·사용자 변수는 보존. 반환=삭제 수.
+   `globalOnly`: 플러그인 Global 컬렉션 안에서만 지운다 — 무료 실행은 Semantic을 만들지도 지우지도 않는다(ia-v4 §4.3a). */
+export async function prunePaletteColors(keep: string[], opts: { globalOnly?: boolean } = {}): Promise<number> {
   const keepSet = new Set(keep);
   // 이번 팔레트가 쓰는 hue 패밀리(이 안에서만 정리 — 무관 색 보존).
   const keepFamilies = new Set(keep.map(paletteFamilyOf).filter((f): f is string => f !== null));
   const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const palIds = ownedIds(cols); // 플러그인 Global · Semantic 안에서만 — 사용자 컬렉션의 색은 지우지 않는다(13.7)
+  // 플러그인 Global · Semantic 안에서만 — 사용자 컬렉션의 색은 지우지 않는다(13.7). globalOnly면 Global만.
+  const palIds = opts.globalOnly
+    ? new Set([ownedCollection(cols, 'global')?.id].filter((x): x is string => !!x))
+    : ownedIds(cols);
   let removed = 0;
   for (const v of await figma.variables.getLocalVariablesAsync()) {
     if (!palIds.has(v.variableCollectionId)) continue;
@@ -943,9 +947,9 @@ export interface TextStyleResult {
  * 화면에 붙이는 일은 「기존만 연결」(`applyExistingTextStyles`)이 맡는다. 한 버튼이 둘 다 하면
  * 되돌릴 때 무엇까지 되돌려야 하는지가 흐려진다.
  */
-export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<TextStyleResult> {
+export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promise<TextStyleResult> {
   const res: TextStyleResult = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
-  if (!specs.length) return res;
+  if (!allSpecs.length) return res;
 
   // 0) 재스캔 rename 준비: boundStyleId가 **실제로 존재하는** 스타일을 가리킬 때만 rename.
   //    역할 이름 변경(old→new) 시 시맨틱 별칭 `{category}/{role}`도 옮긴다(대상이 비어 있을 때만).
@@ -956,6 +960,18 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
   // 유효 앵커: id로 스타일을 찾은 스펙만 rename(이름만). stale id는 이름 폴백·신규와 같이 취급.
   const anchoredStyle = (spec: TextStyleSpec): TextStyle | undefined =>
     spec.boundStyleId ? styleById.get(spec.boundStyleId) : undefined;
+  // 글자 크기도 정수만(§2.11 11번 — A.18 3): 앵커 없는 소수 크기 스펙은 스타일 · 변수(글자 크기 · 줄 높이 · 자간 · 별칭)를
+  // 만들지도 쓰지도 않는다(이름이 같은 스타일이 있어도). 앵커(이미 등록된 스타일)면 지금처럼 이름 맞춤 길.
+  const specs: TextStyleSpec[] = [];
+  for (const spec of allSpecs) {
+    if (!anchoredStyle(spec) && !isIntegerSize(spec.fontSize)) {
+      res.missing.push(t('textStyle.missDecimal', { name: spec.name, size: roundN(spec.fontSize) }));
+      continue;
+    }
+    specs.push(spec);
+  }
+  /** 앵커된 스타일의 지금 글자 크기가 소수인가 — 그 크기의 변수를 만들지도, 없다고 알리지도 않는다. */
+  const decimalAnchor = (st: TextStyle | undefined): boolean => !!st && !isIntegerSize(roundN(st.fontSize));
 
   // 대상 이름을 다른 스타일이 이미 쓰면 rename 충돌 — 이름·시맨틱·바인딩을 건드리지 않고 보고만.
   const renameBlocked = new Set<string>(); // boundStyleId (또는 name) 키
@@ -1071,6 +1087,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
       const st = anchoredStyle(s);
       if (!st) continue;
       if (semNames.has(`font-size/${s.name}`)) continue; // 이미 있음(이동됐거나 대상 역할 존재) → 덮지 않음
+      if (decimalAnchor(st)) continue; // 소수 크기 앵커 — 이름 · 값 그대로, 변수는 만들지 않는다
       const fontSize = roundN(st.fontSize);
       // 스펙(스캔)이 아니라 **스타일의 현재 단위**가 기준 — 앵커 행은 타이포를 건드리지 않으므로.
       pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
@@ -1179,7 +1196,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
     if (fsVar) {
       style.setBoundVariable('fontSize', fsVar);
       res.bound++;
-    } else res.missing.push(t('textStyle.missVar', { name: bindRole, var: `font-size/${bindRole}` }));
+    } else if (!(isRename && decimalAnchor(style))) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `font-size/${bindRole}` }));
     if (spec.lineHeight > 0 || isRename) {
       // 지금 스타일에 들어 있는 단위가 기준 — 신규는 방금 쓴 값, rename은 교정 후 값.
       // Figma는 행간에 변수를 바인딩하면 단위를 PIXELS로 강제한다(실측). %를 지키려면 바인딩을 포기해야 하고,
@@ -1196,7 +1213,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         if (lhVar) {
           style.setBoundVariable('lineHeight', lhVar);
           res.bound++;
-        } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight)) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `line-height/${bindRole}` })); // 소수 px는 변수를 안 만드는 게 규칙이라 누락이 아니다
+        } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight) && !(isRename && decimalAnchor(style))) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `line-height/${bindRole}` })); // 소수 px는 변수를 안 만드는 게 규칙이라 누락이 아니다
       }
     }
     if (spec.letterSpacing !== 0 || isRename) {
@@ -1210,7 +1227,7 @@ export async function createSemanticTextStyles(specs: TextStyleSpec[]): Promise<
         if (lsVar) {
           style.setBoundVariable('letterSpacing', lsVar);
           res.bound++;
-        } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing)) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `letter-spacing/${bindRole}` }));
+        } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing) && !(isRename && decimalAnchor(style))) res.missing.push(t('textStyle.missVar', { name: bindRole, var: `letter-spacing/${bindRole}` }));
       }
     }
     // 글꼴 — 값이 같은 Global STRING 변수가 있으면 붙인다(IA v4 §4.3 "스타일의 글꼴 변수"). 없으면 만들지 않는다.
@@ -1531,6 +1548,8 @@ export interface ApplyTextStylesResult {
   applied: number;
   skipped: number;
   skipReasons: Record<TextStyleSkipReason, number>;
+  /** 스타일을 붙인 글자 id(applyTextStyleRows만 — 메인 단위 수를 셀 때). */
+  appliedIds?: string[];
 }
 
 /** 텍스트 스타일 비교 키 — 스타일이 정하는 모든 글자 속성(§2.11). 숫자는 소수 2자리. */
@@ -1719,6 +1738,7 @@ export async function applyTextStyleRows(rows: readonly { styleId: string; nodeI
       try {
         await attachTextStyle(t as TextNode, r.id, loaded);
         res.applied++;
+        (res.appliedIds ??= []).push(id);
       } catch {
         /* 폰트를 못 불러옴 */
       }
@@ -1739,6 +1759,8 @@ export async function textStyleCandidateTest(): Promise<(t: TextNode) => boolean
 /** 타이포 등록 · 바로 연결 결과(IA v4 §4.3 "타이포 등록"). */
 export interface ApplyRegisteredResult {
   applied: number;
+  /** 스타일을 붙인 글자 id(메인 단위 수를 셀 때 — ia-v3 §2.11 11번 ②). */
+  appliedIds?: string[];
   applySkipped: number;
   applyReasons: Record<TextStyleApplySkipReason, number>;
 }
@@ -1784,6 +1806,7 @@ export async function applyRegisteredTextStyles(roots: readonly SceneNode[], sty
   if (rows.size) {
     const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
     out.applied = r.applied;
+    if (r.appliedIds?.length) out.appliedIds = r.appliedIds;
   }
   return out;
 }

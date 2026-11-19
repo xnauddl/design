@@ -2,12 +2,12 @@
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
 import type { TsRenameRow } from './shared/messages';
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig, MainUnitInfo } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
-import { type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
+import { type StyleCluster, type TextStyleSpec, rampToSpecs, tsSig } from './lib/textStyles';
 import { headState, headToggleTarget, mergeSameNameTokens, buildRenameTree, type RenameTreeItem } from './lib/treeState';
 import { renderTree, focusRow, type TreeItem } from './treeList';
 import { type Tier } from './lib/entitlements';
@@ -101,7 +101,7 @@ let bindLinking = 0;
 /** 연결 중에 사용자가 선택을 바꿨다 — 결과 지우기를 미뤄 뒀다(연결이 성공하면 결과 카드, 아니면 그때 지운다). */
 let bindSelChangedDuringLink = false;
 /** 마지막으로 보낸 연결 자리 — 연결 오류의 [다시 시도]가 쓴다(lastSentMsg는 그 뒤 다른 요청으로 바뀔 수 있다). */
-type LinkJob = { items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']; textStyles: { styleId: string; nodeIds: string[] }[] };
+type LinkJob = { items: Extract<UiToCode, { type: 'APPLY_SELECTED' }>['items']; textStyles: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[] };
 let lastLinkItems: LinkJob | null = null;
 /**
  * SELECT_NODES를 부른 자리의 상태 줄. 레이어 선택은 적용 탭의 스킵 칩만 쓰던 기능이라
@@ -930,9 +930,25 @@ const DEFAULT_TS_FAMILY = 'Inter';
 
 /** 편집 중인 스타일 목록 — 카드가 곧 편집기라 이름 외에는 이 배열이 단일 출처다. */
 let tsSpecs: TextStyleSpec[] = [];
+/** 앵커 없는 소수 크기 후보(TEXT_STYLE_CANDIDATES.decimalRows) — 만들지 않는 흐린 카드(ia-v4 §4.3 "소수 크기 줄"). 수에 넣지 않는다. */
+let tsDecimal: StyleCluster[] = [];
+/** 후보 읽기를 했는가 — [등록] 0개 잠금(`textStyle.noRegistrable`)은 "읽었는데 흐린 줄만 있음"일 때만. */
+let tsRead = false;
+/** 크기 순서 제자리에 흐린 줄을 끼운 목록(보통 줄 순서는 그대로). */
+function withDecimals<T extends { fontSize: number }, D extends { fontSize: number }>(rows: readonly T[], dec: readonly D[]): (T | { decimal: D })[] {
+  const out: (T | { decimal: D })[] = [];
+  const ds = [...dec].sort((a, b) => b.fontSize - a.fontSize);
+  let i = 0;
+  for (const r of rows) {
+    while (i < ds.length && ds[i].fontSize > r.fontSize) out.push({ decimal: ds[i++] });
+    out.push(r);
+  }
+  while (i < ds.length) out.push({ decimal: ds[i++] });
+  return out;
+}
 
 /** 요약 한 줄 — "Inter · 32 / 120% / 0 · Bold". 행간·자간은 원본 단위로 보여준다. */
-function tsSummary(s: TextStyleSpec): string {
+function tsSummary(s: Pick<TextStyleSpec, 'family' | 'fontSize' | 'lineHeight' | 'lineHeightPercent' | 'letterSpacing' | 'letterSpacingPercent' | 'style'>): string {
   const lh = s.lineHeight > 0 ? (s.lineHeightPercent ? `${s.lineHeightPercent}%` : `${s.lineHeight}px`) : 'AUTO';
   const ls = s.letterSpacingPercent ? `${s.letterSpacingPercent}%` : `${s.letterSpacing}`;
   return `${s.family} · ${s.fontSize} / ${lh} / ${ls} · ${s.style}`;
@@ -1040,8 +1056,16 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
 /** 스캔만 알 수 있는 부가 정보 — 표를 편집해도 그 스캔의 사실이라 남는다(이름 출처·경고). */
 let tsScanNote = { namePart: '', warnings: [] as string[] };
 
+/** 소수 크기 흐린 카드(ia-v4 §4.3 "소수 크기 줄") — 이름 입력 자리에 회색 사유, 아래 줄 값 요약. 입력 · [삭제] 없음. */
+function decimalCard(c: StyleCluster): HTMLElement {
+  const card = resultCard({ title: t('textStyle.decimalRow'), summary: tsSummary(c), summaryMono: true });
+  card.classList.add('ts-decimal');
+  return card;
+}
+
 function renderTextStyles(): void {
-  renderChunked($('tsList'), tsSpecs, textStyleCard);
+  renderChunked($('tsList'), withDecimals(tsSpecs, tsDecimal), (x) => ('decimal' in x ? decimalCard(x.decimal) : textStyleCard(x)));
+  updateEmptyLocks(); // [등록] 0개 잠금(흐린 줄만 있음)
   if (!tsSpecs.length) {
     setTsStatus('', ''); // 마지막 행까지 지웠다 — 남은 개수 요약은 거짓말이 된다
     return;
@@ -1657,8 +1681,8 @@ $('btnApplyConfirm').addEventListener('click', () => {
   const eff = bindTsOnly() ? [] : effCandidates();
   const items = eff
     .filter((c) => bindChecked.has(candKey(c)))
-    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}) }));
-  const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds }));
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}) }));
+  const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds, ...(r.mainIds?.some(Boolean) ? { mainIds: r.mainIds } : {}) }));
   if (!items.length && !textStyles.length) return;
   startLink({ items, textStyles });
 });
@@ -1870,10 +1894,11 @@ const PAID_LOCK = '🔒'; // 와이어의 잠금 배지는 자물쇠 하나 — 
 const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
-// 이유를 알 수 없는 막다른 길이 된다(btnPalette=팔레트 생성이 그 카드의 미리보기 역할).
+// 이유를 알 수 없는 막다른 길이 된다. 브랜드 팔레트([팔레트 생성] · [팔레트 만들기])는 무료다
+// (2026-11-18 — ia-v4 §4.3a "브랜드 팔레트 무료": 무료의 [색 변수 만들기]가 Global 색만 만든다).
 const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
-  'btnPalette', 'btnPaletteRun', // [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
+  // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
   'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
   'btnTsRename', // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
@@ -1893,11 +1918,11 @@ function updateGates(): void {
   // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성'·'색 변수 만들기')가 한 툴바에 섞여
   // 있어 카드 배지만으로는 어느 쪽이 잠긴 건지 알 수 없다 → 두 버튼 모두에 자물쇠를 붙인다
   // (와이어 rev k). 400px에서 툴바가 두 줄이 되는 건 감수 — 결론 버튼의 잠금이 먼저다.
-  for (const id of ['paletteBtnLock', 'componentLock', 'darkLock', 'semLock', 'tsLock']) {
+  for (const id of ['componentLock', 'darkLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
-  // 색 변수화 · 토큰 만들기는 무료(F8) — 🔒 없음(색 카드 제목의 🔒도 — F-D9).
-  for (const id of ['paletteLock', 'colorVarsLock', 'createLock']) $(id).textContent = '';
+  // 색 변수화 · 토큰 만들기 · 브랜드 팔레트는 무료(F8 · ia-v4 §4.3a) — 🔒 없음(색 카드 제목의 🔒도 — F-D9).
+  for (const id of ['paletteLock', 'colorVarsLock', 'createLock', 'paletteBtnLock']) $(id).textContent = '';
   // 다크 채우기는 Paid에 더해 컬렉션·모드(라이트 출처)가 있어야 한다. PAID_FIELDS 루프가
   // 방금 disabled를 티어만 보고 덮었으니, 전제를 여기서 다시 적용해야 한다(순서 의존).
   // Dark 모드는 없으면 생성하므로 모드 2개 전제는 더 이상 없다.
@@ -1942,6 +1967,8 @@ function setCardPrimary(all: HTMLElement[], order: HTMLElement[]): void {
 /** 색 단계의 보이는 색이 있는지 — 색 목록이 숨어 있으면(토큰 단계 [미리보기]만으로 추출) 보지 못한 색이다. */
 const colorsVisible = (): boolean => colorRevealed && tokens.some((tk) => tk.category === 'color' && typeof tk.value === 'string');
 function updateEmptyLocks(): void {
+  // 타이포 [등록] — 읽었는데 흐린 줄(소수 크기)만 있으면 0개 잠금(ia-v4 §4.3 "소수 크기 줄"). 유료 잠금이 먼저(setEmptyLock이 건너뜀).
+  setEmptyLock($('btnTextStyles'), tsRead && !tsSpecs.length && tsDecimal.length ? t('textStyle.noRegistrable') : null);
   // 색
   const extract = $('btnExtract');
   const colorVars = $('btnColorVars');
@@ -2500,6 +2527,7 @@ window.onmessage = (event: MessageEvent) => {
         const prev = bindCandidates;
         const prevChecked = new Set(bindChecked);
         bindCandidates = msg.candidates ?? [];
+        bindMains = msg.mains ?? [];
         bindCounts = msg.counts as ReasonCounts | undefined;
         bindVarPending = false;
         bindChecked.clear();
@@ -2519,6 +2547,7 @@ window.onmessage = (event: MessageEvent) => {
         // 연결 후(§4.2) — 첫 화면으로 돌아오고 상태 줄 "🔗 {n}곳 연결 · ⌘Z로 되돌리기"(+ 건너뜀). 카드는 다시 읽는다.
         const n = msg.bound + (msg.textStylesApplied ?? 0);
         const m = msg.skipped + (msg.textStylesSkipped ?? 0);
+        rememberMainsBound(msg.mainsBound ?? []); // 상태 줄 글은 그대로 — 메인 수는 카드 1 ✓ 아래 줄만(결정 B)
         clearBindPreview();
         setStatus('applyStatus', '', '');
         if (activeTab === 'select' && selSub === 'bind') showSelSub('home');
@@ -2605,7 +2634,14 @@ window.onmessage = (event: MessageEvent) => {
       // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
       ($('btnTsRowLabels') as HTMLButtonElement).disabled = !msg.styles.length;
       tsExistingNames = (msg.existing ?? []).map((e) => e.name); // 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프)
-      if (msg.styles.length) {
+      tsDecimal = msg.decimalRows ?? []; // 소수 크기 흐린 줄 — 이름 채우기 응답도 이 값대로 다시 그린다
+      tsRead = true;
+      if (!msg.styles.length && tsDecimal.length) {
+        // 흐린 줄뿐 — 기본 램프로 가지 않는다(textStyle.fallbackRamp 없음). [등록]은 0개 잠금.
+        tsSpecs = [];
+        tsScanNote = { namePart: '', warnings: msg.warnings };
+        renderTextStyles();
+      } else if (msg.styles.length) {
         tsSpecs = msg.styles.map((x) => ({ ...x }));
         // 이름 출처는 「왼쪽 글자로 이름 채우기」를 누른 뒤에만 적는다 — 맨 스캔은 전부 크기 순이라
         // `왼쪽 글자 0`이 실패처럼 읽힌다. 와이어 상태 줄: 신규 · 등록됨 · 왼쪽 글자 · 크기 순.
@@ -3374,6 +3410,8 @@ let mkPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 let mkPreviewTagsOnly = false;
 /** 텍스트 스타일 후보(유료). */
 let mkTs: TextStyleSpec[] = [];
+/** 앵커 없는 소수 크기 후보 — 흐린 줄(ia-v4 §4.3 "소수 크기 줄"). 켠 목록 · 탭 수 · 실행 수에 넣지 않는다. */
+let mkTsDecimal: StyleCluster[] = [];
 let mkTsExisting: ExistingStyleSig[] = [];
 let mkTsFor: string | null = null;
 let mkScanReq = 0;
@@ -3502,6 +3540,7 @@ function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): 
   if (mkEditSig) { mkTsPending = msg; return; } // 고치는 동안은 칸을 닫을 때까지 미룬다
   mkTsReading = false;
   mkTs = msg.styles;
+  mkTsDecimal = msg.decimalRows ?? [];
   mkTsExisting = msg.existing ?? [];
   const sigs = new Set(mkTs.map(tsSig));
   for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
@@ -3531,7 +3570,7 @@ function mkLayers(n: number | undefined): HTMLElement {
 function mkTabsVisible(): MkTab[] {
   const out: MkTab[] = [];
   if (mkTokens.length) out.push('global', 'semantic');
-  if (isPaid && (mkTs.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
+  if (isPaid && (mkTs.length || mkTsDecimal.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
   return out;
 }
 /** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · zero r = 0 · rows. */
@@ -3588,7 +3627,25 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
     }
   } else {
     if (!isPaid || mkTsFor !== baseKey()) return items;
-    for (const s of mkTs) {
+    for (const x of withDecimals(mkTs, mkTsDecimal)) {
+      if ('decimal' in x) {
+        // 흐린 줄 — "Aa" · (이름 칩 없음) · 값 요약 · "Layer {n}" · 스위치 자리에 사유. 고치기 · 켜기 없음.
+        const c = x.decimal;
+        const aa = document.createElement('span');
+        aa.className = 'ts-aa';
+        aa.setAttribute('aria-hidden', 'true');
+        aa.textContent = 'Aa';
+        const sum = tsSummary(c);
+        const sub = document.createElement('span');
+        sub.className = 'tr-sub';
+        sub.textContent = sum;
+        const why = document.createElement('span');
+        why.className = 'tr-sub ts-why';
+        why.textContent = t('textStyle.decimalRow');
+        items.push({ key: `td:${tsSig(c)}`, indent: 0, cls: 'ts-decimal', cells: [aa, sub], right: [mkLayers(c.count), why], aria: `${sum} · ${t('textStyle.decimalRow')}` });
+        continue;
+      }
+      const s = x;
       const sig = tsSig(s);
       const on = !mkTsOff.has(sig);
       const aa = document.createElement('span');
@@ -3697,7 +3754,7 @@ function renderMakeScreen(): void {
     if (!baseline && !mkRunning) { emptyText = t('v4.noSel'); emptyAction = [t('v4.backHome'), subBack]; }
     else if (!mkRunning && mkFor !== baseKey() && !mkReading && baseline && baseline.scanned > BIG_SELECTION) { emptyText = t('list.big'); emptyAction = [t('list.read'), () => readMake(true)]; }
     else if (!mkRunning && (mkFor !== baseKey() || mkReading)) skeleton = true;
-    else if (!mkTokens.length && !mkTs.length) emptyText = t('make.zero');
+    else if (!mkTokens.length && !mkTs.length && !(isPaid && mkTsDecimal.length)) emptyText = t('make.zero');
   }
   empty.hidden = !emptyText;
   if (emptyText) {
@@ -3741,7 +3798,7 @@ function renderMakeScreen(): void {
   if (skeleton) { topText = t('v4.reading'); links = false; }
   else if (semLic) { topText = t('make.freeSemTop') + ' · '; links = false; }
   else if (tab === 'semantic') { topText = t('make.semTop'); info = t('make.semNote'); links = false; }
-  else if (tab === 'ts') { topText = t('make.tsTop'); info = t('make.tsNote'); }
+  else if (tab === 'ts') { topText = t('make.tsTop'); info = t('make.tsNote'); if (!mkTs.length) links = false; } // 흐린 줄뿐이면 켤 것이 없다
   $('makeTopText').textContent = topText;
   $('makeSemLic').hidden = !semLic;
   const infoBtn = $('makeInfo');
@@ -3889,6 +3946,8 @@ async function runMake(): Promise<void> {
   renderMakeScreen();
   if ($('btnMakeRun').getAttribute('aria-disabled') === 'true') return;
   if (mkResults) { mkResults = null; showSelSub('home'); return; } // [닫기]
+  const mkBase = baseline ? baseKey() : null; // 연결 뒤 메인 기억의 목록 기준(§4.1 결정 B)
+  const mkMainsDone: string[] = []; // 연결 단계 mainsBound ∪ 텍스트 스타일 단계 mainsApplied
   const link = ($('makeOptLink') as HTMLInputElement).checked;
   const steps = planMake({ isPaid, globalsOn: mkGlobalsOn().length, stylesOn: mkTsOnList().length, link, rename: ($('makeOptRename') as HTMLInputElement).checked, dark: isPaid && ($('makeOptDark') as HTMLInputElement).checked });
   if (!steps.length || !baseline) return;
@@ -3937,12 +3996,14 @@ async function runMake(): Promise<void> {
         const rid = mkNextReq();
         const r = await wizardRequest({ type: 'CREATE_TEXT_STYLES', styles, reqId: rid, ...(link ? { applyTo: ids } : {}) }, ['TEXT_STYLES_RESULT'], rid);
         totals.styles = { s: r.created + r.updated, a: r.applied ?? 0, ...(r.missing.length ? { missing: r.missing } : {}) };
+        mkMainsDone.push(...(r.mainsApplied ?? []));
         results.push({ id, mark: 'ok', text: t('wizard.seq.textStyles', { created: r.created, updated: r.updated }) + (r.applied ? t('wizard.seq.textStylesLinked', { a: r.applied }) : '') + (r.missing.length ? t('wizard.seq.textStylesMissing', { k: r.missing.length }) : ''), ...(r.missing.length ? { tip: r.missing.join('\n') } : {}) });
       } else if (id === 'bind') {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
         const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
         totals.bound = r.bound;
+        mkMainsDone.push(...(r.mainsBound ?? []));
         const reasons = r.reasons ?? {};
         if (r.bound) results.push({ id, mark: 'ok', text: t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') });
         else {
@@ -3967,6 +4028,7 @@ async function runMake(): Promise<void> {
     }
   }
   const finishedSteps = mkProg?.done ?? [];
+  rememberMainsBound(mkMainsDone, mkBase); // 만들기 실행이 끝남 — 다 됨 줄 글은 그대로(결정 B)
   mkRunning = false;
   mkProg = null;
   wizardRunning = false;
@@ -4060,7 +4122,31 @@ let bindCounts: ReasonCounts | undefined;
 let layerLibUse: boolean | null = null;
 let layerLibReq = 0;
 /** 텍스트 스타일 미리보기(§4.2) — 스타일 줄 · 사유(레이어 단위) · 끈 줄. */
-type BindTsRow = { styleId: string; name: string; nodeIds: string[] };
+type BindTsRow = { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] };
+/** 찾기가 함께 걸은 선택 밖 메인 컴포넌트 단위(APPLY_RESULT.mains — ia-v3 §2.11 11번). */
+let bindMains: MainUnitInfo[] = [];
+/** 연결 뒤 메인 기억(ia-v4 §4.1 "연결 뒤 메인 줄" — 결정 B): 그때의 목록 기준 + 붙인 메인 단위 id. */
+let lastMainsBound: { base: string; ids: string[] } | null = null;
+/** 메인 단위 수 — 후보의 mainId와 스타일 줄의 mainIds를 합친 서로 다른 단위 id. */
+function mainUnitIds(cands: readonly BindCandidate[], rows: readonly BindTsRow[]): string[] {
+  const out = new Set<string>();
+  for (const c of cands) if (c.mainId) out.add(c.mainId);
+  for (const r of rows) for (const m of r.mainIds ?? []) if (m) out.add(m);
+  return [...out];
+}
+/** 메인 줄 툴팁 — "{이름} — {페이지}" 한 줄에 하나, 10개까지 + "외 {n}개". */
+function mainsTip(ids: readonly string[]): string {
+  const byId = new Map(bindMains.map((m) => [m.id, m]));
+  const lines = ids.map((id) => byId.get(id)).filter((m): m is MainUnitInfo => !!m).map((m) => (m.page ? `${m.name} — ${m.page}` : m.name));
+  return lines.slice(0, 10).join('\n') + (lines.length > 10 ? '\n' + t('v4.mainsMore', { n: lines.length - 10 }) : '');
+}
+/** 회색 메인 줄(카드 1 · 연결 화면 공통 글 · 툴팁). */
+function mainsLineEl(ids: readonly string[]): HTMLElement {
+  const sp = document.createElement('span');
+  sp.textContent = t('v4.mainsLine', { c: ids.length });
+  sp.title = mainsTip(ids);
+  return sp;
+}
 let bindTsRows: BindTsRow[] = [];
 let bindTsSkips: Record<string, number> = {};
 const bindTsOff = new Set<string>();
@@ -4409,6 +4495,16 @@ function updateBindApply(): void {
   const n = bindOnCount();
   $('btnApplyConfirmLabel').textContent = bindPreviewed && hasBindPreview() ? t('bind.linkN', { n }) : t('bind.link');
   $('bindFoot').hidden = !!bindLinking || bindZero(); // 건너뛴 곳 · 모두 연결된 모습은 연결할 곳이 0 — 버튼 줄 없음
+  // 메인 컴포넌트 줄(§4.2) — 켠 줄의 자리가 든 서로 다른 메인 단위 수. 연결 중 · 찾는 중 · 후보 0 · 건너뛴 곳 · 모두 연결된 모습엔 없음.
+  {
+    const eff = bindTsOnly() ? [] : effCandidates();
+    const ids = mainUnitIds(eff.filter((c) => bindChecked.has(candKey(c))), bindTsRows.filter((r) => !bindTsOff.has(r.styleId)));
+    const box = $('bindMains');
+    const show = !bindLinking && !bindFinding && bindPreviewed && hasBindPreview() && !bindZero() && ids.length > 0;
+    box.hidden = !show;
+    if (show) box.replaceChildren(mainsLineEl(ids));
+    else box.replaceChildren();
+  }
   if (!curSel.count && !baseline) setLock(confirm, 'prereq', t('status.noSelection'));
   else if (!bindPreviewed) setLock(confirm, 'prereq', t('v4.reading'));
   else if (!hasBindPreview()) setLock(confirm, 'prereq', t('bind.nothing'));
@@ -4428,6 +4524,7 @@ function clearBindPreview(): void {
   bindSkipsOpen = false;
   bindTsRows = [];
   bindTsSkips = {};
+  bindMains = [];
   bindVarPending = false;
   bindTsPending = false;
   clearMount($('bindSkips'));
@@ -4626,28 +4723,25 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   bindSkipReasons = { ...reasons };
   const box = $('bindSkips');
   clearMount(box);
-  // 줄 하나 = 사유 하나(§4.2 건너뛴 곳 목록): 이름 · 수 · 한 줄 설명 · [선택 ›]
+  // 줄 하나 = 사유 하나(§4.2 건너뛴 곳 목록 "두 줄 · 설명만"): 첫 줄 = 이름 · 수 · (손볼 곳 줄이면) [선택 ›], 둘째 줄 = 설명.
+  // [선택 ›]은 손볼 곳(FIX_SKIP_REASONS) 줄에만 — 그대로 둬도 되는 곳 줄은 레이어 목록이 있어도 없다(결정 A 확장).
   const row = (label: string, count: string, help: string, items: readonly SkipItem[], key?: string): HTMLElement => {
     const ids = [...new Set(items.map((x) => x.nodeId))];
     const r = document.createElement('div');
     r.className = 'skip-row';
+    const line = document.createElement('div');
+    line.className = 'skip-line';
     const nm = document.createElement('span');
     nm.className = 'skip-name';
     nm.textContent = label;
     const n = document.createElement('span');
     n.className = 'skip-n';
     n.textContent = count;
-    r.append(nm, n);
-    if (help) {
-      const h = document.createElement('span');
-      h.className = 'skip-help';
-      h.textContent = help;
-      r.appendChild(h);
-    }
     const grow = document.createElement('span');
     grow.className = 'grow';
-    r.appendChild(grow);
-    if (ids.length && key) {
+    line.append(nm, n, grow);
+    r.appendChild(line);
+    if (ids.length && key && FIX_SKIP_REASONS.includes(key)) {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'link link-btn skip-sel';
@@ -4663,7 +4757,13 @@ function renderSkipReasons(reasons: Record<string, number>): void {
         selectNodes(ids, 'applyStatus');
         setStatus('applyStatus', t('bind.skipSelected', { reason: t('reason.' + key), n: ids.length }), '');
       });
-      r.appendChild(btn);
+      line.appendChild(btn);
+    }
+    if (help) {
+      const h = document.createElement('div');
+      h.className = 'skip-help';
+      h.textContent = help;
+      r.appendChild(h);
     }
     return r;
   };
@@ -5522,7 +5622,7 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
 function bindFocusFirst(): void {
   if (!bindFocusPending || activeTab !== 'select' || selSub !== 'bind') return;
-  // 건너뛴 곳 모습은 첫 [선택 ›](없으면 ←), 모두 연결된 모습은 ← — §4.2
+  // 건너뛴 곳 모습은 첫 손볼 곳 [선택 ›](없으면 ←), 모두 연결된 모습은 ← — §4.2
   const row = bindZero()
     ? $('bindSkips').querySelector<HTMLElement>('.skip-sel') ?? $('btnSubBack')
     : $('bindTree').querySelector<HTMLElement>('[data-tkey][tabindex="0"]');
@@ -8550,10 +8650,16 @@ function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[]): void {
   b.dataset.k = 'tsLink';
   actions.push(b);
 }
+/** 연결 · 만들기 실행이 끝날 때 붙인 메인 단위를 기억한다(§4.1 결정 B) — 0이면 지운다. */
+function rememberMainsBound(ids: readonly string[], base: string | null = baseline ? baseKey() : null): void {
+  const uniq = [...new Set(ids)];
+  lastMainsBound = uniq.length && base ? { base, ids: uniq } : null;
+}
 /** 카드 1 — 변수 없는 값(§4.1). */
 function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | null): void {
   if (prereqKnown && !hasBindable) {
     // noTier — 계층 컬렉션에 변수가 없음
+    lastMainsBound = null; // noTier 모습 — 기억을 지운다(§4.1)
     const subs: (string | Node)[] = [t('bind.noTier')];
     const actions: HTMLElement[] = []; // 만들기 입구는 할 일 [변수 만들기] 하나(§4.1)
     tsOnlyExtra(subs, actions);
@@ -8567,13 +8673,33 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     return;
   }
   const { m, k, s, n } = counts;
-  if (n === 0 && s === 0) { put(selCard({ title: t('v4.allBound'), cls: 'ok' })); return; }
+  // 연결 뒤 메인 줄(§4.1 결정 B) — ✓ 모습이고 기억의 목록 기준이 지금과 같을 때만. ✓가 아니면 기억을 지운다.
+  const boundMains = (): HTMLElement[] => {
+    if (lastMainsBound && lastMainsBound.base !== baseKey()) lastMainsBound = null; // 목록 기준이 바뀜 — 지운다
+    if (!lastMainsBound) return [];
+    const sp = document.createElement('span');
+    sp.textContent = t('v4.allBoundMains', { c: lastMainsBound.ids.length });
+    return [sp];
+  };
+  const mainsSub = (card: HTMLElement): HTMLElement => {
+    // 회색 줄 — selCard의 둘째 줄(.s)과 같은 자리 규칙, 클래스만 더한다
+    for (const el of Array.from(card.querySelectorAll<HTMLElement>('.s'))) if (el.querySelector('[data-mains]')) el.classList.add('mains');
+    return card;
+  };
+  const markMains = (els: HTMLElement[]): HTMLElement[] => { for (const e of els) e.dataset.mains = '1'; return els; };
+  if (n === 0 && s === 0) {
+    const mb = markMains(boundMains());
+    put(mainsSub(selCard({ title: t('v4.allBound'), cls: 'ok', subs: mb })));
+    return;
+  }
   if (n === 0) {
     const v = selLink(t('v4.view'), (el) => { bindSkipsOpen = true; showSelSub('bind', el); renderBindTree(); });
     v.dataset.k = 'skips';
-    put(selCard({ title: t('v4.allLinked'), subs: [t('v4.fixPlaces', { s })], actions: [v] }));
+    const mb = markMains(boundMains());
+    put(mainsSub(selCard({ title: t('v4.allLinked'), subs: [...mb, t('v4.fixPlaces', { s })], actions: [v] })));
     return;
   }
+  lastMainsBound = null; // ✓가 아님 — 기억을 지운다(한 번 지우면 그 뒤 ✓가 돼도 보이지 않는다)
   // 둘째 줄: 종류별 연결할 곳(합 = m, Other 제외) + " · 새로 만들 값 {k}곳"(링크 없음 — 입구는 할 일 [변수 만들기]).
   const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== 'other').map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
   if (k > 0) parts.push(t('v4.noVarPlaces', { k }));
@@ -8585,7 +8711,11 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     go.dataset.k = 'link';
     actions.push(go);
   } else if (k > 0) selMakeHot = true; // m = 0 · k > 0 — 버튼 없음, 할 일 [변수 만들기]가 주 버튼(§4.1, 2026-11-11 사용자 결정)
-  const card = selCard({ title: t('v4.findN', { n }), subs: [sub], actions });
+  // 메인 컴포넌트 줄(§4.1) — m > 0 · c > 0이면 둘째 줄 아래 회색 줄 + 툴팁(메인 단위 이름 — 페이지).
+  const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
+  const subs: (string | Node)[] = [sub];
+  if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
+  const card = mainsSub(selCard({ title: t('v4.findN', { n }), subs, actions }));
   (card.querySelector('.t') as HTMLElement).title = t('v4.findTip');
   put(card);
 }

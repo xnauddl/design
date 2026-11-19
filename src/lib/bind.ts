@@ -7,7 +7,7 @@
 import { rgbToHex, colorKey, roundAlpha, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
 import { collectionTiers, ensureOwnedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
-import type { BindCandidate, BindNode, BindSkip, NewRoleRef } from '../shared/messages';
+import type { BindCandidate, BindNode, BindSkip, MainUnitInfo, NewRoleRef } from '../shared/messages';
 import { backgroundOf, gapSkip, isIconOrAvatar, inAutoLayoutFlow, iconOrAvatarKind, isInsideIconFrame } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타 · 오토레이아웃 흐름) — 만들기와 같은 기준
 import { ROLE_KEY, isKnownRole } from './naming';
 import { fieldKind, type ReasonCounts } from './selCards'; // 카드 숫자 — 속성 → 종류(IA v4 §4.1)
@@ -88,6 +88,10 @@ export interface BindResult {
   newRoles?: number;
   /** 사유 × 종류별 자리 수(상한 없음, IA v4 §4.1 카드 숫자). */
   counts?: ReasonCounts;
+  /** 함께 걸은 선택 밖 메인 컴포넌트 단위(ia-v3 §2.11 11번) — 순서대로. */
+  mains?: MainUnitInfo[];
+  /** 적용 모드 — 실제로 붙인 자리가 있는 메인 단위 id. */
+  mainsBound?: string[];
 }
 
 /**
@@ -350,26 +354,129 @@ function isEffectivelyVisible(node: SceneNode): boolean {
   return true;
 }
 
-/** 선택 하위 전체 노드 수(진행률 분모). 처리 없이 셈만. */
-function countNodes(sel: readonly SceneNode[]): number {
-  let n = 0;
-  const stack: SceneNode[] = sel.slice();
-  while (stack.length) {
-    const x = stack.pop() as SceneNode;
-    // walk가 건너뛰는 노드는 분모에서도 빼야 진행률이 100%로 끝난다.
-    if (x.visible === false) continue;
-    n++;
-    if (x.type === 'INSTANCE') continue;
-    if ('children' in x) for (const c of (x as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+/* ---------- 인스턴스의 메인 컴포넌트(ia-v3 §2.11 11번 · A.18 결함 1) ---------- */
+
+/** 메인 단위 — 변형이면 그 COMPONENT_SET(세트의 변형 모두), 아니면 COMPONENT. */
+export interface MainUnit {
+  id: string;
+  name: string;
+  page: string;
+  /** 걸을 루트(세트면 변형들 — 숨긴 변형도 넣는다, 걷기가 'hidden'으로 센다). */
+  roots: SceneNode[];
+}
+export interface LocalMains {
+  units: MainUnit[];
+  /** 인스턴스 id → 쓰는 메인(변형) — 실제로 걷는 메인 · 변형만(인스턴스 루트 자리 비교용). */
+  mainOf: Map<string, SceneNode>;
+  /** 메인이 라이브러리(remote)인 인스턴스 id. */
+  remote: Set<string>;
+  /** 숨긴 메인 단위(걷지 않음 — 'hidden'으로 센다). */
+  hiddenMains: SceneNode[];
+}
+
+const pageOf = (n: BaseNode): PageNode | null => {
+  let p: BaseNode | null = n;
+  while (p && p.type !== 'PAGE') p = p.parent;
+  return (p as PageNode | null) ?? null;
+};
+
+/**
+ * 목록 기준을 걸으며 보이는 인스턴스의 메인을 메인 단위로 너비 우선으로 모은다(메인 안 인스턴스도, 같은 단위 한 번,
+ * 목록 기준 안의 단위는 뺌, 다른 페이지면 `loadAsync`). 찾기 · 추출 · 텍스트 스타일이 함께 쓴다.
+ */
+export async function collectLocalMains(roots: readonly SceneNode[]): Promise<LocalMains> {
+  const out: LocalMains = { units: [], mainOf: new Map(), remote: new Set(), hiddenMains: [] };
+  const rootIds = new Set(roots.map((r) => r.id));
+  const inRoots = (n: BaseNode): boolean => {
+    let p: BaseNode | null = n;
+    while (p) {
+      if (rootIds.has(p.id)) return true;
+      p = p.parent;
+    }
+    return false;
+  };
+  const seenUnits = new Set<string>();
+  const seenNodes = new Set<string>();
+  const queue: SceneNode[] = roots.filter((r) => isEffectivelyVisible(r));
+  while (queue.length) {
+    const n = queue.shift() as SceneNode;
+    if (seenNodes.has(n.id)) continue;
+    seenNodes.add(n.id);
+    if (n.visible === false) continue;
+    if (n.type === 'INSTANCE') {
+      let main: ComponentNode | null = null;
+      try { main = await n.getMainComponentAsync(); } catch { main = null; }
+      if (!main) continue;
+      if (main.remote) { out.remote.add(n.id); continue; }
+      const parent = main.parent;
+      const unit: SceneNode = parent && parent.type === 'COMPONENT_SET' ? (parent as ComponentSetNode) : main;
+      const unitVisible = isEffectivelyVisible(unit);
+      if (unitVisible && isEffectivelyVisible(main)) out.mainOf.set(n.id, main);
+      if (seenUnits.has(unit.id)) continue;
+      seenUnits.add(unit.id);
+      if (inRoots(unit)) continue; // 목록 기준 안 — 그 걷기가 한다
+      if (!unitVisible) { out.hiddenMains.push(unit); continue; }
+      const page = pageOf(unit);
+      if (page && page !== figma.currentPage) {
+        try { await page.loadAsync(); } catch { /* 이미 불렸거나 동적 페이지가 아님 */ }
+      }
+      const unitRoots = unit.type === 'COMPONENT_SET' ? ((unit as ComponentSetNode).children as readonly SceneNode[]).filter((c) => c.type === 'COMPONENT') : [unit];
+      out.units.push({ id: unit.id, name: unit.name, page: page?.name ?? '', roots: [...unitRoots] });
+      for (const r of unitRoots) queue.push(r);
+      continue;
+    }
+    if ('children' in n) for (const c of (n as ChildrenMixin).children as readonly SceneNode[]) queue.push(c);
   }
+  return out;
+}
+
+/** 선택 하위 + 메인 단위 전체 노드 수(진행률 분모). 걷기와 같은 방문 집합 규칙으로 센다. */
+function countNodes(sel: readonly SceneNode[], units: readonly MainUnit[] = []): number {
+  let n = 0;
+  const visited = new Set<string>();
+  const count = (roots: readonly SceneNode[]): void => {
+    const stack: SceneNode[] = roots.slice().reverse();
+    while (stack.length) {
+      const x = stack.pop() as SceneNode;
+      if (visited.has(x.id)) continue;
+      visited.add(x.id);
+      // walk가 건너뛰는 노드는 분모에서도 빼야 진행률이 100%로 끝난다.
+      if (x.visible === false) continue;
+      n++;
+      if (x.type === 'INSTANCE') continue;
+      if ('children' in x) for (const c of (x as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
+    }
+  };
+  count(sel);
+  for (const u of units) count(u.roots);
   return n;
 }
+
+/**
+ * 인스턴스 루트 자신의 자리 값이 메인(쓰는 변형) 루트의 같은 자리 값과 같은가(§2.11 11번 "인스턴스 루트 자신의 속성").
+ * 같으면 메인을 따르는 값이라 후보 · 자리 단위 사유를 만들지 않는다. index가 없으면 그 속성 전체를 본다.
+ */
+function sameAsMain(inst: SceneNode, main: SceneNode, field: string, index?: number): boolean {
+  const a = (inst as unknown as Record<string, unknown>)[field];
+  const b = (main as unknown as Record<string, unknown>)[field];
+  if (a === undefined && b === undefined) return false;
+  const pick = (v: unknown): unknown => (index != null && Array.isArray(v) ? v[index] : v);
+  try {
+    return JSON.stringify(pick(a)) === JSON.stringify(pick(b));
+  } catch {
+    return false;
+  }
+}
+
+/** 걷는 중 자리 단위 사유를 거를 판정(인스턴스 루트 자리 — `sameAsMain`). note()가 본다. */
+let placeFilter: ((node: SceneNode, field?: string) => boolean) | null = null;
 
 /**
  * 사유 1건 집계(스킵 카운트는 증가시키지 않는 '건너뜀' 사유에도 사용).
  * dry-run이면 어느 레이어였는지도 남긴다 — 숫자만으로는 원인 레이어를 찾을 수 없다.
  */
 function note(res: BindResult, key: string, node?: SceneNode, preview?: Preview | null, field?: string): void {
+  if (node && field && placeFilter?.(node, field)) return; // 메인을 따르는 인스턴스 루트 자리(§2.11 11번)
   res.reasons[key] = (res.reasons[key] ?? 0) + 1;
   const kind = fieldKind(field);
   const byKind = ((res.counts ??= {})[key] ??= {});
@@ -421,9 +528,12 @@ export async function bindSelection(
   opts: BindOptions = {},
 ): Promise<BindResult> {
   const index = await buildIndex();
-  liveVarIds = await collectLiveVarIds(selection, new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
+  // 인스턴스의 메인 컴포넌트(§2.11 11번) — 목록 기준을 다 걸은 뒤 메인 단위마다 걷는다.
+  const mains = await collectLocalMains(selection);
+  const mainRoots = mains.units.flatMap((u) => u.roots);
+  liveVarIds = await collectLiveVarIds([...selection, ...mainRoots], new Set((await figma.variables.getLocalVariablesAsync()).map((v) => v.id)));
   const res: BindResult = { bound: 0, skipped: 0, reasons: {} };
-  const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection) : 0, every: 50 };
+  const prog: Progress = { done: 0, total: hooks.onProgress ? countNodes(selection, mains.units) : 0, every: 50 };
   // 적용 모드에서도 "어느 레이어에 어느 변수가 붙었나" 목록을 모은다(결과 트리). dry-run과 같은 수집기 —
   // 후보는 상한 없이 전부 싣는다(§4.6 "찾기 · 연결의 수").
   const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
@@ -440,6 +550,9 @@ export async function bindSelection(
     },
     skipText: opts.skipTextStyleNode,
     noNewRoles: !!opts.noNewRoles,
+    mainOf: mains.mainOf,
+    remote: mains.remote,
+    visited: new Set(),
   };
   for (const node of selection) {
     // 선택 루트가 숨긴 그룹 안이면 walk의 자체 visible 검사로는 못 거른다(루트 자신은 보임).
@@ -450,13 +563,24 @@ export async function bindSelection(
     await walk(node, ctx, hooks, prog, 0, null);
     if (res.cancelled) break;
   }
+  for (const u of mains.hiddenMains) note(res, 'hidden', u, preview);
+  for (const u of mains.units) {
+    if (res.cancelled) break;
+    ctx.mainId = u.id;
+    for (const r of u.roots) {
+      await walk(r, ctx, hooks, prog, 0, null);
+      if (res.cancelled) break;
+    }
+  }
+  ctx.mainId = undefined;
+  if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
   resolveSlots(ctx); // 자리마다 붙일 변수(또는 새 역할)를 고른다 — 색 밝기 · 번호는 찾기 전체를 보고 정한다(§2.12)
   if (apply && preview.candidates.length) {
     // 적용 모드도 같은 규칙 — 찾은 후보를 연결 경로(bindSelectedItems)로 붙인다(§2.12 12.9).
     const known = new Map<string, SceneNode>();
     for (const s of ctx.slots) known.set(s.node.id, s.node);
     const r = await bindSelectedItems(
-      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole })),
+      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}) })),
       {},
       known, // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
     );
@@ -464,6 +588,7 @@ export async function bindSelection(
     res.skipped += r.skipped;
     for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = (res.reasons[k] ?? 0) + v;
     res.newRoles = r.newRoles;
+    if (r.mainsBound.length) res.mainsBound = r.mainsBound;
     // 결과 트리에는 실제로 만든 역할의 id를 싣는다.
     for (const c of preview.candidates) {
       const id = c.newRole ? r.createdIds[c.newRole.name] : undefined;
@@ -612,6 +737,8 @@ interface Slot {
   bg?: BgKind;
   /** 연결 후보가 없을 때의 사유 — 'drop'은 만들기가 뽑지 않는 값이라 어디에도 세지 않는다(§4.1 k ①). */
   noMatchReason: string;
+  /** 선택 밖 메인 단위 안 자리(§2.11 11번). */
+  mainId?: string;
 }
 
 /** 만들기(extract)가 뽑지 않는 값 — 후보가 없으면 사유 없이 버린다(§4.1 k ①). */
@@ -630,6 +757,14 @@ interface Ctx {
   skipText?: (node: TextNode) => boolean;
   /** 무료 — 새 역할 없이 Global에 붙인다(BindOptions.noNewRoles). */
   noNewRoles?: boolean;
+  /** 지금 걷는 메인 단위 id — 후보에 싣는다. */
+  mainId?: string;
+  /** 인스턴스 id → 쓰는 메인(실제로 걷는 것만). */
+  mainOf?: ReadonlyMap<string, SceneNode>;
+  /** 메인이 라이브러리인 인스턴스 id. */
+  remote?: ReadonlySet<string>;
+  /** 목록 기준 · 메인 걷기 전체가 함께 쓰는 방문 집합. */
+  visited?: Set<string>;
 }
 
 /** 값 · 용도가 맞는 변수들(12.2 전제). */
@@ -797,6 +932,7 @@ function candOf(s: Slot, variableId: string, variableName: string, tier: number,
     tier,
     variableValue,
     ...(variableAlpha != null ? { variableAlpha } : {}),
+    ...(s.mainId ? { mainId: s.mainId } : {}),
   };
 }
 
@@ -828,6 +964,11 @@ async function walk(
 ): Promise<void> {
   const { res, preview } = ctx;
   if (res.cancelled) return;
+  // 방문 집합(§2.11 11번) — 목록 기준 루트가 메인 안에 있으면 그 아래를 두 번 걷지 않는다.
+  if (ctx.visited) {
+    if (ctx.visited.has(node.id)) return;
+    ctx.visited.add(node.id);
+  }
   // 숨긴 레이어는 화면에 없는 값이라 하위까지 통째로 제외 — extract.ts와 동일 기준.
   if (node.visible === false) {
     note(res, 'hidden', node, preview);
@@ -835,13 +976,28 @@ async function walk(
   }
   // 미리보기 트리(#13)용: 방문한 모든 노드를 기록(나중에 영향+조상으로 가지치기).
   preview.nodeIndex.push({ id: node.id, name: node.name, type: node.type, depth, parentId });
-  bindPaints(node, ctx);
-  bindFrame(node, ctx);
-  bindRadius(node, ctx);
-  bindStroke(node, ctx);
-  bindOpacity(node, ctx);
-  bindEffects(node, ctx);
-  await bindText(node, ctx);
+  const slotsBefore = ctx.slots.length;
+  // 메인을 걷는 인스턴스의 루트 자리 — 메인 루트와 같은 값이면 후보 · 사유를 만들지 않는다(§2.11 11번).
+  const main = node.type === 'INSTANCE' ? ctx.mainOf?.get(node.id) : undefined;
+  const prevFilter = placeFilter;
+  if (main) placeFilter = (n, field) => n === node && !!field && sameAsMain(node, main, field);
+  try {
+    bindPaints(node, ctx);
+    bindFrame(node, ctx);
+    bindRadius(node, ctx);
+    bindStroke(node, ctx);
+    bindOpacity(node, ctx);
+    bindEffects(node, ctx);
+    await bindText(node, ctx);
+  } finally {
+    placeFilter = prevFilter;
+  }
+  if (main) {
+    const kept = ctx.slots.slice(slotsBefore).filter((sl) => !sameAsMain(node, main, sl.field, sl.index));
+    ctx.slots.length = slotsBefore;
+    ctx.slots.push(...kept);
+  }
+  if (ctx.mainId) for (let i = slotsBefore; i < ctx.slots.length; i++) ctx.slots[i].mainId = ctx.mainId;
   // UX6: 주기적으로 진행률 보고 + 이벤트 루프 양보(취소 메시지 수신 가능) + 취소 확인.
   prog.done++;
   if (hooks.onProgress && prog.done % prog.every === 0) {
@@ -855,7 +1011,9 @@ async function walk(
   // 인스턴스 내부에 바인딩하면 인스턴스 오버라이드가 되어 마스터를 고쳐도 따라오지 않는다 —
   // 인스턴스 자체 속성까지만 처리하고 하위로는 내려가지 않는다(extract.ts와 동일 기준).
   if (node.type === 'INSTANCE') {
-    if (node.children.length) {
+    // 라이브러리 메인은 이 파일에서 연결할 수 없다(§2.11 11번) — 자식이 없어도 센다.
+    if (ctx.remote?.has(node.id)) note(res, 'library-main', node, preview);
+    else if (node.children.length) {
       note(res, 'instance-children', node, preview);
     }
     return;
@@ -1135,6 +1293,8 @@ export interface SelectedBindItem {
   variableId: string;
   /** 새 역할(§2.12 12.9) — 이 자리가 다시 확인을 통과하면 만든다(같은 이름은 한 번). */
   newRole?: NewRoleRef;
+  /** 선택 밖 메인 단위 안 자리(§2.11 11번) — 실제로 붙이면 mainsBound에 든다. */
+  mainId?: string;
 }
 
 /** 연결 진행률 · 양보 훅(§4.6 "찾기 · 연결의 수"). 묶음이 끝날 때마다 부른다. */
@@ -1164,6 +1324,8 @@ export interface SelectedBindResult {
   newRoles: number;
   /** 만든 역할 이름 → 변수 id. */
   createdIds: Record<string, string>;
+  /** 실제로 붙인 자리가 있는 메인 단위 id(서로 다른 것, 처음 붙인 순서). */
+  mainsBound: string[];
 }
 
 /**
@@ -1192,6 +1354,7 @@ export async function bindSelectedItems(
       res.reasons[key] = (res.reasons[key] ?? 0) + 1;
     }
   };
+  const mainsBound = new Set<string>();
   // 새 역할은 이 연결 안에서 이름마다 한 번 만든다(§2.12 12.9).
   const created = new Map<string, Variable>();
   const createdIds: Record<string, string> = {};
@@ -1247,7 +1410,7 @@ export async function bindSelectedItems(
     };
 
     // 칠하기·선·효과는 레이어×속성마다 새 배열을 모았다가 묶음 끝에 한 번 쓴다. fields = 그 배열에 연결한 자리 수.
-    const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', { arr: (Paint | Effect)[]; fields: number }>>();
+    const changedPaints = new Map<SceneNode, Map<'fills' | 'strokes' | 'effects', { arr: (Paint | Effect)[]; fields: number; mains: string[] }>>();
 
     for (const it of chunk) {
       const node = nodes.get(it.nodeId) ?? null;
@@ -1301,7 +1464,8 @@ export async function bindSelectedItems(
           if (w) {
             w.arr = arr;
             w.fields++;
-          } else m.set(key, { arr, fields: 1 });
+            if (it.mainId) w.mains.push(it.mainId);
+          } else m.set(key, { arr, fields: 1, mains: it.mainId ? [it.mainId] : [] });
           continue; // bound는 묶음 끝 배열 쓰기가 성공해야 센다
         }
         if ((TEXT_RANGE_FIELDS as readonly string[]).includes(it.field)) {
@@ -1326,6 +1490,7 @@ export async function bindSelectedItems(
           await figma.loadFontAsync(node.fontName);
           node.setRangeBoundVariable(0, node.characters.length, field, await target());
           res.bound++;
+          if (it.mainId) mainsBound.add(it.mainId);
           hooks.onBound?.(res.bound);
           continue;
         }
@@ -1366,6 +1531,7 @@ export async function bindSelectedItems(
         }
         (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, await target());
         res.bound++;
+        if (it.mainId) mainsBound.add(it.mainId);
         hooks.onBound?.(res.bound);
       } catch {
         fail('error', node, it.field);
@@ -1376,6 +1542,7 @@ export async function bindSelectedItems(
         try {
           (node as unknown as Record<string, unknown>)[key] = w.arr;
           res.bound += w.fields;
+          for (const id of w.mains) mainsBound.add(id);
           hooks.onBound?.(res.bound);
         } catch {
           // 배열 쓰기 실패 — 그 배열에 연결한 자리는 연결되지 않았다.
@@ -1390,7 +1557,7 @@ export async function bindSelectedItems(
     if (hooks.yieldToEvents) await hooks.yieldToEvents();
   }
   const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds };
+  return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds, mainsBound: [...mainsBound] };
 }
 
 /**

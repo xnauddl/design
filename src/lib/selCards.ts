@@ -34,7 +34,7 @@ export const FIX_SKIP_REASONS: readonly string[] = ['fraction', 'size-fraction',
 /** 그대로 둬도 되는 자리 단위 사유(§4.2) — s에 넣지 않고 건너뛴 곳 목록에만. 이 순서가 목록 줄 순서. */
 export const INFO_SKIP_REASONS: readonly string[] = ['styled', 'space-between', 'hug-fill', 'empty-text'];
 /** 레이어 단위 건너뜀(§4.2 — 건너뜀 칩 안에만 사유로 보인다). */
-export const LAYER_SKIP_REASONS: readonly string[] = ['instance-children', 'hidden', 'no-autolayout', 'size-free-layout', 'font'];
+export const LAYER_SKIP_REASONS: readonly string[] = ['instance-children', 'hidden', 'no-autolayout', 'size-free-layout', 'font', 'library-main'];
 
 /** 건너뜀 목록 항목(`BindSkip`의 필요한 부분). */
 export interface SkipItem {
