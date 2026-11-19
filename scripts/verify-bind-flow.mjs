@@ -276,7 +276,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   // ⋯ — 준비 현황 · 내보내기 · 색 격자 · 펼치기 · 접기
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴 6개(색 격자로 보기 · 이름 다시 짓기 포함)', more.length === 6 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기' && more[5].startsWith('텍스트 스타일 이름 다시 짓기…'), more.join('|'));
+  check('9 ⋯ 메뉴 7개(색 격자로 보기 · 안 쓰는 변수 찾기 · 이름 다시 짓기 포함)', more.length === 7 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기' && more[5] === '안 쓰는 변수 찾기…' && more[6].startsWith('텍스트 스타일 이름 다시 짓기…'), more.join('|'));
   check('9 ⋯ 이름 다시 짓기 — 무료면 잠김 · 앞에 구분선', (await p.$eval('.ctx-menu button:last-child', (b) => b.getAttribute('aria-disabled') === 'true' || b.disabled)) && (await p.$$eval('.ctx-menu [role="separator"], .ctx-menu hr, .ctx-menu .sep', (e) => e.length)) >= 1);
   await p.click('.ctx-menu button >> text=색 격자로 보기');
   check('9 색 격자 — 동그라미만(이름 없음)', (await p.$$('.vp-line.vp-dot .vp-item')).length === 2 && (await p.$('.vp-line.vp-dot .vp-name')) === null);
@@ -2580,8 +2580,55 @@ async function fillBoth(p) {
   await p.close();
 }
 
+/* ---------- 27 안 쓰는 변수 찾기(docs/unused-vars.md) ---------- */
 {
-  // 27e 브랜드 팔레트 무료(ia-v4 §4.3a · A.18 4) — 무료에서 [팔레트 생성] · [팔레트 만들기] 열림, [색 변수 만들기]는 Global만
+  const p = await open(480, 'variables');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnVarMore');
+  const item = await p.$('.ctx-menu button:has-text("안 쓰는 변수 찾기")');
+  check('27 ⋯ 메뉴에 "안 쓰는 변수 찾기…"', !!item);
+  await item.click();
+  await p.waitForTimeout(40);
+  const scan = (await sent(p, 'SCAN_UNUSED_VARS')).at(-1);
+  check('27 누르면 SCAN_UNUSED_VARS(reqId) · 팝업 · 처음 포커스 [취소]', typeof scan?.reqId === 'number' && (await p.$$('.modal')).length === 1 && (await p.evaluate(() => document.activeElement?.textContent)) === '취소');
+  await recv(p, { type: 'PROGRESS', op: 'unused', done: 0, total: 0 });
+  check('27 불러오는 중 띠(role=status)', (await p.textContent('.modal .unused-prog')).includes('페이지를 불러오는 중') && (await p.getAttribute('.modal .unused-prog', 'role')) === 'status');
+  await recv(p, { type: 'PROGRESS', op: 'unused', done: 3, total: 12 });
+  check('27 읽는 중 "3 / 12 페이지"', (await p.textContent('.modal .unused-prog')).includes('3 / 12 페이지'));
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(30);
+  const cx = (await sent(p, 'CANCEL')).at(-1);
+  check('27 읽는 중 Esc → CANCEL{op:"unused"} · 팝업 닫힘', cx?.op === 'unused' && (await p.$$('.modal')).length === 0);
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button:has-text("안 쓰는 변수 찾기")');
+  await p.waitForTimeout(40);
+  const scan2 = (await sent(p, 'SCAN_UNUSED_VARS')).at(-1);
+  await recv(p, { type: 'UNUSED_VARS', reqId: scan.reqId, items: [{ id: 'g0', kind: 'none' }], pages: 1, layers: 1 });
+  check('27 지난 요청의 결과는 버림', (await p.$$('.modal .unused-tree')).length === 0);
+  await recv(p, { type: 'UNUSED_VARS', reqId: scan2.reqId, items: [{ id: 'g0', kind: 'chain' }, { id: 'sp8', kind: 'none' }, { id: 'nope', kind: 'none' }], pages: 12, layers: 8240 });
+  await p.waitForTimeout(40);
+  check('27 결과 — 제목은 그린 줄 수(표에 없는 id 뺌) · 요약 · 주의 띠(주황)', (await p.textContent('.modal h3')) === '안 쓰는 변수 2개' && (await p.textContent('.modal .unused-sum')).includes('8,240') && (await p.textContent('.modal .banner.caution')) === '다른 파일에서 쓰는 변수는 확인하지 못해요', await p.textContent('.modal h3'));
+  check('27 트리 — 머리 띠 · 처음 모두 끔', (await p.$$eval('.modal .unused-tree .tr-head', (e) => e.length)) === 1 && (await p.$$eval('.modal .unused-tree .tr-row .bv-switch', (e) => e.every((x) => x.getAttribute('aria-checked') === 'false'))));
+  check('27 chain 태그', (await p.$$eval('.modal .unused-tree .tr-tag', (e) => e.map((x) => x.textContent))).includes('안 쓰는 변수만 가리킴'));
+  check('27 k = 0 → [선택한 0개 지우기] aria-disabled', (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) === 'true');
+  await p.click('.modal .unused-tree .tr-row .bv-switch');
+  await p.waitForTimeout(30);
+  check('27 하나 켜면 [선택한 1개 지우기] 풀림', (await p.textContent('.modal [data-unused="delete"]')) === '선택한 1개 지우기' && (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) !== 'true');
+  const badU = await nestedCards(p);
+  check('27 카드 안 카드 0 — 안 쓰는 변수 팝업', badU.length === 0, badU.join(' · '));
+  await p.click('.modal [data-unused="delete"]');
+  await p.waitForTimeout(30);
+  const del = (await sent(p, 'DELETE_VARIABLES')).at(-1);
+  check('27 지우기 → DELETE_VARIABLES(켠 id) · 확인하는 중 잠금', del?.ids?.length === 1 && (await p.textContent('.modal .unused-prog')).includes('확인하는 중') && (await p.$$eval('.modal .unused-tree .bv-switch', (e) => e.every((x) => x.getAttribute('aria-disabled') === 'true'))));
+  await recv(p, { type: 'VARIABLES_DELETED', reqId: del.reqId, deleted: 1, skipped: 1, failed: 0 });
+  await p.waitForTimeout(40);
+  check('27 지운 뒤 팝업 닫힘 · 상태 줄 문구', (await p.$$('.modal')).length === 0 && (await p.textContent('#statusText')) === '변수 1개를 지웠어요 · ⌘Z로 되돌리기 · 건너뜀 1', await p.textContent('#statusText'));
+  await p.close();
+}
+
+{
+  // 28e 브랜드 팔레트 무료(ia-v4 §4.3a · A.18 4) — 무료에서 [팔레트 생성] · [팔레트 만들기] 열림, [색 변수 만들기]는 Global만
   const p = await open(480, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, PREREQ);
@@ -2589,24 +2636,24 @@ async function fillBoth(p) {
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['k1'] });
   await goSub(p, 'pick');
   await p.waitForTimeout(40);
-  check('27e 무료 — [팔레트 생성] · [팔레트 만들기] aria-disabled 없음 · 🔒 빈 글',
+  check('28e 무료 — [팔레트 생성] · [팔레트 만들기] aria-disabled 없음 · 🔒 빈 글',
     (await p.getAttribute('#btnPalette', 'aria-disabled')) !== 'true' && (await p.getAttribute('#btnPaletteRun', 'aria-disabled')) !== 'true' && (await p.textContent('#paletteBtnLock')) === '');
   await p.click('#btnPalette');
-  check('27e [팔레트 생성] → 띠 열림', await visible(p, '#paletteBand'));
+  check('28e [팔레트 생성] → 띠 열림', await visible(p, '#paletteBand'));
   await p.click('#btnPaletteRun');
   await p.waitForTimeout(80);
-  check('27e [팔레트 만들기] → 색 목록', (await p.$$eval('#colorTable .r-card', (e) => e.length)) > 10);
+  check('28e [팔레트 만들기] → 색 목록', (await p.$$eval('#colorTable .r-card', (e) => e.length)) > 10);
   await p.click('#btnColorVars');
   const cr = (await sent(p, 'CREATE_TOKENS')).at(-1);
-  check('27e [색 변수 만들기] → CREATE_TOKENS{globalOnly · replacePalette}', cr?.globalOnly === true && cr.replacePalette === true && !cr.preview, JSON.stringify(cr && { g: cr.globalOnly, r: cr.replacePalette }));
+  check('28e [색 변수 만들기] → CREATE_TOKENS{globalOnly · replacePalette}', cr?.globalOnly === true && cr.replacePalette === true && !cr.preview, JSON.stringify(cr && { g: cr.globalOnly, r: cr.replacePalette }));
   await recv(p, { type: 'CREATE_RESULT', created: 10, updated: 0, summary: 'Global 10개', roles: 0 });
   await p.waitForTimeout(40);
-  check('27e 그 뒤 CREATE_SEMANTICS 없음', (await sent(p, 'CREATE_SEMANTICS')).length === 0);
+  check('28e 그 뒤 CREATE_SEMANTICS 없음', (await sent(p, 'CREATE_SEMANTICS')).length === 0);
   await p.close();
 }
 
 {
-  // 27f 소수 크기 흐린 줄(ia-v4 §4.3 "소수 크기 줄" · A.18 3) — 만들기 화면 Text Style 탭
+  // 28f 소수 크기 흐린 줄(ia-v4 §4.3 "소수 크기 줄" · A.18 3) — 만들기 화면 Text Style 탭
   const S24 = { name: 'heading/medium', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 3, nodeIds: ['t1'] };
   const D2667 = { fontSize: 26.67, lineHeight: 36, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'SemiBold', count: 4, uiCount: 0, sample: 'Title', styleIds: [], nodeIds: ['t2'] };
   const openMake = async (styles) => {
@@ -2629,14 +2676,14 @@ async function fillBoth(p) {
   };
   {
     const p = await openMake([S24]);
-    check('27f 탭 수 — Text Style 1(흐린 줄은 세지 않음)', (await tabsOf(p)).includes('Text Style1'), JSON.stringify(await tabsOf(p)));
+    check('28f 탭 수 — Text Style 1(흐린 줄은 세지 않음)', (await tabsOf(p)).includes('Text Style1'), JSON.stringify(await tabsOf(p)));
     await p.click('#makeTab-ts');
     await p.waitForTimeout(30);
     const rows = await p.$$eval('#makeTree .tr-row', (e) => e.map((r) => ({ k: r.dataset.tkey, dec: r.classList.contains('ts-decimal'), sw: !!r.querySelector('.bv-switch'), txt: r.textContent, aria: r.getAttribute('aria-label'), col: getComputedStyle(r.querySelector('.ts-aa')).color })));
-    check('27f Text Style 탭 줄 2개 — 26.67 흐린 줄이 크기 순서 제자리(먼저) · 스위치 없음 · 오른쪽 글',
+    check('28f Text Style 탭 줄 2개 — 26.67 흐린 줄이 크기 순서 제자리(먼저) · 스위치 없음 · 오른쪽 글',
       rows.length === 2 && rows[0].dec && !rows[0].sw && rows[0].txt.includes('글자 크기가 소수라 만들지 않아요') && rows[0].txt.includes('26.67') && rows[0].txt.includes('Layer 4') && !rows[1].dec && rows[1].sw, JSON.stringify(rows));
-    check('27f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(146, 152, 161)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
-    check('27f 아래 줄 · 실행 수는 스타일 1개', (await p.textContent('#makeCount')).includes('스타일 1개'), await p.textContent('#makeCount'));
+    check('28f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(146, 152, 161)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
+    check('28f 아래 줄 · 실행 수는 스타일 1개', (await p.textContent('#makeCount')).includes('스타일 1개'), await p.textContent('#makeCount'));
     // 키보드 — 화살표가 흐린 줄에도 멈추고 Enter · Space는 아무 일 없음
     await p.focus('#makeTree .tr-row[data-tkey^="t:"]');
     await p.keyboard.press('ArrowUp');
@@ -2645,23 +2692,23 @@ async function fillBoth(p) {
     await p.keyboard.press('Enter');
     await p.keyboard.press(' ');
     await p.waitForTimeout(20);
-    check('27f 화살표가 흐린 줄에 멈춤 · Enter · Space 아무 일 없음(고치기 칸 없음 · 줄 그대로)', onDec && (await p.$$eval('#makeTree input.tr-edit', (e) => e.length)) === 0 && (await p.$$eval('#makeTree .tr-row', (e) => e.length)) === 2);
+    check('28f 화살표가 흐린 줄에 멈춤 · Enter · Space 아무 일 없음(고치기 칸 없음 · 줄 그대로)', onDec && (await p.$$eval('#makeTree input.tr-edit', (e) => e.length)) === 0 && (await p.$$eval('#makeTree .tr-row', (e) => e.length)) === 2);
     const bad = await nestedCards(p);
-    check('27f 카드 안 카드 0 — Text Style 탭', bad.length === 0, bad.join(' · '));
+    check('28f 카드 안 카드 0 — Text Style 탭', bad.length === 0, bad.join(' · '));
     await p.close();
   }
   {
     // 소수 크기만 — 탭 수 0 · 빈 상태 없음 · 모두 켜기 · 끄기 없음
     const p = await openMake([]);
-    check('27g 만들기 화면 소수 크기만 — Text Style 탭 수 0', (await tabsOf(p)).includes('Text Style0'), JSON.stringify(await tabsOf(p)));
+    check('28g 만들기 화면 소수 크기만 — Text Style 탭 수 0', (await tabsOf(p)).includes('Text Style0'), JSON.stringify(await tabsOf(p)));
     await p.click('#makeTab-ts');
     await p.waitForTimeout(30);
-    check('27g Text Style 탭(소수 크기만) — 흐린 줄 하나 · 빈 상태 없음 · 모두 켜기 · 끄기 없음', (await p.$$eval('#makeTree .tr-row.ts-decimal', (e) => e.length)) === 1 && !(await visible(p, '#makeEmpty')) && !(await visible(p, '#makeAllOn')) && !(await visible(p, '#makeAllOff')));
+    check('28g Text Style 탭(소수 크기만) — 흐린 줄 하나 · 빈 상태 없음 · 모두 켜기 · 끄기 없음', (await p.$$eval('#makeTree .tr-row.ts-decimal', (e) => e.length)) === 1 && !(await visible(p, '#makeEmpty')) && !(await visible(p, '#makeAllOn')) && !(await visible(p, '#makeAllOff')));
     await p.close();
   }
 }
 {
-  // 27f · 27g 값을 직접 고르기 › 타이포 #tsList 흐린 카드 · [등록] 0개 잠금
+  // 28f · 28g 값을 직접 고르기 › 타이포 #tsList 흐린 카드 · [등록] 0개 잠금
   const D2667 = { fontSize: 26.67, lineHeight: 36, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'SemiBold', count: 4, uiCount: 0, sample: 'Title', styleIds: [], nodeIds: ['t2'] };
   const openTs = async () => {
     const p = await open(480, 'variables');
@@ -2682,10 +2729,10 @@ async function fillBoth(p) {
     ] });
     await p.waitForTimeout(60);
     const cards = await p.$$eval('#tsList .r-card', (e) => e.map((c) => ({ dec: c.classList.contains('ts-decimal'), inputs: c.querySelectorAll('input').length, del: c.querySelectorAll('.link').length, title: c.querySelector('.r-title')?.textContent, col: getComputedStyle(c.querySelector('.r-title')).color })));
-    check('27f #tsList — 흐린 카드가 크기 순서 제자리(가운데) · 이름 입력 · [삭제] 없음 · 회색 사유',
+    check('28f #tsList — 흐린 카드가 크기 순서 제자리(가운데) · 이름 입력 · [삭제] 없음 · 회색 사유',
       cards.length === 3 && cards[1].dec && cards[1].inputs === 0 && cards[1].del === 0 && cards[1].title === '글자 크기가 소수라 만들지 않아요' && cards[1].col === 'rgb(146, 152, 161)' && !cards[0].dec && !cards[2].dec, JSON.stringify(cards));
-    check('27f #tsStatus 수 — 신규 2(흐린 줄은 세지 않음)', (await p.textContent('#tsStatus')).startsWith('신규 2'), await p.textContent('#tsStatus'));
-    check('27f [등록] 잠금 없음(만들 스타일 있음)', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true');
+    check('28f #tsStatus 수 — 신규 2(흐린 줄은 세지 않음)', (await p.textContent('#tsStatus')).startsWith('신규 2'), await p.textContent('#tsStatus'));
+    check('28f [등록] 잠금 없음(만들 스타일 있음)', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true');
     // [왼쪽 글자로 이름 채우기] 뒤 — 응답의 decimalRows대로 다시 그림(빠진 줄은 없어짐)
     await p.click('#btnTsRowLabels');
     await recv(p, { type: 'TEXT_STYLE_CANDIDATES', warnings: [], labeled: 1, fallback: 1, decimalRows: [], styles: [
@@ -2693,7 +2740,7 @@ async function fillBoth(p) {
       { name: 'body/medium', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 12, nodeIds: ['t3'] },
     ] });
     await p.waitForTimeout(60);
-    check('27f 이름 채우기 뒤 — 응답에 없는 흐린 줄은 없어짐', (await p.$$eval('#tsList .r-card.ts-decimal', (e) => e.length)) === 0 && (await p.$$eval('#tsList .r-card', (e) => e.length)) === 2);
+    check('28f 이름 채우기 뒤 — 응답에 없는 흐린 줄은 없어짐', (await p.$$eval('#tsList .r-card.ts-decimal', (e) => e.length)) === 0 && (await p.$$eval('#tsList .r-card', (e) => e.length)) === 2);
     await p.close();
   }
   {
@@ -2701,21 +2748,21 @@ async function fillBoth(p) {
     // 읽기 전에 누르면 지금처럼 needSpecs
     await p.click('#btnTextStyles', { force: true });
     await p.waitForTimeout(20);
-    check('27g 읽기 전 [등록] — 잠금 없음 · needSpecs', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true' && (await p.textContent('#tsStatus')) === '먼저 ‘스캔’으로 스타일을 읽어 주세요', await p.textContent('#tsStatus'));
+    check('28g 읽기 전 [등록] — 잠금 없음 · needSpecs', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true' && (await p.textContent('#tsStatus')) === '먼저 ‘스캔’으로 스타일을 읽어 주세요', await p.textContent('#tsStatus'));
     const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
     await recv(p, { type: 'TEXT_STYLE_CANDIDATES', ...(sc?.reqId != null ? { reqId: sc.reqId } : {}), warnings: [], existing: [], styles: [], decimalRows: [D2667] });
     await p.waitForTimeout(60);
-    check('27g 소수 크기만 — 램프로 가지 않음 · fallbackRamp 없음 · 흐린 카드 하나', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 1 && (await p.$$eval('#tsList .r-card.ts-decimal', (e) => e.length)) === 1 && !(await p.textContent('#tsStatus')).includes('기본 램프'));
-    check('27g [등록] aria-disabled', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) === 'true');
+    check('28g 소수 크기만 — 램프로 가지 않음 · fallbackRamp 없음 · 흐린 카드 하나', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 1 && (await p.$$eval('#tsList .r-card.ts-decimal', (e) => e.length)) === 1 && !(await p.textContent('#tsStatus')).includes('기본 램프'));
+    check('28g [등록] aria-disabled', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) === 'true');
     await p.click('#btnTextStyles', { force: true });
     await p.waitForTimeout(20);
-    check('27g 누르면 상태 줄 "만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요" · CREATE_TEXT_STYLES 0', (await p.textContent('#statusText')) === '만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요' && (await count(p, 'CREATE_TEXT_STYLES')) === 0, await p.textContent('#statusText'));
+    check('28g 누르면 상태 줄 "만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요" · CREATE_TEXT_STYLES 0', (await p.textContent('#statusText')) === '만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요' && (await count(p, 'CREATE_TEXT_STYLES')) === 0, await p.textContent('#statusText'));
     await p.close();
   }
 }
 
 {
-  // 27a · 27b · 27c 인스턴스의 메인 컴포넌트(ia-v4 §4.1 · §4.2 · ia-v3 §2.11 11번 · A.18 1)
+  // 28a · 28b · 28c 인스턴스의 메인 컴포넌트(ia-v4 §4.1 · §4.2 · ia-v3 §2.11 11번 · A.18 1)
   const cm = (field, v, name, mainId, nodeId = 'n1') => ({ nodeId, field, currentValue: '8', variableId: v, variableName: name, tier: 2, ...(mainId ? { mainId } : {}) });
   const MAINS = [{ id: 'S', name: 'Traveler Card', page: 'Components' }, { id: 'M', name: 'Badge', page: 'Components' }];
   const CANDS = [cm('itemSpacing', 'vA', 'spacing/a', 'S', 'm1'), cm('paddingLeft', 'vB', 'spacing/b', 'M', 'm2'), cm('paddingTop', 'vC', 'spacing/c', undefined, 'n1')];
@@ -2725,48 +2772,48 @@ async function fillBoth(p) {
   await found(p, { candidates: CANDS, mains: MAINS, reasons: {}, counts: {} });
   await p.waitForTimeout(40);
   const line = await p.evaluate(() => { const e = [...document.querySelectorAll('#selCards .s.mains')][0]; if (!e) return null; const cs = getComputedStyle(e); const sp = e.querySelector('span'); return { text: e.textContent, tip: sp?.title, bw: cs.borderTopWidth, r: cs.borderTopLeftRadius, bg: cs.backgroundColor, below: e.getBoundingClientRect().top >= e.previousElementSibling.getBoundingClientRect().bottom - 1 }; });
-  check('27a 카드 1 — 둘째 줄 아래 "선택 밖 메인 컴포넌트 2개도 함께 연결해요" · 툴팁에 메인 이름 둘', line?.text === '선택 밖 메인 컴포넌트 2개도 함께 연결해요' && line.tip === 'Traveler Card — Components\nBadge — Components' && line.below, JSON.stringify(line));
-  check('27a 카드 안 줄 — 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', line?.bw === '0px' && line.r === '0px' && line.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(line));
-  check('27a 찾기 툴팁 — 메인 컴포넌트 포함', (await p.$eval('#selCards .sel-card .t', (e) => e.title)) === '인스턴스 안쪽 · 숨긴 레이어 제외 — 인스턴스의 메인 컴포넌트는 포함');
-  // 27b 연결 화면
+  check('28a 카드 1 — 둘째 줄 아래 "선택 밖 메인 컴포넌트 2개도 함께 연결해요" · 툴팁에 메인 이름 둘', line?.text === '선택 밖 메인 컴포넌트 2개도 함께 연결해요' && line.tip === 'Traveler Card — Components\nBadge — Components' && line.below, JSON.stringify(line));
+  check('28a 카드 안 줄 — 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', line?.bw === '0px' && line.r === '0px' && line.bg === 'rgba(0, 0, 0, 0)', JSON.stringify(line));
+  check('28a 찾기 툴팁 — 메인 컴포넌트 포함', (await p.$eval('#selCards .sel-card .t', (e) => e.title)) === '인스턴스 안쪽 · 숨긴 레이어 제외 — 인스턴스의 메인 컴포넌트는 포함');
+  // 28b 연결 화면
   await p.click('[data-k="link"]');
   await p.waitForTimeout(40);
   const bm = () => p.evaluate(() => { const e = document.getElementById('bindMains'); return e.hidden ? null : e.textContent; });
   const pos = await p.evaluate(() => { const m = document.getElementById('bindMains').getBoundingClientRect(); const st = document.getElementById('applyStatus').getBoundingClientRect(); const tree = document.getElementById('bindTree').getBoundingClientRect(); return m.top >= tree.bottom - 1 && m.bottom <= st.top + 1; });
-  check('27b 연결 화면 — 아래 고정 줄 위(#applyStatus 위 · 목록 아래) 같은 글', (await bm()) === '선택 밖 메인 컴포넌트 2개도 함께 연결해요' && pos, String(await bm()));
+  check('28b 연결 화면 — 아래 고정 줄 위(#applyStatus 위 · 목록 아래) 같은 글', (await bm()) === '선택 밖 메인 컴포넌트 2개도 함께 연결해요' && pos, String(await bm()));
   const toggle = async (name) => { await p.evaluate((n) => { const r = [...document.querySelectorAll('#bindTree .tr-row')].find((x) => x.textContent.includes(n)); r.querySelector('.bv-switch').click(); }, name); await p.waitForTimeout(20); };
   await toggle('spacing/b');
-  check('27b 메인 자리만 가진 줄을 끄면 c = 2 → 1', (await bm()) === '선택 밖 메인 컴포넌트 1개도 함께 연결해요', String(await bm()));
+  check('28b 메인 자리만 가진 줄을 끄면 c = 2 → 1', (await bm()) === '선택 밖 메인 컴포넌트 1개도 함께 연결해요', String(await bm()));
   await p.click('#bindAllOff');
   await p.waitForTimeout(20);
-  check('27b 모두 끄면 줄 숨김', (await bm()) === null);
+  check('28b 모두 끄면 줄 숨김', (await bm()) === null);
   await p.click('#bindAllOn');
   await p.waitForTimeout(20);
   await p.click('#btnApplyConfirm');
   const as = (await sent(p, 'APPLY_SELECTED')).at(-1);
-  check('27b 보낸 APPLY_SELECTED.items에 mainId', as?.items?.find((i) => i.variableId === 'vA')?.mainId === 'S' && as.items.find((i) => i.variableId === 'vC')?.mainId === undefined, JSON.stringify(as?.items));
-  // 27c 연결 뒤 메인 줄(결정 B)
+  check('28b 보낸 APPLY_SELECTED.items에 mainId', as?.items?.find((i) => i.variableId === 'vA')?.mainId === 'S' && as.items.find((i) => i.variableId === 'vC')?.mainId === undefined, JSON.stringify(as?.items));
+  // 28c 연결 뒤 메인 줄(결정 B)
   await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 3, skipped: 0, reasons: {}, skips: [], mainsBound: ['S', 'M'] });
   await p.waitForTimeout(40);
-  check('27c 상태 줄에 "메인 컴포넌트" 없음(v4.linked 글 그대로)', (await p.textContent('#statusText')) === '🔗 3곳 연결 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
+  check('28c 상태 줄에 "메인 컴포넌트" 없음(v4.linked 글 그대로)', (await p.textContent('#statusText')) === '🔗 3곳 연결 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
   const doneFind = async (extra = {}) => { const id = await lastReq(p, 'APPLY'); await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {}, ...extra }); await recv(p, tsPrev(id)); await p.waitForTimeout(40); };
   const boundLine = () => p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'));
   await p.waitForTimeout(450);
   await doneFind();
-  check('27c 다음 찾기 ✓ → 카드 1 ✓ 글 아래 회색 "메인 컴포넌트 2개도 함께 연결했어요"', (await boundLine()) === '메인 컴포넌트 2개도 함께 연결했어요' && (await p.textContent('#selCards')).includes('✓ 찾은 값은 모두 연결돼 있어요'), await boundLine());
+  check('28c 다음 찾기 ✓ → 카드 1 ✓ 글 아래 회색 "메인 컴포넌트 2개도 함께 연결했어요"', (await boundLine()) === '메인 컴포넌트 2개도 함께 연결했어요' && (await p.textContent('#selCards')).includes('✓ 찾은 값은 모두 연결돼 있어요'), await boundLine());
   // allLinked(s > 0) — ✓ 제목 바로 아래 · "손볼 곳" 줄 위
   await doneFind({ counts: { fraction: { gap: 2 } }, reasons: { fraction: 2 }, skips: [{ nodeId: 'x', name: 'X', type: 'FRAME', reason: 'fraction', field: 'paddingLeft' }] });
   const order = await p.evaluate(() => [...document.querySelectorAll('#selCards .sel-card')[0].querySelectorAll('.t, .s')].map((e) => e.textContent));
-  check('27c allLinked 모습 — 줄이 ✓ 제목 바로 아래 · "손볼 곳" 줄 위', JSON.stringify(order) === JSON.stringify(['✓ 연결할 곳은 모두 연결됐어요', '메인 컴포넌트 2개도 함께 연결했어요', '손볼 곳 2곳']), JSON.stringify(order));
+  check('28c allLinked 모습 — 줄이 ✓ 제목 바로 아래 · "손볼 곳" 줄 위', JSON.stringify(order) === JSON.stringify(['✓ 연결할 곳은 모두 연결됐어요', '메인 컴포넌트 2개도 함께 연결했어요', '손볼 곳 2곳']), JSON.stringify(order));
   // n > 0 → 줄 없음 · 기억 지움 → 그 뒤 ✓여도 줄 없음
   await doneFind({ candidates: CANDS });
-  check('27c 다음 찾기가 ✓가 아니면 줄 없음', !(await boundLine()).includes('연결했어요'), await boundLine());
+  check('28c 다음 찾기가 ✓가 아니면 줄 없음', !(await boundLine()).includes('연결했어요'), await boundLine());
   await doneFind();
-  check('27c 기억을 지운 뒤 ✓가 돼도 줄 없음', !(await boundLine()).includes('연결했어요'), await boundLine());
+  check('28c 기억을 지운 뒤 ✓가 돼도 줄 없음', !(await boundLine()).includes('연결했어요'), await boundLine());
   await p.close();
 }
 {
-  // 27b 텍스트 스타일 줄만(메인 안 글자) → c = 1 · textStyles[].mainIds · 27c 목록 기준이 바뀌면 줄 없음 · noTier면 줄 없음
+  // 28b 텍스트 스타일 줄만(메인 안 글자) → c = 1 · textStyles[].mainIds · 28c 목록 기준이 바뀌면 줄 없음 · noTier면 줄 없음
   const p = await open(480, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
@@ -2774,16 +2821,16 @@ async function fillBoth(p) {
   await p.waitForTimeout(40);
   await p.click('[data-k="link"], [data-k="tsLink"]');
   await p.waitForTimeout(40);
-  check('27b 메인 안 글자만 가진 텍스트 스타일 줄만 켜도 c = 1', (await p.evaluate(() => document.getElementById('bindMains').hidden ? null : document.getElementById('bindMains').textContent)) === '선택 밖 메인 컴포넌트 1개도 함께 연결해요');
+  check('28b 메인 안 글자만 가진 텍스트 스타일 줄만 켜도 c = 1', (await p.evaluate(() => document.getElementById('bindMains').hidden ? null : document.getElementById('bindMains').textContent)) === '선택 밖 메인 컴포넌트 1개도 함께 연결해요');
   await p.click('#btnApplyConfirm');
   const as = (await sent(p, 'APPLY_SELECTED')).at(-1);
-  check('27b textStyles[].mainIds가 실린다', JSON.stringify(as?.textStyles?.[0]?.mainIds) === JSON.stringify(['S', null]), JSON.stringify(as?.textStyles));
+  check('28b textStyles[].mainIds가 실린다', JSON.stringify(as?.textStyles?.[0]?.mainIds) === JSON.stringify(['S', null]), JSON.stringify(as?.textStyles));
   await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 0, skipped: 0, reasons: {}, skips: [], textStylesApplied: 2, textStylesSkipped: 0, mainsBound: ['S'] });
   await p.waitForTimeout(40);
   // noTier 모습으로 그려지면 줄 없음 · 기억 지움
   await recv(p, { ...PREREQ, hasBindable: false });
   await p.waitForTimeout(40);
-  check('27c 카드 1이 noTier 모습 → 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요'), await p.textContent('#selCards'));
+  check('28c 카드 1이 noTier 모습 → 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요'), await p.textContent('#selCards'));
   await recv(p, PREREQ);
   await p.waitForTimeout(450);
   {
@@ -2792,7 +2839,7 @@ async function fillBoth(p) {
     await recv(p, tsPrev(id0));
     await p.waitForTimeout(40);
   }
-  check('27c noTier로 지운 기억 — 다시 ✓여도 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요'), await p.textContent('#selCards'));
+  check('28c noTier로 지운 기억 — 다시 ✓여도 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요'), await p.textContent('#selCards'));
   // 다시 연결 → 기억 → 목록 기준을 바꾼다 → ✓여도 줄 없음
   await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 0, skipped: 0, reasons: {}, skips: [], textStylesApplied: 2, textStylesSkipped: 0, mainsBound: ['S'] });
   await p.waitForTimeout(40);
@@ -2802,11 +2849,11 @@ async function fillBoth(p) {
   await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {} });
   await recv(p, tsPrev(id));
   await p.waitForTimeout(40);
-  check('27c 목록 기준을 바꾸면 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요') && (await p.textContent('#selCards')).includes('✓'), await p.textContent('#selCards'));
+  check('28c 목록 기준을 바꾸면 줄 없음', !(await p.textContent('#selCards')).includes('연결했어요') && (await p.textContent('#selCards')).includes('✓'), await p.textContent('#selCards'));
   await p.close();
 }
 {
-  // 27d 건너뛴 곳(결정 A 확장 — 손볼 곳 예외): 두 줄 · 설명만 · [선택 ›]은 손볼 곳 줄만
+  // 28d 건너뛴 곳(결정 A 확장 — 손볼 곳 예외): 두 줄 · 설명만 · [선택 ›]은 손볼 곳 줄만
   const p = await open(480, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
@@ -2841,21 +2888,21 @@ async function fillBoth(p) {
   const fixR = rows.find((r) => r.name === '소수 값(정수만)');
   const keepR = rows.filter((r) => r.name === '숨긴 레이어' || r.name === '라이브러리 컴포넌트');
   const libR = rows.find((r) => r.name === '라이브러리 컴포넌트');
-  check('27d 설명이 있는 줄은 모두 두 줄(설명이 첫 줄 아래)', rows.filter((r) => r.help).every((r) => r.twoLine) && rows.filter((r) => r.help).length >= 3, JSON.stringify(rows));
-  check('27d 손볼 곳 줄(fraction)에 [선택 ›] 1개 — 첫 줄 오른쪽', fixR?.sel === 1 && fixR.selOk, JSON.stringify(fixR));
-  check('27d 그대로 둬도 되는 곳 줄(숨긴 레이어 · 라이브러리 컴포넌트)에는 [선택 ›] 0개(레이어 항목이 있어도)', keepR.length === 2 && keepR.every((r) => r.sel === 0), JSON.stringify(keepR));
-  check('27d "라이브러리 컴포넌트" 줄 설명', libR?.help === '라이브러리 컴포넌트라 이 파일에서 연결할 수 없어요', JSON.stringify(libR));
-  check('27d 480px — 이름 줄바꿈 없음 · 설명 잘림 없음', rows.every((r) => r.nameOneLine && r.noClip), JSON.stringify(rows));
-  check('27d 줄에 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', rows.every((r) => !r.card));
+  check('28d 설명이 있는 줄은 모두 두 줄(설명이 첫 줄 아래)', rows.filter((r) => r.help).every((r) => r.twoLine) && rows.filter((r) => r.help).length >= 3, JSON.stringify(rows));
+  check('28d 손볼 곳 줄(fraction)에 [선택 ›] 1개 — 첫 줄 오른쪽', fixR?.sel === 1 && fixR.selOk, JSON.stringify(fixR));
+  check('28d 그대로 둬도 되는 곳 줄(숨긴 레이어 · 라이브러리 컴포넌트)에는 [선택 ›] 0개(레이어 항목이 있어도)', keepR.length === 2 && keepR.every((r) => r.sel === 0), JSON.stringify(keepR));
+  check('28d "라이브러리 컴포넌트" 줄 설명', libR?.help === '라이브러리 컴포넌트라 이 파일에서 연결할 수 없어요', JSON.stringify(libR));
+  check('28d 480px — 이름 줄바꿈 없음 · 설명 잘림 없음', rows.every((r) => r.nameOneLine && r.noClip), JSON.stringify(rows));
+  check('28d 줄에 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', rows.every((r) => !r.card));
   const stops = await p.$$eval('#bindSkips button, #bindSkips [tabindex]:not([tabindex="-1"]), #bindSkips a, #bindSkips input', (e) => e.map((x) => x.className));
-  check('27d 목록 안 탭 정지점은 손볼 곳 줄의 [선택 ›]뿐', stops.length === 1 && stops[0].includes('skip-sel'), JSON.stringify(stops));
+  check('28d 목록 안 탭 정지점은 손볼 곳 줄의 [선택 ›]뿐', stops.length === 1 && stops[0].includes('skip-sel'), JSON.stringify(stops));
   const bad = await nestedCards(p);
-  check('27d 카드 안 카드 0 — 건너뛴 곳 목록', bad.length === 0, bad.join(' · '));
+  check('28d 카드 안 카드 0 — 건너뛴 곳 목록', bad.length === 0, bad.join(' · '));
   await p.close();
 }
 
 {
-  // 27c 만들기 실행 — 연결 mainsBound ['a'] + 텍스트 스타일 mainsApplied ['a', 'b'] → 다 됨 줄에 메인 없음 · 카드 1 ✓ 아래 2개
+  // 28c 만들기 실행 — 연결 mainsBound ['a'] + 텍스트 스타일 mainsApplied ['a', 'b'] → 다 됨 줄에 메인 없음 · 카드 1 ✓ 아래 2개
   const p = await open(480, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
@@ -2879,13 +2926,13 @@ async function fillBoth(p) {
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId, mainsBound: ['a'] });
   await p.waitForTimeout(120);
-  check('27c 만들기 다 됨 줄에 "메인 컴포넌트" 없음', (await visible(p, '#selHome')) && !(await p.textContent('#statusText')).includes('메인'), await p.textContent('#statusText'));
+  check('28c 만들기 다 됨 줄에 "메인 컴포넌트" 없음', (await visible(p, '#selHome')) && !(await p.textContent('#statusText')).includes('메인'), await p.textContent('#statusText'));
   await p.waitForTimeout(450);
   const id = await lastReq(p, 'APPLY');
   await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {} });
   await recv(p, tsPrev(id));
   await p.waitForTimeout(40);
-  check('27c 만들기 뒤 카드 1 ✓ 아래 "메인 컴포넌트 2개도 함께 연결했어요"', (await p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'))) === '메인 컴포넌트 2개도 함께 연결했어요', await p.textContent('#selCards'));
+  check('28c 만들기 뒤 카드 1 ✓ 아래 "메인 컴포넌트 2개도 함께 연결했어요"', (await p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'))) === '메인 컴포넌트 2개도 함께 연결했어요', await p.textContent('#selCards'));
   await p.close();
 }
 
