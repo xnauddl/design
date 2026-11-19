@@ -1,7 +1,7 @@
 /* ============================================================
    themeApply.ts — 다크 모드 자동 채움 (figma 의존 → 목으로 테스트)
    값 변환 자체는 순수 themeGen.ts가 맡고, 여기서는 변수 그래프를 읽고 쓴다.
-   (similar.ts ↔ similarApply.ts와 같은 분리)
+   (components.ts ↔ artwork.ts와 같은 분리)
    ============================================================ */
 import { t } from './i18n';
 import { rgbToHex, hexToRgb } from './tokens';

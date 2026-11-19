@@ -18,7 +18,6 @@ import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters'
 import { leafName, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteGroup } from './lib/varTable';
 import { varKind, APPLY_TARGETS, targetAllowed, scopeFits, scopesForNew, type ApplyTarget } from './lib/varKind';
 import { createReentryScheduler } from './lib/reread';
-import type { FrameMeta } from './lib/similar';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
@@ -1887,11 +1886,10 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 
 /* ---------- 유료(Paid) 기능 게이트 ----------
    Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·다크 테마 생성·시맨틱·
-   텍스트 스타일·컴포넌트/베리언트·닮은 프레임 컴포넌트화.
-   Free: 추출·색 정리·바인딩·리네임·닮은 프레임 스캔·내보내기. */
+   텍스트 스타일·컴포넌트/베리언트.
+   Free: 추출·색 정리·바인딩·리네임·내보내기. */
 const PAID_LOCK = '🔒'; // 와이어의 잠금 배지는 자물쇠 하나 — 사유는 버튼·배지 툴팁(setLockTitle)
-// btnScanSimilar(스캔)은 읽기 전용이라 Free — 잠그는 건 실제로 문서를 바꾸는 btnComponentize뿐.
-const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing', 'btnComponentize'];
+const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다. 브랜드 팔레트([팔레트 생성] · [팔레트 만들기])는 무료다
@@ -1939,8 +1937,6 @@ function updateGates(): void {
    할 것이 없을 때 누르면 아무 일도 없던 실행 버튼을 전제 잠금으로 두고, 그때는 찾기 · 추출 버튼을 주 버튼으로.
    유료 잠금이 먼저다(무료는 PAID_FIELDS 루프의 'paid' 그대로). 잠긴 버튼에는 primary를 두지 않는다 —
    판정은 dataset.baseLock(유료 · 전제)만 본다. 대기 잠금(setWait)은 잠깐이라 주 버튼을 옮기지 않는다. */
-/** 닮은 프레임을 찾은 적 있는지 — [합치기] 잠금 사유 similar.needTwo ↔ needScan(합친 뒤엔 다시 false). */
-let similarScanned = false;
 const baseLocked = (el: HTMLElement): boolean => !!el.dataset.baseLock;
 /** 유료 잠금이 아니면 전제 잠금을 걸거나 푼다. */
 function setEmptyLock(el: HTMLElement, msg: string | null): void {
@@ -1976,29 +1972,22 @@ function updateEmptyLocks(): void {
   setCardPrimary([extract, colorVars], baseLocked(colorVars) ? [extract] : [colorVars, extract]);
   // 컴포넌트
   const scan = $('btnScanComp');
-  const similar = $('btnScanSimilar');
   const reg = $('btnRegisterComp');
-  const merge = $('btnComponentize');
   const eligible = compEligibleCount();
   const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
-  // 목록 기준이 없으면 찾기 두 버튼도 잠근다(ia-v4 §4.5 "선택 없음" — 유료 잠금이 먼저, 무료 [닮은 프레임 찾기]도).
+  // 목록 기준이 없으면 찾기 버튼도 잠근다(ia-v4 §4.5 "선택 없음" — 유료 잠금이 먼저).
   const noBase = !baseline;
   const prevActive = document.activeElement;
-  const lockedBefore = prevActive === scan || prevActive === similar ? baseLocked(prevActive as HTMLElement) : true;
+  const lockedBefore = prevActive === scan ? baseLocked(prevActive as HTMLElement) : true;
   setEmptyLock(scan, noBase ? t('status.noSelection') : null);
-  setEmptyLock(similar, noBase ? t('status.noSelection') : null);
   setEmptyLock(reg,
     !compScanned ? t('component.needScan')
       : !eligible ? t('component.noEligibleShort')
         : !checked ? t('component.noChecked') : null);
-  const canMerge = similarMemberIds.length >= 2 && !!similarMasterId;
-  setEmptyLock(merge, canMerge ? null : t(similarScanned ? 'similar.needTwo' : 'similar.needScan'));
-  // 판정: 등록할 후보 1개 이상 → [등록], 합칠 닮은 프레임 → [합치기], 아니면 [컴포넌트 후보 찾기].
-  // 고른 버튼이 잠겼으면 누를 수 있는 버튼(무료 = [닮은 프레임 찾기]). [닮은 프레임 찾기]는 유료에서 늘 보조.
-  const first = eligible > 0 ? reg : canMerge ? merge : scan;
-  // 유료에서 고른 버튼이 잠겼으면(후보는 있는데 체크 0) 누를 수 있는 다음 버튼으로 — [합치기] · [컴포넌트 후보 찾기].
-  const order = isPaid ? [first, merge, scan] : [first, similar];
-  setCardPrimary([scan, similar, reg, merge], order);
+  // 판정: 등록할 후보 1개 이상 → [등록], 아니면 [컴포넌트 후보 찾기]. 고른 버튼이 잠겼으면(후보는 있는데 체크 0)
+  // [컴포넌트 후보 찾기]. 무료는 둘 다 유료 잠금이라 주 버튼이 없다(2026-11-19 닮은 프레임 찾기 제거 — ia-v4 §4.3a-2).
+  const first = eligible > 0 ? reg : scan;
+  setCardPrimary([scan, reg], [first, scan]);
   // 포커스가 있던 찾기 버튼이 잠기면 그 모습의 주 버튼, 없으면 ←(ia-v4 §4.5 "선택 없음" · C-D7).
   if (!lockedBefore && baseLocked(prevActive as HTMLElement)) compFocusPrimary();
 }
@@ -2115,9 +2104,8 @@ function renderPipeline(): void {
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
 /* 찾기 요청 — 목록 기준의 nodeIds(ia-v4 §2.5) · reqId(§4.5 "비운 뒤 늦게 온 찾기 응답은 버린다"). 목록을 비우면
    기다리던 reqId를 지워, 비우기 전에 보낸 응답 · 오류(C-D12)는 그리지 않는다. */
-/** 기다리는 [컴포넌트 후보 찾기] · [닮은 프레임 찾기]의 reqId — 0이면 없음. */
+/** 기다리는 [컴포넌트 후보 찾기]의 reqId — 0이면 없음. */
 let compScanReq = 0;
-let similarScanReq = 0;
 /** 상태 자리 글이 찾기 쪽(찾는 중 · 찾기 결과 · 오류)인가 — 목록을 비울 때 함께 지운다(쓰기 결과 글은 남김). */
 let structStatusFind = false;
 function setFindStatus(text: string, cls: 'ok' | 'warn' | ''): void {
@@ -2257,25 +2245,6 @@ $('btnGenDark').addEventListener('click', () => {
   // addMode가 실패해 생성 자체가 막힌다.
   const toModeId = ($('darkToMode') as HTMLSelectElement).value;
   send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, ...(toModeId ? { toModeId } : {}) });
-});
-
-/* ---------- 닮은 프레임 컴포넌트화 ---------- */
-// 스캔이 확정한 멤버(구조가 같은 최대 그룹)와 고른 마스터. 컴포넌트화는 이 둘만 보낸다 —
-// 제외된 프레임을 실수로 교체 대상에 넣지 않으려면 선택 그대로가 아니라 스캔 결과를 써야 한다.
-let similarMemberIds: string[] = [];
-let similarMasterId: string | null = null;
-
-function startSimilarScan(): void {
-  setFindStatus(t('similar.scanning'), '');
-  similarScanReq = ++bindReqSeq;
-  send({ type: 'SCAN_SIMILAR', nodeIds: baseline?.ids ?? [], reqId: similarScanReq });
-}
-$('btnScanSimilar').addEventListener('click', startSimilarScan);
-
-$('btnComponentize').addEventListener('click', () => {
-  if (similarMemberIds.length < 2 || !similarMasterId) return; // 빈 상태는 잠금(updateEmptyLocks)이 사유를 띄운다
-  setStatus('structureStatus', t('similar.componentizing'), '');
-  send({ type: 'COMPONENTIZE_SIMILAR', masterId: similarMasterId, frameIds: similarMemberIds });
 });
 
 $('btnRegisterComp').addEventListener('click', () => {
@@ -2769,7 +2738,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'COMPONENTS_RESULT': {
-      // 후보 · 닮은 프레임 목록은 작업 직후 다시 읽는 때에 비웠다(opReceived → readScreen('work') — §4.5 "목록 비우기").
+      // 후보 목록은 작업 직후 다시 읽는 때에 비웠다(opReceived → readScreen('work') — §4.5 "목록 비우기").
       const misplaced = msg.placeFailed ?? [];
       const cloned = msg.placeCloned ?? [];
       const propFailed = msg.propFailed ?? [];
@@ -2848,34 +2817,6 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('darkStatus', t('dark.done', { modePart, n: msg.realiased, c: msg.created, skipPart }), 'ok');
       break;
     }
-    case 'SIMILAR_CANDIDATES':
-      // 비운 뒤 늦게 온, 비우기 전에 보낸 응답은 버린다(ia-v4 §4.5).
-      if (msg.reqId !== similarScanReq) break;
-      similarScanReq = 0;
-      renderSimilar(msg);
-      break;
-    case 'COMPONENTIZE_RESULT': {
-      if (!msg.instances) {
-        // 교체가 하나도 없으면 실패다 — 경고를 그대로 보여줘야 원인을 안다. 제자리에 못 둔 것도 같은 꼬리로(§4.7 5번).
-        const misplaced0 = msg.placeFailed ?? [];
-        const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
-        const warnPart = first ? t('similar.failedWarn', { warning: first }) : '';
-        setStatus('structureStatus', t('similar.failed', { warnPart }) + placeFailedText(misplaced0), 'warn');
-        break;
-      }
-      const parts = [t('similar.resMaster', { name: msg.master }), t('similar.resInstances', { n: msg.instances })];
-      if (msg.properties) parts.push(t('similar.resProps', { n: msg.properties }));
-      if (msg.images) parts.push(t('similar.resImages', { n: msg.images }));
-      // 경고(제외·오버라이드 실패)는 성공했어도 반드시 노출 — 원본이 남아 있다는 신호다.
-      // 제자리에 못 둔 것은 따로 이름까지 적는다(§4.7 5번) — 경고 목록에서는 빼고 센다(같은 일을 두 번 세지 않게).
-      const misplaced = msg.placeFailed ?? [];
-      const others = msg.warnings.length - misplaced.length;
-      const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
-      const warn = others > 0 && firstOther ? t('similar.resKept', { n: others, warning: firstOther }) : '';
-      setStatus('structureStatus', `${parts.join(' · ')}${warn}${placeFailedText(misplaced)}`, msg.warnings.length ? 'warn' : 'ok');
-      // 교체된 프레임은 더 이상 대상이 아니다 — 두 목록은 작업 직후 다시 읽는 때에 비웠다(§4.5 "목록 비우기").
-      break;
-    }
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
@@ -2910,10 +2851,9 @@ window.onmessage = (event: MessageEvent) => {
         renderSelHome();
       }
       // 컴포넌트 화면 찾기 — 목록을 비운 뒤 늦게 온, 비우기 전에 보낸 찾기의 오류는 보이지 않는다(C-D12 — reqId 대조).
-      if (msg.op === 'SCAN_COMPONENT_CANDIDATES' || msg.op === 'SCAN_SIMILAR') {
-        const want = msg.op === 'SCAN_COMPONENT_CANDIDATES' ? compScanReq : similarScanReq;
-        if (!want || (msg.reqId != null && msg.reqId !== want)) break;
-        if (msg.op === 'SCAN_COMPONENT_CANDIDATES') compScanReq = 0; else similarScanReq = 0;
+      if (msg.op === 'SCAN_COMPONENT_CANDIDATES') {
+        if (!compScanReq || (msg.reqId != null && msg.reqId !== compScanReq)) break;
+        compScanReq = 0;
       }
       // 텍스트 스타일 이름 다시 짓기 — 팝업 안 알림 줄(ia-v4 §2.8 · §4.11 T-P29 ④, B.19 APPLY_TS_RENAME 오류 갈래).
       if (msg.op === 'APPLY_TS_RENAME') { onTsRenameError(msg); break; }
@@ -2963,9 +2903,7 @@ const OP_STATUS: Record<string, string> = {
   SCAN_COMPONENT_CANDIDATES: 'structureStatus',
   REGISTER_COMPONENTS: 'structureStatus',
   CLASSIFY_VARIANTS: 'structureStatus',
-  GENERATE_MISSING_VARIANTS: 'structureStatus',
-  SCAN_SIMILAR: 'structureStatus', // 컴포넌트 화면 여섯 작업 모두(ia-v4 §4.5 "상태 줄")
-  COMPONENTIZE_SIMILAR: 'structureStatus',
+  GENERATE_MISSING_VARIANTS: 'structureStatus', // 컴포넌트 화면 네 작업 모두(ia-v4 §4.5 "상태 줄")
   RENAME_APPLY: 'renameStatus', // 이름 정리 [이름 바꾸기]
   GENERATE_DARK_MODE: 'darkStatus', // 도구 탭 PR 뒤에는 다크 화면 상태 줄(§4.11 T-P7)
   UNBIND_DELETED: STATUS_LINE, // 선택 탭 삭제된 변수 카드 — 결과 DELETED_UNBOUND와 같은 자리
@@ -3067,15 +3005,14 @@ function showError(id: string, f: FriendlyError, op?: string): void {
   // 컴포넌트 화면 찾기는 찾기 버튼과 같은 함수로 지금 목록 기준 · 새 reqId로(ia-v4 §4.3a-2 "찾기의 [다시 시도]").
   // 오류의 종류가 마지막 요청과 다르면 무엇을 다시 할지 모르므로 숨긴다.
   const linkRetry = op === 'APPLY_SELECTED' ? lastLinkItems : null;
-  const scanRetry = op === 'SCAN_COMPONENT_CANDIDATES' ? 'comp' : op === 'SCAN_SIMILAR' ? 'similar' : null;
+  const scanRetry = op === 'SCAN_COMPONENT_CANDIDATES';
   const retry = linkRetry || scanRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
   const onRetry = f.retryable && (linkRetry || scanRetry || retry) ? (): void => {
     if (linkRetry) { startLink(linkRetry); return; }
     if (scanRetry) {
-      // 상태 글이 "…찾는 중…"으로 바뀌어 상자가 바로 사라진다 — 포커스는 다시 실행한 찾기 버튼.
-      const btn = scanRetry === 'comp' ? $('btnScanComp') : $('btnScanSimilar');
-      if (scanRetry === 'comp') startCompScan(); else startSimilarScan();
-      btn.focus({ preventScroll: true });
+      // 상태 글이 "…찾는 중…"으로 바뀌어 상자가 바로 사라진다 — 포커스는 찾기 버튼.
+      startCompScan();
+      $('btnScanComp').focus({ preventScroll: true });
       return;
     }
     if (!retry) return;
@@ -4595,14 +4532,13 @@ function setCompAutoNamed(n: number): void {
 /** 찾은 적 있는지(ia-v4 §4.3a-2 [등록] 잠금 ①②) — 결과가 0개여도 참, 목록을 비우면 거짓. */
 let compScanned = false;
 /**
- * 목록 비우기(2026-11-13 C-D5 — ia-v4 §4.5): 목록 기준이 바뀌거나 쓰기 작업이 끝나면(다시 읽는 때) 후보 · 닮은 프레임
- * 목록을 모두 비운다 — 머리 띠 · 개수 · 목록 · 전체 체크 줄, 찾기 결과 상태 글 · 찾는 중 글 · 오류 상자(C-D14)도.
+ * 목록 비우기(2026-11-13 C-D5 — ia-v4 §4.5): 목록 기준이 바뀌거나 쓰기 작업이 끝나면(다시 읽는 때) 후보 목록을
+ * 비운다 — 머리 띠 · 개수 · 목록 · 전체 체크 줄, 찾기 결과 상태 글 · 찾는 중 글 · 오류 상자(C-D14)도.
  * 쓰기 작업의 결과 글과 `#variantReport`는 남긴다. 기다리던 찾기는 버린다(reqId — C-D12).
  */
 function clearCompLists(): void {
   const hadFocus = compFocusInLists();
   compScanReq = 0;
-  similarScanReq = 0;
   compScanned = false;
   compCandidates = [];
   compChecked.clear();
@@ -4611,23 +4547,17 @@ function clearCompLists(): void {
   $('compTreeCount').textContent = '';
   $('compTreeGroup').style.display = 'none';
   ($('compTreeCtrls') as HTMLElement).style.display = 'none';
-  similarMemberIds = [];
-  similarMasterId = null;
-  similarScanned = false;
-  clearMount($('similarList'));
-  $('similarGroupCount').textContent = '';
-  $('similarGroup').style.display = 'none';
   if (structStatusFind) setStatus('structureStatus', '', '');
   updateEmptyLocks();
   refreshTreeEmptyStates();
   if (hadFocus) compFocusPrimary();
 }
-/** 포커스가 컴포넌트 화면의 목록(후보 트리 · 닮은 프레임 · 전체 체크) 안이거나 문서 맨 앞(지워진 요소)에 있는가. */
+/** 포커스가 컴포넌트 화면의 목록(후보 트리 · 전체 체크) 안이거나 문서 맨 앞(지워진 요소)에 있는가. */
 function compFocusInLists(): boolean {
   if (activeTab !== 'select' || selSub !== 'structure') return false;
   const a = document.activeElement;
   if (!a || a === document.body) return true;
-  return ['compTree', 'similarList', 'compTreeCtrls'].some((id) => $(id).contains(a));
+  return ['compTree', 'compTreeCtrls'].some((id) => $(id).contains(a));
 }
 /** 컴포넌트 화면의 주 버튼으로(C-D7 — 오류 동안은 [다시 시도], 주 버튼이 없으면 ←). 화면에 있을 때만. */
 function compFocusPrimary(): void {
@@ -4798,10 +4728,6 @@ function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 
 function placeFailedText(names: readonly string[]): string {
   return placeTailText('component.placeFailed', names);
 }
-/** 묶기 경고 중 "제자리에 둘 수 없어" 줄인가 — 꼬리로 따로 세므로 경고 목록에서 뺀다(§4.7 5번). */
-function isPlaceFailWarning(w: string, names: readonly string[]): boolean {
-  return names.some((name) => w === t('similar.placeFail', { name }));
-}
 
 
 /* ---------- UX6: 진행률 바 ---------- */
@@ -4812,71 +4738,6 @@ function showApplyProgress(label: string, cancellable = true): void {
   $('applyProgressText').textContent = label;
   $('btnApplyCancel').hidden = !cancellable;
 }
-/** 닮은 프레임 멤버 한 줄 — 마스터 라디오 + 이름 + 완전성 근거(왜 이게 추천인지). */
-function makeSimilarRow(m: FrameMeta, recommendedId: string | null): HTMLElement {
-  const radio = document.createElement('input');
-  radio.type = 'radio';
-  radio.name = 'similarMaster';
-  radio.value = m.id;
-  radio.checked = m.id === similarMasterId;
-  radio.addEventListener('change', () => {
-    if (radio.checked) similarMasterId = m.id;
-  });
-
-  // 추천 근거를 숫자로 — 텍스트가 얼마나 채워졌는지가 마스터 선택의 핵심이다.
-  const parts = [t('similar.metaText', { filled: m.textFilled, total: m.textTotal })];
-  if (m.images) parts.push(t('similar.metaImages', { n: m.images }));
-  if (m.emptyLayers) parts.push(t('similar.metaEmpty', { n: m.emptyLayers }));
-
-  const card = resultCard({
-    check: radio,
-    title: m.name,
-    summary: parts.join(' · '),
-    summaryMono: true,
-    meta: m.id === recommendedId ? t('similar.recommended') : '',
-  });
-  if (m.id === recommendedId) (card.querySelector('.r-meta') as HTMLElement).className = 'tag tag-set';
-  // 줄 아무 데나 눌러도 라디오가 선택되게 — 라벨로 감싸던 예전 동작을 유지한다.
-  card.addEventListener('click', (e) => {
-    if ((e.target as HTMLElement).tagName === 'INPUT') return;
-    radio.checked = true;
-    radio.dispatchEvent(new Event('change'));
-  });
-  return card;
-}
-
-/** 스캔 결과 → 멤버 목록(마스터 라디오) + 무엇이 속성으로 열리는지 요약. */
-function renderSimilar(msg: Extract<CodeToUi, { type: 'SIMILAR_CANDIDATES' }>): void {
-  const hadFocus = compFocusInLists();
-  if (hadFocus) queueMicrotask(compFocusPrimary);
-  similarMemberIds = msg.metas.map((m) => m.id);
-  similarMasterId = msg.recommendedMasterId;
-  similarScanned = true;
-  $('similarGroupCount').textContent = msg.metas.length ? t('tree.count', { n: msg.metas.length }) : '';
-  $('similarGroup').style.display = msg.metas.length ? '' : 'none';
-  updateEmptyLocks();
-
-  const box = $('similarList');
-  renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
-
-  if (!msg.metas.length) {
-    // 왜 대상이 없는지 알려준다 — 제외 사유가 있으면 그걸 그대로 보여주는 게 가장 빠른 안내다.
-    const why = msg.excluded.length ? msg.excluded[0].reason : t('similar.needTwo');
-    setFindStatus(t('similar.none', { why }), 'warn');
-    return;
-  }
-
-  const texts = msg.varying.filter((v) => v.type === 'TEXT').length;
-  const swaps = msg.varying.length - texts;
-  const opened: string[] = [];
-  if (texts) opened.push(t('similar.openText', { n: texts }));
-  if (swaps) opened.push(t('similar.openSwap', { n: swaps }));
-  if (msg.imageVarying.length) opened.push(t('similar.openImage', { n: msg.imageVarying.length }));
-  const openPart = opened.length ? t('similar.opened', { list: opened.join(' · ') }) : t('similar.noVarying');
-  const skipPart = msg.excluded.length ? t('similar.excluded', { n: msg.excluded.length, why: msg.excluded[0].reason }) : '';
-  setFindStatus(t('similar.scanned', { n: msg.metas.length, openPart, skipPart }), 'ok');
-}
-
 function updateApplyProgress(done: number, total: number): void {
   $('applyProgress').style.display = '';
   const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
@@ -5292,8 +5153,6 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   REGISTER_COMPONENTS: { results: ['COMPONENTS_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
   CLASSIFY_VARIANTS: { results: ['VARIANTS_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
   GENERATE_MISSING_VARIANTS: { results: ['GENERATE_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
-  SCAN_SIMILAR: { results: ['SIMILAR_CANDIDATES'], label: 'op.components', go: goLayer('structure'), write: false },
-  COMPONENTIZE_SIMILAR: { results: ['COMPONENTIZE_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
   EXPORT: { results: ['EXPORT_RESULT'], label: 'op.export', go: () => showTab('variables'), write: false },
   UNBIND_DELETED: { results: ['DELETED_UNBOUND'], label: 'op.unbind', go: () => { showTab('select'); showSelSub('home'); }, write: true },
 };
@@ -5315,7 +5174,6 @@ const WAIT_LINK_IDS = [
   'btnRegisterComp', // REGISTER_COMPONENTS
   'btnClassifyVariants', // CLASSIFY_VARIANTS
   'btnGenMissing', // GENERATE_MISSING_VARIANTS
-  'btnComponentize', // COMPONENTIZE_SIMILAR
   'btnMakeRun', // 만들기 화면 실행(§4.3)
 ];
 /** 연결 화면의 [n곳 연결] — 사유는 화면 상태 줄(#applyStatus). */
@@ -5406,16 +5264,13 @@ function opReceived(m: CodeToUi): void {
     if ((m.type === 'COMPONENTS_RESULT' || m.type === 'VARIANTS_RESULT') && (m.failures?.length ?? 0) > 0) failed = true;
     // 속성 값 실패 · 복사본 · 빈 자리도 실패로(§4.7 5·6번) — failures에도 실리지만 꼬리와 같은 기준으로 한 번 더 본다.
     if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.fillKept?.length ?? 0) + (m.reuseKept?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
-    // [묶기]에서 제자리에 못 둔 것도 실패로(§4.7 "인스턴스 자리" 5번 — 최소화 중이면 ⚠).
-    if (m.type === 'COMPONENTIZE_RESULT' && (m.placeFailed?.length ?? 0) > 0) failed = true;
     if (m.type === 'APPLY_RESULT' && m.cancelled) cancelled = true;
     if (m.type === 'VARIABLES_DELETED') { if (m.cancelled) cancelled = true; if (m.failed > 0) failed = true; }
     if (cancelled) { if (isMini) renderMiniMark(); }
     else opFinished(!failed, def);
     // 작업 직후 다시 읽기(§4.1) — 파일을 바꾼 작업만. 준비 상태 + 변수 표 + 지금 화면의 표.
-    // 실패(⚠)로 끝나도 파일을 바꿨으면 읽는다(컴포넌트 등록·묶기·분류 — §4.1 표).
-    // [묶기]는 마스터가 있을 때만 — 실패 여부와 무관(이른 반환 = 마스터 없음 = 아무것도 안 바꿈).
-    const reread = m.type === 'VARIABLES_DELETED' ? m.deleted > 0 : m.type === 'COMPONENTIZE_RESULT' ? changedFile(m) : !failed || changedFile(m);
+    // 실패(⚠)로 끝나도 파일을 바꿨으면 읽는다(컴포넌트 등록·분류 — §4.1 표).
+    const reread = m.type === 'VARIABLES_DELETED' ? m.deleted > 0 : !failed || changedFile(m);
     if (def.write && reread) readScreen('work');
     return;
   }
@@ -5423,7 +5278,6 @@ function opReceived(m: CodeToUi): void {
 /** 실패로 끝난 결과라도 파일을 바꿨나(§4.1 "플러그인 작업이 끝난 직후"). 그 밖의 실패는 바꾸지 않았다고 본다. */
 function changedFile(m: CodeToUi): boolean {
   if (m.type === 'COMPONENTS_RESULT') return m.registered > 0 || m.sets > 0 || (m.reused?.length ?? 0) > 0; // 재사용만이어도 파일을 바꿨다(§4.7 "재사용" 6번)
-  if (m.type === 'COMPONENTIZE_RESULT') return !!m.master; // 마스터를 컴포넌트로 만든 결과(빈 이름 = 아무것도 안 바꿈)
   if (m.type === 'VARIANTS_RESULT') return m.sets > 0;
   return false;
 }

@@ -8,7 +8,6 @@ import type { StyleCluster, TextStyleSpec } from '../lib/textStyles';
 import type { Tier, Feature } from '../lib/entitlements';
 import type { LicenseStatus, VerifyResult } from '../lib/license';
 import type { ExportFormat } from '../lib/exporters';
-import type { FrameMeta, VaryingPosition } from '../lib/similar';
 
 export interface VarMode {
   modeId: string;
@@ -272,9 +271,7 @@ export type UiToCode =
   | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
-  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string } // 라이트→Dark(없으면 추가) 자동 채움
-  | { type: 'SCAN_SIMILAR'; nodeIds?: string[]; reqId?: number } // 닮은 프레임: 목록 기준(nodeIds) 프레임 정렬 미리보기(읽기 전용 → Free). reqId는 응답에 돌려받는다
-  | { type: 'COMPONENTIZE_SIMILAR'; masterId: string; frameIds: string[] }; // 닮은 프레임(Paid): 마스터 컴포넌트화 + 나머지를 오버라이드 인스턴스로 교체
+  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string }; // 라이트→Dark(없으면 추가) 자동 채움
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -360,10 +357,6 @@ export type CodeToUi =
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
   | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }
-  // 닮은 프레임 스캔 결과 — metas는 완전성 점수 내림차순(맨 앞이 추천 마스터).
-  // varying/imageVarying는 "무엇이 속성으로 열리는지" 미리 보여주는 용도.
-  | { type: 'SIMILAR_CANDIDATES'; reqId?: number; metas: FrameMeta[]; recommendedMasterId: string | null; varying: VaryingPosition[]; imageVarying: string[]; excluded: { id: string; name: string; reason: string }[] }
-  | { type: 'COMPONENTIZE_RESULT'; master: string; properties: number; instances: number; images: number; warnings: string[]; placeFailed?: string[] } // placeFailed: 제자리에 못 둔 원본 이름(원본은 그대로, §4.7)
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }
   | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'paid' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 유료(무료의 플러그인 Semantic 컬렉션 — §4.9 F2) · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
 

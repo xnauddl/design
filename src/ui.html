@@ -79,7 +79,7 @@
        구분점을 각 문자열에 넣으면 앞이 비었을 때 점만 남는다(Paid는 자물쇠가 빈 칸).
        :not(:empty)로 내용 있는 것끼리만 이어 그 경우를 없앴다.
        자물쇠(.lock)는 이 사슬에서 빠진다 — 뒤 라벨과 한 덩어리로 읽혀야 한다(와이어 rev l:
-       `🔒 변수화` · `🔒 후보 24` · `🔒 닮은 프레임`). Paid로 자물쇠가 비면 그냥 사라진다. */
+       `🔒 변수화` · `🔒 후보 24`). Paid로 자물쇠가 비면 그냥 사라진다. */
     h2 .muted:not(.lock):not(:empty) ~ .muted:not(.lock):not(:empty)::before { content: '· '; }
     .warn    { color: var(--warn); }
     .ok      { color: var(--ok); }
@@ -371,10 +371,6 @@
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
     .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
-    /* 툴바가 두 줄인 카드(구조: 스캔 2 / 쓰기 2) — 윗줄은 선을 긋지 않고 아랫줄만 본문과 가른다. */
-    .toolbar:has(+ .toolbar-2) { padding-bottom: 0; border-bottom: 0; }
-    /* 둘째 버튼 줄은 첫째 줄(버튼 높이 27px) 바로 아래에 고정 — 같은 높이에 붙으면 겹친다. */
-    .toolbar-2 { margin-top: 0; top: calc(var(--toolbar-top, 95px) + 27px); }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
@@ -1068,20 +1064,14 @@
       </div>
     </div>
 
-    <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
-         목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
+    <!-- 구조 — 컴포넌트 후보 찾기 · 등록(닮은 프레임 찾기 · 하나로 합치기는 2026-11-19 제거, ia-v4 §4.3a). -->
     <div class="step" id="structureCard" data-apply-step="structure">
       <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span></h2>
-      <div class="hint" data-i18n="component.hint">후보를 찾아 등록하거나, 닮은 프레임을 하나의 컴포넌트로 합쳐요 · 닮은 프레임 찾기는 무료</div>
+      <div class="hint" data-i18n="component.hint">후보를 찾아 컴포넌트로 등록해요</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">컴포넌트 후보 찾기</button>
-        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 찾아 보여 줘요. 파일은 안 바꿔요.">닮은 프레임 찾기</button>
-      </div>
-      <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
-      <div class="toolbar toolbar-2">
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나로 합치기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1091,8 +1081,6 @@
       <div id="compTree" class="results"></div>
       <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
       <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
-      <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
-      <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
            낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
       <div id="variantRow" hidden>
