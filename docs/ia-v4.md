@@ -941,29 +941,34 @@
   - 카드 · 섹션 · 링크 줄 · 아이콘 묶음 · 페이지 번호 · 캐러셀 · 탭 · 격자는 2 · 3차(아래 "다음 차수")에서 다룬다 — 이번에는 지금처럼 `container`(A4로 logo에서 빠진 헤더 묶음 포함, B2에서 뺀 가로 글자 3개 이상 · 숫자 글자 포함).
 - **다음 차수(기록 — 2026-11-18 후보 정리):** 2차 `card`(목록 항목 중 사진 묶음 + 글자 묶음, 테두리 · 배경 없어도) · 안쪽 `section`(본문 안 큰 제목 + 내용) · `links`(글자만 가로 3개 이상 · 구분선이 낀 링크 줄) · `column`(제목 + 세로 링크 목록) · `icon-group` · `pagination`. 3차 `carousel` · `slide` · `tabs` · `grid`.
 
-**역할 세분화 2차 — 내용으로 이름, 아니면 방향 (2026-11-19 사용자 결정 6-2 결정 4 — QA 5 결함 6, ia-v3 §0 "6-2" · 체크 B.28 · ia-v3 A.21, 구현 전)**
+**역할 세분화 2차 — 내용으로 이름, 아니면 방향 (2026-11-19 사용자 결정 6-2 결정 4 · Q6-2-3 — QA 5 결함 6, ia-v3 §0 "6-2" · 체크 B.28 · ia-v3 A.21, 구현 전)**
 - **까닭:** QA 5 결과 파일 270노드 가운데 `container` 51 · `wrapper` 17(25%)이 남았다(`docs/qa/2026-11-17-qa5.md` A 결함 6). 1차가 고친 뒤에도 폴백 자리의 노드는 모두 일반어로 끝난다.
-- **원칙:** 이름 정리는 `container` · `wrapper`를 **더는 만들지 않는다.** 폴백 자리(지금 `kids.length === 1 ? 'wrapper' : 'container'`를 돌려주는 자리와 자식 없는 프레임의 `container`)에서 ① 안에 든 것으로 이름(C1–C6) ② 아니면 오토레이아웃 방향 이름(D). **조건은 보수적으로** — 틀린 내용 이름은 일반 이름보다 나쁘다(사용자 결정 질문의 단서). 앞의 판정(아이콘 프레임 A1 · 버튼 · `progress` · `card` · `figure` · `field` · `list` · `item` · `hero` · 영역 · `section`)과 1차 B1–B3는 그대로이고 그보다 뒤다.
-- **낱말:** "보이는 자식" · "아이콘 같은 것"(`isIconish`) · "짧은 한 줄 글자" · "가로로 나란히"(`sideBySide` — 가로 오토레이아웃이거나, 오토레이아웃이 아닐 때 모두 서로 세로 범위가 겹침) · "숫자 글자"(`isDigitsText` — 숫자 · `/` · 공백뿐)는 1차와 같다. "버튼" = `isButtonLike` 또는 `isTextButtonLike`(A2). "원형 사진" = 사진 채움 ELLIPSE, 또는 사진 채움이 있고 보이는 자식이 없으며 두 변의 차가 1 이하 · 64 이하 · 모서리 반경 ≥ 짧은 변의 절반인 RECTANGLE · FRAME.
+- **원칙:** 이름 정리는 `container` · `wrapper`를 **더는 만들지 않는다.** 폴백 자리(지금 `kids.length === 1 ? 'wrapper' : 'container'`를 돌려주는 자리와 자식 없는 프레임의 `container`)에서 ① 안에 든 것으로 이름(C1–C6) ② 아니면 오토레이아웃 방향 이름(D). **조건은 보수적으로** — 틀린 내용 이름은 일반 이름보다 나쁘다(사용자 결정 질문의 단서). 앞의 판정(`resolveRole`의 전역 판정 — 버튼 · `nav` · `logo` · `actions` · `status` · `thumbnail` · A2 글자 버튼 · A1 아이콘 프레임, FRAME 분기의 `progress` · `card` · `figure` · `field` · `list` · `item` · `hero` · 영역 · `section`)과 1차 B1–B3는 그대로이고 그보다 뒤다. 그래서 C1–C6는 그 판정들이 잡지 않은 노드에만 닿는다(아래 "앞 판정이 먼저인 경우").
+- **낱말:** "보이는 자식" · "아이콘 같은 것"(`isIconish`) · "짧은 한 줄 글자" · "가로로 나란히"(`sideBySide` — 가로 오토레이아웃이거나, 오토레이아웃이 아닐 때 모두 서로 세로 범위가 겹침) · "숫자 글자"(`isDigitsText` — 숫자 · `/` · 공백뿐)는 1차와 같다. "버튼" = `isButtonLike` 또는 `isTextButtonLike`(A2). "원형 사진" = 사진 채움 ELLIPSE, 또는 사진 채움이 있고 보이는 자식이 없으며 두 변의 차가 1 이하 · 64 이하 · 모서리 반경 ≥ 짧은 변의 절반인 RECTANGLE · FRAME. **"아바타 같은 인스턴스"** = INSTANCE이고, 이름을 kebab으로 나눈 낱말에 `avatar` · `profile`이 있거나 자손에 원형 사진이 있는 것. **"아이콘만"**(C4 · C5용 — 1차 `isIconish`는 그대로) = 아이콘 같은 것이면서 아바타 같은 인스턴스가 아닌 것. "화살표 글자" = `characters`(앞뒤 공백 뗌)가 `‹` · `›` · `<` · `>` · `«` · `»` · `←` · `→` 가운데 하나인 TEXT.
 
 | # | 새 이름 | 조건(FRAME · GROUP — 아래 순서로 처음 맞는 것. 1차 B1 `row` 다음) | 예 |
 |---|---|---|---|
-| C1 | `profile` | 보이는 자식이 정확히 2개 — 하나는 원형 사진, 다른 하나는 짧은 한 줄 TEXT이거나 보이는 자식이 모두 TEXT(1–3개)인 FRAME · GROUP. 방향은 보지 않는다 | [원형 사진 + 이름] · [아바타 + (이름 · 직함)] |
+| C1 | `profile` | 보이는 자식이 정확히 2개 — 하나는 원형 사진 또는 아바타 같은 인스턴스, 다른 하나는 짧은 한 줄 TEXT이거나 보이는 자식이 모두 TEXT(1–3개)인 FRAME · GROUP. 방향은 보지 않는다 | GROUP [원형 사진 + 이름] · FRAME [아바타 인스턴스 + (이름 · 직함) 글자 묶음 프레임] |
 | C2 | `title-group` | 1차 B2(`text-group`) 조건을 만족하고, **세로로 쌓였고**(세로 오토레이아웃, 또는 오토레이아웃이 아닐 때 맨 위 글자(y가 가장 작음)가 다른 글자와 세로 범위가 겹치지 않음), 맨 위 글자가 제목처럼 — 크기가 나머지 모든 글자의 1.2배 이상, 또는 크기가 같거나 크고 굵기 600 이상인데 나머지가 모두 600 미만. 글자 크기 · 굵기가 섞인 글자(`figma.mixed`)가 하나라도 있으면 아님. 아니면 지금처럼 `text-group` | [제목 32 Bold + 본문 16] |
-| C3 | `links` | 보이는 자식 3개 이상 · 가로로 나란히 · 자식이 모두 짧은 한 줄 TEXT · 글자 버튼(A2) · 구분선(LINE, 또는 `isThin`인 RECTANGLE) 가운데 하나이고 TEXT · 글자 버튼이 3개 이상. 글자가 모두 숫자 글자면 아님(C4) | 푸터 [이용약관 \| 개인정보 \| 고객센터] · 헤더 메뉴 글자 줄(nav가 아닐 때) |
-| C4 | `pagination` | 보이는 자식 2개 이상 · 가로로 나란히 · 숫자 글자 TEXT가 1개 이상 · 나머지는 모두 아이콘 같은 것 | [‹ 01 / 03 ›] · [1 2 3 4] |
-| C5 | `icon-group` | 보이는 자식 2개 이상 · 모두 아이콘 같은 것 · 가로로 나란히(이 프레임이 아이콘 프레임이면 A1이 먼저 `icon`) | 헤더 [검색 · 장바구니 · 메뉴] 아이콘 인스턴스 3개 |
+| C3 | `pagination` | 가로로 나란히 · 숫자 글자 TEXT가 **2개 이상**이거나 `/`가 든 숫자 글자가 1개 이상 · 나머지 보이는 자식은 모두 아이콘만 또는 화살표 글자 | GROUP · 레이아웃 없는 FRAME [‹ 01 / 03 ›](글자 넷) · [1 2 3 4] · [01 / 03 + 화살표 아이콘 둘](GROUP) |
+| C4 | `links` | 보이는 자식 3개 이상 · 가로로 나란히 · 자식이 모두 짧은 한 줄 TEXT · 글자 버튼(A2) · 구분선(LINE, 또는 `isThin`인 RECTANGLE) 가운데 하나이고 TEXT · 글자 버튼이 3개 이상. 글자가 모두 숫자 글자면 아님(그것은 C3) | 푸터 [이용약관 \| 개인정보 \| 고객센터] · 헤더 메뉴 글자 줄(nav가 아닐 때) |
+| C5 | `icon-group` | 보이는 자식 2개 이상 · 모두 아이콘만 · 가로로 나란히(이 프레임이 아이콘 프레임이면 A1이 먼저 `icon`) | 헤더 [검색 · 장바구니 · 메뉴] 아이콘 인스턴스 3개 |
 | C6 | `button-group` | 보이는 자식 2개 이상 · 모두 버튼(방향은 보지 않는다) | [취소 · 확인] · [로그인 · 회원가입](헤더 끝이면 지금처럼 `actions`가 먼저) |
 
-  - 1차와 합친 순서: B1 `row` → C1 `profile` → B2 · C2(`title-group`이면 그것, 아니면 `text-group`) → C3 `links` → C4 `pagination` → B3 `media` → C5 `icon-group` → C6 `button-group` → D.
-  - **D — 방향 이름(위 아무것도 아니면):** 가로 오토레이아웃 → `hstack`, 세로 오토레이아웃 → `vstack`, 격자 오토레이아웃 → `grid`, 오토레이아웃 없음(GROUP · 레이아웃 없는 FRAME · SECTION) → `zstack`(2026-11-19 사용자 결정 Q6-2-3 — `row` · `column` 대신 `hstack` · `vstack`. `grid` · `zstack`은 같은 짝으로 Claude가 정함: 격자는 쌓는 방향이 아니라 칸이라 `grid` 그대로, 오토레이아웃 없음은 자식을 겹쳐 놓을 수 있는 묶음이라 SwiftUI 관례의 `zstack` — 까닭은 ia-v3 §0 "6-2" 사용자 결정 줄). 자식 수(1개 — 지금 `wrapper`)와 자식 없음(지금 `container`)도 같은 표. SECTION 노드도 D만 받는다(C1–C6 · B1–B3는 지금처럼 FRAME · GROUP만).
+  - 1차와 합친 순서: B1 `row` → C1 `profile` → B2 · C2(`title-group`이면 그것, 아니면 `text-group`) → C3 `pagination` → C4 `links` → B3 `media` → C5 `icon-group` → C6 `button-group` → D. C3가 C4보다 앞이다 — 화살표가 글자인 페이지 번호(`‹` · 숫자 · `›`)가 글자 셋 이상이라 `links`가 되지 않게.
+  - **D — 방향 이름(위 아무것도 아니면):** 가로 오토레이아웃 → `hstack`, 세로 오토레이아웃 → `vstack`, 격자 오토레이아웃 → `grid`, 오토레이아웃 없음(GROUP · 레이아웃 없는 FRAME · SECTION) → `zstack`(2026-11-19 사용자 결정 Q6-2-3 — `row` · `column` 대신 `hstack` · `vstack`. `grid` · `zstack`은 같은 짝으로 Claude가 정함 — 까닭은 ia-v3 §0 "6-2" Q6-2-3 줄). 자식 수(1개 — 지금 `wrapper`)와 자식 없음(지금 `container`)도 같은 표. SECTION 노드도 D만 받는다(C1–C6 · B1–B3는 지금처럼 FRAME · GROUP만).
+  - **앞 판정이 먼저인 경우(코드 순서 — 예를 고를 때 확인함):** FRAME [원형 사진 + 이름 글자](자식 2–3개)는 `isFigureLike`(사진 채움 자식 + TEXT 자식 — `rename.ts` 805–811)가 폴백보다 먼저 `figure`를 준다 — C1은 GROUP이거나 이름이 글자 묶음 프레임 안에 든 경우만 닿는다. 가로 · 세로 오토레이아웃 FRAME(높이 64 이하)에 짧은 글자 1개 + 아이콘이면 A2 `isTextButtonLike`가 먼저 `button`을 준다 — [‹ 01 / 03 ›]가 오토레이아웃 FRAME에 글자 하나(`01 / 03`) + 화살표 아이콘 둘이면 `button`이다(C3는 GROUP · 레이아웃 없는 프레임 · 글자가 나뉜 경우).
 - **이름 · 맥락:** C1–C6는 1차 B1–B3처럼 **맥락 + 역할**(`card-profile` · `footer-links` · `header-icon-group`)이고 자식에게 받은 맥락을 그대로 넘긴다(passthrough). D는 지금 `container` · `wrapper`처럼 **맥락 없는 이름**(`hstack` · `vstack` · `grid` · `zstack`)이고 맥락을 그대로 넘긴다(`PASSTHROUGH_ROLES`). 그래서 자손의 이름 · 판정은 지금(이 노드가 `container`였을 때)과 같다.
 - **어휘(`naming.ts`):** 출력 역할(`EMITTED_ROLES`)에 `profile` · `title-group` · `links` · `pagination` · `icon-group` · `button-group` · `hstack` · `vstack` · `grid` · `zstack`을 더한다(1차 `row`는 이름표 + 값 한 줄 그대로). `container` · `wrapper`는 출력 역할에서 인식 전용(`RECOGNIZED_ROLES`)으로 옮긴다 — 지난 정리 결과의 이름을 읽는 곳(아이콘 프레임의 뜻 없는 이름 ⓐ `STRUCT_FALLBACK_NAMES` · `pickScope`의 일반 구조어 · [등록]의 `GENERIC_GROUP_NAMES`)은 그대로 안다. 새 낱말은 맥락 판정에서 1차 세 역할처럼 **보통 낱말**이다(`REFINED_ROLES`에 더함 — `isScopeRole`이 거짓). `pickScope`의 일반 구조어(`GENERIC_ROLES`)에 `hstack` · `vstack` · `grid` · `zstack`을 더한다(그 이름의 노드를 선택 루트로 고르면 맥락 없이 — 지금 `container` 루트와 같게). 두 낱말 역할(`title-group` · `icon-group` · `button-group`)은 1차의 `writeRoleFromName` 두 낱말 규칙으로 되읽힌다.
 - **다른 기능에 미치는 영향:**
   - 쓰임 이름(변수): 6-2 결정 1로 쓰임 이름에 주인이 없어져(ia-v3 §2.12 "6-2 새 규칙" N1) 새 이름은 변수 이름에 영향이 없다.
   - 텍스트 스타일 label 판정(`dsRoleOwner` — `docs/text-style-krds.md` §3.2-1)은 지금 `container`를 건너뛰고 위로 올라간다. 같은 자리의 새 이름도 건너뛰도록 `usageRoles.ts` `STRUCTURAL`에 새 열 낱말을 더한다(label 판정이 지금과 같게).
-  - [등록]: 후보 자격은 구조만 본다(`componentEligible`) — 바뀌지 않는다. 같은 이름 묶기(`groupByExactName`)가 일반어로 건너뛰는 `GENERIC_GROUP_NAMES`에 `hstack` · `vstack` · `grid` · `zstack`을 더한다(지금 `container`가 빠지듯 — 같은 이름이라고 한 세트가 되지 않게). 내용 이름(C1–C6)은 더하지 않는다(맥락이 붙고, 구조가 다르면 가족이 갈린다 — ia-v3 §4.7 "묶기").
-- **한계(받아들임):** 조건은 구조만 본다. 원형이 아닌 사각 아바타 + 이름은 `profile`이 아니다. 제목이 맨 위가 아닌 글자 묶음(본문 위 작은 라벨 + 큰 제목)은 `text-group`이다. 아이콘과 글자가 섞인 가로 오토레이아웃 줄은 `hstack`이다. 2차 후보 기록(위 "다음 차수")의 `card` · 안쪽 `section` · `column`(제목 + 세로 링크 목록)은 이번에 하지 않는다 — `column` 후보는 나중 그대로(D의 세로 이름은 `vstack`이라 겹치지 않는다). `carousel` · `slide` · `tabs`는 3차 그대로.
+  - [등록]: 후보 자격은 구조만 본다(`componentEligible` — FRAME · GROUP은 고신뢰 역할 판정, 말단은 `COMPONENT_ROLES` — 새 낱말은 들지 않음) — 바뀌지 않는다. 같은 이름 묶기(`groupByExactName`)가 일반어로 건너뛰는 `GENERIC_GROUP_NAMES`에 `hstack` · `vstack` · `grid` · `zstack`을 더한다(지금 `container`가 빠지듯 — 같은 이름이라고 한 세트가 되지 않게). 내용 이름(C1–C6)은 더하지 않는다(맥락이 붙고, 구조가 다르면 가족이 갈린다 — ia-v3 §4.7 "묶기"). 세트 이름: 후보가 아닌 노드라 `recognizeComponentName`(마지막 명사 — `header-icon-group` → `Icon`)에 새 이름이 닿지 않는다. 후보 안쪽 레이어의 이름이 세트 이름 폴백(`commonBaseName` 1450)에 쓰이는지는 A.21 5에서 확인한다.
+- **한계(받아들임):** 조건은 구조만 본다.
+  - 원형이 아닌 사각 아바타 + 이름은 `profile`이 아니다. 반대로 원형 카테고리 썸네일 + 라벨(GROUP)은 `profile`이 된다 — 구조로는 아바타와 구분하지 못한다(시안 확인 때 사용자에게 보인다).
+  - 제목이 맨 위가 아닌 글자 묶음(본문 위 작은 라벨 + 큰 제목)은 `text-group`이다.
+  - 아이콘과 글자가 섞인 가로 오토레이아웃 줄은 `hstack`이다. 아바타 인스턴스 + 아이콘 인스턴스(QA 5 카드 머리)는 아바타가 "아이콘만"이 아니라 `icon-group`이 아니고 `hstack`이다.
+  - 2차 후보 기록(위 "다음 차수")의 `card` · 안쪽 `section`은 이번에 하지 않는다. `column`(제목 + 세로 링크 목록) 후보는 나중 그대로(D의 세로 이름은 `vstack`이라 겹치지 않는다). 3차 `grid`(내용 격자 — 같은 카드가 칸으로 놓인 묶음) 후보는 D의 `grid`(격자 오토레이아웃)와 낱말이 겹치므로 나중에 다른 이름(`card-grid` 등)으로 다룬다. `carousel` · `slide` · `tabs`는 3차 그대로.
 - **화면:** 바뀌지 않는다. 이름 정리 미리보기 트리의 새 이름(`after`)만 달라진다.
 
 ### 4.5 컴포넌트 (베타)
@@ -2087,19 +2092,20 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 - [x] 4검사 · 화면 비교(컴포넌트 카드 지운 전 / 뒤, 유료 · 무료)
 - [ ] 실기 확인(Figma) — 사용자
 
-### B.28 변수 · 이름 생성 규칙 PR의 화면 변화 (2026-11-19 6-2 사용자 결정 1–4 — 체크리스트 · 검사는 ia-v3 A.21) — 대략 시안 · 명세 초안
+### B.28 변수 · 이름 생성 규칙 PR의 화면 변화 (2026-11-19 6-2 사용자 결정 1–4 · Q6-2-1–Q6-2-3 · T1–T3 — 체크리스트 · 검사는 ia-v3 A.21) — 대략 시안 · 명세 초안(검토 1회차 반영)
 
 이 PR의 코드 · 테스트 · verify 블록은 ia-v3 부록 A.21 하나에 둔다. 이 문서에서 바뀌는 곳과 화면 글만 적는다.
 
 - **화면 모양은 바뀌지 않는다.** 바뀌는 것은 화면에 보이는 **이름(데이터)**이다:
-  - 만들기 화면(⑧) Semantic 탭 줄 · 만들 수 r: 숫자 Semantic이 `spacing/padding/md` · `spacing/gap/sm` · `radius/full` · `size/icon/md` 꼴, 글자 크기가 `font-size/body/large` 꼴(값마다 하나), 줄 높이 · 자간이 `line-height/md` 꼴. 같은 선택에서 r이 줄어든다(QA 5 결과 파일 Semantic 109 → 약 50 — 추정). 탭 · 줄 모양 · 글은 그대로(§4.3).
+  - 만들기 화면(⑧) Semantic 탭 줄 · 만들 수 r: 숫자 Semantic이 `spacing/padding/md` · `spacing/gap/sm` · `radius/full` · `size/icon/md` 꼴. 같은 선택에서 숫자 r이 줄어든다(간격 44 → 약 20 — 추정). **글자 줄은 지금처럼 없다**(T2 — 만들기는 글자 Semantic을 만들지 않는다. 빈 모습 ① "글자 종류 값만 있음 → `make.semNone`"도 그대로). 단계 이름은 Global 스위치를 켜고 꺼도 바뀌지 않는다(ia-v3 §2.12 N3 "곳 수" — 추출 전체로 정함). 탭 · 줄 모양 · 글은 그대로(§4.3).
+  - 만들기 실행 결과의 글자 변수: 텍스트 스타일 단계가 만드는 글자 크기 Semantic이 px마다 하나(`font-size/body/large`), 줄 높이 · 자간이 값마다 하나(`line-height/md`)다 — 같은 선택에서 글자 Semantic 수가 줄어든다(QA 5: 글자 크기 27 → 9 — 추정). 이 수는 화면에 따로 나오지 않는다(다 됨 줄의 "텍스트 스타일 {y}개"에 포함 — §4.3).
+  - 텍스트 스타일 이름(만들기 Text Style 탭 · [이름 다시 짓기] 팝업): 분류 한 줄만 바뀐다(T1 — 21.5px 이상은 굵기와 상관없이 heading, 보통 굵기는 `-w400` 꼬리). 예: 보통 굵기 24px/140% `body/large-24-140` → `heading/medium-w400-140`. 이미 등록된 스타일은 [이름 다시 짓기] 팝업에서 새 이름이 바꿀 줄로 보인다(앵커라 스캔 줄은 지금 이름 그대로).
   - 연결 화면(⑦) 후보 묶음의 새 Semantic 이름(N 배지 "새 Semantic" 줄)과 선택 탭 카드 1의 수 — 같은 규칙의 새 이름. 모양 · 글 그대로(§4.2 · §4.1).
   - 이름 정리(⑨) 미리보기 트리의 `after` — `container` · `wrapper` 대신 C1–C6 · D 이름(`hstack` · `vstack` · `grid` · `zstack`)(§4.4 "역할 세분화 2차"). 모양 · 글 그대로.
-  - 텍스트 스타일 이름(만들기 Text Style 탭 · [이름 다시 짓기] 팝업)은 **그대로**(`docs/text-style-krds.md` 규칙 그대로).
-- **[이름 다시 짓기] 결과 상태 줄에서 Semantic 변수 꼬리를 없앤다**(ia-v3 §0 "6-2" ⑥ · `docs/text-style-krds.md` §5.3 — 변수가 스타일 이름을 따르지 않으므로 함께 바꿀 변수가 없다): `ui.ts` `onTsRenamed`(1568–1582)의 " · Semantic 변수 {n}개는 같은 이름이 있어 그대로 뒀어요"(`textStyle.renameRoleSkipped`) · " · Semantic 변수 {n}개는 바꾸지 못했어요"(`textStyle.renameRoleError`) · 툴팁 줄 "되돌리지 못한 변수: {names}"(`textStyle.renameRoleStuck`)와 경고 색 조건의 `roleVarsTaken` · `roleVarsError`를 지운다. 남는 글: "텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기"(`textStyle.renamed`) + 건너뜀 꼬리(`textStyle.renameSkipped`) + 사유 툴팁 — 경고 색은 건너뜀이 있을 때만.
-- **만들기 실행의 텍스트 스타일 알림에서** `textStyle.missRoleStuck`("{name}: Semantic 변수 이름을 되돌리지 못했어요 — {vars}")이 더는 나오지 않는다 — 키를 지운다(등록 0단계의 역할 변수 이름 바꾸기 · 되돌림이 없어짐).
+- **[이름 다시 짓기] 결과 상태 줄에서 Semantic 변수 꼬리를 없앤다**(ia-v3 §0 "6-2" T3 · `docs/text-style-krds.md` §5.3 — 옛 변수 이름을 함께 바꾸지 않으므로): `ui.ts` `onTsRenamed`(1568–1582)의 " · Semantic 변수 {n}개는 같은 이름이 있어 그대로 뒀어요"(`textStyle.renameRoleSkipped`) · " · Semantic 변수 {n}개는 바꾸지 못했어요"(`textStyle.renameRoleError`) · 툴팁 줄 "되돌리지 못한 변수: {names}"(`textStyle.renameRoleStuck`)와 경고 색 조건의 `roleVarsTaken` · `roleVarsError`를 지운다. 남는 글: "텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기"(`textStyle.renamed`) + 건너뜀 꼬리(`textStyle.renameSkipped`) + 사유 툴팁 — 경고 색은 건너뜀이 있을 때만.
+- **만들기 실행의 텍스트 스타일 알림에서** `textStyle.missRoleStuck`("{name}: Semantic 변수 이름을 되돌리지 못했어요 — {vars}")이 더는 나오지 않는다 — 키를 지운다(등록 0단계의 역할 변수 이름 바꾸기 · 되돌림이 없어짐). `textStyle.missVar`("{name}: 변수 '{var}'이 없어 연결하지 않았어요")의 글은 그대로이고 `{var}`에 새 이름(`font-size/body/large` 등)이 들어간다.
 - [ ] 글(`i18n.ts`): `textStyle.renameRoleSkipped` · `textStyle.renameRoleError` · `textStyle.renameRoleStuck` · `textStyle.missRoleStuck` 지움(`verify:i18n` 미참조 0)
-- [ ] `TS_RENAMED`(`src/shared/messages.ts` 308)에서 `roleVarsRenamed` · `roleVarsTaken` · `roleVarsError` · `roleVarsStuck` 지움 — UI는 위 글만
-- [ ] verify 블록(ia-v3 A.21 "verify-bind-flow" — 새 블록 29): [이름 다시 짓기] 결과 상태 줄에 "Semantic 변수"가 없음 · 건너뜀 0이면 `ok` 색
-- [ ] 화면 시안(정밀) — 바뀌는 모양이 없으므로 이름 표(전 → 뒤)와 만들기 Semantic 탭 · 이름 정리 트리를 실제 이름으로 한 장씩(CLAUDE.md 5번 "바뀐 것이 없으면 짧게")
+- [ ] `TS_RENAMED`(`src/shared/messages.ts` 308) · `TsRenameResult`(`variables.ts` 1467–1476)에서 `roleVarsRenamed` · `roleVarsTaken` · `roleVarsError` · `roleVarsStuck` 지움, `code.ts` `APPLY_TS_RENAME`(1623–1631)의 주석 "스타일 · 역할 변수 이름을" → "스타일 이름을"
+- [ ] verify(ia-v3 A.21 8): 블록 19(1468–1471 — `roleVars*`를 보내고 "Semantic 변수 1개는"을 검사)를 새 모양으로 고치고, 새 블록 29를 더한다
+- [ ] 화면 시안(정밀) — 바뀌는 모양이 없으므로 이름 표(전 → 뒤)와 만들기 Semantic 탭 · 이름 정리 트리 · [이름 다시 짓기] 팝업(T1 예)을 실제 이름으로 한 장씩(CLAUDE.md 5번 "바뀐 것이 없으면 짧게")
 - [ ] 실기 확인(Figma) — 사용자
