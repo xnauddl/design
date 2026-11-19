@@ -8150,7 +8150,7 @@ test('B.24 ⑨–⑬ 맥락 통과 · 판넬 역할 되읽기 · 접두사 · �
 });
 
 
-/* ================= A.20 만드는 규칙 다시 정하기(ia-v3 §2.12 12.12 N-D1–N-D7 · N-D2a) ================= */
+/* ================= A.21 만드는 규칙 다시 정하기(ia-v3 §2.12 12.12 N-D1–N-D7 · N-D2a) ================= */
 const semCount = (figma) => {
   const col = figma._state.collections.find((c) => c.name === 'Semantic');
   return col ? figma._state.variables.filter((v) => v.variableCollectionId === col.id).length : 0;
@@ -8177,7 +8177,7 @@ const a20Frame = (id, extra = {}) => withPd({
   setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; }, ...extra,
 });
 
-test('A.20 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주인 없음) · 만들기 쓰임도 같은 이름', async () => {
+test('A.21 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주인 없음) · 만들기 쓰임도 같은 이름', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
   const card = withPd(alFrame('card', { itemSpacing: 16 }), { dsRole: 'card' });
@@ -8192,7 +8192,7 @@ test('A.20 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주�
   assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2 }]);
 });
 
-test('A.20 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {
+test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {
   const A = (list, existing = new Map()) => Object.fromEntries([...assignNames(list.map(([value, count]) => ({ base: 'radius/default', value, count })), existing)].map(([k, v]) => [k.split('\u0000')[1], v]));
   assert.deepEqual(A([['8', 10], ['24', 3], ['4', 2]]), { 8: 'radius/default', 24: 'radius/lg', 4: 'radius/sm' });
   // 큰 쪽 4개 → 마지막 후보 + -n, 기준 값이 기본 이름을 받지 못하면 radius/default-2
@@ -8208,7 +8208,7 @@ test('A.20 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radi
   assert.equal(nameKindOf('spacing/gap', '8'), 'number');
 });
 
-test('A.20 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반경 9999 · 반쪽 알약 · 갈린 모서리 · 순서 3은 원래 값', async () => {
+test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반경 9999 · 반쪽 알약 · 갈린 모서리 · 순서 3은 원래 값', async () => {
   let figma = installFigma();
   await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
   const btn = a20Frame('btn', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
@@ -8256,7 +8256,7 @@ test('A.20 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반�
   assert.ok(c3.every((c) => c.variableId === d.id && c.pillFrom == null));
 });
 
-test('A.20 ④ body/large-w500-120 · body/large-w700-150 → font-size/body/large 하나(표시) · 파일에 = 19가 있으면 18은 -sm(덮지 않음)', async () => {
+test('A.21 ④ body/large-w500-120 · body/large-w700-150 → font-size/body/large 하나(표시) · 파일에 = 19가 있으면 18은 -sm(덮지 않음)', async () => {
   let figma = installFigma();
   const spec = (name, style, lh, pct) => ({ name, step: 'body/large', fontSize: 18, lineHeight: lh, lineHeightPercent: pct, letterSpacing: 0, family: 'Inter', style });
   await createSemanticTextStyles([spec('body/large-w500-120', 'Medium', 21.6, 120), spec('body/large-w700-150', 'Bold', 27, 150)]);
@@ -8278,7 +8278,7 @@ test('A.20 ④ body/large-w500-120 · body/large-w700-150 → font-size/body/lar
   assert.equal(roleTarget(figma, old.id), findVar(figma, 'Global', 'font-size/19').id, '덮지 않음');
 });
 
-test('A.20 ⑤ 줄 높이 27(3) · 24 · 32(px) → line-height/body/large · -tight · -loose', async () => {
+test('A.21 ⑤ 줄 높이 27(3) · 24 · 32(px) → line-height/body/large · -tight · -loose', async () => {
   const figma = installFigma();
   const spec = (name, style, lh) => ({ name, step: 'body/large', fontSize: 18, lineHeight: lh, letterSpacing: 0, family: 'Inter', style });
   await createSemanticTextStyles([spec('a', 'Regular', 27), spec('b', 'Medium', 27), spec('c', 'Bold', 27), spec('d', 'Light', 24), spec('e', 'Black', 32)]);
@@ -8292,7 +8292,7 @@ test('A.20 ⑤ 줄 높이 27(3) · 24 · 32(px) → line-height/body/large · -t
   assert.ok(fam.test('line-height/body/large-tighter') && fam.test('line-height/body/large-loose-2') && !fam.test('line-height/body/large-sm'));
 });
 
-test('A.20 ⑥ 색 기준색 — 배경은 가장 밝은 불투명 무채색, 글자 · 아이콘은 가장 진한 색, 불투명 무채색이 없으면 곳 수 1위', async () => {
+test('A.21 ⑥ 색 기준색 — 배경은 가장 밝은 불투명 무채색, 글자 · 아이콘은 가장 진한 색, 불투명 무채색이 없으면 곳 수 1위', async () => {
   const k = colorSlotKey;
   const bg = colorRoleBases([{ hex: '#a3a3a3', count: 10 }, { hex: '#ffffff', count: 2 }], undefined, 'background');
   assert.equal(bg.get(k('#ffffff')), 'default');
@@ -8315,7 +8315,7 @@ test('A.20 ⑥ 색 기준색 — 배경은 가장 밝은 불투명 무채색, �
   assert.equal(roleTarget(figma, findVar(figma, 'Semantic', 'color/background/strong').id), s.globalOf.get('color/a3a3a3'));
 });
 
-test('A.20 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x, 세로 → stack-y, 오토레이아웃 아님 → container, 자식 1 → wrapper · stack-x 루트의 자식은 맥락 없음', async () => {
+test('A.21 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x, 세로 → stack-y, 오토레이아웃 아님 → container, 자식 1 → wrapper · stack-x 루트의 자식은 맥락 없음', async () => {
   installFigma();
   const box = (id, layoutMode, kids) => ({ type: 'FRAME', id, name: `Frame ${id}`, ...(layoutMode ? { layoutMode } : {}), width: 600, height: 300, children: kids });
   const sq = (id, x) => ({ type: 'RECTANGLE', id, name: `Rectangle ${id}`, x, y: 0, width: 200, height: 200, fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 }, visible: true }] });
@@ -8342,7 +8342,7 @@ test('A.20 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x,
   assert.equal(isKnownRolePure('stack-y'), true);
 });
 
-test('A.20 ⑧ 옛 이름 spacing/card/gap만 있는 파일 → 새 spacing/gap을 만들고 옛 것은 그대로', async () => {
+test('A.21 ⑧ 옛 이름 spacing/card/gap만 있는 파일 → 새 spacing/gap을 만들고 옛 것은 그대로', async () => {
   const figma = installFigma();
   const old = await semNum(figma, 'spacing/card/gap', 16, { cat: 'spacing', scopes: ['GAP'] });
   old.setPluginData('dsl.autoRole', '1'); // 옛 플러그인이 만든 쓰임 역할
@@ -8356,7 +8356,7 @@ test('A.20 ⑧ 옛 이름 spacing/card/gap만 있는 파일 → 새 spacing/gap�
   assert.equal(roleTarget(figma, old.id), roleTarget(figma, neu.id));
 });
 
-test('A.20 ⑨ 이름 다시 짓기 · 등록 — 새 규칙 변수는 단계가 바뀐 스타일만 옮겨 연결 · 옛 규칙 변수는 이름만 함께 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
+test('A.21 ⑨ 이름 다시 짓기 · 등록 — 새 규칙 변수는 단계가 바뀐 스타일만 옮겨 연결 · 옛 규칙 변수는 이름만 함께 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
   let figma = installFigma();
   const spec = (name, style, step = 'body/large', fontSize = 18) => ({ name, step, fontSize, lineHeight: 27, letterSpacing: 0, family: 'Inter', style });
   await createSemanticTextStyles([spec('body/large-w500-120', 'Medium'), spec('body/large-w700-150', 'Bold')]);
@@ -8407,7 +8407,7 @@ test('A.20 ⑨ 이름 다시 짓기 · 등록 — 새 규칙 변수는 단계가
   assert.equal(figma._state.textStyles.find((s) => s.name === 'body/large').boundVariables.fontSize.id, oldFs.id);
 });
 
-test('A.20 ⑩ QA 5 모양 입력 — 주인 여럿 × 같은 간격 값, 18px 글자 10개 → Semantic 수가 줄어든다', async () => {
+test('A.21 ⑩ QA 5 모양 입력 — 주인 여럿 × 같은 간격 값, 18px 글자 10개 → Semantic 수가 줄어든다', async () => {
   // 간격: 주인 8종 × 프레임 4개, gap 값 6가지 · padding 값 4가지(같은 값이 주인마다 반복)
   const owners = ['card', 'button', 'chip', 'list', 'nav', 'field', 'table', 'tab'];
   const gaps = [4, 8, 12, 16, 24, 32];
@@ -8461,7 +8461,7 @@ test('A.20 ⑩ QA 5 모양 입력 — 주인 여럿 × 같은 간격 값, 18px �
   const textAfter = semCount(figma);
   assert.equal(textBefore, 20); // font-size 10 + line-height 10
   assert.equal(textAfter, 6); // 단계마다 font-size 1 + line-height 2(기준 · -tight)
-  console.log(`A.20 ⑩ Semantic — 간격 ${spacingBefore} → ${spacingAfter}, 글자 ${textBefore} → ${textAfter}`);
+  console.log(`A.21 ⑩ Semantic — 간격 ${spacingBefore} → ${spacingAfter}, 글자 ${textBefore} → ${textAfter}`);
 });
 
 /* ---------- 6-1b 컴포넌트 규칙 — SCAN_COMPONENT_CANDIDATES(ia-v3 A.19 6번 figma.test ①–⑥) ---------- */

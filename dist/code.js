@@ -99,9 +99,6 @@
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
-    // 닮은 프레임 컴포넌트화
-    "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
-    "similar.componentizeBtn": "\uD558\uB098\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -693,9 +690,8 @@
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
     "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
-    "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
-    "component.hint": "\uD6C4\uBCF4\uB97C \uCC3E\uC544 \uB4F1\uB85D\uD558\uAC70\uB098, \uB2EE\uC740 \uD504\uB808\uC784\uC744 \uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCCD0\uC694 \xB7 \uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\uB294 \uBB34\uB8CC",
+    "component.hint": "\uD6C4\uBCF4\uB97C \uCC3E\uC544 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694",
     "component.scanBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30",
     "component.registerBtn": "\uB4F1\uB85D",
     "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
@@ -704,9 +700,6 @@
     "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components \uD398\uC774\uC9C0\uC5D0 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD558\uACE0, \uC6D0\uB798 \uC790\uB9AC\uC5D0\uB294 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uB0A8\uAE34 \uC778\uC2A4\uD134\uC2A4\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
-    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
-    "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
-    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.autoNamed": "\uC774\uB984 \uC5C6\uB294 \uB808\uC774\uC5B4 {n}\uAC1C \u2014 \u2018\uC774\uB984 \uC815\uB9AC\u2019\uB97C \uBA3C\uC800 \uD558\uBA74 \uD6C4\uBCF4\uAC00 \uB3FC\uC694",
     "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
@@ -802,36 +795,6 @@
     "component.fail.iconSwapErr": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer}): {error}",
     "component.fail.photoNoSlot": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}) \u2014 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "component.fail.photo": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}): {error}",
-    // 레이어 › 컴포넌트 — 닮은 프레임 묶기
-    "similar.scanning": "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026",
-    "similar.componentizing": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uB294 \uC911\u2026",
-    "similar.failed": "\uD569\uCE58\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
-    "similar.failedWarn": " \u2014 {warning}",
-    "similar.resMaster": "\uC6D0\uBCF8 {name}",
-    "similar.resInstances": "\uC778\uC2A4\uD134\uC2A4 {n}\uAC1C",
-    "similar.resProps": "\uC18D\uC131 {n}\uAC1C",
-    "similar.resImages": "\uC774\uBBF8\uC9C0 {n}\uAC1C",
-    "similar.resKept": " \xB7 \uB0A8\uACA8\uB454 \uAC83 {n}\uAC74: {warning}",
-    "similar.metaText": "\uD14D\uC2A4\uD2B8 {filled}/{total}",
-    "similar.metaImages": "\uC774\uBBF8\uC9C0 {n}",
-    "similar.metaEmpty": "\uBE48 \uCE78 {n}",
-    "similar.recommended": "\uC6D0\uBCF8 \uCD94\uCC9C",
-    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uC788\uC5B4\uC57C \uD574\uC694",
-    "similar.none": "\uD569\uCE60 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
-    "similar.openText": "\uD14D\uC2A4\uD2B8 {n}",
-    "similar.openSwap": "\uC544\uC774\uCF58 \uAD50\uCCB4 {n}",
-    "similar.openImage": "\uC774\uBBF8\uC9C0 {n}",
-    "similar.opened": "\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: {list}",
-    "similar.noVarying": "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
-    "similar.excluded": " \xB7 \uC81C\uC678 {n}\uAC1C({why})",
-    "similar.scanned": "\uB300\uC0C1 {n}\uAC1C \xB7 {openPart}{skipPart}",
-    "similar.noMaster": "\uC6D0\uBCF8 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
-    "similar.overrideFail": "{name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "similar.placeFail": "{name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "similar.why.needTwo": "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694",
-    "similar.why.mismatch": "\uAD6C\uC870 \uBD88\uC77C\uCE58",
-    "similar.why.fewSame": "\uB3D9\uC77C \uAD6C\uC870 \uD504\uB808\uC784 2\uAC1C \uBBF8\uB9CC",
     // 만들기 › 색 · 토큰
     "create.hintPreview": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uC138\uC694.",
     "create.hintNoSel": "\uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.",
@@ -10628,299 +10591,6 @@
     return r.result;
   }
 
-  // src/lib/similar.ts
-  function flattenFrame(root) {
-    const out = [];
-    const visit = (node, prefix) => {
-      var _a, _b;
-      const seen = /* @__PURE__ */ new Map();
-      for (const c of (_a = node.children) != null ? _a : []) {
-        const n = ((_b = seen.get(c.name)) != null ? _b : 0) + 1;
-        seen.set(c.name, n);
-        const seg = n === 1 ? c.name : `${c.name}#${n}`;
-        const path = prefix ? `${prefix}/${seg}` : seg;
-        out.push({ id: c.id, path, type: c.type, characters: c.characters, componentKey: c.componentKey, hasImageFill: c.hasImageFill, imageHash: c.imageHash });
-        visit(c, path);
-      }
-    };
-    visit(root, "");
-    return out;
-  }
-  var SEP = "\0";
-  function frameShapeSignature(root) {
-    return JSON.stringify(
-      flattenFrame(root).map((e) => `${e.path}${SEP}${e.type}`).sort()
-    );
-  }
-  var textOf = (e) => {
-    var _a;
-    return ((_a = e.characters) != null ? _a : "").trim();
-  };
-  function metaOf(frame) {
-    const leaves = flattenFrame(frame);
-    const texts = leaves.filter((l) => l.type === "TEXT");
-    const textFilled = texts.filter((l) => textOf(l) !== "").length;
-    const images = leaves.filter((l) => l.type === "INSTANCE" || l.hasImageFill).length;
-    const emptyLayers = texts.length - textFilled;
-    return {
-      id: frame.id,
-      name: frame.name,
-      textFilled,
-      textTotal: texts.length,
-      images,
-      emptyLayers,
-      score: textFilled * 2 + images - emptyLayers
-    };
-  }
-  function alignFrames(frames) {
-    var _a;
-    const empty = { memberIds: [], recommendedMasterId: null, metas: [], varying: [], imageVarying: [], excluded: [] };
-    if (frames.length < 2) {
-      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: t("similar.why.needTwo") })) });
-    }
-    const bySig = /* @__PURE__ */ new Map();
-    for (const f of frames) {
-      const sig = frameShapeSignature(f);
-      ((_a = bySig.get(sig)) != null ? _a : bySig.set(sig, []).get(sig)).push(f);
-    }
-    let best = [];
-    for (const group of bySig.values()) if (group.length > best.length) best = group;
-    const excluded = frames.filter((f) => !best.includes(f)).map((f) => ({ id: f.id, name: f.name, reason: t("similar.why.mismatch") }));
-    if (best.length < 2) {
-      return __spreadProps(__spreadValues({}, empty), { excluded: frames.map((f) => ({ id: f.id, name: f.name, reason: t("similar.why.fewSame") })) });
-    }
-    const flats = best.map((f) => flattenFrame(f));
-    const paths = flats[0];
-    const varying = [];
-    const imageVarying = [];
-    const at = (leaves, path) => leaves.find((l) => l.path === path);
-    for (const entry of paths) {
-      if (entry.hasImageFill) {
-        const hashes = new Set(flats.map((f) => {
-          var _a2, _b;
-          return (_b = (_a2 = at(f, entry.path)) == null ? void 0 : _a2.imageHash) != null ? _b : "";
-        }));
-        if (hashes.size > 1) imageVarying.push(entry.path);
-      }
-      if (entry.type !== "TEXT" && entry.type !== "INSTANCE") continue;
-      const valueAt = (leaves) => {
-        var _a2;
-        const e = at(leaves, entry.path);
-        if (!e) return "";
-        return entry.type === "TEXT" ? textOf(e) : (_a2 = e.componentKey) != null ? _a2 : "";
-      };
-      const distinct = new Set(flats.map(valueAt));
-      if (distinct.size > 1) varying.push({ path: entry.path, type: entry.type === "TEXT" ? "TEXT" : "INSTANCE_SWAP" });
-    }
-    const metas = best.map(metaOf);
-    const order = new Map(best.map((f, i) => [f.id, i]));
-    metas.sort((a, b) => b.score - a.score || order.get(a.id) - order.get(b.id));
-    const recommendedMasterId = metas.length ? metas[0].id : null;
-    return {
-      memberIds: best.map((f) => f.id),
-      recommendedMasterId,
-      metas,
-      varying,
-      imageVarying: [...new Set(imageVarying)],
-      excluded
-    };
-  }
-  var leafName = (path) => {
-    var _a;
-    const seg = (_a = path.split("/").pop()) != null ? _a : path;
-    return kebab(seg.replace(/#\d+$/, ""));
-  };
-  function planContentProperties(varying) {
-    const taken = /* @__PURE__ */ new Set();
-    const uniq = (base) => {
-      const b = base || "prop";
-      let n = b;
-      let i = 2;
-      while (taken.has(n)) n = `${b}-${i++}`;
-      taken.add(n);
-      return n;
-    };
-    return varying.map((v) => ({
-      propName: uniq(leafName(v.path) || (v.type === "TEXT" ? "text" : "swap")),
-      type: v.type,
-      path: v.path,
-      field: v.type === "TEXT" ? "characters" : "mainComponent"
-    }));
-  }
-  function overridesForFrame(frameLeaves, plan) {
-    var _a, _b;
-    const byPath = new Map(frameLeaves.map((l) => [l.path, l]));
-    const out = {};
-    for (const p of plan) {
-      const e = byPath.get(p.path);
-      if (!e) continue;
-      const value = p.type === "TEXT" ? (_a = e.characters) != null ? _a : "" : (_b = e.componentKey) != null ? _b : "";
-      if (value !== "") out[p.propName] = value;
-    }
-    return out;
-  }
-
-  // src/lib/similarApply.ts
-  async function buildSimTree(node) {
-    var _a;
-    const out = { id: node.id, name: node.name, type: node.type };
-    if (node.type === "TEXT") out.characters = typeof node.characters === "string" ? node.characters : "";
-    if (node.type === "INSTANCE") {
-      const mc = await node.getMainComponentAsync();
-      if (mc) out.componentKey = mc.key || mc.id;
-    }
-    const fills = node.fills;
-    if (Array.isArray(fills)) {
-      const img = fills.find((p) => p.type === "IMAGE" && p.visible !== false);
-      if (img) {
-        out.hasImageFill = true;
-        out.imageHash = (_a = img.imageHash) != null ? _a : void 0;
-      }
-    }
-    if ("children" in node) {
-      const kids = [];
-      for (const c of node.children) kids.push(await buildSimTree(c));
-      out.children = kids;
-    }
-    return out;
-  }
-  function figmaPathMap(root) {
-    const map = /* @__PURE__ */ new Map();
-    const visit = (node, prefix) => {
-      var _a;
-      if (!("children" in node)) return;
-      const seen = /* @__PURE__ */ new Map();
-      for (const c of node.children) {
-        const n = ((_a = seen.get(c.name)) != null ? _a : 0) + 1;
-        seen.set(c.name, n);
-        const seg = n === 1 ? c.name : `${c.name}#${n}`;
-        const path = prefix ? `${prefix}/${seg}` : seg;
-        map.set(path, c);
-        visit(c, path);
-      }
-    };
-    visit(root, "");
-    return map;
-  }
-  async function scanSimilar(frames) {
-    const trees = [];
-    for (const f of frames) trees.push(await buildSimTree(f));
-    return alignFrames(trees);
-  }
-  async function componentizeSimilar(master, members) {
-    var _a;
-    const trees = [];
-    for (const n of members) trees.push(await buildSimTree(n));
-    const treeById = new Map(members.map((n, i) => [n.id, trees[i]]));
-    const aligned = alignFrames(trees);
-    const plan = planContentProperties(aligned.varying);
-    const comp = figma.createComponentFromNode(master);
-    const compPaths = figmaPathMap(comp);
-    const propIdByPath = /* @__PURE__ */ new Map();
-    let properties = 0;
-    for (const p of plan) {
-      const target = compPaths.get(p.path);
-      if (!target) continue;
-      try {
-        let def = "";
-        if (p.type === "TEXT") def = target.type === "TEXT" ? target.characters : "";
-        else {
-          const mc = target.type === "INSTANCE" ? await target.getMainComponentAsync() : null;
-          def = mc ? mc.key || mc.id : "";
-        }
-        const id = comp.addComponentProperty(p.propName, p.type, def);
-        const refs = __spreadValues({}, (_a = target.componentPropertyReferences) != null ? _a : {});
-        refs[p.field] = id;
-        target.componentPropertyReferences = refs;
-        propIdByPath.set(p.path, id);
-        properties++;
-      } catch (e) {
-      }
-    }
-    let instances = 0;
-    let images = 0;
-    const kept = [];
-    const placeFailed = [];
-    const memberSet = new Set(aligned.memberIds);
-    for (const n of members) {
-      if (n.id === master.id) continue;
-      if (!memberSet.has(n.id)) continue;
-      const leaves = treeById.get(n.id);
-      if (!leaves) continue;
-      let inst = null;
-      try {
-        inst = comp.createInstance();
-        try {
-          inst.resize(n.width, n.height);
-        } catch (e) {
-        }
-        const origin = captureOrigin(n, { anchor: false });
-        if (!placeAtOrigin(inst, origin)) {
-          inst = null;
-          placeFailed.push(n.name);
-          continue;
-        }
-        releaseOrigin(origin);
-        const ov = overridesForFrame(flattenFrame(leaves), plan);
-        const props = {};
-        for (const p of plan) {
-          const v = ov[p.propName];
-          const id = propIdByPath.get(p.path);
-          if (v !== void 0 && id) props[id] = v;
-        }
-        if (Object.keys(props).length) {
-          try {
-            inst.setProperties(props);
-          } catch (e) {
-            inst.remove();
-            kept.push(n.name);
-            continue;
-          }
-        }
-        if (aligned.imageVarying.length) {
-          const srcPaths = figmaPathMap(n);
-          const dstPaths = figmaPathMap(inst);
-          for (const path of aligned.imageVarying) {
-            const src = srcPaths.get(path);
-            const dst = dstPaths.get(path);
-            const f = src && "fills" in src ? src.fills : null;
-            if (dst && "fills" in dst && Array.isArray(f)) {
-              try {
-                dst.fills = f;
-                images++;
-              } catch (e) {
-              }
-            }
-          }
-        }
-        n.remove();
-        instances++;
-      } catch (e) {
-        if (inst) {
-          try {
-            inst.remove();
-          } catch (e2) {
-          }
-        }
-      }
-    }
-    const warnings = aligned.excluded.map((e) => `${e.name}: ${e.reason}`);
-    for (const name of kept) warnings.push(t("similar.overrideFail", { name }));
-    for (const name of placeFailed) warnings.push(t("similar.placeFail", { name }));
-    return { master: comp.name, properties, instances, images, warnings, placeFailed };
-  }
-  function componentizeResultMessage(r) {
-    return {
-      type: "COMPONENTIZE_RESULT",
-      master: r.master,
-      properties: r.properties,
-      instances: r.instances,
-      images: r.images,
-      warnings: r.warnings,
-      placeFailed: r.placeFailed
-    };
-  }
-
   // src/lib/themeGen.ts
   var DARK_L_MIN = 0.18;
   var DARK_L_MAX = 0.97;
@@ -13714,41 +13384,6 @@
             await postPrereq();
           }
           post({ type: "VARIABLES", vars: await collectVars() });
-          break;
-        }
-        case "SCAN_SIMILAR": {
-          const frames = (await resolveRoots(msg.nodeIds)).filter((n) => n.type === "FRAME" || n.type === "GROUP" || n.type === "COMPONENT");
-          const r = await scanSimilar(frames);
-          post({
-            type: "SIMILAR_CANDIDATES",
-            reqId: msg.reqId,
-            metas: r.metas,
-            recommendedMasterId: r.recommendedMasterId,
-            varying: r.varying,
-            imageVarying: r.imageVarying,
-            excluded: r.excluded
-          });
-          break;
-        }
-        case "COMPONENTIZE_SIMILAR": {
-          if (!requirePaid("components")) break;
-          const master = await figma.getNodeByIdAsync(msg.masterId);
-          if (!master || master.type !== "FRAME" && master.type !== "GROUP") {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.noMaster")], placeFailed: [] });
-            break;
-          }
-          const memberNodes = [];
-          for (const id of msg.frameIds) {
-            const n = await figma.getNodeByIdAsync(id);
-            if (n && "type" in n) memberNodes.push(n);
-          }
-          if (memberNodes.length < 2) {
-            post({ type: "COMPONENTIZE_RESULT", master: "", properties: 0, instances: 0, images: 0, warnings: [t("similar.tooFew")], placeFailed: [] });
-            break;
-          }
-          const r = await componentizeSimilar(master, memberNodes);
-          post(componentizeResultMessage(r));
-          if (r.instances) commitUndo(figma);
           break;
         }
       }

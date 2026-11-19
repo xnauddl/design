@@ -23,7 +23,6 @@ import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type Ke
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
-import { scanSimilar, componentizeSimilar, componentizeResultMessage } from './lib/similarApply';
 import { generateDarkMode } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache, isVerifyErrCode } from './lib/license';
@@ -2893,45 +2892,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           await postPrereq();
         }
         post({ type: 'VARIABLES', vars: await collectVars() }); // 모드가 늘었을 수 있으니 목록 갱신
-        break;
-      }
-      case 'SCAN_SIMILAR': {
-        // 미리보기(읽기 전용)는 Free — 선택 프레임을 정렬해 가변 위치·마스터 추천만 보여준다.
-        // 목록 기준의 nodeIds(ia-v4 §2.5) — 없으면 지금 선택.
-        const frames = (await resolveRoots(msg.nodeIds)).filter((n) => n.type === 'FRAME' || n.type === 'GROUP' || n.type === 'COMPONENT');
-        const r = await scanSimilar(frames);
-        post({
-          type: 'SIMILAR_CANDIDATES',
-          reqId: msg.reqId,
-          metas: r.metas,
-          recommendedMasterId: r.recommendedMasterId,
-          varying: r.varying,
-          imageVarying: r.imageVarying,
-          excluded: r.excluded,
-        });
-        break;
-      }
-      case 'COMPONENTIZE_SIMILAR': {
-        if (!requirePaid('components')) break;
-        const master = await figma.getNodeByIdAsync(msg.masterId);
-        if (!master || (master.type !== 'FRAME' && master.type !== 'GROUP')) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.noMaster')], placeFailed: [] });
-          break;
-        }
-        // 멤버 노드 수집(마스터 포함) → 정렬·컴포넌트화·인스턴스 교체는 similarApply에 위임.
-        const memberNodes: SceneNode[] = [];
-        for (const id of msg.frameIds) {
-          const n = await figma.getNodeByIdAsync(id);
-          if (n && 'type' in n) memberNodes.push(n as SceneNode);
-        }
-        if (memberNodes.length < 2) {
-          post({ type: 'COMPONENTIZE_RESULT', master: '', properties: 0, instances: 0, images: 0, warnings: [t('similar.tooFew')], placeFailed: [] });
-          break;
-        }
-        const r = await componentizeSimilar(master as SceneNode, memberNodes);
-        // 결과의 모든 필드를 싣는다(placeFailed가 빠지면 결과 줄 꼬리·⚠가 동작하지 않는다 — §4.7 5번).
-        post(componentizeResultMessage(r));
-        if (r.instances) commitUndo(figma); // UX2: 컴포넌트화 전체를 단일 Undo로
         break;
       }
     }

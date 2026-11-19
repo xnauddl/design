@@ -616,7 +616,6 @@ export interface ImageSlot {
  * 멤버들 사이에서 **사진이 다른 슬롯**을 찾는다(순수). 같은 자리·같은 구조에서
  * `imageHash`만 갈리는 경우다 — Figma에 '이미지 속성'은 없지만 인스턴스의 `fills`는
  * 오버라이드되므로, 등록이 멤버 원본 fill을 그 경로에 이식하면 사진이 살아남는다.
- * (닮은 프레임 컴포넌트화가 쓰는 방식과 같다.)
  */
 export function inferVaryingImageSlots(members: readonly StructNode[]): ImageSlot[] {
   if (members.length < 2) return [];
