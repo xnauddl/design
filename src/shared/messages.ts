@@ -100,6 +100,8 @@ export interface BindCandidate {
   newRoleGlobalName?: string;
   /** 선택 밖 메인 컴포넌트 안 자리면 그 메인 단위 id(세트면 COMPONENT_SET id — ia-v3 §2.11 11번). */
   mainId?: string;
+  /** 9999로 붙이는 알약 반경 자리면 찾을 때 읽은 원래 값(ia-v3 §2.12 12.12 N-D5) — 연결 직전 다시 확인에 쓴다. */
+  pillFrom?: number;
 }
 
 /** 함께 연결하는 선택 밖 메인 컴포넌트 단위(세트는 하나 — ia-v3 §2.11 11번). */
@@ -214,7 +216,7 @@ export type UiToCode =
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
   | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'PREVIEW_TEXT_STYLES'; reqId: number; nodeIds?: string[] } // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다
-  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string; pillFrom?: number }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
   // 변수 고치기(§4.4 고치기, PR 3.5) — 고친 것만. base = 팝업을 열 때(또는 마지막 저장 응답 뒤)의 이름과 고친 모드의 칸(값 없음은 null).
@@ -305,7 +307,7 @@ export type CodeToUi =
   // decimalRows: 앵커 없는 소수 크기 군집 — 만들지 않는 흐린 줄(§2.11 11번 · ia-v4 §4.3 "소수 크기 줄").
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; decimalRows?: StyleCluster[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
   | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
-  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[] }
+  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[]; roleMoveError: number; roleMoveNames: string[] }
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number>; mainsApplied?: string[] } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
@@ -371,6 +373,8 @@ export interface TsRenameRow {
   from: string;
   to: string;
   sig: string;
+  /** 새 이름의 크기 단계(KRDS `sizeKey`, ia-v3 §2.12 12.12 N-D2a) — 바꾸기가 새 단계 변수로 옮겨 연결할 때 쓴다. */
+  step?: string;
 }
 /** [이름 다시 짓기] 바꾸기 항목. */
 export interface TsRenameItem {
@@ -378,4 +382,6 @@ export interface TsRenameItem {
   from: string;
   to: string;
   sig: string;
+  /** 새 이름의 크기 단계(TsRenameRow.step 그대로). */
+  step?: string;
 }

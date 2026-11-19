@@ -884,6 +884,8 @@
     "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
     "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
+    "textStyle.renameRoleMoveError": " \xB7 {m}\uAC1C\uB294 Semantic \uBCC0\uC218\uB97C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "textStyle.renameRoleMoveNames": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC2A4\uD0C0\uC77C: {names}",
     "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
     "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
     "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
@@ -1421,16 +1423,21 @@
   }
 
   // src/lib/usageRoles.ts
-  var STRUCTURAL = /* @__PURE__ */ new Set(["container", "wrapper", "shape", "group", "content", "body", "row", "text-group", "media"]);
+  var STRUCTURAL = /* @__PURE__ */ new Set(["container", "wrapper", "stack-x", "stack-y", "shape", "group", "content", "body", "row", "text-group", "media"]);
   function pickOwner(dsRole, highConfidence, known) {
     if (dsRole && known(dsRole) && !STRUCTURAL.has(dsRole)) return dsRole;
     return highConfidence != null ? highConfidence : void 0;
   }
-  function composeName(group, owner, prop) {
-    if (owner && prop) return `${group}/${owner}/${prop}`;
-    if (prop) return `${group}/${prop}`;
-    if (owner) return `${group}/${owner}`;
-    return `${group}/default`;
+  function composeName(group, prop) {
+    return prop ? `${group}/${prop}` : `${group}/default`;
+  }
+  var PILL_RADIUS = 9999;
+  function isPillRadius(v, width, height) {
+    const short = Math.min(width, height);
+    return v > 0 && Number.isFinite(short) && v >= short / 2;
+  }
+  function pillCorners(values, width, height) {
+    return values.map((v) => isPillRadius(v, width, height) ? PILL_RADIUS : v);
   }
   var near = (a, b) => Math.abs(a - b) < 5e-3;
   function paddingProp(field, p) {
@@ -1454,29 +1461,30 @@
     const live = values.filter((v) => v > 0);
     return live.every((v) => near(v, live[0]));
   }
-  function radiusName(field, owner, corners) {
+  function radiusName(field, corners) {
     var _a;
-    if (allSame(corners)) return composeName("radius", owner, void 0);
-    const suf = (_a = CORNER_SUFFIX[field]) != null ? _a : "default";
-    return owner ? `radius/${owner}-${suf}` : `radius/${suf}`;
+    if (allSame(corners)) {
+      const live = corners.filter((v) => v > 0);
+      return live.length && near(live[0], PILL_RADIUS) ? "radius/full" : composeName("radius", void 0);
+    }
+    return `radius/${(_a = CORNER_SUFFIX[field]) != null ? _a : "default"}`;
   }
-  function strokeName(field, owner, sides) {
+  function strokeName(field, sides) {
     var _a;
-    if (field === "strokeWeight" || allSame(sides)) return composeName("stroke-width", owner, void 0);
-    const suf = (_a = SIDE_SUFFIX[field]) != null ? _a : "default";
-    return owner ? `stroke-width/${owner}-${suf}` : `stroke-width/${suf}`;
+    if (field === "strokeWeight" || allSame(sides)) return composeName("stroke-width", void 0);
+    return `stroke-width/${(_a = SIDE_SUFFIX[field]) != null ? _a : "default"}`;
   }
-  function simpleNumericName(field, owner, sizeKind) {
+  function simpleNumericName(field, sizeKind) {
     switch (field) {
       case "itemSpacing":
-        return composeName("spacing", owner, "gap");
+        return composeName("spacing", "gap");
       case "counterAxisSpacing":
       case "gridRowGap":
-        return composeName("spacing", owner, "row-gap");
+        return composeName("spacing", "row-gap");
       case "gridColumnGap":
-        return composeName("spacing", owner, "column-gap");
+        return composeName("spacing", "column-gap");
       case "opacity":
-        return composeName("opacity", owner, void 0);
+        return composeName("opacity", void 0);
       case "width":
       case "height":
         return sizeKind ? `size/${sizeKind}` : null;
@@ -1512,16 +1520,29 @@
   }
   var INVERSE_USES = /* @__PURE__ */ new Set(["text", "icon", "border"]);
   var byCountThenHex = (a, b) => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
-  function colorRoleRef(colors, existingDefaultHex) {
-    var _a, _b, _c;
+  function colorRoleRef(colors, existingDefaultHex, use) {
+    var _a, _b;
+    if (existingDefaultHex) return existingDefaultHex.split("@")[0].toLowerCase();
     const totals = /* @__PURE__ */ new Map();
-    for (const c of colors) totals.set(c.hex.toLowerCase(), ((_a = totals.get(c.hex.toLowerCase())) != null ? _a : 0) + c.count);
-    const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-    return (_c = (_b = existingDefaultHex == null ? void 0 : existingDefaultHex.split("@")[0]) != null ? _b : top == null ? void 0 : top.hex) == null ? void 0 : _c.toLowerCase();
+    const opaque = /* @__PURE__ */ new Set();
+    for (const c of colors) {
+      const hex = c.hex.toLowerCase();
+      totals.set(hex, ((_a = totals.get(hex)) != null ? _a : 0) + c.count);
+      if (c.alpha == null || c.alpha >= 1) opaque.add(hex);
+    }
+    const all = [...totals].map(([hex, count]) => ({ hex, count }));
+    if (use === "background" || use === "text" || use === "icon") {
+      const neutral = all.filter((x) => opaque.has(x.hex) && hexToOklch(x.hex).c < LOW_CHROMA);
+      if (neutral.length) {
+        const sign = use === "background" ? -1 : 1;
+        return neutral.sort((a, b) => sign * (lOf(a.hex) - lOf(b.hex)) || byCountThenHex(a, b))[0].hex;
+      }
+    }
+    return (_b = all.sort(byCountThenHex)[0]) == null ? void 0 : _b.hex;
   }
   function colorRoleBases(colors, existingDefaultHex, use) {
     const out = /* @__PURE__ */ new Map();
-    const refHex = colorRoleRef(colors, existingDefaultHex);
+    const refHex = colorRoleRef(colors, existingDefaultHex, use);
     if (!refHex) return out;
     const ref = hexToOklch(refHex);
     const refDark = ref.l < 0.35;
@@ -1557,10 +1578,16 @@
       if (last === "inverse") return "inverse";
       return "default";
     }
-    return value !== "" && !Number.isNaN(Number(value)) ? "number" : "plain";
+    if (base === "radius/full") return "plain";
+    if (value === "" || Number.isNaN(Number(value))) return "plain";
+    return base.startsWith("line-height/") || base.startsWith("letter-spacing/") ? "leading" : "number";
   }
   var SIZE_SMALL = ["sm", "xs", "2xs"];
   var SIZE_LARGE = ["lg", "xl", "2xl"];
+  var TIGHT = ["tight", "tighter", "tightest"];
+  var LOOSE = ["loose", "looser", "loosest"];
+  var isDefaultTail = (base) => base.endsWith("/default");
+  var tailName = (base, word) => isDefaultTail(base) ? `${base.slice(0, base.lastIndexOf("/"))}/${word}` : `${base}-${word}`;
   var LIGHTER = ["subtle", "subtler", "subtlest"];
   var DARKER = ["strong", "stronger", "strongest"];
   var LADDER_WORDS = [...LIGHTER, ...DARKER];
@@ -1571,7 +1598,11 @@
     const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
     switch (kind) {
       case "number":
-        return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join("|")}))?(?:-\\d+)?$`);
+      case "leading": {
+        const words = (kind === "leading" ? [...TIGHT, ...LOOSE] : [...SIZE_SMALL, ...SIZE_LARGE]).join("|");
+        if (isDefaultTail(base)) return new RegExp(`^${esc(base.slice(0, base.lastIndexOf("/")))}/(?:default|${words})(?:-\\d+)?$`);
+        return new RegExp(`^${esc(base)}(?:-(?:${words}))?(?:-\\d+)?$`);
+      }
       case "plain":
         return new RegExp(`^${esc(base)}(?:-\\d+)?$`);
       case "default":
@@ -1638,7 +1669,7 @@
       const fallback = (name) => {
         for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
       };
-      if (g.kind === "number") assignNumbers(base, g.values, left, taken, assign, fallback);
+      if (g.kind === "number" || g.kind === "leading") assignNumbers(base, g.kind, g.values, left, taken, assign, fallback);
       else if (g.kind === "plain") {
         for (const value of sortByCount(left, g.values)) assign(value, taken.has(base) ? fallback(base) : base);
       } else assignColors(base, g.kind, g.refHex, g.values, left, taken, assign, fallback);
@@ -1655,7 +1686,7 @@
     const v = taken.get(name);
     return v && v.length ? v[0] : void 0;
   }
-  function assignNumbers(base, counts, left, taken, assign, fallback) {
+  function assignNumbers(base, kind, counts, left, taken, assign, fallback) {
     let rest = sortByCount(left, counts);
     let ref;
     const held = holderValue(taken, base);
@@ -1669,14 +1700,15 @@
     const side = (vals, words) => {
       const sorted = [...vals].sort((a, b) => Math.abs(Number(a) - ref) - Math.abs(Number(b) - ref) || Number(a) - Number(b));
       for (const v of sorted) {
-        const free = words.map((w) => `${base}-${w}`).find((n) => !taken.has(n));
-        assign(v, free != null ? free : fallback(`${base}-${words[words.length - 1]}`));
+        const free = words.map((w) => tailName(base, w)).find((n) => !taken.has(n));
+        assign(v, free != null ? free : fallback(tailName(base, words[words.length - 1])));
       }
     };
     const same = rest.filter((v) => Math.abs(Number(v) - ref) < 5e-3);
     for (const v of same) assign(v, fallback(base));
-    side(rest.filter((v) => Number(v) < ref - 49e-4), SIZE_SMALL);
-    side(rest.filter((v) => Number(v) > ref + 49e-4), SIZE_LARGE);
+    const lead = kind === "leading";
+    side(rest.filter((v) => Number(v) < ref - 49e-4), lead ? TIGHT : SIZE_SMALL);
+    side(rest.filter((v) => Number(v) > ref + 49e-4), lead ? LOOSE : SIZE_LARGE);
   }
   function assignColors(base, kind, refHex, counts, left, taken, assign, fallback) {
     var _a, _b, _c, _d, _e;
@@ -1814,6 +1846,7 @@
     return typeof v === "number" ? String(Math.round(v * 100) / 100) : v.toLowerCase();
   }
   var AUTO_ROLE_KEY = "dsl.autoRole";
+  var TEXT_STEP_KEY = "dsl.textStep";
 
   // src/lib/extract.ts
   var SKIP_HIDDEN = t("extract.skipHidden");
@@ -1916,17 +1949,16 @@
   }
   function collectSpacing(acc, node) {
     if (node.layoutMode === "NONE") return;
-    const owner = acc.owner(node);
     const pad = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
     const gaps = ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"].map((f) => [
       node[f],
-      composeName("spacing", owner, paddingProp(f, pad))
+      composeName("spacing", paddingProp(f, pad))
     ]);
     if (node.layoutMode === "GRID") {
-      gaps.push([node.gridRowGap, simpleNumericName("gridRowGap", owner)], [node.gridColumnGap, simpleNumericName("gridColumnGap", owner)]);
+      gaps.push([node.gridRowGap, simpleNumericName("gridRowGap")], [node.gridColumnGap, simpleNumericName("gridColumnGap")]);
     } else {
-      if (!gapSkip(node, "itemSpacing")) gaps.push([node.itemSpacing, simpleNumericName("itemSpacing", owner)]);
-      if (typeof node.counterAxisSpacing === "number" && !gapSkip(node, "counterAxisSpacing")) gaps.push([node.counterAxisSpacing, simpleNumericName("counterAxisSpacing", owner)]);
+      if (!gapSkip(node, "itemSpacing")) gaps.push([node.itemSpacing, simpleNumericName("itemSpacing")]);
+      if (typeof node.counterAxisSpacing === "number" && !gapSkip(node, "counterAxisSpacing")) gaps.push([node.counterAxisSpacing, simpleNumericName("counterAxisSpacing")]);
     }
     for (const [g, use] of gaps) {
       if (typeof g === "number" && g > 0) {
@@ -2028,12 +2060,13 @@
     const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
     if (r !== figma.mixed && typeof r !== "number") return;
     const values = corners.map((c) => r !== figma.mixed ? r : Number(node[c]) || 0);
-    const owner = acc.owner(node);
-    const list = r === figma.mixed ? corners.map((c, i) => [c, values[i]]) : [[corners[0], r]];
+    const { width, height } = node;
+    const named = pillCorners(values, width, height);
+    const list = r === figma.mixed ? corners.map((c, i) => [c, named[i]]) : [[corners[0], named[0]]];
     for (const [c, rv] of list) {
       if (rv > 0) {
         const v = round(rv);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id, radiusName(c, owner, values));
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id, radiusName(c, named));
       }
     }
   }
@@ -2047,11 +2080,10 @@
     const widths = [];
     if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
     else if (typeof w === "number") widths.push(["strokeWeight", w]);
-    const owner = acc.owner(node);
     for (const [field, wv] of widths) {
       if (wv > 0) {
         const v = round(wv);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id, strokeName(field, owner, sideValues));
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id, strokeName(field, sideValues));
       }
     }
   }
@@ -2060,7 +2092,7 @@
     const o = node.opacity;
     if (typeof o !== "number" || o >= 1 || o <= 0) return;
     const v = round(o);
-    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id, simpleNumericName("opacity", acc.owner(node)));
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id, simpleNumericName("opacity"));
   }
   function collectEffects(acc, node) {
     var _a;
@@ -2118,8 +2150,8 @@
     }
     return true;
   }
-  function extractFromSelection(selection2, ownerOf = () => void 0, coveredInstances) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), owner: ownerOf, covered: coveredInstances };
+  function extractFromSelection(selection2, coveredInstances) {
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), covered: coveredInstances };
     for (const node of selection2) {
       if (!isEffectivelyVisible(node)) {
         acc.skipped.add(SKIP_HIDDEN);
@@ -2246,6 +2278,10 @@
     // 구조 폴백(역할을 못 정했을 때)
     "container",
     "wrapper",
+    "stack-x",
+    // 가로 오토레이아웃 묶음(ia-v3 §2.12 12.12 N-D6) — container처럼 맥락 없음 · 맥락 통과
+    "stack-y",
+    // 세로 오토레이아웃 묶음
     "shape",
     // HTML 랜드마크
     "header",
@@ -2430,8 +2466,10 @@
     return { roleLeaf, context, primitive: false };
   }
   var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
+  var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "stack-x", "stack-y", "content", "group", "section", "body", "main", "shape"]);
+  var STRUCT_FALLBACK_WHOLE = /* @__PURE__ */ new Set(["container", "wrapper", "stack-x", "stack-y"]);
   function pickScope(name) {
+    if (STRUCT_FALLBACK_WHOLE.has(kebab(name).replace(/(?:-\d+)+$/, ""))) return null;
     const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
     if (!segs.length) return null;
     const known = segs.filter(isScopeRole);
@@ -2729,7 +2767,7 @@
   var weightKey = (w) => `${w.weight}${w.italic ? "i" : ""}`;
   var lhTail = (lh) => lh === "auto" ? "-auto" : lh === 150 ? "" : `-${lh}`;
   function nameKrdsStyles(inputs, opts = {}) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const path = (_a = opts.path) != null ? _a : "scan";
     const anchored = (_b = opts.anchored) != null ? _b : /* @__PURE__ */ new Map();
     const out = inputs.map((_, i) => {
@@ -2832,6 +2870,11 @@
       w.name = final;
     }
     for (const w of works) out[w.idx] = w.name;
+    if (opts.steps) {
+      opts.steps.length = inputs.length;
+      for (let i = 0; i < inputs.length; i++) opts.steps[i] = "";
+      for (const w of works) opts.steps[w.idx] = (_d = sizeKey.get(w)) != null ? _d : "";
+    }
     return out;
   }
 
@@ -2935,21 +2978,22 @@
         uiCount: (_a = c.uiCount) != null ? _a : 0
       };
     });
-    const names = nameKrdsStyles(inputs, { reserved, anchored, path: "scan" });
+    const steps = [];
+    const names = nameKrdsStyles(inputs, { reserved, anchored, path: "scan", steps });
     return ordered.map((c, i) => {
       var _a, _b, _c;
       const boundId = boundIds[i];
       const ex = boundId ? existingById.get(boundId) : void 0;
       const lineHeightPercent = c.lineHeightPercent || (ex == null ? void 0 : ex.lineHeightPercent) || 0;
       const letterSpacingPercent = ((_a = c.letterSpacingPercent) != null ? _a : 0) !== 0 ? c.letterSpacingPercent : (_b = ex == null ? void 0 : ex.letterSpacingPercent) != null ? _b : 0;
-      return __spreadValues(__spreadProps(__spreadValues(__spreadValues(__spreadValues({
+      return __spreadValues(__spreadProps(__spreadValues(__spreadValues(__spreadValues(__spreadValues({
         name: names[i],
         fontSize: c.fontSize,
         lineHeight: c.lineHeight,
         letterSpacing: c.letterSpacing,
         family: c.family,
         style: c.style
-      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}), {
+      }, lineHeightPercent ? { lineHeightPercent } : {}), letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}), boundId ? { boundStyleId: boundId } : {}), !boundId && steps[i] ? { step: steps[i] } : {}), {
         count: c.count
       }), ((_c = c.nodeIds) == null ? void 0 : _c.length) ? { nodeIds: c.nodeIds } : {});
     });
@@ -3052,6 +3096,7 @@
       const label = labelBySig.get(sigKey(style));
       if (label) {
         style.name = unique(label);
+        delete style.step;
         labeled++;
       }
     }
@@ -3390,7 +3435,7 @@
     return pickOwner(role, void 0, isKnownRole);
   }
   async function bindSelection(selection2, apply = true, hooks = {}, opts = {}) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const index = await buildIndex();
     const mains = await collectLocalMains(selection2);
     const mainRoots = mains.units.flatMap((u) => u.roots);
@@ -3398,17 +3443,11 @@
     const res = { bound: 0, skipped: 0, reasons: {} };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2, mains.units) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
-    const ownerCache = /* @__PURE__ */ new Map();
-    const ownerOf = (_a = opts.ownerOf) != null ? _a : dsRoleOwner;
     const ctx = {
       index,
       res,
       preview,
       slots: [],
-      owner: (n) => {
-        if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
-        return ownerCache.get(n);
-      },
       skipText: opts.skipTextStyleNode,
       noNewRoles: !!opts.noNewRoles,
       mainOf: mains.mainOf,
@@ -3439,14 +3478,14 @@
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => __spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {})),
+        preview.candidates.map((c) => __spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {})),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
       );
       res.bound = r.bound;
       res.skipped += r.skipped;
-      for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
+      for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_a = res.reasons[k]) != null ? _a : 0) + v;
       res.newRoles = r.newRoles;
       if (r.mainsBound.length) res.mainsBound = r.mainsBound;
       for (const c of preview.candidates) {
@@ -3460,10 +3499,10 @@
       res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
       res.skips = skips;
       const layers = {};
-      for (const s of preview.skips) layers[s.reason] = ((_c = layers[s.reason]) != null ? _c : 0) + 1;
+      for (const s of preview.skips) layers[s.reason] = ((_b = layers[s.reason]) != null ? _b : 0) + 1;
       res.skipLayers = layers;
     }
-    (_d = hooks.onProgress) == null ? void 0 : _d.call(hooks, prog.done, prog.total);
+    (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
     return res;
   }
   async function buildIndex() {
@@ -3553,12 +3592,12 @@
   var DROP = "drop";
   var isFrac = (v) => Math.abs(v - Math.round(v)) >= 5e-3;
   var numReason = (v, dropAtOrBelowZero = true) => dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? "fraction" : "no-match";
-  function sameValueEntries(ctx, s) {
+  function sameValueEntries(ctx, s, value = s.value) {
     return ctx.index.entries.filter((e) => {
       if (!scopeOk(e.scopes, s.allowed)) return false;
-      if (s.kind === "color") return e.colorKey === s.value;
-      if (typeof s.value === "number") return e.num != null && sameNumber(e.num, s.value);
-      return e.str != null && e.str === s.value;
+      if (s.kind === "color") return e.colorKey === value;
+      if (typeof value === "number") return e.num != null && sameNumber(e.num, value);
+      return e.str != null && e.str === value;
     });
   }
   var byName = (a, b) => a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
@@ -3579,9 +3618,9 @@
     const { res, preview } = ctx;
     const pending = [];
     const colorLeft = [];
-    const emit = (s, e) => {
+    const emit = (s, e, viaPill = false) => {
       res.bound++;
-      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e)));
+      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill));
     };
     const globalFor = (cands) => {
       var _a2;
@@ -3598,13 +3637,15 @@
         colorLeft.push({ slot: s, cands });
         continue;
       }
+      const viaPill = s.pill != null;
+      const cands2 = viaPill ? sameValueEntries(ctx, s, s.pill) : cands;
       const group = s.usage.split("/")[0];
-      const two = s.kind === "text" ? cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0] : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
+      const two = s.kind === "text" ? cands2.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0] : firstInFamily(cands2.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(slotValue(s)))).test(e.variable.name)), s.usage);
       if (two) {
-        emit(s, two);
+        emit(s, two, viaPill);
         continue;
       }
-      pending.push({ slot: s, base: s.usage, global: globalFor(cands) });
+      pending.push({ slot: s, base: s.usage, global: globalFor(cands2) });
     }
     const byUse = /* @__PURE__ */ new Map();
     for (const x of colorLeft) {
@@ -3622,7 +3663,7 @@
       }
       const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
-      const refHex = colorRoleRef([...counts.values()], def == null ? void 0 : def.colorHex);
+      const refHex = colorRoleRef([...counts.values()], def == null ? void 0 : def.colorHex, use);
       for (const x of list) {
         const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha))) != null ? _a : "default"}`;
         const fam = familyRe(base, nameKindOf(base, valueKey(x.slot.value)));
@@ -3640,17 +3681,17 @@
       return false;
     });
     if (ctx.noNewRoles) {
-      for (const p of live) emit(p.slot, p.global);
+      for (const p of live) emit(p.slot, p.global, p.slot.pill != null);
       return;
     }
     const names = assignNames(
-      live.map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
+      live.map((p) => __spreadValues({ base: p.base, value: valueKey(slotValue(p.slot)), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
       ctx.index.semNames,
       { reuse: false }
     );
     const roleOf = /* @__PURE__ */ new Map();
     for (const p of live) {
-      const name = (_b = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _b : p.base;
+      const name = (_b = names.get(`${p.base}\0${valueKey(slotValue(p.slot))}`)) != null ? _b : p.base;
       let spec = roleOf.get(name);
       if (!spec) {
         const g2 = p.global;
@@ -3660,14 +3701,18 @@
       }
       res.bound++;
       const g = p.global;
-      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g))), {
+      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null)), {
         newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
         newRoleGlobalName: spec.globalName
       }));
     }
   }
-  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha) {
-    return __spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+  var slotValue = (s) => {
+    var _a;
+    return (_a = s.pill) != null ? _a : s.value;
+  };
+  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha, viaPill = false) {
+    return __spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
@@ -3677,7 +3722,7 @@
       variableName,
       tier,
       variableValue
-    }), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {});
+    }), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), viaPill && typeof s.value === "number" ? { pillFrom: s.value } : {});
   }
   function entryAlpha(e) {
     return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;
@@ -3817,10 +3862,9 @@
       note(res, "no-autolayout", node, preview);
       return;
     }
-    const owner = ctx.owner(node);
     if (node.layoutMode === "GRID") {
-      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap", owner), numReason(node.gridRowGap));
-      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap", owner), numReason(node.gridColumnGap));
+      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap"), numReason(node.gridRowGap));
+      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap"), numReason(node.gridColumnGap));
     } else {
       for (const f of ["itemSpacing", "counterAxisSpacing"]) {
         const v = node[f];
@@ -3829,12 +3873,12 @@
         if (gs === "no-wrap") continue;
         if (gs === "space-between") {
           if (v > 0) note(res, "space-between", node, preview, f);
-        } else tryBind(ctx, node, f, v, simpleNumericName(f, owner), numReason(v));
+        } else tryBind(ctx, node, f, v, simpleNumericName(f), numReason(v));
       }
     }
     const pad = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
     for (const f of ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]) {
-      tryBind(ctx, node, f, node[f], composeName("spacing", owner, paddingProp(f, pad)), numReason(node[f]));
+      tryBind(ctx, node, f, node[f], composeName("spacing", paddingProp(f, pad)), numReason(node[f]));
     }
   }
   function bindRadius(node, ctx) {
@@ -3843,16 +3887,17 @@
     const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
     const values = corners.map((c) => r !== figma.mixed && typeof r === "number" ? r : Number(node[c]) || 0);
     if (r !== figma.mixed && !(typeof r === "number" && r > 0)) return;
-    const owner = ctx.owner(node);
+    const { width, height } = node;
+    const named = pillCorners(values, width, height);
     corners.forEach((c, i) => {
-      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
+      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, named), numReason(values[i]), named[i] !== values[i] ? PILL_RADIUS : void 0);
     });
   }
   function bindOpacity(node, ctx) {
     if (!("opacity" in node)) return;
     const o = node.opacity;
     if (typeof o !== "number" || o >= 1 || o <= 0) return;
-    tryBind(ctx, node, "opacity", o, simpleNumericName("opacity", ctx.owner(node)));
+    tryBind(ctx, node, "opacity", o, simpleNumericName("opacity"));
   }
   function bindStroke(node, ctx) {
     const { res, preview } = ctx;
@@ -3862,7 +3907,6 @@
     const w = node.strokeWeight;
     const sides = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
     const sideValues = sides.map((sd) => Number(node[sd]) || 0);
-    const owner = ctx.owner(node);
     const one = (field, v) => {
       if (!(v > 0)) return;
       const st = stateReason(nodeFieldState(node, field));
@@ -3874,7 +3918,7 @@
         note(res, "fraction", node, preview, field);
         return;
       }
-      tryBind(ctx, node, field, v, strokeName(field, owner, sideValues));
+      tryBind(ctx, node, field, v, strokeName(field, sideValues));
     };
     if (w !== figma.mixed && typeof w === "number") {
       one("strokeWeight", w);
@@ -3954,14 +3998,14 @@
     }
     ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: reason });
   }
-  function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match") {
+  function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match", pill) {
     const allowed = numAllowed(field);
     const st = stateReason(nodeFieldState(node, field));
     if (st) {
       note(ctx.res, st, node, ctx.preview, field);
       return;
     }
-    ctx.slots.push({ node, field, kind: "num", value, display: String(value), allowed, usage, noMatchReason });
+    ctx.slots.push(__spreadValues({ node, field, kind: "num", value, display: String(value), allowed, usage, noMatchReason }, pill != null ? { pill } : {}));
   }
   var LINK_CHUNK = 300;
   async function bindSelectedItems(items, hooks = {}, known) {
@@ -4129,11 +4173,18 @@
             continue;
           }
           const cur = node[it.field];
-          if (typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
+          const pillOk = () => {
+            const { width, height } = node;
+            return it.pillFrom != null && typeof cur === "number" && typeof value === "number" && sameNumber(value, PILL_RADIUS) && sameNumber(cur, it.pillFrom) && isPillRadius(cur, width, height);
+          };
+          const pill = it.pillFrom != null;
+          if (pill ? !pillOk() : typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
             fail("changed", node, it.field);
             continue;
           }
-          node.setBoundVariable(it.field, await target());
+          const tv = await target();
+          if (pill) node[it.field] = PILL_RADIUS;
+          node.setBoundVariable(it.field, tv);
           res.bound++;
           if (it.mainId) mainsBound.add(it.mainId);
           (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
@@ -4864,7 +4915,9 @@
       );
       const refHex = colorRoleRef(
         list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-        defKey || void 0
+        defKey || void 0,
+        use.slice("color/".length)
+        // 쓰임별 기준값(12.12 N-D4)
       );
       for (const x of list) {
         const hex = String(x.token.value).toLowerCase();
@@ -5216,8 +5269,111 @@
     });
     return (family) => list.find((v) => directValue(v, modeOf) === family);
   }
+  function textStepOf(v) {
+    const fn = v == null ? void 0 : v.getPluginData;
+    try {
+      return typeof fn === "function" ? fn.call(v, TEXT_STEP_KEY) || "" : "";
+    } catch (e) {
+      return "";
+    }
+  }
+  async function styleBoundVar(st, field) {
+    var _a;
+    const a = (_a = st.boundVariables) == null ? void 0 : _a[field];
+    if (!a || typeof a !== "object" || !a.id) return null;
+    try {
+      return await figma.variables.getVariableByIdAsync(a.id);
+    } catch (e) {
+      return null;
+    }
+  }
+  async function readSemanticIndex() {
+    var _a;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const owned = ownedIds(cols);
+    const varById = new Map(vars.map((v) => [v.id, v]));
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const resolve = (v) => {
+      var _a2;
+      let cur = v;
+      for (let i = 0; i < 12 && cur; i++) {
+        const val = cur.valuesByMode[(_a2 = modeOf.get(cur.variableCollectionId)) != null ? _a2 : ""];
+        if (val && typeof val === "object" && val.type === "VARIABLE_ALIAS") cur = varById.get(val.id);
+        else return val;
+      }
+      return void 0;
+    };
+    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+    const rank = (id) => {
+      var _a2;
+      return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
+    };
+    const existing = /* @__PURE__ */ new Map();
+    const byName2 = /* @__PURE__ */ new Map();
+    for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
+      const val = resolve(v);
+      const k = typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
+      const arr = existing.get(v.name);
+      if (!arr) existing.set(v.name, k ? [k] : []);
+      else if (k && !arr.includes(k)) arr.push(k);
+      byName2.set(v.name, [...(_a = byName2.get(v.name)) != null ? _a : [], { key: k, v }]);
+    }
+    const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+    return { cols, existing, byName: byName2, globalNames };
+  }
+  async function placeTextRoleVars(reqs, globalOf) {
+    if (!reqs.length) return [];
+    const idx = await readSemanticIndex();
+    const stepBases = new Set(reqs.filter((r) => r.step).map((r) => r.base));
+    const canReuse = (name, value, base) => {
+      var _a;
+      if (idx.globalNames.has(name)) return false;
+      const step = stepBases.has(base);
+      if (!step && name !== base) return false;
+      const need = scopeForSemanticRole(base);
+      return ((_a = idx.byName.get(name)) != null ? _a : []).some(({ key, v }) => {
+        var _a2;
+        return key === value && (!step || !!textStepOf(v)) && (!need || ((_a2 = v.scopes) != null ? _a2 : []).includes("ALL_SCOPES") || need.every((x) => {
+          var _a3;
+          return ((_a3 = v.scopes) != null ? _a3 : []).includes(x);
+        }));
+      });
+    };
+    const names = assignNames(reqs.map((r) => ({ base: r.base, value: valueKey(r.value), count: 1 })), idx.existing, { canReuse });
+    let col;
+    const made = /* @__PURE__ */ new Map();
+    return reqs.map((r) => {
+      var _a, _b, _c, _d, _e, _f;
+      const value = valueKey(r.value);
+      const name = (_a = names.get(`${r.base}\0${value}`)) != null ? _a : r.base;
+      if (idx.existing.has(name)) {
+        const hit = ((_b = idx.byName.get(name)) != null ? _b : []).find(({ key, v: v2 }) => key === value && (!r.step || !!textStepOf(v2)));
+        return { name, v: (_c = hit == null ? void 0 : hit.v) != null ? _c : null };
+      }
+      if (made.has(name)) return { name, v: (_d = made.get(name)) != null ? _d : null };
+      const g = globalOf(r.token);
+      if (!g) {
+        made.set(name, null);
+        return { name, v: null };
+      }
+      col != null ? col : col = ensureOwnedCollection(idx.cols, "semantic");
+      const v = figma.variables.createVariable(name, col, g.resolvedType);
+      for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
+      v.scopes = scopesForType((_e = scopeForSemanticRole(name)) != null ? _e : g.scopes, g.resolvedType);
+      if (r.step) {
+        try {
+          (_f = v.setPluginData) == null ? void 0 : _f.call(v, TEXT_STEP_KEY, r.step);
+        } catch (e) {
+        }
+      }
+      made.set(name, v);
+      return { name, v };
+    });
+  }
   async function createSemanticTextStyles(allSpecs) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     const res = { created: 0, updated: 0, bound: 0, applied: 0, missing: [], notes: [], styleIds: [] };
     if (!allSpecs.length) return res;
     const existing = await figma.getLocalTextStylesAsync();
@@ -5245,6 +5401,8 @@
         res.missing.push(t("textStyle.missRename", { from: st.name, to: spec.name }));
         continue;
       }
+      const fsBound = await styleBoundVar(st, "fontSize");
+      if (!fsBound || textStepOf(fsBound) || fsBound.name !== `font-size/${st.name}`) continue;
       roleRenames.push({ from: st.name, to: spec.name });
       roleSpecs.push(spec);
     }
@@ -5257,7 +5415,6 @@
         tokens.push(t2);
       }
     };
-    const aliasMap = {};
     const lhTokens = /* @__PURE__ */ new Map();
     const pushLineHeightTok = (name, px, pct2, fontSize) => {
       const prev = lhTokens.get(name);
@@ -5290,27 +5447,30 @@
       prev.fontSize = void 0;
       res.notes.push(t("textStyle.noteLsPx", { name }));
     };
-    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
-      pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
-      aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
+    const roleReqs = [];
+    const pushAlias = (spec, role, step, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
+      const fsTok = numberTokenName("font-size", fontSize);
+      pushTok({ name: fsTok, category: "fontSize", value: fontSize, sources: ["fontSize"] });
+      roleReqs.push({ spec, cat: "font-size", req: __spreadValues({ base: `font-size/${role}`, value: fontSize, token: fsTok }, step ? { step } : {}) });
       if (lineHeight > 0 && lineHeightPercent === 0 && Number.isInteger(lineHeight)) {
         const lhName = numberTokenName("line-height", lineHeight);
         pushLineHeightTok(lhName, lineHeight, 0, fontSize);
-        aliasMap[`line-height/${role}`] = lhName;
+        roleReqs.push({ spec, cat: "line-height", req: __spreadValues({ base: `line-height/${role}`, value: lineHeight, token: lhName }, step ? { step } : {}) });
       }
       if (letterSpacing !== 0 && letterSpacingPercent === 0 && Number.isInteger(letterSpacing)) {
         const lsName = numberTokenName("letter-spacing", letterSpacing);
         pushLetterSpacingTok(lsName, letterSpacing, 0, fontSize);
-        aliasMap[`letter-spacing/${role}`] = lsName;
+        roleReqs.push({ spec, cat: "letter-spacing", req: __spreadValues({ base: `letter-spacing/${role}`, value: letterSpacing, token: lsName }, step ? { step } : {}) });
       }
     };
+    const finalOf = /* @__PURE__ */ new Map();
     for (const s of specs) {
       if (anchoredStyle(s)) continue;
-      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_a = s.lineHeightPercent) != null ? _a : 0, (_b = s.letterSpacingPercent) != null ? _b : 0);
+      pushAlias(s, (_a = s.step) != null ? _a : s.name, s.step, s.fontSize, s.lineHeight, s.letterSpacing, (_b = s.lineHeightPercent) != null ? _b : 0, (_c = s.letterSpacingPercent) != null ? _c : 0);
     }
     {
       const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_c = ownedCollection(cols0, "semantic")) == null ? void 0 : _c.id;
+      const semId0 = (_d = ownedCollection(cols0, "semantic")) == null ? void 0 : _d.id;
       const semNames = /* @__PURE__ */ new Set();
       if (semId0) {
         for (const v of await figma.variables.getLocalVariablesAsync())
@@ -5319,22 +5479,49 @@
       for (const s of specs) {
         const st = anchoredStyle(s);
         if (!st) continue;
+        const fsBound = await styleBoundVar(st, "fontSize");
+        if (fsBound && textStepOf(fsBound)) {
+          const lhBound = await styleBoundVar(st, "lineHeight");
+          const lsBound = await styleBoundVar(st, "letterSpacing");
+          finalOf.set(s, __spreadValues(__spreadValues({ "font-size": fsBound.name }, lhBound ? { "line-height": lhBound.name } : {}), lsBound ? { "letter-spacing": lsBound.name } : {}));
+          continue;
+        }
         if (semNames.has(`font-size/${s.name}`)) continue;
         if (decimalAnchor(st)) continue;
         const fontSize = roundN(st.fontSize);
-        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
+        pushAlias(s, s.name, void 0, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
       }
     }
-    if (tokens.length) await createTokens(tokens, 16);
-    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
+    const made = tokens.length ? await createTokens(tokens, 16) : null;
+    const varOfName = /* @__PURE__ */ new Map();
+    if (roleReqs.length) {
+      const allVars = new Map((await figma.variables.getLocalVariablesAsync()).map((v) => [v.id, v]));
+      const placed = await placeTextRoleVars(
+        roleReqs.map((r) => r.req),
+        (token) => {
+          const id = made == null ? void 0 : made.globalOf.get(token);
+          return id ? allVars.get(id) : void 0;
+        }
+      );
+      roleReqs.forEach((r, i) => {
+        var _a2;
+        const p = placed[i];
+        finalOf.set(r.spec, __spreadProps(__spreadValues({}, (_a2 = finalOf.get(r.spec)) != null ? _a2 : {}), { [r.cat]: p.name }));
+        if (p.v) varOfName.set(p.name, p.v);
+      });
+    }
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_d = ownedCollection(cols, "semantic")) == null ? void 0 : _d.id;
+    const semId = (_e = ownedCollection(cols, "semantic")) == null ? void 0 : _e.id;
     const semByName = /* @__PURE__ */ new Map();
     if (semId) {
       for (const v of await figma.variables.getLocalVariablesAsync())
         if (v.variableCollectionId === semId) semByName.set(v.name, v);
     }
     const familyVarFor = await globalFamilyVars();
+    const roleVar = (name) => {
+      var _a2;
+      return (_a2 = varOfName.get(name)) != null ? _a2 : semByName.get(name);
+    };
     for (const spec of specs) {
       const anchored = anchoredStyle(spec);
       if (anchored && spec.boundStyleId && renameBlocked.has(spec.boundStyleId)) {
@@ -5379,8 +5566,8 @@
         }
         if (!style) style = figma.createTextStyle();
         setName(style);
-        const lhPct = (_e = spec.lineHeightPercent) != null ? _e : 0;
-        const lsPct = (_f = spec.letterSpacingPercent) != null ? _f : 0;
+        const lhPct = (_f = spec.lineHeightPercent) != null ? _f : 0;
+        const lsPct = (_g = spec.letterSpacingPercent) != null ? _g : 0;
         if (!isRename && loaded) {
           style.fontName = loaded;
           style.fontSize = spec.fontSize;
@@ -5388,44 +5575,48 @@
           style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
         } else if (lhPct > 0 || lsPct !== 0) {
           if (lhPct > 0) {
-            if ((_g = style.boundVariables) == null ? void 0 : _g.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
+            if ((_h = style.boundVariables) == null ? void 0 : _h.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
             else style.lineHeight = { value: lhPct, unit: "PERCENT" };
           }
           if (lsPct !== 0) {
-            if ((_h = style.boundVariables) == null ? void 0 : _h.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
+            if ((_i = style.boundVariables) == null ? void 0 : _i.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
             else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
           }
         }
         const bindRole = style.name;
-        const fsVar = semByName.get(`font-size/${bindRole}`);
+        const fin = (_j = finalOf.get(spec)) != null ? _j : {};
+        const fsName = (_k = fin["font-size"]) != null ? _k : `font-size/${bindRole}`;
+        const fsVar = roleVar(fsName);
         if (fsVar) {
           style.setBoundVariable("fontSize", fsVar);
           res.bound++;
-        } else if (!(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
+        } else if (!(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: fsName }));
         if (spec.lineHeight > 0 || isRename) {
           const pctNow = lhPctOf(style.lineHeight);
           if (pctNow > 0) {
-            if ((_i = style.boundVariables) == null ? void 0 : _i.lineHeight) style.setBoundVariable("lineHeight", null);
+            if ((_l = style.boundVariables) == null ? void 0 : _l.lineHeight) style.setBoundVariable("lineHeight", null);
             res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
           } else {
-            const lhVar = semByName.get(`line-height/${bindRole}`);
+            const lhName = (_m = fin["line-height"]) != null ? _m : `line-height/${bindRole}`;
+            const lhVar = roleVar(lhName);
             if (lhVar) {
               style.setBoundVariable("lineHeight", lhVar);
               res.bound++;
-            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
+            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: lhName }));
           }
         }
         if (spec.letterSpacing !== 0 || isRename) {
           const lsPctNow = lsPctOf(style.letterSpacing);
           if (lsPctNow !== 0) {
-            if ((_j = style.boundVariables) == null ? void 0 : _j.letterSpacing) style.setBoundVariable("letterSpacing", null);
+            if ((_n = style.boundVariables) == null ? void 0 : _n.letterSpacing) style.setBoundVariable("letterSpacing", null);
             res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
           } else {
-            const lsVar = semByName.get(`letter-spacing/${bindRole}`);
+            const lsName = (_o = fin["letter-spacing"]) != null ? _o : `letter-spacing/${bindRole}`;
+            const lsVar = roleVar(lsName);
             if (lsVar) {
               style.setBoundVariable("letterSpacing", lsVar);
               res.bound++;
-            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
+            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: lsName }));
           }
         }
         const famVar = familyVarFor(style.fontName.family);
@@ -5534,7 +5725,7 @@
       if (p.from === p.to) return;
       for (const cat of ROLE_VAR_CATS) {
         const v = byName2.get(`${cat}/${p.from}`);
-        if (!v || picked.has(v.id) || isManualVar(v) || opts.onlyIds && !opts.onlyIds.has(v.id)) continue;
+        if (!v || picked.has(v.id) || isManualVar(v) || textStepOf(v) || opts.onlyIds && !opts.onlyIds.has(v.id)) continue;
         picked.add(v.id);
         cands.push({ key: v.id, from: v.name, to: `${cat}/${p.to}`, v, pair });
       }
@@ -5584,14 +5775,44 @@
   }
   async function planTsRename() {
     const styles = await figma.getLocalTextStylesAsync();
-    const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: /* @__PURE__ */ new Set(), path: "rename" });
+    const steps = [];
+    const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: /* @__PURE__ */ new Set(), path: "rename", steps });
     const rows = [];
     styles.forEach((s, i) => {
       const to = names[i];
       if (!to || to === s.name) return;
-      rows.push({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)) });
+      rows.push(__spreadValues({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)) }, steps[i] ? { step: steps[i] } : {}));
     });
     return rows;
+  }
+  async function moveStyleToStep(st, step) {
+    await figma.loadFontAsync(st.fontName);
+    const fontSize = roundN(st.fontSize);
+    const lh = lhPxOf(fontSize, st.lineHeight);
+    const ls = lsPxOf(fontSize, st.letterSpacing);
+    const toks = [{ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] }];
+    const reqs = [{ field: "fontSize", req: { base: `font-size/${step}`, value: fontSize, step, token: toks[0].name } }];
+    if (lh > 0 && lhPctOf(st.lineHeight) === 0 && Number.isInteger(lh)) {
+      const name = numberTokenName("line-height", lh);
+      toks.push({ name, category: "lineHeight", value: lh, unit: "px", sources: ["lineHeight"] });
+      reqs.push({ field: "lineHeight", req: { base: `line-height/${step}`, value: lh, step, token: name } });
+    }
+    if (ls !== 0 && lsPctOf(st.letterSpacing) === 0 && Number.isInteger(ls)) {
+      const name = numberTokenName("letter-spacing", ls);
+      toks.push({ name, category: "letterSpacing", value: ls, unit: "px", sources: ["letterSpacing"] });
+      reqs.push({ field: "letterSpacing", req: { base: `letter-spacing/${step}`, value: ls, step, token: name } });
+    }
+    const made = await createTokens(toks, 16);
+    const allVars = new Map((await figma.variables.getLocalVariablesAsync()).map((v) => [v.id, v]));
+    const placed = await placeTextRoleVars(
+      reqs.map((r) => r.req),
+      (token) => {
+        const id = made.globalOf.get(token);
+        return id ? allVars.get(id) : void 0;
+      }
+    );
+    if (placed.some((p) => !p.v)) throw new Error("no global");
+    reqs.forEach((r, i) => st.setBoundVariable(r.field, placed[i].v));
   }
   async function applyTsRename(items) {
     var _a, _b, _c;
@@ -5628,7 +5849,7 @@
       }))
     );
     for (const [k, v] of done) status.set(k, v);
-    const res = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [] };
+    const res = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] };
     for (const id of order) {
       const st = status.get(id);
       res.results.push({ id, status: st, name: (_b = (_a = byId.get(id)) == null ? void 0 : _a.name) != null ? _b : "" });
@@ -5638,7 +5859,32 @@
         res.skipReasons[st] = ((_c = res.skipReasons[st]) != null ? _c : 0) + 1;
       }
     }
-    const pairs = live.filter((c) => status.get(c.key) === "renamed").map((c) => ({ from: c.from, to: c.to }));
+    const stepOf = new Map(items.map((it) => [it.id, it.step]));
+    const pairs = [];
+    const moves = [];
+    for (const c of live) {
+      if (status.get(c.key) !== "renamed") continue;
+      let fs = null;
+      try {
+        fs = await styleBoundVar(c.st, "fontSize");
+      } catch (e) {
+        fs = null;
+      }
+      if (!fs) continue;
+      const mark = textStepOf(fs);
+      const step = stepOf.get(c.key);
+      if (!mark) {
+        if (fs.name === `font-size/${c.from}`) pairs.push({ from: c.from, to: c.to });
+      } else if (step && step !== mark) moves.push({ st: c.st, step });
+    }
+    for (const m of moves) {
+      try {
+        await moveStyleToStep(m.st, m.step);
+      } catch (e) {
+        res.roleMoveError++;
+        res.roleMoveNames.push(m.st.name);
+      }
+    }
     if (pairs.length) {
       try {
         const rv = await renameTextRoleVars(pairs);
@@ -7015,7 +7261,7 @@
     const role = toks[toks.length - 1];
     return role && isKnownRole(role) ? writeRole(node, role) : false;
   }
-  var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
+  var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "stack-x", "stack-y"]);
   var REFINED_PASSTHROUGH = /* @__PURE__ */ new Set(["row", "text-group", "media"]);
   var PAINT_ROLES = /* @__PURE__ */ new Set(["background", "border", "surface"]);
   var hasChildren = (node) => "children" in node && node.children.length > 0;
@@ -7075,7 +7321,9 @@
           if (isTextGroupLike(node, kids)) return "text-group";
           if (isMediaLike(kids)) return "media";
         }
-        return kids.length === 1 ? "wrapper" : "container";
+        if (kids.length === 1) return "wrapper";
+        const lm = node.layoutMode;
+        return lm === "HORIZONTAL" ? "stack-x" : lm === "VERTICAL" ? "stack-y" : "container";
       }
       default:
         return kebab(node.type);
@@ -7484,7 +7732,7 @@
     return false;
   }
   var EMITTED = new Set(EMITTED_ROLES);
-  var STRUCT_FALLBACK_NAMES = /* @__PURE__ */ new Set(["container", "wrapper", "shape"]);
+  var STRUCT_FALLBACK_NAMES = /* @__PURE__ */ new Set(["container", "wrapper", "stack-x", "stack-y", "shape"]);
   function isMeaninglessIconName(node, rootPrefix) {
     const name = node.name;
     if (isDefaultName(name)) return true;
@@ -8655,6 +8903,8 @@
   var GENERIC_GROUP_NAMES = /* @__PURE__ */ new Set([
     "container",
     "wrapper",
+    "stack-x",
+    "stack-y",
     "content",
     "frame",
     "group",
@@ -11278,15 +11528,6 @@
       children: node.type === "INSTANCE" || iconKey ? [] : kids.map((k) => toStructNode(k, false, mains))
     });
   }
-  function bindOwnerOf(roots) {
-    let idx = null;
-    return (node) => {
-      const role = readRole(node);
-      idx != null ? idx : idx = structIndex(roots);
-      const s = idx.get(node.id);
-      return pickOwner(role, s ? highConfidenceComponentRole(s, { wideTab: false }) : null, isKnownRole);
-    };
-  }
   function structIndex(roots, mains) {
     const out = /* @__PURE__ */ new Map();
     const add2 = (n) => {
@@ -11652,7 +11893,7 @@
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
           const wm = await withLocalMains(sel);
-          const { tokens, warnings } = extractFromSelection(wm.roots, bindOwnerOf(sel), new Set(wm.mains.mainOf.keys()));
+          const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys()));
           post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
@@ -11708,9 +11949,7 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              __spreadValues(__spreadValues({
-                ownerOf: bindOwnerOf(sel)
-              }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
+              __spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
             );
             post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",

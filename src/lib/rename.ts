@@ -291,7 +291,7 @@ export function writeRoleFromName(node: SceneNode, name: string): boolean {
 }
 
 /** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
-const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
+const PASSTHROUGH_ROLES = new Set(['container', 'wrapper', 'stack-x', 'stack-y']); // 오토레이아웃 묶음(ia-v3 §2.12 12.12 N-D6)도 container처럼
 /** 세분화 1차 역할(ia-v4 §4.4 B1–B3) — 이름은 맥락 + 역할, 자식에게는 받은 맥락 통과. */
 const REFINED_PASSTHROUGH = new Set(['row', 'text-group', 'media']);
 /** 페인트(채움·선)에서 온 색 역할 — 자식 있는 컨테이너의 구조 역할을 덮지 못한다. */
@@ -379,7 +379,10 @@ function resolveRole(
         if (isTextGroupLike(node, kids)) return 'text-group';
         if (isMediaLike(kids)) return 'media';
       }
-      return kids.length === 1 ? 'wrapper' : 'container';
+      if (kids.length === 1) return 'wrapper';
+      // 오토레이아웃 묶음은 방향으로 나눈다(ia-v3 §2.12 12.12 N-D6) — 격자 · 오토레이아웃 아님 · GROUP은 container 그대로.
+      const lm = (node as { layoutMode?: string }).layoutMode;
+      return lm === 'HORIZONTAL' ? 'stack-x' : lm === 'VERTICAL' ? 'stack-y' : 'container';
     }
     default:
       return kebab(node.type);
@@ -961,7 +964,7 @@ function isIconish(node: SceneNode): boolean {
 }
 
 const EMITTED = new Set<string>(EMITTED_ROLES);
-const STRUCT_FALLBACK_NAMES = new Set(['container', 'wrapper', 'shape']);
+const STRUCT_FALLBACK_NAMES = new Set(['container', 'wrapper', 'stack-x', 'stack-y', 'shape']);
 
 /** 아이콘 프레임의 지금 이름이 뜻 없는 이름인지(A1 ① 자동 이름 · ② 전에 붙인 이름). */
 function isMeaninglessIconName(node: SceneNode, rootPrefix: string | null): boolean {

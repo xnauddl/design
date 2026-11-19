@@ -16,10 +16,9 @@ import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './l
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
-import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor, isKnownRole } from './lib/naming';
+import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor } from './lib/naming';
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
-import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
-import { pickOwner } from './lib/usageRoles';
+import { tabInfo } from './lib/componentLike';
 import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
@@ -897,20 +896,6 @@ function toStructNode(node: SceneNode, isRoot = true, mains?: InstMains): Struct
   };
 }
 
-/**
- * 쓰임 이름의 주인(§2.12 12.3) — ① 이름 정리 역할(`dsRole`, 어휘 안 · 구조 폴백 아님) ② 고신뢰 판정 ③ 없음.
- * 고신뢰 판정 입력(StructNode)은 처음 물을 때 선택 루트마다 한 번 만든다.
- */
-function bindOwnerOf(roots: readonly SceneNode[]): (node: SceneNode) => string | undefined {
-  let idx: Map<string, StructNode> | null = null;
-  return (node) => {
-    const role = readRole(node);
-    idx ??= structIndex(roots);
-    const s = idx.get(node.id);
-    return pickOwner(role, s ? highConfidenceComponentRole(s, { wideTab: false }) : null, isKnownRole); // 쓰임 이름은 엄격한 구조 탭만(§4.7 "묶기" 1번)
-  };
-}
-
 /** 선택 루트마다 StructNode를 한 번 만들고 노드 id로 찾는다(§4.7 "묶기" — 하위마다 새로 만들지 않는다). */
 function structIndex(roots: readonly SceneNode[], mains?: InstMains): Map<string, StructNode> {
   const out = new Map<string, StructNode>();
@@ -1313,7 +1298,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const sel = await resolveRoots(msg.nodeIds);
         // 인스턴스의 메인 컴포넌트 안 값도 뽑는다(ia-v3 §2.11 11번) — 메인을 더한 인스턴스는 "인스턴스 안쪽" 건너뜀을 남기지 않는다.
         const wm = await withLocalMains(sel);
-        const { tokens, warnings } = extractFromSelection(wm.roots, bindOwnerOf(sel), new Set(wm.mains.mainOf.keys())); // 쓰임 이름의 주인(§2.12 12.3)
+        const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys())); // 쓰임 이름은 주인을 쓰지 않는다(§2.12 12.12 N-D1)
         post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         break;
       }
@@ -1384,7 +1369,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
           },
           {
-            ownerOf: bindOwnerOf(sel), // 쓰임 이름의 주인 — 이름 정리 역할 → 고신뢰 판정(§2.12 12.3)
             // 만들기 실행의 연결(IA v4 §4.3) — 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다(실제 연결만).
             ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
             // 무료 자동 연결은 새 Semantic을 만들지 않는다 — 찾기 · 실제 연결 · 카드 1의 m이 같은 규칙(IA v4 §2.3-7 · F6).

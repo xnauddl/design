@@ -1,7 +1,7 @@
 /* ============================================================
    usageRoles.ts — 쓰임 이름 역할(§2.12, 순수 · figma 의존 없음)
    레이어에는 역할(Semantic)만 붙인다. 같은 값의 역할이 없으면 "어디에 쓰였나"로 이름을 짓는다.
-   - 숫자 · 글자: `{그룹}/{주인}/{속성}` (12.3)
+   - 숫자 · 글자: `{그룹}/{속성}` — 주인(레이어 역할)은 쓰지 않는다(12.12 N-D1). 속성이 없으면 `{그룹}/default`
    - 색: `color/{쓰임}/{밝기}` (12.4)
    - 꼬리: 같은 이름에 다른 값이 오면 뜻이 읽히는 꼬리(`-sm` · `-lg`, `brand-red` · `-subtle`, `subtler`, 같은 색 투명도만 다르면 `-subtle` · `-strong`), 모자라면 `-n` (12.5)
    만들기(createUsageRoles)와 연결(bind.ts)이 같은 함수를 쓴다 — 두 경로의 이름이 어긋나지 않게.
@@ -13,10 +13,11 @@ import { colorKey } from './tokens';
 import { classifyColor } from './colorName';
 
 /** 주인으로 쓰지 않는 구조 폴백 역할(12.3 ①). */
-const STRUCTURAL = new Set(['container', 'wrapper', 'shape', 'group', 'content', 'body', 'row', 'text-group', 'media']); // 세분화 1차 역할도 주인 아님(ia-v4 §4.4)
+const STRUCTURAL = new Set(['container', 'wrapper', 'stack-x', 'stack-y', 'shape', 'group', 'content', 'body', 'row', 'text-group', 'media']); // 세분화 1차 역할 · 오토레이아웃 묶음(12.12 N-D6)도 주인 아님(ia-v4 §4.4)
 
 /**
  * 레이어의 주인(역할) — ① 이름 정리가 남긴 역할(어휘 안 · 구조 폴백 아님) ② 고신뢰 판정 ③ 없음.
+ * 쓰임 이름에는 쓰지 않는다(12.12 N-D1) — 텍스트 스타일 label 판정(`inUiRole`)이 쓴다.
  * `known`은 역할 어휘 판정(naming.isKnownRole)을 넘겨받는다(순수 모듈이 naming을 끌어오지 않게).
  */
 export function pickOwner(dsRole: string | undefined, highConfidence: string | null | undefined, known: (r: string) => boolean): string | undefined {
@@ -24,12 +25,23 @@ export function pickOwner(dsRole: string | undefined, highConfidence: string | n
   return highConfidence ?? undefined;
 }
 
-/** `{그룹}/{주인}/{속성}` — 빠진 칸은 줄이고, 둘 다 없으면 `{그룹}/default`. */
-export function composeName(group: string, owner: string | undefined, prop: string | undefined): string {
-  if (owner && prop) return `${group}/${owner}/${prop}`;
-  if (prop) return `${group}/${prop}`;
-  if (owner) return `${group}/${owner}`;
-  return `${group}/default`;
+/** `{그룹}/{속성}` — 속성이 없으면 `{그룹}/default`(12.12 N-D1 — 주인을 쓰지 않는다). */
+export function composeName(group: string, prop: string | undefined): string {
+  return prop ? `${group}/${prop}` : `${group}/default`;
+}
+
+/** 알약 반경 값(12.12 N-D5) — 알약 모서리는 이 값으로 세고 이름 짓고(`radius/full`) 붙인다. */
+export const PILL_RADIUS = 9999;
+
+/** 알약 모서리인가 — 반경이 레이어 짧은 변의 절반 이상(화면에서 모두 같은 알약 모양, 12.12 N-D5). 0은 아니다. */
+export function isPillRadius(v: number, width: number, height: number): boolean {
+  const short = Math.min(width, height);
+  return v > 0 && Number.isFinite(short) && v >= short / 2;
+}
+
+/** 모서리 값 → 알약 모서리를 9999로 바꾼 값(12.12 N-D5 — 이름은 바꾼 뒤의 값으로 정한다). */
+export function pillCorners(values: readonly number[], width: number, height: number): number[] {
+  return values.map((v) => (isPillRadius(v, width, height) ? PILL_RADIUS : v));
 }
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.005;
@@ -68,32 +80,36 @@ function allSame(values: readonly number[]): boolean {
   return live.every((v) => near(v, live[0]));
 }
 
-/** 모서리 이름 — 연결되는 모서리가 모두 같으면 `radius/{주인}`, 아니면 모서리마다. */
-export function radiusName(field: string, owner: string | undefined, corners: readonly number[]): string {
-  if (allSame(corners)) return composeName('radius', owner, undefined);
-  const suf = CORNER_SUFFIX[field] ?? 'default';
-  return owner ? `radius/${owner}-${suf}` : `radius/${suf}`;
+/**
+ * 모서리 이름 — 연결되는 모서리가 모두 같으면 `radius/default`(모두 알약 9999면 `radius/full`), 아니면 모서리마다.
+ * `corners`는 알약 모서리를 9999로 바꾼 값(`pillCorners`, 12.12 N-D5).
+ */
+export function radiusName(field: string, corners: readonly number[]): string {
+  if (allSame(corners)) {
+    const live = corners.filter((v) => v > 0);
+    return live.length && near(live[0], PILL_RADIUS) ? 'radius/full' : composeName('radius', undefined);
+  }
+  return `radius/${CORNER_SUFFIX[field] ?? 'default'}`;
 }
 
-/** 선 두께 이름 — strokeWeight 하나거나 방향별이 모두 같으면 `stroke-width/{주인}`, 아니면 방향마다. */
-export function strokeName(field: string, owner: string | undefined, sides: readonly number[]): string {
-  if (field === 'strokeWeight' || allSame(sides)) return composeName('stroke-width', owner, undefined);
-  const suf = SIDE_SUFFIX[field] ?? 'default';
-  return owner ? `stroke-width/${owner}-${suf}` : `stroke-width/${suf}`;
+/** 선 두께 이름 — strokeWeight 하나거나 방향별이 모두 같으면 `stroke-width/default`, 아니면 방향마다. */
+export function strokeName(field: string, sides: readonly number[]): string {
+  if (field === 'strokeWeight' || allSame(sides)) return composeName('stroke-width', undefined);
+  return `stroke-width/${SIDE_SUFFIX[field] ?? 'default'}`;
 }
 
 /** 여백 · 간격 · 불투명도 · 크기처럼 속성 이름이 고정인 필드. */
-export function simpleNumericName(field: string, owner: string | undefined, sizeKind?: 'icon' | 'avatar' | null): string | null {
+export function simpleNumericName(field: string, sizeKind?: 'icon' | 'avatar' | null): string | null {
   switch (field) {
     case 'itemSpacing':
-      return composeName('spacing', owner, 'gap');
+      return composeName('spacing', 'gap');
     case 'counterAxisSpacing':
     case 'gridRowGap':
-      return composeName('spacing', owner, 'row-gap');
+      return composeName('spacing', 'row-gap');
     case 'gridColumnGap':
-      return composeName('spacing', owner, 'column-gap');
+      return composeName('spacing', 'column-gap');
     case 'opacity':
-      return composeName('opacity', owner, undefined);
+      return composeName('opacity', undefined);
     case 'width':
     case 'height':
       return sizeKind ? `size/${sizeKind}` : null;
@@ -166,23 +182,40 @@ const byCountThenHex = (a: { hex: string; count: number }, b: { hex: string; cou
 /**
  * 한 쓰임의 색들 → 번호 없는 밝기 이름(default · subtle · strong · inverse · brand), 키는 `colorSlotKey(hex, bg, alpha)`.
  * 밝기 판정은 hex로만 — 같은 hex · 다른 투명도는 같은 자리를 받고 assignNames가 투명도 단계(-subtle · -strong)로 가른다(§2.11 "반투명 색 토큰").
- * 기준색: `existingDefaultHex`(`color/{쓰임}/default`가 이미 있으면 그 색), 없으면 hex별 곳 수 합이 가장 많은 색
- * (같으면 hex 순). 판정 순서: default → inverse(합친 판정) → brand(유채) → subtle · strong.
+ * 기준색: `existingDefaultHex`(`color/{쓰임}/default`가 이미 있으면 그 색), 없으면 쓰임별 기준값(`colorRoleRef` — 12.12 N-D4).
+ * 판정 순서: default → inverse(합친 판정) → brand(유채) → subtle · strong.
  * inverse(12.4 합친 판정, `use`가 text · icon · border일 때만 — 없으면 판정한다):
  *   1. 기준색이 극단(L < 0.35 또는 ≥ 0.85) 2. 그 색이 반대쪽 극단 3. 배경 종류가 있고 chroma이거나 기준과 같은 쪽.
  * 같은 이름 후보가 여럿이면 번호는 assignNames가 붙인다.
  */
-/** 12.4 기준색 hex — 이미 있는 default 값(색 값 키여도 hex만), 없으면 hex별 곳 수 합이 가장 많은 색(같으면 hex 순). 12.5 사다리의 기준. */
-export function colorRoleRef(colors: readonly ColorCount[], existingDefaultHex?: string): string | undefined {
+/**
+ * 12.4 기준색 hex — 이미 있는 default 값(색 값 키여도 hex만), 없으면 쓰임별 기준값(12.12 N-D4):
+ * background = 불투명 무채색 중 가장 밝은 색(OKLCH L 최대), text · icon = 불투명 무채색 중 가장 진한 색(L 최소) — 같으면 곳 수 · hex 순.
+ * 그 밖의 쓰임(border · shadow · 모름)이나 불투명 무채색이 없으면 hex별 곳 수 합이 가장 많은 색(같으면 hex 순). 12.5 사다리의 기준.
+ */
+export function colorRoleRef(colors: readonly ColorCount[], existingDefaultHex?: string, use?: string): string | undefined {
+  if (existingDefaultHex) return existingDefaultHex.split('@')[0].toLowerCase();
   const totals = new Map<string, number>();
-  for (const c of colors) totals.set(c.hex.toLowerCase(), (totals.get(c.hex.toLowerCase()) ?? 0) + c.count);
-  const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-  return (existingDefaultHex?.split('@')[0] ?? top?.hex)?.toLowerCase();
+  const opaque = new Set<string>(); // 불투명(투명도 1)으로 쓰인 hex
+  for (const c of colors) {
+    const hex = c.hex.toLowerCase();
+    totals.set(hex, (totals.get(hex) ?? 0) + c.count);
+    if (c.alpha == null || c.alpha >= 1) opaque.add(hex);
+  }
+  const all = [...totals].map(([hex, count]) => ({ hex, count }));
+  if (use === 'background' || use === 'text' || use === 'icon') {
+    const neutral = all.filter((x) => opaque.has(x.hex) && hexToOklch(x.hex).c < LOW_CHROMA);
+    if (neutral.length) {
+      const sign = use === 'background' ? -1 : 1; // 배경은 L 큰 쪽, 글자 · 아이콘은 L 작은 쪽
+      return neutral.sort((a, b) => sign * (lOf(a.hex) - lOf(b.hex)) || byCountThenHex(a, b))[0].hex;
+    }
+  }
+  return all.sort(byCountThenHex)[0]?.hex;
 }
 
 export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex?: string, use?: string): Map<string, string> {
   const out = new Map<string, string>();
-  const refHex = colorRoleRef(colors, existingDefaultHex);
+  const refHex = colorRoleRef(colors, existingDefaultHex, use);
   if (!refHex) return out;
   const ref = hexToOklch(refHex);
   const refDark = ref.l < 0.35;
@@ -214,10 +247,11 @@ export function colorRoleBases(colors: readonly ColorCount[], existingDefaultHex
 /* ---------- 이름 꼬리 (12.5) ---------- */
 
 /**
- * 기본 이름의 종류(12.5 표). number = 숫자 쓰임, plain = 크기 없는 값(글꼴), chroma = `…/brand`,
+ * 기본 이름의 종류(12.5 표). number = 숫자 쓰임, leading = 줄 높이 · 자간(꼬리 `-tight` · `-loose`, 12.12 N-D3),
+ * plain = 크기 없는 값(글꼴 · `radius/full` — 12.12 N-D5), chroma = `…/brand`,
  * ladder = `…/subtle` · `…/strong`, inverse = `…/inverse`, default = `…/default`.
  */
-export type NameKind = 'number' | 'plain' | 'chroma' | 'ladder' | 'inverse' | 'default';
+export type NameKind = 'number' | 'leading' | 'plain' | 'chroma' | 'ladder' | 'inverse' | 'default';
 
 /** 기본 이름 · 값 모양으로 종류를 정한다. */
 export function nameKindOf(base: string, value: string): NameKind {
@@ -228,11 +262,20 @@ export function nameKindOf(base: string, value: string): NameKind {
     if (last === 'inverse') return 'inverse';
     return 'default';
   }
-  return value !== '' && !Number.isNaN(Number(value)) ? 'number' : 'plain';
+  if (base === 'radius/full') return 'plain'; // 값이 언제나 9999 하나(12.12 N-D5)
+  if (value === '' || Number.isNaN(Number(value))) return 'plain';
+  return base.startsWith('line-height/') || base.startsWith('letter-spacing/') ? 'leading' : 'number';
 }
 
 const SIZE_SMALL = ['sm', 'xs', '2xs'];
 const SIZE_LARGE = ['lg', 'xl', '2xl'];
+/** 줄 높이 · 자간 꼬리(12.12 N-D3). */
+const TIGHT = ['tight', 'tighter', 'tightest'];
+const LOOSE = ['loose', 'looser', 'loosest'];
+/** `{그룹}/default` 숫자 이름 — 꼬리는 마지막 마디를 바꾼다(`radius/sm`, 12.12 N-D1). 그 밖은 끝에 붙인다. */
+const isDefaultTail = (base: string): boolean => base.endsWith('/default');
+/** 숫자 꼬리 후보 이름 — `{그룹}/default`면 `{그룹}/{말}`, 아니면 `{기본}-{말}`. */
+const tailName = (base: string, word: string): string => (isDefaultTail(base) ? `${base.slice(0, base.lastIndexOf('/'))}/${word}` : `${base}-${word}`);
 const LIGHTER = ['subtle', 'subtler', 'subtlest'];
 const DARKER = ['strong', 'stronger', 'strongest'];
 const LADDER_WORDS = [...LIGHTER, ...DARKER];
@@ -250,7 +293,12 @@ export function familyRe(base: string, kind: NameKind): RegExp {
   const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
   switch (kind) {
     case 'number':
-      return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join('|')}))?(?:-\\d+)?$`);
+    case 'leading': {
+      const words = (kind === 'leading' ? [...TIGHT, ...LOOSE] : [...SIZE_SMALL, ...SIZE_LARGE]).join('|');
+      // `{그룹}/default`의 가족은 `{그룹}/{default · 크기 말}`과 그 -n(12.12 N-D1 — `radius/full` · `radius/top-left`는 아님)
+      if (isDefaultTail(base)) return new RegExp(`^${esc(base.slice(0, base.lastIndexOf('/')))}/(?:default|${words})(?:-\\d+)?$`);
+      return new RegExp(`^${esc(base)}(?:-(?:${words}))?(?:-\\d+)?$`);
+    }
     case 'plain':
       return new RegExp(`^${esc(base)}(?:-\\d+)?$`);
     case 'default':
@@ -347,7 +395,7 @@ export function assignNames(requests: readonly NameRequest[], existing: Readonly
     const fallback = (name: string): string => {
       for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
     };
-    if (g.kind === 'number') assignNumbers(base, g.values, left, taken, assign, fallback);
+    if (g.kind === 'number' || g.kind === 'leading') assignNumbers(base, g.kind, g.values, left, taken, assign, fallback);
     else if (g.kind === 'plain') {
       for (const value of sortByCount(left, g.values)) assign(value, taken.has(base) ? fallback(base) : base);
     } else assignColors(base, g.kind, g.refHex, g.values, left, taken, assign, fallback);
@@ -367,7 +415,7 @@ function holderValue(taken: Taken, name: string): string | undefined {
   return v && v.length ? v[0] : undefined;
 }
 
-function assignNumbers(base: string, counts: ReadonlyMap<string, number>, left: string[], taken: Taken, assign: (v: string, n: string) => void, fallback: (n: string) => string): void {
+function assignNumbers(base: string, kind: NameKind, counts: ReadonlyMap<string, number>, left: string[], taken: Taken, assign: (v: string, n: string) => void, fallback: (n: string) => string): void {
   let rest = sortByCount(left, counts);
   let ref: number;
   const held = holderValue(taken, base);
@@ -381,14 +429,15 @@ function assignNumbers(base: string, counts: ReadonlyMap<string, number>, left: 
   const side = (vals: string[], words: string[]): void => {
     const sorted = [...vals].sort((a, b) => Math.abs(Number(a) - ref) - Math.abs(Number(b) - ref) || Number(a) - Number(b));
     for (const v of sorted) {
-      const free = words.map((w) => `${base}-${w}`).find((n) => !taken.has(n));
-      assign(v, free ?? fallback(`${base}-${words[words.length - 1]}`));
+      const free = words.map((w) => tailName(base, w)).find((n) => !taken.has(n));
+      assign(v, free ?? fallback(tailName(base, words[words.length - 1])));
     }
   };
   const same = rest.filter((v) => Math.abs(Number(v) - ref) < 0.005);
   for (const v of same) assign(v, fallback(base)); // 기준과 같은 값 · 재사용 불가 → {기본}-n
-  side(rest.filter((v) => Number(v) < ref - 0.0049), SIZE_SMALL);
-  side(rest.filter((v) => Number(v) > ref + 0.0049), SIZE_LARGE);
+  const lead = kind === 'leading';
+  side(rest.filter((v) => Number(v) < ref - 0.0049), lead ? TIGHT : SIZE_SMALL);
+  side(rest.filter((v) => Number(v) > ref + 0.0049), lead ? LOOSE : SIZE_LARGE);
 }
 
 /**
@@ -536,3 +585,9 @@ export function valueKey(v: number | string): string {
 
 /** 플러그인이 만든 역할에 남기는 변수 플러그인 데이터 키(12.6). */
 export const AUTO_ROLE_KEY = 'dsl.autoRole';
+
+/**
+ * 텍스트 스타일 등록이 크기 단계(`step`)로 지은 역할 변수의 표시(12.12 N-D2) — 값 = 그 크기 단계 이름(예 `body/large-18`).
+ * 옛 규칙 변수(스타일 이름 전체 · 표시 없음)와 이름이 같을 수 있어 옛 · 새는 이 표시로 가른다.
+ */
+export const TEXT_STEP_KEY = 'dsl.textStep';

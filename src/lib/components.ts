@@ -1288,7 +1288,7 @@ function exactNameKey(name: string): string {
  * 히어로 이미지가 바뀌고 카드 3종이 "Book & relax" 하나로 통일됨).
  */
 export const GENERIC_GROUP_NAMES: ReadonlySet<string> = new Set([
-  'container', 'wrapper', 'content', 'frame', 'group', 'section', 'main', 'header', 'footer', 'nav', 'aside',
+  'container', 'wrapper', 'stack-x', 'stack-y', 'content', 'frame', 'group', 'section', 'main', 'header', 'footer', 'nav', 'aside',
   'item', 'list', 'image', 'icon', 'background', 'border', 'shape', 'text', 'divider', 'swatch', 'figure',
 ]);
 

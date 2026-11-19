@@ -26,6 +26,9 @@ import {
   nameKindOf,
   paddingProp,
   pickOwner,
+  pillCorners,
+  isPillRadius,
+  PILL_RADIUS,
   radiusName,
   simpleNumericName,
   strokeName,
@@ -493,10 +496,8 @@ function skip(res: BindResult, key: string, node?: SceneNode, preview?: Preview 
   note(res, key, node, preview, field);
 }
 
-/** 찾기 · 연결 옵션 — 주인(레이어 역할) 판정은 부르는 쪽이 구조 색인으로 넘길 수 있다(§2.12 12.3). */
+/** 찾기 · 연결 옵션. 쓰임 이름은 주인(레이어 역할)을 쓰지 않는다(§2.12 12.12 N-D1). */
 export interface BindOptions {
-  /** 레이어의 주인 역할. 없으면 이름 정리가 남긴 역할(`dsRole`)만 본다. */
-  ownerOf?: (node: SceneNode) => string | undefined;
   /**
    * 텍스트 스타일이 먼저(IA v4 §4.2 · §4.3 `APPLY.skipTextStyleNodes`) — true인 글자는 글자 자리
    * (fontSize · lineHeight · letterSpacing · fontFamily)를 찾지도 세지도 않는다(스타일 연결은 연결 화면에서).
@@ -509,7 +510,7 @@ export interface BindOptions {
   noNewRoles?: boolean;
 }
 
-/** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). */
+/** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). 텍스트 스타일 label 판정(`inUiRole`)이 쓴다. */
 export function dsRoleOwner(node: SceneNode): string | undefined {
   const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
   let role: string | undefined;
@@ -537,17 +538,11 @@ export async function bindSelection(
   // 적용 모드에서도 "어느 레이어에 어느 변수가 붙었나" 목록을 모은다(결과 트리). dry-run과 같은 수집기 —
   // 후보는 상한 없이 전부 싣는다(§4.6 "찾기 · 연결의 수").
   const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
-  const ownerCache = new Map<SceneNode, string | undefined>();
-  const ownerOf = opts.ownerOf ?? dsRoleOwner;
   const ctx: Ctx = {
     index,
     res,
     preview,
     slots: [],
-    owner: (n) => {
-      if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
-      return ownerCache.get(n);
-    },
     skipText: opts.skipTextStyleNode,
     noNewRoles: !!opts.noNewRoles,
     mainOf: mains.mainOf,
@@ -580,7 +575,7 @@ export async function bindSelection(
     const known = new Map<string, SceneNode>();
     for (const s of ctx.slots) known.set(s.node.id, s.node);
     const r = await bindSelectedItems(
-      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}) })),
+      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}) })),
       {},
       known, // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
     );
@@ -737,6 +732,8 @@ interface Slot {
   bg?: BgKind;
   /** 연결 후보가 없을 때의 사유 — 'drop'은 만들기가 뽑지 않는 값이라 어디에도 세지 않는다(§4.1 k ①). */
   noMatchReason: string;
+  /** 알약 반경 자리(12.12 N-D5) — 순서 2 · 4 · 무료는 이 값(9999)으로 찾는다. 순서 1 · 3은 원래 값(`value`). */
+  pill?: number;
   /** 선택 밖 메인 단위 안 자리(§2.11 11번). */
   mainId?: string;
 }
@@ -753,7 +750,6 @@ interface Ctx {
   res: BindResult;
   preview: Preview;
   slots: Slot[];
-  owner: (n: SceneNode) => string | undefined;
   skipText?: (node: TextNode) => boolean;
   /** 무료 — 새 역할 없이 Global에 붙인다(BindOptions.noNewRoles). */
   noNewRoles?: boolean;
@@ -767,13 +763,13 @@ interface Ctx {
   visited?: Set<string>;
 }
 
-/** 값 · 용도가 맞는 변수들(12.2 전제). */
-function sameValueEntries(ctx: Ctx, s: Slot): VarEntry[] {
+/** 값 · 용도가 맞는 변수들(12.2 전제). `value`를 주면 그 값으로(알약 자리의 9999 — 12.12 N-D5). */
+function sameValueEntries(ctx: Ctx, s: Slot, value: number | string = s.value): VarEntry[] {
   return ctx.index.entries.filter((e) => {
     if (!scopeOk(e.scopes, s.allowed)) return false;
-    if (s.kind === 'color') return e.colorKey === s.value; // hex · 투명도 모두
-    if (typeof s.value === 'number') return e.num != null && sameNumber(e.num, s.value);
-    return e.str != null && e.str === s.value;
+    if (s.kind === 'color') return e.colorKey === value; // hex · 투명도 모두
+    if (typeof value === 'number') return e.num != null && sameNumber(e.num, value);
+    return e.str != null && e.str === value;
   });
 }
 
@@ -812,9 +808,9 @@ function resolveSlots(ctx: Ctx): void {
   const { res, preview } = ctx;
   const pending: Pending[] = [];
   const colorLeft: { slot: Slot; cands: VarEntry[] }[] = [];
-  const emit = (s: Slot, e: VarEntry): void => {
+  const emit = (s: Slot, e: VarEntry, viaPill = false): void => {
     res.bound++;
-    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e)));
+    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill));
   };
   const globalFor = (cands: VarEntry[]): VarEntry | null => {
     // 직접 값 Global만(별칭 변수는 사슬을 만든다 — 13.3), 사용자 컬렉션 먼저.
@@ -831,17 +827,19 @@ function resolveSlots(ctx: Ctx): void {
       colorLeft.push({ slot: s, cands });
       continue;
     }
-    // 순서 2 — 숫자: 쓰임 이름의 가족(12.5), 글자: 같은 그룹 아무 이름(거울 제외).
+    // 순서 2 — 숫자: 쓰임 이름의 가족(12.5), 글자: 같은 그룹 아무 이름(거울 제외). 알약 자리는 9999로(12.12 N-D5).
+    const viaPill = s.pill != null;
+    const cands2 = viaPill ? sameValueEntries(ctx, s, s.pill as number) : cands;
     const group = s.usage.split('/')[0];
     const two =
       s.kind === 'text'
-        ? cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0]
-        : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
+        ? cands2.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0]
+        : firstInFamily(cands2.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(slotValue(s)))).test(e.variable.name)), s.usage);
     if (two) {
-      emit(s, two);
+      emit(s, two, viaPill);
       continue;
     }
-    pending.push({ slot: s, base: s.usage, global: globalFor(cands) });
+    pending.push({ slot: s, base: s.usage, global: globalFor(cands2) });
   }
 
   // 색: 남은 자리를 쓰임별로 모아 밝기 이름을 한 번에 정한다(12.4 처리 순서 ②~④).
@@ -863,7 +861,7 @@ function resolveSlots(ctx: Ctx): void {
     }
     const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
     const bases = colorRoleBases([...counts.values()], def?.colorHex, use);
-    const refHex = colorRoleRef([...counts.values()], def?.colorHex);
+    const refHex = colorRoleRef([...counts.values()], def?.colorHex, use);
     for (const x of list) {
       const base = `color/${use}/${bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha)) ?? 'default'}`;
       const fam = familyRe(base, nameKindOf(base, valueKey(x.slot.value)));
@@ -884,18 +882,18 @@ function resolveSlots(ctx: Ctx): void {
   });
   // 무료(F6 — §2.3-7): 새 역할을 만들지 않고 그 Global에 바로 붙인다.
   if (ctx.noNewRoles) {
-    for (const p of live) emit(p.slot, p.global as VarEntry);
+    for (const p of live) emit(p.slot, p.global as VarEntry, p.slot.pill != null);
     return;
   }
   // 재사용은 순서 2가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
   const names = assignNames(
-    live.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
+    live.map((p) => ({ base: p.base, value: valueKey(slotValue(p.slot)), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
     ctx.index.semNames,
     { reuse: false },
   );
   const roleOf = new Map<string, NewRoleSpec>(); // 이름 → 역할(처음 본 Global)
   for (const p of live) {
-    const name = names.get(`${p.base}\u0000${valueKey(p.slot.value)}`) ?? p.base;
+    const name = names.get(`${p.base}\u0000${valueKey(slotValue(p.slot))}`) ?? p.base;
     let spec = roleOf.get(name);
     if (!spec) {
       const g = p.global as VarEntry;
@@ -906,7 +904,7 @@ function resolveSlots(ctx: Ctx): void {
     res.bound++;
     const g = p.global as VarEntry;
     preview.candidates.push({
-      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g)),
+      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null),
       newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
       newRoleGlobalName: spec.globalName,
     });
@@ -920,7 +918,10 @@ interface NewRoleSpec {
   globalName: string;
 }
 
-function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number): BindCandidate {
+/** 순서 2 · 4 · 무료가 찾는 값 — 알약 자리면 9999(12.12 N-D5), 아니면 원래 값. */
+const slotValue = (s: Slot): number | string => s.pill ?? s.value;
+
+function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number, viaPill = false): BindCandidate {
   return {
     nodeId: s.node.id,
     field: s.field,
@@ -933,6 +934,8 @@ function candOf(s: Slot, variableId: string, variableName: string, tier: number,
     variableValue,
     ...(variableAlpha != null ? { variableAlpha } : {}),
     ...(s.mainId ? { mainId: s.mainId } : {}),
+    // 9999로 붙이는 알약 자리 — 연결 직전 다시 확인은 "원래 값이 같고 지금도 알약"(12.12 N-D5)
+    ...(viaPill && typeof s.value === 'number' ? { pillFrom: s.value } : {}),
   };
 }
 
@@ -1111,11 +1114,10 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
     note(res, 'no-autolayout', node, preview);
     return;
   }
-  const owner = ctx.owner(node);
   if (node.layoutMode === 'GRID') {
     // 그리드 모드의 간격은 gridRowGap/gridColumnGap(extract.ts와 동일 기준).
-    tryBind(ctx, node, 'gridRowGap', node.gridRowGap, simpleNumericName('gridRowGap', owner) as string, numReason(node.gridRowGap));
-    tryBind(ctx, node, 'gridColumnGap', node.gridColumnGap, simpleNumericName('gridColumnGap', owner) as string, numReason(node.gridColumnGap));
+    tryBind(ctx, node, 'gridRowGap', node.gridRowGap, simpleNumericName('gridRowGap') as string, numReason(node.gridRowGap));
+    tryBind(ctx, node, 'gridColumnGap', node.gridColumnGap, simpleNumericName('gridColumnGap') as string, numReason(node.gridColumnGap));
   } else {
     // 사이 간격 자동(Space between)이면 간격 값은 피그마가 쓰지 않는다 — 붙이면 정렬이 MIN으로 바뀌어
     // 레이어 모양이 바뀐다(§2.11 "사이 간격 자동", QA #3 불합격 1). 사유만 남기고 건너뛴다.
@@ -1127,12 +1129,12 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
       if (gs === 'no-wrap') continue;
       if (gs === 'space-between') {
         if (v > 0) note(res, 'space-between', node, preview, f); // 0 이하는 만들 수 없는 값 — 건너뜀으로도 세지 않는다(§4.1 k ①)
-      } else tryBind(ctx, node, f, v, simpleNumericName(f, owner) as string, numReason(v));
+      } else tryBind(ctx, node, f, v, simpleNumericName(f) as string, numReason(v));
     }
   }
   const pad: Padding = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
   for (const f of ['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const) {
-    tryBind(ctx, node, f, node[f], composeName('spacing', owner, paddingProp(f, pad)), numReason(node[f]));
+    tryBind(ctx, node, f, node[f], composeName('spacing', paddingProp(f, pad)), numReason(node[f]));
   }
 }
 
@@ -1142,9 +1144,11 @@ function bindRadius(node: SceneNode, ctx: Ctx): void {
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
   const values = corners.map((c) => (r !== figma.mixed && typeof r === 'number' ? r : Number((node as unknown as Record<string, number>)[c]) || 0));
   if (r !== figma.mixed && !(typeof r === 'number' && r > 0)) return;
-  const owner = ctx.owner(node);
+  // 알약 모서리(반경 ≥ 짧은 변 / 2)는 9999로 바꾼 값으로 이름 짓고, 순서 2 · 4 · 무료는 9999로 찾는다(12.12 N-D5).
+  const { width, height } = node as unknown as { width: number; height: number };
+  const named = pillCorners(values, width, height);
   corners.forEach((c, i) => {
-    if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
+    if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, named), numReason(values[i]), named[i] !== values[i] ? PILL_RADIUS : undefined);
   });
 }
 
@@ -1152,7 +1156,7 @@ function bindOpacity(node: SceneNode, ctx: Ctx): void {
   if (!('opacity' in node)) return;
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1/0은 바인딩 대상 아님
-  tryBind(ctx, node, 'opacity', o, simpleNumericName('opacity', ctx.owner(node)) as string);
+  tryBind(ctx, node, 'opacity', o, simpleNumericName('opacity') as string);
 }
 
 function bindStroke(node: SceneNode, ctx: Ctx): void {
@@ -1164,7 +1168,6 @@ function bindStroke(node: SceneNode, ctx: Ctx): void {
   const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
   const sides = ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const;
   const sideValues = sides.map((sd) => Number((node as unknown as Record<string, number>)[sd]) || 0);
-  const owner = ctx.owner(node);
   // 선 두께는 정수만(§2.11, 2026-11-04) — 소수 두께는 정수 변수에 당겨 붙이지 않고 "소수 선 두께"로 건너뛴다.
   const one = (field: 'strokeWeight' | (typeof sides)[number], v: number): void => {
     if (!(v > 0)) return;
@@ -1172,7 +1175,7 @@ function bindStroke(node: SceneNode, ctx: Ctx): void {
     const st = stateReason(nodeFieldState(node, field));
     if (st) { note(res, st, node, preview, field); return; }
     if (Math.abs(v - Math.round(v)) >= 0.005) { note(res, 'fraction', node, preview, field); return; }
-    tryBind(ctx, node, field, v, strokeName(field, owner, sideValues));
+    tryBind(ctx, node, field, v, strokeName(field, sideValues));
   };
   if (w !== figma.mixed && typeof w === 'number') {
     one('strokeWeight', w);
@@ -1273,6 +1276,8 @@ function tryBind(
   usage: string,
   /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
   noMatchReason = 'no-match',
+  /** 알약 반경 자리면 9999(12.12 N-D5). */
+  pill?: number,
 ): void {
   const allowed = numAllowed(field);
   const st = stateReason(nodeFieldState(node, field));
@@ -1280,7 +1285,7 @@ function tryBind(
     note(ctx.res, st, node, ctx.preview, field);
     return;
   }
-  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, noMatchReason });
+  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, noMatchReason, ...(pill != null ? { pill } : {}) });
 }
 
 /* ---------- 체크한 자리 연결(APPLY_SELECTED) — 연결 직전 다시 확인(§4.6 "찾는 범위") ---------- */
@@ -1295,6 +1300,8 @@ export interface SelectedBindItem {
   newRole?: NewRoleRef;
   /** 선택 밖 메인 단위 안 자리(§2.11 11번) — 실제로 붙이면 mainsBound에 든다. */
   mainId?: string;
+  /** 9999로 붙일 알약 자리의 찾을 때 읽은 원래 값(12.12 N-D5). */
+  pillFrom?: number;
 }
 
 /** 연결 진행률 · 양보 훅(§4.6 "찾기 · 연결의 수"). 묶음이 끝날 때마다 부른다. */
@@ -1525,11 +1532,19 @@ export async function bindSelectedItems(
           continue;
         }
         const cur = (node as unknown as Record<string, unknown>)[it.field];
-        if (typeof cur !== 'number' || typeof value !== 'number' || !sameNumber(cur, value)) {
+        // 알약 자리(12.12 N-D5): 지금 값이 찾을 때 읽은 원래 값과 같고 지금도 알약이면 같은 것으로 본다(변수 값 9999).
+        const pillOk = (): boolean => {
+          const { width, height } = node as unknown as { width: number; height: number };
+          return it.pillFrom != null && typeof cur === 'number' && typeof value === 'number' && sameNumber(value, PILL_RADIUS) && sameNumber(cur, it.pillFrom) && isPillRadius(cur, width, height);
+        };
+        const pill = it.pillFrom != null;
+        if (pill ? !pillOk() : typeof cur !== 'number' || typeof value !== 'number' || !sameNumber(cur, value)) {
           fail('changed', node, it.field);
           continue;
         }
-        (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, await target());
+        const tv = await target();
+        if (pill) (node as unknown as Record<string, number>)[it.field] = PILL_RADIUS; // 겉모습 그대로(같은 값 규칙의 예외 — 12.12 N-D5)
+        (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, tv);
         res.bound++;
         if (it.mainId) mainsBound.add(it.mainId);
         hooks.onBound?.(res.bound);

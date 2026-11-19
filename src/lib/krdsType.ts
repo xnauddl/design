@@ -181,10 +181,12 @@ const lhTail = (lh: number | 'auto'): string => (lh === 'auto' ? '-auto' : lh ==
  * - `anchored`: 입력 index → 그대로 쓸 기존 이름(꼬리 계산에서 빠지고, 그 이름은 사용 중).
  * - `reserved`: 처음부터 사용 중인 이름(이 파일의 로컬 텍스트 스타일 이름) — 겹치면 강제 꼬리.
  * - `path`: 'scan'(uiCount로 label 판정) · 'rename'(지금 이름 조각으로 판정).
+ * - `steps`: 주면 입력 index마다 크기 단계 이름(§3.5 `sizeKey` — `{분류}/{단계}[-크기]`)을 채운다(앵커는 '').
+ *   텍스트 스타일 역할 변수 이름이 쓴다(ia-v3 §2.12 12.12 N-D2 — 이름 문자열을 다시 읽지 않는다).
  */
 export function nameKrdsStyles(
   inputs: readonly KrdsInput[],
-  opts: { reserved?: ReadonlySet<string>; anchored?: ReadonlyMap<number, string>; path?: KrdsPath } = {},
+  opts: { reserved?: ReadonlySet<string>; anchored?: ReadonlyMap<number, string>; path?: KrdsPath; steps?: string[] } = {},
 ): string[] {
   const path = opts.path ?? 'scan';
   const anchored = opts.anchored ?? new Map<number, string>();
@@ -318,5 +320,10 @@ export function nameKrdsStyles(
   }
 
   for (const w of works) out[w.idx] = w.name;
+  if (opts.steps) {
+    opts.steps.length = inputs.length;
+    for (let i = 0; i < inputs.length; i++) opts.steps[i] = '';
+    for (const w of works) opts.steps[w.idx] = sizeKey.get(w) ?? '';
+  }
   return out;
 }

@@ -74,6 +74,11 @@ export interface TextStyleSpec {
   count?: number;
   /** 그 글자들의 노드 id — 지금 UI에서 읽지 않음(옛 ×N 배지용 · 메시지 모양 유지). */
   nodeIds?: string[];
+  /**
+   * 크기 단계 이름(KRDS `sizeKey` — `{분류}/{단계}[-크기]`, ia-v3 §2.12 12.12 N-D2). `nameKrdsStyles`가 이름과 함께 준다.
+   * 역할 변수(`font-size/{step}` …)는 이것으로 짓는다. 없으면(앵커 · 사용자가 지은 이름 · 손으로 더한 행) 스타일 이름 전체.
+   */
+  step?: string;
 }
 
 /** 이미 존재하는 로컬 텍스트 스타일(시그니처 매칭용). px 환산된 행간·자간.
@@ -228,7 +233,8 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
     count: c.count,
     uiCount: c.uiCount ?? 0,
   }));
-  const names = nameKrdsStyles(inputs, { reserved, anchored, path: 'scan' });
+  const steps: string[] = [];
+  const names = nameKrdsStyles(inputs, { reserved, anchored, path: 'scan', steps });
 
   return ordered.map((c, i) => {
     const boundId = boundIds[i];
@@ -247,6 +253,7 @@ export function nameTextStyles(clusters: StyleCluster[], existing?: ExistingText
       ...(lineHeightPercent ? { lineHeightPercent } : {}),
       ...(letterSpacingPercent !== 0 ? { letterSpacingPercent } : {}),
       ...(boundId ? { boundStyleId: boundId } : {}),
+      ...(!boundId && steps[i] ? { step: steps[i] } : {}),
       count: c.count,
       ...(c.nodeIds?.length ? { nodeIds: c.nodeIds } : {}),
     };
@@ -385,6 +392,7 @@ export function nameTextStylesWithRowLabels(
     const label = labelBySig.get(sigKey(style));
     if (label) {
       style.name = unique(label);
+      delete style.step; // 라벨 이름은 사용자가 지은 이름 — 역할 변수는 스타일 이름 전체(12.12 N-D2)
       labeled++;
     }
   }
@@ -447,9 +455,11 @@ export function rampToSpecs(family: string, reserved?: ReadonlySet<string> | rea
     count: 0,
     uiCount: 0,
   }));
-  const names = nameKrdsStyles(inputs, { reserved: new Set(reserved ?? []), path: 'scan' });
+  const steps: string[] = [];
+  const names = nameKrdsStyles(inputs, { reserved: new Set(reserved ?? []), path: 'scan', steps });
   return inputs.map((x, i) => ({
     name: names[i],
+    ...(steps[i] ? { step: steps[i] } : {}),
     fontSize: x.fontSize,
     lineHeight: x.lineHeight,
     lineHeightPercent: 150,
