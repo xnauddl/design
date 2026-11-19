@@ -961,7 +961,7 @@
   1. 영어: 이름을 `kebab`으로 나눈 낱말 목록에서 맨 뒤의 숫자 낱말을 뗀다. 맨 뒤 낱말이 표의 영어 낱말이면 그 역할(`special-nav` → nav · `Product tabs` → tabs · `상품상세 tab` → `kebab`이 한글을 지워 `tab` → tab · `Specification divider` → divider).
   2. 꼬리 규칙은 **nav · tab 낱말 뒤에만** 쓴다: 맨 뒤 낱말이 **중립 꼬리** `menu` · `bar` · `area` · `wrap` · `box`이고 바로 앞 낱말이 nav 낱말이면 nav(`gnb-menu` · `gnb-area` → nav). 바로 앞 낱말이 `tab`이고 맨 뒤가 중립 꼬리 또는 `list` · `group`이면 `tabs`(`tab-menu` · `tab-area` · `tab-list` → tabs). `button` · `divider` · `breadcrumb` 낱말은 맨 뒤 낱말일 때만 힌트다(`btn-wrap` · `button-area` · `divider-box` → 힌트 없음 — 버튼 · 구분선을 담은 상자).
   3. 그 밖이면 영어 힌트 없음 — 맨 뒤가 다른 역할 · 구조 낱말인 이름은 그 낱말이 머리명사다(`nav-item` · `nav-link` · `tab-item` · `button-group` · `btn-wrapper` · `btn-wrap` → 힌트 없음, 지금 규칙). `menu` 단독도 힌트가 아니다(`category-menu` 같은 햄버거 단추가 nav가 되지 않게 — 사용자 결정).
-  4. 영어 힌트가 없으면 한글: 원래 이름을 공백 · 문장부호로 나눈 **맨 뒤 토막**이 표의 한글 낱말로 끝나면 그 역할(`탭메뉴`를 `탭`보다, `네비게이션`을 `네비`보다 먼저 본다 — `상품상세탭` → tab). 영어 2번처럼 **한글 중립 꼬리** `메뉴` · `영역` · `바`도 둔다: 맨 뒤 토막이 정확히 꼬리이고 바로 앞 토막이 nav 낱말(영어 · 한글)이면 nav, `tab` · `탭`이면 tabs(`GNB 메뉴` · `gnb-메뉴` → nav, `탭 영역` → tabs). 맨 뒤 토막이 꼬리로 **끝나기만** 하는 붙여 쓴 이름(`카테고리메뉴`)은 꼬리가 아니다. 맨 뒤 토막만 보므로 `배송 경로 안내`(맨 뒤 `안내`)는 힌트가 아니다.
+  4. 영어 힌트가 없으면 한글: 원래 이름을 공백 · 문장부호로 나눈 **맨 뒤 토막**이 표의 한글 낱말로 끝나면 그 역할(`탭메뉴`를 `탭`보다, `네비게이션`을 `네비`보다 먼저 본다 — `상품상세탭` → tab). 영어 2번처럼 **한글 중립 꼬리** `메뉴` · `영역` · `바`도 둔다: 맨 뒤 토막이 정확히 꼬리이고 바로 앞 토막이 nav 낱말(영어 · 한글)이면 nav, `tab` · `탭`이면 tabs(`GNB 메뉴` · `gnb-메뉴` → nav, `탭 영역` → tabs). 맨 뒤 토막이 꼬리로 **끝나기만** 하는 붙여 쓴 이름(`카테고리메뉴`)은 꼬리가 아니다. 앞 토막은 영어면 소문자로 바꿔 표 낱말과 정확히 같은지, 한글이면 표 낱말로 끝나는지 본다(`GNB` → `gnb` · `상단내비` → nav). 맨 뒤 토막만 보므로 `배송 경로 안내`(맨 뒤 `안내`)는 힌트가 아니다.
   - `componentLike.ts` `isTabName`(§4.7 탭 묶기)은 이름 어디에든 `탭` · 탭 낱말이 있으면 탭으로 본다 — 그쪽은 이미 탭 모양인 칸을 고르는 보조 조건이고, 여기는 이름만으로 역할을 정하므로 머리 낱말로 좁힌다. 영어 낱말 목록은 같다(`tab` · `tabs` · `tabbar` · `tablist` · `tabmenu` · `tabgroup`).
 - **이 플러그인이 전에 지은 이름은 힌트가 아니다:** 레이어의 `dsRole`이 **힌트 역할과 다르고**, A1 "뜻 없는 이름 ②ⓑ"(이름 낱말이 `dsRole` 낱말로 끝나며 앞 낱말이 모두 출력 역할이거나 맨 앞 한 낱말만 루트 접두사)에 걸리면 힌트를 보지 않는다. 한 번 정리한 `header-button`(`dsRole` `button`)은 힌트 역할도 `button`이라 그대로 두고, `nav-item`(`dsRole` `item`)은 3번에서 이미 힌트가 없다. 힌트로 이름을 둔 노드는 `dsRole`이 힌트 역할과 같으므로 다시 정리해도 같은 결과다(멱등 — `Breadcrumb` · `Divider` · `Button`이 두 번째 정리에서 바뀌지 않는다).
 - **구조 판정과의 관계(사용자 결정 "약한 판정만 덮기"):** 지금 규칙으로 역할 `r`을 먼저 구한 뒤(판정 순서 · 맥락 그대로), 힌트 역할이 `h`이면:
@@ -982,7 +982,7 @@
 - **화면:** 바뀌지 않는다. 미리보기 트리에서 힌트로 이름을 둔 줄은 바꿀 줄이 아니라 보이지 않는다(그 아래 바꿀 줄이 있으면 머리 줄로 회색 이름이 보인다 — 지금 규칙).
 - **예(실기 파일, 바뀌는 것):** `gnb`(`container` → 그대로, nav) · `special-nav` · `gnb-menu`(`header-actions` · `stack-x` → 그대로, nav — 부모가 nav라 `item` 자리) · `Breadcrumb`(`section` → 그대로) · `Product tabs`(`section` → 그대로, tabs) · 탭 칸 4개(→ 그대로, tab) · `Active tab underline`(`swatch` → `tab-indicator`) · `Divider` 4개 · `Specification divider` 2개(`swatch` → 그대로, divider) · 바닥글 `Button` 5개 · 앱 다운로드 `button`(`footer-button` · `item-button` → 그대로, button). 그대로: `Shared storefront navigation` → `header`, `category-menu`(아이콘 프레임), `Add to cart` · `Start subscription`(힌트 낱말 없음 → `wrapper`). 두 번째 정리에서도 같다.
 - **한계(받아들임):**
-  - 한글은 맨 뒤 토막이 그 낱말로 **끝나는지**만 본다 — 붙여 쓴 `배송경로` → breadcrumb, `스탭` → tab처럼 걸릴 수 있다.
+  - 한글은 맨 뒤 토막이 그 낱말로 **끝나는지**만 본다 — 붙여 쓴 `배송경로` → breadcrumb, `스탭` → tab처럼 걸릴 수 있다. 반대로 붙여 쓴 nav + 꼬리(`네비메뉴` · `GNB메뉴`)는 힌트가 없다(`탭메뉴`는 표 낱말이라 tabs).
   - 힌트는 낱말만 본다 — 이름이 틀리면(`nav`라 지은 카드 묶음) 약한 판정 자리에서 틀린 역할을 따른다.
   - 대문자 · 띄어쓰기 · 한글이 섞인 이름(`Product tabs`)은 그대로 남는다(사용자 결정 B).
   - 이미 이 플러그인으로 정리해 이름이 바뀐 파일(`gnb` → `container`)은 원래 이름이 없어 되살리지 못한다(원본을 다시 정리해야 한다).
