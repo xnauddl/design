@@ -32,7 +32,7 @@ export function mergeSameNameTokens(tokens: readonly DraftToken[]): DraftToken[]
   for (const t of tokens) {
     const prev = byName.get(t.name);
     if (!prev) {
-      const copy: DraftToken = { ...t, sources: [...t.sources], ...(t.uses ? { uses: t.uses.map((u) => ({ ...u })) } : {}) };
+      const copy: DraftToken = { ...t, sources: [...t.sources], ...(t.uses ? { uses: t.uses.map((u) => ({ ...u })) } : {}), ...(t.freeBy ? { freeBy: { ...t.freeBy } } : {}) };
       byName.set(t.name, copy);
       out.push(copy);
       continue;
@@ -49,6 +49,11 @@ export function mergeSameNameTokens(tokens: readonly DraftToken[]): DraftToken[]
       }
     }
     if (t.count != null) prev.count = Math.max(prev.count ?? 0, t.count);
+    // 변수가 안 붙은 자리(IA v4 §4.1 "만들기 카드 — 상태 5") — 같은 허용 스코프 묶음 키끼리 더한다.
+    if (t.freeBy) {
+      const fb = (prev.freeBy ??= {});
+      for (const [k, n] of Object.entries(t.freeBy)) fb[k] = (fb[k] ?? 0) + n;
+    }
   }
   return out;
 }

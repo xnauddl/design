@@ -8937,3 +8937,80 @@ test('B.28 보강 — 자식 없는 얇은 색 프레임은 divider · 두꺼운
   assert.equal(b.get('u1'), 'tab-indicator');
   assert.equal(b.get('u2'), 'tab-indicator');
 });
+
+/* ---------- 상태 5 만들기 카드 — 추출 freeBy(IA v4 §4.1 "만들기 카드 — 상태 5" · B.30) ---------- */
+const fbOf = (tokens, name) => tokens.find((tk) => tk.name === name)?.freeBy;
+
+test('extract freeBy — 칠: 변수 붙은 페인트 쪽 · 노드 boundVariables.fills[i] 쪽 모두 붙은 자리, 안 붙은 칠만 센다', () => {
+  installFigma();
+  const a = frame({ id: 'fa', fills: [solid('#3366ff', { boundVariables: { color: alias('L1') } })] });
+  const b = frame({ id: 'fb', fills: [solid('#3366ff')], boundVariables: { fills: [alias('L1')] } });
+  const c = frame({ id: 'fc', fills: [solid('#3366ff')] });
+  const { tokens } = extractFromSelection([a, b, c]);
+  const tk = tokens.find((x) => x.name === 'color/3366ff');
+  assert.equal(tk.count, 3); // count는 그대로 레이어 수(붙은 레이어도 든다)
+  assert.deepEqual(tk.freeBy, { 'ALL_FILLS|FRAME_FILL': 1 });
+});
+
+test('extract freeBy — padding 한 방향만 붙음 → 나머지 3자리 · 모두 붙은 토큰은 빈 freeBy(free 0)', () => {
+  installFigma();
+  const f = frame({ id: 'pad', layoutMode: 'VERTICAL', paddingTop: 16, paddingRight: 16, paddingBottom: 16, paddingLeft: 16, itemSpacing: 4, boundVariables: { paddingLeft: alias('L2'), itemSpacing: alias('L3') } });
+  const { tokens } = extractFromSelection([f]);
+  assert.deepEqual(fbOf(tokens, 'spacing/16'), { GAP: 3 });
+  assert.deepEqual(fbOf(tokens, 'spacing/4'), {}); // 이미 변수가 붙은 값 — 토큰은 남지만 free = 0
+});
+
+test('extract freeBy — 같은 반경은 모서리 4자리(연결 찾기와 같은 단위), 붙은 모서리는 뺀다', () => {
+  installFigma();
+  const r1 = rect({ id: 'r1', cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomLeftRadius: 8, bottomRightRadius: 8, width: 100, height: 100 });
+  const r2 = rect({ id: 'r2', cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomLeftRadius: 8, bottomRightRadius: 8, width: 100, height: 100, boundVariables: { topLeftRadius: alias('L4') } });
+  const { tokens } = extractFromSelection([r1, r2]);
+  const tk = tokens.find((x) => x.name === 'radius/8');
+  assert.equal(tk.count, 2);
+  assert.deepEqual(tk.freeBy, { CORNER_RADIUS: 7 });
+});
+
+test('extract freeBy — 선 두께: 방향별이면 한 방향만 붙어도 나머지는 남음 · 한 값이면 한 방향이라도 붙으면 붙음', () => {
+  installFigma();
+  const sides = frame({ id: 'sd', strokes: [solid('#000000')], strokeWeight: figma.mixed, strokeTopWeight: 1, strokeRightWeight: 1, strokeBottomWeight: 1, strokeLeftWeight: 1, boundVariables: { strokeTopWeight: alias('L5') } });
+  const one = frame({ id: 'one', strokes: [solid('#000000')], strokeWeight: 2, strokeTopWeight: 2, strokeRightWeight: 2, strokeBottomWeight: 2, strokeLeftWeight: 2, boundVariables: { strokeTopWeight: alias('L6') } });
+  const { tokens } = extractFromSelection([sides, one]);
+  assert.deepEqual(fbOf(tokens, 'stroke-width/1'), { STROKE_FLOAT: 3 });
+  assert.deepEqual(fbOf(tokens, 'stroke-width/2'), {});
+  assert.deepEqual(fbOf(tokens, 'color/000000'), { STROKE_COLOR: 2 }); // 선 색은 STROKE_COLOR 묶음
+});
+
+test('extract freeBy — 비율이 잠긴 크기는 한 자리(lockedSizeState), 잠기지 않으면 축마다', () => {
+  installFigma();
+  const lk = lockedIcon('lk');
+  assert.deepEqual(fbOf(extractFromSelection([lk]).tokens, 'size/20'), { WIDTH_HEIGHT: 1 });
+  const lkBound = lockedIcon('lkb', { boundVariables: { height: alias('L7') } });
+  assert.deepEqual(fbOf(extractFromSelection([lkBound]).tokens, 'size/20'), {});
+  const free = lockedIcon('fr', { constrainProportions: false });
+  assert.deepEqual(fbOf(extractFromSelection([free]).tokens, 'size/20'), { WIDTH_HEIGHT: 2 });
+});
+
+test('extract freeBy — 글자 칠 TEXT_FILL과 프레임 칠 FRAME_FILL은 다른 묶음 · 그림자 색은 EFFECT_COLOR · 같은 이름 합치기는 같은 키끼리 더함', async () => {
+  installFigma();
+  const { mergeSameNameTokens, libSameSplit } = await import('../dist/pure.mjs');
+  const tx = text('Hi', { id: 'tx', fills: [solid('#101828')], lineHeight: { unit: 'AUTO' }, letterSpacing: { unit: 'PIXELS', value: 0 } });
+  const fr = frame({ id: 'fr2', fills: [solid('#101828')], effects: [{ ...SHADOW, color: { ...hexToRgb('#101828'), a: 1 } }] });
+  const raw = extractFromSelection([tx, fr]).tokens;
+  // 추출은 칠(color)과 그림자 색(effectColor)을 따로 토큰으로 — 칠 쪽은 글자 · 프레임 묶음이 나뉜다
+  assert.deepEqual(raw.find((tk) => tk.category === 'color').freeBy, { 'ALL_FILLS|TEXT_FILL': 1, 'ALL_FILLS|FRAME_FILL': 1 });
+  assert.deepEqual(raw.find((tk) => tk.category === 'effectColor').freeBy, { EFFECT_COLOR: 1 });
+  const tokens = mergeSameNameTokens(raw);
+  assert.deepEqual(fbOf(tokens, 'color/101828'), { 'ALL_FILLS|TEXT_FILL': 1, 'ALL_FILLS|FRAME_FILL': 1, EFFECT_COLOR: 1 });
+  // 채움색과 그림자색이 다른 토큰으로 왔다고 쳐도 합치면 같은 키끼리 더한다
+  const merged = mergeSameNameTokens([
+    { name: 'color/x', category: 'color', value: '#101828', sources: ['fill'], count: 2, freeBy: { 'ALL_FILLS|FRAME_FILL': 2 } },
+    { name: 'color/x', category: 'effectColor', value: '#101828', sources: ['effectColor'], count: 1, freeBy: { 'ALL_FILLS|FRAME_FILL': 1, EFFECT_COLOR: 1 } },
+  ]);
+  assert.deepEqual(merged[0].freeBy, { 'ALL_FILLS|FRAME_FILL': 3, EFFECT_COLOR: 1 });
+  // FRAME_FILL 전용 라이브러리 색 → 프레임 칠 자리는 같은 값, 글자 칠 · 그림자 자리는 남은 자리
+  const lib = [{ type: 'COLOR', value: { kind: 'color', hex: '#101828' }, scopes: ['FRAME_FILL'] }];
+  const sp = libSameSplit(tokens.filter((tk) => tk.name === 'color/101828'), lib);
+  assert.equal(sp.L, 1);
+  assert.equal(sp.n, 2);
+  assert.equal(sp.left.length, 1);
+});

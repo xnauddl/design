@@ -355,6 +355,7 @@ export const STRINGS: Record<string, string> = {
   'v4.noVarsFile': '이 파일엔 아직 변수가 없어요',
   'v4.reading': '선택을 읽는 중…',
   'v4.libOnly': '라이브러리 변수만 써요 · 연결은 피그마 오른쪽 패널에서 해요',
+  'v4.libSame': '라이브러리에 같은 값 {k}곳 — 오른쪽 패널에서 연결해요', // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
   'v4.makeArrow': '변수 만들기 →',
   'v4.find0': '변수 없는 값',
   'v4.findN': '변수 없는 값 {n}곳',
@@ -453,6 +454,7 @@ export const STRINGS: Record<string, string> = {
   'mkc.lockNoSem': '🔒 텍스트 스타일 · 다크 모드',
   'mkc.lockAfter': '🔒 Semantic {r}개',
   'mkc.titleMade': 'Global 변수 {c}개를 만들었어요',
+  'mkc.titleLib': '변수가 안 붙은 값 {n}곳', // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
   'mkc.subAfter': '같은 값을 쓰는 레이어에 연결해요 · Semantic 변수는 유료예요',
   'mkc.link': '{o}곳 연결 →',
   'mkc.noDefault': '기본으로 만들 값이 없어요',

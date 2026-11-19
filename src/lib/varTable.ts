@@ -50,6 +50,8 @@ export interface LibraryVar {
   value?: VarCell;
   /** 모든 모드에서 별칭으로 가리키는 변수 id(간접 사용 판정). */
   aliasTargets: string[];
+  /** 라이브러리 변수의 스코프 — 선택 탭 상태 5의 "라이브러리와 같은 값" 판정(IA v4 §4.1). 없으면(옛 응답) 스코프를 보지 않고 통과. */
+  scopes?: string[];
 }
 
 /** 이름의 그룹 경로(마지막 토막 앞부분). `color/background/default` → `color/background`. 그룹 없으면 ''. */

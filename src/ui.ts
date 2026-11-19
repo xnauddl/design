@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, makeCreatedText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, libSameSplit, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -3341,6 +3341,13 @@ let mkExtractReq = 0;
 let mkReading = false;
 /** 줄 스위치(토큰 이름 → 켬). 같은 토큰 이름이면 다시 읽어도 이어받는다. */
 const mkOn = new Map<string, boolean>();
+/**
+ * 기본 끔(§4.1 상태 5 "만들기 화면 — 그 줄은 기본으로 끔" · §4.3 Global 탭 "기본") — 첫 화면이 상태 5 · 거르는 남긴 카드일 때
+ * 남은 값이 아닌 토큰 이름. mkOn에 적지 않고 들어갈 때 · 추출할 때마다 다시 정한다.
+ */
+const mkOffByLib = new Set<string>();
+/** 사용자가 직접 바꾼 줄(줄 스위치 · 종류 머리 스위치 · 모두 켜기 · 끄기). 잠금 풀림 자동 켬은 표시하지 않는다. */
+const mkTouched = new Set<string>();
 const mkCollapsed = new Set<string>();
 let mkTreeFresh = true;
 /** 만들기 탭(§4.3) — null = 보이는 첫 탭(들어올 때). */
@@ -3381,7 +3388,30 @@ let mkCancelNote = '';
 const mkNextReq = (): number => { const id = ++bindReqSeq; mkOwned.add(id); return id; };
 const mkKind = (tk: DraftToken): MakeKind | undefined => MAKE_KIND_OF[tk.category];
 const mkLocked = (tk: DraftToken): boolean => mkStates[tk.name]?.state === 'manual';
-const mkIsOn = (tk: DraftToken): boolean => !mkLocked(tk) && (mkOn.get(tk.name) ?? true);
+/** 기본 끔을 뺀 켬 — 새 줄 규칙("그 종류가 지금 모두 꺼져 있으면 새 줄 끔")의 판정에 쓴다. */
+const mkOnNoLib = (tk: DraftToken): boolean => !mkLocked(tk) && (mkOn.get(tk.name) ?? true);
+/** 줄이 켜졌는가 — 사용자가 바꾼 값 > 기본 끔(mkOffByLib) > 지금 기본(mkOn에 적힌 기본 · 새 줄 규칙). */
+const mkIsOn = (tk: DraftToken): boolean => !mkLocked(tk) && (mkTouched.has(tk.name) || !mkOffByLib.has(tk.name)) && (mkOn.get(tk.name) ?? true);
+/** 사용자가 줄 켬을 바꿈 — mkOn에 적고 바꾼 줄로 표시한다. */
+function mkSetOn(name: string, on: boolean): void {
+  mkOn.set(name, on);
+  mkTouched.add(name);
+}
+/**
+ * 기본 끔 다시 정하기 — 들어갈 때 · 추출할 때마다 그때 첫 화면 상태로. 첫 화면이 상태 5(만들기 카드가 있든 없든) 또는
+ * 거르는 남긴 카드면 남은 값이 아닌 토큰(글자 종류 제외 — 이미 끔), 아니면(상태 6 · 7 · 첫 화면 상태를 모름) 비운다.
+ */
+function mkRecalcOffByLib(): void {
+  mkOffByLib.clear();
+  if (!baseline || !usageMap) return; // 쓰는 변수 결과 전 · 기준이 바뀐 뒤 결과 전 — 거르지 않는다
+  const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
+  if (!vmTableKnown && !prereqKnown) return;
+  const libs = libDirectNow();
+  if (!libs.length || !(localZero || mcKeep())) return;
+  const toks = mkTokens.filter((tk) => mkKind(tk) !== 'text');
+  const left = new Set(libSameSplit(toks, libs).left.map((tk) => tk.name));
+  for (const tk of toks) if (!left.has(tk.name)) mkOffByLib.add(tk.name);
+}
 const mkGlobalsOn = (): DraftToken[] => mkTokens.filter(mkIsOn);
 const mkSendTokens = (): DraftToken[] => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
 const mkTsName = (s: TextStyleSpec): string => mkTsNames.get(tsSig(s)) ?? s.name;
@@ -3456,7 +3486,8 @@ function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void
   const raw = msg.tokens.map((x) => ({ ...x }));
   huefyTokenColors(raw);
   const prevByKind = new Map<MakeKind, boolean[]>();
-  for (const tk of mkTokens) { const k = mkKind(tk); if (k) prevByKind.set(k, [...(prevByKind.get(k) ?? []), mkIsOn(tk)]); }
+  // 새 줄 규칙의 "모두 꺼짐"은 기본 끔을 빼고 판정한다 — 기본 끔 때문에 새 줄이 mkOn에 끔으로 적혀 상태 6에서도 꺼진 채 남지 않게.
+  for (const tk of mkTokens) { const k = mkKind(tk); if (k) prevByKind.set(k, [...(prevByKind.get(k) ?? []), mkOnNoLib(tk)]); }
   mkTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
   for (const tk of mkTokens) {
     if (mkOn.has(tk.name)) continue;
@@ -3466,6 +3497,7 @@ function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void
     mkOn.set(tk.name, prev ? prev.some(Boolean) : k !== 'text');
   }
   mkFor = baseKey();
+  mkRecalcOffByLib(); // 추출할 때마다 그때 첫 화면 상태로(§4.1 상태 5 "만들기 화면")
   if (!sameBase) mkTreeFresh = true;
   renderMakeScreen();
   mkSendPreview();
@@ -3545,13 +3577,13 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
         else if (st?.state === 'manual') cells.push(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
         return {
           key: `g:${tk.name}`, indent: 24, off: !on, cells, right: [mkLayers(tk.count)],
-          sw: { state: on, disabled: locked, label: t('make.rowAria', { name }), onToggle: () => { mkOn.set(tk.name, !on); mkPreviewSoon(); renderMakeScreen(); } },
+          sw: { state: on, disabled: locked, label: t('make.rowAria', { name }), onToggle: () => { mkSetOn(tk.name, !on); mkPreviewSoon(); renderMakeScreen(); } },
         };
       });
       const hs = headState(list.map((tk) => ({ on: mkIsOn(tk), locked: mkLocked(tk) })));
       items.push({
         key: `gk:${k}`, head: true, name: KIND_HEAD[k], countText: t('tree.count', { n: list.length }), indent: 0, children: rows,
-        sw: { state: hs, label: t('tree.headAria', { name: KIND_HEAD[k] }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
+        sw: { state: hs, label: t('tree.headAria', { name: KIND_HEAD[k] }), onToggle: () => { const to = headToggleTarget(hs); for (const tk of list) if (!mkLocked(tk)) mkSetOn(tk.name, to); mkPreviewSoon(); renderMakeScreen(); } },
       });
     }
   } else if (tab === 'semantic') {
@@ -4018,7 +4050,7 @@ $('makeSemLic').addEventListener('click', () => goToLicense());
 /** 모두 켜기 · 끄기 — 고른 탭의 줄만(잠긴 줄은 그대로, §4.3 도구 줄). */
 function mkSetAll(on: boolean): void {
   if (mkTab === 'ts') { if (on) mkTsOff.clear(); else for (const s of mkTs) mkTsOff.add(tsSig(s)); }
-  else { for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, on); mkPreviewSoon(); }
+  else { for (const tk of mkTokens) if (!mkLocked(tk)) mkSetOn(tk.name, on); mkPreviewSoon(); }
   renderMakeScreen();
 }
 $('makeAllOn').addEventListener('click', () => { mkSetAll(true); $('makeAllOn').focus(); });
@@ -5478,7 +5510,11 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
   renderSelHome();
   // 연결 화면에 들어오면 첫 스위치에 포커스(§4.2) — 목록이 아직 없으면 결과가 그려질 때.
   if (changed && sub === 'bind') { bindFocusPending = true; bindTreeFresh = true; $('bindTree').dataset.focusKey = ''; if (bindPreviewed) renderBindTree(); }
-  if (changed && sub === 'make') { mkFocusPending = true; mkTreeFresh = true; mkTab = null; mkCancelNote = ''; if (!mkRunning && !mkResults) readMake(); else renderMakeScreen(); }
+  if (changed && sub === 'make') {
+    mkFocusPending = true; mkTreeFresh = true; mkTab = null; mkCancelNote = '';
+    mkRecalcOffByLib(); // 들어갈 때마다 그때 첫 화면 상태로 기본 끔을 다시 정한다(입구 셋 모두 — §4.1 상태 5 "만들기 화면")
+    if (!mkRunning && !mkResults) readMake(); else renderMakeScreen();
+  }
   if (changed && sub === 'rename') { renameFocusPending = true; renameTreeFresh = true; renameFor = null; renameNodes = []; readRename(); }
   if (changed && sub === 'structure') {
     // 들어올 때(C-D7 — 원칙, ia-v4 §4.5 "포커스"): 접힌 카드는 먼저 펼치고, 그 모습의 주 버튼(오류 동안은 [다시 시도]), 없으면 ←.
@@ -6043,7 +6079,8 @@ function onUsageResult(msg: Extract<CodeToUi, { type: 'USAGE_RESULT' }>): void {
   if (msg.reqId !== vmUsageReq) return; // 늦게 온 이전 기준의 응답
   vmUsageInFlight = false;
   // 조용한 반영 — 응답이 이전과 같으면 다시 그리지 않는다(스크롤·포커스 행 유지).
-  const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
+  // 값 · 스코프도 본다 — 상태 5 만들기 카드의 "라이브러리와 같은 값" 판정이 쓴다(IA v4 §4.1 "쓰는 변수 결과의 변경 비교").
+  const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => [l.id, l.value ?? null, l.scopes ?? null]), msg.deleted.count]);
   const changed = sig !== vmUsageSig || usageMap === null;
   vmUsageSig = sig;
   if (changed) {
@@ -8097,6 +8134,9 @@ let mcSendBase = '';
 let mcDeferred = false;
 /** 추출 · 미리보기가 ERROR로 끝난 기준 — 카드 자리만 찾기 실패 모습(F-D3). 성공하면 지운다. */
 let mcFailedFor: string | null = null;
+/** 마지막으로 미리보기를 보낸 토큰 집합(이름 · 값)과, 그 응답을 받은 집합 — 지금 보여 줄 집합과 다르면 다시 보낸다(§4.1 "만들기 카드 — 상태 5"). */
+let mcSendSig = '';
+let mcPrevSig = '';
 /** 카드가 아는 법(§4.1 "만든 뒤 카드를 남기는 때") — 성공한 만들기의 기준 · 보낸 토큰 이름(UI 메모리만). */
 let mcMemo: { base: string; names: Set<string> } | null = null;
 /** 보낸 만들기(받을 때 기준이 다르면 기억하지 않는다). */
@@ -8115,13 +8155,26 @@ const mcOwned = new Set<number>();
 const mcNextReq = (): number => { const id = ++bindReqSeq; mcOwned.add(id); return id; };
 /** 고른 토큰 — 만들기 화면 Global 탭의 기본으로 켜지는 것(글자 종류 제외 — §4.3 "기본"). */
 const mcPicked = (): DraftToken[] => mcTokens.filter((tk) => { const k = mkKind(tk); return !!k && k !== 'text'; });
+/** 지금 직접 쓰는 라이브러리 변수(마지막으로 받은 쓰는 변수 결과에서 자리 수 > 0). 결과가 없으면 빈 목록. */
+const libDirectNow = (): LibraryVar[] => (usageMap ? libVars.filter((l) => (usageMap!.get(l.id)?.places ?? 0) > 0) : []);
+/** 라이브러리와 같은 값 거르기(§4.1 "만들기 카드 — 상태 5") — 직접 쓰는 라이브러리 변수가 1개 이상일 때만. 아니면 null(거르지 않음 · freeBy도 보지 않음). */
+function mcLibSplit(): LibSameSplit<DraftToken> | null {
+  const libs = libDirectNow();
+  return libs.length ? libSameSplit(mcPicked(), libs) : null;
+}
+/** 지금 보여 줄 토큰 — 거르면 남은 값, 아니면 고른 토큰(값 줄 · g · k · 미리보기 · 만들기가 이 집합으로). */
+const mcShown = (): DraftToken[] => mcLibSplit()?.left ?? mcPicked();
+/** 토큰 집합의 표시(이름 · 값 · 투명도) — 미리보기를 다시 보낼지 견준다. */
+const mcSigOf = (toks: readonly DraftToken[]): string => JSON.stringify(toks.map((tk) => [tk.name, tk.value, tk.alpha ?? 1]));
+/** 추출 중인가(같은 기준 다시 읽기 포함) — 미리보기를 기다리는 동안은 아니다. */
+const mcExtracting = (): boolean => mcInFlight && mcPreviewReq === 0;
 /** 줄 상태 — 만든 직후의 토큰은 다시 읽기 전까지 reuse(§4.1 "만든 직후"). */
 const mcState = (name: string): TokenState['state'] | undefined => (mcJust.has(name) ? 'reuse' : mcStates[name]?.state);
 const mcRemembered = (name: string): boolean => !!mcMemo && mcMemo.base === baseKey() && (mcMemo.names.has(name) || mcJust.has(name));
 /** c = 기억한 토큰 가운데 지금 reuse인 수(F-D2 · F-D8). */
 const mcMadeCount = (): number => mcTokens.filter((tk) => mcRemembered(tk.name) && mcState(tk.name) === 'reuse').length;
 /** 무료 g = 고른 토큰 가운데 new인 수. */
-const mcNewTokens = (): DraftToken[] => mcPicked().filter((tk) => mcState(tk.name) === 'new');
+const mcNewTokens = (): DraftToken[] => mcShown().filter((tk) => mcState(tk.name) === 'new');
 /** 남기는 조건(§4.1) — 무료 · 같은 기준 · 기억한 토큰 하나 이상이 reuse(c ≥ 1). */
 function mcKeep(): boolean {
   if (isPaid || !mcMemo || !baseline || mcMemo.base !== baseKey()) return false;
@@ -8158,7 +8211,18 @@ function mcTakes(msg: CodeToUi): boolean {
     if (rid === mcExtractReq || rid === mcPreviewReq) {
       // 추출 · 미리보기 실패 — 카드 자리만 찾기 실패 모습. 찾기 결과 · 남긴 카드의 기억은 지우지 않는다(F-D3).
       mcInFlight = false;
-      if (mcSendBase === baseKey()) mcFailedFor = mcSendBase;
+      const extractFailed = rid === mcExtractReq && mcPreviewReq === 0;
+      // 남은 값이 0으로 확정된 뒤의 미리보기 실패(상태 5 — 거르기 전 고른 토큰 모두로 보낸 미리보기)는 무시한다(§4.1 상태 5 "실패" ②).
+      if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && mcLibSplit() && !mcShown().length) {
+        mcPrevFor = mcFor;
+        mcPrevSig = mcSigOf([]);
+        renderSelHome();
+        return true;
+      }
+      if (mcSendBase === baseKey()) {
+        mcFailedFor = mcSendBase;
+        if (extractFailed) mcFor = null; // 이 기준의 추출 결과가 없다 — 같은 값 줄 없음 · 다시 읽는 중 카드는 제목 없이(상태 5 "실패" ①)
+      }
       renderSelHome();
     } else if (rid === mcCreateReq) {
       // 만들기 실패 — 기억하지 않고 줄 · 숫자는 그대로, 공통 상태 줄 "변수 만들기 실패 · [보기]"(최소화가 아닐 때도).
@@ -8176,26 +8240,51 @@ function onMcExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
   huefyTokenColors(raw); // 값 줄 이름 · 보내는 토큰은 만들기 화면과 같은 정리 뒤 토큰(§4.3 "추출 뒤 정리")
   mcTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
   mcFor = mcSendBase;
-  const picked = mcPicked();
-  if (!picked.length) { // 추출 0개 · 고른 토큰 0개 — 미리보기 없음
+  const shown = mcShown();
+  if (!shown.length) { // 추출 0개 · 고른 토큰 0개 · (상태 5) 남은 값 0개 — 미리보기 없음
     mcStates = {};
     mcR = 0;
     mcG = 0;
     mcPrevFor = mcFor;
+    mcPrevSig = mcSigOf([]);
     mcInFlight = false;
     mcFailedFor = null;
     renderSelHome();
     return;
   }
+  mcSendPreview(shown);
+  renderSelHome(); // 상태 5 — 같은 값 줄 · 만들기 카드(읽는 중)는 추출 결과가 오면 그린다
+}
+/** 카드 미리보기 — 지금 보여 줄 토큰 집합으로(상태 5 · 거르는 남긴 카드는 남은 값). 무엇을 보냈는지 기억한다. */
+function mcSendPreview(toks: DraftToken[]): void {
+  mcSendSig = mcSigOf(toks);
+  mcInFlight = true;
+  mcSendBase = baseKey();
   mcPreviewReq = mcNextReq();
   opSilent = true;
   // 무료도 globalOnly 없이 — r(roles)이 유료 주 버튼 · 무료 🔒 줄에 쓰인다(§4.3 "무료 — 무료 규칙 PR 뒤").
-  send({ type: 'CREATE_TOKENS', tokens: picked, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq });
+  send({ type: 'CREATE_TOKENS', tokens: toks, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq });
   opSilent = false;
+}
+/**
+ * 보여 줄 집합이 마지막으로 미리보기한 집합과 다르면 다시 보낸다 — 무엇 때문이든(상태 5 ↔ 6 · 라이브러리 집합 · 값 · 스코프 ·
+ * 남긴 카드의 거르기 켜짐/꺼짐, §4.1 "미리보기 · 만들기 토큰"). 보여 줄 집합이 비면 보내지 않고 기억만 바꾼다. true = 아직 맞지 않음(읽는 중).
+ */
+function mcResync(): boolean {
+  const base = baseKey();
+  if (mcFor !== base || mcPrevFor !== base || mcFailedFor === base) return false;
+  if (mcInFlight) return true;
+  const shown = mcShown();
+  const sig = mcSigOf(shown);
+  if (sig === mcPrevSig) return false;
+  if (!shown.length) { mcPrevSig = sig; mcG = 0; mcR = 0; return false; }
+  mcSendPreview(shown);
+  return true;
 }
 function onMcPreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
   mcInFlight = false;
   if (mcSendBase !== baseKey()) return;
+  mcPrevSig = mcSendSig;
   mcStates = msg.tokenStates ?? {};
   mcG = msg.created + msg.updated;
   mcR = msg.roles ?? 0;
@@ -8237,9 +8326,9 @@ function onMcCreated(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
   }
   renderSelHome();
 }
-/** 보이는 값 줄 — 고른 토큰을 레이어 수 많은 순(같으면 추출 순서)으로 최대 4개. */
+/** 보이는 값 줄 — 보여 줄 토큰(거르면 남은 값)을 레이어 수 많은 순(같으면 추출 순서)으로 최대 4개. */
 function mcRows(): DraftToken[] {
-  return mcPicked().map((tk, i) => ({ tk, i })).sort((a, b) => (b.tk.count ?? 0) - (a.tk.count ?? 0) || a.i - b.i).slice(0, 4).map((x) => x.tk);
+  return mcShown().map((tk, i) => ({ tk, i })).sort((a, b) => (b.tk.count ?? 0) - (a.tk.count ?? 0) || a.i - b.i).slice(0, 4).map((x) => x.tk);
 }
 /** 카드 버튼의 쓰기 잠금 · 읽기 잠금(쓰기 잠금 사유가 먼저 — §4.6). */
 function mcWriteLock(): string | null {
@@ -8247,15 +8336,19 @@ function mcWriteLock(): string | null {
   const other = otherWriteOp();
   return other ? t('bind.waitOp', { op: other }) : null;
 }
-/** 만들기 카드 — 상태 6(keep = 남긴 카드: 상태 7의 카드 1 자리). */
-function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean): void {
+/**
+ * 만들기 카드 — 상태 6(keep = 남긴 카드: 상태 7의 카드 1 자리).
+ * lib = 상태 5(라이브러리 변수를 쓸 때 — §4.1 "만들기 카드 — 상태 5"): 제목 "변수가 안 붙은 값 {n}곳" · 텍스트 스타일 줄은 안내 카드에 ·
+ * 추출 0개 · 고른 토큰 0개 모습 없음(부르는 쪽이 남은 값 ≥ 1일 때만 부른다). n = null이면 이 기준의 추출 결과가 없음(추출 실패).
+ */
+function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n: number | null }): void {
   const base = baseKey();
   const c = keep ? mcMadeCount() : 0;
-  const title = keep ? t('mkc.titleMade', { c }) : t('v4.noVarsFile');
+  const title = keep ? t('mkc.titleMade', { c }) : lib ? (lib.n != null ? t('mkc.titleLib', { n: lib.n }) : t('v4.reading')) : t('v4.noVarsFile');
   const findHere = selFindFor === base && !selFindInFlight;
   // 추출 · 미리보기 실패(F-D3) — 카드 자리만 "선택을 읽지 못했어요 · [다시 읽기]". 거기서 시작한 다시 읽기는 읽는 중 카드(F-D13).
   if (mcFailedFor === base) {
-    if (mcInFlight) { put(selCard({ title, subs: [t('v4.reading')] })); return; }
+    if (mcInFlight) { put(lib && lib.n == null ? selCard({ title }) : selCard({ title, subs: [t('v4.reading')] })); return; }
     const rd = selBtn(t('v4.reread'), () => {
       // 찾기 결과가 지금 기준의 것이면 추출 + 미리보기만(F-D6), 없으면 찾기도(F-D12).
       if (selFindFor !== base) { requestManagerUsage('user'); readSelFind(true, true); }
@@ -8266,10 +8359,12 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean): void {
     put(selCard({ title: t('mkc.readFailed'), actions: [rd] }));
     return;
   }
-  const ready = mcFor === base && mcPrevFor === base;
+  // 보여 줄 집합이 마지막으로 미리보기한 집합과 다르면 다시 보낸다(§4.1 상태 5 "미리보기 · 만들기 토큰") — 그동안 읽는 중.
+  const resending = mcResync();
+  const ready = mcFor === base && mcPrevFor === base && !resending;
   // 기억이 없는 카드는 결과 전 · 같은 기준을 조용히 다시 읽는 동안 제목 + "선택을 읽는 중…"만(라벨 · 값 줄 · 버튼 · 🔒 줄 없음).
   if (!keep && (!ready || mcInFlight)) { put(selCard({ title, subs: [t('v4.reading')] })); return; }
-  const reading = mcInFlight; // 남긴 카드 다시 읽기 — 예전 줄 · 숫자를 둔 채 버튼만 잠근다(F-D14)
+  const reading = mcInFlight; // 남긴 카드 다시 읽기 · 다시 보낸 미리보기 — 예전 줄 · 숫자를 둔 채 버튼만 잠근다(F-D14)
   const writeLock = mcWriteLock() ?? (mcCreateReq ? t('bind.waitOp', { op: t('op.makeCard') }) : null);
   const lockBtn = (b: HTMLButtonElement): HTMLButtonElement => { setWait(b, writeLock ?? (reading ? t('v4.reading') : null)); return b; };
   const card = document.createElement('div');
@@ -8282,7 +8377,7 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean): void {
   const tsLine = (hasMain: boolean): void => {
     // 텍스트 스타일만 연결하기(§4.1) — 카드 맨 아래. 만들기 · 연결 버튼이 있으면 보조, 없으면 주 버튼. 다시 읽는 동안 뺀다.
     const n = bindPreviewed && findHere ? tsAllNodes().size : 0;
-    if (!n || reading) return;
+    if (!n || reading || lib) return; // 상태 5는 텍스트 스타일 줄을 안내 카드에 둔다(한 화면에 같은 줄은 한 번)
     const row = document.createElement('div');
     row.className = 'mk-ts';
     const l = document.createElement('span');
@@ -8314,8 +8409,8 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean): void {
     if (right) d.appendChild(right);
     card.appendChild(d);
   };
-  // 추출 0개 · 고른 토큰 0개 — 라벨 · 값 줄 · 버튼 · 🔒 줄 없이(무료 · 유료 같음).
-  const picked = mcPicked();
+  // 추출 0개 · 고른 토큰 0개 — 라벨 · 값 줄 · 버튼 · 🔒 줄 없이(무료 · 유료 같음). 보여 줄 토큰은 거르면 남은 값(상태 5 · 거르는 남긴 카드).
+  const picked = mcShown();
   if (!mcTokens.length) { sub([t('make.zero')]); tsLine(false); put(card); return; }
   if (!picked.length) { sub([`${t('mkc.noDefault')} · `, more(mcTokens.length)]); tsLine(false); put(card); return; }
   const newToks = mcNewTokens();
@@ -8464,12 +8559,21 @@ function renderSelHome(): void {
   if (localZero) {
     mcKick(); // 만들기 카드 읽기는 쓰는 변수 결과를 기다리지 않는다(§4.1 "읽기")
     if (!usageReady) { put(reading()); return finishSelFocus(hadFocus); }
-    const libDirect = libVars.filter((l) => (usageMap?.get(l.id)?.places ?? 0) > 0);
+    const libDirect = libDirectNow();
     if (libDirect.length) {
+      // 상태 5(§4.1 "만들기 카드 — 상태 5") — 안내 카드(같은 값 줄 → 텍스트 스타일 줄) → 남은 값 ≥ 1이면 만들기 카드 → 쓰는 변수 → 카드 3.
+      const base = baseKey();
+      const split = mcFor === base ? mcLibSplit() : null; // 이 기준의 추출 결과가 오기 전에는 판정하지 않는다
+      // 만들기 카드 자리: 추출 · 미리보기 실패 모습(남은 값을 모르거나 ≥ 1), 아니면 남은 값 ≥ 1일 때만. 추출 결과 전에는 없음.
+      const makeShown = mcFailedFor === base ? !split || split.left.length > 0 : !!split && split.left.length > 0;
       const subs: (string | Node)[] = [];
       const actions: HTMLElement[] = [];
-      tsOnlyExtra(subs, actions);
+      // 같은 값 줄 — 추출 결과가 온 뒤 · 같은 기준을 다시 추출하는 동안은 뺀다.
+      if (split && split.L > 0 && !mcExtracting()) subs.push(t('v4.libSame', { k: split.L }));
+      // 텍스트 스타일 줄 — 찾기만 실패하면 뺀다(안내 카드는 그대로, 상태 5 "실패" ③). 만들기 카드가 보이면 [{t}곳 연결]은 보조.
+      if (!bindFindFailed) tsOnlyExtra(subs, actions, makeShown);
       put(selCard({ title: t('v4.libOnly'), subs, actions }));
+      if (makeShown) renderMakeCard(put, false, { n: split ? split.n : null });
       renderUsesCard(put);
     } else {
       // 상태 6 — 만들기 카드(§4.1, 무료 규칙 F3). 할 일 [변수 만들기]는 상태 6에서 늘 보조.
@@ -8516,11 +8620,12 @@ function mcKick(): void {
   queueMicrotask(() => { if (!mcInFlight && mcFor !== baseKey()) { mcRead(); if (mcInFlight) renderSelHome(); } });
 }
 /** 텍스트 스타일만 연결하기(§4.1) — 5 · 6번 카드와 noTier 카드 1 안에 "텍스트 스타일 {t}곳" + [{t}곳 연결]. */
-function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[]): void {
+function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[], secondary = false): void {
   const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
   if (!n) return;
   subs.push(t('v4.tsPlaces', { t: n }));
-  const b = selBtn(t('v4.linkN', { n }), (el) => { showSelSub('bind', el); }, !actions.length);
+  // secondary — 상태 5에서 만들기 카드가 보이면(읽는 중 · 실패 모습 포함) 보조: 주 버튼은 만들기 카드의 만들기 버튼(§4.1 상태 5).
+  const b = selBtn(t('v4.linkN', { n }), (el) => { showSelSub('bind', el); }, !actions.length && !secondary);
   b.dataset.k = 'tsLink';
   actions.push(b);
 }

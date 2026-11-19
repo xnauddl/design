@@ -15,6 +15,8 @@ import {
   alphaPct,
 } from './tokens';
 import { bgKindOf, colorUse, composeName, paddingProp, pillCorners, radiusName, simpleNumericName, strokeName, type BgKind, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
+import { aspectLocked, colorState, lockedSizeState, nodeFieldState, numAllowed, type SlotState } from './bind'; // 자리 연결 상태 — 연결 찾기와 같은 판정(IA v4 §4.1 "만들기 카드 — 상태 5")
+import { STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes';
 
 interface Accumulator {
   map: Map<string, DraftToken>;
@@ -66,6 +68,21 @@ function colorToken(category: 'color' | 'effectColor', hex: string, alpha: numbe
     : { name: colorTokenName(hex), category, value: hex };
 }
 
+/**
+ * 이 add가 나타내는 자리(IA v4 §4.1 "만들기 카드 — 상태 5") — 연결 찾기(bind.ts)가 자리를 만드는 단위로 센다.
+ * key = 허용 스코프 묶음 키, free = 그 가운데 변수가 안 붙은 자리 수(0이면 묶음만 만들지 않고 freeBy만 연다).
+ */
+interface Place {
+  key: string;
+  free: number;
+}
+/** 허용 스코프 묶음 키 — 스코프를 `|`로 잇는다(DraftToken.freeBy의 키). */
+const scopeKey = (allowed: readonly string[]): string => allowed.join('|');
+/** 붙은 자리인가 — 어떤 변수든(라이브러리 · 삭제된 변수) 붙어 있으면 bound · deleted. */
+const isFree = (st: SlotState): boolean => st === 'none';
+/** 한 값 속성 자리 하나(간격 · 여백 · 선 두께 · 투명도 · 크기 축) — 스코프는 필드별 numAllowed. */
+const fieldPlace = (node: SceneNode, field: string, places = 1): Place => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) ? places : 0 });
+
 function add(
   acc: Accumulator,
   token: Omit<DraftToken, 'sources'>,
@@ -75,6 +92,8 @@ function add(
   use?: string,
   /** 색 쓰임의 배경 종류(12.4) — 같은 쓰임이라도 배경 종류가 다르면 따로 센다. */
   bg?: BgKind,
+  /** 자리(freeBy) — 만들기 카드 종류(색 · 간격 · 반경 · 크기 · 선 두께 · 투명도)만 준다. 글자 · 그림자 수치는 없음. */
+  place?: Place,
 ): void {
   const k = keyOf(token.category, token.value, token.unit, token.alpha);
   let existing = acc.map.get(k);
@@ -86,6 +105,10 @@ function add(
     acc.map.set(k, existing);
   }
   acc.lastNode.set(k, nodeId);
+  if (place) {
+    const fb = (existing.freeBy ??= {});
+    if (place.free > 0) fb[place.key] = (fb[place.key] ?? 0) + place.free;
+  }
   if (use) {
     const uses = (existing.uses ??= []);
     const u = uses.find((x) => x.name === use && x.bg === bg);
@@ -125,7 +148,9 @@ function collectPaints(
 ): void {
   const nodeId = node.id;
   if (paints === figma.mixed || !Array.isArray(paints)) return;
-  for (const p of paints) {
+  const key = scopeKey(source === 'fill' ? fillScopesFor(node.type) : STROKE_SCOPES);
+  for (let i = 0; i < paints.length; i++) {
+    const p = paints[i];
     if (p.visible === false) continue;
     if (p.type !== 'SOLID') {
       acc.skipped.add(SKIP_GRADIENT); // GRADIENT / IMAGE / VIDEO — 변수 바인딩 불가, 조용히 스킵
@@ -136,7 +161,9 @@ function collectPaints(
     const hex = rgbToHex(p.color);
     const cu = colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node));
     const bgHex = cu === 'text' || cu === 'icon' || cu === 'border' ? backgroundOf(node) : undefined;
-    add(acc, colorToken('color', hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined);
+    // 자리 = 페인트 하나(연결 찾기 bindPaints와 같은 단위) — 그 페인트 · 노드 배열 어느 쪽이든 변수가 붙었으면 붙은 자리.
+    const free = isFree(colorState(p, node, source === 'fill' ? 'fills' : 'strokes', i)) ? 1 : 0;
+    add(acc, colorToken('color', hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined, { key, free });
     // 페인트 불투명도(p.opacity)는 따로 `opacity/…` 토큰으로 만들지 않는다 — OPACITY 스코프는 **레이어** 불투명도 전용.
     // 대신 색 토큰의 투명도(alpha)로 담는다: 색 변수를 붙이면 피그마가 칠 불투명도를 변수 alpha로 맞춘다(§2.11 "색").
   }
@@ -193,25 +220,26 @@ export function gapSkip(node: unknown, field: string): 'no-wrap' | 'space-betwee
 function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | InstanceNode): void {
   if (node.layoutMode === 'NONE') return;
   const pad: Padding = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
-  const gaps: [number, string][] = (['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const).map((f) => [
+  const gaps: [number, string, string][] = (['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const).map((f) => [
     node[f],
     composeName('spacing', paddingProp(f, pad)),
+    f,
   ]);
   if (node.layoutMode === 'GRID') {
     // 그리드 오토레이아웃의 간격은 gridRowGap/gridColumnGap — itemSpacing/counterAxisSpacing은
     // HORIZONTAL/VERTICAL 전용이라 그리드에서는 의미 있는 값을 주지 않는다.
-    gaps.push([node.gridRowGap, simpleNumericName('gridRowGap') as string], [node.gridColumnGap, simpleNumericName('gridColumnGap') as string]);
+    gaps.push([node.gridRowGap, simpleNumericName('gridRowGap') as string, 'gridRowGap'], [node.gridColumnGap, simpleNumericName('gridColumnGap') as string, 'gridColumnGap']);
   } else {
     // 사이 간격 자동(Space between)이면 피그마가 간격을 계산한다 — 저장된 숫자는 화면 값이 아니라
     // 토큰으로 뽑으면 쓰레기(spacing/33·109…)가 된다(IA v3 §2.11, QA #3 불합격 1). padding은 그대로.
-    if (!gapSkip(node, 'itemSpacing')) gaps.push([node.itemSpacing, simpleNumericName('itemSpacing') as string]);
+    if (!gapSkip(node, 'itemSpacing')) gaps.push([node.itemSpacing, simpleNumericName('itemSpacing') as string, 'itemSpacing']);
     // 줄 사이 간격 — 줄바꿈일 때만 쓰이고, 줄 정렬이 Space between이면 같은 이유로 뺀다.
-    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push([node.counterAxisSpacing, simpleNumericName('counterAxisSpacing') as string]);
+    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push([node.counterAxisSpacing, simpleNumericName('counterAxisSpacing') as string, 'counterAxisSpacing']);
   }
-  for (const [g, use] of gaps) {
+  for (const [g, use, field] of gaps) {
     if (typeof g === 'number' && g > 0) {
       const v = round(g);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id, use);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id, use, undefined, fieldPlace(node, field));
     }
   }
 }
@@ -345,12 +373,22 @@ function collectSize(acc: Accumulator, node: SceneNode): void {
   if (!inAutoLayoutFlow(node)) return;
   // Fixed인 축만 토큰화 — HUG/FILL은 계산된 동적 크기라 디자인 토큰이 아님.
   // 정수만 — 343.5처럼 자유 리사이즈로 남은 소수 값은 의도된 척도가 아님.
-  const addSize = (v: number) => {
+  // 자리 = 축 하나. 비율이 잠긴 레이어는 한 자리(연결 찾기 bindFrame — lockedSizeState): 첫 FIXED 축만 자리로 센다.
+  const locked = aspectLocked(node);
+  let lockedTaken = false;
+  const addSize = (v: number, field: 'width' | 'height') => {
     const rv = round(v);
-    if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size', node.id, `size/${isIconSelf(node) ? 'icon' : 'avatar'}`);
+    if (!(rv > 0 && Number.isInteger(rv))) return;
+    let place: Place;
+    if (!locked) place = fieldPlace(node, field);
+    else {
+      place = { key: scopeKey(numAllowed(field)), free: !lockedTaken && isFree(lockedSizeState(node).state) ? 1 : 0 };
+      lockedTaken = true;
+    }
+    add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size', node.id, `size/${isIconSelf(node) ? 'icon' : 'avatar'}`, undefined, place);
   };
-  if (node.layoutSizingHorizontal === 'FIXED') addSize(node.width);
-  if (node.layoutSizingVertical === 'FIXED') addSize(node.height);
+  if (node.layoutSizingHorizontal === 'FIXED') addSize(node.width, 'width');
+  if (node.layoutSizingVertical === 'FIXED') addSize(node.height, 'height');
 }
 
 /* ---------- radius ---------- */
@@ -368,7 +406,9 @@ function collectRadius(acc: Accumulator, node: SceneNode): void {
   for (const [c, rv] of list) {
     if (rv > 0) {
       const v = round(rv);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, radiusName(c, named));
+      // 자리 = 모서리 하나(연결 찾기 bindRadius는 같은 반경이어도 모서리 4자리) — 하나로 셀 때는 안 붙은 모서리 수.
+      const place: Place = r === figma.mixed ? fieldPlace(node, c) : { key: scopeKey(numAllowed(c)), free: corners.filter((cc) => isFree(nodeFieldState(node, cc))).length };
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, radiusName(c, named), undefined, place);
     }
   }
 }
@@ -388,7 +428,8 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   for (const [field, wv] of widths) {
     if (wv > 0) {
       const v = round(wv);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, strokeName(field, sideValues));
+      // 자리 = strokeWeight 하나 또는 방향별 하나씩(연결 찾기 bindStroke — strokeWeight는 한 방향이라도 붙었으면 붙음).
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, strokeName(field, sideValues), undefined, fieldPlace(node, field));
     }
   }
 }
@@ -399,19 +440,23 @@ function collectOpacity(acc: Accumulator, node: SceneNode): void {
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
   const v = round(o);
-  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, simpleNumericName('opacity') as string);
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, simpleNumericName('opacity') as string, undefined, fieldPlace(node, 'opacity'));
 }
 
 /* ---------- effects ---------- */
 function collectEffects(acc: Accumulator, node: SceneNode): void {
   if (!('effects' in node)) return;
-  for (const e of (node as { effects: readonly Effect[] }).effects) {
+  const effects = (node as { effects: readonly Effect[] }).effects;
+  for (let i = 0; i < effects.length; i++) {
+    const e = effects[i];
     if (e.visible === false) continue;
     if (e.type === 'DROP_SHADOW' || e.type === 'INNER_SHADOW') {
       const alpha = roundAlpha(e.color.a);
       if (alpha === 0) continue; // 보이지 않는 그림자 — 숨긴 효과처럼 건너뜀
       const hex = rgbToHex(e.color);
-      add(acc, colorToken('effectColor', hex, alpha), 'effectColor', node.id, 'color/shadow');
+      // 자리 = 효과 하나(연결 찾기 bindEffects). 그림자 수치(effectFloat)는 만들기 카드 종류가 아니라 자리를 세지 않는다.
+      const free = isFree(colorState(e, node, 'effects', i)) ? 1 : 0;
+      add(acc, colorToken('effectColor', hex, alpha), 'effectColor', node.id, 'color/shadow', undefined, { key: scopeKey(EFFECT_SCOPES), free });
       for (const [g, val] of [
         ['shadow-blur', e.radius],
         ['shadow-spread', e.spread ?? 0],

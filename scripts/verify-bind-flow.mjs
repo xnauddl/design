@@ -20,6 +20,7 @@
     14 컴포넌트(베타): 언제나 하위 탭 셋 · [베타] 배지 · 접근성 이름 · 준비 현황 각주 없음 · 켜기 체크박스 없음 · End
     23 UX 검수 C(IA v4 §4.3a · B.14): 색 Layer · 빈 상태 잠금 · 주 버튼 · 팔레트 띠 · 컴포넌트 문구 · 머리 띠
     25 라이선스 구매 버튼(IA v4 §4.10 · B.21): 늘 보임 · 자리표시자면 잠금 · 티어별 글 · 툴팁 꼬리
+    30 상태 5 만들기 카드(IA v4 §4.1 · B.30): 남은 값 · 같은 값 줄 · 추출 전 · 실패 · 미리보기 다시 보냄 · 만들기 화면 기본 끔
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -2943,6 +2944,234 @@ async function fillBoth(p) {
   await p.keyboard.up('Meta');
   await p.waitForTimeout(30);
   check('29 ⌘+Enter(실행)는 조작 — 메시지를 지움', !(await actionShown()));
+  await p.close();
+}
+
+/* ---------- 30 상태 5 만들기 카드(IA v4 §4.1 "만들기 카드 — 상태 5" · B.30) ---------- */
+const LIB30 = [
+  { id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [], scopes: ['ALL_SCOPES'] },
+  { id: 'LS8', name: 'core/space/8', collection: 'Core', type: 'FLOAT', value: { kind: 'number', text: '8' }, aliasTargets: [], scopes: ['GAP'] },
+];
+const usage30 = (reqId, libs = LIB30) => usageResult(reqId, Object.fromEntries(libs.map((l) => [l.id, { places: 2, layers: 1 }])), { libraryVars: libs });
+/** 추출 토큰(freeBy = 변수가 안 붙은 자리 — 허용 스코프 묶음별). 남은 값 5개(n = 15) · 같은 값 2개(L = 13) · free 0 하나 · 글자 하나. */
+const T30 = [
+  { name: 'color/101828', category: 'color', value: '#101828', sources: ['fills'], count: 31, freeBy: { 'ALL_FILLS|TEXT_FILL': 5 } },
+  { name: 'color/3366ff', category: 'color', value: '#3366ff', sources: ['fills'], count: 6, freeBy: { 'ALL_FILLS|FRAME_FILL': 4 } }, // 라이브러리 L1과 같은 값(ALL_SCOPES)
+  { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 22, freeBy: { GAP: 9 } }, // 라이브러리 LS8과 같은 값(GAP)
+  { name: 'spacing/4', category: 'gap', value: 4, sources: ['itemSpacing'], count: 18, freeBy: { GAP: 3 } },
+  { name: 'radius/8', category: 'radius', value: 8, sources: ['topLeftRadius'], count: 3, freeBy: { CORNER_RADIUS: 4 } }, // 값은 8이지만 LS8은 GAP 전용 → 남은 값
+  { name: 'opacity/0.5', category: 'opacity', value: 0.5, sources: ['opacity'], count: 1, freeBy: { OPACITY: 1 } },
+  { name: 'stroke-width/1', category: 'strokeWidth', value: 1, sources: ['strokeWidth'], count: 2, freeBy: { STROKE_FLOAT: 2 } },
+  { name: 'spacing/12', category: 'gap', value: 12, sources: ['itemSpacing'], count: 2, freeBy: {} }, // 이미 모두 변수가 붙음(free 0)
+  { name: 'font-size/16', category: 'fontSize', value: 16, sources: ['fontSize'], count: 9 },
+];
+const isLibSame30 = (tk) => tk.name === 'spacing/8' || String(tk.value).toLowerCase() === '#3366ff';
+/** 상태 5로 연다 — 로컬 변수 0개 + 라이브러리 변수 직접 사용. 추출에는 아직 답하지 않는다. */
+async function openLib30({ tier = 'free', usage = true, find = true, prereq = { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 } } = {}) {
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier, unlimited: tier === 'paid', source: 'dev' });
+  await recv(p, prereq);
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['f1'], firstName: 'Flightin website' });
+  await p.waitForTimeout(450);
+  if (usage) await recv(p, usage30((await sent(p, 'SCAN_USAGE')).at(-1).reqId));
+  if (find) {
+    const ap = (await sent(p, 'APPLY')).at(-1);
+    if (ap) await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2 } } });
+    const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+    if (pt) await recv(p, tsPrev(pt.reqId));
+  }
+  await p.waitForTimeout(40);
+  return p;
+}
+/** 아직 답하지 않은 미리보기에 모두 답한다 — 카드가 보여 줄 집합이 바뀌어 다시 보내면 그것에도(최대 3번). 지난 reqId 응답은 화면이 버린다. */
+async function settle30(p) {
+  const done = new Set();
+  for (let i = 0; i < 3 && !(await p.$('[data-k="mkAll"]')); i++) {
+    for (const pv of (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview && !done.has(m.reqId))) {
+      done.add(pv.reqId);
+      await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: pv.tokens.length, updated: 0, summary: '', roles: 4, skippedManual: 0, tokenStates: Object.fromEntries(pv.tokens.map((tk) => [tk.name, { state: 'new' }])), roleRows: [] });
+    }
+    await p.waitForTimeout(40);
+  }
+}
+const titles30 = (p) => p.$$eval('#selCards .sel-card', (e) => e.map((x) => x.querySelector('.t')?.textContent ?? ''));
+const guideSubs30 = (p) => p.$eval('#selCards .sel-card', (e) => [...e.querySelectorAll('.s')].map((x) => x.textContent));
+/** 만들기 화면 Global 탭 — 켜진 줄의 토큰 이름(data-tkey "g:{이름}"). */
+const mkOnRows30 = (p) => p.$$eval('#makeTree [data-tkey^="g:"]', (e) => e.filter((r) => r.querySelector('.bv-switch')?.getAttribute('aria-checked') === 'true').map((r) => r.dataset.tkey.slice(2)));
+/** 만들기 화면에 들어가 추출에 답하고, 이어 보낸 미리보기(켠 줄)를 돌려준다. */
+async function enterMake30(p, how, tokens = T30) {
+  const before = (await sent(p, 'EXTRACT')).length;
+  if (how === 'more') await p.click('[data-k="mkMore"]');
+  else await p.click('#btnGoMake');
+  await p.waitForTimeout(40);
+  const exs = await sent(p, 'EXTRACT');
+  const ex = exs.at(-1);
+  if (exs.length > before) await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens });
+  await p.waitForTimeout(40);
+  return (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+}
+/** ← 로 첫 화면에 돌아와 쓰는 변수를 다시 받는다(libs = 직접 쓰는 라이브러리 변수 — []면 상태 6). */
+async function backHome30(p, libs) {
+  await p.click('#btnSubBack');
+  await p.waitForTimeout(40);
+  const u = (await sent(p, 'SCAN_USAGE')).at(-1);
+  await recv(p, usage30(u.reqId, libs));
+  await p.waitForTimeout(40);
+}
+{
+  // ① · ⑤ · ⑥ · ⑩ — 상태 5 + 라이브러리와 다른 날값
+  const p = await openLib30();
+  // ④ 추출 결과 전 — 만들기 카드 없음 · 같은 값 줄 없음(상태 6처럼 "선택을 읽는 중…" 카드를 먼저 두지 않는다)
+  const t0 = await titles30(p);
+  check('30 ④ 상태 5 · 추출 결과 전 → 만들기 카드 없음 · 같은 값 줄 없음', t0.length === 2 && t0[0] === '라이브러리 변수만 써요 · 연결은 피그마 오른쪽 패널에서 해요' && !t0.some((x) => x.startsWith('변수가 안 붙은 값')) && (await guideSubs30(p)).length === 0, JSON.stringify(t0));
+  const pv = await cardAnswer(p, T30);
+  check('30 미리보기 — 남은 값만(라이브러리와 같은 값 · free 0 · 글자 빼고)', !!pv && pv.tokens.length === 5 && !pv.tokens.some(isLibSame30) && !pv.tokens.some((tk) => tk.name === 'spacing/12' || tk.category === 'fontSize'), JSON.stringify(pv?.tokens?.map((tk) => tk.name)));
+  const t1 = await titles30(p);
+  check('30 ① 카드 순서 — 안내 카드 · 만들기 카드 "변수가 안 붙은 값 15곳" · 쓰는 변수 카드(서로 형제)', t1.length === 3 && t1[0].startsWith('라이브러리 변수만 써요') && t1[1] === '변수가 안 붙은 값 15곳' && t1[2].startsWith('쓰는 변수'), JSON.stringify(t1));
+  check('30 ① 안내 카드 둘째 줄 "라이브러리에 같은 값 13곳 — 오른쪽 패널에서 연결해요"', JSON.stringify(await guideSubs30(p)) === JSON.stringify(['라이브러리에 같은 값 13곳 — 오른쪽 패널에서 연결해요']), JSON.stringify(await guideSubs30(p)));
+  const rows = await cardRows(p);
+  check('30 ① 값 줄 — 남은 값 4줄(라이브러리와 같은 값 없음) · [외 1개 보기] · [Global 5개 모두 만들기]', rows.length === 4 && !rows.some((r) => r.includes('spacing/8 ') || r.startsWith('#3366FF')) && (await p.textContent('[data-k="mkMore"]')) === '외 1개 보기' && (await p.textContent('[data-k="mkAll"]')) === 'Global 5개 모두 만들기', JSON.stringify(rows));
+  check('30 ① 주 버튼 하나(만들기 카드) · 할 일 [변수 만들기]는 보조', (await primaries(p)) === 1 && (await p.$eval('[data-k="mkAll"]', (b) => b.classList.contains('primary'))) && !(await makeHot(p)));
+  check('30 ① 카드 안 카드 0', (await nestedCards(p)).length === 0, (await nestedCards(p)).join(' · '));
+  check('30 ① 포커스 대체 = 카드 영역 첫 버튼(만들기 카드의 첫 [＋ 만들기])', await p.evaluate(() => document.querySelector('#selCards button')?.closest('.sel-card')?.querySelector('.t')?.textContent === '변수가 안 붙은 값 15곳'));
+  if (process.env.STATE5_SHOT) {
+    // 화면 시안 대조용(로컬에서만) — 할 일 줄이 화면 아래에 붙어 있어 전체 높이 창으로 찍는다
+    await p.setViewportSize({ width: 480, height: 720 });
+    await p.waitForTimeout(60);
+    await p.screenshot({ path: process.env.STATE5_SHOT });
+    await p.setViewportSize({ width: 480, height: 510 });
+    await p.waitForTimeout(60);
+  }
+  // ⑤ 텍스트 스타일 후보 + 만들기 카드 → [{t}곳 연결]은 안내 카드(같은 값 줄 아래)에 보조
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  await recv(p, tsPrev(pt.reqId, B2_TS, { hasStyle: 1 }));
+  await p.waitForTimeout(60);
+  const g5 = await guideSubs30(p);
+  check('30 ⑤ 상태 5 + 텍스트 스타일 + 만들기 카드 → 안내 카드 [2곳 연결] 보조 · 같은 값 줄 아래 · 만들기 카드에는 없음', !!(await p.$('#selCards .sel-card >> nth=0 >> [data-k="tsLink"]')) && !(await p.$eval('[data-k="tsLink"]', (b) => b.classList.contains('primary'))) && (await primaries(p)) === 1 && g5[0].startsWith('라이브러리에 같은 값') && g5[1] === 'Text Style 2곳' && (await p.$$eval('[data-k="tsLink"]', (e) => e.length)) === 1, JSON.stringify(g5));
+  await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(40);
+  // ⑩ 상태 5에서 [외 1개 보기]로 만들기 화면 → 남은 값이 아닌 줄(라이브러리와 같은 값 · free 0)은 기본 끔
+  const mp1 = await enterMake30(p, 'more');
+  const on1 = await mkOnRows30(p);
+  check('30 ⑩ 상태 5 → [외 1개 보기] → 처음 켜진 줄 = 카드의 남은 값 5개(같은 값 · free 0 · 글자 끔)', on1.length === 5 && !on1.includes('spacing/8') && !on1.includes('spacing/12') && mp1 && mp1.tokens.length === 5 && !mp1.tokens.some(isLibSame30), `${JSON.stringify(on1)} / ${JSON.stringify(mp1?.tokens?.map((tk) => tk.name))}`);
+  check('30 ⑩ 기본 끈 줄도 보이고 켤 수 있음(잠그지 않음)', await p.$eval('#makeTree [data-tkey="g:spacing/8"] .bv-switch', (b) => b.getAttribute('aria-checked') === 'false' && b.getAttribute('aria-disabled') !== 'true' && !b.disabled));
+  // 상태 5 → 6: 라이브러리 연결이 없어진 뒤 [변수 만들기]로 들어가면 모두 켬(글자 빼고)
+  await backHome30(p, []);
+  await enterMake30(p, 'go');
+  const on2 = await mkOnRows30(p);
+  check('30 ⑩ 상태 5에서 들어갔다 나온 뒤 상태 6에서 [변수 만들기] → 모두 켬(8줄 — 글자만 끔)', on2.length === 8, JSON.stringify(on2));
+  // 상태 6 → 5: 사용자가 바꾸지 않은 줄은 다시 꺼짐. 상태 6에서 사용자가 켠 줄(spacing/8 — 껐다 켬)은 켜진 채(한계)
+  await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
+  await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
+  await p.waitForTimeout(20);
+  await backHome30(p, LIB30);
+  await enterMake30(p, 'go');
+  const on3 = await mkOnRows30(p);
+  check('30 ⑩ 상태 6에서 먼저 들어갔다 나온 뒤 상태 5에서 [변수 만들기] → 같은 값 줄 다시 꺼짐(사용자가 안 바꾼 줄)', on3.length === 6 && !on3.includes('spacing/12') && on3.filter((n) => n.startsWith('color/')).length === 1, JSON.stringify(on3));
+  check('30 ⑩ 상태 6에서 사용자가 켠 줄(spacing/8)은 상태 5에서도 켜짐(한계 — 사용자가 바꾼 것이 먼저)', on3.includes('spacing/8'), JSON.stringify(on3));
+  await p.click('#btnSubBack');
+  await p.waitForTimeout(40);
+  await recv(p, usage30((await sent(p, 'SCAN_USAGE')).at(-1).reqId));
+  await p.waitForTimeout(40);
+  // ⑥ 무료 [＋ 만들기] 뒤 상태 7 남긴 카드 — 라이브러리와 같은 값이 줄로 나타나지 않음(상태 6 · 5를 오가며 다시 보낸 카드 미리보기에 먼저 답한다)
+  await settle30(p);
+  await p.click('#selCards .mk-row >> nth=0 >> button');
+  await p.waitForTimeout(20);
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  check('30 ⑥ [＋ 만들기] → 그 토큰 하나(남은 값)', !!cr && cr.tokens.length === 1 && !cr.tokens.some(isLibSame30), JSON.stringify(cr?.tokens?.map((tk) => tk.name)));
+  await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(40);
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 1, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS.slice(0, 1), vars: [{ id: 'nv1', name: cr.tokens[0].name, collectionId: 'g', type: 'COLOR', values: { m: { kind: 'color', hex: '#101828' } }, scopes: [], description: '' }] });
+  const u7 = (await sent(p, 'SCAN_USAGE')).at(-1);
+  await recv(p, usage30(u7.reqId));
+  const ex7 = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex7.reqId, warnings: [], selection: 1, tokens: T30 });
+  await p.waitForTimeout(30);
+  const pv7 = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv7.reqId, preview: true, created: pv7.tokens.length - 1, updated: 0, summary: '', roles: 4, skippedManual: 0, tokenStates: Object.fromEntries(pv7.tokens.map((tk) => [tk.name, tk.name === cr.tokens[0].name ? { state: 'reuse', varName: tk.name } : { state: 'new' }])), roleRows: [] });
+  await p.waitForTimeout(60);
+  const rows7 = await cardRows(p);
+  check('30 ⑥ 상태 7 남긴 카드 — 제목 "Global 변수 1개를 만들었어요" · 라이브러리와 같은 값 줄 없음 · 미리보기도 남은 값만', (await p.textContent('#selCards .sel-card .t')) === 'Global 변수 1개를 만들었어요' && !rows7.some((r) => r.includes('spacing/8 ') || r.startsWith('#3366FF')) && !pv7.tokens.some(isLibSame30) && pv7.tokens.length === 5, `${JSON.stringify(rows7)} / ${JSON.stringify(pv7.tokens.map((tk) => tk.name))}`);
+  await p.close();
+}
+{
+  // ② 날값이 모두 라이브러리와 같음 → 만들기 카드 없음 · 안내 카드 둘째 줄만
+  const p = await openLib30();
+  const before = (await sent(p, 'CREATE_TOKENS')).length;
+  const same = T30.filter((tk) => isLibSame30(tk) || tk.name === 'spacing/12' || tk.category === 'fontSize');
+  await cardAnswer(p, same);
+  const t2 = await titles30(p);
+  check('30 ② 모든 날값이 라이브러리와 같음 → 만들기 카드 없음 · 안내 카드 "라이브러리에 같은 값 13곳 …" · 미리보기 안 보냄', t2.length === 2 && !t2.some((x) => x.startsWith('변수가 안 붙은 값')) && JSON.stringify(await guideSubs30(p)) === JSON.stringify(['라이브러리에 같은 값 13곳 — 오른쪽 패널에서 연결해요']) && (await sent(p, 'CREATE_TOKENS')).length === before, `${JSON.stringify(t2)} / ${JSON.stringify(await guideSubs30(p))}`);
+  check('30 ② 할 일 [변수 만들기]는 보조 그대로', !(await makeHot(p)));
+  // ⑩ 만들기 카드가 없어도 상태 5면 기본 끔 — 켜진 줄 0(같은 값 · free 0 · 글자)
+  const mp0 = await enterMake30(p, 'go', same);
+  check('30 ⑩ 상태 5(만들기 카드 없음) → [변수 만들기] → 켜진 줄 0 · 미리보기 보내지 않음', (await mkOnRows30(p)).length === 0 && (!mp0 || mp0.reqId < (await sent(p, 'EXTRACT')).at(-1).reqId), JSON.stringify(await mkOnRows30(p)));
+  await p.close();
+}
+{
+  // ③ 날값 0(모든 토큰의 freeBy 합 = 0) → 지금과 같음
+  const p = await openLib30();
+  await cardAnswer(p, T30.map((tk) => ({ ...tk, freeBy: {} })));
+  const t3 = await titles30(p);
+  check('30 ③ 날값 0 → 안내 카드(둘째 줄 없음) · 쓰는 변수 카드', t3.length === 2 && t3[1].startsWith('쓰는 변수') && (await guideSubs30(p)).length === 0, JSON.stringify(t3));
+  await p.close();
+}
+{
+  // ⑦ 추출 실패 → 만들기 카드 자리에 실패 카드(같은 값 줄 없음)
+  const p = await openLib30();
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'EXTRACT', reqId: ex.reqId });
+  await p.waitForTimeout(40);
+  const t7 = await titles30(p);
+  check('30 ⑦ 추출 실패 → 안내 카드 · 만들기 카드 자리 "선택을 읽지 못했어요 · [다시 읽기]" · 쓰는 변수 카드 · 같은 값 줄 없음', t7.length === 3 && t7[0].startsWith('라이브러리 변수만 써요') && t7[1] === '선택을 읽지 못했어요' && !!(await p.$('[data-k="mkReread"]')) && t7[2].startsWith('쓰는 변수') && (await guideSubs30(p)).length === 0, JSON.stringify(t7));
+  await p.click('[data-k="mkReread"]');
+  await p.waitForTimeout(30);
+  const t7b = await titles30(p);
+  check('30 ⑦ 실패 모습의 [다시 읽기] → 추출 결과가 없으니 제목 "선택을 읽는 중…"만', t7b[1] === '선택을 읽는 중…' && (await p.$eval('#selCards .sel-card >> nth=1', (e) => e.querySelectorAll('.s').length)) === 0, JSON.stringify(t7b));
+  await p.close();
+}
+{
+  // ⑦ 남은 값 0 확정 뒤 미리보기 실패 → 화면 그대로(추출이 쓰는 변수 결과보다 먼저 와 고른 토큰 모두로 보낸 미리보기)
+  const p = await openLib30({ usage: false });
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: T30.filter(isLibSame30) });
+  await p.waitForTimeout(20);
+  const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  await recv(p, usage30((await sent(p, 'SCAN_USAGE')).at(-1).reqId));
+  await p.waitForTimeout(20);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'CREATE_TOKENS', reqId: pv.reqId });
+  await p.waitForTimeout(40);
+  const t7 = await titles30(p);
+  check('30 ⑦ 남은 값 0 확정 뒤 미리보기 실패 → 실패 카드 없음 · 같은 값 줄 그대로', !!pv && pv.tokens.length === 2 && t7.length === 2 && !t7.includes('선택을 읽지 못했어요') && (await guideSubs30(p))[0] === '라이브러리에 같은 값 13곳 — 오른쪽 패널에서 연결해요', JSON.stringify(t7));
+  await p.close();
+}
+{
+  // ⑧ 상태 5 찾기만 실패 → 안내 카드 · 만들기 카드 그대로
+  const p = await openLib30({ find: false, prereq: { ...PREREQ, hasBindable: true, tierVars: 0, otherVars: 0 } });
+  await cardAnswer(p, T30);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'APPLY', reqId: ap.reqId });
+  await p.waitForTimeout(40);
+  const t8 = await titles30(p);
+  check('30 ⑧ 상태 5 찾기만 실패 → 안내 카드(같은 값 줄 그대로) · 만들기 카드 그대로', !!ap && t8[0].startsWith('라이브러리 변수만 써요') && t8[1] === '변수가 안 붙은 값 15곳' && !!(await p.$('[data-k="mkAll"]')) && (await guideSubs30(p))[0]?.startsWith('라이브러리에 같은 값'), JSON.stringify(t8));
+  await p.close();
+}
+{
+  // ⑨ 라이브러리 변수 값만 바뀐 쓰는 변수 결과 → 미리보기 다시 보냄(보여 줄 집합이 바뀜)
+  const p = await openLib30();
+  await cardAnswer(p, T30);
+  const n0 = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).length;
+  await goTab(p, 'variables');
+  await p.waitForTimeout(40);
+  const changed = [{ ...LIB30[0], value: { kind: 'color', hex: '#101828' } }, LIB30[1]]; // id는 같고 값만 — 이제 #101828이 같은 값, #3366ff가 남은 값
+  await recv(p, usage30((await sent(p, 'SCAN_USAGE')).at(-1).reqId, changed));
+  await goTab(p, 'select');
+  await p.waitForTimeout(60);
+  const pvs = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview);
+  const last = pvs.at(-1);
+  check('30 ⑨ 라이브러리 변수 값만 바뀜 → 미리보기 다시 보냄(#101828 빠지고 #3366ff 들어감) · 그동안 읽는 중', pvs.length === n0 + 1 && last.tokens.some((tk) => String(tk.value).toLowerCase() === '#3366ff') && !last.tokens.some((tk) => tk.value === '#101828') && (await titles30(p))[1].startsWith('변수가 안 붙은 값') && (await p.$eval('#selCards .sel-card >> nth=1', (e) => e.innerText)).includes('선택을 읽는 중…'), JSON.stringify(last?.tokens?.map((tk) => tk.name)));
   await p.close();
 }
 

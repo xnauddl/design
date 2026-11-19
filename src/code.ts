@@ -469,7 +469,7 @@ async function collectUsage(nodeIds: readonly string[] | undefined): Promise<Omi
     out[id] = u;
     const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
     const modeId = col?.defaultModeId ?? Object.keys(v.valuesByMode)[0];
-    libraryVars.push({ id: v.id, name: v.name, collection: col?.name ?? '', type: v.resolvedType as VarType, value: await libCell(modeId ? v.valuesByMode[modeId] : undefined), aliasTargets: [] });
+    libraryVars.push({ id: v.id, name: v.name, collection: col?.name ?? '', type: v.resolvedType as VarType, value: await libCell(modeId ? v.valuesByMode[modeId] : undefined), aliasTargets: [], scopes: [...(v.scopes ?? [])] });
   }
   return { usage: out, libraryVars, deleted: countDeleted(roots, deletedIds), scanned };
 }
