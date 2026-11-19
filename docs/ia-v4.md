@@ -2119,5 +2119,14 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 - [x] 단위 테스트: 실기 파일 구조(헤더 > `gnb` 자유 배치 > `special-nav` · `gnb-menu`, `Breadcrumb`, `Product tabs` > `Divider` · 탭 칸 > `Active tab underline`, 바닥글 `Button`) — "예" 그대로, **같은 트리를 두 번 정리해도 같음**(첫 정리의 `dsRole`을 둔 채). `category-menu` 그대로 · `nav-item`(`dsRole` `item`) · `nav-link` · `button-group` → 힌트 없음 · `tab-list` · `tab-area` → tabs · `btn-wrap` · `divider-box` → 힌트 없음 · `Tab 버튼` → button · `nav 항목` → 힌트 없음 · `GNB 메뉴` → nav · `카테고리메뉴` → 힌트 없음 · 루트 아래에서 정리된 `nav`(키 `focal-nav`) 다시 정리 → 키 남음 · `상품상세탭` → tab · `배송 경로 안내` → 힌트 없음 · `Frame 3`인 1280×1 띠 → `divider` · 1920×76 색 띠 → `swatch` · `Shared storefront navigation` → `header` · `Product tabs` 선택 루트 → 접두사 없음 · `tab-icon`(`dsRole` `icon`) 다시 정리 → 맥락 + `icon`
 - [x] 기존 테스트 기대값 확인 — 바뀌는 것은 사유와 함께 고친다(이름에 힌트 낱말이 있는 픽스처 · 얇은 `swatch` → `divider` 등) · `pure.test.mjs` EMITTED/RECOGNIZED 겹침 테스트 통과
 - [x] 4검사(tsc · `npm test` 772 · `verify:i18n` 0 · `verify-bind-flow` 통과)
-- [ ] 실기 확인(사용자, 피그마 — 원본 `PC_상품상세_FOCAL 유토피아` 복제 → 이름 정리)
+- [x] 실기 확인(사용자, 피그마 — 원본 `PC_상품상세_FOCAL 유토피아` 복제 → 이름 정리) — 2026-11-19 사용자 확인 뒤 #157 병합(f60457f)
 - 구현 메모: 기존 테스트는 B.24 ② ③의 픽스처 이름 `button` 3곳만 바뀜(글자 버튼 판정 `button` = 힌트 → 이름 그대로 · 역할 기록, 전에는 `card-button` · `list/nav-item`). 한글 힌트 낱말은 src 리터럴 한글 금지(terms 5b) 때문에 코드 값(`ko('D0ED')`)으로 적었다. 토막 나누기는 es2017 대상이라 `\p{L}` 대신 라틴 · 그리스 · 키릴 · 한글 · 가나 · 한자 범위 밖 문자로 나눈다. 실기 구조 재현에서 자동 이름 1px 띠 `Frame 3`은 본문 섹션 아래라 루트 접두사가 떼어져 `divider`(맥락 없음)가 된다(지금 `pickScope` 규칙 그대로).
+
+### B.29 #110 검토 결함 고침 (2026-11-19 사용자 지시 — IA v3 PR 1 코드 검토 결과 중 지금 main에 남은 것)
+
+화면 · 문구는 바뀌지 않는다(지금 명세대로 동작하게 고침).
+- [x] ② 사용 수 읽기(`SCAN_USAGE`) 오류 — 진행 중 표시(`vmUsageInFlight`)를 풀고 창 다시 들어옴 보류를 놓는다(`reentry.release`). 레이어 › 연결의 라이브러리 판정 읽기(`layerLibReq`)도 푼다. 알림은 지금처럼 공통 상태 줄. 전에는 오류 한 번 뒤 변수 탭에서 사용 수 갱신 · 다시 들어옴 다시 읽기가 선택을 바꿀 때까지 멈췄다
+- [x] ⑤ 누를 수 있는 상태 줄 메시지 — ⌘ · Ctrl · Alt(조합 키 시작 · 창 전환)는 조작이 아니라 지우지 않는다(§2.8 · ia-v3 §4.1 "지우지 않는 조작")
+- [x] ⑥ `messages.ts` `SET_UI_SIZE` 주석 최소화 크기 140×104
+- [x] verify-bind-flow 블록 29(② · ⑤ — 고치기 전 코드에서 실패 확인) · 4검사
+- 이미 고쳐짐: ① 다시 들어옴 보류(`vmUsageInFlight`로 봄) · ③ 오류는 그 작업만 실패로. 해당 없음: ④ `selectionSummary`는 화면에서 쓰지 않음

@@ -253,7 +253,7 @@ export type UiToCode =
   // applyTo: 바로 연결 — 그 루트 안에서 방금 등록 · 갱신한 스타일과 값이 같은 글자에 붙인다(IA v4 §4.3 "타이포 등록", 같은 ⌘Z).
   | { type: 'CREATE_TEXT_STYLES'; styles: TextStyleSpec[]; reqId?: number; applyTo?: string[] } // Phase C: 변수 보장+스타일 등록
   | { type: 'GET_COLLECTIONS' }
-  | { type: 'SET_UI_SIZE'; mode: 'default' | 'mini' } // IA v3: 최소화(400×48) / 펼치기(400×510), 저장 안 함
+  | { type: 'SET_UI_SIZE'; mode: 'default' | 'mini' } // IA v3: 최소화(140×104) / 펼치기(400×510), 저장 안 함
   | { type: 'GET_PREREQ' } // #11: 단계 전제(변수 존재) 상태 요청
   | { type: 'GET_LICENSE' }
   | { type: 'SET_LICENSE'; tier: Tier } // M1: 개발용 강제 티어(검증 키 없을 때만 적용)

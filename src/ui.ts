@@ -2841,6 +2841,11 @@ window.onmessage = (event: MessageEvent) => {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
       if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       if (msg.op === 'UPDATE_VARIABLE') break;
+      // 사용 수 읽기 실패 — 진행 중 표시를 풀어 다음 읽기 · 창 다시 들어옴 다시 읽기가 막히지 않게(#110 검토 ②). 알림은 아래 공통 상태 줄 그대로.
+      if (msg.op === 'SCAN_USAGE' && msg.reqId != null) {
+        if (msg.reqId === vmUsageReq) { vmUsageInFlight = false; reentry.release(); }
+        if (msg.reqId === layerLibReq) layerLibReq = 0;
+      }
       if (onUnusedError(msg)) break;
       if (onVarOpError(msg)) break;
       if (msg.op === 'PREVIEW_TEXT_STYLES') {
@@ -4963,6 +4968,9 @@ function dismissStickyOnAction(e: Event): void {
   if (e.type === 'keydown') {
     const k = (e as KeyboardEvent).key;
     if (k === 'Tab' || k.startsWith('Arrow') || k === 'Shift' || k === 'Home' || k === 'End' || k === 'PageUp' || k === 'PageDown' || k === 'Escape') return;
+    // ⌘ · Ctrl · Alt(조합 키 시작 · 창 전환)은 조작이 아니다 — 누를 수 있는 메시지를 지우지 않는다(#110 검토 ⑤).
+    const ke = e as KeyboardEvent;
+    if (k === 'Control' || k === 'Meta' || k === 'Alt' || ke.ctrlKey || ke.metaKey || ke.altKey) return;
   }
   clearStatusLine();
 }

@@ -2888,6 +2888,35 @@ async function fillBoth(p) {
   await p.close();
 }
 
+{
+  /* ---------- 29 #110 검토 ② · ⑤ — 사용 수 읽기 오류 뒤에도 다시 읽기 · 조합 키는 상태 줄 버튼을 지우지 않음 ---------- */
+  const p = await open(480, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, sel(1, 0));
+  await p.waitForTimeout(450);
+  const u1 = (await sent(p, 'SCAN_USAGE')).at(-1);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'SCAN_USAGE', reqId: u1.reqId });
+  const n1 = (await sent(p, 'SCAN_USAGE')).length;
+  await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await p.waitForTimeout(600);
+  const n2 = (await sent(p, 'SCAN_USAGE')).length;
+  check('29 사용 수 읽기 오류 뒤 창 다시 들어옴 → 사용 수를 다시 읽음(진행 중 표시가 풀림)', n2 > n1, `${n1} → ${n2}`);
+  await p.evaluate(() => {
+    // 누를 수 있는 메시지([라이선스 →])를 띄운다 — 유료 거절 응답 경로
+    window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' } } }));
+  });
+  await p.waitForTimeout(30);
+  const shown = !(await p.$eval('#statusAction', (b) => b.hidden));
+  await p.keyboard.down('Meta');
+  await p.keyboard.up('Meta');
+  await p.keyboard.down('Control');
+  await p.keyboard.up('Control');
+  await p.waitForTimeout(30);
+  check('29 ⌘ · Ctrl만 눌러도 상태 줄 [라이선스 →]가 남음', shown && !(await p.$eval('#statusAction', (b) => b.hidden)), String(shown));
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);
