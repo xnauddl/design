@@ -950,8 +950,8 @@
 |---|---|---|---|
 | C1 | `profile` | 보이는 자식이 정확히 2개 — 하나는 원형 사진 또는 아바타 같은 인스턴스, 다른 하나는 짧은 한 줄 TEXT이거나 보이는 자식이 모두 TEXT(1–3개)인 FRAME · GROUP. 방향은 보지 않는다 | GROUP [원형 사진 + 이름] · FRAME [아바타 인스턴스 + (이름 · 직함) 글자 묶음 프레임] |
 | C2 | `title-group` | 1차 B2(`text-group`) 조건을 만족하고, **세로로 쌓였고**(세로 오토레이아웃, 또는 오토레이아웃이 아닐 때 맨 위 글자(y가 가장 작음)가 다른 글자와 세로 범위가 겹치지 않음), 맨 위 글자가 제목처럼 — 크기가 나머지 모든 글자의 1.2배 이상, 또는 크기가 같거나 크고 굵기 600 이상인데 나머지가 모두 600 미만. 글자 크기 · 굵기가 섞인 글자(`figma.mixed`)가 하나라도 있으면 아님. 아니면 지금처럼 `text-group` | [제목 32 Bold + 본문 16] |
-| C3 | `pagination` | 가로로 나란히 · 숫자 글자 TEXT가 **2개 이상**이거나 `/`가 든 숫자 글자가 1개 이상 · 나머지 보이는 자식은 모두 아이콘만 또는 화살표 글자 · **숫자 글자는 화면 순서(x)로 가운데에 이어져 있고, 아이콘 · 화살표 글자는 양 끝에만** — 숫자 글자 사이에 아이콘이 하나라도 끼면 아님(좋아요 · 댓글 줄 [♥ 12 💬 34]는 `hstack`) | GROUP · 레이아웃 없는 FRAME [‹ 01 / 03 ›](글자 넷) · [1 2 3 4] · [01 / 03 + 화살표 아이콘 둘](GROUP) |
-| C4 | `links` | 보이는 자식 3개 이상 · 가로로 나란히 · 자식이 모두 짧은 한 줄 TEXT · 글자 버튼(A2) · 구분선(LINE, 또는 `isThin`인 RECTANGLE) 가운데 하나이고 TEXT · 글자 버튼이 3개 이상. 글자가 모두 숫자 글자면 아님(그것은 C3) | 푸터 [이용약관 \| 개인정보 \| 고객센터] · 헤더 메뉴 글자 줄(nav가 아닐 때) |
+| C3 | `pagination` | 가로로 나란히 · 숫자 글자 TEXT가 **2개 이상**이거나 `/`가 든 숫자 글자가 1개 이상 · 나머지 보이는 자식은 모두 아이콘만 또는 화살표 글자, 또는 숫자 글자 사이의 생략 글자(`…` · `...` — 6-2 구현 때 더함, 검토 3회차 사소 (b)) · **숫자 글자는 화면 순서(x)로 가운데에 이어져 있고(가운데 줄은 숫자 글자로 시작하고 끝남), 아이콘 · 화살표 글자는 양 끝에만** — 숫자 글자 사이에 아이콘이 하나라도 끼면 아님(좋아요 · 댓글 줄 [♥ 12 💬 34]는 `hstack`) | GROUP · 레이아웃 없는 FRAME [‹ 01 / 03 ›](글자 넷) · [1 2 3 4] · [1 2 3 … 10] · [01 / 03 + 화살표 아이콘 둘](GROUP) |
+| C4 | `links` | 보이는 자식 3개 이상 · 가로로 나란히 · 자식이 모두 짧은 한 줄 TEXT · 글자 버튼(A2) · 구분선(LINE, 또는 `isThin`인 RECTANGLE) 가운데 하나이고 TEXT · 글자 버튼이 3개 이상. 숫자 글자가 TEXT · 글자 버튼의 절반을 넘으면 아님(페이지 번호 쪽 — C3. 6-2 구현 때 "모두" → "절반 넘게", 검토 3회차 사소 (b)) | 푸터 [이용약관 \| 개인정보 \| 고객센터] · 헤더 메뉴 글자 줄(nav가 아닐 때) |
 | C5 | `icon-group` | 보이는 자식 2개 이상 · 모두 아이콘만 · 가로로 나란히(이 프레임이 아이콘 프레임이면 A1이 먼저 `icon`) | 헤더 [검색 · 장바구니 · 메뉴] 아이콘 인스턴스 3개 |
 | C6 | `button-group` | 보이는 자식 2개 이상 · 모두 버튼(방향은 보지 않는다) | [취소 · 확인] · [로그인 · 회원가입](헤더 끝이면 지금처럼 `actions`가 먼저) |
 
@@ -2092,7 +2092,7 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 - [x] 4검사 · 화면 비교(컴포넌트 카드 지운 전 / 뒤, 유료 · 무료)
 - [ ] 실기 확인(Figma) — 사용자
 
-### B.28 변수 · 이름 생성 규칙 PR의 화면 변화 (2026-11-19 6-2 사용자 결정 1–4 · Q6-2-1–Q6-2-3 · T1–T3 — 체크리스트 · 검사는 ia-v3 A.21) — 대략 시안 · 명세 초안(검토 1회차 반영)
+### B.28 변수 · 이름 생성 규칙 PR의 화면 변화 (2026-11-19 6-2 사용자 결정 1–4 · Q6-2-1–Q6-2-3 · T1–T3 — 체크리스트 · 검사는 ia-v3 A.21) — 구현(2026-11-19) · 실기 대기
 
 이 PR의 코드 · 테스트 · verify 블록은 ia-v3 부록 A.21 하나에 둔다. 이 문서에서 바뀌는 곳과 화면 글만 적는다.
 
@@ -2102,10 +2102,11 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
   - 텍스트 스타일 이름(만들기 Text Style 탭 · [이름 다시 짓기] 팝업): 분류 한 줄만 바뀐다(T1 — 21.5px 이상은 굵기와 상관없이 heading, 보통 굵기는 `-w400` 꼬리). 예: 보통 굵기 24px/140% `body/large-24-140` → `heading/medium-w400-140`. 이미 등록된 스타일은 [이름 다시 짓기] 팝업에서 새 이름이 바꿀 줄로 보인다(앵커라 스캔 줄은 지금 이름 그대로).
   - 연결 화면(⑦) 후보 묶음의 새 Semantic 이름(N 배지 "새 Semantic" 줄)과 선택 탭 카드 1의 수 — 같은 규칙의 새 이름. 모양 · 글 그대로(§4.2 · §4.1).
   - 이름 정리(⑨) 미리보기 트리의 `after` — `container` · `wrapper` 대신 C1–C6 · D 이름(`hstack` · `vstack` · `grid` · `zstack`)(§4.4 "역할 세분화 2차"). 모양 · 글 그대로.
+- **만들기 Text Style 탭의 긴 이름**(6-2 구현 때 확인 — T1 굵기 꼬리로 `heading/medium-w400-140` 같은 긴 이름이 늘어남): 줄 이름 칩은 지금처럼 말줄임(…)이고, 말줄임된 이름에만 전체 이름 툴팁이 붙는다(`ui.ts` `tipTruncatedNames` — 지금 코드). 이름 겹침 글(`make.tsDup` · `make.tsExists`)은 그 툴팁이 지우던 것을 함께 보이게 고쳤다(툴팁 = 전체 이름 + 줄바꿈 + 겹침 글, 말줄임이 아니면 겹침 글만). [이름 다시 짓기] 팝업 줄은 지금도 줄 툴팁 "{from} → {to}"(verify 29).
 - **[이름 다시 짓기] 결과 상태 줄에서 Semantic 변수 꼬리를 없앤다**(ia-v3 §0 "6-2" T3 · `docs/text-style-krds.md` §5.3 — 옛 변수 이름을 함께 바꾸지 않으므로): `ui.ts` `onTsRenamed`(1568–1582)의 " · Semantic 변수 {n}개는 같은 이름이 있어 그대로 뒀어요"(`textStyle.renameRoleSkipped`) · " · Semantic 변수 {n}개는 바꾸지 못했어요"(`textStyle.renameRoleError`) · 툴팁 줄 "되돌리지 못한 변수: {names}"(`textStyle.renameRoleStuck`)와 경고 색 조건의 `roleVarsTaken` · `roleVarsError`를 지운다. 남는 글: "텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기"(`textStyle.renamed`) + 건너뜀 꼬리(`textStyle.renameSkipped`) + 사유 툴팁 — 경고 색은 건너뜀이 있을 때만.
 - **만들기 실행의 텍스트 스타일 알림에서** `textStyle.missRoleStuck`("{name}: Semantic 변수 이름을 되돌리지 못했어요 — {vars}")이 더는 나오지 않는다 — 키를 지운다(등록 0단계의 역할 변수 이름 바꾸기 · 되돌림이 없어짐). `textStyle.missVar`("{name}: 변수 '{var}'이 없어 연결하지 않았어요")의 글은 그대로이고 `{var}`에 새 이름(`font-size/body/large` 등)이 들어간다.
-- [ ] 글(`i18n.ts`): `textStyle.renameRoleSkipped` · `textStyle.renameRoleError` · `textStyle.renameRoleStuck` · `textStyle.missRoleStuck` 지움(`verify:i18n` 미참조 0)
-- [ ] `TS_RENAMED`(`src/shared/messages.ts` 308) · `TsRenameResult`(`variables.ts` 1467–1476)에서 `roleVarsRenamed` · `roleVarsTaken` · `roleVarsError` · `roleVarsStuck` 지움, `code.ts` `APPLY_TS_RENAME`(1623–1631)의 주석 "스타일 · 역할 변수 이름을" → "스타일 이름을"
-- [ ] verify(ia-v3 A.21 8): 블록 19(1468–1471 — `roleVars*`를 보내고 "Semantic 변수 1개는"을 검사)를 새 모양으로 고치고, 새 블록 29를 더한다
-- [ ] 화면 시안(정밀) — 바뀌는 모양이 없으므로 이름 표(전 → 뒤)와 만들기 Semantic 탭 · 이름 정리 트리 · [이름 다시 짓기] 팝업(T1 예)을 실제 이름으로 한 장씩(CLAUDE.md 5번 "바뀐 것이 없으면 짧게")
+- [x] 글(`i18n.ts`): `textStyle.renameRoleSkipped` · `textStyle.renameRoleError` · `textStyle.renameRoleStuck` · `textStyle.missRoleStuck` 지움(`verify:i18n` 미참조 0)
+- [x] `TS_RENAMED`(`src/shared/messages.ts` 308) · `TsRenameResult`(`variables.ts` 1467–1476)에서 `roleVarsRenamed` · `roleVarsTaken` · `roleVarsError` · `roleVarsStuck` 지움, `code.ts` `APPLY_TS_RENAME`(1623–1631)의 주석 "스타일 · 역할 변수 이름을" → "스타일 이름을"
+- [x] verify(ia-v3 A.21 8): 블록 19(1468–1471 — `roleVars*`를 보내고 "Semantic 변수 1개는"을 검사)를 새 모양으로 고치고, 새 블록 29를 더한다
+- [x] 화면 시안(정밀) — 바뀌는 모양이 없으므로 이름 표(전 → 뒤)와 만들기 Semantic 탭 · 이름 정리 트리 · [이름 다시 짓기] 팝업(T1 예)을 실제 이름으로 한 장씩(CLAUDE.md 5번 "바뀐 것이 없으면 짧게")
 - [ ] 실기 확인(Figma) — 사용자

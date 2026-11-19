@@ -3590,7 +3590,8 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       else {
         const chip = varChip(mkTsName(s), 'Aa', undefined, false);
         const c = mkTsConflict(s);
-        if (c) { chip.classList.add('dup'); chip.title = t(c === 'dup' ? 'make.tsDup' : 'make.tsExists'); }
+        // 긴 이름은 말줄임 그대로 — 전체 이름은 말줄임된 이름의 툴팁(tipTruncatedNames)이 보인다(6-2 B.28). 겹침 글은 그 툴팁에 함께.
+        if (c) { chip.classList.add('dup'); chip.dataset.dupTip = t(c === 'dup' ? 'make.tsDup' : 'make.tsExists'); chip.title = chip.dataset.dupTip; }
         chip.addEventListener('dblclick', () => { if (!mkRunning) mkStartEdit(sig); });
         cells.push(chip);
       }
@@ -4217,7 +4218,9 @@ function tipTruncatedNames(root: HTMLElement): void {
     for (const nm of Array.from(root.querySelectorAll<HTMLElement>('.bv-name'))) {
       const chip = nm.parentElement as HTMLElement;
       if (chip.dataset.tip) continue;
-      if (nm.scrollWidth > nm.clientWidth + 1) chip.title = nm.textContent ?? '';
+      const extra = chip.dataset.dupTip; // 텍스트 스타일 이름 겹침 글(만들기 Text Style 탭) — 말줄임 툴팁에 함께, 말줄임이 아니어도 남긴다
+      if (nm.scrollWidth > nm.clientWidth + 1) chip.title = extra ? `${nm.textContent ?? ''}\n${extra}` : nm.textContent ?? '';
+      else if (extra) chip.title = extra;
       else chip.removeAttribute('title');
     }
   });

@@ -881,9 +881,6 @@
     "textStyle.renameRowAria": "{from} \u2192 {to}",
     "textStyle.renamed": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "textStyle.renameSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
-    "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
     "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
     "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
     "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
@@ -891,7 +888,6 @@
     "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
     "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
     "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
-    "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
     "textStyle.missingN": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -998,6 +994,17 @@
   function hasVisibleStroke(node) {
     const s = paintsOf(node, "strokes");
     return !!s && s.some((p) => p.visible !== false);
+  }
+  function isCoveredPaint(paints2, index) {
+    var _a;
+    for (let j = index + 1; j < paints2.length; j++) {
+      const p = paints2[j];
+      if (!p || p.visible === false) continue;
+      if (((_a = p.opacity) != null ? _a : 1) < 1) continue;
+      if (p.type === "SOLID") return true;
+      if ((p.type === "IMAGE" || p.type === "VIDEO") && (p.scaleMode === "FILL" || p.scaleMode === "CROP")) return true;
+    }
+    return false;
   }
 
   // src/lib/tokens.ts
@@ -1391,7 +1398,7 @@
     if (!m) return orig;
     const fam = m[1];
     const step = Number(m[2]);
-    const stepName = `color/${fam}/${step}`;
+    const stepName2 = `color/${fam}/${step}`;
     const plain = m[3] === "";
     if (plain && STEP_LIST.includes(step)) {
       const ownerL = (f == null ? void 0 : f.hex) ? hexToOklch(f.hex).l : stepRefL(step);
@@ -1399,7 +1406,7 @@
       const mid = midSteps(step)[side];
       if (mid != null && !file.has(`color/${fam}/${mid}`) && free(`color/${fam}/${mid}`, key)) return `color/${fam}/${mid}`;
     }
-    if (plain && STEP_SET.has(step)) return nextN(stepName, key);
+    if (plain && STEP_SET.has(step)) return nextN(stepName2, key);
     const c = classifyColor(hex);
     return nextN(`color/${c.family}/${c.step}`, key);
   }
@@ -1420,832 +1427,17 @@
     return name.split("/")[1];
   }
 
-  // src/lib/usageRoles.ts
-  var STRUCTURAL = /* @__PURE__ */ new Set(["container", "wrapper", "shape", "group", "content", "body", "row", "text-group", "media"]);
-  function pickOwner(dsRole, highConfidence, known) {
-    if (dsRole && known(dsRole) && !STRUCTURAL.has(dsRole)) return dsRole;
-    return highConfidence != null ? highConfidence : void 0;
-  }
-  function composeName(group, owner, prop) {
-    if (owner && prop) return `${group}/${owner}/${prop}`;
-    if (prop) return `${group}/${prop}`;
-    if (owner) return `${group}/${owner}`;
-    return `${group}/default`;
-  }
-  var near = (a, b) => Math.abs(a - b) < 5e-3;
-  function paddingProp(field, p) {
-    if (near(p.left, p.right) && near(p.top, p.bottom) && near(p.left, p.top)) return "padding";
-    if (field === "paddingLeft" || field === "paddingRight") return near(p.left, p.right) ? "padding-x" : field === "paddingLeft" ? "padding-left" : "padding-right";
-    return near(p.top, p.bottom) ? "padding-y" : field === "paddingTop" ? "padding-top" : "padding-bottom";
-  }
-  var CORNER_SUFFIX = {
-    topLeftRadius: "top-left",
-    topRightRadius: "top-right",
-    bottomLeftRadius: "bottom-left",
-    bottomRightRadius: "bottom-right"
-  };
-  var SIDE_SUFFIX = {
-    strokeTopWeight: "top",
-    strokeRightWeight: "right",
-    strokeBottomWeight: "bottom",
-    strokeLeftWeight: "left"
-  };
-  function allSame(values) {
-    const live = values.filter((v) => v > 0);
-    return live.every((v) => near(v, live[0]));
-  }
-  function radiusName(field, owner, corners) {
-    var _a;
-    if (allSame(corners)) return composeName("radius", owner, void 0);
-    const suf = (_a = CORNER_SUFFIX[field]) != null ? _a : "default";
-    return owner ? `radius/${owner}-${suf}` : `radius/${suf}`;
-  }
-  function strokeName(field, owner, sides) {
-    var _a;
-    if (field === "strokeWeight" || allSame(sides)) return composeName("stroke-width", owner, void 0);
-    const suf = (_a = SIDE_SUFFIX[field]) != null ? _a : "default";
-    return owner ? `stroke-width/${owner}-${suf}` : `stroke-width/${suf}`;
-  }
-  function simpleNumericName(field, owner, sizeKind) {
-    switch (field) {
-      case "itemSpacing":
-        return composeName("spacing", owner, "gap");
-      case "counterAxisSpacing":
-      case "gridRowGap":
-        return composeName("spacing", owner, "row-gap");
-      case "gridColumnGap":
-        return composeName("spacing", owner, "column-gap");
-      case "opacity":
-        return composeName("opacity", owner, void 0);
-      case "width":
-      case "height":
-        return sizeKind ? `size/${sizeKind}` : null;
-      default:
-        return null;
-    }
-  }
-  var TEXT_GROUP = {
-    fontSize: "font-size",
-    lineHeight: "line-height",
-    letterSpacing: "letter-spacing",
-    fontFamily: "font-family"
-  };
-  function textUsageName(field) {
-    const g = TEXT_GROUP[field];
-    return g ? `${g}/text` : null;
-  }
-  function colorUse(nodeType, field, insideIconFrame2) {
-    if (field === "effects") return "shadow";
-    if (nodeType === "TEXT" && field === "fills") return "text";
-    if (VECTOR_TYPES.has(nodeType)) return "icon";
-    if (insideIconFrame2 && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
-    return field === "fills" ? "background" : "border";
-  }
-  function bgKindOf(hex) {
-    const o = hexToOklch(hex);
-    if (o.c >= LOW_CHROMA) return "chroma";
-    return o.l < 0.5 ? "dark" : "light";
-  }
-  function colorSlotKey(hex, bg, alpha) {
-    const k = colorKey(hex, alpha);
-    return bg ? `${k}|${bg}` : k;
-  }
-  var INVERSE_USES = /* @__PURE__ */ new Set(["text", "icon", "border"]);
-  var byCountThenHex = (a, b) => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
-  function colorRoleRef(colors, existingDefaultHex) {
-    var _a, _b, _c;
-    const totals = /* @__PURE__ */ new Map();
-    for (const c of colors) totals.set(c.hex.toLowerCase(), ((_a = totals.get(c.hex.toLowerCase())) != null ? _a : 0) + c.count);
-    const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
-    return (_c = (_b = existingDefaultHex == null ? void 0 : existingDefaultHex.split("@")[0]) != null ? _b : top == null ? void 0 : top.hex) == null ? void 0 : _c.toLowerCase();
-  }
-  function colorRoleBases(colors, existingDefaultHex, use) {
-    const out = /* @__PURE__ */ new Map();
-    const refHex = colorRoleRef(colors, existingDefaultHex);
-    if (!refHex) return out;
-    const ref = hexToOklch(refHex);
-    const refDark = ref.l < 0.35;
-    const refExtreme = refDark || ref.l >= 0.85;
-    const sameSide = ref.l < 0.5 ? "dark" : "light";
-    const inverseUse = use == null || INVERSE_USES.has(use);
-    for (const c of colors) {
-      const hex = c.hex.toLowerCase();
-      const key = colorSlotKey(hex, c.bg, c.alpha);
-      if (hex === refHex) {
-        out.set(key, "default");
-        continue;
-      }
-      const o = hexToOklch(hex);
-      const opposite = refDark ? o.l >= 0.85 : o.l < 0.35;
-      if (inverseUse && refExtreme && opposite && c.bg && (c.bg === "chroma" || c.bg === sameSide)) {
-        out.set(key, "inverse");
-        continue;
-      }
-      if (o.c >= LOW_CHROMA) {
-        out.set(key, "brand");
-        continue;
-      }
-      out.set(key, o.l > ref.l ? "subtle" : "strong");
-    }
-    return out;
-  }
-  function nameKindOf(base, value) {
-    if (base.startsWith("color/")) {
-      const last = base.slice(base.lastIndexOf("/") + 1);
-      if (last === "brand") return "chroma";
-      if (last === "subtle" || last === "strong") return "ladder";
-      if (last === "inverse") return "inverse";
-      return "default";
-    }
-    return value !== "" && !Number.isNaN(Number(value)) ? "number" : "plain";
-  }
-  var SIZE_SMALL = ["sm", "xs", "2xs"];
-  var SIZE_LARGE = ["lg", "xl", "2xl"];
-  var LIGHTER = ["subtle", "subtler", "subtlest"];
-  var DARKER = ["strong", "stronger", "strongest"];
-  var LADDER_WORDS = [...LIGHTER, ...DARKER];
-  var FAMILIES = ["red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple", "pink"];
-  var esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  function familyRe(base, kind) {
-    const lad = LADDER_WORDS.join("|");
-    const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
-    switch (kind) {
-      case "number":
-        return new RegExp(`^${esc(base)}(?:-(?:${[...SIZE_SMALL, ...SIZE_LARGE].join("|")}))?(?:-\\d+)?$`);
-      case "plain":
-        return new RegExp(`^${esc(base)}(?:-\\d+)?$`);
-      case "default":
-        return new RegExp(`^${esc(base)}${tail}`);
-      case "inverse":
-        return new RegExp(`^${esc(base)}(?:-(?:${lad}))?${tail}`);
-      case "chroma":
-        return new RegExp(`^${esc(base)}(?:-(?:${FAMILIES.join("|")})(?:-(?:${lad}))?|-(?:${lad}))?${tail}`);
-      case "ladder": {
-        const i = base.lastIndexOf("/");
-        const words = base.slice(i + 1) === "strong" ? DARKER : LIGHTER;
-        return new RegExp(`^${esc(base.slice(0, i))}/(?:${words.join("|")})${tail}`);
-      }
-    }
-  }
-  function familyRank(name, base) {
-    if (name === base) return [0, 0, ""];
-    const m = /-(\d+)$/.exec(name);
-    return m ? [2, Number(m[1]), name] : [1, 0, name];
-  }
-  function byFamilyOrder(base) {
-    return (a, b) => {
-      const x = familyRank(a, base);
-      const y = familyRank(b, base);
-      return x[0] - y[0] || x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0);
-    };
-  }
-  var hexOfKey = (v) => v.split("@")[0].toLowerCase();
-  var alphaOfKey = (v) => v.includes("@") ? Number(v.split("@")[1]) : void 0;
-  var lOf = (hex) => hexToOklch(hex).l;
-  var famOf = (hex) => classifyColor(hex).family;
-  var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-  function assignNames(requests, existing, opts = {}) {
-    var _a, _b, _c;
-    const out = /* @__PURE__ */ new Map();
-    const groups = /* @__PURE__ */ new Map();
-    for (const r of requests) {
-      let g = groups.get(r.base);
-      if (!g) groups.set(r.base, g = { kind: (_a = r.kind) != null ? _a : nameKindOf(r.base, r.value), refHex: r.refHex, values: /* @__PURE__ */ new Map() });
-      if (r.refHex && !g.refHex) g.refHex = r.refHex;
-      g.values.set(r.value, ((_b = g.values.get(r.value)) != null ? _b : 0) + r.count);
-    }
-    const taken = new Map([...existing].map(([n, v]) => [n, typeof v === "string" ? v ? [v] : [] : v]));
-    const canReuse = (_c = opts.canReuse) != null ? _c : () => true;
-    for (const [base, g] of groups) {
-      const fam = familyRe(base, g.kind);
-      const left = [];
-      for (const value of g.values.keys()) {
-        if (opts.reuse !== false) {
-          const names = [...taken].filter(([n, v]) => fam.test(n) && v.includes(value) && canReuse(n, value, base)).map(([n]) => n).sort(byFamilyOrder(base));
-          if (names.length) {
-            out.set(`${base}\0${value}`, names[0]);
-            continue;
-          }
-        }
-        left.push(value);
-      }
-      if (!left.length) continue;
-      const assign = (value, name) => {
-        out.set(`${base}\0${value}`, name);
-        const arr = taken.get(name);
-        taken.set(name, arr ? [...arr, value] : [value]);
-      };
-      const fallback = (name) => {
-        for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
-      };
-      if (g.kind === "number") assignNumbers(base, g.values, left, taken, assign, fallback);
-      else if (g.kind === "plain") {
-        for (const value of sortByCount(left, g.values)) assign(value, taken.has(base) ? fallback(base) : base);
-      } else assignColors(base, g.kind, g.refHex, g.values, left, taken, assign, fallback);
-    }
-    return out;
-  }
-  function sortByCount(values, counts) {
-    return [...values].sort((a, b) => {
-      var _a, _b;
-      return ((_a = counts.get(b)) != null ? _a : 0) - ((_b = counts.get(a)) != null ? _b : 0) || cmpValue(a, b);
-    });
-  }
-  function holderValue(taken, name) {
-    const v = taken.get(name);
-    return v && v.length ? v[0] : void 0;
-  }
-  function assignNumbers(base, counts, left, taken, assign, fallback) {
-    let rest = sortByCount(left, counts);
-    let ref;
-    const held = holderValue(taken, base);
-    if (held != null && !Number.isNaN(Number(held))) ref = Number(held);
-    else {
-      const first = rest[0];
-      rest = rest.slice(1);
-      ref = Number(first);
-      assign(first, taken.has(base) ? fallback(base) : base);
-    }
-    const side = (vals, words) => {
-      const sorted = [...vals].sort((a, b) => Math.abs(Number(a) - ref) - Math.abs(Number(b) - ref) || Number(a) - Number(b));
-      for (const v of sorted) {
-        const free = words.map((w) => `${base}-${w}`).find((n) => !taken.has(n));
-        assign(v, free != null ? free : fallback(`${base}-${words[words.length - 1]}`));
-      }
-    };
-    const same = rest.filter((v) => Math.abs(Number(v) - ref) < 5e-3);
-    for (const v of same) assign(v, fallback(base));
-    side(rest.filter((v) => Number(v) < ref - 49e-4), SIZE_SMALL);
-    side(rest.filter((v) => Number(v) > ref + 49e-4), SIZE_LARGE);
-  }
-  function assignColors(base, kind, refHex, counts, left, taken, assign, fallback) {
-    var _a, _b, _c, _d, _e;
-    const slotOf = /* @__PURE__ */ new Map();
-    const slotAssigned = /* @__PURE__ */ new Set();
-    const slotOwner = /* @__PURE__ */ new Map();
-    const slotFree = (name, hex) => {
-      const own = slotOwner.get(name);
-      if (own) return own === hex;
-      const v = taken.get(name);
-      if (!v) return true;
-      return v.length > 0 && v.every((x) => hexOfKey(x) === hex);
-    };
-    const setSlot = (hex, name) => {
-      slotOf.set(hex, name);
-      slotOwner.set(name, hex);
-    };
-    const hexCount = /* @__PURE__ */ new Map();
-    for (const v of left) hexCount.set(hexOfKey(v), ((_a = hexCount.get(hexOfKey(v))) != null ? _a : 0) + ((_b = counts.get(v)) != null ? _b : 0));
-    const hexes = [...hexCount.keys()].sort((a, b) => {
-      var _a2, _b2;
-      return ((_a2 = hexCount.get(b)) != null ? _a2 : 0) - ((_b2 = hexCount.get(a)) != null ? _b2 : 0) || cmpStr(a, b);
-    });
-    const fellBack = /* @__PURE__ */ new Set();
-    const pick = (hex, cands) => {
-      const free = cands.find((n) => slotFree(n, hex));
-      if (!free) fellBack.add(hex);
-      setSlot(hex, free != null ? free : cands[cands.length - 1]);
-    };
-    const ladderSide = (list, refL, prefix) => {
-      const lighter = list.filter((h) => lOf(h) > refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
-      const darker = list.filter((h) => lOf(h) <= refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
-      for (const h of lighter) pick(h, LIGHTER.map((w) => `${prefix}-${w}`));
-      for (const h of darker) pick(h, DARKER.map((w) => `${prefix}-${w}`));
-    };
-    if (kind === "ladder") {
-      const i = base.lastIndexOf("/");
-      const words = base.slice(i + 1) === "strong" ? DARKER : LIGHTER;
-      const refL = refHex ? lOf(refHex) : 0;
-      const sorted = [...hexes].sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr(a, b));
-      for (const h of sorted) pick(h, words.map((w) => `${base.slice(0, i)}/${w}`));
-    } else if (kind === "default") {
-      for (const h of hexes) pick(h, [base]);
-    } else {
-      const held = holderValue(taken, base);
-      let rest = hexes;
-      let refH;
-      if (held) refH = hexOfKey(held);
-      else {
-        refH = hexes[0];
-        rest = hexes.slice(1);
-        pick(refH, [base]);
-      }
-      if (kind === "inverse") ladderSide(rest.filter((h) => h !== refH), lOf(refH), base);
-      else {
-        const refFam = famOf(refH);
-        ladderSide(rest.filter((h) => h !== refH && famOf(h) === refFam), lOf(refH), base);
-        const byFam = /* @__PURE__ */ new Map();
-        for (const h of rest) {
-          if (h === refH || famOf(h) === refFam) continue;
-          const f = famOf(h);
-          byFam.set(f, [...(_c = byFam.get(f)) != null ? _c : [], h]);
-        }
-        for (const [f, list] of byFam) {
-          const famName = `${base}-${f}`;
-          const famHeld = holderValue(taken, famName);
-          let famRef;
-          let others = list;
-          if (famHeld) famRef = hexOfKey(famHeld);
-          else {
-            famRef = list[0];
-            others = list.slice(1);
-            pick(famRef, [famName]);
-          }
-          ladderSide(others.filter((h) => h !== famRef), lOf(famRef), famName);
-        }
-      }
-      if (held && rest.includes(refH) && !slotOf.has(refH)) setSlot(refH, base);
-    }
-    const alphaOf = (v) => {
-      var _a2;
-      return (_a2 = alphaOfKey(v)) != null ? _a2 : 1;
-    };
-    const byHex = /* @__PURE__ */ new Map();
-    for (const v of left) byHex.set(hexOfKey(v), [...(_d = byHex.get(hexOfKey(v))) != null ? _d : [], v]);
-    const nameFree = (n, hex) => !taken.has(n) && (!slotOwner.has(n) || slotOwner.get(n) === hex);
-    for (const [hex, vals] of byHex) {
-      const slot = (_e = slotOf.get(hex)) != null ? _e : base;
-      const fb = fellBack.has(hex);
-      const order = [...vals].sort((a, b) => {
-        var _a2, _b2;
-        return ((_a2 = counts.get(b)) != null ? _a2 : 0) - ((_b2 = counts.get(a)) != null ? _b2 : 0) || alphaOf(b) - alphaOf(a) || cmpValue(a, b);
-      });
-      const fileVals = !fb ? taken.get(slot) : void 0;
-      const held = fileVals && fileVals.length && fileVals.every((x) => hexOfKey(x) === hex) && !slotAssigned.has(slot) ? fileVals[0] : void 0;
-      let refA;
-      let rest = order;
-      if (held != null) refA = alphaOf(held);
-      else {
-        const first = order[0];
-        rest = order.slice(1);
-        refA = alphaOf(first);
-        assign(first, fb || taken.has(slot) ? fallback(slot) : slot);
-        slotAssigned.add(slot);
-      }
-      const side = (list, words) => {
-        const sorted = [...list].sort((a, b) => Math.abs(alphaOf(a) - refA) - Math.abs(alphaOf(b) - refA) || alphaOf(a) - alphaOf(b));
-        sorted.forEach((v, i) => {
-          const cands = words.map((w) => `${slot}-${w}`);
-          if (fb) {
-            assign(v, fallback(cands[Math.min(i, cands.length - 1)]));
-            return;
-          }
-          const free = cands.find((n) => nameFree(n, hex));
-          assign(v, free != null ? free : fallback(cands[cands.length - 1]));
-        });
-      };
-      for (const v of rest.filter((x) => Math.abs(alphaOf(x) - refA) < 5e-3)) assign(v, fallback(slot));
-      side(rest.filter((x) => alphaOf(x) < refA - 49e-4), LIGHTER);
-      side(rest.filter((x) => alphaOf(x) > refA + 49e-4), DARKER);
-    }
-  }
-  function cmpValue(a, b) {
-    const na = Number(a);
-    const nb = Number(b);
-    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-    return a < b ? -1 : a > b ? 1 : 0;
-  }
-  var OLD_LADDER = /^(spacing|radius|size|stroke-width)\/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$/;
-  var OLD_COLOR = /* @__PURE__ */ new Set(["color/background/default", "color/text/default", "color/border/default", "color/background/brand"]);
-  function isOldPluginName(name) {
-    return OLD_LADDER.test(name) || OLD_COLOR.has(name);
-  }
-  function valueKey(v) {
-    return typeof v === "number" ? String(Math.round(v * 100) / 100) : v.toLowerCase();
-  }
-  var AUTO_ROLE_KEY = "dsl.autoRole";
-
-  // src/lib/extract.ts
-  var SKIP_HIDDEN = t("extract.skipHidden");
-  var SKIP_INSTANCE = t("extract.skipInstance");
-  var SKIP_GRADIENT = t("extract.skipGradient");
-  var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
-  var SKIP_FRACTION = t("extract.skipFraction");
-  function onScale(acc, v, step = 1) {
-    const ok = Math.abs(v / step - Math.round(v / step)) < 1e-6;
-    if (!ok) acc.skipped.add(SKIP_FRACTION);
-    return ok;
-  }
-  function keyOf(category, value, unit, alpha) {
-    return `${category}|${value}|${unit != null ? unit : ""}|${alpha != null ? alpha : 1}`;
-  }
-  function colorToken(category, hex, alpha) {
-    return alpha < 1 ? { name: `${colorTokenName(hex)}-a${alphaPct(alpha)}`, category, value: hex, alpha } : { name: colorTokenName(hex), category, value: hex };
-  }
-  function add(acc, token, source, nodeId, use, bg) {
-    var _a, _b;
-    const k = keyOf(token.category, token.value, token.unit, token.alpha);
-    let existing = acc.map.get(k);
-    if (existing) {
-      if (!existing.sources.includes(source)) existing.sources.push(source);
-      if (acc.lastNode.get(k) !== nodeId) existing.count = ((_a = existing.count) != null ? _a : 1) + 1;
-    } else {
-      existing = __spreadProps(__spreadValues({}, token), { sources: [source], count: 1 });
-      acc.map.set(k, existing);
-    }
-    acc.lastNode.set(k, nodeId);
-    if (use) {
-      const uses = (_b = existing.uses) != null ? _b : existing.uses = [];
-      const u = uses.find((x) => x.name === use && x.bg === bg);
-      if (u) u.count++;
-      else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
-    }
-  }
-  function backgroundOf(node) {
-    var _a;
-    let p = node.parent;
-    while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
-      const fills = p.fills;
-      if (Array.isArray(fills)) {
-        const vis = fills.filter((f) => f.visible !== false && f.opacity !== 0);
-        if (vis.length) {
-          const top = vis[vis.length - 1];
-          if (top.type === "SOLID" && ((_a = top.opacity) != null ? _a : 1) >= 1) return rgbToHex(top.color);
-          return void 0;
-        }
-      }
-      p = p.parent;
-    }
-    return void 0;
-  }
-  function collectPaints(acc, node, paints2, source) {
-    const nodeId = node.id;
-    if (paints2 === figma.mixed || !Array.isArray(paints2)) return;
-    for (const p of paints2) {
-      if (p.visible === false) continue;
-      if (p.type !== "SOLID") {
-        acc.skipped.add(SKIP_GRADIENT);
-        continue;
-      }
-      const alpha = roundAlpha(p.opacity);
-      if (alpha === 0) continue;
-      const hex = rgbToHex(p.color);
-      const cu = colorUse(node.type, source === "fill" ? "fills" : "strokes", isInsideIconFrame(node));
-      const bgHex = cu === "text" || cu === "icon" || cu === "border" ? backgroundOf(node) : void 0;
-      add(acc, colorToken("color", hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : void 0);
-    }
-  }
-  function collectText(acc, node) {
-    if (node.fontSize !== figma.mixed) {
-      const v = round(node.fontSize);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize", node.id);
-    }
-    if (node.fontName !== figma.mixed) {
-      const fam = node.fontName.family;
-      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily", node.id);
-    }
-    if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") {
-      const v = round(node.lineHeight.value);
-      const unit = "px";
-      if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight", node.id);
-    }
-    if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
-      const v = round(node.letterSpacing.value);
-      const unit = "px";
-      if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing", node.id);
-    }
-  }
-  function gapSkip(node, field) {
-    const n = node;
-    if (field === "itemSpacing") return n.primaryAxisAlignItems === "SPACE_BETWEEN" ? "space-between" : null;
-    if (field === "counterAxisSpacing") {
-      if (n.layoutWrap !== "WRAP") return "no-wrap";
-      return n.counterAxisAlignContent === "SPACE_BETWEEN" ? "space-between" : null;
-    }
-    return null;
-  }
-  function collectSpacing(acc, node) {
-    if (node.layoutMode === "NONE") return;
-    const owner = acc.owner(node);
-    const pad = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
-    const gaps = ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"].map((f) => [
-      node[f],
-      composeName("spacing", owner, paddingProp(f, pad))
-    ]);
-    if (node.layoutMode === "GRID") {
-      gaps.push([node.gridRowGap, simpleNumericName("gridRowGap", owner)], [node.gridColumnGap, simpleNumericName("gridColumnGap", owner)]);
-    } else {
-      if (!gapSkip(node, "itemSpacing")) gaps.push([node.itemSpacing, simpleNumericName("itemSpacing", owner)]);
-      if (typeof node.counterAxisSpacing === "number" && !gapSkip(node, "counterAxisSpacing")) gaps.push([node.counterAxisSpacing, simpleNumericName("counterAxisSpacing", owner)]);
-    }
-    for (const [g, use] of gaps) {
-      if (typeof g === "number" && g > 0) {
-        const v = round(g);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap", node.id, use);
-      }
-    }
-  }
-  function iconVectorCount(children, visible = true) {
-    let vectors = 0;
-    for (const c of children) {
-      if (hasImageFill(c)) return -1;
-      const shown = visible && c.visible !== false;
-      if (VECTOR_TYPES.has(c.type)) {
-        if (shown) vectors++;
-        continue;
-      }
-      if (c.type === "ELLIPSE" || c.type === "RECTANGLE") continue;
-      if (c.type === "GROUP" || c.type === "FRAME" || c.type === "INSTANCE") {
-        const n = iconVectorCount("children" in c ? c.children : [], shown);
-        if (n < 0) return -1;
-        vectors += n;
-        continue;
-      }
-      return -1;
-    }
-    return vectors;
-  }
-  function isSmallSquare(node) {
-    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return false;
-    const w = round(node.width);
-    return w > 0 && w === round(node.height) && w <= 64;
-  }
-  function isIconSelf(node) {
-    return !hasImageFill(node) && iconVectorCount("children" in node ? node.children : []) > 0;
-  }
-  function isAvatarSelf(node) {
-    const w = round(node.width);
-    const r = node.cornerRadius;
-    let radii = [];
-    if (r === figma.mixed) {
-      for (const corner of ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]) {
-        const cv = node[corner];
-        radii.push(typeof cv === "number" ? cv : 0);
-      }
-    } else if (typeof r === "number") radii = [r];
-    if (radii.length > 0 && radii.every((cv) => round(cv) >= w / 2)) {
-      const imageWithin = (n, depth) => {
-        if (hasImageFill(n)) return true;
-        if (depth >= 2 || !("children" in n)) return false;
-        return n.children.some((c) => c.visible !== false && imageWithin(c, depth + 1));
-      };
-      if (imageWithin(node, 0)) return true;
-    }
-    const children = "children" in node ? node.children : [];
-    return children.some(
-      (c) => c.visible !== false && c.type === "ELLIPSE" && hasImageFill(c) && Math.abs(c.width - node.width) <= 0.5 && Math.abs(c.height - node.height) <= 0.5
-    );
-  }
-  function hasIconAncestor(node) {
-    for (let p = node.parent; p && p.type !== "PAGE" && p.type !== "DOCUMENT"; p = p.parent) {
-      if (isSmallSquare(p) && isIconSelf(p)) return true;
-    }
-    return false;
-  }
-  function isIconOrAvatar(node) {
-    if (!isSmallSquare(node)) return false;
-    if (!isIconSelf(node) && !isAvatarSelf(node)) return false;
-    return !hasIconAncestor(node);
-  }
-  function inAutoLayoutFlow(node) {
-    if ("layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE") return false;
-    const parent = node.parent;
-    return node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
-  }
-  function iconOrAvatarKind(node) {
-    if (!isIconOrAvatar(node)) return null;
-    return isIconSelf(node) ? "icon" : "avatar";
-  }
-  function isInsideIconFrame(node) {
-    for (let p = node.parent; p && p.type !== "PAGE" && p.type !== "DOCUMENT"; p = p.parent) {
-      if (isSmallSquare(p) && isIconSelf(p)) return true;
-    }
-    return false;
-  }
-  function collectSize(acc, node) {
-    if (!isIconOrAvatar(node)) return;
-    if (!inAutoLayoutFlow(node)) return;
-    const addSize = (v) => {
-      const rv = round(v);
-      if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size", node.id, `size/${isIconSelf(node) ? "icon" : "avatar"}`);
-    };
-    if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
-    if (node.layoutSizingVertical === "FIXED") addSize(node.height);
-  }
-  function collectRadius(acc, node) {
-    if (!("cornerRadius" in node)) return;
-    const r = node.cornerRadius;
-    const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
-    if (r !== figma.mixed && typeof r !== "number") return;
-    const values = corners.map((c) => r !== figma.mixed ? r : Number(node[c]) || 0);
-    const owner = acc.owner(node);
-    const list = r === figma.mixed ? corners.map((c, i) => [c, values[i]]) : [[corners[0], r]];
-    for (const [c, rv] of list) {
-      if (rv > 0) {
-        const v = round(rv);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id, radiusName(c, owner, values));
-      }
-    }
-  }
-  function collectStroke(acc, node) {
-    if (!("strokes" in node) || !("strokeWeight" in node)) return;
-    const strokes = node.strokes;
-    if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
-    const w = node.strokeWeight;
-    const sides = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
-    const sideValues = sides.map((sd) => Number(node[sd]) || 0);
-    const widths = [];
-    if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
-    else if (typeof w === "number") widths.push(["strokeWeight", w]);
-    const owner = acc.owner(node);
-    for (const [field, wv] of widths) {
-      if (wv > 0) {
-        const v = round(wv);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id, strokeName(field, owner, sideValues));
-      }
-    }
-  }
-  function collectOpacity(acc, node) {
-    if (!("opacity" in node)) return;
-    const o = node.opacity;
-    if (typeof o !== "number" || o >= 1 || o <= 0) return;
-    const v = round(o);
-    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id, simpleNumericName("opacity", acc.owner(node)));
-  }
-  function collectEffects(acc, node) {
-    var _a;
-    if (!("effects" in node)) return;
-    for (const e of node.effects) {
-      if (e.visible === false) continue;
-      if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
-        const alpha = roundAlpha(e.color.a);
-        if (alpha === 0) continue;
-        const hex = rgbToHex(e.color);
-        add(acc, colorToken("effectColor", hex, alpha), "effectColor", node.id, "color/shadow");
-        for (const [g, val] of [
-          ["shadow-blur", e.radius],
-          ["shadow-spread", (_a = e.spread) != null ? _a : 0],
-          ["shadow-x", e.offset.x],
-          ["shadow-y", e.offset.y]
-        ]) {
-          const v = round(val);
-          if (onScale(acc, v)) add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat", node.id);
-        }
-      } else if (e.type === "LAYER_BLUR" || e.type === "BACKGROUND_BLUR") {
-        const v = round(e.radius);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat", node.id);
-      }
-    }
-  }
-  function walk(acc, node) {
-    var _a;
-    if (node.visible === false) {
-      acc.skipped.add(SKIP_HIDDEN);
-      return;
-    }
-    if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
-    if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
-    if (node.type === "TEXT") collectText(acc, node);
-    if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
-      collectSpacing(acc, node);
-    }
-    collectSize(acc, node);
-    collectRadius(acc, node);
-    collectStroke(acc, node);
-    collectOpacity(acc, node);
-    collectEffects(acc, node);
-    if (node.type === "INSTANCE") {
-      if ("children" in node && node.children.length && !((_a = acc.covered) == null ? void 0 : _a.has(node.id))) acc.skipped.add(SKIP_INSTANCE);
-      return;
-    }
-    if ("children" in node) for (const child of node.children) walk(acc, child);
-  }
-  function isEffectivelyVisible(node) {
-    let p = node;
-    while (p) {
-      if ("visible" in p && p.visible === false) return false;
-      p = p.parent;
-    }
-    return true;
-  }
-  function extractFromSelection(selection2, ownerOf = () => void 0, coveredInstances) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), owner: ownerOf, covered: coveredInstances };
-    for (const node of selection2) {
-      if (!isEffectivelyVisible(node)) {
-        acc.skipped.add(SKIP_HIDDEN);
-        continue;
-      }
-      walk(acc, node);
-    }
-    const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
-    const warnings = tokens.length ? [...acc.warnings] : [...acc.warnings, ...acc.skipped];
-    return { tokens, warnings };
-  }
-
-  // src/lib/errors.ts
-  function explainError(raw) {
-    const s = (raw || "").toLowerCase();
-    if (/font|loadfontasync|has not been loaded/.test(s))
-      return { message: t("err.font"), action: t("err.fontAction"), retryable: true };
-    if (/invalid scope|scope/.test(s))
-      return { message: t("err.scope"), action: t("err.scopeAction"), retryable: true };
-    if (/incompatible|property value/.test(s))
-      return { message: t("err.prop"), action: t("err.propAction"), retryable: false };
-    if (/read[- ]?only|permission|not allowed|cannot edit/.test(s))
-      return { message: t("err.readonly"), action: t("err.readonlyAction"), retryable: false };
-    if (/network|fetch|timeout|offline/.test(s))
-      return { message: t("err.network"), action: t("err.networkAction"), retryable: true };
-    if (/storage|quota|exceeded/.test(s))
-      return { message: t("err.storage"), action: t("err.storageAction"), retryable: true };
-    return { message: raw || t("err.unknown"), action: t("err.unknownAction"), retryable: true };
-  }
-
-  // src/lib/tiers.ts
-  var TIER_NUM = { global: 1, semantic: 2, component: 3 };
-  var CANONICAL_NAME = { global: "Global", semantic: "Semantic" };
-  function hasComponentWord(name) {
-    return /\bcomponents?\b/i.test(name);
-  }
-  function judgeUserTier(name, collectionId, samples) {
-    let counted = 0;
-    let alias = 0;
-    for (const s of samples) {
-      if (s.alias && s.targetCollection === collectionId) continue;
-      counted++;
-      if (s.alias) alias++;
-    }
-    if (counted === 0) return { tier: 0, why: { kind: "empty", alias, counted } };
-    if (hasComponentWord(name)) return { tier: 3, why: { kind: "name", alias, counted } };
-    const tier = 5 * alias >= 4 * counted ? 2 : 5 * alias <= counted ? 1 : 0;
-    return { tier, why: { kind: "ratio", alias, counted } };
-  }
-  function pickOwned(cols, marker) {
-    var _a;
-    const out = { global: void 0, semantic: void 0 };
-    for (const role of ["global", "semantic"]) {
-      out[role] = (_a = cols.find((c) => marker(c) === role)) != null ? _a : cols.find((c) => !marker(c) && c.name === CANONICAL_NAME[role]);
-    }
-    return out;
-  }
-
-  // src/lib/collectionRoles.ts
-  var OWNED_KEY = "dsl.owned";
-  function ownedMarker(c) {
-    try {
-      const fn = c.getPluginData;
-      return typeof fn === "function" ? fn.call(c, OWNED_KEY) || "" : "";
-    } catch (e) {
-      return "";
-    }
-  }
-  function ownedCollections(cols) {
-    return pickOwned(cols, ownedMarker);
-  }
-  function ownedCollection(cols, role) {
-    return ownedCollections(cols)[role];
-  }
-  function ensureOwnedCollection(cols, role) {
-    var _a;
-    const found = ownedCollection(cols, role);
-    const col = found != null ? found : figma.variables.createVariableCollection(CANONICAL_NAME[role]);
-    if (ownedMarker(col) !== role) {
-      try {
-        (_a = col.setPluginData) == null ? void 0 : _a.call(col, OWNED_KEY, role);
-      } catch (e) {
-      }
-    }
-    return col;
-  }
-  function samplesByCollection(cols, vars) {
-    var _a, _b, _c;
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const colOfVar = new Map(vars.map((v) => [v.id, v.variableCollectionId]));
-    const out = /* @__PURE__ */ new Map();
-    for (const v of vars) {
-      const raw = (_b = v.valuesByMode) == null ? void 0 : _b[(_a = modeOf.get(v.variableCollectionId)) != null ? _a : ""];
-      const isAlias2 = !!raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS";
-      const s = isAlias2 ? { alias: true, targetCollection: (_c = colOfVar.get(raw.id)) != null ? _c : null } : { alias: false };
-      const arr = out.get(v.variableCollectionId);
-      if (arr) arr.push(s);
-      else out.set(v.variableCollectionId, [s]);
-    }
-    return out;
-  }
-  function collectionTierInfo(cols, vars) {
-    var _a;
-    const owned = ownedCollections(cols);
-    const samples = samplesByCollection(cols, vars);
-    const out = /* @__PURE__ */ new Map();
-    for (const c of cols) {
-      const role = owned.global === c ? "global" : owned.semantic === c ? "semantic" : null;
-      out.set(c.id, role ? { tier: TIER_NUM[role], why: { kind: "owned" } } : judgeUserTier(c.name, c.id, (_a = samples.get(c.id)) != null ? _a : []));
-    }
-    return out;
-  }
-  function collectionTiers(cols, vars) {
-    return new Map([...collectionTierInfo(cols, vars)].map(([id, i]) => [id, i.tier]));
-  }
-  function ownedIds(cols) {
-    var _a, _b;
-    const o = ownedCollections(cols);
-    return new Set([(_a = o.global) == null ? void 0 : _a.id, (_b = o.semantic) == null ? void 0 : _b.id].filter((x) => !!x));
-  }
-
   // src/lib/naming.ts
   var EMITTED_ROLES = [
-    // 구조 폴백(역할을 못 정했을 때)
-    "container",
-    "wrapper",
+    // 구조 폴백(역할을 못 정했을 때) — 6-2: container · wrapper 대신 방향 이름(ia-v4 §4.4 "역할 세분화 2차" D)
+    "hstack",
+    // 가로 오토레이아웃
+    "vstack",
+    // 세로 오토레이아웃
+    "grid",
+    // 격자 오토레이아웃
+    "zstack",
+    // 오토레이아웃 없음(겹쳐 놓을 수 있는 묶음)
     "shape",
     // HTML 랜드마크
     "header",
@@ -2269,6 +1461,19 @@
     // 글자만 2개 이상
     "media",
     // 사진(+ 작은 아이콘)만 담은 상자
+    // 역할 세분화 2차(ia-v4 §4.4 C1–C6, 6-2) — 안에 든 것으로 짓는 이름, 자식에게는 맥락을 통과시킨다
+    "profile",
+    // 원형 사진 · 아바타 + 이름
+    "title-group",
+    // 제목 + 글자 묶음
+    "links",
+    // 가로 글자 링크 3개 이상
+    "pagination",
+    // 페이지 번호
+    "icon-group",
+    // 아이콘만 2개 이상
+    "button-group",
+    // 버튼만 2개 이상
     // 컴포넌트
     "button",
     "chip",
@@ -2295,6 +1500,9 @@
     "avatar"
   ];
   var RECOGNIZED_ROLES = [
+    // 6-2 전 이름 정리가 만들던 구조 폴백 — 지난 결과의 이름을 읽는 곳(아이콘 프레임 ⓐ · pickScope 일반 구조어 · [등록] 일반어)이 그대로 안다
+    "container",
+    "wrapper",
     "content",
     "group",
     "body",
@@ -2320,7 +1528,8 @@
   function isKnownRole(seg) {
     return ROLE_SET.has(seg);
   }
-  var REFINED_ROLES = /* @__PURE__ */ new Set(["row", "text-group", "media"]);
+  var REFINED_ROLES = /* @__PURE__ */ new Set(["row", "text-group", "media", "profile", "title-group", "links", "pagination", "icon-group", "button-group"]);
+  var REFINED_TWO_WORD = /* @__PURE__ */ new Set(["title-group", "icon-group", "button-group"]);
   function isScopeRole(seg) {
     return ROLE_SET.has(seg) && !REFINED_ROLES.has(seg);
   }
@@ -2430,9 +1639,11 @@
     return { roleLeaf, context, primitive: false };
   }
   var UNIT_WORDS = /* @__PURE__ */ new Set(["percent", "px", "em", "rem", "ratio", "pt"]);
-  var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "content", "group", "section", "body", "main", "shape"]);
+  var GENERIC_ROLES = /* @__PURE__ */ new Set(["frame", "container", "wrapper", "content", "group", "section", "body", "main", "shape", "hstack", "vstack", "grid", "zstack"]);
   function pickScope(name) {
-    const segs = kebab(name).split("-").filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
+    let parts = kebab(name).split("-");
+    if (parts.length >= 2 && REFINED_TWO_WORD.has(parts.slice(-2).join("-"))) parts = parts.slice(0, -2);
+    const segs = parts.filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
     if (!segs.length) return null;
     const known = segs.filter(isScopeRole);
     return known.length ? known[known.length - 1] : segs[segs.length - 1];
@@ -2700,7 +1911,7 @@
     const { weight } = weightOf(input.style);
     const size = round1(input.fontSize);
     if (weight >= 600 && size >= 42) return "display";
-    if (weight >= 600) return "heading";
+    if (weight >= 600 || size >= 21.5) return "heading";
     return "body";
   }
   function krdsStepDef(category, size) {
@@ -2709,7 +1920,7 @@
     const steps = KRDS_STEPS[category];
     return (_a = steps.find((s) => d >= s.min)) != null ? _a : steps[steps.length - 1];
   }
-  var cmpStr2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  var cmpStr = (a, b) => a < b ? -1 : a > b ? 1 : 0;
   var slug = (s) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
   var sigOf = (i) => `${i.fontSize}|${i.lineHeight}|${i.letterSpacing}|${i.family}|${i.style}`;
   function groupBy(items, key) {
@@ -2724,7 +1935,7 @@
   }
   var cmpLast = (a, b) => {
     var _a, _b, _c, _d;
-    return b.count - a.count || cmpStr2(sigOf(a.input), sigOf(b.input)) || cmpStr2((_a = a.input.name) != null ? _a : "", (_b = b.input.name) != null ? _b : "") || cmpStr2((_c = a.input.id) != null ? _c : "", (_d = b.input.id) != null ? _d : "") || a.idx - b.idx;
+    return b.count - a.count || cmpStr(sigOf(a.input), sigOf(b.input)) || cmpStr((_a = a.input.name) != null ? _a : "", (_b = b.input.name) != null ? _b : "") || cmpStr((_c = a.input.id) != null ? _c : "", (_d = b.input.id) != null ? _d : "") || a.idx - b.idx;
   };
   var weightKey = (w) => `${w.weight}${w.italic ? "i" : ""}`;
   var lhTail = (lh) => lh === "auto" ? "-auto" : lh === 150 ? "" : `-${lh}`;
@@ -2798,7 +2009,7 @@
     for (const g of groupBy(works, (w) => w.name)) {
       const byFam = groupBy(g, (w) => w.input.family);
       if (byFam.length < 2) continue;
-      const ranked = byFam.map((ws) => ({ fam: ws[0].input.family, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => b.used - a.used || cmpStr2(a.fam, b.fam));
+      const ranked = byFam.map((ws) => ({ fam: ws[0].input.family, ws, used: ws.reduce((s, w) => s + w.count, 0) })).sort((a, b) => b.used - a.used || cmpStr(a.fam, b.fam));
       ranked.forEach((r, i) => {
         if (i === 0) return;
         for (const w of r.ws) {
@@ -2833,6 +2044,1096 @@
     }
     for (const w of works) out[w.idx] = w.name;
     return out;
+  }
+
+  // src/lib/usageRoles.ts
+  var STRUCTURAL = /* @__PURE__ */ new Set([
+    "container",
+    "wrapper",
+    "shape",
+    "group",
+    "content",
+    "body",
+    "row",
+    "text-group",
+    "media",
+    // 6-2 세분화 2차(ia-v4 §4.4 "역할 세분화 2차" C1–C6 · D)
+    "profile",
+    "title-group",
+    "links",
+    "pagination",
+    "icon-group",
+    "button-group",
+    "hstack",
+    "vstack",
+    "grid",
+    "zstack"
+  ]);
+  function isStructuralRole(role) {
+    return STRUCTURAL.has(role);
+  }
+  function numericKind(field, sizeKind) {
+    switch (field) {
+      case "paddingLeft":
+      case "paddingRight":
+      case "paddingTop":
+      case "paddingBottom":
+        return "spacing/padding";
+      case "itemSpacing":
+      case "counterAxisSpacing":
+      case "gridRowGap":
+      case "gridColumnGap":
+        return "spacing/gap";
+      case "cornerRadius":
+      case "topLeftRadius":
+      case "topRightRadius":
+      case "bottomLeftRadius":
+      case "bottomRightRadius":
+        return "radius";
+      case "strokeWeight":
+      case "strokeTopWeight":
+      case "strokeRightWeight":
+      case "strokeBottomWeight":
+      case "strokeLeftWeight":
+        return "stroke-width";
+      case "opacity":
+        return "opacity";
+      case "width":
+      case "height":
+        return sizeKind ? `size/${sizeKind}` : null;
+      case "lineHeight":
+        return "line-height";
+      case "letterSpacing":
+        return "letter-spacing";
+      default:
+        return null;
+    }
+  }
+  function isPillRadius(radius, width, height) {
+    const short = Math.round(Math.min(width, height) * 100) / 100;
+    return short > 0 && radius >= short / 2;
+  }
+  var TEXT_GROUP = {
+    fontSize: "font-size",
+    lineHeight: "line-height",
+    letterSpacing: "letter-spacing",
+    fontFamily: "font-family"
+  };
+  function textUsageName(field) {
+    var _a;
+    if (field === "fontFamily") return "font-family/text";
+    return (_a = TEXT_GROUP[field]) != null ? _a : null;
+  }
+  function colorUse(nodeType, field, insideIconFrame2) {
+    if (field === "effects") return "shadow";
+    if (nodeType === "TEXT" && field === "fills") return "text";
+    if (VECTOR_TYPES.has(nodeType)) return "icon";
+    if (insideIconFrame2 && (nodeType === "RECTANGLE" || nodeType === "ELLIPSE")) return "icon";
+    return field === "fills" ? "background" : "border";
+  }
+  function bgKindOf(hex) {
+    const o = hexToOklch(hex);
+    if (o.c >= LOW_CHROMA) return "chroma";
+    return o.l < 0.5 ? "dark" : "light";
+  }
+  function colorSlotKey(hex, bg, alpha) {
+    const k = colorKey(hex, alpha);
+    return bg ? `${k}|${bg}` : k;
+  }
+  var INVERSE_USES = /* @__PURE__ */ new Set(["text", "icon", "border"]);
+  var byCountThenHex = (a, b) => b.count - a.count || (a.hex < b.hex ? -1 : a.hex > b.hex ? 1 : 0);
+  function colorRoleRef(colors, existingDefaultHex) {
+    var _a, _b, _c;
+    const totals = /* @__PURE__ */ new Map();
+    for (const c of colors) totals.set(c.hex.toLowerCase(), ((_a = totals.get(c.hex.toLowerCase())) != null ? _a : 0) + c.count);
+    const top = [...totals].map(([hex, count]) => ({ hex, count })).sort(byCountThenHex)[0];
+    return (_c = (_b = existingDefaultHex == null ? void 0 : existingDefaultHex.split("@")[0]) != null ? _b : top == null ? void 0 : top.hex) == null ? void 0 : _c.toLowerCase();
+  }
+  function colorRoleBases(colors, existingDefaultHex, use) {
+    const out = /* @__PURE__ */ new Map();
+    const refHex = colorRoleRef(colors, existingDefaultHex);
+    if (!refHex) return out;
+    const ref = hexToOklch(refHex);
+    const refDark = ref.l < 0.35;
+    const refExtreme = refDark || ref.l >= 0.85;
+    const sameSide = ref.l < 0.5 ? "dark" : "light";
+    const inverseUse = use == null || INVERSE_USES.has(use);
+    for (const c of colors) {
+      const hex = c.hex.toLowerCase();
+      const key = colorSlotKey(hex, c.bg, c.alpha);
+      if (hex === refHex) {
+        out.set(key, "default");
+        continue;
+      }
+      const o = hexToOklch(hex);
+      const opposite = refDark ? o.l >= 0.85 : o.l < 0.35;
+      if (inverseUse && refExtreme && opposite && c.bg && (c.bg === "chroma" || c.bg === sameSide)) {
+        out.set(key, "inverse");
+        continue;
+      }
+      if (o.c >= LOW_CHROMA) {
+        out.set(key, "brand");
+        continue;
+      }
+      out.set(key, o.l > ref.l ? "subtle" : "strong");
+    }
+    return out;
+  }
+  function nameKindOf(base, value) {
+    if (base.startsWith("color/")) {
+      const last = base.slice(base.lastIndexOf("/") + 1);
+      if (last === "brand") return "chroma";
+      if (last === "subtle" || last === "strong") return "ladder";
+      if (last === "inverse") return "inverse";
+      return "default";
+    }
+    return value !== "" && !Number.isNaN(Number(value)) ? "number" : "plain";
+  }
+  var LIGHTER = ["subtle", "subtler", "subtlest"];
+  var DARKER = ["strong", "stronger", "strongest"];
+  var LADDER_WORDS = [...LIGHTER, ...DARKER];
+  var FAMILIES = ["red", "orange", "yellow", "green", "teal", "blue", "indigo", "purple", "pink"];
+  var esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  function familyRe(base, kind) {
+    const lad = LADDER_WORDS.join("|");
+    const tail = `(?:-(?:${lad})|-a\\d+)?(?:-\\d+)?$`;
+    switch (kind) {
+      case "number":
+        return stepFamilyRe(base);
+      case "plain":
+        return new RegExp(`^${esc(base)}(?:-\\d+)?$`);
+      case "default":
+        return new RegExp(`^${esc(base)}${tail}`);
+      case "inverse":
+        return new RegExp(`^${esc(base)}(?:-(?:${lad}))?${tail}`);
+      case "chroma":
+        return new RegExp(`^${esc(base)}(?:-(?:${FAMILIES.join("|")})(?:-(?:${lad}))?|-(?:${lad}))?${tail}`);
+      case "ladder": {
+        const i = base.lastIndexOf("/");
+        const words = base.slice(i + 1) === "strong" ? DARKER : LIGHTER;
+        return new RegExp(`^${esc(base.slice(0, i))}/(?:${words.join("|")})${tail}`);
+      }
+    }
+  }
+  function familyRank(name, base) {
+    if (name.startsWith(base + "/")) return stepFamilyRank(name, base);
+    if (name === base) return [0, 0, ""];
+    const m = /-(\d+)$/.exec(name);
+    return m ? [2, Number(m[1]), name] : [1, 0, name];
+  }
+  function byFamilyOrder(base) {
+    return (a, b) => {
+      const x = familyRank(a, base);
+      const y = familyRank(b, base);
+      return x[0] - y[0] || x[1] - y[1] || (x[2] < y[2] ? -1 : x[2] > y[2] ? 1 : 0);
+    };
+  }
+  var hexOfKey = (v) => v.split("@")[0].toLowerCase();
+  var alphaOfKey = (v) => v.includes("@") ? Number(v.split("@")[1]) : void 0;
+  var lOf = (hex) => hexToOklch(hex).l;
+  var famOf = (hex) => classifyColor(hex).family;
+  var cmpStr2 = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function assignNames(requests, existing, opts = {}) {
+    var _a, _b, _c, _d;
+    const out = /* @__PURE__ */ new Map();
+    const groups = /* @__PURE__ */ new Map();
+    for (const r of requests) {
+      let g = groups.get(r.base);
+      if (!g) groups.set(r.base, g = { kind: (_a = r.kind) != null ? _a : nameKindOf(r.base, r.value), refHex: r.refHex, values: /* @__PURE__ */ new Map(), pills: /* @__PURE__ */ new Map() });
+      if (r.refHex && !g.refHex) g.refHex = r.refHex;
+      g.values.set(r.value, ((_b = g.values.get(r.value)) != null ? _b : 0) + r.count);
+      if (r.pill) g.pills.set(r.value, ((_c = g.pills.get(r.value)) != null ? _c : 0) + r.pill);
+    }
+    const taken = new Map([...existing].map(([n, v]) => [n, typeof v === "string" ? v ? [v] : [] : v]));
+    const canReuse = (_d = opts.canReuse) != null ? _d : () => true;
+    for (const [base, g] of groups) {
+      const fam = familyRe(base, g.kind);
+      const left = [];
+      for (const value of g.values.keys()) {
+        if (opts.reuse !== false) {
+          const names = [...taken].filter(([n, v]) => fam.test(n) && v.includes(value) && canReuse(n, value, base)).map(([n]) => n).sort(byFamilyOrder(base));
+          if (names.length) {
+            out.set(`${base}\0${value}`, names[0]);
+            continue;
+          }
+        }
+        left.push(value);
+      }
+      if (!left.length) continue;
+      const assign = (value, name) => {
+        out.set(`${base}\0${value}`, name);
+        const arr = taken.get(name);
+        taken.set(name, arr ? [...arr, value] : [value]);
+      };
+      const fallback = (name) => {
+        for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
+      };
+      if (g.kind === "number") stepLadder(base, [...g.values].map(([value, count]) => {
+        var _a2;
+        return { value, count, pill: (_a2 = g.pills.get(value)) != null ? _a2 : 0 };
+      }), left, taken, assign, fallback);
+      else if (g.kind === "plain") {
+        for (const value of sortByCount(left, g.values)) assign(value, taken.has(base) ? fallback(base) : base);
+      } else assignColors(base, g.kind, g.refHex, g.values, left, taken, assign, fallback);
+    }
+    return out;
+  }
+  function sortByCount(values, counts) {
+    return [...values].sort((a, b) => {
+      var _a, _b;
+      return ((_a = counts.get(b)) != null ? _a : 0) - ((_b = counts.get(a)) != null ? _b : 0) || cmpValue(a, b);
+    });
+  }
+  function holderValue(taken, name) {
+    const v = taken.get(name);
+    return v && v.length ? v[0] : void 0;
+  }
+  function assignColors(base, kind, refHex, counts, left, taken, assign, fallback) {
+    var _a, _b, _c, _d, _e;
+    const slotOf = /* @__PURE__ */ new Map();
+    const slotAssigned = /* @__PURE__ */ new Set();
+    const slotOwner = /* @__PURE__ */ new Map();
+    const slotFree = (name, hex) => {
+      const own = slotOwner.get(name);
+      if (own) return own === hex;
+      const v = taken.get(name);
+      if (!v) return true;
+      return v.length > 0 && v.every((x) => hexOfKey(x) === hex);
+    };
+    const setSlot = (hex, name) => {
+      slotOf.set(hex, name);
+      slotOwner.set(name, hex);
+    };
+    const hexCount = /* @__PURE__ */ new Map();
+    for (const v of left) hexCount.set(hexOfKey(v), ((_a = hexCount.get(hexOfKey(v))) != null ? _a : 0) + ((_b = counts.get(v)) != null ? _b : 0));
+    const hexes = [...hexCount.keys()].sort((a, b) => {
+      var _a2, _b2;
+      return ((_a2 = hexCount.get(b)) != null ? _a2 : 0) - ((_b2 = hexCount.get(a)) != null ? _b2 : 0) || cmpStr2(a, b);
+    });
+    const fellBack = /* @__PURE__ */ new Set();
+    const pick = (hex, cands) => {
+      const free = cands.find((n) => slotFree(n, hex));
+      if (!free) fellBack.add(hex);
+      setSlot(hex, free != null ? free : cands[cands.length - 1]);
+    };
+    const ladderSide = (list, refL, prefix) => {
+      const lighter = list.filter((h) => lOf(h) > refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr2(a, b));
+      const darker = list.filter((h) => lOf(h) <= refL).sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr2(a, b));
+      for (const h of lighter) pick(h, LIGHTER.map((w) => `${prefix}-${w}`));
+      for (const h of darker) pick(h, DARKER.map((w) => `${prefix}-${w}`));
+    };
+    if (kind === "ladder") {
+      const i = base.lastIndexOf("/");
+      const words = base.slice(i + 1) === "strong" ? DARKER : LIGHTER;
+      const refL = refHex ? lOf(refHex) : 0;
+      const sorted = [...hexes].sort((a, b) => Math.abs(lOf(a) - refL) - Math.abs(lOf(b) - refL) || cmpStr2(a, b));
+      for (const h of sorted) pick(h, words.map((w) => `${base.slice(0, i)}/${w}`));
+    } else if (kind === "default") {
+      for (const h of hexes) pick(h, [base]);
+    } else {
+      const held = holderValue(taken, base);
+      let rest = hexes;
+      let refH;
+      if (held) refH = hexOfKey(held);
+      else {
+        refH = hexes[0];
+        rest = hexes.slice(1);
+        pick(refH, [base]);
+      }
+      if (kind === "inverse") ladderSide(rest.filter((h) => h !== refH), lOf(refH), base);
+      else {
+        const refFam = famOf(refH);
+        ladderSide(rest.filter((h) => h !== refH && famOf(h) === refFam), lOf(refH), base);
+        const byFam = /* @__PURE__ */ new Map();
+        for (const h of rest) {
+          if (h === refH || famOf(h) === refFam) continue;
+          const f = famOf(h);
+          byFam.set(f, [...(_c = byFam.get(f)) != null ? _c : [], h]);
+        }
+        for (const [f, list] of byFam) {
+          const famName = `${base}-${f}`;
+          const famHeld = holderValue(taken, famName);
+          let famRef;
+          let others = list;
+          if (famHeld) famRef = hexOfKey(famHeld);
+          else {
+            famRef = list[0];
+            others = list.slice(1);
+            pick(famRef, [famName]);
+          }
+          ladderSide(others.filter((h) => h !== famRef), lOf(famRef), famName);
+        }
+      }
+      if (held && rest.includes(refH) && !slotOf.has(refH)) setSlot(refH, base);
+    }
+    const alphaOf = (v) => {
+      var _a2;
+      return (_a2 = alphaOfKey(v)) != null ? _a2 : 1;
+    };
+    const byHex = /* @__PURE__ */ new Map();
+    for (const v of left) byHex.set(hexOfKey(v), [...(_d = byHex.get(hexOfKey(v))) != null ? _d : [], v]);
+    const nameFree = (n, hex) => !taken.has(n) && (!slotOwner.has(n) || slotOwner.get(n) === hex);
+    for (const [hex, vals] of byHex) {
+      const slot = (_e = slotOf.get(hex)) != null ? _e : base;
+      const fb = fellBack.has(hex);
+      const order = [...vals].sort((a, b) => {
+        var _a2, _b2;
+        return ((_a2 = counts.get(b)) != null ? _a2 : 0) - ((_b2 = counts.get(a)) != null ? _b2 : 0) || alphaOf(b) - alphaOf(a) || cmpValue(a, b);
+      });
+      const fileVals = !fb ? taken.get(slot) : void 0;
+      const held = fileVals && fileVals.length && fileVals.every((x) => hexOfKey(x) === hex) && !slotAssigned.has(slot) ? fileVals[0] : void 0;
+      let refA;
+      let rest = order;
+      if (held != null) refA = alphaOf(held);
+      else {
+        const first = order[0];
+        rest = order.slice(1);
+        refA = alphaOf(first);
+        assign(first, fb || taken.has(slot) ? fallback(slot) : slot);
+        slotAssigned.add(slot);
+      }
+      const side = (list, words) => {
+        const sorted = [...list].sort((a, b) => Math.abs(alphaOf(a) - refA) - Math.abs(alphaOf(b) - refA) || alphaOf(a) - alphaOf(b));
+        sorted.forEach((v, i) => {
+          const cands = words.map((w) => `${slot}-${w}`);
+          if (fb) {
+            assign(v, fallback(cands[Math.min(i, cands.length - 1)]));
+            return;
+          }
+          const free = cands.find((n) => nameFree(n, hex));
+          assign(v, free != null ? free : fallback(cands[cands.length - 1]));
+        });
+      };
+      for (const v of rest.filter((x) => Math.abs(alphaOf(x) - refA) < 5e-3)) assign(v, fallback(slot));
+      side(rest.filter((x) => alphaOf(x) < refA - 49e-4), LIGHTER);
+      side(rest.filter((x) => alphaOf(x) > refA + 49e-4), DARKER);
+    }
+  }
+  function cmpValue(a, b) {
+    const na = Number(a);
+    const nb = Number(b);
+    if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+  function stepName(offset) {
+    if (offset === 0) return "md";
+    if (offset === -1) return "sm";
+    if (offset === -2) return "xs";
+    if (offset === 1) return "lg";
+    if (offset === 2) return "xl";
+    return offset < 0 ? `${-offset - 1}xs` : `${offset - 1}xl`;
+  }
+  var STEP_RE_SRC = "(?:md|sm|xs|lg|xl|(?:[2-9]|[1-9]\\d+)x[sl])";
+  function stepOffset(step) {
+    switch (step) {
+      case "md":
+        return 0;
+      case "sm":
+        return -1;
+      case "xs":
+        return -2;
+      case "lg":
+        return 1;
+      case "xl":
+        return 2;
+    }
+    const m = /^([2-9]|[1-9]\d+)x([sl])$/.exec(step);
+    if (!m) return null;
+    const k = Number(m[1]) + 1;
+    return m[2] === "s" ? -k : k;
+  }
+  function stepFamilyRe(kind) {
+    const full = kind === "radius" ? `|full` : "";
+    return new RegExp(`^${esc(kind)}\\/(?:${STEP_RE_SRC}${full})(?:-\\d+)?$`);
+  }
+  function parseStepName(name, kind) {
+    if (!name.startsWith(kind + "/")) return null;
+    const rest = name.slice(kind.length + 1);
+    const m = /^([a-z0-9]+?)(?:-(\d+))?$/.exec(rest);
+    if (!m) return null;
+    const n = m[2] ? Number(m[2]) : 0;
+    if (m[1] === "full") return kind === "radius" ? { off: "full", n } : null;
+    const off = stepOffset(m[1]);
+    return off == null ? null : { off, n };
+  }
+  function stepFamilyRank(name, kind) {
+    const p = parseStepName(name, kind);
+    if (!p) return [3, 0, name];
+    if (p.n) return [2, p.n, name];
+    if (p.off === "full") return [1, 0, ""];
+    return [0, Math.abs(p.off) * 2 + (p.off > 0 ? 1 : 0), ""];
+  }
+  function stepLadder(kind, all, left, taken, assign, fallback) {
+    var _a, _b, _c;
+    const info = /* @__PURE__ */ new Map();
+    for (const x of all) {
+      const cur = info.get(x.value);
+      if (cur) info.set(x.value, { value: x.value, count: cur.count + x.count, pill: ((_a = cur.pill) != null ? _a : 0) + ((_b = x.pill) != null ? _b : 0) });
+      else info.set(x.value, { value: x.value, count: x.count, pill: (_c = x.pill) != null ? _c : 0 });
+    }
+    const leftSet = new Set(left);
+    const num = (v) => Number(v);
+    const isPill = (v) => {
+      var _a2;
+      if (kind !== "radius") return false;
+      const x = info.get(v);
+      return !!x && x.count > 0 && ((_a2 = x.pill) != null ? _a2 : 0) >= x.count;
+    };
+    const allValues = [.../* @__PURE__ */ new Set([...info.keys(), ...left])];
+    for (const v of left) if (!info.has(v)) info.set(v, { value: v, count: 0, pill: 0 });
+    const out = /* @__PURE__ */ new Map();
+    const give = (v, name) => {
+      out.set(v, name);
+      if (leftSet.has(v)) assign(v, name);
+      else {
+        const arr = taken.get(name);
+        taken.set(name, arr ? [...arr, v] : [v]);
+      }
+    };
+    const nameOf = (off) => `${kind}/${stepName(off)}`;
+    const reusedValues = /* @__PURE__ */ new Set();
+    for (const v of allValues) {
+      if (leftSet.has(v)) continue;
+      for (const [n, vals] of taken) if (vals.includes(v) && parseStepName(n, kind)) reusedValues.add(v);
+    }
+    const pills = allValues.filter((v) => isPill(v) && !reusedValues.has(v)).sort((a, b) => info.get(b).count - info.get(a).count || num(a) - num(b));
+    for (const v of pills) {
+      const base = `${kind}/full`;
+      give(v, taken.has(base) ? fallback(base) : base);
+    }
+    const ladder = allValues.filter((v) => !isPill(v) && !reusedValues.has(v));
+    if (!ladder.length) return;
+    const slots = /* @__PURE__ */ new Map();
+    const byValue = /* @__PURE__ */ new Map();
+    for (const [n, vals] of taken) {
+      const p = parseStepName(n, kind);
+      if (!p || p.n || p.off === "full" || !vals.length) continue;
+      const v = vals[0];
+      if (Number.isNaN(Number(v))) continue;
+      if (!slots.has(p.off)) slots.set(p.off, Number(v));
+      const r = stepFamilyRank(n, kind);
+      const cur = byValue.get(v);
+      if (!cur || r[1] < cur.rank[1]) byValue.set(v, { off: p.off, rank: r });
+    }
+    const free = (off) => !taken.has(nameOf(off));
+    if (!slots.size) {
+      const md = [...ladder].sort((a, b) => info.get(b).count - info.get(a).count || num(a) - num(b))[0];
+      give(md, free(0) ? nameOf(0) : fallback(nameOf(0)));
+      const small = ladder.filter((v) => num(v) < num(md)).sort((a, b) => num(b) - num(a));
+      const large = ladder.filter((v) => num(v) > num(md)).sort((a, b) => num(a) - num(b));
+      let off = 0;
+      for (const v of small) {
+        do
+          off--;
+        while (!free(off));
+        give(v, nameOf(off));
+      }
+      off = 0;
+      for (const v of large) {
+        do
+          off++;
+        while (!free(off));
+        give(v, nameOf(off));
+      }
+      return;
+    }
+    const existingVals = /* @__PURE__ */ new Set([...byValue.keys()]);
+    const order = [...slots].sort((a, b) => a[0] - b[0]);
+    const monotonic = order.every(([, v], i) => i === 0 || v > order[i - 1][1]);
+    const firstFree = (from, to, dir) => {
+      for (let o = from; to == null ? true : dir > 0 ? o <= to : o >= to; o += dir) if (free(o) && !slots.has(o)) return o;
+      return null;
+    };
+    const nearestTail = (v, lower, upper) => {
+      const pick = !upper ? lower : !lower ? upper : Math.abs(v - lower[1]) <= Math.abs(upper[1] - v) ? lower : upper;
+      return fallback(nameOf(pick[0]));
+    };
+    for (const v of ladder.filter((x) => leftSet.has(x) || !existingVals.has(x)).sort((a, b) => num(a) - num(b))) {
+      const x = num(v);
+      const known = [...slots].map(([o, val]) => [o, val]);
+      const same = known.find(([, val]) => Math.abs(val - x) < 5e-3);
+      if (same) {
+        give(v, fallback(nameOf(same[0])));
+        continue;
+      }
+      if (monotonic) {
+        const lower = known.filter(([, val]) => val < x).sort((a, b) => b[1] - a[1])[0];
+        const upper = known.filter(([, val]) => val > x).sort((a, b) => a[1] - b[1])[0];
+        let off;
+        if (lower && upper) off = firstFree(lower[0] + 1, upper[0] - 1, 1);
+        else if (upper) off = firstFree(upper[0] - 1, null, -1);
+        else off = firstFree(lower[0] + 1, null, 1);
+        if (off == null) give(v, nearestTail(x, lower, upper));
+        else {
+          give(v, nameOf(off));
+          slots.set(off, x);
+        }
+        continue;
+      }
+      const vals = known.map(([, val]) => val);
+      const offs = known.map(([o]) => o);
+      if (x < Math.min(...vals)) {
+        const off = firstFree(Math.min(...offs) - 1, null, -1);
+        give(v, nameOf(off));
+        slots.set(off, x);
+      } else if (x > Math.max(...vals)) {
+        const off = firstFree(Math.max(...offs) + 1, null, 1);
+        give(v, nameOf(off));
+        slots.set(off, x);
+      } else {
+        const near = [...known].sort((a, b) => Math.abs(a[1] - x) - Math.abs(b[1] - x) || a[1] - b[1])[0];
+        give(v, fallback(nameOf(near[0])));
+      }
+    }
+  }
+  function assignSteps(kind, values, existing, opts = {}) {
+    var _a, _b;
+    const taken = new Map([...existing].map(([n, v]) => [n, typeof v === "string" ? v ? [v] : [] : v]));
+    const out = /* @__PURE__ */ new Map();
+    const fam = stepFamilyRe(kind);
+    const canReuse = (_a = opts.canReuse) != null ? _a : () => true;
+    const uniq = [...new Set(values.map((x) => x.value))];
+    const want = new Set((_b = opts.want) != null ? _b : uniq);
+    const left = [];
+    for (const value of uniq) {
+      if (opts.reuse !== false) {
+        const names = [...taken].filter(([n, v]) => fam.test(n) && v.includes(value) && canReuse(n, value, kind)).map(([n]) => n).sort(byFamilyOrder(kind));
+        if (names.length) {
+          if (want.has(value)) out.set(value, names[0]);
+          continue;
+        }
+      }
+      if (want.has(value)) left.push(value);
+    }
+    const assign = (value, name) => {
+      out.set(value, name);
+      const arr = taken.get(name);
+      taken.set(name, arr ? [...arr, value] : [value]);
+    };
+    const fallback = (name) => {
+      for (let i = 2; ; i++) if (!taken.has(`${name}-${i}`)) return `${name}-${i}`;
+    };
+    const reused = new Set(uniq.filter((v) => !left.includes(v) && want.has(v)));
+    stepLadder(kind, values.filter((x) => !reused.has(x.value)), left, taken, assign, fallback);
+    return out;
+  }
+  function parseFontSizeName(name) {
+    const m = /^font-size\/(display|heading|body|label)\/([a-z]+)(?:-(\d+))?(?:-(\d+))?$/.exec(name);
+    if (!m) return null;
+    const cat = m[1];
+    if (!KRDS_STEPS[cat].some((d) => d.step === m[2])) return null;
+    return __spreadValues(__spreadValues({ cat, step: m[2] }, m[3] ? { px: m[3] } : {}), m[4] ? { n: Number(m[4]) } : {});
+  }
+  function isFontSizeShape(name, value) {
+    const p = parseFontSizeName(name);
+    if (!p) return false;
+    if (p.px == null) return p.n == null;
+    return p.px === value;
+  }
+  function isTextRoleShape(group, name, value) {
+    if (group === "font-size") return isFontSizeShape(name, value);
+    if (group === "line-height" || group === "letter-spacing") return stepFamilyRe(group).test(name);
+    return false;
+  }
+  function fontSizeCategory(px, styles) {
+    const allZero = styles.every((s) => !(s.count > 0));
+    const sum = (c) => styles.filter((s) => s.category === c).reduce((a, s) => a + (allZero ? 1 : Math.max(0, s.count)), 0);
+    if (px >= 21.5) return px >= 42 && sum("display") > sum("heading") ? "display" : "heading";
+    const order = ["body", "label", "heading", "display"];
+    let best = "body";
+    for (const c of order) if (sum(c) > sum(best)) best = c;
+    return best;
+  }
+  function assignFontSizeNames(reqs, existing, opts = {}) {
+    var _a;
+    const taken = new Map([...existing].map(([n, v]) => [n, typeof v === "string" ? v ? [v] : [] : v]));
+    const canReuse = (_a = opts.canReuse) != null ? _a : () => true;
+    const out = /* @__PURE__ */ new Map();
+    const merged = /* @__PURE__ */ new Map();
+    for (const r of reqs) {
+      const k = valueKey(r.px);
+      const cur = merged.get(k);
+      if (cur) cur.count += r.count;
+      else merged.set(k, __spreadValues({}, r));
+    }
+    const left = [];
+    for (const [k, r] of merged) {
+      if (opts.reuse !== false) {
+        const names = [...taken].filter(([n, v]) => isFontSizeShape(n, k) && v.includes(k) && canReuse(n, k, "font-size")).map(([n]) => n).sort((a, b) => Number(/-\d+$/.test(a)) - Number(/-\d+$/.test(b)) || cmpStr2(a, b));
+        if (names.length) {
+          out.set(k, names[0]);
+          continue;
+        }
+      }
+      left.push(r);
+    }
+    const groups = /* @__PURE__ */ new Map();
+    for (const r of left) {
+      const d = krdsStepDef(r.category, r.px);
+      const base = `font-size/${r.category}/${d.step}`;
+      const g = groups.get(base);
+      if (g) g.items.push(r);
+      else groups.set(base, { ref: d.ref, items: [r] });
+    }
+    const holds = (name) => taken.has(name);
+    for (const [base, g] of groups) {
+      const sorted = [...g.items].sort((a, b) => Math.abs(a.px - g.ref) - Math.abs(b.px - g.ref) || b.count - a.count || b.px - a.px);
+      sorted.forEach((r, i) => {
+        const k = valueKey(r.px);
+        const tail = `${base}-${k}`;
+        let name;
+        if (i === 0 && !holds(base)) name = base;
+        else if (!holds(tail)) name = tail;
+        else {
+          let n = 2;
+          while (holds(`${tail}-${n}`)) n++;
+          name = `${tail}-${n}`;
+        }
+        out.set(k, name);
+        const arr = taken.get(name);
+        taken.set(name, arr ? [...arr, k] : [k]);
+      });
+    }
+    return out;
+  }
+  var OLD_LADDER = /^(?:(?:spacing|size)\/(?:none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)|radius\/none|stroke-width\/(?:none|thin|thick))(-\d+)?$/;
+  var OLD_COLOR = /* @__PURE__ */ new Set(["color/background/default", "color/text/default", "color/border/default", "color/background/brand"]);
+  function isOldPluginName(name) {
+    return OLD_LADDER.test(name) || OLD_COLOR.has(name);
+  }
+  function valueKey(v) {
+    return typeof v === "number" ? String(Math.round(v * 100) / 100) : v.toLowerCase();
+  }
+  var AUTO_ROLE_KEY = "dsl.autoRole";
+
+  // src/lib/extract.ts
+  var SKIP_HIDDEN = t("extract.skipHidden");
+  var SKIP_INSTANCE = t("extract.skipInstance");
+  var SKIP_GRADIENT = t("extract.skipGradient");
+  var round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
+  var SKIP_FRACTION = t("extract.skipFraction");
+  function onScale(acc, v, step = 1) {
+    const ok = Math.abs(v / step - Math.round(v / step)) < 1e-6;
+    if (!ok) acc.skipped.add(SKIP_FRACTION);
+    return ok;
+  }
+  function keyOf(category, value, unit, alpha) {
+    return `${category}|${value}|${unit != null ? unit : ""}|${alpha != null ? alpha : 1}`;
+  }
+  function colorToken(category, hex, alpha) {
+    return alpha < 1 ? { name: `${colorTokenName(hex)}-a${alphaPct(alpha)}`, category, value: hex, alpha } : { name: colorTokenName(hex), category, value: hex };
+  }
+  function add(acc, token, source, nodeId, use, bg, mark) {
+    var _a, _b, _c, _d;
+    const k = keyOf(token.category, token.value, token.unit, token.alpha);
+    let existing = acc.map.get(k);
+    if (existing) {
+      if (!existing.sources.includes(source)) existing.sources.push(source);
+      if (acc.lastNode.get(k) !== nodeId) existing.count = ((_a = existing.count) != null ? _a : 1) + 1;
+    } else {
+      existing = __spreadProps(__spreadValues({}, token), { sources: [source], count: 1 });
+      acc.map.set(k, existing);
+    }
+    acc.lastNode.set(k, nodeId);
+    if (use) {
+      const uses = (_b = existing.uses) != null ? _b : existing.uses = [];
+      let u = uses.find((x) => x.name === use && x.bg === bg);
+      if (!u) {
+        u = bg ? { name: use, count: 0, bg } : { name: use, count: 0 };
+        uses.push(u);
+      }
+      if (mark == null ? void 0 : mark.under) u.underCount = ((_c = u.underCount) != null ? _c : 0) + 1;
+      else u.count++;
+      if (mark == null ? void 0 : mark.pill) u.pill = ((_d = u.pill) != null ? _d : 0) + 1;
+    }
+  }
+  function backgroundOf(node) {
+    var _a;
+    let p = node.parent;
+    while (p && p.type !== "PAGE" && p.type !== "DOCUMENT") {
+      const fills = p.fills;
+      if (Array.isArray(fills)) {
+        const vis = fills.filter((f) => f.visible !== false && f.opacity !== 0);
+        if (vis.length) {
+          const top = vis[vis.length - 1];
+          if (top.type === "SOLID" && ((_a = top.opacity) != null ? _a : 1) >= 1) return rgbToHex(top.color);
+          return void 0;
+        }
+      }
+      p = p.parent;
+    }
+    return void 0;
+  }
+  function collectPaints(acc, node, paints2, source) {
+    if (paints2 === figma.mixed || !Array.isArray(paints2)) return;
+    paints2.forEach((p, i) => collectPaint(acc, node, paints2, p, i, source));
+  }
+  function collectPaint(acc, node, paints2, p, i, source) {
+    const nodeId = node.id;
+    {
+      if (p.visible === false) return;
+      if (p.type !== "SOLID") {
+        acc.skipped.add(SKIP_GRADIENT);
+        return;
+      }
+      const alpha = roundAlpha(p.opacity);
+      if (alpha === 0) return;
+      const hex = rgbToHex(p.color);
+      const cu = colorUse(node.type, source === "fill" ? "fills" : "strokes", isInsideIconFrame(node));
+      const bgHex = cu === "text" || cu === "icon" || cu === "border" ? backgroundOf(node) : void 0;
+      add(acc, colorToken("color", hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : void 0, isCoveredPaint(paints2, i) ? { under: true } : void 0);
+    }
+  }
+  function collectText(acc, node) {
+    if (node.fontSize !== figma.mixed) {
+      const v = round(node.fontSize);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize", node.id);
+    }
+    if (node.fontName !== figma.mixed) {
+      const fam = node.fontName.family;
+      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily", node.id);
+    }
+    if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") {
+      const v = round(node.lineHeight.value);
+      const unit = "px";
+      if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight", node.id);
+    }
+    if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
+      const v = round(node.letterSpacing.value);
+      const unit = "px";
+      if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing", node.id);
+    }
+  }
+  function gapSkip(node, field) {
+    const n = node;
+    if (field === "itemSpacing") return n.primaryAxisAlignItems === "SPACE_BETWEEN" ? "space-between" : null;
+    if (field === "counterAxisSpacing") {
+      if (n.layoutWrap !== "WRAP") return "no-wrap";
+      return n.counterAxisAlignContent === "SPACE_BETWEEN" ? "space-between" : null;
+    }
+    return null;
+  }
+  function collectSpacing(acc, node) {
+    if (node.layoutMode === "NONE") return;
+    const gaps = ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"].map((f) => [node[f], "spacing/padding"]);
+    if (node.layoutMode === "GRID") {
+      gaps.push([node.gridRowGap, "spacing/gap"], [node.gridColumnGap, "spacing/gap"]);
+    } else {
+      if (!gapSkip(node, "itemSpacing")) gaps.push([node.itemSpacing, "spacing/gap"]);
+      if (typeof node.counterAxisSpacing === "number" && !gapSkip(node, "counterAxisSpacing")) gaps.push([node.counterAxisSpacing, "spacing/gap"]);
+    }
+    for (const [g, use] of gaps) {
+      if (typeof g === "number" && g > 0) {
+        const v = round(g);
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap", node.id, use);
+      }
+    }
+  }
+  function iconVectorCount(children, visible = true) {
+    let vectors = 0;
+    for (const c of children) {
+      if (hasImageFill(c)) return -1;
+      const shown = visible && c.visible !== false;
+      if (VECTOR_TYPES.has(c.type)) {
+        if (shown) vectors++;
+        continue;
+      }
+      if (c.type === "ELLIPSE" || c.type === "RECTANGLE") continue;
+      if (c.type === "GROUP" || c.type === "FRAME" || c.type === "INSTANCE") {
+        const n = iconVectorCount("children" in c ? c.children : [], shown);
+        if (n < 0) return -1;
+        vectors += n;
+        continue;
+      }
+      return -1;
+    }
+    return vectors;
+  }
+  function isSmallSquare(node) {
+    if (node.type !== "FRAME" && node.type !== "COMPONENT" && node.type !== "INSTANCE") return false;
+    const w = round(node.width);
+    return w > 0 && w === round(node.height) && w <= 64;
+  }
+  function isIconSelf(node) {
+    return !hasImageFill(node) && iconVectorCount("children" in node ? node.children : []) > 0;
+  }
+  function isAvatarSelf(node) {
+    const w = round(node.width);
+    const r = node.cornerRadius;
+    let radii = [];
+    if (r === figma.mixed) {
+      for (const corner of ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]) {
+        const cv = node[corner];
+        radii.push(typeof cv === "number" ? cv : 0);
+      }
+    } else if (typeof r === "number") radii = [r];
+    if (radii.length > 0 && radii.every((cv) => round(cv) >= w / 2)) {
+      const imageWithin = (n, depth) => {
+        if (hasImageFill(n)) return true;
+        if (depth >= 2 || !("children" in n)) return false;
+        return n.children.some((c) => c.visible !== false && imageWithin(c, depth + 1));
+      };
+      if (imageWithin(node, 0)) return true;
+    }
+    const children = "children" in node ? node.children : [];
+    return children.some(
+      (c) => c.visible !== false && c.type === "ELLIPSE" && hasImageFill(c) && Math.abs(c.width - node.width) <= 0.5 && Math.abs(c.height - node.height) <= 0.5
+    );
+  }
+  function hasIconAncestor(node) {
+    for (let p = node.parent; p && p.type !== "PAGE" && p.type !== "DOCUMENT"; p = p.parent) {
+      if (isSmallSquare(p) && isIconSelf(p)) return true;
+    }
+    return false;
+  }
+  function isIconOrAvatar(node) {
+    if (!isSmallSquare(node)) return false;
+    if (!isIconSelf(node) && !isAvatarSelf(node)) return false;
+    return !hasIconAncestor(node);
+  }
+  function inAutoLayoutFlow(node) {
+    if ("layoutPositioning" in node && node.layoutPositioning === "ABSOLUTE") return false;
+    const parent = node.parent;
+    return node.layoutMode !== "NONE" || parent != null && "layoutMode" in parent && parent.layoutMode !== "NONE";
+  }
+  function iconOrAvatarKind(node) {
+    if (!isIconOrAvatar(node)) return null;
+    return isIconSelf(node) ? "icon" : "avatar";
+  }
+  function isInsideIconFrame(node) {
+    for (let p = node.parent; p && p.type !== "PAGE" && p.type !== "DOCUMENT"; p = p.parent) {
+      if (isSmallSquare(p) && isIconSelf(p)) return true;
+    }
+    return false;
+  }
+  function collectSize(acc, node) {
+    if (!isIconOrAvatar(node)) return;
+    if (!inAutoLayoutFlow(node)) return;
+    const addSize = (v) => {
+      const rv = round(v);
+      if (rv > 0 && Number.isInteger(rv)) add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size", node.id, `size/${isIconSelf(node) ? "icon" : "avatar"}`);
+    };
+    if (node.layoutSizingHorizontal === "FIXED") addSize(node.width);
+    if (node.layoutSizingVertical === "FIXED") addSize(node.height);
+  }
+  function collectRadius(acc, node) {
+    var _a, _b;
+    if (!("cornerRadius" in node)) return;
+    const r = node.cornerRadius;
+    const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
+    if (r !== figma.mixed && typeof r !== "number") return;
+    const values = corners.map((c) => r !== figma.mixed ? r : Number(node[c]) || 0);
+    const list = r === figma.mixed ? values : [r];
+    const w = (_a = node.width) != null ? _a : 0;
+    const h = (_b = node.height) != null ? _b : 0;
+    for (const rv of list) {
+      if (rv > 0) {
+        const v = round(rv);
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id, "radius", void 0, isPillRadius(rv, w, h) ? { pill: true } : void 0);
+      }
+    }
+  }
+  function collectStroke(acc, node) {
+    if (!("strokes" in node) || !("strokeWeight" in node)) return;
+    const strokes = node.strokes;
+    if (strokes === figma.mixed || !Array.isArray(strokes) || !strokes.some((p) => p.visible !== false)) return;
+    const w = node.strokeWeight;
+    const sides = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
+    const sideValues = sides.map((sd) => Number(node[sd]) || 0);
+    const widths = [];
+    if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
+    else if (typeof w === "number") widths.push(["strokeWeight", w]);
+    for (const [, wv] of widths) {
+      if (wv > 0) {
+        const v = round(wv);
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id, "stroke-width");
+      }
+    }
+  }
+  function collectOpacity(acc, node) {
+    if (!("opacity" in node)) return;
+    const o = node.opacity;
+    if (typeof o !== "number" || o >= 1 || o <= 0) return;
+    const v = round(o);
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id, "opacity");
+  }
+  function collectEffects(acc, node) {
+    var _a;
+    if (!("effects" in node)) return;
+    for (const e of node.effects) {
+      if (e.visible === false) continue;
+      if (e.type === "DROP_SHADOW" || e.type === "INNER_SHADOW") {
+        const alpha = roundAlpha(e.color.a);
+        if (alpha === 0) continue;
+        const hex = rgbToHex(e.color);
+        add(acc, colorToken("effectColor", hex, alpha), "effectColor", node.id, "color/shadow");
+        for (const [g, val] of [
+          ["shadow-blur", e.radius],
+          ["shadow-spread", (_a = e.spread) != null ? _a : 0],
+          ["shadow-x", e.offset.x],
+          ["shadow-y", e.offset.y]
+        ]) {
+          const v = round(val);
+          if (onScale(acc, v)) add(acc, { name: numberTokenName(g, v), category: "effectFloat", value: v }, "effectFloat", node.id);
+        }
+      } else if (e.type === "LAYER_BLUR" || e.type === "BACKGROUND_BLUR") {
+        const v = round(e.radius);
+        if (onScale(acc, v)) add(acc, { name: numberTokenName("blur", v), category: "effectFloat", value: v }, "effectFloat", node.id);
+      }
+    }
+  }
+  function walk(acc, node) {
+    var _a;
+    if (node.visible === false) {
+      acc.skipped.add(SKIP_HIDDEN);
+      return;
+    }
+    if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
+    if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
+    if (node.type === "TEXT") collectText(acc, node);
+    if (node.type === "FRAME" || node.type === "COMPONENT" || node.type === "INSTANCE") {
+      collectSpacing(acc, node);
+    }
+    collectSize(acc, node);
+    collectRadius(acc, node);
+    collectStroke(acc, node);
+    collectOpacity(acc, node);
+    collectEffects(acc, node);
+    if (node.type === "INSTANCE") {
+      if ("children" in node && node.children.length && !((_a = acc.covered) == null ? void 0 : _a.has(node.id))) acc.skipped.add(SKIP_INSTANCE);
+      return;
+    }
+    if ("children" in node) for (const child of node.children) walk(acc, child);
+  }
+  function isEffectivelyVisible(node) {
+    let p = node;
+    while (p) {
+      if ("visible" in p && p.visible === false) return false;
+      p = p.parent;
+    }
+    return true;
+  }
+  function extractFromSelection(selection2, coveredInstances) {
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), covered: coveredInstances };
+    for (const node of selection2) {
+      if (!isEffectivelyVisible(node)) {
+        acc.skipped.add(SKIP_HIDDEN);
+        continue;
+      }
+      walk(acc, node);
+    }
+    const tokens = [...acc.map.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const warnings = tokens.length ? [...acc.warnings] : [...acc.warnings, ...acc.skipped];
+    return { tokens, warnings };
+  }
+
+  // src/lib/errors.ts
+  function explainError(raw) {
+    const s = (raw || "").toLowerCase();
+    if (/font|loadfontasync|has not been loaded/.test(s))
+      return { message: t("err.font"), action: t("err.fontAction"), retryable: true };
+    if (/invalid scope|scope/.test(s))
+      return { message: t("err.scope"), action: t("err.scopeAction"), retryable: true };
+    if (/incompatible|property value/.test(s))
+      return { message: t("err.prop"), action: t("err.propAction"), retryable: false };
+    if (/read[- ]?only|permission|not allowed|cannot edit/.test(s))
+      return { message: t("err.readonly"), action: t("err.readonlyAction"), retryable: false };
+    if (/network|fetch|timeout|offline/.test(s))
+      return { message: t("err.network"), action: t("err.networkAction"), retryable: true };
+    if (/storage|quota|exceeded/.test(s))
+      return { message: t("err.storage"), action: t("err.storageAction"), retryable: true };
+    return { message: raw || t("err.unknown"), action: t("err.unknownAction"), retryable: true };
+  }
+
+  // src/lib/tiers.ts
+  var TIER_NUM = { global: 1, semantic: 2, component: 3 };
+  var CANONICAL_NAME = { global: "Global", semantic: "Semantic" };
+  function hasComponentWord(name) {
+    return /\bcomponents?\b/i.test(name);
+  }
+  function judgeUserTier(name, collectionId, samples) {
+    let counted = 0;
+    let alias = 0;
+    for (const s of samples) {
+      if (s.alias && s.targetCollection === collectionId) continue;
+      counted++;
+      if (s.alias) alias++;
+    }
+    if (counted === 0) return { tier: 0, why: { kind: "empty", alias, counted } };
+    if (hasComponentWord(name)) return { tier: 3, why: { kind: "name", alias, counted } };
+    const tier = 5 * alias >= 4 * counted ? 2 : 5 * alias <= counted ? 1 : 0;
+    return { tier, why: { kind: "ratio", alias, counted } };
+  }
+  function pickOwned(cols, marker) {
+    var _a;
+    const out = { global: void 0, semantic: void 0 };
+    for (const role of ["global", "semantic"]) {
+      out[role] = (_a = cols.find((c) => marker(c) === role)) != null ? _a : cols.find((c) => !marker(c) && c.name === CANONICAL_NAME[role]);
+    }
+    return out;
+  }
+
+  // src/lib/collectionRoles.ts
+  var OWNED_KEY = "dsl.owned";
+  function ownedMarker(c) {
+    try {
+      const fn = c.getPluginData;
+      return typeof fn === "function" ? fn.call(c, OWNED_KEY) || "" : "";
+    } catch (e) {
+      return "";
+    }
+  }
+  function ownedCollections(cols) {
+    return pickOwned(cols, ownedMarker);
+  }
+  function ownedCollection(cols, role) {
+    return ownedCollections(cols)[role];
+  }
+  function ensureOwnedCollection(cols, role) {
+    var _a;
+    const found = ownedCollection(cols, role);
+    const col = found != null ? found : figma.variables.createVariableCollection(CANONICAL_NAME[role]);
+    if (ownedMarker(col) !== role) {
+      try {
+        (_a = col.setPluginData) == null ? void 0 : _a.call(col, OWNED_KEY, role);
+      } catch (e) {
+      }
+    }
+    return col;
+  }
+  function samplesByCollection(cols, vars) {
+    var _a, _b, _c;
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const colOfVar = new Map(vars.map((v) => [v.id, v.variableCollectionId]));
+    const out = /* @__PURE__ */ new Map();
+    for (const v of vars) {
+      const raw = (_b = v.valuesByMode) == null ? void 0 : _b[(_a = modeOf.get(v.variableCollectionId)) != null ? _a : ""];
+      const isAlias2 = !!raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS";
+      const s = isAlias2 ? { alias: true, targetCollection: (_c = colOfVar.get(raw.id)) != null ? _c : null } : { alias: false };
+      const arr = out.get(v.variableCollectionId);
+      if (arr) arr.push(s);
+      else out.set(v.variableCollectionId, [s]);
+    }
+    return out;
+  }
+  function collectionTierInfo(cols, vars) {
+    var _a;
+    const owned = ownedCollections(cols);
+    const samples = samplesByCollection(cols, vars);
+    const out = /* @__PURE__ */ new Map();
+    for (const c of cols) {
+      const role = owned.global === c ? "global" : owned.semantic === c ? "semantic" : null;
+      out.set(c.id, role ? { tier: TIER_NUM[role], why: { kind: "owned" } } : judgeUserTier(c.name, c.id, (_a = samples.get(c.id)) != null ? _a : []));
+    }
+    return out;
+  }
+  function collectionTiers(cols, vars) {
+    return new Map([...collectionTierInfo(cols, vars)].map(([id, i]) => [id, i.tier]));
+  }
+  function ownedIds(cols) {
+    var _a, _b;
+    const o = ownedCollections(cols);
+    return new Set([(_a = o.global) == null ? void 0 : _a.id, (_b = o.semantic) == null ? void 0 : _b.id].filter((x) => !!x));
   }
 
   // src/lib/textStyles.ts
@@ -3387,10 +3688,10 @@
     } catch (e) {
       role = void 0;
     }
-    return pickOwner(role, void 0, isKnownRole);
+    return role && isKnownRole(role) && !isStructuralRole(role) ? role : void 0;
   }
   async function bindSelection(selection2, apply = true, hooks = {}, opts = {}) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c;
     const index = await buildIndex();
     const mains = await collectLocalMains(selection2);
     const mainRoots = mains.units.flatMap((u) => u.roots);
@@ -3398,17 +3699,11 @@
     const res = { bound: 0, skipped: 0, reasons: {} };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2, mains.units) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
-    const ownerCache = /* @__PURE__ */ new Map();
-    const ownerOf = (_a = opts.ownerOf) != null ? _a : dsRoleOwner;
     const ctx = {
       index,
       res,
       preview,
       slots: [],
-      owner: (n) => {
-        if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
-        return ownerCache.get(n);
-      },
       skipText: opts.skipTextStyleNode,
       noNewRoles: !!opts.noNewRoles,
       mainOf: mains.mainOf,
@@ -3446,7 +3741,7 @@
       );
       res.bound = r.bound;
       res.skipped += r.skipped;
-      for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
+      for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_a = res.reasons[k]) != null ? _a : 0) + v;
       res.newRoles = r.newRoles;
       if (r.mainsBound.length) res.mainsBound = r.mainsBound;
       for (const c of preview.candidates) {
@@ -3460,10 +3755,10 @@
       res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
       res.skips = skips;
       const layers = {};
-      for (const s of preview.skips) layers[s.reason] = ((_c = layers[s.reason]) != null ? _c : 0) + 1;
+      for (const s of preview.skips) layers[s.reason] = ((_b = layers[s.reason]) != null ? _b : 0) + 1;
       res.skipLayers = layers;
     }
-    (_d = hooks.onProgress) == null ? void 0 : _d.call(hooks, prog.done, prog.total);
+    (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
     return res;
   }
   async function buildIndex() {
@@ -3579,6 +3874,7 @@
     const { res, preview } = ctx;
     const pending = [];
     const colorLeft = [];
+    const rest = [];
     const emit = (s, e) => {
       res.bound++;
       preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e)));
@@ -3598,8 +3894,9 @@
         colorLeft.push({ slot: s, cands });
         continue;
       }
+      rest.push(s);
       const group = s.usage.split("/")[0];
-      const two = s.kind === "text" ? cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0] : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
+      const two = s.kind === "text" ? textOrderTwo(cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)), group, valueKey(s.value)) : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
       if (two) {
         emit(s, two);
         continue;
@@ -3613,12 +3910,14 @@
       else byUse.set(x.slot.usage, [x]);
     }
     for (const [use, list] of byUse) {
+      const allUnder = list.every((x) => x.slot.under);
       const counts = /* @__PURE__ */ new Map();
       for (const x of list) {
         const k = colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha);
+        const add2 = !x.slot.under || allUnder ? 1 : 0;
         const c = counts.get(k);
-        if (c) c.count++;
-        else counts.set(k, __spreadValues({ hex: x.slot.display, count: 1, bg: x.slot.bg }, x.slot.alpha != null ? { alpha: x.slot.alpha } : {}));
+        if (c) c.count += add2;
+        else counts.set(k, __spreadValues({ hex: x.slot.display, count: add2, bg: x.slot.bg }, x.slot.alpha != null ? { alpha: x.slot.alpha } : {}));
       }
       const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
@@ -3643,14 +3942,39 @@
       for (const p of live) emit(p.slot, p.global);
       return;
     }
+    const isStepKind = (p) => p.slot.kind !== "color" && p.base !== "font-size" && p.base !== "font-family/text";
     const names = assignNames(
-      live.map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
+      live.filter((p) => !isStepKind(p) && p.base !== "font-size").map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
       ctx.index.semNames,
       { reuse: false }
     );
+    const stepNames = /* @__PURE__ */ new Map();
+    {
+      const ladder = /* @__PURE__ */ new Map();
+      for (const s of rest) {
+        if (s.kind === "color" || s.usage === "font-size" || s.usage === "font-family/text") continue;
+        if (typeof s.value !== "number" || !Number.isFinite(s.value)) continue;
+        const arr = (_b = ladder.get(s.usage)) != null ? _b : [];
+        arr.push({ value: valueKey(s.value), count: 1, pill: s.pill ? 1 : 0 });
+        ladder.set(s.usage, arr);
+      }
+      for (const [kind, values] of ladder) {
+        const want = live.filter((p) => p.base === kind).map((p) => valueKey(p.slot.value));
+        if (want.length) stepNames.set(kind, assignSteps(kind, values, ctx.index.semNames, { reuse: false, want }));
+      }
+    }
+    const fsLive = live.filter((p) => p.base === "font-size");
+    const fsNames = fsLive.length ? assignFontSizeNames(fontSizeReqs(fsLive.map((p) => p.slot)), ctx.index.semNames, { reuse: false }) : /* @__PURE__ */ new Map();
+    const nameFor = (p) => {
+      var _a2, _b2, _c2, _d;
+      const v = valueKey(p.slot.value);
+      if (p.base === "font-size") return (_a2 = fsNames.get(v)) != null ? _a2 : p.base;
+      if (isStepKind(p)) return (_c2 = (_b2 = stepNames.get(p.base)) == null ? void 0 : _b2.get(v)) != null ? _c2 : p.base;
+      return (_d = names.get(`${p.base}\0${v}`)) != null ? _d : p.base;
+    };
     const roleOf = /* @__PURE__ */ new Map();
     for (const p of live) {
-      const name = (_b = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _b : p.base;
+      const name = nameFor(p);
       let spec = roleOf.get(name);
       if (!spec) {
         const g2 = p.global;
@@ -3665,6 +3989,31 @@
         newRoleGlobalName: spec.globalName
       }));
     }
+  }
+  function textOrderTwo(list, group, value) {
+    var _a;
+    const sorted = [...list].sort(byName);
+    return (_a = sorted.find((e) => isTextRoleShape(group, e.variable.name, value))) != null ? _a : sorted[0];
+  }
+  function fontSizeReqs(slots) {
+    var _a, _b;
+    const byPx = /* @__PURE__ */ new Map();
+    for (const s of slots) {
+      const px = Number(s.value);
+      const fn = s.node.fontName;
+      const weight = fn && typeof fn === "object" && "style" in fn ? weightOf(fn.style).weight : 400;
+      const cat = px >= 21.5 ? px >= 42 && weight >= 600 ? "display" : "heading" : weight >= 600 ? "heading" : "body";
+      const m = (_a = byPx.get(px)) != null ? _a : /* @__PURE__ */ new Map();
+      m.set(cat, ((_b = m.get(cat)) != null ? _b : 0) + 1);
+      byPx.set(px, m);
+    }
+    const order = ["body", "heading", "display"];
+    return [...byPx].map(([px, m]) => {
+      var _a2, _b2;
+      let best = order.find((c) => m.has(c));
+      for (const c of order) if (((_a2 = m.get(c)) != null ? _a2 : 0) > ((_b2 = m.get(best)) != null ? _b2 : 0)) best = c;
+      return { px, category: best, count: [...m.values()].reduce((a, b) => a + b, 0) };
+    });
   }
   function candOf(s, variableId, variableName, tier, variableValue, variableAlpha) {
     return __spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
@@ -3778,7 +4127,8 @@
           const bgHex = use === "text" || use === "icon" || use === "border" ? backgroundOf(node) : void 0;
           bg = bgHex ? bgKindOf(bgHex) : void 0;
         }
-        ctx.slots.push(__spreadProps(__spreadValues(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: colorKey(hex, alpha), display: hex }, alpha !== 1 ? { alpha } : {}), { allowed, usage: use }), bg ? { bg } : {}), { noMatchReason: "no-match" }));
+        const under = isCoveredPaint(paints2, i);
+        ctx.slots.push(__spreadProps(__spreadValues(__spreadValues(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: colorKey(hex, alpha), display: hex }, alpha !== 1 ? { alpha } : {}), { allowed, usage: use }), bg ? { bg } : {}), under ? { under: true } : {}), { noMatchReason: "no-match" }));
       });
     }
   }
@@ -3794,7 +4144,7 @@
             return;
           }
           const fraction = Math.abs(v - Math.round(v)) >= 5e-3;
-          tryBind(ctx, node, field, v, `size/${kind}`, fraction ? "size-fraction" : void 0);
+          tryBind(ctx, node, field, v, numericKind(field, kind), fraction ? "size-fraction" : void 0);
         };
         if (aspectLocked(node)) {
           const ls = lockedSizeState(node);
@@ -3817,10 +4167,9 @@
       note(res, "no-autolayout", node, preview);
       return;
     }
-    const owner = ctx.owner(node);
     if (node.layoutMode === "GRID") {
-      tryBind(ctx, node, "gridRowGap", node.gridRowGap, simpleNumericName("gridRowGap", owner), numReason(node.gridRowGap));
-      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, simpleNumericName("gridColumnGap", owner), numReason(node.gridColumnGap));
+      tryBind(ctx, node, "gridRowGap", node.gridRowGap, "spacing/gap", numReason(node.gridRowGap));
+      tryBind(ctx, node, "gridColumnGap", node.gridColumnGap, "spacing/gap", numReason(node.gridColumnGap));
     } else {
       for (const f of ["itemSpacing", "counterAxisSpacing"]) {
         const v = node[f];
@@ -3829,30 +4178,31 @@
         if (gs === "no-wrap") continue;
         if (gs === "space-between") {
           if (v > 0) note(res, "space-between", node, preview, f);
-        } else tryBind(ctx, node, f, v, simpleNumericName(f, owner), numReason(v));
+        } else tryBind(ctx, node, f, v, "spacing/gap", numReason(v));
       }
     }
-    const pad = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
     for (const f of ["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]) {
-      tryBind(ctx, node, f, node[f], composeName("spacing", owner, paddingProp(f, pad)), numReason(node[f]));
+      tryBind(ctx, node, f, node[f], "spacing/padding", numReason(node[f]));
     }
   }
   function bindRadius(node, ctx) {
+    var _a, _b;
     if (!("cornerRadius" in node)) return;
     const r = node.cornerRadius;
     const corners = ["topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"];
     const values = corners.map((c) => r !== figma.mixed && typeof r === "number" ? r : Number(node[c]) || 0);
     if (r !== figma.mixed && !(typeof r === "number" && r > 0)) return;
-    const owner = ctx.owner(node);
+    const w = (_a = node.width) != null ? _a : 0;
+    const h = (_b = node.height) != null ? _b : 0;
     corners.forEach((c, i) => {
-      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
+      if (values[i] > 0) tryBind(ctx, node, c, values[i], "radius", numReason(values[i]), isPillRadius(values[i], w, h));
     });
   }
   function bindOpacity(node, ctx) {
     if (!("opacity" in node)) return;
     const o = node.opacity;
     if (typeof o !== "number" || o >= 1 || o <= 0) return;
-    tryBind(ctx, node, "opacity", o, simpleNumericName("opacity", ctx.owner(node)));
+    tryBind(ctx, node, "opacity", o, "opacity");
   }
   function bindStroke(node, ctx) {
     const { res, preview } = ctx;
@@ -3862,7 +4212,6 @@
     const w = node.strokeWeight;
     const sides = ["strokeTopWeight", "strokeRightWeight", "strokeBottomWeight", "strokeLeftWeight"];
     const sideValues = sides.map((sd) => Number(node[sd]) || 0);
-    const owner = ctx.owner(node);
     const one = (field, v) => {
       if (!(v > 0)) return;
       const st = stateReason(nodeFieldState(node, field));
@@ -3874,7 +4223,7 @@
         note(res, "fraction", node, preview, field);
         return;
       }
-      tryBind(ctx, node, field, v, strokeName(field, owner, sideValues));
+      tryBind(ctx, node, field, v, "stroke-width");
     };
     if (w !== figma.mixed && typeof w === "number") {
       one("strokeWeight", w);
@@ -3954,14 +4303,14 @@
     }
     ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: reason });
   }
-  function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match") {
+  function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match", pill = false) {
     const allowed = numAllowed(field);
     const st = stateReason(nodeFieldState(node, field));
     if (st) {
       note(ctx.res, st, node, ctx.preview, field);
       return;
     }
-    ctx.slots.push({ node, field, kind: "num", value, display: String(value), allowed, usage, noMatchReason });
+    ctx.slots.push(__spreadProps(__spreadValues({ node, field, kind: "num", value, display: String(value), allowed, usage }, pill ? { pill: true } : {}), { noMatchReason }));
   }
   var LINK_CHUNK = 300;
   async function bindSelectedItems(items, hooks = {}, known) {
@@ -4780,13 +5129,8 @@
     }
     return summary;
   }
-  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-    const withUses = tokens.filter((t2) => {
-      var _a2;
-      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
-    });
-    if (!withUses.length) return 0;
+  async function semanticNameIndex() {
+    var _a;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const vars = await figma.variables.getLocalVariablesAsync();
     const tiers = collectionTiers(cols, vars);
@@ -4835,6 +5179,16 @@
         return sc.includes("ALL_SCOPES") || need.every((x) => sc.includes(x));
       });
     };
+    return { cols, vars, byId, existing, semByName, canReuse };
+  }
+  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName, ladder) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    const withUses = tokens.filter((t2) => {
+      var _a2;
+      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
+    });
+    if (!withUses.length) return 0;
+    const { cols, vars, byId, existing, canReuse } = await semanticNameIndex();
     const pluginGlobal = ownedCollection(cols, "global");
     const globalFor = (t2) => {
       var _a2;
@@ -4844,18 +5198,39 @@
       return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : void 0;
     };
     const reqs = [];
+    const numReqs = [];
     const colorUses = /* @__PURE__ */ new Map();
     for (const t2 of withUses) {
-      for (const u of (_b = t2.uses) != null ? _b : []) {
+      for (const u of (_a = t2.uses) != null ? _a : []) {
         if (u.name.startsWith("color/")) {
-          const arr = (_c = colorUses.get(u.name)) != null ? _c : [];
-          arr.push({ token: t2, count: u.count, bg: u.bg });
+          const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
+          arr.push({ token: t2, count: u.count, under: (_c = u.underCount) != null ? _c : 0, bg: u.bg });
           colorUses.set(u.name, arr);
-        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
+        } else numReqs.push({ kind: u.name, value: valueKey(t2.value), count: u.count, pill: (_d = u.pill) != null ? _d : 0, token: t2 });
       }
     }
-    for (const [use, list] of colorUses) {
-      const defKey = (_d = existing.get(`${use}/default`)) == null ? void 0 : _d[0];
+    const stepName2 = /* @__PURE__ */ new Map();
+    {
+      const kinds = /* @__PURE__ */ new Map();
+      for (const r of numReqs) kinds.set(r.kind, [...(_e = kinds.get(r.kind)) != null ? _e : [], r]);
+      for (const [kind, list] of kinds) {
+        const values = [];
+        const seenV = /* @__PURE__ */ new Set();
+        for (const l of ladder != null ? ladder : []) {
+          if (l.kind !== kind) continue;
+          const v = valueKey(Number(l.value));
+          values.push({ value: v, count: l.count, pill: (_f = l.pill) != null ? _f : 0 });
+          seenV.add(v);
+        }
+        for (const r of list) if (!seenV.has(r.value)) values.push({ value: r.value, count: r.count, pill: r.pill });
+        const names2 = assignSteps(kind, values, existing, { canReuse, want: [...new Set(list.map((r) => r.value))] });
+        for (const r of list) stepName2.set(`${kind}\0${r.value}`, (_g = names2.get(r.value)) != null ? _g : `${kind}/md`);
+      }
+    }
+    for (const [use, list0] of colorUses) {
+      const allUnder = list0.every((x) => !(x.count > 0));
+      const list = list0.map((x) => __spreadProps(__spreadValues({}, x), { count: allUnder ? x.under : x.count }));
+      const defKey = (_h = existing.get(`${use}/default`)) == null ? void 0 : _h[0];
       const bases = colorRoleBases(
         list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
         defKey || void 0,
@@ -4868,13 +5243,18 @@
       );
       for (const x of list) {
         const hex = String(x.token.value).toLowerCase();
-        reqs.push(__spreadValues({ base: `${use}/${(_e = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _e : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
+        reqs.push(__spreadValues({ base: `${use}/${(_i = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _i : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
       }
     }
     const names = assignNames(reqs, existing, { canReuse });
     const toMake = /* @__PURE__ */ new Map();
+    for (const r of numReqs) {
+      const name = stepName2.get(`${r.kind}\0${r.value}`);
+      if (existing.has(name) || toMake.has(name)) continue;
+      toMake.set(name, r.token);
+    }
     for (const r of reqs) {
-      const name = (_f = names.get(`${r.base}\0${r.value}`)) != null ? _f : r.base;
+      const name = (_j = names.get(`${r.base}\0${r.value}`)) != null ? _j : r.base;
       if (existing.has(name) || toMake.has(name)) continue;
       toMake.set(name, r.token);
     }
@@ -4882,7 +5262,7 @@
       if (rowsOut) {
         for (const [name, t2] of toMake) {
           const id = globalOf == null ? void 0 : globalOf.get(t2.name);
-          rowsOut.push({ name, global: id && ((_g = byId.get(id)) == null ? void 0 : _g.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
+          rowsOut.push({ name, global: id && ((_k = byId.get(id)) == null ? void 0 : _k.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
         }
       }
       return toMake.size;
@@ -4895,9 +5275,9 @@
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_h = scopeForSemanticRole(name)) != null ? _h : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_l = scopeForSemanticRole(name)) != null ? _l : g.scopes, g.resolvedType);
       try {
-        (_i = v.setPluginData) == null ? void 0 : _i.call(v, AUTO_ROLE_KEY, "1");
+        (_m = v.setPluginData) == null ? void 0 : _m.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -5234,8 +5614,6 @@
     }
     const decimalAnchor = (st) => !!st && !isIntegerSize(roundN(st.fontSize));
     const renameBlocked = /* @__PURE__ */ new Set();
-    const roleRenames = [];
-    const roleSpecs = [];
     for (const spec of specs) {
       const st = anchoredStyle(spec);
       if (!st || st.name === spec.name) continue;
@@ -5243,12 +5621,8 @@
       if (occupant && occupant.id !== st.id) {
         renameBlocked.add(spec.boundStyleId);
         res.missing.push(t("textStyle.missRename", { from: st.name, to: spec.name }));
-        continue;
       }
-      roleRenames.push({ from: st.name, to: spec.name });
-      roleSpecs.push(spec);
     }
-    const roleMoved = roleRenames.length ? (await renameTextRoleVars(roleRenames)).moved : [];
     const tokens = [];
     const seen = /* @__PURE__ */ new Set();
     const pushTok = (t2) => {
@@ -5257,7 +5631,6 @@
         tokens.push(t2);
       }
     };
-    const aliasMap = {};
     const lhTokens = /* @__PURE__ */ new Map();
     const pushLineHeightTok = (name, px, pct2, fontSize) => {
       const prev = lhTokens.get(name);
@@ -5290,50 +5663,74 @@
       prev.fontSize = void 0;
       res.notes.push(t("textStyle.noteLsPx", { name }));
     };
-    const pushAlias = (role, fontSize, lineHeight, letterSpacing, lineHeightPercent = 0, letterSpacingPercent = 0) => {
-      pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
-      aliasMap[`font-size/${role}`] = numberTokenName("font-size", fontSize);
-      if (lineHeight > 0 && lineHeightPercent === 0 && Number.isInteger(lineHeight)) {
-        const lhName = numberTokenName("line-height", lineHeight);
-        pushLineHeightTok(lhName, lineHeight, 0, fontSize);
-        aliasMap[`line-height/${role}`] = lhName;
+    const fsStyles = /* @__PURE__ */ new Map();
+    const lhValues = /* @__PURE__ */ new Map();
+    const lsValues = /* @__PURE__ */ new Map();
+    const categoryOf = (spec, fontSize) => {
+      var _a2;
+      const head = spec.name.split("/")[0];
+      if (head === "display" || head === "heading" || head === "body" || head === "label") return head;
+      return krdsCategory({ name: spec.name, fontSize, lineHeight: spec.lineHeight, letterSpacing: spec.letterSpacing, family: spec.family, style: spec.style, count: (_a2 = spec.count) != null ? _a2 : 0, uiCount: 0 }, "scan");
+    };
+    const need = (spec, fontSize, lineHeight, letterSpacing, lhPct, lsPct, fields) => {
+      var _a2, _b2, _c2, _d2;
+      const count = Math.max(0, (_a2 = spec.count) != null ? _a2 : 0);
+      if (fields.fs) {
+        pushTok({ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] });
+        fsStyles.set(fontSize, [...(_b2 = fsStyles.get(fontSize)) != null ? _b2 : [], { category: categoryOf(spec, fontSize), count }]);
       }
-      if (letterSpacing !== 0 && letterSpacingPercent === 0 && Number.isInteger(letterSpacing)) {
-        const lsName = numberTokenName("letter-spacing", letterSpacing);
-        pushLetterSpacingTok(lsName, letterSpacing, 0, fontSize);
-        aliasMap[`letter-spacing/${role}`] = lsName;
+      if (fields.lh && lineHeight > 0 && lhPct === 0 && Number.isInteger(lineHeight)) {
+        pushLineHeightTok(numberTokenName("line-height", lineHeight), lineHeight, 0, fontSize);
+        lhValues.set(lineHeight, ((_c2 = lhValues.get(lineHeight)) != null ? _c2 : 0) + count);
+      }
+      if (fields.ls && letterSpacing !== 0 && lsPct === 0 && Number.isInteger(letterSpacing)) {
+        pushLetterSpacingTok(numberTokenName("letter-spacing", letterSpacing), letterSpacing, 0, fontSize);
+        lsValues.set(letterSpacing, ((_d2 = lsValues.get(letterSpacing)) != null ? _d2 : 0) + count);
       }
     };
     for (const s of specs) {
-      if (anchoredStyle(s)) continue;
-      pushAlias(s.name, s.fontSize, s.lineHeight, s.letterSpacing, (_a = s.lineHeightPercent) != null ? _a : 0, (_b = s.letterSpacingPercent) != null ? _b : 0);
-    }
-    {
-      const cols0 = await figma.variables.getLocalVariableCollectionsAsync();
-      const semId0 = (_c = ownedCollection(cols0, "semantic")) == null ? void 0 : _c.id;
-      const semNames = /* @__PURE__ */ new Set();
-      if (semId0) {
-        for (const v of await figma.variables.getLocalVariablesAsync())
-          if (v.variableCollectionId === semId0) semNames.add(v.name);
+      const st = anchoredStyle(s);
+      if (!st) {
+        need(s, s.fontSize, s.lineHeight, s.letterSpacing, (_a = s.lineHeightPercent) != null ? _a : 0, (_b = s.letterSpacingPercent) != null ? _b : 0, { fs: true, lh: true, ls: true });
+        continue;
       }
-      for (const s of specs) {
-        const st = anchoredStyle(s);
-        if (!st) continue;
-        if (semNames.has(`font-size/${s.name}`)) continue;
-        if (decimalAnchor(st)) continue;
-        const fontSize = roundN(st.fontSize);
-        pushAlias(s.name, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing));
-      }
+      if (s.boundStyleId && renameBlocked.has(s.boundStyleId)) continue;
+      if (decimalAnchor(st)) continue;
+      const fontSize = roundN(st.fontSize);
+      const bv = (_c = st.boundVariables) != null ? _c : {};
+      need(s, fontSize, lhPxOf(fontSize, st.lineHeight), lsPxOf(fontSize, st.letterSpacing), lhPctOf(st.lineHeight), lsPctOf(st.letterSpacing), { fs: !bv.fontSize, lh: !bv.lineHeight, ls: !bv.letterSpacing });
     }
     if (tokens.length) await createTokens(tokens, 16);
-    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_d = ownedCollection(cols, "semantic")) == null ? void 0 : _d.id;
-    const semByName = /* @__PURE__ */ new Map();
-    if (semId) {
-      for (const v of await figma.variables.getLocalVariablesAsync())
-        if (v.variableCollectionId === semId) semByName.set(v.name, v);
+    const idx0 = await semanticNameIndex();
+    const fsNames = assignFontSizeNames(
+      [...fsStyles].map(([px, styles]) => ({ px, category: fontSizeCategory(px, styles), count: styles.reduce((a, x) => a + x.count, 0) })),
+      idx0.existing,
+      { canReuse: idx0.canReuse }
+    );
+    const stepsOf = (kind, m) => m.size ? assignSteps(kind, [...m].map(([v, count]) => ({ value: valueKey(v), count })), idx0.existing, { canReuse: idx0.canReuse }) : /* @__PURE__ */ new Map();
+    const lhNames = stepsOf("line-height", lhValues);
+    const lsNames = stepsOf("letter-spacing", lsValues);
+    const aliasMap = {};
+    for (const [px] of fsStyles) {
+      const n = fsNames.get(valueKey(px));
+      if (n && !idx0.existing.has(n)) aliasMap[n] = numberTokenName("font-size", px);
     }
+    for (const [v] of lhValues) {
+      const n = lhNames.get(valueKey(v));
+      if (n && !idx0.existing.has(n)) aliasMap[n] = numberTokenName("line-height", v);
+    }
+    for (const [v] of lsValues) {
+      const n = lsNames.get(valueKey(v));
+      if (n && !idx0.existing.has(n)) aliasMap[n] = numberTokenName("letter-spacing", v);
+    }
+    if (Object.keys(aliasMap).length) await createSemanticAliases(aliasMap);
+    const idx = await semanticNameIndex();
+    const semVar = (name, value) => {
+      var _a2, _b2, _c2;
+      if (!name) return void 0;
+      const list = (_a2 = idx.semByName.get(name)) != null ? _a2 : [];
+      return (_c2 = (_b2 = list.find((x) => x.key === valueKey(value))) != null ? _b2 : list[0]) == null ? void 0 : _c2.v;
+    };
     const familyVarFor = await globalFamilyVars();
     for (const spec of specs) {
       const anchored = anchoredStyle(spec);
@@ -5379,8 +5776,8 @@
         }
         if (!style) style = figma.createTextStyle();
         setName(style);
-        const lhPct = (_e = spec.lineHeightPercent) != null ? _e : 0;
-        const lsPct = (_f = spec.letterSpacingPercent) != null ? _f : 0;
+        const lhPct = (_d = spec.lineHeightPercent) != null ? _d : 0;
+        const lsPct = (_e = spec.letterSpacingPercent) != null ? _e : 0;
         if (!isRename && loaded) {
           style.fontName = loaded;
           style.fontSize = spec.fontSize;
@@ -5388,31 +5785,41 @@
           style.letterSpacing = lsPct !== 0 ? { value: lsPct, unit: "PERCENT" } : { value: spec.letterSpacing, unit: "PIXELS" };
         } else if (lhPct > 0 || lsPct !== 0) {
           if (lhPct > 0) {
-            if ((_g = style.boundVariables) == null ? void 0 : _g.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
+            if ((_f = style.boundVariables) == null ? void 0 : _f.lineHeight) res.notes.push(t("textStyle.noteKeepLh", { name: spec.name, n: lhPct }));
             else style.lineHeight = { value: lhPct, unit: "PERCENT" };
           }
           if (lsPct !== 0) {
-            if ((_h = style.boundVariables) == null ? void 0 : _h.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
+            if ((_g = style.boundVariables) == null ? void 0 : _g.letterSpacing) res.notes.push(t("textStyle.noteKeepLs", { name: spec.name, n: lsPct }));
             else style.letterSpacing = { value: lsPct, unit: "PERCENT" };
           }
         }
         const bindRole = style.name;
-        const fsVar = semByName.get(`font-size/${bindRole}`);
-        if (fsVar) {
-          style.setBoundVariable("fontSize", fsVar);
-          res.bound++;
-        } else if (!(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `font-size/${bindRole}` }));
+        const bv = (_h = style.boundVariables) != null ? _h : {};
+        const fsNow = roundN(style.fontSize);
+        const decAnchor = isRename && decimalAnchor(style);
+        if (!(isRename && bv.fontSize) && !decAnchor) {
+          const fsName = fsNames.get(valueKey(fsNow));
+          const fsVar = semVar(fsName, fsNow);
+          if (fsVar) {
+            style.setBoundVariable("fontSize", fsVar);
+            res.bound++;
+          } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: fsName != null ? fsName : numberTokenName("font-size", fsNow) }));
+        }
         if (spec.lineHeight > 0 || isRename) {
           const pctNow = lhPctOf(style.lineHeight);
           if (pctNow > 0) {
             if ((_i = style.boundVariables) == null ? void 0 : _i.lineHeight) style.setBoundVariable("lineHeight", null);
             res.notes.push(t("textStyle.noteLhPct", { role: bindRole, n: pctNow }));
-          } else {
-            const lhVar = semByName.get(`line-height/${bindRole}`);
-            if (lhVar) {
-              style.setBoundVariable("lineHeight", lhVar);
-              res.bound++;
-            } else if (spec.lineHeight > 0 && Number.isInteger(spec.lineHeight) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `line-height/${bindRole}` }));
+          } else if (!(isRename && bv.lineHeight) && !decAnchor) {
+            const px = isRename ? lhPxOf(fsNow, style.lineHeight) : spec.lineHeight;
+            if (px > 0 && Number.isInteger(px)) {
+              const lhName = lhNames.get(valueKey(px));
+              const lhVar = semVar(lhName, px);
+              if (lhVar) {
+                style.setBoundVariable("lineHeight", lhVar);
+                res.bound++;
+              } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: lhName != null ? lhName : numberTokenName("line-height", px) }));
+            }
           }
         }
         if (spec.letterSpacing !== 0 || isRename) {
@@ -5420,12 +5827,16 @@
           if (lsPctNow !== 0) {
             if ((_j = style.boundVariables) == null ? void 0 : _j.letterSpacing) style.setBoundVariable("letterSpacing", null);
             res.notes.push(t("textStyle.noteLsPct", { role: bindRole, n: lsPctNow }));
-          } else {
-            const lsVar = semByName.get(`letter-spacing/${bindRole}`);
-            if (lsVar) {
-              style.setBoundVariable("letterSpacing", lsVar);
-              res.bound++;
-            } else if (spec.letterSpacing !== 0 && Number.isInteger(spec.letterSpacing) && !(isRename && decimalAnchor(style))) res.missing.push(t("textStyle.missVar", { name: bindRole, var: `letter-spacing/${bindRole}` }));
+          } else if (!(isRename && bv.letterSpacing) && !decAnchor) {
+            const px = isRename ? lsPxOf(fsNow, style.letterSpacing) : spec.letterSpacing;
+            if (px !== 0 && Number.isInteger(px)) {
+              const lsName = lsNames.get(valueKey(px));
+              const lsVar = semVar(lsName, px);
+              if (lsVar) {
+                style.setBoundVariable("letterSpacing", lsVar);
+                res.bound++;
+              } else res.missing.push(t("textStyle.missVar", { name: bindRole, var: lsName != null ? lsName : numberTokenName("letter-spacing", px) }));
+            }
           }
         }
         const famVar = familyVarFor(style.fontName.family);
@@ -5441,24 +5852,8 @@
         if (style) styleByName.set(style.name, style);
       }
     }
-    for (let i = 0; i < roleSpecs.length; i++) {
-      const spec = roleSpecs[i];
-      const st = anchoredStyle(spec);
-      const ids = new Set(roleMoved.filter((m) => m.pair === i).map((m) => m.id));
-      if (!st || !ids.size || st.name === spec.name) continue;
-      const orig = roleRenames[i].from;
-      await renameTextRoleVars([{ from: spec.name, to: orig }], { onlyIds: ids });
-      const want = new Set(ROLE_VAR_CATS.map((c) => `${c}/${orig}`));
-      const stuck = [];
-      for (const id of ids) {
-        const v = await figma.variables.getVariableByIdAsync(id);
-        if (v && !want.has(v.name)) stuck.push(v.name);
-      }
-      if (stuck.length) res.missing.push(t("textStyle.missRoleStuck", { name: st.name, vars: stuck.join(", ") }));
-    }
     return res;
   }
-  var ROLE_VAR_CATS = ["font-size", "line-height", "letter-spacing"];
   function finalNameTaken(cands, others) {
     var _a;
     const out = /* @__PURE__ */ new Set();
@@ -5516,56 +5911,6 @@
     for (const j of backJobs) if (cur(j) !== j.from) trySet(j, j.from);
     for (const j of backJobs) status.set(j.key, cur(j) !== j.from ? "error-stuck" : failed.has(j.key) ? "error" : "error-chain");
     return status;
-  }
-  var varTmpName = (id) => `__dsl_tmp_${id.replace(/[^A-Za-z0-9_-]/g, "_")}`;
-  async function renameTextRoleVars(pairs, opts = {}) {
-    var _a;
-    const res = { renamed: 0, taken: 0, error: 0, stuck: [], moved: [] };
-    if (!pairs.length) return res;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semId = (_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id;
-    if (!semId) return res;
-    const vars = (await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === semId);
-    const byName2 = /* @__PURE__ */ new Map();
-    for (const v of vars) if (!byName2.has(v.name)) byName2.set(v.name, v);
-    const cands = [];
-    const picked = /* @__PURE__ */ new Set();
-    pairs.forEach((p, pair) => {
-      if (p.from === p.to) return;
-      for (const cat of ROLE_VAR_CATS) {
-        const v = byName2.get(`${cat}/${p.from}`);
-        if (!v || picked.has(v.id) || isManualVar(v) || opts.onlyIds && !opts.onlyIds.has(v.id)) continue;
-        picked.add(v.id);
-        cands.push({ key: v.id, from: v.name, to: `${cat}/${p.to}`, v, pair });
-      }
-    });
-    if (!cands.length) return res;
-    const taken = finalNameTaken(cands, vars.filter((v) => !picked.has(v.id)).map((v) => v.name));
-    res.taken = taken.size;
-    const live = cands.filter((c) => !taken.has(c.key));
-    const status = twoPhaseRename(
-      live.map((c) => ({
-        key: c.key,
-        from: c.from,
-        to: c.to,
-        tmp: varTmpName(c.v.id),
-        get: () => c.v.name,
-        set: (n) => {
-          c.v.name = n;
-        }
-      }))
-    );
-    for (const c of live) {
-      const st = status.get(c.key);
-      if (st === "renamed") {
-        res.renamed++;
-        res.moved.push({ id: c.v.id, pair: c.pair });
-      } else {
-        res.error++;
-        if (st === "error-stuck") res.stuck.push(c.v.name);
-      }
-    }
-    return res;
   }
   function krdsInputOf(s) {
     const e = existingOf(s);
@@ -5628,7 +5973,7 @@
       }))
     );
     for (const [k, v] of done) status.set(k, v);
-    const res = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [] };
+    const res = { results: [], renamed: 0, skipped: 0, skipReasons: {} };
     for (const id of order) {
       const st = status.get(id);
       res.results.push({ id, status: st, name: (_b = (_a = byId.get(id)) == null ? void 0 : _a.name) != null ? _b : "" });
@@ -5636,18 +5981,6 @@
       else {
         res.skipped++;
         res.skipReasons[st] = ((_c = res.skipReasons[st]) != null ? _c : 0) + 1;
-      }
-    }
-    const pairs = live.filter((c) => status.get(c.key) === "renamed").map((c) => ({ from: c.from, to: c.to }));
-    if (pairs.length) {
-      try {
-        const rv = await renameTextRoleVars(pairs);
-        res.roleVarsRenamed = rv.renamed;
-        res.roleVarsTaken = rv.taken;
-        res.roleVarsError = rv.error;
-        res.roleVarsStuck = rv.stuck;
-      } catch (e) {
-        res.roleVarsError = pairs.length;
       }
     }
     return res;
@@ -6439,9 +6772,9 @@
   }
 
   // src/lib/componentLike.ts
-  function highConfidenceComponentRole(node, opts = {}) {
+  function highConfidenceComponentRole(node) {
     var _a;
-    if (tabInfo(node, { wide: opts.wideTab !== false }) != null) return "tab";
+    if (tabInfo(node) != null) return "tab";
     if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
     if (isNavLike(node, 0)) return "nav";
     if (isContainerType(node)) {
@@ -6778,7 +7111,7 @@
   }
   var weightOf2 = (t2) => typeof t2.fontWeight === "number" ? t2.fontWeight : typeof t2.fontWeight === "symbol" ? "mixed" : 400;
   var underlineOf = (t2) => t2.textDecoration === "UNDERLINE";
-  function tabInfo(node, opts = {}) {
+  function tabInfo(node) {
     var _a, _b, _c;
     if (node.type !== "FRAME") return null;
     if (layoutOf(node) !== "horizontal") return null;
@@ -6788,7 +7121,6 @@
     if (cells.length < 2) return null;
     const strict = cells.length >= 3 ? strictTab(cells) : null;
     if (strict) return strict;
-    if (opts.wide === false) return null;
     if (!isTabName((_c = (_b = node.nameKey) != null ? _b : node.name) != null ? _c : "")) return null;
     return wideTab(cells);
   }
@@ -7015,8 +7347,8 @@
     const role = toks[toks.length - 1];
     return role && isKnownRole(role) ? writeRole(node, role) : false;
   }
-  var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["container", "wrapper"]);
-  var REFINED_PASSTHROUGH = /* @__PURE__ */ new Set(["row", "text-group", "media"]);
+  var PASSTHROUGH_ROLES = /* @__PURE__ */ new Set(["hstack", "vstack", "grid", "zstack"]);
+  var REFINED_PASSTHROUGH = /* @__PURE__ */ new Set(["row", "text-group", "media", "profile", "title-group", "links", "pagination", "icon-group", "button-group"]);
   var PAINT_ROLES = /* @__PURE__ */ new Set(["background", "border", "surface"]);
   var hasChildren = (node) => "children" in node && node.children.length > 0;
   function resolveRole(node, token, pos, parentRole, ctxScope) {
@@ -7058,7 +7390,7 @@
           if (hasColorFill(node)) return "swatch";
           const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
           if (emptyRegion) return emptyRegion;
-          return "container";
+          return directionRole(node);
         }
         if (isProgressLike2(node, kids)) return "progress";
         if (isCardLike2(node, kids)) return parentRole === "list" ? "article" : "card";
@@ -7072,10 +7404,15 @@
         if (isPageSection(pos, ctxScope)) return "section";
         if (node.type !== "SECTION") {
           if (isRowLike(node, kids)) return "row";
-          if (isTextGroupLike(node, kids)) return "text-group";
+          if (isProfileLike(kids)) return "profile";
+          if (isTextGroupLike(node, kids)) return isTitleGroupLike(node, kids) ? "title-group" : "text-group";
+          if (isPaginationLike(node, kids)) return "pagination";
+          if (isLinksLike(node, kids)) return "links";
           if (isMediaLike(kids)) return "media";
+          if (isIconGroupLike(node, kids)) return "icon-group";
+          if (isButtonGroupLike(kids)) return "button-group";
         }
-        return kids.length === 1 ? "wrapper" : "container";
+        return directionRole(node);
       }
       default:
         return kebab(node.type);
@@ -7572,6 +7909,139 @@
     const isPhoto = (k) => hasImageFill(k) && (k.type === "RECTANGLE" || k.type === "FRAME" && !k.children.some(isVisible2));
     if (!shown.some(isPhoto)) return false;
     return shown.every((k) => isPhoto(k) || isIconish(k));
+  }
+  var AVATAR_WORDS = /* @__PURE__ */ new Set(["avatar", "profile"]);
+  var ARROW_TEXTS = /* @__PURE__ */ new Set(["\u2039", "\u203A", "<", ">", "\xAB", "\xBB", "\u2190", "\u2192"]);
+  var ELLIPSIS_TEXTS = /* @__PURE__ */ new Set(["\u2026", "..."]);
+  var textOf = (t2) => typeof t2.characters === "string" ? t2.characters.trim() : "";
+  function isRoundPhoto(node) {
+    if (!hasImageFill(node)) return false;
+    if (node.type === "ELLIPSE") return true;
+    if (node.type !== "RECTANGLE" && node.type !== "FRAME") return false;
+    if ("children" in node && node.children.some(isVisible2)) return false;
+    const d = dims2(node);
+    if (!d || Math.abs(d.w - d.h) > 1 || Math.max(d.w, d.h) > 64) return false;
+    return cornerRadiusOf2(node) >= Math.min(d.w, d.h) / 2;
+  }
+  function isAvatarInstance(node) {
+    var _a;
+    if (node.type !== "INSTANCE") return false;
+    const d = dims2(node);
+    if (!d || d.w <= 0 || d.h <= 0 || d.w > 64 || d.h > 64) return false;
+    const ratio = d.w / d.h;
+    if (ratio < 0.8 || ratio > 1.25) return false;
+    if (kebab((_a = node.name) != null ? _a : "").split("-").some((w) => AVATAR_WORDS.has(w))) return true;
+    const hasRound = (x) => "children" in x && x.children.some((c) => isVisible2(c) && (isRoundPhoto(c) || hasRound(c)));
+    return hasRound(node);
+  }
+  function isIconOnly(node) {
+    return isIconish(node) && !isAvatarInstance(node);
+  }
+  function isArrowText(node) {
+    return node.type === "TEXT" && ARROW_TEXTS.has(textOf(node));
+  }
+  var isShortText = (k) => k.type === "TEXT" && shortOneLine(k);
+  function isProfileLike(kids) {
+    const shown = kids.filter(isVisible2);
+    if (shown.length !== 2) return false;
+    const pic = shown.find((k) => isRoundPhoto(k) || isAvatarInstance(k));
+    if (!pic) return false;
+    const other = shown[0] === pic ? shown[1] : shown[0];
+    if (isShortText(other)) return true;
+    if (other.type !== "FRAME" && other.type !== "GROUP") return false;
+    const ts = other.children.filter(isVisible2);
+    return ts.length >= 1 && ts.length <= 3 && ts.every((t2) => t2.type === "TEXT");
+  }
+  var MIXED = (v) => typeof v === "symbol";
+  function fontSizeOf(t2) {
+    const v = t2.fontSize;
+    return typeof v === "number" ? v : null;
+  }
+  function fontWeightOf(t2) {
+    const w = t2.fontWeight;
+    if (typeof w === "number") return w;
+    if (MIXED(w)) return null;
+    const fn = t2.fontName;
+    if (fn && typeof fn === "object" && typeof fn.style === "string") {
+      const st = fn.style.toLowerCase();
+      if (/black|heavy/.test(st)) return 900;
+      if (/extra\s*bold|ultra\s*bold/.test(st)) return 800;
+      if (/semi\s*bold|demi\s*bold/.test(st)) return 600;
+      if (/bold/.test(st)) return 700;
+      return 400;
+    }
+    return MIXED(fn) ? null : 400;
+  }
+  function isTitleGroupLike(node, kids) {
+    const shown = kids.filter(isVisible2);
+    if (layoutOf2(node) === "horizontal" || node.layoutMode === "GRID") return false;
+    const sizes = shown.map(fontSizeOf);
+    const weights = shown.map(fontWeightOf);
+    if (sizes.some((x) => x == null) || weights.some((x) => x == null)) return false;
+    const yOf = (n) => typeof n.y === "number" ? n.y : 0;
+    let top = 0;
+    if (layoutOf2(node) === "vertical") top = 0;
+    else {
+      top = shown.reduce((best, k, i) => yOf(k) < yOf(shown[best]) ? i : best, 0);
+      if (shown.some((k, i) => i !== top && sameLine(shown[top], k))) return false;
+    }
+    const ts = sizes[top];
+    const tw = weights[top];
+    const rest = shown.map((_, i) => i).filter((i) => i !== top);
+    if (rest.every((i) => ts >= 1.2 * sizes[i])) return true;
+    return tw >= 600 && rest.every((i) => ts >= sizes[i] && weights[i] < 600);
+  }
+  function isPaginationLike(node, kids) {
+    const shown = kids.filter(isVisible2);
+    if (shown.length < 2 || !sideBySide(node, shown)) return false;
+    const kind = (k) => {
+      if (k.type === "TEXT" && isDigitsText(k) && textOf(k) !== "") return "d";
+      if (k.type === "TEXT" && ELLIPSIS_TEXTS.has(textOf(k))) return "l";
+      if (isArrowText(k) || isIconOnly(k)) return "e";
+      return null;
+    };
+    const ordered = layoutOf2(node) === "horizontal" ? shown : [...shown].sort((a, b) => xOf(a) - xOf(b));
+    const kinds = ordered.map(kind);
+    if (kinds.some((k) => k == null)) return false;
+    const digits = ordered.filter((_, i) => kinds[i] === "d");
+    if (!(digits.length >= 2 || digits.some((d) => textOf(d).includes("/")))) return false;
+    const first = kinds.findIndex((k) => k !== "e");
+    let last = kinds.length - 1;
+    while (last >= 0 && kinds[last] === "e") last--;
+    if (first < 0 || kinds[first] !== "d" || kinds[last] !== "d") return false;
+    for (let i = first; i <= last; i++) if (kinds[i] === "e") return false;
+    return true;
+  }
+  function isLinksLike(node, kids) {
+    const shown = kids.filter(isVisible2);
+    if (shown.length < 3 || !sideBySide(node, shown)) return false;
+    const isDivider = (k) => k.type === "LINE" || k.type === "RECTANGLE" && isThin(k);
+    let words = 0;
+    let digits = 0;
+    for (const k of shown) {
+      if (isShortText(k)) {
+        words++;
+        if (isDigitsText(k)) digits++;
+      } else if (isTextButtonLike(k)) words++;
+      else if (!isDivider(k)) return false;
+    }
+    if (words < 3) return false;
+    return digits * 2 <= words;
+  }
+  function isIconGroupLike(node, kids) {
+    const shown = kids.filter(isVisible2);
+    return shown.length >= 2 && shown.every(isIconOnly) && sideBySide(node, shown);
+  }
+  function isButtonGroupLike(kids) {
+    const shown = kids.filter(isVisible2);
+    return shown.length >= 2 && shown.every((k) => isButtonLike2(k) || isTextButtonLike(k));
+  }
+  function directionRole(node) {
+    const m = node.layoutMode;
+    if (m === "HORIZONTAL") return "hstack";
+    if (m === "VERTICAL") return "vstack";
+    if (m === "GRID") return "grid";
+    return "zstack";
   }
 
   // src/lib/placement.ts
@@ -8674,7 +9144,12 @@
     "text",
     "divider",
     "swatch",
-    "figure"
+    "figure",
+    // 6-2 방향 이름(ia-v4 §4.4 "역할 세분화 2차" D — container · wrapper 자리). 내용 이름(C1–C6)은 맥락이 붙어 더하지 않는다.
+    "hstack",
+    "vstack",
+    "grid",
+    "zstack"
   ]);
   function groupByExactName(children) {
     var _a;
@@ -11278,15 +11753,6 @@
       children: node.type === "INSTANCE" || iconKey ? [] : kids.map((k) => toStructNode(k, false, mains))
     });
   }
-  function bindOwnerOf(roots) {
-    let idx = null;
-    return (node) => {
-      const role = readRole(node);
-      idx != null ? idx : idx = structIndex(roots);
-      const s = idx.get(node.id);
-      return pickOwner(role, s ? highConfidenceComponentRole(s, { wideTab: false }) : null, isKnownRole);
-    };
-  }
   function structIndex(roots, mains) {
     const out = /* @__PURE__ */ new Map();
     const add2 = (n) => {
@@ -11652,7 +12118,7 @@
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
           const wm = await withLocalMains(sel);
-          const { tokens, warnings } = extractFromSelection(wm.roots, bindOwnerOf(sel), new Set(wm.mains.mainOf.keys()));
+          const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys()));
           post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
@@ -11661,7 +12127,7 @@
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
-          const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName);
+          const roles = msg.globalOnly ? 0 : await createUsageRoles(roleTokens, !!msg.preview, s.globalOf, msg.preview ? roleRows : void 0, s.finalName, msg.ladder);
           const pruned = !msg.preview && msg.replacePalette ? await prunePaletteColors(msg.tokens.map((t2) => t2.name), { globalOnly: !isPaid() }) : 0;
           let summary = t("create.sumGlobals", { n: s.globals, c: s.created, u: s.updated });
           if (roles) summary += t("create.sumRoles", { n: roles });
@@ -11708,9 +12174,7 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              __spreadValues(__spreadValues({
-                ownerOf: bindOwnerOf(sel)
-              }, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
+              __spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
             );
             post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",

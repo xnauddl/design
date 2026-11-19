@@ -1465,10 +1465,10 @@ async function saveAndGet(p) {
   await applyBtn.click();
   const ap = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
   check('19 [바꾸기] → APPLY_TS_RENAME(켠 줄 · id · from · to · sig) · 실행 중 잠금', typeof ap?.reqId === 'number' && JSON.stringify(ap.items) === JSON.stringify([{ id: 's1', from: 'body', to: 'body/large', sig: 'a' }, { id: 's4', from: 'body/large', to: 'body/xlarge', sig: 'd' }]) && (await applyBtn.getAttribute('aria-disabled')) === 'true', JSON.stringify(ap?.items));
-  await recv(p, { type: 'TS_RENAMED', reqId: ap.reqId, renamed: 2, skipped: 0, skipReasons: {}, results: [], roleVarsRenamed: 2, roleVarsTaken: 1, roleVarsError: 0, roleVarsStuck: [] });
+  await recv(p, { type: 'TS_RENAMED', reqId: ap.reqId, renamed: 2, skipped: 0, skipReasons: {}, results: [] }); // 6-2 T3 — roleVars* 없음
   await p.waitForTimeout(60);
   check('19 끝 — 팝업 닫힘 · 포커스 [이름 다시 짓기]로', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.id)) === 'btnTsRename');
-  check('19 상태 줄 — "2개 이름을 바꿨어요 · ⌘Z" + Semantic 변수 그대로 · warn', (await p.textContent('#statusText')).startsWith('텍스트 스타일 2개 이름을 바꿨어요 · ⌘Z로 되돌리기 · Semantic 변수 1개는'), await p.textContent('#statusText'));
+  check('19 상태 줄 — "텍스트 스타일 2개 이름을 바꿨어요 · ⌘Z로 되돌리기"(Semantic 변수 꼬리 없음 — 6-2 T3) · ok', (await p.textContent('#statusText')) === '텍스트 스타일 2개 이름을 바꿨어요 · ⌘Z로 되돌리기' && (await p.getAttribute('#statusLine', 'class')) === 'status-line ok', `${await p.textContent('#statusText')} | ${await p.getAttribute('#statusLine', 'class')}`);
   check('19 스캔 표 비움 · [왼쪽 글자로 이름 채우기] 잠김 · 다시 스캔 안내', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 0 && (await p.$eval('#btnTsRowLabels', (b) => b.disabled)) && (await p.textContent('#tsStatus')).endsWith('스캔 표를 비웠어요 — 다시 [스캔]해 주세요'));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/krds-after.png` : '/dev/null' }).catch(() => {});
   await p.close();
@@ -2885,6 +2885,88 @@ async function fillBoth(p) {
   await recv(p, tsPrev(id));
   await p.waitForTimeout(40);
   check('28c 만들기 뒤 카드 1 ✓ 아래 "메인 컴포넌트 2개도 함께 연결했어요"', (await p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'))) === '메인 컴포넌트 2개도 함께 연결했어요', await p.textContent('#selCards'));
+  await p.close();
+}
+
+/* ---------- 29 변수 · 이름 생성 규칙(6-2 — ia-v3 A.21 8 · ia-v4 B.28) — [이름 다시 짓기] 건너뜀 · Semantic 탭 새 이름 · ladder ---------- */
+{
+  // [이름 다시 짓기] 건너뜀 1 → 상태 줄에 건너뜀 꼬리 · warn, "Semantic 변수" 없음
+  const p = await open(480, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasTextStyles: true });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await p.click('#btnAddVar');
+  await p.click('.ctx-menu button >> text=텍스트 스타일 만들기…');
+  await p.waitForTimeout(40);
+  const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', ...(sc?.reqId != null ? { reqId: sc.reqId } : {}), warnings: [], existing: [], styles: [
+    { name: 'heading/medium-w400-140', fontSize: 24, lineHeight: 33.6, lineHeightPercent: 140, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 2, nodeIds: ['t1'] },
+  ] });
+  await p.waitForTimeout(40);
+  await p.click('#btnTsRename');
+  await p.waitForTimeout(30);
+  const sr = (await sent(p, 'SCAN_TS_RENAME')).at(-1);
+  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows: [
+    { id: 's1', from: 'body/large-24-140', to: 'heading/medium-w400-140', sig: 'a' },
+    { id: 's2', from: 'h2', to: 'heading/medium-26_7-w400', sig: 'b' },
+  ] });
+  await p.waitForTimeout(30);
+  check('29 [이름 다시 짓기] 줄 — T1 새 이름(보통 굵기 24 → heading/medium-w400-140) · 줄 툴팁에 전체 이름', (await p.textContent('.modal .tsr-row >> nth=0')).replace(/\s+/g, '') === 'body/large-24-140→heading/medium-w400-140' && (await p.getAttribute('.modal .tsr-row >> nth=0', 'title')) === 'body/large-24-140 → heading/medium-w400-140');
+  await p.locator('.modal button', { hasText: '이름 바꾸기' }).click();
+  const ap = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
+  await recv(p, { type: 'TS_RENAMED', reqId: ap.reqId, renamed: 1, skipped: 1, skipReasons: { 'name-taken': 1 }, results: [] });
+  await p.waitForTimeout(60);
+  const st = await p.textContent('#statusText');
+  check('29 상태 줄 — 건너뜀 꼬리 · warn · "Semantic 변수" 없음(6-2 T3)', st === '텍스트 스타일 1개 이름을 바꿨어요 · ⌘Z로 되돌리기 · 건너뜀 1' && (await p.getAttribute('#statusLine', 'class')) === 'status-line warn' && !(await p.getAttribute('#statusText', 'title')).includes('Semantic 변수'), `${st} | ${await p.getAttribute('#statusText', 'title')}`);
+  await p.close();
+}
+{
+  // 만들기 화면 Semantic 탭 — 새 이름의 roleRows가 그대로 보이고(모양 그대로) · 미리보기 CREATE_TOKENS에 ladder · Global 하나를 꺼도 ladder는 같다
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w29'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(40);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['paddingLeft'], count: 4, uses: [{ name: 'spacing/padding', count: 8 }, { name: 'spacing/gap', count: 2 }] },
+    { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2, uses: [{ name: 'spacing/gap', count: 5 }] },
+    { name: 'radius/120', category: 'radius', value: 120, sources: ['topLeftRadius'], count: 1, uses: [{ name: 'radius', count: 4, pill: 4 }] },
+  ] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [
+    { name: 'heading/medium-w400-140-noto-sans-kr-condensed', fontSize: 24, lineHeight: 33.6, lineHeightPercent: 140, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 2, nodeIds: ['t1'] },
+  ] });
+  await p.waitForTimeout(40);
+  const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  const want = [{ kind: 'spacing/padding', value: '16', count: 8 }, { kind: 'spacing/gap', value: '16', count: 2 }, { kind: 'spacing/gap', value: '8', count: 5 }, { kind: 'radius', value: '120', count: 4, pill: 4 }];
+  const norm = (l) => JSON.stringify([...(l ?? [])].sort((a, b) => `${a.kind}${a.value}`.localeCompare(`${b.kind}${b.value}`)));
+  check('29 만들기 미리보기 CREATE_TOKENS에 ladder(추출 전체의 숫자 쓰임 · 종류 · 값 · 곳 수 · 알약)', norm(pv?.ladder) === norm(want), JSON.stringify(pv?.ladder));
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 3, updated: 0, summary: '', roles: 4, skippedManual: 0, tokenStates: {}, roleRows: [
+    { name: 'spacing/padding/md', global: 'spacing/16', token: 'spacing/16' },
+    { name: 'spacing/gap/sm', global: 'spacing/16', token: 'spacing/16' },
+    { name: 'spacing/gap/md', global: 'spacing/8', token: 'spacing/8' },
+    { name: 'radius/full', global: 'radius/120', token: 'radius/120' },
+  ] });
+  await p.waitForTimeout(40);
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(30);
+  const names = await p.$$eval('#makeTree .bv-name', (e) => e.map((x) => x.textContent));
+  check('29 Semantic 탭 — 새 이름이 줄 이름 그대로(spacing/padding/md · radius/full) · 탭 개수 4', JSON.stringify(names) === JSON.stringify(['spacing/padding/md', 'spacing/gap/sm', 'spacing/gap/md', 'radius/full']) && (await p.textContent('#makeTab-semantic')).includes('4'), JSON.stringify(names));
+  // Global 하나(spacing/8)를 끄면 보내는 토큰은 줄지만 ladder는 같다(N3 "곳 수")
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
+  await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
+  await p.waitForTimeout(400);
+  const pv2 = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  check('29 Global 하나를 꺼도 ladder 그대로 · 보내는 토큰에서는 빠짐', pv2 !== pv && norm(pv2?.ladder) === norm(want) && !pv2.tokens.some((x) => x.name === 'spacing/8'), JSON.stringify(pv2?.tokens?.map((x) => x.name)));
+  // Text Style 탭 — 긴 이름은 말줄임 · 전체 이름은 툴팁
+  await p.evaluate(() => [...document.querySelectorAll('#makeTabs [role="tab"]')].find((x) => x.textContent.startsWith('Text Style'))?.click());
+  await p.waitForTimeout(30);
+  await p.waitForTimeout(40);
+  const tsChip = await p.$eval('#makeTree .bv-var', (x) => { const nm = x.querySelector('.bv-name'); return { title: x.title, cut: nm.scrollWidth > nm.clientWidth + 1, ell: getComputedStyle(nm).textOverflow }; });
+  check('29 Text Style 탭 — 긴 이름은 말줄임(…) 그대로 · 툴팁에 전체 이름', tsChip.cut && tsChip.ell === 'ellipsis' && tsChip.title === 'heading/medium-w400-140-noto-sans-kr-condensed', JSON.stringify(tsChip));
+  if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/m62-ts.png` }).catch(() => {});
   await p.close();
 }
 
