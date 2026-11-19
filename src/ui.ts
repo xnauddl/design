@@ -1021,8 +1021,11 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   const name = document.createElement('input');
   name.value = s.name;
   name.placeholder = t('textStyle.namePlaceholder');
+  const kept = { name: s.name, step: s.step }; // 크기 단계(12.12 N-D2)는 지은 이름 그대로일 때만 — 고친 이름은 스타일 이름 전체로 역할 변수를 짓는다
   name.addEventListener('input', () => {
     s.name = name.value;
+    if (kept.step && s.name.trim() === kept.name) s.step = kept.step;
+    else delete s.step;
   });
   if (s.boundStyleId) {
     name.classList.add('ts-bound');
@@ -1531,7 +1534,7 @@ function onTsRenamePlan(msg: Extract<CodeToUi, { type: 'TS_RENAME_PLAN' }>): voi
 }
 function tsrApply(): void {
   if (!tsrApplyBtn || tsrApplyBtn.getAttribute('aria-disabled') === 'true') return;
-  const items = tsrApplicable().map((r) => ({ id: r.id, from: r.from, to: r.to, sig: r.sig }));
+  const items = tsrApplicable().map((r) => ({ id: r.id, from: r.from, to: r.to, sig: r.sig, ...(r.step ? { step: r.step } : {}) }));
   if (!items.length) return;
   tsrBusy = true;
   tsrRender();
@@ -1574,12 +1577,14 @@ function onTsRenamed(msg: Extract<CodeToUi, { type: 'TS_RENAMED' }>): void {
   if (msg.skipped) text += t('textStyle.renameSkipped', { m: msg.skipped });
   if (msg.roleVarsTaken) text += t('textStyle.renameRoleSkipped', { n: msg.roleVarsTaken });
   if (msg.roleVarsError) text += t('textStyle.renameRoleError', { n: msg.roleVarsError });
+  if (msg.roleMoveError) text += t('textStyle.renameRoleMoveError', { m: msg.roleMoveError }); // 새 단계 변수로 옮기지 못함(ia-v3 §2.12 12.12 N-D2a)
   const stuck = msg.results.filter((r) => r.status === 'error-stuck');
   const tip = [
     ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => (k === 'error-stuck' ? `${t('textStyle.renameSkip.error-stuck', { name: stuck.map((x) => x.name).join(', ') })} ${n}` : `${t('textStyle.renameSkip.' + k)} ${n}`)),
     ...(msg.roleVarsStuck.length ? [t('textStyle.renameRoleStuck', { names: msg.roleVarsStuck.join(', ') })] : []),
+    ...(msg.roleMoveNames?.length ? [t('textStyle.renameRoleMoveNames', { names: msg.roleMoveNames.join(', ') })] : []),
   ].join('\n');
-  const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError);
+  const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError || msg.roleMoveError);
   showStatusLine(text, { cls: warn ? 'warn' : 'ok', ...(tip ? { tip } : {}) });
   if (msg.renamed >= 1) {
     mkTsNames.clear(); // 만들기 화면의 고친 이름 — 남기면 다음 실행이 옛 손 이름으로 되돌린다(§5.2b)
@@ -1681,7 +1686,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
   const eff = bindTsOnly() ? [] : effCandidates();
   const items = eff
     .filter((c) => bindChecked.has(candKey(c)))
-    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}) }));
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}) }));
   const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds, ...(r.mainIds?.some(Boolean) ? { mainIds: r.mainIds } : {}) }));
   if (!items.length && !textStyles.length) return;
   startLink({ items, textStyles });
@@ -3953,7 +3958,13 @@ async function runMake(): Promise<void> {
   if (!steps.length || !baseline) return;
   const ids = baseline.ids.slice();
   const toks = mkSendTokens();
-  const styles = mkTsOnList().map((s) => ({ ...s, name: mkTsName(s) }));
+  // 고친 이름(mkTsNames)은 사용자가 지은 이름 — 크기 단계를 싣지 않는다(역할 변수 = 스타일 이름 전체, ia-v3 §2.12 12.12 N-D2).
+  const styles = mkTsOnList().map((s) => {
+    const name = mkTsName(s);
+    if (name === s.name) return { ...s };
+    const { step: _step, ...rest } = s;
+    return { ...rest, name };
+  });
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   mkRunning = true;
   mkCancelReq = false;

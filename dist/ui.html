@@ -1409,6 +1409,18 @@
     return a;
   };
   var __spreadProps = (a, b) => __defProps(a, __getOwnPropDescs(b));
+  var __objRest = (source, exclude) => {
+    var target = {};
+    for (var prop in source)
+      if (__hasOwnProp.call(source, prop) && exclude.indexOf(prop) < 0)
+        target[prop] = source[prop];
+    if (source != null && __getOwnPropSymbols)
+      for (var prop of __getOwnPropSymbols(source)) {
+        if (exclude.indexOf(prop) < 0 && __propIsEnum.call(source, prop))
+          target[prop] = source[prop];
+      }
+    return target;
+  };
 
   // src/lib/i18n.ts
   var STRINGS = {
@@ -2296,6 +2308,8 @@
     "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
     "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
+    "textStyle.renameRoleMoveError": " \xB7 {m}\uAC1C\uB294 Semantic \uBCC0\uC218\uB97C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    "textStyle.renameRoleMoveNames": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC2A4\uD0C0\uC77C: {names}",
     "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
     "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
     "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
@@ -2678,6 +2692,10 @@
     // 구조 폴백(역할을 못 정했을 때)
     "container",
     "wrapper",
+    "stack-x",
+    // 가로 오토레이아웃 묶음(ia-v3 §2.12 12.12 N-D6) — container처럼 맥락 없음 · 맥락 통과
+    "stack-y",
+    // 세로 오토레이아웃 묶음
     "shape",
     // HTML 랜드마크
     "header",
@@ -2876,7 +2894,7 @@
   var weightKey = (w) => `${w.weight}${w.italic ? "i" : ""}`;
   var lhTail = (lh) => lh === "auto" ? "-auto" : lh === 150 ? "" : `-${lh}`;
   function nameKrdsStyles(inputs, opts = {}) {
-    var _a3, _b, _c;
+    var _a3, _b, _c, _d;
     const path = (_a3 = opts.path) != null ? _a3 : "scan";
     const anchored = (_b = opts.anchored) != null ? _b : /* @__PURE__ */ new Map();
     const out = inputs.map((_, i) => {
@@ -2979,6 +2997,11 @@
       w.name = final;
     }
     for (const w of works) out[w.idx] = w.name;
+    if (opts.steps) {
+      opts.steps.length = inputs.length;
+      for (let i = 0; i < inputs.length; i++) opts.steps[i] = "";
+      for (const w of works) opts.steps[w.idx] = (_d = sizeKey.get(w)) != null ? _d : "";
+    }
     return out;
   }
 
@@ -3022,9 +3045,11 @@
       count: 0,
       uiCount: 0
     }));
-    const names = nameKrdsStyles(inputs, { reserved: new Set(reserved != null ? reserved : []), path: "scan" });
-    return inputs.map((x, i) => ({
-      name: names[i],
+    const steps = [];
+    const names = nameKrdsStyles(inputs, { reserved: new Set(reserved != null ? reserved : []), path: "scan", steps });
+    return inputs.map((x, i) => __spreadProps(__spreadValues({
+      name: names[i]
+    }, steps[i] ? { step: steps[i] } : {}), {
       fontSize: x.fontSize,
       lineHeight: x.lineHeight,
       lineHeightPercent: 150,
@@ -5076,8 +5101,11 @@
     const name = document.createElement("input");
     name.value = s.name;
     name.placeholder = t("textStyle.namePlaceholder");
+    const kept = { name: s.name, step: s.step };
     name.addEventListener("input", () => {
       s.name = name.value;
+      if (kept.step && s.name.trim() === kept.name) s.step = kept.step;
+      else delete s.step;
     });
     if (s.boundStyleId) {
       name.classList.add("ts-bound");
@@ -5616,7 +5644,7 @@
   }
   function tsrApply() {
     if (!tsrApplyBtn || tsrApplyBtn.getAttribute("aria-disabled") === "true") return;
-    const items = tsrApplicable().map((r) => ({ id: r.id, from: r.from, to: r.to, sig: r.sig }));
+    const items = tsrApplicable().map((r) => __spreadValues({ id: r.id, from: r.from, to: r.to, sig: r.sig }, r.step ? { step: r.step } : {}));
     if (!items.length) return;
     tsrBusy = true;
     tsrRender();
@@ -5652,6 +5680,7 @@
     tsrRender();
   }
   function onTsRenamed(msg) {
+    var _a3;
     if (msg.reqId !== tsrApplyReq) return;
     tsrBusy = false;
     if (tsrBody) closeModal();
@@ -5659,12 +5688,14 @@
     if (msg.skipped) text += t("textStyle.renameSkipped", { m: msg.skipped });
     if (msg.roleVarsTaken) text += t("textStyle.renameRoleSkipped", { n: msg.roleVarsTaken });
     if (msg.roleVarsError) text += t("textStyle.renameRoleError", { n: msg.roleVarsError });
+    if (msg.roleMoveError) text += t("textStyle.renameRoleMoveError", { m: msg.roleMoveError });
     const stuck = msg.results.filter((r) => r.status === "error-stuck");
     const tip = [
       ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => k === "error-stuck" ? `${t("textStyle.renameSkip.error-stuck", { name: stuck.map((x) => x.name).join(", ") })} ${n}` : `${t("textStyle.renameSkip." + k)} ${n}`),
-      ...msg.roleVarsStuck.length ? [t("textStyle.renameRoleStuck", { names: msg.roleVarsStuck.join(", ") })] : []
+      ...msg.roleVarsStuck.length ? [t("textStyle.renameRoleStuck", { names: msg.roleVarsStuck.join(", ") })] : [],
+      ...((_a3 = msg.roleMoveNames) == null ? void 0 : _a3.length) ? [t("textStyle.renameRoleMoveNames", { names: msg.roleMoveNames.join(", ") })] : []
     ].join("\n");
-    const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError);
+    const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError || msg.roleMoveError);
     showStatusLine(text, __spreadValues({ cls: warn ? "warn" : "ok" }, tip ? { tip } : {}));
     if (msg.renamed >= 1) {
       mkTsNames.clear();
@@ -5748,7 +5779,7 @@
   }
   $("btnApplyConfirm").addEventListener("click", () => {
     const eff = bindTsOnly() ? [] : effCandidates();
-    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}));
+    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}));
     const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => {
       var _a3;
       return __spreadValues({ styleId: r.styleId, nodeIds: r.nodeIds }, ((_a3 = r.mainIds) == null ? void 0 : _a3.some(Boolean)) ? { mainIds: r.mainIds } : {});
@@ -7828,7 +7859,12 @@
     if (!steps.length || !baseline) return;
     const ids = baseline.ids.slice();
     const toks = mkSendTokens();
-    const styles = mkTsOnList().map((s) => __spreadProps(__spreadValues({}, s), { name: mkTsName(s) }));
+    const styles = mkTsOnList().map((s) => {
+      const name = mkTsName(s);
+      if (name === s.name) return __spreadValues({}, s);
+      const _a4 = s, { step: _step } = _a4, rest = __objRest(_a4, ["step"]);
+      return __spreadProps(__spreadValues({}, rest), { name });
+    });
     const base = Number($("base").value) || 16;
     mkRunning = true;
     mkCancelReq = false;

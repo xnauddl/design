@@ -915,6 +915,8 @@ export const STRINGS: Record<string, string> = {
   'textStyle.renameRoleSkipped': ' · Semantic 변수 {n}개는 같은 이름이 있어 그대로 뒀어요',
   'textStyle.renameRoleError': ' · Semantic 변수 {n}개는 바꾸지 못했어요',
   'textStyle.renameRoleStuck': '되돌리지 못한 변수: {names}',
+  'textStyle.renameRoleMoveError': ' · {m}개는 Semantic 변수를 옮기지 못했어요',
+  'textStyle.renameRoleMoveNames': '옮기지 못한 스타일: {names}',
   'textStyle.renameSkip.renamed-meanwhile': '그 사이 이름이 바뀜',
   'textStyle.renameSkip.value-changed': '그 사이 값이 바뀜',
   'textStyle.renameSkip.name-taken': '같은 이름이 있음',
