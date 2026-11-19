@@ -327,11 +327,13 @@ function stateReason(s: SlotState): 'already-bound' | 'deleted-var' | null {
 
 /**
  * 비율이 잠긴 레이어(ia-v3 §2.11 "비율 고정") — 피그마는 크기 변수를 한 축만 붙여 둔다(세로를 붙이면 가로 연결이 풀린다).
- * 새 API(targetAspectRatio)와 낡은 API(constrainProportions)를 둘 다 본다.
+ * 새 API(targetAspectRatio)가 있으면 그것만 본다 — 낡은 API(constrainProportions)는 읽기만 해도 피그마가
+ * 콘솔 경고("constrainProportions has been replaced by targetAspectRatio")를 레이어마다 남긴다. 새 API가 없는 노드만 낡은 API로.
  */
 function aspectLocked(n: SceneNode): boolean {
   const x = n as unknown as { targetAspectRatio?: unknown; constrainProportions?: boolean };
-  return x.targetAspectRatio != null || x.constrainProportions === true;
+  if ('targetAspectRatio' in x) return x.targetAspectRatio != null;
+  return x.constrainProportions === true;
 }
 /** 잠긴 레이어의 크기 연결 상태 — 두 축 중 연결된 축 하나로(삭제된 변수가 먼저). */
 function lockedSizeState(n: SceneNode): { state: SlotState; field: 'width' | 'height' } {

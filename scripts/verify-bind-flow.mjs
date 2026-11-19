@@ -2970,6 +2970,30 @@ async function fillBoth(p) {
   await p.close();
 }
 
+{
+  // 30 큰 선택(300개 넘음) · 로컬 변수 0개 — [읽기]를 누르면 만들기 카드도 읽는다(찾기 APPLY 진행 중이라 미룬 추출을 찾기가 끝난 뒤 보냄 — "선택을 읽는 중…"에 멈추지 않음)
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), scanned: 4000, ids: ['big1'], firstName: 'PC_main_BK' });
+  await p.waitForTimeout(450);
+  check('30 큰 선택 — 자동으로 읽지 않음([읽기] 카드 · 추출 없음)', (await p.$('[data-k="read"]')) !== null && (await sent(p, 'EXTRACT')).length === 0);
+  await p.click('[data-k="read"]');
+  await p.waitForTimeout(30);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2, color: 2 } } });
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(40);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  check('30 [읽기] 뒤 — 만들기 카드 추출 EXTRACT{기준} 보냄', !!ex && ex.nodeIds?.[0] === 'big1', String((await sent(p, 'EXTRACT')).length));
+  if (ex) await cardAnswer(p);
+  check('30 [읽기] 뒤 — 카드가 "선택을 읽는 중…"에 멈추지 않고 값 줄을 그림', (await cardRows(p)).length === 4 && !(await cardText(p)).includes('선택을 읽는 중'), await cardText(p).catch(() => ''));
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);

@@ -3547,7 +3547,8 @@
   }
   function aspectLocked(n) {
     const x = n;
-    return x.targetAspectRatio != null || x.constrainProportions === true;
+    if ("targetAspectRatio" in x) return x.targetAspectRatio != null;
+    return x.constrainProportions === true;
   }
   function lockedSizeState(n) {
     const w = nodeFieldState(n, "width");

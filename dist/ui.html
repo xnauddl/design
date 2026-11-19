@@ -11920,6 +11920,7 @@ ${opts.tip}` : text;
   var mcInFlight = false;
   var mcSendBase = "";
   var mcDeferred = false;
+  var mcDeferUserFor = null;
   var mcFailedFor = null;
   var mcMemo = null;
   var mcCreating = null;
@@ -11956,12 +11957,15 @@ ${opts.tip}` : text;
   }
   function mcRead(user = false) {
     if (!baseline || isMini || activeTab !== "select" || !mcNeed()) return;
+    if (mcDeferUserFor === baseKey()) user = true;
     if (!user && baseline.scanned > BIG_SELECTION) return;
     if (bindLinking || opBusy() || wizardRunning) {
       mcDeferred = true;
+      if (user) mcDeferUserFor = baseKey();
       return;
     }
     mcDeferred = false;
+    mcDeferUserFor = null;
     mcInFlight = true;
     mcSendBase = baseKey();
     mcExtractReq = mcNextReq();
@@ -12386,7 +12390,7 @@ ${opts.tip}` : text;
     target.focus({ preventScroll: true });
   }
   function mcKick() {
-    if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || baseline.scanned > BIG_SELECTION) return;
+    if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || baseline.scanned > BIG_SELECTION && mcDeferUserFor !== baseKey()) return;
     queueMicrotask(() => {
       if (!mcInFlight && mcFor !== baseKey()) {
         mcRead();
