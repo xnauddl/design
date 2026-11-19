@@ -28,8 +28,8 @@ export const KRDS_STEPS: Readonly<Record<KrdsCategory, readonly KrdsStepDef[]>> 
     { step: 'large', ref: 32, min: 28 },
     { step: 'medium', ref: 24, min: 21.5 },
     { step: 'small', ref: 19, min: 18 },
-    { step: 'xsmall', ref: 17, min: 16 },
-    { step: 'xxsmall', ref: 15, min: -Infinity },
+    // 16 미만은 heading이 되지 않는다(§3.2 — 2026-11-19 T4) — KRDS xxsmall(15)은 단계로 두지 않는다.
+    { step: 'xsmall', ref: 17, min: -Infinity },
   ],
   body: [
     { step: 'large', ref: 19, min: 18 },
@@ -93,7 +93,15 @@ export function lineHeightPct(i: Pick<KrdsInput, 'fontSize' | 'lineHeight' | 'li
 
 const LABEL_TOKENS = new Set(['label', 'button', 'btn', 'chip', 'input', 'field']);
 
-/** 분류(§3.2) — 위에서부터 처음 맞는 것. scan: uiCount × 2 ≥ count(uiCount > 0), rename: 이름 조각. */
+/** heading이 되는 크기(§3.2 — 2026-11-19 T1 · T4). 크기는 표기값. */
+const HEADING_BY_SIZE = 21.5; // 이 크기 이상은 굵기와 관계없이 heading
+const HEADING_BOLD_MIN = 16; // 굵은 글자(600 이상)는 이 크기 이상만 heading
+
+/**
+ * 분류(§3.2) — 위에서부터 처음 맞는 것.
+ * label(scan: uiCount × 2 ≥ count(uiCount > 0), rename: 이름 조각) → display(600 이상 · 42 이상)
+ * → heading(21.5 이상) → heading(600 이상 · 16 이상) → body.
+ */
 export function krdsCategory(input: KrdsInput, path: KrdsPath = 'scan'): KrdsCategory {
   if (path === 'scan') {
     const ui = input.uiCount ?? 0;
@@ -107,7 +115,8 @@ export function krdsCategory(input: KrdsInput, path: KrdsPath = 'scan'): KrdsCat
   const { weight } = weightOf(input.style);
   const size = round1(input.fontSize);
   if (weight >= 600 && size >= 42) return 'display';
-  if (weight >= 600) return 'heading';
+  if (size >= HEADING_BY_SIZE) return 'heading';
+  if (weight >= 600 && size >= HEADING_BOLD_MIN) return 'heading';
   return 'body';
 }
 
