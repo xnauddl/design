@@ -1099,10 +1099,9 @@ async function saveAndGet(p) {
   s1 = await st();
   await recv(p, { type: 'COMPONENTS_RESULT', registered: 1, skipped: 0, sets: 0, singles: ['WebsiteImage'], missing: [], failures: ['x'], propFailed: ['P'], fillKept: ['flight'], placeCloned: ['C'] });
   const s2 = await st();
-  check('13 채움·크기 꼬리 — 속성 값 뒤 · 복사본 앞, 경고',
-    s2.text.includes('채움·크기가 달라 건너뛴 1개: flight')
-      && s2.text.indexOf('속성 값을 못 넣은') < s2.text.indexOf('채움·크기가 달라')
-      && s2.text.indexOf('채움·크기가 달라') < s2.text.indexOf('복사본을 둔')
+  check('13 채움·크기는 상태 줄에 없음(처리 중 문제에만 — 2026-11-19 사용자 결정) · 경고',
+    !s2.text.includes('채움·크기가 달라')
+      && s2.text.indexOf('속성 값을 못 넣은') < s2.text.indexOf('복사본을 둔')
       && s2.cls.includes('warn'), JSON.stringify(s2));
   check('13 속성 값만 못 넣어도 경고', s1.text.includes('속성 값을 못 넣은 1개: M') && s1.cls.includes('warn'), JSON.stringify(s1));
   await recv(p, { type: 'COMPONENTIZE_RESULT', master: 'Card', properties: 1, instances: 1, images: 0, warnings: ['Other: 제자리에 둘 수 없어 원본을 그대로 두었어요.'], placeFailed: ['Other'] });
@@ -1117,20 +1116,24 @@ async function saveAndGet(p) {
   s1 = await st();
   check('13 결과 줄 — 컴포넌트 1 (변형 세트 0 · 컴포넌트 1), 단일 꼬리 없음',
     s1.text.startsWith('컴포넌트 1 (변형 세트 0 · 컴포넌트 1) · ') && !s1.text.includes(') · 컴포넌트 '), JSON.stringify(s1));
-  check('13 재사용 꼬리 — 속성 앞, 3개 + " 외"',
-    s1.text.includes(' · 기존 컴포넌트 재사용 4: Card, Badge, Chip 외')
-      && s1.text.indexOf('기존 컴포넌트 재사용') < s1.text.indexOf(' · 속성 2'), JSON.stringify(s1));
+  const rv = await p.$$eval('#variantReport > *', (els) => els.map((e) => e.textContent));
+  check('13 재사용은 상태 줄이 아니라 결과 목록 "기존 컴포넌트 재사용" 구획에(이름 모두)',
+    !s1.text.includes('기존 컴포넌트 재사용') && s1.text.includes(' · 속성 2')
+      && rv[0]?.startsWith('기존 컴포넌트 재사용') && rv[0]?.includes('4')
+      && ['Card', 'Badge', 'Chip', 'Pill'].every((n, i) => rv[i + 1] === n), JSON.stringify({ s1, rv }));
   await recv(p, { type: 'COMPONENTS_RESULT', registered: 39, skipped: 0, sets: 7, singles: ['A', 'B', 'C', 'D'], exposed: 3, missing: [], failures: [] });
   s1 = await st();
   check('13 결과 줄 — 변형 수 대신 맨 위 단위', s1.text === '컴포넌트 11 (변형 세트 7 · 컴포넌트 4) · 속성 3', JSON.stringify(s1));
   await recv(p, { type: 'COMPONENTS_RESULT', registered: 0, skipped: 0, sets: 0, singles: [], missing: [], failures: [], reused: ['ItemButton'] });
   s1 = await st();
-  check('13 재사용만 있어도 성공 상태', s1.text.startsWith('컴포넌트 0 (변형 세트 0 · 컴포넌트 0) · 기존 컴포넌트 재사용 1: ItemButton') && s1.cls.includes('ok') && !s1.cls.includes('warn'), JSON.stringify(s1));
+  check('13 재사용만 있어도 성공 상태', s1.text === '컴포넌트 0 (변형 세트 0 · 컴포넌트 0)' && s1.cls.includes('ok') && !s1.cls.includes('warn'), JSON.stringify(s1));
   await recv(p, { type: 'COMPONENTS_RESULT', registered: 0, skipped: 0, sets: 0, singles: [], missing: [], failures: ['x'], reused: ['Card'], fillKept: ['flight'], reuseKept: ['Row A', 'Row B'], placeCloned: ['C'] });
   s1 = await st();
-  check('13 구조가 달라 원본을 둔 꼬리 — 채움·크기 뒤 · 복사본 앞, 경고',
+  const rv2 = await p.$$eval('#variantReport > *', (els) => els.map((e) => e.textContent));
+  check('13 처리 중 문제 → 재사용 구획 순서(재사용 구획은 맨 아래)', rv2[0]?.startsWith('처리 중 문제') && rv2[2]?.startsWith('기존 컴포넌트 재사용') && rv2[3] === 'Card', JSON.stringify(rv2));
+  check('13 구조가 달라 원본을 둔 꼬리 — 복사본 앞, 경고',
     s1.text.includes(' · 구조가 달라 원본을 둔 2개: Row A, Row B')
-      && s1.text.indexOf('채움·크기가 달라') < s1.text.indexOf('구조가 달라 원본을 둔')
+      && !s1.text.includes('채움·크기가 달라')
       && s1.text.indexOf('구조가 달라 원본을 둔') < s1.text.indexOf('복사본을 둔')
       && s1.cls.includes('warn'), JSON.stringify(s1));
   // 후보 트리 — 재사용할 줄은 종류 배지 대신 [재사용] + 기존 컴포넌트 이름(세트면 "{세트} · {변형}")

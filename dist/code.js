@@ -85,10 +85,7 @@
     "common.beta": "\uBCA0\uD0C0",
     "layer.componentsBetaAria": "\uCEF4\uD3EC\uB10C\uD2B8 (\uBCA0\uD0C0)",
     "component.propFailed": " \xB7 \uC18D\uC131 \uAC12\uC744 \uBABB \uB123\uC740 {n}\uAC1C: {names}",
-    "component.fillKept": " \xB7 \uCC44\uC6C0\xB7\uD06C\uAE30\uAC00 \uB2EC\uB77C \uAC74\uB108\uB6F4 {n}\uAC1C: {names}",
     // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
-    "component.reused": " \xB7 \uAE30\uC874 \uCEF4\uD3EC\uB10C\uD2B8 \uC7AC\uC0AC\uC6A9 {n}: {names}",
-    "component.reusedMore": " \uC678",
     "component.reuseKept": " \xB7 \uAD6C\uC870\uAC00 \uB2EC\uB77C \uC6D0\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     "component.placeCloned": " \xB7 \uC81C\uC790\uB9AC\uC5D0 \uC778\uC2A4\uD134\uC2A4\uB97C \uBABB \uB123\uC5B4 \uBCF5\uC0AC\uBCF8\uC744 \uB454 {n}\uAC1C: {names}",
     // 마법사
@@ -772,6 +769,7 @@
     "component.badgeReuse": "\uC7AC\uC0AC\uC6A9",
     "component.headMissing": "\uBE48 \uBCC0\uD615",
     "component.headIssue": "\uCC98\uB9AC \uC911 \uBB38\uC81C",
+    "component.headReused": "\uAE30\uC874 \uCEF4\uD3EC\uB10C\uD2B8 \uC7AC\uC0AC\uC6A9",
     // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
     "component.fail.copyPlaced": "\uC778\uC2A4\uD134\uC2A4 \uB300\uC2E0 \uBCF5\uC0AC\uBCF8\uC744 \uB480\uC5B4\uC694({label} \u2192 {name}){causePart}",
     "component.fail.nothingPlaced": "\uC81C\uC790\uB9AC\uC5D0 \uC544\uBB34\uAC83\uB3C4 \uB450\uC9C0 \uBABB\uD588\uC5B4\uC694({label} \u2192 {name}){causePart}",
