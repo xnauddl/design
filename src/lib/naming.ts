@@ -5,7 +5,7 @@
 
 /**
  * 검출기가 실제로 레이어 이름으로 "출력하는" 역할.
- * rename.ts `resolveRole()`의 반환 후보와 1:1 — 여기 없는 이름을 출력하면 어휘와 어긋난다.
+ * rename.ts `resolveRole()` 반환 후보 + 이름 힌트 역할(ia-v4 §4.4 "이름 힌트") — 여기 없는 이름을 출력하면 어휘와 어긋난다.
  * (예외: 이색 노드 타입의 `kebab(node.type)` 폴백)
  */
 export const EMITTED_ROLES = [
@@ -31,6 +31,10 @@ export const EMITTED_ROLES = [
   'row', // 이름표 글자 + 값 한 줄
   'text-group', // 글자만 2개 이상
   'media', // 사진(+ 작은 아이콘)만 담은 상자
+  // 이름 힌트로만 붙는 역할(ia-v4 §4.4 "이름 힌트" · B.26) — 구조 판정은 없다
+  'breadcrumb',
+  'tabs',
+  'tab',
   // 컴포넌트
   'button',
   'chip',
@@ -74,7 +78,6 @@ export const RECOGNIZED_ROLES = [
   'drawer',
   'dialog',
   'popup',
-  'tab',
   'label',
   'title',
 ] as const;

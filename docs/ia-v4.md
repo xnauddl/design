@@ -2111,11 +2111,13 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 - [ ] 실기 확인(Figma) — 사용자
 ### B.26 이름 힌트 PR (2026-11-19 사용자 결정 B · "B + 보강 하나" · §4.4 "이름 힌트")
 
-- [ ] `rename.ts` 힌트 낱말 표 · 머리 낱말 찾기(영어 맨 뒤 낱말 · 중립 꼬리 · `tab`+꼬리 → tabs · 한글 맨 뒤 토막) · 이 플러그인이 지은 이름 빼기(`dsRole` ≠ 힌트 역할 + A1 ②ⓑ)
-- [ ] `rename.ts` `decide`: FRAME · GROUP · SECTION에서 `r`이 약한 판정이거나 `r === h`면 `{ role, name: 지금 이름, keepName: true }`. 자식에게 부모 역할 = 기록한 역할 · 맥락 = 역할 낱말(통과 아님)
-- [ ] `rename.ts` 보강: 자식 없는 색 채움 프레임이 얇고(`isThin`) 짧은 변 4 이하면 `divider`(사진 채움 `image` 먼저)
-- [ ] `rename.ts` 탭 맥락의 얇은 띠 → `indicator`(`isBarFill` 다음)
-- [ ] `naming.ts` `EMITTED_ROLES`에 `breadcrumb` · `tabs` · `tab`(`tab`은 `RECOGNIZED_ROLES`에서 옮김) · 주석 고침
-- [ ] 단위 테스트: 실기 파일 구조(헤더 > `gnb` 자유 배치 > `special-nav` · `gnb-menu`, `Breadcrumb`, `Product tabs` > `Divider` · 탭 칸 > `Active tab underline`, 바닥글 `Button`) — "예" 그대로, **같은 트리를 두 번 정리해도 같음**(첫 정리의 `dsRole`을 둔 채). `category-menu` 그대로 · `nav-item`(`dsRole` `item`) · `nav-link` · `button-group` → 힌트 없음 · `tab-list` · `tab-area` → tabs · `btn-wrap` · `divider-box` → 힌트 없음 · `Tab 버튼` → button · `nav 항목` → 힌트 없음 · `GNB 메뉴` → nav · `카테고리메뉴` → 힌트 없음 · 루트 아래에서 정리된 `nav`(키 `focal-nav`) 다시 정리 → 키 남음 · `상품상세탭` → tab · `배송 경로 안내` → 힌트 없음 · `Frame 3`인 1280×1 띠 → `divider` · 1920×76 색 띠 → `swatch` · `Shared storefront navigation` → `header` · `Product tabs` 선택 루트 → 접두사 없음 · `tab-icon`(`dsRole` `icon`) 다시 정리 → 맥락 + `icon`
-- [ ] 기존 테스트 기대값 확인 — 바뀌는 것은 사유와 함께 고친다(이름에 힌트 낱말이 있는 픽스처 · 얇은 `swatch` → `divider` 등) · `pure.test.mjs` EMITTED/RECOGNIZED 겹침 테스트 통과
-- [ ] 4검사 · 실기 확인(사용자, 피그마 — 원본 `PC_상품상세_FOCAL 유토피아` 복제 → 이름 정리)
+- [x] `rename.ts` 힌트 낱말 표 · 머리 낱말 찾기(영어 맨 뒤 낱말 · 중립 꼬리 · `tab`+꼬리 → tabs · 한글 맨 뒤 토막) · 이 플러그인이 지은 이름 빼기(`dsRole` ≠ 힌트 역할 + A1 ②ⓑ)
+- [x] `rename.ts` `decide`: FRAME · GROUP · SECTION에서 `r`이 약한 판정이거나 `r === h`면 `{ role, name: 지금 이름, keepName: true }`. 자식에게 부모 역할 = 기록한 역할 · 맥락 = 역할 낱말(통과 아님)
+- [x] `rename.ts` 보강: 자식 없는 색 채움 프레임이 얇고(`isThin`) 짧은 변 4 이하면 `divider`(사진 채움 `image` 먼저)
+- [x] `rename.ts` 탭 맥락의 얇은 띠 → `indicator`(`isBarFill` 다음)
+- [x] `naming.ts` `EMITTED_ROLES`에 `breadcrumb` · `tabs` · `tab`(`tab`은 `RECOGNIZED_ROLES`에서 옮김) · 주석 고침
+- [x] 단위 테스트: 실기 파일 구조(헤더 > `gnb` 자유 배치 > `special-nav` · `gnb-menu`, `Breadcrumb`, `Product tabs` > `Divider` · 탭 칸 > `Active tab underline`, 바닥글 `Button`) — "예" 그대로, **같은 트리를 두 번 정리해도 같음**(첫 정리의 `dsRole`을 둔 채). `category-menu` 그대로 · `nav-item`(`dsRole` `item`) · `nav-link` · `button-group` → 힌트 없음 · `tab-list` · `tab-area` → tabs · `btn-wrap` · `divider-box` → 힌트 없음 · `Tab 버튼` → button · `nav 항목` → 힌트 없음 · `GNB 메뉴` → nav · `카테고리메뉴` → 힌트 없음 · 루트 아래에서 정리된 `nav`(키 `focal-nav`) 다시 정리 → 키 남음 · `상품상세탭` → tab · `배송 경로 안내` → 힌트 없음 · `Frame 3`인 1280×1 띠 → `divider` · 1920×76 색 띠 → `swatch` · `Shared storefront navigation` → `header` · `Product tabs` 선택 루트 → 접두사 없음 · `tab-icon`(`dsRole` `icon`) 다시 정리 → 맥락 + `icon`
+- [x] 기존 테스트 기대값 확인 — 바뀌는 것은 사유와 함께 고친다(이름에 힌트 낱말이 있는 픽스처 · 얇은 `swatch` → `divider` 등) · `pure.test.mjs` EMITTED/RECOGNIZED 겹침 테스트 통과
+- [x] 4검사(tsc · `npm test` 772 · `verify:i18n` 0 · `verify-bind-flow` 통과)
+- [ ] 실기 확인(사용자, 피그마 — 원본 `PC_상품상세_FOCAL 유토피아` 복제 → 이름 정리)
+- 구현 메모: 기존 테스트는 B.24 ② ③의 픽스처 이름 `button` 3곳만 바뀜(글자 버튼 판정 `button` = 힌트 → 이름 그대로 · 역할 기록, 전에는 `card-button` · `list/nav-item`). 한글 힌트 낱말은 src 리터럴 한글 금지(terms 5b) 때문에 코드 값(`ko('D0ED')`)으로 적었다. 토막 나누기는 es2017 대상이라 `\p{L}` 대신 라틴 · 그리스 · 키릴 · 한글 · 가나 · 한자 범위 밖 문자로 나눈다. 실기 구조 재현에서 자동 이름 1px 띠 `Frame 3`은 본문 섹션 아래라 루트 접두사가 떼어져 `divider`(맥락 없음)가 된다(지금 `pickScope` 규칙 그대로).

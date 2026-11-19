@@ -51,6 +51,7 @@ import {
   boundVariableIds,
   findUsers,
   renameSelection,
+  nameHintRole,
   writeRole,
   writeRoleFromName,
   stripRootPrefix,
@@ -8005,15 +8006,20 @@ test('B.24 ② 글자 버튼 — 숨긴 앞뒤 아이콘 + 글자 1개 → butto
     T(`${id}-t`, ch),
     { type: 'FRAME', id: `${id}-r`, name: 'arro_right', visible: false, width: 20, height: 20, children: [V(`${id}-rv`)] },
   ] });
+  // 픽스처 이름이 `button`(힌트 낱말)이라 이름은 그대로 두고 역할 button만 기록한다(B.26 이름 힌트 — 전에는 card-button)
+  const roleOf = (r, id) => r.nodes.find((n) => n.id === id)?.role;
   let r = await inCard(btn('b'));
-  assert.equal(r.changes.find((c) => c.id === 'b')?.after, 'card-button');
+  assert.ok(!r.changes.some((c) => c.id === 'b'));
+  assert.equal(roleOf(r, 'b'), 'button');
   r = await inCard(btn('b2', '두 줄\n글자'));
   assert.notEqual(r.changes.find((c) => c.id === 'b2')?.after, 'card-button');
   const list = { type: 'FRAME', id: 'list', name: 'Frame 3', layoutMode: 'HORIZONTAL', width: 500, height: 48, children: [btn('x1'), btn('x2'), btn('x3')] };
   r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [list] }], { apply: false, maxDepth: 5 });
   // 깊이 1 가로 글자 칸 줄은 지금 규칙상 nav일 수 있다 — 어느 쪽이든 직속은 item(A2를 쓰지 않음)
   assert.ok(['list', 'nav'].includes(r.changes.find((c) => c.id === 'list')?.after));
-  assert.match(r.changes.find((c) => c.id === 'x1')?.after, /^(list|nav)-item$/);
+  // 직속 판정은 item(A2를 쓰지 않음) — 약한 판정이라 이름 힌트 button이 덮어 이름 그대로(B.26 — 전에는 list/nav-item)
+  assert.ok(!r.changes.some((c) => c.id === 'x1'));
+  assert.equal(roleOf(r, 'x1'), 'button');
   // 모바일 화면 깊이 1 상단 바
   const bar = { type: 'FRAME', id: 'bar', name: 'Frame 2', layoutMode: 'HORIZONTAL', width: 375, height: 56, children: [
     { type: 'FRAME', id: 'bk', name: 'back', width: 24, height: 24, children: [V('bkv')] }, T('ttl', '설정'),
@@ -8052,7 +8058,9 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   const r3 = await inCard(app);
   const a3 = new Map(r3.changes.map((c) => [c.id, c.after]));
   assert.ok(!String(a3.get('app')).endsWith('field'), a3.get('app'));
-  assert.equal(a3.get('ab'), 'card-button');
+  // 이름 `button` + 글자 버튼 판정 button → 이름 그대로(B.26 이름 힌트 r === h — 전에는 card-button)
+  assert.ok(!a3.has('ab'));
+  assert.equal(r3.nodes.find((n) => n.id === 'ab')?.role, 'button');
   assert.notEqual(hcRolePure(app), 'field');
 });
 
@@ -8767,4 +8775,165 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   assert.equal(await mainName(root2.children[0]), 'Style=Text');
   assert.equal(root2.children[2].type, 'FRAME');
   assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
+});
+
+/* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.26, 2026-11-19) ---------- */
+const solidFill = [{ type: 'SOLID', visible: true, color: { r: 0.9, g: 0.9, b: 0.9 } }];
+/** 실기 파일(`PC_상품상세_FOCAL 유토피아`) 구조 — 헤더 > gnb, Breadcrumb, Product tabs, 본문, 바닥글. */
+function focalPage() {
+  const P = (n) => withPd(n);
+  const gnb = P({ type: 'FRAME', id: 'gnb', name: 'gnb', x: 0, y: 80, width: 1920, height: 50, children: [
+    P({ type: 'FRAME', id: 'gnbMenu', name: 'gnb-menu', layoutMode: 'HORIZONTAL', x: 360, y: 0, width: 800, height: 50, children: [
+      P({ type: 'FRAME', id: 'catMenu', name: 'category-menu', width: 24, height: 24, children: [V('catV')] }),
+      T('gm1', '베스트'), T('gm2', '신상품'), T('gm3', '이벤트'), T('gm4', '브랜드'),
+    ] }),
+    P({ type: 'FRAME', id: 'specialNav', name: 'special-nav', x: 1400, y: 0, width: 160, height: 50, children: [
+      T('sn1', '고객센터', { x: 0, y: 15 }), T('sn2', '매장안내', { x: 80, y: 15 }),
+    ] }),
+  ] });
+  const header = P({ type: 'FRAME', id: 'header', name: 'Shared storefront navigation', layoutMode: 'VERTICAL', width: 1920, height: 130, children: [gnb] });
+  const crumb = P({ type: 'FRAME', id: 'crumb', name: 'Breadcrumb', width: 1920, height: 80, children: [T('crT', '홈 > 정수기')] });
+  const divider = (id) => P({ type: 'FRAME', id, name: 'Divider', width: 1280, height: 1, fills: solidFill, children: [] });
+  const cell = (id, name, kids) => P({ type: 'FRAME', id, name, width: 320, height: 72, children: kids });
+  const tabs = P({ type: 'FRAME', id: 'tabs', name: 'Product tabs', width: 1920, height: 72, children: [
+    divider('dv1'), divider('dv2'),
+    cell('tab1', '상품상세 tab', [T('t1T', '상품상세'), P({ type: 'FRAME', id: 'underline', name: 'Active tab underline', y: 69, width: 320, height: 3, fills: solidFill, children: [] })]),
+    cell('tab2', '상품정보 tab', [T('t2T', '상품정보')]),
+    cell('tab3', '리뷰 tab', [T('t3T', '리뷰')]),
+    cell('tab4', '문의 tab', [T('t4T', '문의')]),
+  ] });
+  const body = P({ type: 'FRAME', id: 'body', name: 'Frame 100', layoutMode: 'VERTICAL', width: 1920, height: 2000, children: [
+    P({ type: 'FRAME', id: 'cart', name: 'Add to cart', width: 200, height: 56, children: [T('cartT', '장바구니')] }),
+    P({ type: 'FRAME', id: 'spec1', name: 'Specification divider', width: 1200, height: 1, fills: solidFill, children: [] }),
+    P({ type: 'FRAME', id: 'strip', name: 'Frame 3', width: 1280, height: 1, fills: solidFill, children: [] }),
+  ] });
+  const fbtn = (i) => P({ type: 'FRAME', id: `fb${i}`, name: 'Button', layoutMode: 'HORIZONTAL', paddingLeft: 8, paddingRight: 8, width: 90, height: 32, children: [T(`fb${i}T`, `링크${i}`)] });
+  const footer = P({ type: 'FRAME', id: 'footer', name: 'Frame 200', width: 1920, height: 300, children: [
+    fbtn(0), fbtn(1), fbtn(2), fbtn(3), fbtn(4),
+    P({ type: 'FRAME', id: 'appBtn', name: 'button', layoutMode: 'HORIZONTAL', width: 76, height: 30, cornerRadius: 4, strokes: vis, paddingLeft: 8, paddingRight: 8, children: [T('appT', '앱다운로드')] }),
+  ] });
+  const page = { type: 'FRAME', id: 'page', name: 'PC_상품상세_FOCAL 유토피아', layoutMode: 'VERTICAL', width: 1920, height: 5000, children: [header, crumb, tabs, body, footer] };
+  return page;
+}
+
+test('B.26 실기 파일 구조 — 힌트 낱말 이름은 그대로 · 역할만 기록, 두 번 정리해도 같다', async () => {
+  installFigma();
+  const page = focalPage();
+  const byId = new Map();
+  const walk = (n) => { byId.set(n.id, n); for (const c of n.children ?? []) walk(c); };
+  walk(page);
+  const r = await renameSelection([page], { apply: true, maxDepth: 8 });
+  const after = new Map(r.changes.map((c) => [c.id, c.after]));
+  const role = (id) => byId.get(id).getPluginData('dsRole');
+  // 이름 그대로 + 역할 기록
+  const kept = { gnb: 'nav', specialNav: 'nav', gnbMenu: 'nav', crumb: 'breadcrumb', tabs: 'tabs',
+    tab1: 'tab', tab2: 'tab', tab3: 'tab', tab4: 'tab', dv1: 'divider', dv2: 'divider', spec1: 'divider',
+    fb0: 'button', fb4: 'button', appBtn: 'button', catMenu: 'icon' };
+  for (const [id, want] of Object.entries(kept)) {
+    assert.ok(!after.has(id), `${id} 이름 그대로 — 실제 ${after.get(id)}`);
+    assert.equal(role(id), want, id);
+  }
+  // 바뀌는 것: 헤더(확실한 판정) · 탭 밑줄 · 힌트 없는 버튼 상자 · 자동 이름 1px 띠
+  assert.equal(after.get('header'), 'header');
+  assert.equal(after.get('underline'), 'tab-indicator');
+  assert.equal(role('underline'), 'indicator');
+  assert.equal(after.get('cart'), 'wrapper');
+  assert.match(after.get('strip'), /divider$/);
+  assert.equal(role('strip'), 'divider');
+  // 미리보기 트리 노드도 역할을 싣는다(판넬 roleOnly 적용이 쓰는 값)
+  assert.equal(r.nodes.find((n) => n.id === 'gnb').role, 'nav');
+  // 두 번째 정리 — 첫 정리의 dsRole을 둔 채 같은 결과(멱등)
+  const names = new Map([...byId].map(([id, n]) => [id, n.name]));
+  const roles = new Map([...byId].map(([id, n]) => [id, n.getPluginData?.('dsRole') ?? '']));
+  const r2 = await renameSelection([page], { apply: true, maxDepth: 8 });
+  assert.deepEqual(r2.changes, [], JSON.stringify(r2.changes));
+  for (const [id, n] of byId) {
+    assert.equal(n.name, names.get(id), id);
+    assert.equal(n.getPluginData?.('dsRole') ?? '', roles.get(id), id);
+  }
+});
+
+test('B.26 머리 낱말 찾기 — 영어 맨 뒤 낱말 · 중립 꼬리 · 한글 맨 뒤 토막', () => {
+  const cases = {
+    gnb: 'nav', 'special-nav': 'nav', 'gnb-menu': 'nav', 'gnb-area': 'nav', 'Product tabs': 'tabs', '상품상세 tab': 'tab',
+    'Specification divider': 'divider', Breadcrumb: 'breadcrumb', Button: 'button', 'Button 2': 'button', CTA: 'button',
+    'tab-menu': 'tabs', 'tab-area': 'tabs', 'tab-list': 'tabs', TabBar: 'tabs',
+    'Tab 버튼': 'button', 'GNB 메뉴': 'nav', 'gnb-메뉴': 'nav', '탭 영역': 'tabs', '상단내비 바': 'nav', '상품상세탭': 'tab', '탭메뉴': 'tabs', '구분선': 'divider',
+    'category-menu': null, menu: null, 'nav-item': null, 'nav-link': null, 'tab-item': null, 'button-group': null,
+    'btn-wrap': null, 'btn-wrapper': null, 'button-area': null, 'divider-box': null, 'Active tab underline': null,
+    'nav 항목': null, '카테고리메뉴': null, '배송 경로 안내': null, 'GNB메뉴': null, 'Frame 3': null, 'Add to cart': null,
+  };
+  for (const [name, want] of Object.entries(cases)) assert.equal(nameHintRole(name), want, name);
+});
+
+test('B.26 약한 판정 자리에서만 덮기 · 이 플러그인이 지은 이름 · 아이콘 프레임 · 선택 루트', async () => {
+  installFigma();
+  // 글자 2개 자유 배치(text-group 자리) — 힌트가 있으면 이름 그대로
+  const tg = (name, pd) => withPd({ type: 'FRAME', id: 'n', name, width: 200, height: 60, children: [T('a', 'A', { y: 0 }), T('b', 'B', { y: 30 })] }, pd);
+  for (const [name, want] of [['tab-list', 'tabs'], ['tab-area', 'tabs'], ['Tab 버튼', 'button'], ['GNB 메뉴', 'nav'], ['상품상세탭', 'tab']]) {
+    const n = tg(name);
+    const r = await inCard(n);
+    assert.ok(!r.changes.some((c) => c.id === 'n'), name);
+    assert.equal(n._pd.get('dsRole'), want, name);
+  }
+  for (const [name, pd] of [['nav-item', { dsRole: 'item' }], ['nav-link'], ['button-group'], ['btn-wrap'], ['divider-box'], ['nav 항목'], ['카테고리메뉴'], ['배송 경로 안내'],
+    ['tab-list', { dsRole: 'list' }]]) { // 이 플러그인이 지은 tab-list(dsRole list ≠ tabs · A1 ②ⓑ) → 힌트 아님
+    const r = await inCard(tg(name, pd));
+    assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group', name);
+  }
+  // 확실한 판정(card)은 이름을 바꾼다
+  const navCard = withPd({ type: 'FRAME', id: 'nc', name: 'nav', cornerRadius: 8, fills: vis, width: 300, height: 200, children: [T('x', 'x'), T('y', 'y')] });
+  let r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [navCard] }], { apply: false, maxDepth: 5 });
+  assert.equal(r.changes.find((c) => c.id === 'nc')?.after, 'card');
+  // 아이콘 프레임은 힌트를 보지 않는다(A1) — 이름 Button이어도 역할 icon
+  const icBtn = withPd({ type: 'FRAME', id: 'ib', name: 'Button', width: 24, height: 24, children: [V('ibv')] });
+  r = await inCard(icBtn);
+  assert.ok(!r.changes.some((c) => c.id === 'ib'));
+  assert.equal(icBtn._pd.get('dsRole'), 'icon');
+  // tab-icon(dsRole icon)은 전 정리 이름(tab이 출력 역할) → 맥락 + icon
+  const tabIcon = withPd({ type: 'FRAME', id: 'ti', name: 'tab-icon', width: 24, height: 24, children: [V('tiv')] }, { dsRole: 'icon' });
+  r = await inCard(tabIcon);
+  assert.equal(r.changes.find((c) => c.id === 'ti')?.after, 'card-icon');
+  // Product tabs를 선택 루트로 — 루트는 그대로(힌트 안 봄), tabs가 역할 낱말이라 루트 접두사 없음
+  const cellKids = withPd({ type: 'FRAME', id: 'tg', name: 'Frame 5', width: 200, height: 60, children: [T('c', 'C', { y: 0 }), T('d', 'D', { y: 30 })] });
+  const ptabs = { type: 'FRAME', id: 'pt', name: 'Product tabs', width: 1920, height: 72, children: [cellKids,
+    withPd({ type: 'FRAME', id: 'pdv', name: 'Divider', width: 1280, height: 1, fills: solidFill, children: [] })] };
+  r = await renameSelection([ptabs], { apply: false, maxDepth: 5 });
+  assert.equal(r.nodes.find((n) => n.id === 'pt').keep, 'root');
+  assert.equal(r.changes.find((c) => c.id === 'tg')?.after, 'tabs-text-group');
+  assert.ok(!r.changes.some((c) => c.id === 'pdv'));
+});
+
+test('B.26 이름을 둘 때 dsNameKey — 맞는 키는 남기고(트리 노드에도 실음) 안 맞으면 지운다', async () => {
+  installFigma();
+  const mk = (key) => withPd({ type: 'FRAME', id: 'nv', name: 'nav', width: 300, height: 40, children: [T('a', 'A', { y: 0 }), T('b', 'B', { y: 20 })] }, { dsRole: 'nav', dsNameKey: key });
+  let nv = mk('focal-nav');
+  let r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'FOCAL', width: 800, height: 800, children: [nv] }], { apply: true, maxDepth: 5 });
+  assert.ok(!r.changes.some((c) => c.id === 'nv'));
+  assert.equal(nv._pd.get('dsNameKey'), 'focal-nav');
+  assert.equal(nv._pd.get('dsRole'), 'nav');
+  assert.equal(r.nodes.find((n) => n.id === 'nv').nameKey, 'focal-nav', '판넬 roleOnly 적용이 같은 키를 싣는다');
+  nv = mk('focal-header');
+  r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'FOCAL', width: 800, height: 800, children: [nv] }], { apply: true, maxDepth: 5 });
+  assert.equal(nv._pd.get('dsNameKey'), '');
+  assert.equal(r.nodes.find((n) => n.id === 'nv').nameKey, undefined);
+});
+
+test('B.26 보강 — 자식 없는 얇은 색 프레임은 divider · 두꺼운 띠는 swatch · 탭 맥락의 얇은 띠는 indicator', async () => {
+  installFigma();
+  const strip = (id, w, h, type = 'FRAME') => ({ type, id, name: type === 'FRAME' ? 'Frame 3' : 'Rectangle 4', width: w, height: h, fills: solidFill, ...(type === 'FRAME' ? { children: [] } : {}) });
+  let r = await inCard(strip('s1', 1280, 1), [strip('s2', 1920, 76), strip('s3', 200, 4), { ...strip('s4', 300, 2), fills: imgFill }]);
+  const a = new Map(r.changes.map((c) => [c.id, c.after]));
+  assert.equal(a.get('s1'), 'card-divider');
+  assert.equal(a.get('s2'), 'card-swatch');
+  assert.equal(a.get('s3'), 'card-divider');
+  assert.ok(!String(a.get('s4')).endsWith('divider'), '사진 채움은 사진 판정 먼저(card 맥락이라 thumbnail)');
+  // 탭 맥락(힌트 tab 칸 안) — 프레임 · 사각형 모두 indicator
+  const cell = withPd({ type: 'FRAME', id: 'cell', name: 'Tab', width: 320, height: 72, children: [T('ct', '리뷰'), strip('u1', 320, 3), strip('u2', 320, 2, 'RECTANGLE')] });
+  r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 1920, height: 800, children: [cell] }], { apply: false, maxDepth: 5 });
+  const b = new Map(r.changes.map((c) => [c.id, c.after]));
+  assert.ok(!b.has('cell'));
+  assert.equal(r.nodes.find((n) => n.id === 'cell').role, 'tab');
+  assert.equal(b.get('u1'), 'tab-indicator');
+  assert.equal(b.get('u2'), 'tab-indicator');
 });

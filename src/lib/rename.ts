@@ -25,7 +25,7 @@
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Instance · 잠긴 레이어는 서브트리째 스킵, Text는 자기 이름만 보존.
    ============================================================ */
-import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, isScopeRole, isDefaultName, EMITTED_ROLES, ROLE_KEY, NAME_KEY } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, isScopeRole, isDefaultName, nameKeyFor, EMITTED_ROLES, ROLE_KEY, NAME_KEY } from './naming';
 import { isIconFrame, shortOneLine } from './componentLike';
 import type { ParsedToken } from './naming';
 import type { KeepReason, RenameChange, RenameNode } from '../shared/messages';
@@ -157,6 +157,8 @@ async function recurse(
       // 아이콘 모양 이름을 그대로 두는 경우(A1)는 접두사를 떼지 않는다.
       const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
       if (visible !== decided.name) nameKey = decided.name;
+      // 이름 힌트로 이름을 둔 노드는 저장된 키가 지금 이름과 이어질 때만 남긴다(ia-v4 §4.4 "이름 힌트" — A1과 다름).
+      if (decided.keepKey) nameKey = nameKeyFor(before, readPluginKey(node, NAME_KEY));
       // 숫자 접미사 없음 — 형제가 같은 이름이어도 그대로(Figma는 중복 이름 허용).
       if (visible !== before) {
         after = visible;
@@ -168,7 +170,8 @@ async function recurse(
       if (opts.apply && decided.role) writeRole(node, decided.role);
       if (opts.apply) writeNameKey(node, nameKey ?? null);
       // 맥락: 일반 레이아웃(passthrough)은 받은 맥락을 그대로 통과, 그 외엔 내 새 이름.
-      contextForChildren = decided.passthrough ? ancestorName : decided.name;
+      // 이름 힌트로 이름을 둔 노드는 이름이 아니라 기록한 역할 낱말을 넘긴다(디자이너 낱말을 자손이 베끼지 않게).
+      contextForChildren = decided.ctxName ?? (decided.passthrough ? ancestorName : decided.name);
       if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
     }
 
@@ -187,13 +190,25 @@ async function recurse(
   }
 }
 
+/** decide() 결과. keepKey = 저장된 dsNameKey를 맞으면 남김(이름 힌트), ctxName = 자식에게 넘길 맥락(이름 대신). */
+interface Decided {
+  skip: boolean;
+  name?: string;
+  passthrough?: boolean;
+  role?: string;
+  keep?: KeepReason;
+  keepName?: boolean;
+  keepKey?: boolean;
+  ctxName?: string;
+}
+
 async function decide(
   node: SceneNode,
   ancestorName: string | null,
   pos: Pos,
   opts: Opts,
   parentRole: string | null,
-): Promise<{ skip: boolean; name?: string; passthrough?: boolean; role?: string; keep?: KeepReason; keepName?: boolean }> {
+): Promise<Decided> {
   // 제외 규칙(이름 유지). 일부 노드는 recurse()에서 서브트리째 중단한다.
   // keep은 미리보기에서 "왜 안 바뀌는지"를 보여 주려고 싣는다 — 조용히 빠지면 버그로 읽힌다.
   if (node.type === 'COMPONENT' || node.type === 'COMPONENT_SET') return { skip: true, keep: 'component' };
@@ -218,6 +233,14 @@ async function decide(
   // 역할 판정보다 먼저 구한다 — field→input, card→thumbnail처럼 맥락이 역할을 가르는 경우가 있다.
   const ctxScope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
   const role = resolveRole(node, token, pos, parentRole, ctxScope);
+  // 이름 힌트(ia-v4 §4.4 · B.26) — 머리 낱말이 역할 낱말이고 구조 판정이 약하거나 같으면 이름 그대로, 역할만 기록.
+  // FRAME · GROUP · SECTION만(아이콘 프레임은 A1 규칙 그대로). 자식에게는 부모 역할 = 힌트 역할 · 맥락 = 역할 낱말.
+  if (isContainerType(node) && !isIconFrameNode(node)) {
+    const h = hintRole(node, pos.rootPrefix);
+    if (h && (role === h || HINT_WEAK_ROLES.has(role))) {
+      return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h };
+    }
+  }
   // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
   // 상속 맥락은 자식에게 그대로 통과(passthrough)시켜 의미있는 후손이 카드 맥락을 받게.
   if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
@@ -311,6 +334,8 @@ function resolveRole(
   if (isModalLike(node, pos, ctxScope)) return 'modal';
   // 프로그레스 트랙 안의 채움 바 → indicator(얇은 막대 → divider 오검출 방지).
   if (ctxScope === 'progress' && isBarFill(node)) return 'indicator';
+  // 탭 안의 얇은 색 띠 → indicator(ia-v4 §4.4 "이름 힌트" — 보강 divider보다 먼저).
+  if (ctxScope === 'tab' && (node.type === 'FRAME' || node.type === 'RECTANGLE') && isThinColorStrip(node)) return 'indicator';
   // 입력은 field 맥락에서만 인정 — 맥락 없이는 아웃라인 버튼과 구분되지 않는다.
   if (ctxScope === 'field' && isInputBox(node)) return 'input';
   if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button'; // 버튼은 토큰 채움색보다 우선
@@ -349,9 +374,9 @@ function resolveRole(
     case 'SECTION': {
       const kids = 'children' in node ? node.children : [];
       if (kids.length === 0) {
-        // 자식 없는 프레임: 색만 채웠으면 스와치, 이미지면 image.
+        // 자식 없는 프레임: 색만 채웠으면 스와치(얇은 띠면 divider — ia-v4 §4.4 보강), 이미지면 image.
         if (hasImageFill(node)) return 'image';
-        if (hasColorFill(node)) return 'swatch';
+        if (hasColorFill(node)) return node.type === 'FRAME' && isThinStrip(node) ? 'divider' : 'swatch';
         // 빈 컨테이너도 페이지 랜드마크 자리는 차지한다(자리표시 섹션).
         const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
         if (emptyRegion) return emptyRegion;
@@ -461,6 +486,19 @@ function isThin(node: SceneNode): boolean {
   const max = Math.max(d.w, d.h);
   if (min <= 0) return false;
   return min <= 2 || max / min >= 25;
+}
+
+/** 얇은 띠 — `isThin`이면서 짧은 변 4 이하(1920×76 색 띠 · 자리표시 배너 제외 — ia-v4 §4.4 보강). */
+function isThinStrip(node: SceneNode): boolean {
+  const d = dims(node);
+  return !!d && isThin(node) && Math.min(d.w, d.h) <= 4;
+}
+
+/** 자식 없는 색 채움(사진 아님) 얇은 띠 — 탭 밑줄(indicator) 판정용. */
+function isThinColorStrip(node: SceneNode): boolean {
+  if ('children' in node && node.children.length > 0) return false;
+  if (hasImageFill(node) || !hasColorFill(node)) return false;
+  return isThinStrip(node);
 }
 
 function paints(node: SceneNode, field: 'fills' | 'strokes'): Paint[] | null {
@@ -974,19 +1012,114 @@ function isMeaninglessIconName(node: SceneNode, rootPrefix: string | null): bool
   const toks = kebab(name).split('-').filter(Boolean);
   if (toks.length === 1 && toks[0] === 'icon') return true; // ⓐ Icon
   // ⓑ dsRole + 이름이 그 역할로 끝나고 앞 낱말이 출력 역할(맨 앞 한 낱말만 루트 접두사 허용)
-  let role = '';
+  const role = readPluginKey(node, ROLE_KEY);
+  return !!role && namedByPlugin(name, role, rootPrefix);
+}
+
+/** pluginData 값 읽기(API 없음 · 실패 → ''). */
+function readPluginKey(node: SceneNode, key: string): string {
   try {
     const fn = (node as { getPluginData?: (k: string) => string }).getPluginData;
-    role = typeof fn === 'function' ? fn.call(node, ROLE_KEY) || '' : '';
+    return typeof fn === 'function' ? fn.call(node, key) || '' : '';
   } catch {
-    role = '';
+    return '';
   }
-  if (!role) return false;
+}
+
+/** A1 ②ⓑ — 이름이 `dsRole` 낱말로 끝나고 앞 낱말이 모두 출력 역할(맨 앞 한 낱말만 루트 접두사 허용)인지. */
+function namedByPlugin(name: string, role: string, rootPrefix: string | null): boolean {
+  const toks = kebab(name).split('-').filter(Boolean);
   const rt = kebab(role).split('-').filter(Boolean);
   if (!rt.length || toks.length < rt.length) return false;
   if (toks.slice(toks.length - rt.length).join('-') !== rt.join('-')) return false;
   const head = toks.slice(0, toks.length - rt.length);
   return head.every((t, i) => EMITTED.has(t) || (i === 0 && rootPrefix != null && t === rootPrefix));
+}
+
+/* ---------- 이름 힌트(ia-v4 §4.4 "이름 힌트" · B.26) ---------- */
+/** 영어 힌트 낱말 → 힌트 역할. */
+const HINT_EN: Readonly<Record<string, string>> = {
+  gnb: 'nav', lnb: 'nav', snb: 'nav', nav: 'nav', navigation: 'nav', navbar: 'nav', menubar: 'nav',
+  breadcrumb: 'breadcrumb', breadcrumbs: 'breadcrumb',
+  tabs: 'tabs', tabbar: 'tabs', tablist: 'tabs', tabmenu: 'tabs', tabgroup: 'tabs',
+  tab: 'tab',
+  divider: 'divider', separator: 'divider',
+  button: 'button', btn: 'button', cta: 'button',
+};
+/** 한글 낱말을 코드 값으로 적는다 — src 문자열 리터럴에 한글을 두지 않는 규칙(terms 5b, 화면 문구는 i18n.ts에만). */
+const ko = (hex: string): string => hex.split(' ').map((c) => String.fromCharCode(parseInt(c, 16))).join('');
+const TAB_KO = ko('D0ED'); // 탭
+/** 한글 힌트 낱말 — 긴 낱말 먼저(`탭메뉴`를 `탭`보다, `네비게이션`을 `네비`보다). */
+const HINT_KO: ReadonlyArray<readonly [string, string]> = ([
+  [ko('B0B4 BE44'), 'nav'], // 내비
+  [ko('B124 BE44'), 'nav'], // 네비
+  [ko('B124 BE44 AC8C C774 C158'), 'nav'], // 네비게이션
+  [ko('B0B4 BE44 AC8C C774 C158'), 'nav'], // 내비게이션
+  [ko('ACBD B85C'), 'breadcrumb'], // 경로
+  [ko('D0ED BA54 B274'), 'tabs'], // 탭메뉴
+  [ko('D0ED'), 'tab'], // 탭
+  [ko('AD6C BD84 C120'), 'divider'], // 구분선
+  [ko('BC84 D2BC'), 'button'], // 버튼
+] as Array<readonly [string, string]>).sort((a, b) => b[0].length - a[0].length);
+const NAV_EN = new Set(Object.keys(HINT_EN).filter((k) => HINT_EN[k] === 'nav'));
+const NAV_KO = HINT_KO.filter(([, r]) => r === 'nav').map(([w]) => w);
+/** 중립 꼬리 — nav · tab 낱말 바로 뒤에서만 힌트를 잇는다. */
+const NEUTRAL_TAILS = new Set(['menu', 'bar', 'area', 'wrap', 'box']);
+const KO_TAILS = new Set([ko('BA54 B274'), ko('C601 C5ED'), ko('BC14')]); // 메뉴 · 영역 · 바
+const HANGUL = /[\u1100-\u11FF\u3131-\u318E\uAC00-\uD7A3]/;
+/** 토막 나누기 — 글자 · 숫자가 아닌 모든 것(공백 · 문장부호 · `-` `_` `/` `.` `·`). 대상 Figma 런타임이 es2017이라 \p{L} 대신 범위로 적는다. */
+const NON_WORD = /[^0-9A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u1100-\u11FF\u3040-\u30FF\u3131-\u318E\u4E00-\u9FFF\uAC00-\uD7A3]+/;
+/** 약한 구조 판정 — 이름 힌트가 덮을 수 있다. */
+const HINT_WEAK_ROLES = new Set(['container', 'wrapper', 'stack-x', 'stack-y', 'section', 'row', 'text-group', 'media', 'swatch', 'item']);
+
+/** 이름의 머리 낱말(맨 뒤 낱말)에서 힌트 역할을 구한다(없으면 null). 단계 0–4는 ia-v4 §4.4 "머리 낱말 찾기". */
+export function nameHintRole(name: string): string | null {
+  const segs = name.split(NON_WORD).filter(Boolean);
+  const lastSeg = segs[segs.length - 1] ?? '';
+  // 0. 맨 뒤 토막에 한글이 있으면 한글만 본다(뒤에 오는 한글이 머리명사).
+  if (!HANGUL.test(lastSeg)) {
+    // 1. 영어 — 맨 뒤 숫자 낱말을 떼고 맨 뒤 낱말.
+    const w = kebab(name).split('-').filter(Boolean);
+    while (w.length && /^[\d_]+$/.test(w[w.length - 1])) w.pop();
+    const last = w[w.length - 1];
+    if (last) {
+      if (HINT_EN[last]) return HINT_EN[last];
+      // 2. 꼬리 규칙은 nav · tab 낱말 뒤에만.
+      const prev = w[w.length - 2];
+      if (prev && NEUTRAL_TAILS.has(last) && NAV_EN.has(prev)) return 'nav';
+      if (prev === 'tab' && (NEUTRAL_TAILS.has(last) || last === 'list' || last === 'group')) return 'tabs';
+    }
+    // 3. 그 밖이면 영어 힌트 없음 → 4. 한글
+  }
+  return koreanHint(segs);
+}
+
+/** 4. 한글 — 맨 뒤 토막이 한글 낱말로 끝나거나, 정확히 꼬리이고 바로 앞 토막이 nav · tab 낱말. */
+function koreanHint(segs: readonly string[]): string | null {
+  const last = segs[segs.length - 1];
+  if (!last) return null;
+  for (const [word, role] of HINT_KO) if (last.endsWith(word)) return role;
+  if (KO_TAILS.has(last) && segs.length >= 2) {
+    const prev = segs[segs.length - 2];
+    if (HANGUL.test(prev)) {
+      if (NAV_KO.some((k) => prev.endsWith(k))) return 'nav';
+      if (prev.endsWith(TAB_KO)) return 'tabs';
+    } else {
+      const p = prev.toLowerCase();
+      if (NAV_EN.has(p)) return 'nav';
+      if (p === 'tab') return 'tabs';
+    }
+  }
+  return null;
+}
+
+/** 노드의 힌트 역할 — 이 플러그인이 전에 지은 이름(`dsRole` ≠ 힌트 역할 + A1 ②ⓑ)은 힌트가 아니다. */
+function hintRole(node: SceneNode, rootPrefix: string | null): string | null {
+  const h = nameHintRole(node.name);
+  if (!h) return null;
+  const stored = readPluginKey(node, ROLE_KEY);
+  if (stored && stored !== h && namedByPlugin(node.name, stored, rootPrefix)) return null;
+  return h;
 }
 
 /** 영역 자리인지 — 지금 코드가 hero · 영역 · section을 붙이는 자리면 글자 버튼 판정을 건너뛴다(A2). */
