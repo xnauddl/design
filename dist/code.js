@@ -6478,9 +6478,9 @@
   }
 
   // src/lib/componentLike.ts
-  function highConfidenceComponentRole(node) {
+  function highConfidenceComponentRole(node, opts = {}) {
     var _a;
-    if (isTabLike(node)) return "tab";
+    if (tabInfo(node, { wide: opts.wideTab !== false }) != null) return "tab";
     if (isButtonLike(node)) return isChipLike(node) ? "chip" : "button";
     if (isNavLike(node, 0)) return "nav";
     if (isContainerType(node)) {
@@ -6755,12 +6755,32 @@
       (k) => k.type === "TEXT" || isHeadingTitleWrapper(k)
     );
   }
-  function cellText(cell) {
+  var TAB_HANGUL = String.fromCharCode(53485);
+  var TAB_WORDS = /* @__PURE__ */ new Set(["tab", "tabs", "tabbar", "tablist", "tabmenu", "tabgroup"]);
+  function isTabName(name) {
+    if (name.includes(TAB_HANGUL)) return true;
+    return kebab(name).split("-").some((w) => TAB_WORDS.has(w));
+  }
+  function cellBar(cell) {
+    var _a, _b;
+    const kids = ((_a = cell.children) != null ? _a : []).filter(isVisible);
+    const last = kids[kids.length - 1];
+    if (!last) return null;
+    const d = dims(last);
+    const cd = dims(cell);
+    if (!d || !cd) return null;
+    if (last.type !== "LINE" && !(last.type === "RECTANGLE" && d.h <= 4)) return null;
+    if (d.w < cd.w / 2) return null;
+    if (((_b = last.y) != null ? _b : 0) + d.h < cd.h - 1) return null;
+    return last;
+  }
+  function cellText(cell, bar = false) {
     var _a;
     const kids = ((_a = cell.children) != null ? _a : []).filter(isVisible);
     const texts = kids.filter((k) => k.type === "TEXT");
     if (texts.length !== 1) return null;
-    const others = kids.filter((k) => k.type !== "TEXT");
+    const b = bar ? cellBar(cell) : null;
+    const others = kids.filter((k) => k.type !== "TEXT" && k !== b);
     if (others.some((k) => !isIconLike(k))) return null;
     return texts[0];
   }
@@ -6795,50 +6815,106 @@
     if (typeof c !== "string") return false;
     return !/[\n\r\u2028]/.test(c) && c.trim().length > 0 && c.trim().length <= 24;
   }
-  function tabInfo(node) {
-    var _a, _b;
+  var weightOf2 = (t2) => typeof t2.fontWeight === "number" ? t2.fontWeight : typeof t2.fontWeight === "symbol" ? "mixed" : 400;
+  var underlineOf = (t2) => t2.textDecoration === "UNDERLINE";
+  function tabInfo(node, opts = {}) {
+    var _a, _b, _c;
     if (node.type !== "FRAME") return null;
     if (layoutOf(node) !== "horizontal") return null;
     const d = dims(node);
     if (!d || d.h > 80) return null;
     const cells = ((_a = node.children) != null ? _a : []).filter(isVisible);
-    if (cells.length < 3) return null;
+    if (cells.length < 2) return null;
+    const strict = cells.length >= 3 ? strictTab(cells) : null;
+    if (strict) return strict;
+    if (opts.wide === false) return null;
+    if (!isTabName((_c = (_b = node.nameKey) != null ? _b : node.name) != null ? _c : "")) return null;
+    return wideTab(cells);
+  }
+  function wideLooks(cells) {
+    if (cells.every((c) => c.type === "TEXT")) {
+      if (!cells.every(shortOneLine)) return null;
+      if (cells.some((c) => !c.fillHex)) return null;
+      const looks2 = cells.map((c) => `${c.fillHex}|${String(weightOf2(c))}|${underlineOf(c) ? "u" : ""}`);
+      return { looks: looks2, texts: [...cells], bars: cells.map(() => false), textCells: true };
+    }
+    if (!cells.every((c) => c.type === "FRAME")) return null;
+    const texts = cells.map((c) => cellText(c, true));
+    if (texts.some((t2) => !t2 || !shortOneLine(t2) || !t2.fillHex)) return null;
+    if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill(c) && !c.fillHex)) return null;
+    const bars = cells.map((c) => cellBar(c) != null);
+    const looks = cells.map((c, i) => {
+      const t2 = texts[i];
+      return `${hasVisibleFill(c) ? c.fillHex : ""}|${hasVisibleStroke(c) ? "s" : ""}|${t2.fillHex}|${String(weightOf2(t2))}|${underlineOf(t2) ? "u" : ""}|${bars[i] ? "b" : ""}`;
+    });
+    return { looks, texts, bars, textCells: false };
+  }
+  function finishTab(cells, selected, textCells, texts, looks, wide) {
+    const sel = cells[selected];
+    let style = "Text";
+    if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf(sel) > 0 ? "Pill" : "Box";
+    const colorOf = (i) => !textCells && hasVisibleFill(cells[i]) && cells[i].fillHex ? cells[i].fillHex : texts[i].fillHex;
+    const other = selected === 0 ? 1 : 0;
+    return { style, selected, selectedColor: colorOf(selected), unselectedTextColor: texts[other].fillHex, cellLooks: looks, wide };
+  }
+  function strictTab(cells) {
+    var _a;
     let looks;
-    let colors;
-    let textColors;
+    let texts;
     let textCells;
     if (cells.every((c) => c.type === "TEXT")) {
       textCells = true;
       if (!cells.every(shortOneLine)) return null;
       if (cells.some((c) => !c.fillHex)) return null;
       looks = cells.map((c) => c.fillHex);
-      colors = looks;
-      textColors = looks;
+      texts = [...cells];
     } else if (cells.every((c) => c.type === "FRAME")) {
       textCells = false;
-      const texts = cells.map(cellText);
-      if (texts.some((t2) => !t2 || !shortOneLine(t2) || !t2.fillHex)) return null;
+      const ts = cells.map((c) => cellText(c));
+      if (ts.some((t2) => !t2 || !shortOneLine(t2) || !t2.fillHex)) return null;
       if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill(c) && !c.fillHex)) return null;
+      texts = ts;
       looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ""}|${hasVisibleStroke(c) ? "s" : ""}|${texts[i].fillHex}`);
-      colors = cells.map((c, i) => hasVisibleFill(c) && c.fillHex ? c.fillHex : texts[i].fillHex);
-      textColors = texts.map((t2) => t2.fillHex);
     } else {
       return null;
     }
     const counts = /* @__PURE__ */ new Map();
-    for (const l of looks) counts.set(l, ((_b = counts.get(l)) != null ? _b : 0) + 1);
+    for (const l of looks) counts.set(l, ((_a = counts.get(l)) != null ? _a : 0) + 1);
     if (counts.size !== 2) return null;
     const odd = [...counts.entries()].find(([, n]) => n === 1);
     if (!odd) return null;
     const selected = looks.indexOf(odd[0]);
-    const sel = cells[selected];
-    let style = "Text";
-    if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf(sel) > 0 ? "Pill" : "Box";
-    const other = selected === 0 ? 1 : 0;
-    return { style, selected, selectedColor: colors[selected], unselectedTextColor: textColors[other] };
+    const wl = wideLooks(cells);
+    return finishTab(cells, selected, textCells, texts, wl ? wl.looks : looks, false);
   }
-  function isTabLike(node) {
-    return tabInfo(node) != null;
+  function wideTab(cells) {
+    var _a;
+    const wl = wideLooks(cells);
+    if (!wl) return null;
+    const { looks, texts, bars, textCells } = wl;
+    if (texts.some((t2) => weightOf2(t2) === "mixed")) return null;
+    if (cells.length >= 3) {
+      const counts = /* @__PURE__ */ new Map();
+      for (const l of looks) counts.set(l, ((_a = counts.get(l)) != null ? _a : 0) + 1);
+      if (counts.size !== 2) return null;
+      const odd = [...counts.entries()].find(([, n]) => n === 1);
+      if (!odd) return null;
+      return finishTab(cells, looks.indexOf(odd[0]), textCells, texts, looks, true);
+    }
+    if (looks[0] === looks[1]) return null;
+    const marks = [
+      (i) => bars[i] ? 1 : 0,
+      (i) => underlineOf(texts[i]) ? 1 : 0,
+      (i) => weightOf2(texts[i]),
+      (i) => !textCells && hasVisibleFill(cells[i]) ? 1 : 0,
+      (i) => !textCells && hasVisibleStroke(cells[i]) ? 1 : 0
+    ];
+    for (const m of marks) {
+      const a = m(0);
+      const b = m(1);
+      if (a !== b) return finishTab(cells, a > b ? 0 : 1, textCells, texts, looks, true);
+    }
+    return null;
   }
 
   // src/lib/rename.ts
@@ -11351,7 +11427,7 @@
       }
     }
     const nameKey = readNameKey(node);
-    return __spreadProps(__spreadValues(__spreadProps(__spreadValues({
+    return __spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       id: node.id,
       name: node.name
     }, nameKey ? { nameKey } : {}), {
@@ -11381,7 +11457,9 @@
       fills: paintsOf2(a.fills),
       strokes: paintsOf2(a.strokes),
       effects: Array.isArray(a.effects) ? a.effects.map((e) => ({ visible: e.visible, type: e.type })) : void 0,
-      characters,
+      characters
+    }), node.type === "TEXT" ? { fontWeight: node.fontWeight, textDecoration: node.textDecoration } : {}), {
+      y: num(a.y),
       mainComponentKey,
       role: readRole(node)
     }), iconKey ? { iconFrame: true, vectorKey: iconKey } : {}), {
@@ -11395,7 +11473,7 @@
       const role = readRole(node);
       idx != null ? idx : idx = structIndex(roots);
       const s = idx.get(node.id);
-      return pickOwner(role, s ? highConfidenceComponentRole(s) : null, isKnownRole);
+      return pickOwner(role, s ? highConfidenceComponentRole(s, { wideTab: false }) : null, isKnownRole);
     };
   }
   function structIndex(roots) {

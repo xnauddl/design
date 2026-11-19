@@ -5,6 +5,7 @@
    ============================================================ */
 
 import { VECTOR_TYPES, hasVisibleFill, hasImageFill, hasColorFill, hasVisibleStroke } from './nodePaint';
+import { kebab } from './naming';
 
 /** 검출에 필요한 최소 노드 형태(SceneNode / 테스트 fixture와 호환). */
 export interface LikeNode {
@@ -29,6 +30,14 @@ export interface LikeNode {
   characters?: string;
   /** 아이콘 프레임(§4.7 "묶기" 3번 — `toStructNode`가 그림 하나로 접은 노드). */
   iconFrame?: boolean;
+  /** 레이어 이름 · 이름 키 — 넓힌 구조 탭의 이름 조건(§4.7 "묶기" 1번 ②)이 읽는다. */
+  name?: string;
+  nameKey?: string;
+  /** TEXT 글자 굵기 · 밑줄(섞인 값은 symbol) — 넓힌 구조 탭의 칸 모양. */
+  fontWeight?: number | symbol;
+  textDecoration?: string | symbol;
+  /** 부모 안 자리(세로) — 칸 안 막대 판정(아래 끝에 붙었나). */
+  y?: number;
   children?: readonly LikeNode[];
 }
 
@@ -62,9 +71,10 @@ export type HighConfidenceRole =
  * 위치/토큰 같은 약한 신호나 container/wrapper/랜드마크(header)는 제외.
  * heading은 card/nav/list 등보다 낮은 우선순위(오탐 방지).
  */
-export function highConfidenceComponentRole(node: LikeNode): HighConfidenceRole | null {
+export function highConfidenceComponentRole(node: LikeNode, opts: { wideTab?: boolean } = {}): HighConfidenceRole | null {
   // 탭은 맨 먼저 — 메뉴는 nav, 알약 탭은 card · list · heading 조건도 함께 만족한다(§4.7 "묶기" 1번).
-  if (isTabLike(node)) return 'tab';
+  // 쓰임 이름(§2.12 12.3)은 엄격한 구조만 탭으로 본다(`wideTab: false` — 2026-11-19 1회차 검토 결정).
+  if (tabInfo(node, { wide: opts.wideTab !== false }) != null) return 'tab';
   if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button';
   // highConfidenceRole은 depth=0으로 nav를 본다(노드 자체 판정).
   if (isNavLike(node, 0)) return 'nav';
@@ -409,16 +419,50 @@ export interface TabInfo {
   selected: number;
   /** 선택 칸 색 — 글자 칸은 글자 색, 틀 칸은 칸 채움(없으면 안쪽 글자 색). */
   selectedColor: string;
-  /** 선택 안 된 칸의 글자 색(§4.7 "묶기" 2번 — C-D1). 나머지 칸끼리는 모양이 같으므로 첫 나머지 칸의 글자 색. */
+  /** 선택 안 된 칸의 글자 색. 나머지 칸끼리는 모양이 같으므로 첫 나머지 칸의 글자 색. */
   unselectedTextColor: string;
+  /**
+   * 칸마다 넓힌 모양(색 · 굵기 · 밑줄 · 막대 — §4.7 "묶기" 1번 ②). ① · ② 모두 이 모양으로 2번의 칸 맞추기 ·
+   * 재사용 지문을 본다(2026-11-19).
+   */
+  cellLooks: string[];
+  /** ② 넓힌 구조로 판정됐나(이름 조건을 거친 탭). */
+  wide: boolean;
 }
 
-/** 칸 안의 보이는 직접 TEXT 하나(틀 칸 조건). 아니면 null. 그 밖의 자식은 아이콘(그림)만 허용. */
-function cellText(cell: LikeNode): LikeNode | null {
+/** 글자 '탭'(U+D0ED) — 화면 문구가 아니라 이름 판정용이라 i18n 밖에 둔다. */
+const TAB_HANGUL = String.fromCharCode(0xd0ed);
+const TAB_WORDS = new Set(['tab', 'tabs', 'tabbar', 'tablist', 'tabmenu', 'tabgroup']);
+/** 넓힌 구조 탭의 이름 조건(§4.7 "묶기" 1번 ②) — `kebab` 낱말 `tab` · `tabs` · `tabbar` · `tablist` · `tabmenu` · `tabgroup`, 또는 글자 `탭`. */
+export function isTabName(name: string): boolean {
+  if (name.includes(TAB_HANGUL)) return true;
+  return kebab(name).split('-').some((w) => TAB_WORDS.has(w));
+}
+
+/**
+ * 틀 칸의 막대(§4.7 "묶기" 1번 ②) — 마지막 보이는 직접 자식이면서 LINE이거나 높이 4 이하 RECTANGLE, 폭 ≥ 칸 폭 / 2,
+ * 칸 아래 끝에 붙음(`y` + 높이 ≥ 칸 높이 − 1). 아니면 null.
+ */
+function cellBar(cell: LikeNode): LikeNode | null {
+  const kids = (cell.children ?? []).filter(isVisible);
+  const last = kids[kids.length - 1];
+  if (!last) return null;
+  const d = dims(last);
+  const cd = dims(cell);
+  if (!d || !cd) return null;
+  if (last.type !== 'LINE' && !(last.type === 'RECTANGLE' && d.h <= 4)) return null;
+  if (d.w < cd.w / 2) return null;
+  if ((last.y ?? 0) + d.h < cd.h - 1) return null;
+  return last;
+}
+
+/** 칸 안의 보이는 직접 TEXT 하나(틀 칸 조건). 아니면 null. 그 밖의 자식은 아이콘(그림)만 — `bar`면 막대 하나도 허용. */
+function cellText(cell: LikeNode, bar = false): LikeNode | null {
   const kids = (cell.children ?? []).filter(isVisible);
   const texts = kids.filter((k) => k.type === 'TEXT');
   if (texts.length !== 1) return null;
-  const others = kids.filter((k) => k.type !== 'TEXT');
+  const b = bar ? cellBar(cell) : null;
+  const others = kids.filter((k) => k.type !== 'TEXT' && k !== b);
   if (others.some((k) => !isIconLike(k))) return null;
   return texts[0];
 }
@@ -457,34 +501,76 @@ export function shortOneLine(t: LikeNode): boolean {
   return !/[\n\r\u2028]/.test(c) && c.trim().length > 0 && c.trim().length <= 24;
 }
 
-/** 탭이면 정보, 아니면 null(§4.7 "묶기" 1번). */
-export function tabInfo(node: LikeNode): TabInfo | null {
+const weightOf = (t: LikeNode): number | 'mixed' => (typeof t.fontWeight === 'number' ? t.fontWeight : typeof t.fontWeight === 'symbol' ? 'mixed' : 400);
+const underlineOf = (t: LikeNode): boolean => t.textDecoration === 'UNDERLINE';
+
+/**
+ * 탭이면 정보, 아니면 null(§4.7 "묶기" 1번 — 2026-11-19 사용자 결정 B).
+ * ① 엄격한 구조(이름 없이): 칸 3개 이상 · 색 모양이 다른 칸이 정확히 하나. ② 넓힌 구조(`wide` — 기본 참):
+ * 칸 2개 이상 · 색 + 굵기 + 밑줄 + 막대 모양, 칸 2개면 표지 순서로 선택 칸 — 이름 조건(`isTabName`)이 맞을 때만.
+ */
+export function tabInfo(node: LikeNode, opts: { wide?: boolean } = {}): TabInfo | null {
   if (node.type !== 'FRAME') return null;
   if (layoutOf(node) !== 'horizontal') return null;
   const d = dims(node);
   if (!d || d.h > 80) return null;
   const cells = (node.children ?? []).filter(isVisible);
-  if (cells.length < 3) return null;
+  if (cells.length < 2) return null;
+  const strict = cells.length >= 3 ? strictTab(cells) : null;
+  if (strict) return strict;
+  if (opts.wide === false) return null;
+  if (!isTabName(node.nameKey ?? node.name ?? '')) return null;
+  return wideTab(cells);
+}
+
+/** 칸마다 넓힌 모양 — 틀 칸은 막대 하나를 허용해 읽는다. 칸이 탭 칸 조건에 맞지 않으면 null. */
+function wideLooks(cells: readonly LikeNode[]): { looks: string[]; texts: LikeNode[]; bars: boolean[]; textCells: boolean } | null {
+  if (cells.every((c) => c.type === 'TEXT')) {
+    if (!cells.every(shortOneLine)) return null;
+    if (cells.some((c) => !c.fillHex)) return null;
+    const looks = cells.map((c) => `${c.fillHex}|${String(weightOf(c))}|${underlineOf(c) ? 'u' : ''}`);
+    return { looks, texts: [...cells], bars: cells.map(() => false), textCells: true };
+  }
+  if (!cells.every((c) => c.type === 'FRAME')) return null;
+  const texts = cells.map((c) => cellText(c, true));
+  if (texts.some((t) => !t || !shortOneLine(t) || !t.fillHex)) return null;
+  if (cells.some((c) => typeof c.fills === 'symbol' || (hasVisibleFill(c) && !c.fillHex))) return null;
+  const bars = cells.map((c) => cellBar(c) != null);
+  const looks = cells.map((c, i) => {
+    const t = texts[i]!;
+    return `${hasVisibleFill(c) ? c.fillHex : ''}|${hasVisibleStroke(c) ? 's' : ''}|${t.fillHex}|${String(weightOf(t))}|${underlineOf(t) ? 'u' : ''}|${bars[i] ? 'b' : ''}`;
+  });
+  return { looks, texts: texts as LikeNode[], bars, textCells: false };
+}
+
+function finishTab(cells: readonly LikeNode[], selected: number, textCells: boolean, texts: readonly LikeNode[], looks: string[], wide: boolean): TabInfo {
+  const sel = cells[selected];
+  let style: TabStyle = 'Text';
+  if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf(sel) > 0 ? 'Pill' : 'Box';
+  const colorOf = (i: number): string => (!textCells && hasVisibleFill(cells[i]) && cells[i].fillHex ? (cells[i].fillHex as string) : (texts[i].fillHex as string));
+  const other = selected === 0 ? 1 : 0;
+  return { style, selected, selectedColor: colorOf(selected), unselectedTextColor: texts[other].fillHex as string, cellLooks: looks, wide };
+}
+
+/** ① 엄격한 구조 — 고치기 전 `tabInfo` 그대로(칸 3개 이상 · 색 모양 · 칸 안 LINE은 그림). */
+function strictTab(cells: readonly LikeNode[]): TabInfo | null {
   let looks: string[];
-  let colors: string[];
-  let textColors: string[];
+  let texts: LikeNode[];
   let textCells: boolean;
   if (cells.every((c) => c.type === 'TEXT')) {
     textCells = true;
     if (!cells.every(shortOneLine)) return null;
     if (cells.some((c) => !c.fillHex)) return null; // 섞인 색 · 없음
     looks = cells.map((c) => c.fillHex as string);
-    colors = looks;
-    textColors = looks;
+    texts = [...cells];
   } else if (cells.every((c) => c.type === 'FRAME')) {
     textCells = false;
-    const texts = cells.map(cellText);
-    if (texts.some((t) => !t || !shortOneLine(t) || !t.fillHex)) return null;
+    const ts = cells.map((c) => cellText(c));
+    if (ts.some((t) => !t || !shortOneLine(t) || !t.fillHex)) return null;
     // 칸 채움이 섞인 색(symbol)이거나 단색이 아니면(그라데이션 · 사진) 탭이 아니다 — 칸 모양을 비교할 수 없다.
     if (cells.some((c) => typeof c.fills === 'symbol' || (hasVisibleFill(c) && !c.fillHex))) return null;
-    looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ''}|${hasVisibleStroke(c) ? 's' : ''}|${texts[i]!.fillHex}`);
-    colors = cells.map((c, i) => (hasVisibleFill(c) && c.fillHex ? c.fillHex : (texts[i]!.fillHex as string)));
-    textColors = texts.map((t) => t!.fillHex as string);
+    texts = ts as LikeNode[];
+    looks = cells.map((c, i) => `${hasVisibleFill(c) ? c.fillHex : ''}|${hasVisibleStroke(c) ? 's' : ''}|${texts[i].fillHex}`);
   } else {
     return null;
   }
@@ -496,13 +582,38 @@ export function tabInfo(node: LikeNode): TabInfo | null {
   if (!odd) return null;
   // 칸이 3개 이상이므로 나머지 모양은 2번 이상 — 한 번 나온 쪽이 선택 칸.
   const selected = looks.indexOf(odd[0]);
-  const sel = cells[selected];
-  let style: TabStyle = 'Text';
-  if (!textCells) style = hasVisibleFill(sel) && cornerRadiusOf(sel) > 0 ? 'Pill' : 'Box';
-  const other = selected === 0 ? 1 : 0;
-  return { style, selected, selectedColor: colors[selected], unselectedTextColor: textColors[other] };
+  // 넓힌 모양(칸 맞추기 · 재사용 지문) — 막대를 허용해 다시 읽고, 못 읽으면(칸 안 LINE이 막대 조건 밖 등) 색 모양 그대로.
+  const wl = wideLooks(cells);
+  return finishTab(cells, selected, textCells, texts, wl ? wl.looks : looks, false);
 }
 
-function isTabLike(node: LikeNode): boolean {
-  return tabInfo(node) != null;
+/** ② 넓힌 구조(이름 조건은 부르는 쪽이 본다). */
+function wideTab(cells: readonly LikeNode[]): TabInfo | null {
+  const wl = wideLooks(cells);
+  if (!wl) return null;
+  const { looks, texts, bars, textCells } = wl;
+  if (texts.some((t) => weightOf(t) === 'mixed')) return null; // 섞인 굵기
+  if (cells.length >= 3) {
+    const counts = new Map<string, number>();
+    for (const l of looks) counts.set(l, (counts.get(l) ?? 0) + 1);
+    if (counts.size !== 2) return null;
+    const odd = [...counts.entries()].find(([, n]) => n === 1);
+    if (!odd) return null;
+    return finishTab(cells, looks.indexOf(odd[0]), textCells, texts, looks, true);
+  }
+  // 칸 2개 — 표지 순서(막대 → 밑줄 → 굵기 → 채움 → 선)로 처음 갈리는 표지를 가진 칸이 선택. 색만 다르면 탭 아님.
+  if (looks[0] === looks[1]) return null;
+  const marks: ((i: number) => number)[] = [
+    (i) => (bars[i] ? 1 : 0),
+    (i) => (underlineOf(texts[i]) ? 1 : 0),
+    (i) => weightOf(texts[i]) as number,
+    (i) => (!textCells && hasVisibleFill(cells[i]) ? 1 : 0),
+    (i) => (!textCells && hasVisibleStroke(cells[i]) ? 1 : 0),
+  ];
+  for (const m of marks) {
+    const a = m(0);
+    const b = m(1);
+    if (a !== b) return finishTab(cells, a > b ? 0 : 1, textCells, texts, looks, true);
+  }
+  return null;
 }

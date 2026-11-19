@@ -821,6 +821,8 @@ function toStructNode(node: SceneNode, isRoot = true): StructNode {
       ? (a.effects as readonly { visible?: boolean; type?: string }[]).map((e) => ({ visible: e.visible, type: e.type }))
       : undefined,
     characters,
+    ...(node.type === 'TEXT' ? { fontWeight: node.fontWeight as number | symbol, textDecoration: node.textDecoration as string | symbol } : {}),
+    y: num(a.y),
     mainComponentKey,
     role: readRole(node),
     ...(iconKey ? { iconFrame: true, vectorKey: iconKey } : {}),
@@ -839,7 +841,7 @@ function bindOwnerOf(roots: readonly SceneNode[]): (node: SceneNode) => string |
     const role = readRole(node);
     idx ??= structIndex(roots);
     const s = idx.get(node.id);
-    return pickOwner(role, s ? highConfidenceComponentRole(s) : null, isKnownRole);
+    return pickOwner(role, s ? highConfidenceComponentRole(s, { wideTab: false }) : null, isKnownRole); // 쓰임 이름은 엄격한 구조 탭만(§4.7 "묶기" 1번)
   };
 }
 

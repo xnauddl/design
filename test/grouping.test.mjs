@@ -15,6 +15,7 @@ import {
   gateComponentCandidates,
   isAutoNamedCandidate,
   isDefaultName,
+  isTabName,
 } from '../dist/pure.mjs';
 
 const visible = [{ visible: true, type: 'SOLID' }];
@@ -41,8 +42,9 @@ const pill = (id = 'pill', active = 1, fill = '#3d5fdb') => ({
 });
 
 test('탭 판정 — 메뉴형(글자 칸) · 알약형(틀 칸)은 탭, 버튼 · 내비 · 카드보다 먼저', () => {
-  assert.deepEqual(tabInfo(menu()), { style: 'Text', selected: 0, selectedColor: '#000000', unselectedTextColor: '#7a7a7a' });
-  assert.deepEqual(tabInfo(pill()), { style: 'Pill', selected: 1, selectedColor: '#3d5fdb', unselectedTextColor: '#a3a3a3' });
+  const pick = (t) => t && { style: t.style, selected: t.selected, selectedColor: t.selectedColor, unselectedTextColor: t.unselectedTextColor, wide: t.wide };
+  assert.deepEqual(pick(tabInfo(menu())), { style: 'Text', selected: 0, selectedColor: '#000000', unselectedTextColor: '#7a7a7a', wide: false });
+  assert.deepEqual(pick(tabInfo(pill())), { style: 'Pill', selected: 1, selectedColor: '#3d5fdb', unselectedTextColor: '#a3a3a3', wide: false });
   assert.equal(highConfidenceComponentRole(menu()), 'tab');
   assert.equal(highConfidenceComponentRole(pill()), 'tab');
 });
@@ -71,6 +73,69 @@ test('탭의 칸은 후보가 아니다 — 선택 칸이 버튼처럼 보여도
   const cands = scanComponentCandidates([root]);
   assert.ok(cands.some((c) => c.id === 'pill' && c.eligible));
   assert.ok(!cands.some((c) => c.id.startsWith('pill-')));
+});
+
+/* ---------- 6-1b 탭 판정 — 엄격한 구조, 또는 이름 + 넓힌 구조(ia-v3 A.19 · §4.7 "묶기" 1번) ---------- */
+
+test('isTabName — kebab 낱말 tab · tabs · tabbar …, 또는 글자 탭', () => {
+  for (const n of ['Tab', 'tabs', 'TabBar', 'category-tabs', '탭바', '상단 탭', 'Tab 2', 'tabs-1', 'tablist']) assert.equal(isTabName(n), true, n);
+  for (const n of ['table', 'stable', 'nav', 'card', 'Tab2', 'tabs1', '']) assert.equal(isTabName(n), false, n);
+});
+
+test('엄격한 구조 — 이름 없이 탭(nav 메뉴 · card 알약 · 자동 이름 Frame 3)', () => {
+  assert.equal(tabInfo({ ...menu(), name: 'Frame 3' })?.wide, false);
+  assert.equal(tabInfo(pill())?.style, 'Pill');
+  assert.equal(tabInfo(menu(), { wide: false })?.selected, 0, '엄격한 구조는 wide: false에서도 탭');
+});
+
+/** 넓힌 구조 — 글자 색은 모두 같고 굵기 · 밑줄로 선택을 표시한 글자 칸 줄. */
+const weightRow = (name, n = 3, sel = 0, extra = (i) => (i === sel ? { fontWeight: 700 } : { fontWeight: 400 })) => ({
+  id: `w-${name}`, name, type: 'FRAME', layoutMode: 'HORIZONTAL', width: 300, height: 20,
+  children: ['Home', 'Trips', 'Deals', 'My'].slice(0, n).map((c, i) => text(`w-${name}-${i}`, c, '#111111', extra(i))),
+});
+/** 틀 칸 — 막대(마지막 자식 · 아래 끝 · 폭 절반 이상) 유무로 선택 표시. */
+const barCell = (id, label, bar, o = {}) => ({
+  id, name: 'cell', type: 'FRAME', layoutMode: 'VERTICAL', width: 80, height: 40, fills: [],
+  children: [text(`${id}t`, label, '#111111'), ...(bar ? [{ id: `${id}b`, name: 'bar', type: 'RECTANGLE', width: 80, height: 2, y: 38, fillHex: '#2563eb', fills: visible, ...o }] : [])],
+});
+const barRow = (name, n = 3, sel = 0) => ({ id: `b-${name}`, name, type: 'FRAME', layoutMode: 'HORIZONTAL', width: 300, height: 40,
+  children: ['One', 'Two', 'Three'].slice(0, n).map((l, i) => barCell(`b-${name}-${i}`, l, i === sel)) });
+
+test('넓힌 구조 — 굵기 · 밑줄 · 칸 안 막대 3칸 줄과 막대 2칸 줄은 이름이 tabs일 때만 탭', () => {
+  const w = tabInfo(weightRow('tabs', 3, 1));
+  assert.equal(w?.selected, 1);
+  assert.equal(w?.wide, true);
+  assert.equal(w?.style, 'Text');
+  assert.equal(tabInfo(weightRow('nav', 3, 1)), null);
+  assert.equal(tabInfo(weightRow('menu-list', 3, 1)), null);
+  const u = weightRow('tabs', 3, 2, (i) => (i === 2 ? { textDecoration: 'UNDERLINE' } : {}));
+  assert.equal(tabInfo(u)?.selected, 2);
+  const b3 = tabInfo(barRow('tabs', 3, 0));
+  assert.equal(b3?.selected, 0);
+  assert.equal(b3?.style, 'Box');
+  assert.ok(b3.cellLooks[0].endsWith('|b') && !b3.cellLooks[1].endsWith('|b'));
+  assert.equal(tabInfo(barRow('tabs', 2, 1))?.selected, 1, '막대 표지 2칸');
+  assert.equal(tabInfo(barRow('menu', 2, 1)), null);
+  assert.equal(tabInfo({ ...barRow('Tab2', 3, 0) }), null, '숫자가 붙은 낱말은 이름 조건 거짓(한계)');
+});
+
+test('넓힌 구조 2칸 — 색만 다르면 아님 · 채움 유무 · 선 유무만 다르면 탭 · 섞인 굵기 아님 · 위쪽 LINE은 그림', () => {
+  const two = (a, b) => ({ id: 'two', name: 'tabs', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 200, height: 40, children: [a, b] });
+  const fc = (id, o = {}, textHex = '#111111') => ({ id, name: 'cell', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 40, fills: [], ...o, children: [text(`${id}t`, id, textHex)] });
+  assert.equal(tabInfo(two(fc('a', {}, '#111111'), fc('b', {}, '#7a7a7a'))), null, '글자 색만 다름');
+  assert.equal(tabInfo(two(fc('a', { fillHex: '#eeeeee', fills: visible }), fc('b', { fillHex: '#dddddd', fills: visible }))), null, '채움 색만 다름');
+  assert.equal(tabInfo(two(fc('a'), fc('b', { fillHex: '#eeeeee', fills: visible })))?.selected, 1, '채움 있는 칸');
+  assert.equal(tabInfo(two(fc('a', { strokes: visible }), fc('b')))?.selected, 0, '선 있는 칸(테두리 탭)');
+  const mixed = weightRow('tabs', 3, 0, (i) => (i === 0 ? { fontWeight: Symbol('mixed') } : { fontWeight: 400 }));
+  assert.equal(tabInfo(mixed), null, '섞인 굵기');
+  const topLine = (id, line) => ({ ...fc(id), layoutMode: 'VERTICAL', children: [...(line ? [{ id: `${id}l`, name: 'line', type: 'LINE', width: 80, height: 0, y: 0 }] : []), text(`${id}t`, id, '#111111')] });
+  assert.equal(tabInfo(two(topLine('a', true), topLine('b', false))), null, '위쪽 LINE은 막대가 아니라 그림 — 표지 없음');
+});
+
+test('쓰임 이름(⑫) — 넓힌 구조 tabs 줄은 wideTab: false에서 tab이 아님, 엄격한 구조 메뉴는 tab', () => {
+  assert.equal(highConfidenceComponentRole(weightRow('tabs', 3, 1)), 'tab');
+  assert.notEqual(highConfidenceComponentRole(weightRow('tabs', 3, 1), { wideTab: false }), 'tab');
+  assert.equal(highConfidenceComponentRole(menu(), { wideTab: false }), 'tab');
 });
 
 /* ---------- 탭 그룹 (2번) ---------- */
