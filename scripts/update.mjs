@@ -3,6 +3,7 @@
    Claude가 GitHub에 올린 수정은 로컬 폴더에 저절로 오지 않는다. Figma는 로컬 dist/를 읽는다.
 
    사용:
+     npm run dev                    지금 브랜치를 원격 최신으로 (npm run update와 같음)
      npm run update                 지금 브랜치를 원격 최신으로
      npm run update -- <브랜치>      그 브랜치로 바꾼 뒤 원격 최신으로 (예: main)
 
@@ -11,6 +12,7 @@
      2. dist/ 만 바뀌어 있으면 되돌린다(로컬 빌드 잔여물 — 원격 dist/가 정본).
         dist/ 밖에 고친 파일이 있으면 멈춘다(사용자 작업을 지우지 않는다).
      3. 브랜치를 바꾸고(인자가 있을 때) 원격 최신으로 앞으로만 옮긴다(--ff-only).
+        앞으로만 옮길 수 없어도, 로컬에만 있는 커밋이 모두 이미 main에 들어간 것이면(병합 뒤 브랜치를 다시 맞춘 경우) 원격으로 맞춘다.
         원격이 새로 들이는 파일과 이름이 같은 '추적 안 하는' 로컬 파일은 같은 내용이면 지우고, 다르면 .local로 옮긴다.
      4. 받아 온 커밋 · 창 크기(dist/code.js의 UI_WIDTH)를 보여 준다.
    ============================================================ */
@@ -77,7 +79,19 @@ for (const f of incoming) {
 try {
   git('merge', '--ff-only', `origin/${branch}`);
 } catch (e) {
-  fail(`앞으로만 옮길 수 없어요(로컬에만 있는 커밋이 있음). Claude에게 이 메시지를 알려 주세요:\n  ${String(e.stderr || e.message).trim()}`);
+  // 병합 뒤 원격 브랜치를 main으로 다시 맞추면(강제 푸시) 앞으로만 옮길 수 없다.
+  // 로컬에만 있는 커밋이 모두 이미 main에 들어간 것이면 잃을 것이 없으니 원격으로 맞춘다.
+  try { git('fetch', 'origin', 'main'); } catch { /* main을 못 받으면 아래 검사가 막는다 */ }
+  const localOnly = git('rev-list', `origin/${branch}..HEAD`).split('\n').filter(Boolean);
+  const merged = (c) => {
+    try { git('merge-base', '--is-ancestor', c, 'origin/main'); return true; } catch { return false; }
+  };
+  const unmerged = localOnly.filter((c) => !merged(c));
+  if (unmerged.length) {
+    fail(`앞으로만 옮길 수 없어요(main에 없는 로컬 커밋 ${unmerged.length}개). Claude에게 이 메시지를 알려 주세요:\n  ${String(e.stderr || e.message).trim()}`);
+  }
+  git('reset', '--hard', `origin/${branch}`);
+  console.log(`· 이미 main에 들어간 로컬 커밋 ${localOnly.length}개를 두고 원격 ${branch}로 맞춤`);
 }
 
 const after = git('log', '-1', '--oneline');
