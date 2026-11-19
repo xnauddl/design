@@ -2305,6 +2305,10 @@
     // 글자만 2개 이상
     "media",
     // 사진(+ 작은 아이콘)만 담은 상자
+    // 이름 힌트로만 붙는 역할(ia-v4 §4.4 "이름 힌트" · B.28) — 구조 판정은 없다
+    "breadcrumb",
+    "tabs",
+    "tab",
     // 컴포넌트
     "button",
     "chip",
@@ -2341,7 +2345,6 @@
     "drawer",
     "dialog",
     "popup",
-    "tab",
     "label",
     "title"
   ];
@@ -7139,7 +7142,7 @@
     return Number.isFinite(v) ? Math.max(1, Math.round(v)) : 8;
   }
   async function recurse(nodes, ancestorName, opts, col, depth, parentLayout, parentId, parentRole, parentDims, ctxDepth, rootPrefix, parentNode) {
-    var _a, _b;
+    var _a, _b, _c;
     const total = nodes.length;
     const slotOf = /* @__PURE__ */ new Map();
     let slots = 0;
@@ -7183,6 +7186,7 @@
       if (!decided.skip && decided.name) {
         const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
         if (visible !== decided.name) nameKey = decided.name;
+        if (decided.keepKey) nameKey = nameKeyFor(before, readPluginKey(node, NAME_KEY));
         if (visible !== before) {
           after = visible;
           col.changes.push(__spreadValues({ id: node.id, before, after }, nameKey ? { nameKey } : {}));
@@ -7190,13 +7194,13 @@
         }
         if (opts.apply && decided.role) writeRole(node, decided.role);
         if (opts.apply) writeNameKey(node, nameKey != null ? nameKey : null);
-        contextForChildren = decided.passthrough ? ancestorName : decided.name;
+        contextForChildren = (_b = decided.ctxName) != null ? _b : decided.passthrough ? ancestorName : decided.name;
         if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
       }
       col.nodes.push(__spreadValues({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role }, nameKey ? { nameKey } : {}));
       if ("children" in node && !isSkippedSubtree(node) && !isIconFrameNode(node)) {
         const childDims = decided.passthrough ? parentDims : dims2(node);
-        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf2(node), node.id, (_b = decided.role) != null ? _b : null, childDims, ctxDepthForChildren, prefixForChildren, node);
+        await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf2(node), node.id, (_c = decided.role) != null ? _c : null, childDims, ctxDepthForChildren, prefixForChildren, node);
       }
     }
   }
@@ -7216,6 +7220,12 @@
     const token = await primaryToken(node);
     const ctxScope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
     const role = resolveRole(node, token, pos, parentRole, ctxScope);
+    if (isContainerType2(node) && !isIconFrameNode(node)) {
+      const h = hintRole(node, pos.rootPrefix);
+      if (h && (role === h || HINT_WEAK_ROLES.has(role))) {
+        return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h };
+      }
+    }
     if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
     if (role === "icon" && isIconFrameNode(node) && !isMeaninglessIconName(node, pos.rootPrefix)) {
       return { skip: false, role, name: node.name, keepName: true };
@@ -7269,6 +7279,7 @@
     if (pos.isOverlay) return "overlay";
     if (isModalLike(node, pos, ctxScope)) return "modal";
     if (ctxScope === "progress" && isBarFill(node)) return "indicator";
+    if (ctxScope === "tab" && (node.type === "FRAME" || node.type === "RECTANGLE") && isThinColorStrip(node)) return "indicator";
     if (ctxScope === "field" && isInputBox2(node)) return "input";
     if (isButtonLike2(node)) return isChipLike2(node) ? "chip" : "button";
     if (isNavLike2(node, pos.depth, ctxScope)) return "nav";
@@ -7301,7 +7312,7 @@
         const kids = "children" in node ? node.children : [];
         if (kids.length === 0) {
           if (hasImageFill(node)) return "image";
-          if (hasColorFill(node)) return "swatch";
+          if (hasColorFill(node)) return node.type === "FRAME" && isThinStrip(node) ? "divider" : "swatch";
           const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
           if (emptyRegion) return emptyRegion;
           return "container";
@@ -7389,6 +7400,15 @@
     const max = Math.max(d.w, d.h);
     if (min <= 0) return false;
     return min <= 2 || max / min >= 25;
+  }
+  function isThinStrip(node) {
+    const d = dims2(node);
+    return !!d && isThin(node) && Math.min(d.w, d.h) <= 4;
+  }
+  function isThinColorStrip(node) {
+    if ("children" in node && node.children.length > 0) return false;
+    if (hasImageFill(node) || !hasColorFill(node)) return false;
+    return isThinStrip(node);
   }
   function paints(node, field) {
     if (!(field in node)) return null;
@@ -7739,19 +7759,116 @@
     if (STRUCT_FALLBACK_NAMES.has(name)) return true;
     const toks = kebab(name).split("-").filter(Boolean);
     if (toks.length === 1 && toks[0] === "icon") return true;
-    let role = "";
+    const role = readPluginKey(node, ROLE_KEY);
+    return !!role && namedByPlugin(name, role, rootPrefix);
+  }
+  function readPluginKey(node, key) {
     try {
       const fn = node.getPluginData;
-      role = typeof fn === "function" ? fn.call(node, ROLE_KEY) || "" : "";
+      return typeof fn === "function" ? fn.call(node, key) || "" : "";
     } catch (e) {
-      role = "";
+      return "";
     }
-    if (!role) return false;
+  }
+  function namedByPlugin(name, role, rootPrefix) {
+    const toks = kebab(name).split("-").filter(Boolean);
     const rt = kebab(role).split("-").filter(Boolean);
     if (!rt.length || toks.length < rt.length) return false;
     if (toks.slice(toks.length - rt.length).join("-") !== rt.join("-")) return false;
     const head = toks.slice(0, toks.length - rt.length);
     return head.every((t2, i) => EMITTED.has(t2) || i === 0 && rootPrefix != null && t2 === rootPrefix);
+  }
+  var HINT_EN = {
+    gnb: "nav",
+    lnb: "nav",
+    snb: "nav",
+    nav: "nav",
+    navigation: "nav",
+    navbar: "nav",
+    menubar: "nav",
+    breadcrumb: "breadcrumb",
+    breadcrumbs: "breadcrumb",
+    tabs: "tabs",
+    tabbar: "tabs",
+    tablist: "tabs",
+    tabmenu: "tabs",
+    tabgroup: "tabs",
+    tab: "tab",
+    divider: "divider",
+    separator: "divider",
+    button: "button",
+    btn: "button",
+    cta: "button"
+  };
+  var ko = (hex) => hex.split(" ").map((c) => String.fromCharCode(parseInt(c, 16))).join("");
+  var TAB_KO = ko("D0ED");
+  var HINT_KO = [
+    [ko("B0B4 BE44"), "nav"],
+    // 내비
+    [ko("B124 BE44"), "nav"],
+    // 네비
+    [ko("B124 BE44 AC8C C774 C158"), "nav"],
+    // 네비게이션
+    [ko("B0B4 BE44 AC8C C774 C158"), "nav"],
+    // 내비게이션
+    [ko("ACBD B85C"), "breadcrumb"],
+    // 경로
+    [ko("D0ED BA54 B274"), "tabs"],
+    // 탭메뉴
+    [ko("D0ED"), "tab"],
+    // 탭
+    [ko("AD6C BD84 C120"), "divider"],
+    // 구분선
+    [ko("BC84 D2BC"), "button"]
+    // 버튼
+  ].sort((a, b) => b[0].length - a[0].length);
+  var NAV_EN = new Set(Object.keys(HINT_EN).filter((k) => HINT_EN[k] === "nav"));
+  var NAV_KO = HINT_KO.filter(([, r]) => r === "nav").map(([w]) => w);
+  var NEUTRAL_TAILS = /* @__PURE__ */ new Set(["menu", "bar", "area", "wrap", "box"]);
+  var KO_TAILS = /* @__PURE__ */ new Set([ko("BA54 B274"), ko("C601 C5ED"), ko("BC14")]);
+  var HANGUL = /[\u1100-\u11FF\u3131-\u318E\uAC00-\uD7A3]/;
+  var NON_WORD = /[^0-9A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF\u1100-\u11FF\u3040-\u30FF\u3131-\u318E\u4E00-\u9FFF\uAC00-\uD7A3]+/;
+  var HINT_WEAK_ROLES = /* @__PURE__ */ new Set(["container", "wrapper", "stack-x", "stack-y", "section", "row", "text-group", "media", "swatch", "item"]);
+  function nameHintRole(name) {
+    var _a;
+    const segs = name.split(NON_WORD).filter(Boolean);
+    const lastSeg2 = (_a = segs[segs.length - 1]) != null ? _a : "";
+    if (!HANGUL.test(lastSeg2)) {
+      const w = kebab(name).split("-").filter(Boolean);
+      while (w.length && /^[\d_]+$/.test(w[w.length - 1])) w.pop();
+      const last = w[w.length - 1];
+      if (last) {
+        if (HINT_EN[last]) return HINT_EN[last];
+        const prev = w[w.length - 2];
+        if (prev && NEUTRAL_TAILS.has(last) && NAV_EN.has(prev)) return "nav";
+        if (prev === "tab" && (NEUTRAL_TAILS.has(last) || last === "list" || last === "group")) return "tabs";
+      }
+    }
+    return koreanHint(segs);
+  }
+  function koreanHint(segs) {
+    const last = segs[segs.length - 1];
+    if (!last) return null;
+    for (const [word, role] of HINT_KO) if (last.endsWith(word)) return role;
+    if (KO_TAILS.has(last) && segs.length >= 2) {
+      const prev = segs[segs.length - 2];
+      if (HANGUL.test(prev)) {
+        if (NAV_KO.some((k) => prev.endsWith(k))) return "nav";
+        if (prev.endsWith(TAB_KO)) return "tabs";
+      } else {
+        const p = prev.toLowerCase();
+        if (NAV_EN.has(p)) return "nav";
+        if (p === "tab") return "tabs";
+      }
+    }
+    return null;
+  }
+  function hintRole(node, rootPrefix) {
+    const h = nameHintRole(node.name);
+    if (!h) return null;
+    const stored = readPluginKey(node, ROLE_KEY);
+    if (stored && stored !== h && namedByPlugin(node.name, stored, rootPrefix)) return null;
+    return h;
   }
   function atRegionSlot(node, pos, ctxScope, parentRole) {
     if (!isContainerType2(node)) return false;

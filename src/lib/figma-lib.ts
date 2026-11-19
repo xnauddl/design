@@ -36,7 +36,7 @@ export { judgeUnused, collectAliasIds, scanUnusedVariables, deleteUnusedVariable
 export { bindSelection, collectLocalMains, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
 export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName, pickOwner } from './usageRoles';
 export type { BindResult } from './bind';
-export { renameSelection, writeRole, writeRoleFromName, stripRootPrefix } from './rename';
+export { renameSelection, writeRole, writeRoleFromName, stripRootPrefix, nameHintRole } from './rename';
 export type { RenameOutcome } from './rename';
 export { createIconRegistry, cleanupAfterRegister, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember, replaceMemberAsync, swapMemberAsync, copyOverridesAsync, keepLookAsync, photoLeafOf, visibleBox, imageMatrix, shiftMatrix, cornerImagePoints, snapshotOverrides, restoreOverrides, tallyRestoreFailures } from './artwork';
 export type { IconRegistry, VectorSlot, MemberResult, CopyDeps, KeepLookDeps } from './artwork';
