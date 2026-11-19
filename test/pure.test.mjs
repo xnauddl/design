@@ -88,6 +88,7 @@ import {
   weightOf,
   krdsCategory,
   krdsStep,
+  KRDS_STEPS,
   nameKrdsStyles,
   commitUndo,
   explainError,
@@ -3073,12 +3074,27 @@ test('krdsType — weightOf: 폭 · 광학 수식어를 떼고 읽는다, 모르
   assert.deepEqual(weightOf('Regular'), { weight: 400, italic: false });
 });
 
-test('krdsType — 분류: label(경로별) → display(600↑ · 42↑) → heading(600↑) → body', () => {
+test('krdsType — 분류: label(경로별) → display(600↑ · 42↑) → heading(21.5↑) → heading(600↑ · 16↑) → body', () => {
   assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 42 })), 'display');
   assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 41.96 })), 'display'); // 표기값 42.0
   assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 41.94 })), 'heading'); // 표기값 41.9
   assert.equal(krdsCategory(kin({ style: 'SemiBold', fontSize: 36 })), 'heading'); // display small(36)은 나오지 않음
-  assert.equal(krdsCategory(kin({ style: 'Medium', fontSize: 60 })), 'body');
+  assert.equal(krdsCategory(kin({ style: 'Medium', fontSize: 60 })), 'heading'); // 21.5 이상은 굵기와 관계없이 heading(T1) — display는 600 이상만
+  // T1: 21.5 이상은 굵기와 관계없이 heading(표기값)
+  assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 24 })), 'heading');
+  assert.equal(krdsCategory(kin({ style: 'Light', fontSize: 22 })), 'heading');
+  assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 21.46 })), 'heading'); // 표기값 21.5
+  assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 21.44 })), 'body'); // 표기값 21.4
+  assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 18 })), 'body');
+  // T4: 굵은 글자는 16 이상만 heading
+  assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 16 })), 'heading');
+  assert.equal(krdsCategory(kin({ style: 'SemiBold', fontSize: 15.96 })), 'heading'); // 표기값 16.0
+  assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 15.9 })), 'body');
+  assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 14 })), 'body');
+  assert.equal(krdsCategory(kin({ style: 'Medium', fontSize: 18 })), 'body'); // 500은 굵은 글자가 아님
+  // label이 먼저(큰 크기 · 굵은 글자여도)
+  assert.equal(krdsCategory(kin({ count: 3, uiCount: 3, fontSize: 24 }), 'scan'), 'label');
+  assert.equal(krdsCategory(kin({ name: 'button/lg', fontSize: 24, style: 'Bold' }), 'rename'), 'label');
   // 스캔: uiCount × 2 ≥ count
   assert.equal(krdsCategory(kin({ count: 4, uiCount: 2 }), 'scan'), 'label');
   assert.equal(krdsCategory(kin({ count: 5, uiCount: 2 }), 'scan'), 'body');
@@ -3099,7 +3115,8 @@ test('krdsType — 단계 경계(중간점 · 표기값)', () => {
   assert.equal(krdsStep('display', 51.9), 'medium');
   assert.equal(krdsStep('display', 42), 'medium');
   const h = [[40, 'xlarge'], [36, 'xlarge'], [35.9, 'large'], [28, 'large'], [27.9, 'medium'], [21.5, 'medium'],
-    [21.4, 'small'], [18, 'small'], [17.9, 'xsmall'], [16, 'xsmall'], [15.9, 'xxsmall'], [10, 'xxsmall']];
+    [21.4, 'small'], [18, 'small'], [17.9, 'xsmall'], [16, 'xsmall'], [15.9, 'xsmall'], [10, 'xsmall']]; // 16 미만은 heading이 되지 않음(§3.2) — 마지막 단계로 떨어질 뿐
+  assert.ok(!KRDS_STEPS.heading.some((d) => d.step === 'xxsmall'), 'heading xxsmall 단계 없음(2026-11-19 T4)');
   for (const [sz, st] of h) assert.equal(krdsStep('heading', sz), st, `heading ${sz}`);
   const b = [[60, 'large'], [18, 'large'], [17.9, 'medium'], [16, 'medium'], [15.9, 'small'], [14, 'small'], [13.9, 'xsmall'], [8, 'xsmall']];
   for (const [sz, st] of b) {
@@ -3118,8 +3135,8 @@ test('krdsType — 크기 꼬리: 기준값 거리 → 쓰인 곳 → 큰 크기
   );
   // 거리가 먼저 — 19는 쓰인 곳이 적어도 그대로
   assert.deepEqual(
-    nameKrdsStyles([kpx(19, 150, 'Regular'), kpx(24, 150, 'Regular', { count: 9 })]),
-    ['body/large', 'body/large-24'],
+    nameKrdsStyles([kpx(19, 150, 'Regular'), kpx(21, 150, 'Regular', { count: 9 })]),
+    ['body/large', 'body/large-21'],
   );
   // 크기별 쓰인 곳은 그 크기 스타일들의 합
   assert.deepEqual(
@@ -3164,6 +3181,27 @@ test('krdsType — 줄 높이 꼬리 · 꼬리 순서(크기 → 굵기 → 줄 
     nameKrdsStyles([kpx(17, 150, 'Regular'), kpx(16, 130, 'Medium'), kpx(16, 150, 'Regular')]),
     ['body/medium', 'body/medium-16-w500-130', 'body/medium-16'],
   );
+});
+
+test('krdsType — 2026-11-19 T1 · T4: 보통 굵기 큰 글자는 heading, 16 미만 굵은 글자는 body', () => {
+  // T1 — 보통 굵기는 heading 기본 묶음(600 이상) 밖이라 굵기 꼬리
+  assert.deepEqual(nameKrdsStyles([kpx(24, 150, 'Regular')]), ['heading/medium-w400']);
+  assert.deepEqual(nameKrdsStyles([kpx(24, 145, 'Regular')]), ['heading/medium-w400-145']);
+  assert.deepEqual(nameKrdsStyles([kpx(36, 150, 'Regular')]), ['heading/xlarge-w400']);
+  // 44 보통 굵기는 display가 아니라 heading xlarge — 기준 40에 먼 크기는 크기 꼬리
+  assert.deepEqual(nameKrdsStyles([kpx(40, 150, 'Bold'), kpx(44, 150, 'Regular')]), ['heading/xlarge', 'heading/xlarge-44-w400']);
+  assert.deepEqual(nameKrdsStyles([kpx(44, 150, 'Bold')]), ['display/medium']); // display는 그대로
+  // 같은 단계의 굵은 글자가 꼬리 없이, 보통 굵기가 -w400
+  assert.deepEqual(nameKrdsStyles([kpx(24, 150, 'Regular', { count: 9 }), kpx(24, 150, 'Bold')]), ['heading/medium-w400', 'heading/medium']);
+  // T4 — 16 미만 굵은 글자는 body(기본 묶음 500 이하 밖이라 -w700)
+  assert.deepEqual(nameKrdsStyles([kpx(14, 150, 'Bold')]), ['body/small-w700']);
+  assert.deepEqual(nameKrdsStyles([kpx(15, 150, 'Bold')]), ['body/small-w700']);
+  assert.deepEqual(nameKrdsStyles([kpx(14, 150, 'Regular'), kpx(14, 150, 'Bold')]), ['body/small', 'body/small-w700']);
+  assert.deepEqual(nameKrdsStyles([kpx(15, 150, 'Regular'), kpx(15, 150, 'Bold')]), ['body/small', 'body/small-w700']);
+  assert.deepEqual(nameKrdsStyles([kpx(16, 150, 'Bold')]), ['heading/xsmall']);
+  // label이 먼저
+  assert.deepEqual(nameKrdsStyles([kpx(24, 150, 'Regular', { count: 2, uiCount: 2 })]), ['label/large']);
+  assert.deepEqual(nameKrdsStyles([kpx(14, 150, 'Bold', { count: 2, uiCount: 2 })]), ['label/small-w700']);
 });
 
 test('krdsType — 마지막 수단: 자간 → 글꼴 → -2 · -3 (§3.8, 문자 코드 순)', () => {

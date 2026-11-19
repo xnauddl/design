@@ -4079,8 +4079,8 @@
       { step: "large", ref: 32, min: 28 },
       { step: "medium", ref: 24, min: 21.5 },
       { step: "small", ref: 19, min: 18 },
-      { step: "xsmall", ref: 17, min: 16 },
-      { step: "xxsmall", ref: 15, min: -Infinity }
+      // 16 미만은 heading이 되지 않는다(§3.2 — 2026-11-19 T4) — KRDS xxsmall(15)은 단계로 두지 않는다.
+      { step: "xsmall", ref: 17, min: -Infinity }
     ],
     body: [
       { step: "large", ref: 19, min: 18 },
@@ -4115,6 +4115,8 @@
     return Math.round(p);
   }
   var LABEL_TOKENS = /* @__PURE__ */ new Set(["label", "button", "btn", "chip", "input", "field"]);
+  var HEADING_BY_SIZE = 21.5;
+  var HEADING_BOLD_MIN = 16;
   function krdsCategory(input, path = "scan") {
     var _a, _b, _c;
     if (path === "scan") {
@@ -4127,7 +4129,8 @@
     const { weight } = weightOf(input.style);
     const size = round1(input.fontSize);
     if (weight >= 600 && size >= 42) return "display";
-    if (weight >= 600) return "heading";
+    if (size >= HEADING_BY_SIZE) return "heading";
+    if (weight >= 600 && size >= HEADING_BOLD_MIN) return "heading";
     return "body";
   }
   function krdsStepDef(category, size) {
