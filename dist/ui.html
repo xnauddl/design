@@ -7910,8 +7910,11 @@
           if (r.bound) results.push({ id, mark: "ok", text: t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") });
           else {
             const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_g = reasons["already-bound"]) != null ? _g : 0) > 0 && !((_h = reasons["no-match"]) != null ? _h : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
-            results.push({ id, mark: "warn", text: t(zero) });
-            stay = true;
+            if (zero === "wizard.seq.bindAllBound") results.push({ id, mark: "ok", text: t(zero) });
+            else {
+              results.push({ id, mark: "warn", text: t(zero) });
+              stay = true;
+            }
           }
         } else if (id === "rename") {
           const rid = mkNextReq();

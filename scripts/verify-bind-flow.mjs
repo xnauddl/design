@@ -1335,6 +1335,36 @@ async function saveAndGet(p) {
   await p.close();
 }
 {
+  // 연결 0곳이어도 이유가 '이미 모두 연결됨'뿐이면 ✓ · 다 됨(2026-11-19 사용자 결정 — ia-v4 §4.3 "연결 0곳 사유")
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w2b'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+  await p.waitForTimeout(30);
+  check('17b 스타일 후보 0 → 텍스트 스타일 탭 없음 · Semantic 탭은 남음(0)', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global1*', 'Semantic0']), JSON.stringify(await tabsOf(p)));
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(20);
+  check('17b Semantic r = 0 → 탭 안 "만들 Semantic이 없어요"(트리 없음)', (await visible(p, '#makeTabNote')) && (await p.textContent('#makeTabNote')) === '만들 Semantic이 없어요' && !(await visible(p, '#makeTree')));
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(60);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'already-bound': 3 }, preview: false, reqId: ap.reqId });
+  await p.waitForTimeout(80);
+  check('17 연결 0곳 · 이미 모두 연결됨 → 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
+  await p.close();
+}
+{
   const p = await open(480, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
