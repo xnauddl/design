@@ -93,7 +93,7 @@ export function lineHeightPct(i: Pick<KrdsInput, 'fontSize' | 'lineHeight' | 'li
 
 const LABEL_TOKENS = new Set(['label', 'button', 'btn', 'chip', 'input', 'field']);
 
-/** 분류(§3.2) — 위에서부터 처음 맞는 것. scan: uiCount × 2 ≥ count(uiCount > 0), rename: 이름 조각. */
+/** 분류(§3.2) — 위에서부터 처음 맞는 것. scan: uiCount × 2 ≥ count(uiCount > 0), rename: 이름 조각. 그다음 display(600 이상 · 42 이상) → heading(600 이상 또는 21.5 이상 — T1) → body. */
 export function krdsCategory(input: KrdsInput, path: KrdsPath = 'scan'): KrdsCategory {
   if (path === 'scan') {
     const ui = input.uiCount ?? 0;
@@ -107,7 +107,8 @@ export function krdsCategory(input: KrdsInput, path: KrdsPath = 'scan'): KrdsCat
   const { weight } = weightOf(input.style);
   const size = round1(input.fontSize);
   if (weight >= 600 && size >= 42) return 'display';
-  if (weight >= 600) return 'heading';
+  // 2026-11-19 T1(6-2): 21.5px 이상은 굵기와 상관없이 heading — 보통 굵기는 굵기 꼬리(§3.6)로 갈린다(docs/text-style-krds.md §3.2-3).
+  if (weight >= 600 || size >= 21.5) return 'heading';
   return 'body';
 }
 

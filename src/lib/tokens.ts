@@ -68,10 +68,11 @@ export interface DraftToken {
   /** 이 값이 등장한 출처 속성들(스코프 union 산출용). */
   sources: SourceField[];
   /**
-   * 쓰임 목록(§2.12 12.10) — 숫자는 쓰임 이름(`spacing/card/gap`), 색은 `color/{쓰임}`. 곳 수와 함께.
+   * 쓰임 목록(§2.12 12.10) — 숫자는 종류 `K`(`spacing/gap` · `radius` — 6-2 N2), 색은 `color/{쓰임}`. 곳 수와 함께.
    * 토큰을 적용할 때 코드가 이 쓰임마다 Semantic 역할을 만든다(createUsageRoles).
+   * `underCount` = 가려진 칠하기 곳 수(6-2 N6 — `count`에 넣지 않음), `pill` = 알약 반경 자리 수(N2).
    */
-  uses?: { name: string; count: number; bg?: 'chroma' | 'dark' | 'light' }[];
+  uses?: { name: string; count: number; bg?: 'chroma' | 'dark' | 'light'; underCount?: number; pill?: number }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;
   /** 색상 투명도(소수 둘째 자리) — 1이면 없음. 값 키는 colorKey(value, alpha). */
@@ -452,8 +453,11 @@ export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumber
     // 쓰임도 합친다(옮긴 쪽은 이미 비어 있다).
     for (const u of gone.uses ?? []) {
       const have = (rep.uses ??= []).find((x) => x.name === u.name && x.bg === u.bg);
-      if (have) have.count += u.count;
-      else rep.uses.push({ ...u });
+      if (have) {
+        have.count += u.count;
+        if (u.underCount) have.underCount = (have.underCount ?? 0) + u.underCount;
+        if (u.pill) have.pill = (have.pill ?? 0) + u.pill;
+      } else rep.uses.push({ ...u });
     }
     // count는 '값을 쓰는 서로 다른 레이어 수'다. 두 값을 같은 레이어가 함께 썼을 수 있어
     // 단순 합산은 과대계상이 된다(한 카드의 padding 15 + gap 17 → 2× 표시). 겹침을 알 수 없으므로
@@ -475,4 +479,25 @@ export function tidyNumberTokens(tokens: readonly DraftToken[], opts: TidyNumber
 export function numberTokenName(group: string, value: number): string {
   const v = Number.isInteger(value) ? String(value) : String(value).replace('.', '_');
   return `${group}/${v}`;
+}
+
+/**
+ * 만들기 단계 사다리의 곳 수(ia-v3 §2.12 6-2 N3 "곳 수") — 토큰 전부(꺼진 줄 · 잠긴 줄 포함)의 숫자 쓰임을 종류 · 값마다 합친다.
+ * `CREATE_TOKENS.ladder`로 보내면 Global 스위치를 끄고 켜도 단계 이름이 바뀌지 않는다. 색 쓰임은 넣지 않는다.
+ */
+export function ladderOf(tokens: readonly DraftToken[]): { kind: string; value: string; count: number; pill?: number }[] {
+  const out = new Map<string, { kind: string; value: string; count: number; pill?: number }>();
+  for (const t of tokens) {
+    if (typeof t.value !== 'number') continue;
+    for (const u of t.uses ?? []) {
+      if (u.name.startsWith('color/')) continue;
+      const value = String(Math.round(t.value * 100) / 100);
+      const k = `${u.name}\u0000${value}`;
+      const cur = out.get(k) ?? { kind: u.name, value, count: 0 };
+      cur.count += u.count;
+      if (u.pill) cur.pill = (cur.pill ?? 0) + u.pill;
+      out.set(k, cur);
+    }
+  }
+  return [...out.values()];
 }

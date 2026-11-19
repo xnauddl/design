@@ -136,10 +136,9 @@ test('넓힌 구조 2칸 — 색만 다르면 아님 · 채움 유무 · 선 유
   assert.equal(tabInfo(two(topLine('a', true), topLine('b', false))), null, '위쪽 LINE은 막대가 아니라 그림 — 표지 없음');
 });
 
-test('쓰임 이름(⑫) — 넓힌 구조 tabs 줄은 wideTab: false에서 tab이 아님, 엄격한 구조 메뉴는 tab', () => {
+test('6-2 N1 — wideTab 옵션 없음(쓰임 이름에 주인이 없어 엄격한 구조 판정이 필요 없음): 넓힌 구조 tabs 줄 · 엄격한 구조 메뉴 모두 tab', () => {
   assert.equal(highConfidenceComponentRole(weightRow('tabs', 3, 1)), 'tab');
-  assert.notEqual(highConfidenceComponentRole(weightRow('tabs', 3, 1), { wideTab: false }), 'tab');
-  assert.equal(highConfidenceComponentRole(menu(), { wideTab: false }), 'tab');
+  assert.equal(highConfidenceComponentRole(menu()), 'tab');
 });
 
 /* ---------- 탭 그룹 (2번) ---------- */

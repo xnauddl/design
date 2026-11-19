@@ -39,3 +39,19 @@ export function hasVisibleStroke(node: unknown): boolean {
   const s = paintsOf(node, 'strokes');
   return !!s && s.some((p) => p.visible !== false);
 }
+
+/**
+ * 가려진 칠하기인가(ia-v3 §2.12 6-2 N6) — 같은 칠하기 배열에서 그보다 위(배열 뒤)에 보이는 불투명 칠하기가 있다.
+ * 불투명 = 투명도 1인 SOLID, 또는 투명도 1이고 맞춤이 FILL · CROP인 IMAGE · VIDEO(FIT · TILE은 빈틈이 있어 가리지 않음,
+ * 그라데이션은 가리지 않음). 한계: 같은 레이어의 칠하기만 본다(자식이 덮는 모양은 잡지 못함).
+ */
+export function isCoveredPaint(paints: readonly unknown[], index: number): boolean {
+  for (let j = index + 1; j < paints.length; j++) {
+    const p = paints[j] as { visible?: boolean; type?: string; opacity?: number; scaleMode?: string };
+    if (!p || p.visible === false) continue;
+    if ((p.opacity ?? 1) < 1) continue;
+    if (p.type === 'SOLID') return true;
+    if ((p.type === 'IMAGE' || p.type === 'VIDEO') && (p.scaleMode === 'FILL' || p.scaleMode === 'CROP')) return true;
+  }
+  return false;
+}

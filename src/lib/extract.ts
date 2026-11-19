@@ -2,7 +2,7 @@
    extract.ts — 선택 노드에서 원시 토큰 수집·중복 제거 (bottom-up)
    ============================================================ */
 import { t } from './i18n';
-import { VECTOR_TYPES, hasImageFill } from './nodePaint';
+import { VECTOR_TYPES, hasImageFill, isCoveredPaint } from './nodePaint';
 import {
   DraftToken,
   SourceField,
@@ -14,12 +14,10 @@ import {
   roundAlpha,
   alphaPct,
 } from './tokens';
-import { bgKindOf, colorUse, composeName, paddingProp, radiusName, simpleNumericName, strokeName, type BgKind, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
+import { bgKindOf, colorUse, isPillRadius, type BgKind } from './usageRoles'; // 쓰임 이름(§2.12 · 6-2 N2 — 숫자 쓰임 = 종류 K, 주인 없음)
 
 interface Accumulator {
   map: Map<string, DraftToken>;
-  /** 쓰임 이름의 주인(§2.12 12.3) — 부르는 쪽이 넘긴다. 없으면 주인 없음. */
-  owner: (node: SceneNode) => string | undefined;
   warnings: Set<string>;
   /**
    * 지나친 이유. 성공한 추출에서는 말하지 않는다 — 매번 뜨는 경고가 성가셔서 걷어냈다(114393d).
@@ -73,10 +71,12 @@ function add(
   token: Omit<DraftToken, 'sources'>,
   source: SourceField,
   nodeId: string,
-  /** 쓰임 이름(§2.12 12.10) — 숫자는 `spacing/card/gap` 같은 이름, 색은 `color/{쓰임}`. 글자는 없음. */
+  /** 쓰임 이름(§2.12 12.10) — 숫자는 종류 `K`(`spacing/gap` · `radius` — 6-2 N2), 색은 `color/{쓰임}`. 글자는 없음. */
   use?: string,
   /** 색 쓰임의 배경 종류(12.4) — 같은 쓰임이라도 배경 종류가 다르면 따로 센다. */
   bg?: BgKind,
+  /** 쓰임 자리의 표시 — `pill`: 알약 반경 자리(N2), `under`: 가려진 칠하기(N6 — 곳 수 `count`가 아니라 `underCount`로 센다). */
+  mark?: { pill?: boolean; under?: boolean },
 ): void {
   const k = keyOf(token.category, token.value, token.unit, token.alpha);
   let existing = acc.map.get(k);
@@ -90,9 +90,14 @@ function add(
   acc.lastNode.set(k, nodeId);
   if (use) {
     const uses = (existing.uses ??= []);
-    const u = uses.find((x) => x.name === use && x.bg === bg);
-    if (u) u.count++;
-    else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+    let u = uses.find((x) => x.name === use && x.bg === bg);
+    if (!u) {
+      u = bg ? { name: use, count: 0, bg } : { name: use, count: 0 };
+      uses.push(u);
+    }
+    if (mark?.under) u.underCount = (u.underCount ?? 0) + 1;
+    else u.count++;
+    if (mark?.pill) u.pill = (u.pill ?? 0) + 1;
   }
 }
 
@@ -125,20 +130,27 @@ function collectPaints(
   paints: readonly Paint[] | typeof figma.mixed,
   source: 'fill' | 'stroke',
 ): void {
-  const nodeId = node.id;
   if (paints === figma.mixed || !Array.isArray(paints)) return;
-  for (const p of paints) {
-    if (p.visible === false) continue;
+  paints.forEach((p, i) => collectPaint(acc, node, paints, p, i, source));
+}
+
+/** 칠하기 하나 — 단색만 토큰 · 쓰임이 된다. */
+
+function collectPaint(acc: Accumulator, node: SceneNode, paints: readonly Paint[], p: Paint, i: number, source: 'fill' | 'stroke'): void {
+  const nodeId = node.id;
+  {
+    if (p.visible === false) return;
     if (p.type !== 'SOLID') {
       acc.skipped.add(SKIP_GRADIENT); // GRADIENT / IMAGE / VIDEO — 변수 바인딩 불가, 조용히 스킵
-      continue;
+      return;
     }
     const alpha = roundAlpha(p.opacity);
-    if (alpha === 0) continue; // 보이지 않는 칠 — 사유 없이 건너뜀
+    if (alpha === 0) return; // 보이지 않는 칠 — 사유 없이 건너뜀
     const hex = rgbToHex(p.color);
     const cu = colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node));
     const bgHex = cu === 'text' || cu === 'icon' || cu === 'border' ? backgroundOf(node) : undefined;
-    add(acc, colorToken('color', hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined);
+    // 가려진 칠하기(N6)도 토큰 · 쓰임은 되지만 색 이름을 정하는 곳 수(count)에는 넣지 않는다(underCount).
+    add(acc, colorToken('color', hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined, isCoveredPaint(paints, i) ? { under: true } : undefined);
     // 페인트 불투명도(p.opacity)는 따로 `opacity/…` 토큰으로 만들지 않는다 — OPACITY 스코프는 **레이어** 불투명도 전용.
     // 대신 색 토큰의 투명도(alpha)로 담는다: 색 변수를 붙이면 피그마가 칠 불투명도를 변수 alpha로 맞춘다(§2.11 "색").
   }
@@ -194,22 +206,18 @@ export function gapSkip(node: unknown, field: string): 'no-wrap' | 'space-betwee
 
 function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | InstanceNode): void {
   if (node.layoutMode === 'NONE') return;
-  const owner = acc.owner(node);
-  const pad: Padding = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
-  const gaps: [number, string][] = (['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const).map((f) => [
-    node[f],
-    composeName('spacing', owner, paddingProp(f, pad)),
-  ]);
+  // 쓰임 = 종류 K(§2.12 N2) — 여백 네 방향은 `spacing/padding`, 간격은 `spacing/gap`(주인 없음 — N1).
+  const gaps: [number, string][] = (['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const).map((f) => [node[f], 'spacing/padding']);
   if (node.layoutMode === 'GRID') {
     // 그리드 오토레이아웃의 간격은 gridRowGap/gridColumnGap — itemSpacing/counterAxisSpacing은
     // HORIZONTAL/VERTICAL 전용이라 그리드에서는 의미 있는 값을 주지 않는다.
-    gaps.push([node.gridRowGap, simpleNumericName('gridRowGap', owner) as string], [node.gridColumnGap, simpleNumericName('gridColumnGap', owner) as string]);
+    gaps.push([node.gridRowGap, 'spacing/gap'], [node.gridColumnGap, 'spacing/gap']);
   } else {
     // 사이 간격 자동(Space between)이면 피그마가 간격을 계산한다 — 저장된 숫자는 화면 값이 아니라
     // 토큰으로 뽑으면 쓰레기(spacing/33·109…)가 된다(IA v3 §2.11, QA #3 불합격 1). padding은 그대로.
-    if (!gapSkip(node, 'itemSpacing')) gaps.push([node.itemSpacing, simpleNumericName('itemSpacing', owner) as string]);
+    if (!gapSkip(node, 'itemSpacing')) gaps.push([node.itemSpacing, 'spacing/gap']);
     // 줄 사이 간격 — 줄바꿈일 때만 쓰이고, 줄 정렬이 Space between이면 같은 이유로 뺀다.
-    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push([node.counterAxisSpacing, simpleNumericName('counterAxisSpacing', owner) as string]);
+    if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push([node.counterAxisSpacing, 'spacing/gap']);
   }
   for (const [g, use] of gaps) {
     if (typeof g === 'number' && g > 0) {
@@ -363,13 +371,14 @@ function collectRadius(acc: Accumulator, node: SceneNode): void {
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
   if (r !== figma.mixed && typeof r !== 'number') return;
   const values = corners.map((c) => (r !== figma.mixed ? (r as number) : Number((node as unknown as Record<string, unknown>)[c]) || 0));
-  const owner = acc.owner(node);
-  // 연결이 모서리마다 붙이므로 쓰임도 모서리마다 센다(같으면 한 이름 — radiusName).
-  const list = r === figma.mixed ? corners.map((c, i) => [c, values[i]] as const) : [[corners[0], r as number] as const];
-  for (const [c, rv] of list) {
+  // 연결이 모서리마다 붙이므로 쓰임도 모서리마다 센다 — 쓰임은 `radius` 하나, 알약 자리 수 `pill`을 함께(N2).
+  const list = r === figma.mixed ? values : [r as number];
+  const w = (node as { width?: number }).width ?? 0;
+  const h = (node as { height?: number }).height ?? 0;
+  for (const rv of list) {
     if (rv > 0) {
       const v = round(rv);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, radiusName(c, owner, values));
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, 'radius', undefined, isPillRadius(rv, w, h) ? { pill: true } : undefined);
     }
   }
 }
@@ -386,11 +395,10 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   const widths: [string, number][] = [];
   if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
   else if (typeof w === 'number') widths.push(['strokeWeight', w]);
-  const owner = acc.owner(node);
-  for (const [field, wv] of widths) {
+  for (const [, wv] of widths) {
     if (wv > 0) {
       const v = round(wv);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, strokeName(field, owner, sideValues));
+      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, 'stroke-width');
     }
   }
 }
@@ -401,7 +409,7 @@ function collectOpacity(acc: Accumulator, node: SceneNode): void {
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
   const v = round(o);
-  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, simpleNumericName('opacity', acc.owner(node)) as string);
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, 'opacity');
 }
 
 /* ---------- effects ---------- */
@@ -477,12 +485,10 @@ function isEffectivelyVisible(node: SceneNode): boolean {
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
 export function extractFromSelection(
   selection: readonly SceneNode[],
-  /** 쓰임 이름의 주인(§2.12 12.3) — code.ts가 이름 정리 역할 → 고신뢰 판정으로 넘긴다. */
-  ownerOf: (node: SceneNode) => string | undefined = () => undefined,
   /** 메인을 함께 읽는 인스턴스 id(ia-v3 §2.11 11번) — 이 인스턴스는 "인스턴스 안쪽 건너뜀"을 남기지 않는다. */
   coveredInstances?: ReadonlySet<string>,
 ): ExtractResult {
-  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), owner: ownerOf, covered: coveredInstances };
+  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), covered: coveredInstances };
   for (const node of selection) {
     if (!isEffectivelyVisible(node)) {
       acc.skipped.add(SKIP_HIDDEN); // 숨긴 그룹 안의 자식을 직접 고른 경우 — walk가 못 거른다

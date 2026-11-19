@@ -20,21 +20,24 @@ import {
   colorRoleRef,
   colorSlotKey,
   colorUse,
-  composeName,
   familyRe,
   isOldPluginName,
   nameKindOf,
-  paddingProp,
-  pickOwner,
-  radiusName,
-  simpleNumericName,
-  strokeName,
+  numericKind,
+  isPillRadius,
+  isStructuralRole,
+  assignSteps,
+  assignFontSizeNames,
+  isTextRoleShape,
   textUsageName,
   valueKey,
   type BgKind,
   type ColorUse as ColorUseName,
-  type Padding,
-} from './usageRoles'; // 쓰임 이름 역할(§2.12)
+  type StepValue,
+  type FontSizeReq,
+} from './usageRoles'; // 쓰임 이름 역할(§2.12 · 6-2 N1–N6)
+import { weightOf, type KrdsCategory } from './krdsType'; // 연결의 새 글자 크기 역할 분류(§2.12 N4 ②)
+import { isCoveredPaint } from './nodePaint'; // 가려진 칠하기(§2.12 N6)
 
 interface VarEntry {
   variable: Variable;
@@ -493,10 +496,8 @@ function skip(res: BindResult, key: string, node?: SceneNode, preview?: Preview 
   note(res, key, node, preview, field);
 }
 
-/** 찾기 · 연결 옵션 — 주인(레이어 역할) 판정은 부르는 쪽이 구조 색인으로 넘길 수 있다(§2.12 12.3). */
+/** 찾기 · 연결 옵션. 6-2(§2.12 N1): 쓰임 이름에 주인(레이어 역할)이 없어 주인 판정 옵션은 없앴다. */
 export interface BindOptions {
-  /** 레이어의 주인 역할. 없으면 이름 정리가 남긴 역할(`dsRole`)만 본다. */
-  ownerOf?: (node: SceneNode) => string | undefined;
   /**
    * 텍스트 스타일이 먼저(IA v4 §4.2 · §4.3 `APPLY.skipTextStyleNodes`) — true인 글자는 글자 자리
    * (fontSize · lineHeight · letterSpacing · fontFamily)를 찾지도 세지도 않는다(스타일 연결은 연결 화면에서).
@@ -509,7 +510,10 @@ export interface BindOptions {
   noNewRoles?: boolean;
 }
 
-/** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). */
+/**
+ * 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 이름(`STRUCTURAL`)이 아니면. 6-2(§2.12 N1)부터 쓰임 이름에는 쓰지 않고,
+ * 텍스트 스타일 label 판정(docs/text-style-krds.md §3.2-1 — `variables.ts` `inUiRole`)만 쓴다.
+ */
 export function dsRoleOwner(node: SceneNode): string | undefined {
   const fn = (node as { getPluginData?: (key: string) => string }).getPluginData;
   let role: string | undefined;
@@ -518,7 +522,7 @@ export function dsRoleOwner(node: SceneNode): string | undefined {
   } catch {
     role = undefined;
   }
-  return pickOwner(role, undefined, isKnownRole);
+  return role && isKnownRole(role) && !isStructuralRole(role) ? role : undefined;
 }
 
 export async function bindSelection(
@@ -537,17 +541,11 @@ export async function bindSelection(
   // 적용 모드에서도 "어느 레이어에 어느 변수가 붙었나" 목록을 모은다(결과 트리). dry-run과 같은 수집기 —
   // 후보는 상한 없이 전부 싣는다(§4.6 "찾기 · 연결의 수").
   const preview: Preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: new Set() };
-  const ownerCache = new Map<SceneNode, string | undefined>();
-  const ownerOf = opts.ownerOf ?? dsRoleOwner;
   const ctx: Ctx = {
     index,
     res,
     preview,
     slots: [],
-    owner: (n) => {
-      if (!ownerCache.has(n)) ownerCache.set(n, ownerOf(n));
-      return ownerCache.get(n);
-    },
     skipText: opts.skipTextStyleNode,
     noNewRoles: !!opts.noNewRoles,
     mainOf: mains.mainOf,
@@ -731,8 +729,12 @@ interface Slot {
   /** 색: 투명도(소수 둘째 자리) — 1이면 없음. */
   alpha?: number;
   allowed: readonly VariableScope[];
-  /** 숫자 · 글자: 쓰임 이름(12.3). 색: 쓰임(12.4). */
+  /** 숫자 · 줄 높이 · 자간: 종류 `K`(§2.12 N2), 글자 크기: `font-size`, 글꼴: `font-family/text`. 색: 쓰임(12.4). */
   usage: string;
+  /** 반경: 알약 자리(§2.12 N2 — 반경 ≥ 짧은 변의 절반). */
+  pill?: boolean;
+  /** 색: 같은 칠하기 배열의 위 불투명 칠하기에 가려진 칠하기(§2.12 N6) — 색 이름을 정하는 곳 수에서 뺀다. */
+  under?: boolean;
   /** 색: 배경 종류(12.4 inverse 판정 — text · icon · border만). */
   bg?: BgKind;
   /** 연결 후보가 없을 때의 사유 — 'drop'은 만들기가 뽑지 않는 값이라 어디에도 세지 않는다(§4.1 k ①). */
@@ -753,7 +755,6 @@ interface Ctx {
   res: BindResult;
   preview: Preview;
   slots: Slot[];
-  owner: (n: SceneNode) => string | undefined;
   skipText?: (node: TextNode) => boolean;
   /** 무료 — 새 역할 없이 Global에 붙인다(BindOptions.noNewRoles). */
   noNewRoles?: boolean;
@@ -812,6 +813,8 @@ function resolveSlots(ctx: Ctx): void {
   const { res, preview } = ctx;
   const pending: Pending[] = [];
   const colorLeft: { slot: Slot; cands: VarEntry[] }[] = [];
+  /** 순서 1 · 3에 붙지 않은 숫자 · 글자 자리 전부 — 단계 이름의 곳 수(§2.12 N3 "곳 수"). */
+  const rest: Slot[] = [];
   const emit = (s: Slot, e: VarEntry): void => {
     res.bound++;
     preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e)));
@@ -831,11 +834,12 @@ function resolveSlots(ctx: Ctx): void {
       colorLeft.push({ slot: s, cands });
       continue;
     }
+    rest.push(s);
     // 순서 2 — 숫자: 쓰임 이름의 가족(12.5), 글자: 같은 그룹 아무 이름(거울 제외).
     const group = s.usage.split('/')[0];
     const two =
       s.kind === 'text'
-        ? cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0]
+        ? textOrderTwo(cands.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)), group, valueKey(s.value))
         : firstInFamily(cands.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(s.value))).test(e.variable.name)), s.usage);
     if (two) {
       emit(s, two);
@@ -854,12 +858,15 @@ function resolveSlots(ctx: Ctx): void {
   for (const [use, list] of byUse) {
     // 입력 = (hex · 배경 종류 · 곳 수). inverse 여부는 기준색을 정한 뒤 함수 안에서 판정한다(12.4).
     // 키는 투명도까지 나누고 밝기는 hex로만 본다(§2.11 "반투명 색 토큰").
+    // 가려진 칠하기(§2.12 N6)는 색 이름을 정하는 곳 수에서 뺀다 — 쓰임의 모든 자리가 가려졌으면 그때만 그것으로 센다.
+    const allUnder = list.every((x) => x.slot.under);
     const counts = new Map<string, { hex: string; count: number; bg?: BgKind; alpha?: number }>();
     for (const x of list) {
       const k = colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha);
+      const add = !x.slot.under || allUnder ? 1 : 0;
       const c = counts.get(k);
-      if (c) c.count++;
-      else counts.set(k, { hex: x.slot.display, count: 1, bg: x.slot.bg, ...(x.slot.alpha != null ? { alpha: x.slot.alpha } : {}) });
+      if (c) c.count += add;
+      else counts.set(k, { hex: x.slot.display, count: add, bg: x.slot.bg, ...(x.slot.alpha != null ? { alpha: x.slot.alpha } : {}) });
     }
     const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
     const bases = colorRoleBases([...counts.values()], def?.colorHex, use);
@@ -888,14 +895,40 @@ function resolveSlots(ctx: Ctx): void {
     return;
   }
   // 재사용은 순서 2가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
+  // 색 · 글꼴은 assignNames(12.5), 숫자 · 줄 높이 · 자간은 종류마다 assignSteps(N3 — 곳 수 = 순서 1 · 3에 붙지 않은 자리 전부),
+  // 글자 크기는 assignFontSizeNames(N4).
+  const isStepKind = (p: Pending): boolean => p.slot.kind !== 'color' && p.base !== 'font-size' && p.base !== 'font-family/text';
   const names = assignNames(
-    live.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
+    live.filter((p) => !isStepKind(p) && p.base !== 'font-size').map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
     ctx.index.semNames,
     { reuse: false },
   );
+  const stepNames = new Map<string, Map<string, string>>(); // 종류 → 값 → 이름
+  {
+    const ladder = new Map<string, StepValue[]>();
+    for (const s of rest) {
+      if (s.kind === 'color' || s.usage === 'font-size' || s.usage === 'font-family/text') continue;
+      if (typeof s.value !== 'number' || !Number.isFinite(s.value)) continue; // 읽지 못한 값(목 노드 등)은 칸을 차지하지 않는다
+      const arr = ladder.get(s.usage) ?? [];
+      arr.push({ value: valueKey(s.value), count: 1, pill: s.pill ? 1 : 0 });
+      ladder.set(s.usage, arr);
+    }
+    for (const [kind, values] of ladder) {
+      const want = live.filter((p) => p.base === kind).map((p) => valueKey(p.slot.value));
+      if (want.length) stepNames.set(kind, assignSteps(kind, values, ctx.index.semNames, { reuse: false, want }));
+    }
+  }
+  const fsLive = live.filter((p) => p.base === 'font-size');
+  const fsNames = fsLive.length ? assignFontSizeNames(fontSizeReqs(fsLive.map((p) => p.slot)), ctx.index.semNames, { reuse: false }) : new Map<string, string>();
+  const nameFor = (p: Pending): string => {
+    const v = valueKey(p.slot.value);
+    if (p.base === 'font-size') return fsNames.get(v) ?? p.base;
+    if (isStepKind(p)) return stepNames.get(p.base)?.get(v) ?? p.base;
+    return names.get(`${p.base}\u0000${v}`) ?? p.base;
+  };
   const roleOf = new Map<string, NewRoleSpec>(); // 이름 → 역할(처음 본 Global)
   for (const p of live) {
-    const name = names.get(`${p.base}\u0000${valueKey(p.slot.value)}`) ?? p.base;
+    const name = nameFor(p);
     let spec = roleOf.get(name);
     if (!spec) {
       const g = p.global as VarEntry;
@@ -911,6 +944,38 @@ function resolveSlots(ctx: Ctx): void {
       newRoleGlobalName: spec.globalName,
     });
   }
+}
+
+/**
+ * 글자 순서 2(§2.12 N5 "글자 순서 2") — 같은 그룹 · 같은 값 이름 가운데 새 모양(글자 크기 N4 · 줄 높이 · 자간 단계)을 먼저,
+ * 없으면 이름 순 첫 번째(같은 이름이면 13.5 순서).
+ */
+function textOrderTwo(list: VarEntry[], group: string, value: string): VarEntry | undefined {
+  const sorted = [...list].sort(byName);
+  return sorted.find((e) => isTextRoleShape(group, e.variable.name, value)) ?? sorted[0];
+}
+
+/**
+ * 연결의 새 글자 크기 역할 입력(§2.12 N4 ②) — 스타일이 없으므로 px ≥ 21.5면 heading(≥ 42 · 굵기 600 이상이면 display),
+ * 아니면 자리 글자의 굵기로(600 이상 heading, 아니면 body). 같은 px 자리가 여럿이면 곳 수가 가장 많은 분류(같으면 body → heading → display).
+ */
+function fontSizeReqs(slots: readonly Slot[]): FontSizeReq[] {
+  const byPx = new Map<number, Map<KrdsCategory, number>>();
+  for (const s of slots) {
+    const px = Number(s.value);
+    const fn = (s.node as TextNode).fontName;
+    const weight = fn && typeof fn === 'object' && 'style' in fn ? weightOf(fn.style).weight : 400;
+    const cat: KrdsCategory = px >= 21.5 ? (px >= 42 && weight >= 600 ? 'display' : 'heading') : weight >= 600 ? 'heading' : 'body';
+    const m = byPx.get(px) ?? new Map<KrdsCategory, number>();
+    m.set(cat, (m.get(cat) ?? 0) + 1);
+    byPx.set(px, m);
+  }
+  const order: KrdsCategory[] = ['body', 'heading', 'display'];
+  return [...byPx].map(([px, m]) => {
+    let best: KrdsCategory = order.find((c) => m.has(c)) as KrdsCategory;
+    for (const c of order) if ((m.get(c) ?? 0) > (m.get(best) ?? 0)) best = c;
+    return { px, category: best, count: [...m.values()].reduce((a, b) => a + b, 0) };
+  });
 }
 
 interface NewRoleSpec {
@@ -1059,7 +1124,8 @@ function bindPaints(node: SceneNode, ctx: Ctx): void {
         const bgHex = use === 'text' || use === 'icon' || use === 'border' ? backgroundOf(node) : undefined;
         bg = bgHex ? bgKindOf(bgHex) : undefined;
       }
-      ctx.slots.push({ node, field: key, index: i, kind: 'color', value: colorKey(hex, alpha), display: hex, ...(alpha !== 1 ? { alpha } : {}), allowed, usage: use, ...(bg ? { bg } : {}), noMatchReason: 'no-match' });
+      const under = isCoveredPaint(paints, i);
+      ctx.slots.push({ node, field: key, index: i, kind: 'color', value: colorKey(hex, alpha), display: hex, ...(alpha !== 1 ? { alpha } : {}), allowed, usage: use, ...(bg ? { bg } : {}), ...(under ? { under: true } : {}), noMatchReason: 'no-match' });
     });
   }
 }
@@ -1085,7 +1151,7 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
           return;
         }
         const fraction = Math.abs(v - Math.round(v)) >= 0.005; // extract의 소수 2자리 반올림과 같은 판정
-        tryBind(ctx, node, field, v, `size/${kind}`, fraction ? 'size-fraction' : undefined);
+        tryBind(ctx, node, field, v, numericKind(field, kind) as string, fraction ? 'size-fraction' : undefined);
       };
       if (aspectLocked(node)) {
         // 한 자리로 본다: 이미 연결 → 볼 축(FIXED 하나) → 소수(§2.11 "비율 고정").
@@ -1111,11 +1177,10 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
     note(res, 'no-autolayout', node, preview);
     return;
   }
-  const owner = ctx.owner(node);
   if (node.layoutMode === 'GRID') {
     // 그리드 모드의 간격은 gridRowGap/gridColumnGap(extract.ts와 동일 기준).
-    tryBind(ctx, node, 'gridRowGap', node.gridRowGap, simpleNumericName('gridRowGap', owner) as string, numReason(node.gridRowGap));
-    tryBind(ctx, node, 'gridColumnGap', node.gridColumnGap, simpleNumericName('gridColumnGap', owner) as string, numReason(node.gridColumnGap));
+    tryBind(ctx, node, 'gridRowGap', node.gridRowGap, 'spacing/gap', numReason(node.gridRowGap));
+    tryBind(ctx, node, 'gridColumnGap', node.gridColumnGap, 'spacing/gap', numReason(node.gridColumnGap));
   } else {
     // 사이 간격 자동(Space between)이면 간격 값은 피그마가 쓰지 않는다 — 붙이면 정렬이 MIN으로 바뀌어
     // 레이어 모양이 바뀐다(§2.11 "사이 간격 자동", QA #3 불합격 1). 사유만 남기고 건너뛴다.
@@ -1127,12 +1192,11 @@ function bindFrame(node: SceneNode, ctx: Ctx): void {
       if (gs === 'no-wrap') continue;
       if (gs === 'space-between') {
         if (v > 0) note(res, 'space-between', node, preview, f); // 0 이하는 만들 수 없는 값 — 건너뜀으로도 세지 않는다(§4.1 k ①)
-      } else tryBind(ctx, node, f, v, simpleNumericName(f, owner) as string, numReason(v));
+      } else tryBind(ctx, node, f, v, 'spacing/gap', numReason(v));
     }
   }
-  const pad: Padding = { left: node.paddingLeft, right: node.paddingRight, top: node.paddingTop, bottom: node.paddingBottom };
   for (const f of ['paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom'] as const) {
-    tryBind(ctx, node, f, node[f], composeName('spacing', owner, paddingProp(f, pad)), numReason(node[f]));
+    tryBind(ctx, node, f, node[f], 'spacing/padding', numReason(node[f]));
   }
 }
 
@@ -1142,9 +1206,10 @@ function bindRadius(node: SceneNode, ctx: Ctx): void {
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
   const values = corners.map((c) => (r !== figma.mixed && typeof r === 'number' ? r : Number((node as unknown as Record<string, number>)[c]) || 0));
   if (r !== figma.mixed && !(typeof r === 'number' && r > 0)) return;
-  const owner = ctx.owner(node);
+  const w = (node as { width?: number }).width ?? 0;
+  const h = (node as { height?: number }).height ?? 0;
   corners.forEach((c, i) => {
-    if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, owner, values), numReason(values[i]));
+    if (values[i] > 0) tryBind(ctx, node, c, values[i], 'radius', numReason(values[i]), isPillRadius(values[i], w, h));
   });
 }
 
@@ -1152,7 +1217,7 @@ function bindOpacity(node: SceneNode, ctx: Ctx): void {
   if (!('opacity' in node)) return;
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1/0은 바인딩 대상 아님
-  tryBind(ctx, node, 'opacity', o, simpleNumericName('opacity', ctx.owner(node)) as string);
+  tryBind(ctx, node, 'opacity', o, 'opacity');
 }
 
 function bindStroke(node: SceneNode, ctx: Ctx): void {
@@ -1164,7 +1229,6 @@ function bindStroke(node: SceneNode, ctx: Ctx): void {
   const w = (node as { strokeWeight: number | typeof figma.mixed }).strokeWeight;
   const sides = ['strokeTopWeight', 'strokeRightWeight', 'strokeBottomWeight', 'strokeLeftWeight'] as const;
   const sideValues = sides.map((sd) => Number((node as unknown as Record<string, number>)[sd]) || 0);
-  const owner = ctx.owner(node);
   // 선 두께는 정수만(§2.11, 2026-11-04) — 소수 두께는 정수 변수에 당겨 붙이지 않고 "소수 선 두께"로 건너뛴다.
   const one = (field: 'strokeWeight' | (typeof sides)[number], v: number): void => {
     if (!(v > 0)) return;
@@ -1172,7 +1236,7 @@ function bindStroke(node: SceneNode, ctx: Ctx): void {
     const st = stateReason(nodeFieldState(node, field));
     if (st) { note(res, st, node, preview, field); return; }
     if (Math.abs(v - Math.round(v)) >= 0.005) { note(res, 'fraction', node, preview, field); return; }
-    tryBind(ctx, node, field, v, strokeName(field, owner, sideValues));
+    tryBind(ctx, node, field, v, 'stroke-width');
   };
   if (w !== figma.mixed && typeof w === 'number') {
     one('strokeWeight', w);
@@ -1273,6 +1337,8 @@ function tryBind(
   usage: string,
   /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
   noMatchReason = 'no-match',
+  /** 반경: 알약 자리(§2.12 N2). */
+  pill = false,
 ): void {
   const allowed = numAllowed(field);
   const st = stateReason(nodeFieldState(node, field));
@@ -1280,7 +1346,7 @@ function tryBind(
     note(ctx.res, st, node, ctx.preview, field);
     return;
   }
-  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, noMatchReason });
+  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, ...(pill ? { pill: true } : {}), noMatchReason });
 }
 
 /* ---------- 체크한 자리 연결(APPLY_SELECTED) — 연결 직전 다시 확인(§4.6 "찾는 범위") ---------- */

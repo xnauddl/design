@@ -71,10 +71,10 @@ export type HighConfidenceRole =
  * 위치/토큰 같은 약한 신호나 container/wrapper/랜드마크(header)는 제외.
  * heading은 card/nav/list 등보다 낮은 우선순위(오탐 방지).
  */
-export function highConfidenceComponentRole(node: LikeNode, opts: { wideTab?: boolean } = {}): HighConfidenceRole | null {
+export function highConfidenceComponentRole(node: LikeNode): HighConfidenceRole | null {
   // 탭은 맨 먼저 — 메뉴는 nav, 알약 탭은 card · list · heading 조건도 함께 만족한다(§4.7 "묶기" 1번).
-  // 쓰임 이름(§2.12 12.3)은 엄격한 구조만 탭으로 본다(`wideTab: false` — 2026-11-19 1회차 검토 결정).
-  if (tabInfo(node, { wide: opts.wideTab !== false }) != null) return 'tab';
+  // (6-2 N1: 쓰임 이름의 주인이 없어져 엄격한 구조만 보던 `wideTab: false` 호출이 없어졌다 — 옵션도 지움.)
+  if (tabInfo(node) != null) return 'tab';
   if (isButtonLike(node)) return isChipLike(node) ? 'chip' : 'button';
   // highConfidenceRole은 depth=0으로 nav를 본다(노드 자체 판정).
   if (isNavLike(node, 0)) return 'nav';
@@ -506,10 +506,10 @@ const underlineOf = (t: LikeNode): boolean => t.textDecoration === 'UNDERLINE';
 
 /**
  * 탭이면 정보, 아니면 null(§4.7 "묶기" 1번 — 2026-11-19 사용자 결정 B).
- * ① 엄격한 구조(이름 없이): 칸 3개 이상 · 색 모양이 다른 칸이 정확히 하나. ② 넓힌 구조(`wide` — 기본 참):
+ * ① 엄격한 구조(이름 없이): 칸 3개 이상 · 색 모양이 다른 칸이 정확히 하나. ② 넓힌 구조:
  * 칸 2개 이상 · 색 + 굵기 + 밑줄 + 막대 모양, 칸 2개면 표지 순서로 선택 칸 — 이름 조건(`isTabName`)이 맞을 때만.
  */
-export function tabInfo(node: LikeNode, opts: { wide?: boolean } = {}): TabInfo | null {
+export function tabInfo(node: LikeNode): TabInfo | null {
   if (node.type !== 'FRAME') return null;
   if (layoutOf(node) !== 'horizontal') return null;
   const d = dims(node);
@@ -518,7 +518,6 @@ export function tabInfo(node: LikeNode, opts: { wide?: boolean } = {}): TabInfo 
   if (cells.length < 2) return null;
   const strict = cells.length >= 3 ? strictTab(cells) : null;
   if (strict) return strict;
-  if (opts.wide === false) return null;
   if (!isTabName(node.nameKey ?? node.name ?? '')) return null;
   return wideTab(cells);
 }

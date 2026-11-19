@@ -3,7 +3,7 @@
    ============================================================ */
 import type { TsRenameRow } from './shared/messages';
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig, MainUnitInfo } from './shared/messages';
-import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
+import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct, ladderOf } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
@@ -1571,14 +1571,12 @@ function onTsRenamed(msg: Extract<CodeToUi, { type: 'TS_RENAMED' }>): void {
   if (tsrBody) closeModal(); // 팝업을 닫으면 연 버튼으로 포커스가 돌아간다
   let text = t('textStyle.renamed', { n: msg.renamed });
   if (msg.skipped) text += t('textStyle.renameSkipped', { m: msg.skipped });
-  if (msg.roleVarsTaken) text += t('textStyle.renameRoleSkipped', { n: msg.roleVarsTaken });
-  if (msg.roleVarsError) text += t('textStyle.renameRoleError', { n: msg.roleVarsError });
+  // (6-2 T3 — 역할 변수 이름을 함께 바꾸지 않으므로 "Semantic 변수 {n}개…" 꼬리 · 툴팁 줄이 없다, ia-v4 B.28)
   const stuck = msg.results.filter((r) => r.status === 'error-stuck');
   const tip = [
     ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => (k === 'error-stuck' ? `${t('textStyle.renameSkip.error-stuck', { name: stuck.map((x) => x.name).join(', ') })} ${n}` : `${t('textStyle.renameSkip.' + k)} ${n}`)),
-    ...(msg.roleVarsStuck.length ? [t('textStyle.renameRoleStuck', { names: msg.roleVarsStuck.join(', ') })] : []),
   ].join('\n');
-  const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError);
+  const warn = !!msg.skipped;
   showStatusLine(text, { cls: warn ? 'warn' : 'ok', ...(tip ? { tip } : {}) });
   if (msg.renamed >= 1) {
     mkTsNames.clear(); // 만들기 화면의 고친 이름 — 남기면 다음 실행이 옛 손 이름으로 되돌린다(§5.2b)
@@ -3424,7 +3422,7 @@ function mkSendPreview(): void {
   mkPreviewReq = mkNextReq();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   opSilent = true;
-  send({ type: 'CREATE_TOKENS', tokens: toks, base, preview: true, reqId: mkPreviewReq });
+  send({ type: 'CREATE_TOKENS', tokens: toks, base, preview: true, reqId: mkPreviewReq, ladder: ladderOf(mkTokens) }); // ladder: 추출 전체의 곳 수(꺼진 줄 포함 — ia-v3 §2.12 N3)
   opSilent = false;
   renderMakeScreen();
 }
@@ -3911,7 +3909,7 @@ async function runMake(): Promise<void> {
       if (id === 'create') {
         const rid = mkNextReq();
         // 무료는 Global만(`globalOnly` — Semantic을 만들지 않는다, F4).
-        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: toks, base, reqId: rid, ...(isPaid ? {} : { globalOnly: true }) }, ['CREATE_RESULT'], rid);
+        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: toks, base, reqId: rid, ladder: ladderOf(mkTokens), ...(isPaid ? {} : { globalOnly: true }) }, ['CREATE_RESULT'], rid);
         totals.created = { g: r.created + r.updated, r: r.roles ?? 0, m: r.skippedManual ?? 0 };
         results.push({ id, mark: 'ok', text: t('wizard.seq.createDone', { created: r.created, updated: r.updated }) });
       } else if (id === 'dark') {
@@ -8163,7 +8161,7 @@ function onMcExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
   mcPreviewReq = mcNextReq();
   opSilent = true;
   // 무료도 globalOnly 없이 — r(roles)이 유료 주 버튼 · 무료 🔒 줄에 쓰인다(§4.3 "무료 — 무료 규칙 PR 뒤").
-  send({ type: 'CREATE_TOKENS', tokens: picked, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq });
+  send({ type: 'CREATE_TOKENS', tokens: picked, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq, ladder: ladderOf(mcTokens) });
   opSilent = false;
 }
 function onMcPreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
@@ -8185,7 +8183,7 @@ function mcCreate(toks: DraftToken[]): void {
   mcCreateReq = mcNextReq();
   mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
   opCardCreate = true;
-  send({ type: 'CREATE_TOKENS', tokens: toks, base: Number(($('base') as HTMLInputElement).value) || 16, reqId: mcCreateReq, globalOnly: true });
+  send({ type: 'CREATE_TOKENS', tokens: toks, base: Number(($('base') as HTMLInputElement).value) || 16, reqId: mcCreateReq, globalOnly: true, ladder: ladderOf(mcTokens) });
   opCardCreate = false;
   renderSelHome();
 }

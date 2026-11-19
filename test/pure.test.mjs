@@ -3078,7 +3078,8 @@ test('krdsType — 분류: label(경로별) → display(600↑ · 42↑) → hea
   assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 41.96 })), 'display'); // 표기값 42.0
   assert.equal(krdsCategory(kin({ style: 'Bold', fontSize: 41.94 })), 'heading'); // 표기값 41.9
   assert.equal(krdsCategory(kin({ style: 'SemiBold', fontSize: 36 })), 'heading'); // display small(36)은 나오지 않음
-  assert.equal(krdsCategory(kin({ style: 'Medium', fontSize: 60 })), 'body');
+  // 6-2 T1: 21.5px 이상은 굵기와 상관없이 heading(전에는 보통 굵기 60 → body — 기대값 고침)
+  assert.equal(krdsCategory(kin({ style: 'Medium', fontSize: 60 })), 'heading');
   // 스캔: uiCount × 2 ≥ count
   assert.equal(krdsCategory(kin({ count: 4, uiCount: 2 }), 'scan'), 'label');
   assert.equal(krdsCategory(kin({ count: 5, uiCount: 2 }), 'scan'), 'body');
@@ -3091,6 +3092,30 @@ test('krdsType — 분류: label(경로별) → display(600↑ · 42↑) → hea
   assert.equal(krdsCategory(kin({ name: 'table/body' }), 'rename'), 'body');
   assert.equal(krdsCategory(kin({ name: 'tablet' }), 'rename'), 'body');
   assert.equal(krdsCategory(kin({ name: 'labels', uiCount: 9, count: 9 }), 'rename'), 'body'); // uiCount는 보지 않음
+});
+
+test('6-2 T1 — 21.5px 이상은 굵기와 상관없이 heading(label · display 판정이 먼저) · 정수 크기 이름 짓기', () => {
+  for (const path of ['scan', 'rename']) {
+    assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 24 }), path), 'heading', `24 ${path}`);
+    assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 21.5 }), path), 'heading');
+    assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 21 }), path), 'body');
+    assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 44 }), path), 'heading'); // 보통 굵기 42 이상도 heading
+    assert.equal(krdsCategory(kin({ style: 'SemiBold', fontSize: 44 }), path), 'display');
+  }
+  assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 24, count: 2, uiCount: 2 }), 'scan'), 'label'); // label 판정이 먼저
+  assert.equal(krdsCategory(kin({ style: 'Regular', fontSize: 24, name: 'button/large' }), 'rename'), 'label');
+  // 이름: 보통 굵기는 굵기 꼬리로 갈린다
+  assert.deepEqual(nameKrdsStyles([kpx(24, 140, 'Regular')]), ['heading/medium-w400-140']);
+  assert.deepEqual(nameKrdsStyles([kpx(24, 145, 'Bold'), kpx(24, 140, 'Regular')]), ['heading/medium-145', 'heading/medium-w400-140']);
+  assert.deepEqual(nameKrdsStyles([kpx(44, 150, 'Regular')]), ['heading/xlarge-w400']);
+  assert.deepEqual(nameKrdsStyles([kpx(40, 150, 'Bold'), kpx(44, 150, 'Regular')]), ['heading/xlarge', 'heading/xlarge-44-w400']);
+  assert.deepEqual(nameKrdsStyles([kpx(21, 150, 'Regular')]), ['body/large']);
+});
+
+test('6-2 T1 — 6-1a 전에 만든 소수 크기 스타일([이름 다시 짓기]): 보통 굵기 26.67 → heading/medium-26_7-w400, 굵은 26.67 이름은 그대로', () => {
+  const bold24 = kpx(24, 150, 'Bold', { name: 'h3' });
+  assert.deepEqual(nameKrdsStyles([bold24, kpx(26.67, 150, 'Regular', { name: 'h2' })], { path: 'rename' }), ['heading/medium', 'heading/medium-26_7-w400']);
+  assert.deepEqual(nameKrdsStyles([bold24, kpx(26.67, 150, 'Bold', { name: 'h2' })], { path: 'rename' }), ['heading/medium', 'heading/medium-26_7']);
 });
 
 test('krdsType — 단계 경계(중간점 · 표기값)', () => {
@@ -3116,10 +3141,10 @@ test('krdsType — 크기 꼬리: 기준값 거리 → 쓰인 곳 → 큰 크기
     nameKrdsStyles([kpx(18, 150, 'Regular', { count: 3 }), kpx(20, 150, 'Regular', { count: 1 })]),
     ['body/large', 'body/large-20'],
   );
-  // 거리가 먼저 — 19는 쓰인 곳이 적어도 그대로
+  // 거리가 먼저 — 19는 쓰인 곳이 적어도 그대로(6-2 T1: 보통 굵기 24는 이제 heading이라 같은 body 단계의 21로 바꿈)
   assert.deepEqual(
-    nameKrdsStyles([kpx(19, 150, 'Regular'), kpx(24, 150, 'Regular', { count: 9 })]),
-    ['body/large', 'body/large-24'],
+    nameKrdsStyles([kpx(19, 150, 'Regular'), kpx(21, 150, 'Regular', { count: 9 })]),
+    ['body/large', 'body/large-21'],
   );
   // 크기별 쓰인 곳은 그 크기 스타일들의 합
   assert.deepEqual(

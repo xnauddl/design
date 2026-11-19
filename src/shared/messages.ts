@@ -189,6 +189,17 @@ export interface RoleRow {
   token: string;
 }
 
+/**
+ * 만들기 단계 사다리의 곳 수 한 줄(ia-v3 §2.12 6-2 N3 "곳 수") — 그 기준의 마지막 `EXTRACT_RESULT` 토큰 전부(꺼진 줄 · 잠긴 줄 포함)의
+ * 숫자 쓰임을 종류 · 값마다 합친 것. `kind` = 종류 `K`(`spacing/gap` 등), `value` = 값(문자열), `pill` = 알약 반경 자리 수.
+ */
+export interface LadderEntry {
+  kind: string;
+  value: string;
+  count: number;
+  pill?: number;
+}
+
 /** 기존 로컬 텍스트 스타일 — 이름 겹침 잠금용(sig = `tsSig`). */
 export interface ExistingStyleSig {
   name: string;
@@ -208,7 +219,7 @@ export interface VarUpdateError {
 /** UI → code 요청. */
 export type UiToCode =
   | { type: 'EXTRACT'; nodeIds?: string[]; reqId?: number } // reqId: 만들기 화면 요청 번호(결과에 그대로 돌려줌, IA v4 §4.3) · nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
-  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number; globalOnly?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리 · globalOnly: Global만(Semantic을 만들지 않음 — 무료도 됨, IA v4 §4.3 무료 규칙)
+  | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number; globalOnly?: boolean; ladder?: LadderEntry[] } // ladder: 단계 이름의 곳 수(ia-v3 §2.12 6-2 N3 — 추출 전체) · preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리 · globalOnly: Global만(Semantic을 만들지 않음 — 무료도 됨, IA v4 §4.3 무료 규칙)
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
   // 매칭은 언제나 "같은 값"(IA v3 §2.11 — 숫자 소수 2자리, 색 #RRGGBB + 양쪽 불투명). 허용오차는 없앴다.
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
@@ -305,7 +316,7 @@ export type CodeToUi =
   // decimalRows: 앵커 없는 소수 크기 군집 — 만들지 않는 흐린 줄(§2.11 11번 · ia-v4 §4.3 "소수 크기 줄").
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; decimalRows?: StyleCluster[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
   | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
-  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[] }
+  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number> } // 6-2 T3: roleVars* 없음(역할 변수 이름을 함께 바꾸지 않음)
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number>; mainsApplied?: string[] } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
