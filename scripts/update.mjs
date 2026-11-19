@@ -3,7 +3,7 @@
    Claude가 GitHub에 올린 수정은 로컬 폴더에 저절로 오지 않는다. Figma는 로컬 dist/를 읽는다.
 
    사용:
-     npm run dev                    지금 브랜치를 원격 최신으로 (npm run update와 같음)
+     npm run dev                    지금 브랜치를 원격 최신으로 받은 뒤 개발자 모드(__DEV__ — 무료/유료 전환 토글)로 다시 빌드
      npm run update                 지금 브랜치를 원격 최신으로
      npm run update -- <브랜치>      그 브랜치로 바꾼 뒤 원격 최신으로 (예: main)
 

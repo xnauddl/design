@@ -13,7 +13,7 @@
     "verify:i18n": "npm run build && node scripts/verify-i18n.mjs",
     "verify:bind": "npm run build && node scripts/verify-bind-flow.mjs",
     "update": "node scripts/update.mjs",
-    "dev": "node scripts/update.mjs"
+    "dev": "node scripts/update.mjs && node build.mjs --dev"
   },
   "devDependencies": {
     "@figma/plugin-typings": "^1.100.0",
