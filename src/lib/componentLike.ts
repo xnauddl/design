@@ -523,12 +523,23 @@ export function tabInfo(node: LikeNode, opts: { wide?: boolean } = {}): TabInfo 
   return wideTab(cells);
 }
 
+/**
+ * 탭 칸 하나의 넓힌 모양(§4.7 "묶기" 1번 ② · 2번 칸 맞추기 · 7번 재사용 지문) — 글자 칸: 글자 색 · 굵기 · 밑줄,
+ * 틀 칸: 칸 채움 · 선 유무 · 안쪽 글자 색 · 굵기 · 밑줄 · 막대 유무. 칸 조건에 맞지 않으면 빈 문자열.
+ */
+export function tabCellLook(c: LikeNode): string {
+  if (c.type === 'TEXT') return `${c.fillHex ?? ''}|${String(weightOf(c))}|${underlineOf(c) ? 'u' : ''}`;
+  const t = cellText(c, true);
+  if (!t) return '';
+  return `${hasVisibleFill(c) ? c.fillHex ?? '' : ''}|${hasVisibleStroke(c) ? 's' : ''}|${t.fillHex ?? ''}|${String(weightOf(t))}|${underlineOf(t) ? 'u' : ''}|${cellBar(c) ? 'b' : ''}`;
+}
+
 /** 칸마다 넓힌 모양 — 틀 칸은 막대 하나를 허용해 읽는다. 칸이 탭 칸 조건에 맞지 않으면 null. */
 function wideLooks(cells: readonly LikeNode[]): { looks: string[]; texts: LikeNode[]; bars: boolean[]; textCells: boolean } | null {
   if (cells.every((c) => c.type === 'TEXT')) {
     if (!cells.every(shortOneLine)) return null;
     if (cells.some((c) => !c.fillHex)) return null;
-    const looks = cells.map((c) => `${c.fillHex}|${String(weightOf(c))}|${underlineOf(c) ? 'u' : ''}`);
+    const looks = cells.map((c) => tabCellLook(c));
     return { looks, texts: [...cells], bars: cells.map(() => false), textCells: true };
   }
   if (!cells.every((c) => c.type === 'FRAME')) return null;
@@ -536,10 +547,7 @@ function wideLooks(cells: readonly LikeNode[]): { looks: string[]; texts: LikeNo
   if (texts.some((t) => !t || !shortOneLine(t) || !t.fillHex)) return null;
   if (cells.some((c) => typeof c.fills === 'symbol' || (hasVisibleFill(c) && !c.fillHex))) return null;
   const bars = cells.map((c) => cellBar(c) != null);
-  const looks = cells.map((c, i) => {
-    const t = texts[i]!;
-    return `${hasVisibleFill(c) ? c.fillHex : ''}|${hasVisibleStroke(c) ? 's' : ''}|${t.fillHex}|${String(weightOf(t))}|${underlineOf(t) ? 'u' : ''}|${bars[i] ? 'b' : ''}`;
-  });
+  const looks = cells.map((c) => tabCellLook(c));
   return { looks, texts: texts as LikeNode[], bars, textCells: false };
 }
 

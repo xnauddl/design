@@ -12,6 +12,9 @@ import {
   reusePairIssue,
   reusePairGrade,
   isHeadingCollapseGroup,
+  tabItemReuseKey,
+  tabBarReuseKey,
+  matchTabReuse,
 } from '../dist/pure.mjs';
 import { copyOverridesAsync, keepLookAsync, replaceMemberAsync, createIconRegistry } from '../dist/figma-lib.mjs';
 
@@ -476,4 +479,54 @@ test('createIconRegistry.discard — 이번에 만든 아이콘만 지우고 등
   assert.notEqual(reg.ensure('star', vector('v4'), 'Icon'), star);
   assert.equal(reg.created(), 2);
   delete globalThis.figma;
+});
+
+/* ---------- 6-1b — C-D18 짝 맞추기 · 탭 그룹 재사용(ia-v3 A.19 6번 · §4.7 "묶기" 7번) ---------- */
+
+const ins = (id, fam, o = {}) => ({ id, name: 'item', type: 'INSTANCE', mainFamilyKey: fam, mainInSet: true, children: [], ...o });
+
+test('① reusePairIssue C-D18 — 같은 자리 인스턴스 가족이 다르면 걸림 · 같은 세트 · 둘 다 아이콘이면 통과 · asInstance · skipFamily는 보지 않음', () => {
+  const A = { id: 'A', name: 'list', type: 'FRAME', children: [ins('a0', 'card')] };
+  const B = (fam, o) => ({ id: 'B', name: 'list', type: 'COMPONENT', children: [ins('b0', fam, o)] });
+  assert.equal(reusePairIssue(A, B('tabcell')), '0');
+  assert.equal(reusePairIssue(A, B('card')), null);
+  assert.equal(reusePairIssue({ ...A, children: [ins('a0', 'i1', { iconMain: true })] }, B('i2', { iconMain: true })), null);
+  assert.equal(reusePairIssue(A, B('tabcell'), new Set(['a0'])), null, 'asInstance — 이번 실행의 다른 그룹 멤버');
+  assert.equal(reusePairIssue(A, B('tabcell'), new Set(), new Set(), new Set(['a0'])), null, 'skipFamily — 이번 실행이 만든 인스턴스');
+  assert.equal(reusePairIssue({ ...A, children: [ins('a0', undefined)] }, B('tabcell')), null, '메인을 모르면 통과');
+});
+
+test('② structFingerprint — 안쪽 인스턴스 가족이 달라도 같은 키(지금 그대로)', () => {
+  const L = (fam) => ({ id: 'L', name: 'list', type: 'FRAME', layoutMode: 'HORIZONTAL', children: [ins('x', fam, { mainComponentKey: fam })] });
+  assert.equal(structFingerprint(L('card'), true), structFingerprint(L('tabcell'), true));
+});
+
+test('③ tabItemReuseKey · tabBarReuseKey — Style · State · 칸 모양 · 칸 수 · 루트 여백', () => {
+  const c = (o = {}) => ({ id: 'c', name: 'One', type: 'TEXT', characters: 'One', fillHex: '#111111', width: 40, height: 16, ...o });
+  const k = tabItemReuseKey(c(), 'Text', 'Selected');
+  assert.match(k, /^variant:role:tab-item:/);
+  assert.equal(k, tabItemReuseKey(c({ characters: 'Another', width: 80 }), 'Text', 'Selected'), '글자 · 폭만 다르면 같다');
+  assert.notEqual(k, tabItemReuseKey(c(), 'Text', 'Default'));
+  assert.notEqual(k, tabItemReuseKey(c(), 'Pill', 'Selected'));
+  assert.notEqual(k, tabItemReuseKey(c({ fontWeight: 700 }), 'Text', 'Selected'), '칸 모양(굵기)');
+  const bar = (n, pad = 0) => ({ id: 'b', name: 'nav', type: 'FRAME', layoutMode: 'HORIZONTAL', paddingLeft: pad, children: Array.from({ length: n }, (_, i) => c({ id: `c${i}` })) });
+  assert.match(tabBarReuseKey(bar(5), 'Text'), /^variant:role:tab-bar:/);
+  assert.notEqual(tabBarReuseKey(bar(5), 'Text'), tabBarReuseKey(bar(4), 'Text'));
+  assert.notEqual(tabBarReuseKey(bar(5), 'Text'), tabBarReuseKey(bar(5, 8), 'Text'));
+  assert.equal(tabBarReuseKey(bar(5), 'Text'), tabBarReuseKey({ ...bar(5), width: 999 }, 'Text'));
+});
+
+test('④ matchTabReuse — 모든 Style이 한 세트에 있을 때만 Tab Item 재사용, 새 Style이 있으면 새로 · Tab Bar는 그다음', () => {
+  const plan = { kind: 'tab', keys: [], itemKeys: ['iT1', 'iT2', 'iP1', 'iP2'], barKeys: ['bT', 'bP'] };
+  const items = [{ id: 's1', key: 'iT1', setId: 'TI' }, { id: 's2', key: 'iT2', setId: 'TI' }, { id: 's3', key: 'iP1', setId: 'TI' }, { id: 's4', key: 'iP2', setId: 'TI' }];
+  const bars = [{ id: 'b1', key: 'bT', setId: 'TB' }, { id: 'b2', key: 'bP', setId: 'TB' }];
+  const r = matchTabReuse(plan, [...items, ...bars]);
+  assert.deepEqual(r.item.ids, ['s1', 's2', 's3', 's4']);
+  assert.deepEqual(r.bar.ids, ['b1', 'b2']);
+  assert.equal(matchTabReuse(plan, [...items.slice(0, 2), ...bars]).item.ids, null, '새 Style(Pill) — 새 Tab Item');
+  assert.equal(matchTabReuse(plan, [...items, ...bars]).bar.ids !== null, true);
+  assert.equal(matchTabReuse(plan, [...items, ...bars], undefined, () => false).bar.ids, null, '칸이 그 Tab Item 세트의 인스턴스가 아니면 새 Tab Bar');
+  const one = { kind: 'tab', keys: [], itemKeys: ['iT1', 'iT2'], barKeys: ['bT'] };
+  assert.deepEqual(matchTabReuse(one, [...items, { id: 'solo', key: 'bT', setId: null }]).bar.ids, ['solo'], 'Style 하나 — 단독 Tab Bar');
+  assert.deepEqual(matchTabReuse(plan, [...items, ...items.map((x) => ({ ...x, id: x.id + 'c', setId: 'TI2' }))]).item, { ids: null, keepKey: false }, '복제된 세트 둘 — 키를 남기지 않는다');
 });

@@ -6831,11 +6831,18 @@
     if (!isTabName((_c = (_b = node.nameKey) != null ? _b : node.name) != null ? _c : "")) return null;
     return wideTab(cells);
   }
+  function tabCellLook(c) {
+    var _a, _b, _c;
+    if (c.type === "TEXT") return `${(_a = c.fillHex) != null ? _a : ""}|${String(weightOf2(c))}|${underlineOf(c) ? "u" : ""}`;
+    const t2 = cellText(c, true);
+    if (!t2) return "";
+    return `${hasVisibleFill(c) ? (_b = c.fillHex) != null ? _b : "" : ""}|${hasVisibleStroke(c) ? "s" : ""}|${(_c = t2.fillHex) != null ? _c : ""}|${String(weightOf2(t2))}|${underlineOf(t2) ? "u" : ""}|${cellBar(c) ? "b" : ""}`;
+  }
   function wideLooks(cells) {
     if (cells.every((c) => c.type === "TEXT")) {
       if (!cells.every(shortOneLine)) return null;
       if (cells.some((c) => !c.fillHex)) return null;
-      const looks2 = cells.map((c) => `${c.fillHex}|${String(weightOf2(c))}|${underlineOf(c) ? "u" : ""}`);
+      const looks2 = cells.map((c) => tabCellLook(c));
       return { looks: looks2, texts: [...cells], bars: cells.map(() => false), textCells: true };
     }
     if (!cells.every((c) => c.type === "FRAME")) return null;
@@ -6843,10 +6850,7 @@
     if (texts.some((t2) => !t2 || !shortOneLine(t2) || !t2.fillHex)) return null;
     if (cells.some((c) => typeof c.fills === "symbol" || hasVisibleFill(c) && !c.fillHex)) return null;
     const bars = cells.map((c) => cellBar(c) != null);
-    const looks = cells.map((c, i) => {
-      const t2 = texts[i];
-      return `${hasVisibleFill(c) ? c.fillHex : ""}|${hasVisibleStroke(c) ? "s" : ""}|${t2.fillHex}|${String(weightOf2(t2))}|${underlineOf(t2) ? "u" : ""}|${bars[i] ? "b" : ""}`;
-    });
+    const looks = cells.map((c) => tabCellLook(c));
     return { looks, texts, bars, textCells: false };
   }
   function finishTab(cells, selected, textCells, texts, looks, wide) {
@@ -8473,11 +8477,18 @@
   var COMPONENT_ROLES = /* @__PURE__ */ new Set(["icon", "image", "thumbnail", "avatar", "status", "badge", "divider"]);
   function componentEligible(node) {
     if (node.locked || node.visible === false) return false;
+    if (isTabItemRow(node)) return false;
     if (node.type === "FRAME" || node.type === "GROUP") return isHighConfidenceComponent(node);
     return !!node.role && COMPONENT_ROLES.has(kebab(node.role));
   }
   function isClosedComponentSubtree(node) {
-    return node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "COMPONENT_SET";
+    return node.type === "INSTANCE" || node.type === "COMPONENT" || node.type === "COMPONENT_SET" || isTabItemRow(node);
+  }
+  function isTabItemRow(node) {
+    var _a;
+    if (node.type !== "FRAME" || node.layoutMode !== "HORIZONTAL") return false;
+    const kids = ((_a = node.children) != null ? _a : []).filter((c) => c.visible !== false);
+    return kids.length >= 2 && kids.every((c) => c.type === "INSTANCE" && !!c.tabItemMain);
   }
   function isAutoNamedCandidate(n) {
     return isDefaultName(n.name) && tabInfo(n) == null;
@@ -8920,6 +8931,14 @@
     const members = g.members;
     const nk = g.key;
     if (!members.length) return null;
+    if (g.tab) {
+      return {
+        kind: "tab",
+        keys: [],
+        itemKeys: g.tab.items.map((it) => tabItemReuseKey(it.cell, it.style, it.state)),
+        barKeys: g.tab.styles.map((sp) => tabBarReuseKey(sp.rep, sp.style))
+      };
+    }
     if (g.subfamilies.length === 1) {
       if (members.length === 1) return { kind: "single", keys: [reuseKey("single", members[0], nk)] };
       if (isHeadingCollapseGroup(members)) return null;
@@ -8975,7 +8994,7 @@
     const sets = countable(covering);
     return result(sets.length, () => sets[0]);
   }
-  function reusePairCheck(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set()) {
+  function reusePairCheck(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set(), skipFamily = /* @__PURE__ */ new Set()) {
     let viaIcon = false;
     const isVec = (n) => VECTOR_TYPES.has(n.type) || !!n.iconFrame;
     const vecDiff = (x, y) => {
@@ -9001,7 +9020,10 @@
           }
           return p;
         }
-        if (xInst) continue;
+        if (xInst) {
+          if (xa.type === "INSTANCE" && !asInstance.has(xa.id) && !skipFamily.has(xa.id) && familySplit(xa, yb)) return p;
+          continue;
+        }
         if (xa.type !== yb.type) return p;
         if (vecDiff(xa, yb)) return p;
         const deeper = walk3(xa, yb, p);
@@ -9012,19 +9034,19 @@
     const issue = walk3(a, b, "");
     return { issue, viaIcon: issue ? false : viaIcon };
   }
-  function reusePairGrade(a, b, asInstance, iconInstances) {
-    const r = reusePairCheck(a, b, asInstance, iconInstances);
+  function reusePairGrade(a, b, asInstance, iconInstances, skipFamily) {
+    const r = reusePairCheck(a, b, asInstance, iconInstances, skipFamily);
     return r.issue ? "fail" : r.viaIcon ? "loose" : "strict";
   }
-  function reusePairIssue(a, b, asInstance, iconInstances) {
-    return reusePairCheck(a, b, asInstance, iconInstances).issue;
+  function reusePairIssue(a, b, asInstance, iconInstances, skipFamily) {
+    return reusePairCheck(a, b, asInstance, iconInstances, skipFamily).issue;
   }
   var TAB_GROUP_KEY = "role:tab";
   var padOf = (n) => {
     var _a, _b, _c, _d, _e, _f;
     return [(_a = n.paddingTop) != null ? _a : 0, (_b = n.paddingRight) != null ? _b : 0, (_c = n.paddingBottom) != null ? _c : 0, (_d = n.paddingLeft) != null ? _d : 0, (_e = n.itemSpacing) != null ? _e : 0, (_f = n.counterAxisSpacing) != null ? _f : 0].join(",");
   };
-  function pairDiff(a, b) {
+  function pairDiff(a, b, family = true) {
     const d = { split: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
     const isArt = (n) => !!n.iconFrame || VECTOR_TYPES.has(n.type);
     const walk3 = (x, y, path) => {
@@ -9058,6 +9080,10 @@
         return;
       }
       if (x.type === "INSTANCE") {
+        if (family && familySplit(x, y)) {
+          d.split = true;
+          return;
+        }
         if (((_g = x.mainComponentKey) != null ? _g : "") !== ((_h = y.mainComponentKey) != null ? _h : "")) d.content = true;
         if (x.visible !== false !== (y.visible !== false)) {
           if (x.name.trim().endsWith("?") || y.name.trim().endsWith("?")) d.content = true;
@@ -9107,6 +9133,12 @@
     };
     walk3(a, b, "");
     return d;
+  }
+  function familySplit(x, y) {
+    if (!x.mainFamilyKey || !y.mainFamilyKey || x.mainFamilyKey === y.mainFamilyKey) return false;
+    if (x.iconMain && y.iconMain) return false;
+    if (!x.mainInSet && !y.mainInSet && x.mainStruct && y.mainStruct && !pairDiff(x.mainStruct, y.mainStruct, false).split) return false;
+    return true;
   }
   function nodeAtStructPath(root, path) {
     var _a;
@@ -9238,12 +9270,6 @@
     });
   }
   var colorAxisLabelsOrNone = (distinct) => uniqLabels(distinct.map(colorNameOf));
-  var sizeLabel = (distinct) => {
-    const areas = distinct.map(Number);
-    const sorted = [...areas].sort((a, b) => a - b);
-    const grades = tshirtRoles(sorted);
-    return areas.map((a) => grades[sorted.indexOf(a)]);
-  };
   function assignSizeAxis(subs, sizeKey, content) {
     const groups = [];
     for (const s of subs) {
@@ -9300,109 +9326,78 @@
     const ms = [...members];
     return { key: reuseNameKey((_d = (_c = (_a = ms[0]) == null ? void 0 : _a.nameKey) != null ? _c : (_b = ms[0]) == null ? void 0 : _b.name) != null ? _d : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
   }
-  function tabSubfamilies(members) {
-    var _a, _b, _c, _d, _e;
-    const fams = splitFamilies(members);
-    const famOf2 = /* @__PURE__ */ new Map();
-    fams.forEach((f, i) => f.forEach((m) => famOf2.set(m.id, i)));
-    const info = new Map(members.map((m) => [m.id, tabInfo(m)]));
-    const fsOf = (m) => `${famOf2.get(m.id)}#${info.get(m.id).style}`;
-    const rootsBy = /* @__PURE__ */ new Map();
-    for (const m of members) {
-      const k = fsOf(m);
-      if (!rootsBy.has(k)) rootsBy.set(k, /* @__PURE__ */ new Set());
-      rootsBy.get(k).add((_a = m.fillHex) != null ? _a : "");
+  var visibleKids = (n) => {
+    var _a;
+    return ((_a = n.children) != null ? _a : []).filter((c) => c.visible !== false);
+  };
+  function tabBarRootMatches(rep, bar) {
+    if (visibleKids(rep).length !== visibleKids(bar).length) return false;
+    const d = pairDiff(rep, bar);
+    return !d.rootFill && !d.rootPad;
+  }
+  function planTabGroup(members) {
+    var _a;
+    const infos = members.map((m) => ({ m, info: tabInfo(m), cells: visibleKids(m) }));
+    const styleOrder = [];
+    for (const x of infos) if (!styleOrder.includes(x.info.style)) styleOrder.push(x.info.style);
+    const styles = [];
+    const repOf = /* @__PURE__ */ new Map();
+    for (const st of styleOrder) {
+      const same = infos.filter((x) => x.info.style === st);
+      const count = /* @__PURE__ */ new Map();
+      for (const x of same) count.set(x.cells.length, ((_a = count.get(x.cells.length)) != null ? _a : 0) + 1);
+      const top = Math.max(...count.values());
+      const n = same.find((x) => count.get(x.cells.length) === top).cells.length;
+      const rep = same.find((x) => x.cells.length === n);
+      repOf.set(st, rep);
+      const sel = rep.info.selected;
+      const def = rep.cells.findIndex((_, i) => i !== sel);
+      styles.push({ style: st, rep: rep.m, repInfo: rep.info, selectedCell: rep.cells[sel], defaultCell: rep.cells[def] });
     }
-    const rootVaries = (m) => {
-      var _a2, _b2;
-      return ((_b2 = (_a2 = rootsBy.get(fsOf(m))) == null ? void 0 : _a2.size) != null ? _b2 : 0) > 1;
-    };
-    const colorOf = (m) => {
-      var _a2;
-      return rootVaries(m) ? (_a2 = m.fillHex) != null ? _a2 : "" : info.get(m.id).selectedColor;
-    };
-    const backOf = (m) => {
-      var _a2;
-      return (_a2 = info.get(m.id).unselectedTextColor) != null ? _a2 : "";
-    };
-    const famContent = fams.map((f) => f.some((m, i) => i > 0 && pairDiff(f[0], m).content));
-    const key = (m) => {
-      var _a2, _b2;
-      const t2 = info.get(m.id);
-      const fi = famOf2.get(m.id);
-      const content = famContent[fi];
-      return [
-        fi,
-        t2.style,
-        t2.selected,
-        colorOf(m),
-        backOf(m),
-        content ? "" : `${(_a2 = m.width) != null ? _a2 : 0}x${(_b2 = m.height) != null ? _b2 : 0}`,
-        padOf(m),
-        innerSig(m, padOf),
-        content ? "" : innerSig(m, (n) => {
-          var _a3, _b3;
-          return `${(_a3 = n.width) != null ? _a3 : 0}x${(_b3 = n.height) != null ? _b3 : 0}`;
-        })
-      ].join("#");
-    };
-    const subs = subfamiliesBy(members, key);
-    if (subs.length >= 2) {
-      const head = (s) => s.members[s.master];
-      const famStyle = (s) => `${famOf2.get(head(s).id)}#${info.get(head(s).id).style}`;
-      assignAxis(subs, "Style", (s) => info.get(head(s).id).style);
-      const posBy = /* @__PURE__ */ new Map();
-      for (const s of subs) {
-        const k = famStyle(s);
-        if (!posBy.has(k)) posBy.set(k, /* @__PURE__ */ new Set());
-        posBy.get(k).add(info.get(head(s).id).selected);
+    const items = [];
+    for (const sp of styles) {
+      for (const state of ["Selected", "Default"]) {
+        items.push({ style: sp.style, state, variant: formatVariant({ State: state, Style: sp.style }), cell: state === "Selected" ? sp.selectedCell : sp.defaultCell });
       }
-      for (const s of subs) if (((_c = (_b = posBy.get(famStyle(s))) == null ? void 0 : _b.size) != null ? _c : 0) > 1) s.props.Selected = String(info.get(head(s).id).selected + 1);
-      const byPos = /* @__PURE__ */ new Map();
-      for (const s of subs) {
-        const k = `${famStyle(s)}#${info.get(head(s).id).selected}`;
-        if (!byPos.has(k)) byPos.set(k, { front: /* @__PURE__ */ new Set(), back: /* @__PURE__ */ new Set() });
-        byPos.get(k).front.add(colorOf(head(s)));
-        byPos.get(k).back.add(backOf(head(s)));
-      }
-      const groupsV = [...byPos.values()];
-      const frontV = groupsV.some((g) => g.front.size > 1);
-      const backV = groupsV.some((g) => g.back.size > 1);
-      if (frontV || backV) {
-        const both = groupsV.some((g) => g.front.size > 1 && g.back.size > 1) || frontV && backV;
-        if (both) {
-          assignAxis(subs, "Color", (s) => `${colorOf(head(s))}|${backOf(head(s))}`, (d) => uniqLabels(d.map((v) => {
-            const [f, b] = v.split("|");
-            return `${colorNameOf(f)}-${colorNameOf(b)}`;
-          })));
-        } else if (frontV) {
-          assignAxis(subs, "Color", (s) => colorOf(head(s)), colorAxisLabelsOrNone);
-        } else {
-          assignAxis(subs, "Color", (s) => backOf(head(s)), colorAxisLabelsOrNone);
-        }
-      }
-      const sizeBy = /* @__PURE__ */ new Map();
-      for (const s of subs) {
-        const fi = famOf2.get(head(s).id);
-        if (famContent[fi]) continue;
-        const k = famStyle(s);
-        if (!sizeBy.has(k)) sizeBy.set(k, /* @__PURE__ */ new Set());
-        sizeBy.get(k).add(String(((_d = head(s).width) != null ? _d : 0) * ((_e = head(s).height) != null ? _e : 0)));
-      }
-      const area = (s) => {
-        var _a2, _b2;
-        return ((_a2 = head(s).width) != null ? _a2 : 0) * ((_b2 = head(s).height) != null ? _b2 : 0);
+    }
+    const bars = infos.map((x) => {
+      const rep = repOf.get(x.info.style);
+      const isRep = rep.m.id === x.m.id;
+      const sameCount = x.cells.length === rep.cells.length;
+      const rootMatch = isRep || tabBarRootMatches(rep.m, x.m);
+      return {
+        bar: x.m,
+        style: x.info.style,
+        info: x.info,
+        rep: isRep,
+        cells: x.cells,
+        states: x.cells.map((_, i) => i === x.info.selected ? "Selected" : "Default"),
+        sameCount,
+        rootMatch,
+        asBar: !isRep && sameCount && rootMatch
       };
-      for (const [k, v] of sizeBy) {
-        if (v.size < 2) continue;
-        const inGroup = subs.filter((s) => !famContent[famOf2.get(head(s).id)] && famStyle(s) === k);
-        const labels = sizeLabel([...new Set(inGroup.map((s) => String(area(s))))]);
-        const byArea = new Map([...new Set(inGroup.map((s) => String(area(s))))].map((a, i) => [a, labels[i]]));
-        for (const s of inGroup) s.props.Size = byArea.get(String(area(s)));
-      }
-    }
-    finishProps(subs);
-    return subs;
+    });
+    return { styles, items, bars, itemName: "Tab Item" };
+  }
+  function tabItemReuseKey(cell, style, state) {
+    return `variant:role:tab-item:${hash2([style, state, tabCellLook(cell), structFingerprint(cell, false, true)].join("#"))}`;
+  }
+  function tabBarReuseKey(bar, style) {
+    var _a, _b, _c, _d, _e, _f, _g, _h;
+    const parts = [
+      style,
+      visibleKids(bar).length,
+      bar.type,
+      (_a = bar.layoutMode) != null ? _a : "NONE",
+      (_b = bar.paddingTop) != null ? _b : 0,
+      (_c = bar.paddingRight) != null ? _c : 0,
+      (_d = bar.paddingBottom) != null ? _d : 0,
+      (_e = bar.paddingLeft) != null ? _e : 0,
+      (_f = bar.itemSpacing) != null ? _f : 0,
+      (_g = bar.counterAxisSpacing) != null ? _g : 0,
+      (_h = bar.fillHex) != null ? _h : ""
+    ];
+    return `variant:role:tab-bar:${hash2(parts.join(","))}`;
   }
   function planRegisterGroups(nodes, isAncestor) {
     const order = new Map(nodes.map((n, i) => [n.id, i]));
@@ -9412,7 +9407,9 @@
     const tabIds = new Set(tabs.map((t2) => t2.id));
     const rest = nodes.filter((n) => !tabIds.has(n.id) && tabInfo(n) == null);
     if (tabs.length) {
-      out.push({ key: TAB_GROUP_KEY, tab: true, members: tabs, nameGroupSize: tabs.length, nameMembers: tabs, subfamilies: tabSubfamilies(tabs) });
+      const tab = planTabGroup(tabs);
+      const subfamilies = tab.styles.map((sp) => ({ members: [sp.rep], master: 0, props: tab.styles.length > 1 ? { Style: sp.style } : {} }));
+      out.push({ key: TAB_GROUP_KEY, tab, members: tabs, nameGroupSize: tabs.length, nameMembers: tabs, subfamilies });
     }
     for (const g of groupByExactName(rest)) {
       const members = dropAncestors(g.members);
@@ -9474,8 +9471,13 @@
       let base;
       let next;
       if (g.tab) {
-        base = "Tab";
-        next = (k2) => `Tab${k2}`;
+        let item = "Tab Item";
+        let ik = 2;
+        while (taken.has(item)) item = `Tab Item ${ik++}`;
+        taken.add(item);
+        g.tab.itemName = item;
+        base = "Tab Bar";
+        next = (k2) => `Tab Bar ${k2}`;
       } else {
         base = `${(_a = baseByKey.get(g.key)) != null ? _a : componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
         next = (k2) => `${base}-${k2}`;
