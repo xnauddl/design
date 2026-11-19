@@ -3125,3 +3125,62 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] 4검사(tsc · `npm test` · `verify:i18n` 0 · `verify-bind-flow`) · `dist/` 다시 빌드 · 스크린샷이 시안과 같은지
 - [ ] ROADMAP 6-1c 체크(실기 뒤)
 - [ ] 실기 확인(사용자, 피그마 — 새 파일): ① 같은 카드 5장(제목 · 아이콘 · 사진이 저마다 다름, 아이콘은 로컬 컴포넌트 둘의 인스턴스) 중 한 장은 배경 색만, 한 장은 레이어 이름 하나만, 한 장은 컴포넌트로 바꿈 → [닮은 프레임 찾기] → 상태 줄에 제외 없음 · 안내 줄 "제외 2개 — 이미 컴포넌트나 인스턴스인 프레임은 합치지 않아요. 구조나 레이어 이름이 달라요. …" ② [하나로 합치기] → 아이콘이 다른 카드는 인스턴스이고 **아이콘이 원래대로**(지금은 원본 아이콘으로 바뀜) · 아이콘 교체 속성이 Properties 패널에 있음 · 배경 색이 다른 카드는 원본 그대로 · 상태 줄 "원본을 그대로 둔 3개" · "처리 중 문제" 세 줄 ③ 이름을 바꾼 카드에 [이름 정리] 뒤 다시 찾으면 멤버가 됨(이름이 같아지면) ④ ⌘Z 한 번에 모두 되돌아감 ⑤ 모든 멤버가 색이 다른 묶음 → [하나로 합치기] → 파일 그대로(원본이 컴포넌트가 되지 않음) · "합치지 못했어요 · 원본을 그대로 둔 …"
+
+## A.21 변수 · 이름 생성 규칙 PR (2026-11-19 6-2 사용자 결정 1–4 — §0 "6-2" · §2.12 "6-2 새 규칙" N1–N8 · ia-v4 §4.4 "역할 세분화 2차" · B.28) — 대략 시안 · 명세 초안
+
+> 상태: 대략 시안(전 → 뒤 이름 표 한 장) · 명세 초안. 다음은 코드 대조 검토 1회차(CLAUDE.md 3번). 화면 글 변화는 ia-v4 B.28.
+
+**0. 실험(코드를 고치기 전)**
+- [ ] QA 5 결과 파일(읽기만)에서 `color/background/default`(#a3a3a3)가 붙은 곳을 센다 — 사진 채움 아래 깔린 단색인지, 보이는 배경인지(§2.12 N6 "까닭"). 가려진 칠하기가 아니면 N6을 고치고 사용자에게 다시 묻는다.
+- [ ] 같은 파일에서 반경 120 · 150을 쓰는 레이어의 짧은 변 — 알약 판정(N2 "알약")이 둘 다 `full`이 되는지.
+
+**1. 순수 규칙 — `src/lib/usageRoles.ts`**
+- [ ] 새 함수 `numericKind(field, sizeKind?)` → 종류 이름 `K`(N2 표 — `spacing/padding` · `spacing/gap` · `radius` · `stroke-width` · `size/icon` · `size/avatar` · `opacity` · `line-height` · `letter-spacing`). `composeName` · `paddingProp` · `radiusName` · `strokeName` · `simpleNumericName` · `textUsageName`의 숫자 쓰임은 이것으로 바꾸고, 안 쓰이게 된 함수 · 주인 인자는 지운다(`pickOwner`도 — `dsRoleOwner`는 `STRUCTURAL`만 직접 본다)
+- [ ] 새 함수 `stepName(offset)` · `stepOffset(name)`(N3 사다리 — 0 `md`, −1 `sm`, −2 `xs`, −k `{k−1}xs`, +1 `lg`, +2 `xl`, +k `{k−1}xl`)
+- [ ] 새 함수 `assignSteps(K, values: {value, count, pill?}[], existing, opts)` — N3 ① 재사용 → ② 단계 이름 없음(최다 = md) → ③ 이미 있는 단계 사이 빈 칸 · 모자라면 가까운 이웃 + `-n`, 반경 알약(`radius/full` · `-n`). 가족 정규식 · 가족 순서(단계 이름은 md에 가까운 칸 먼저)
+- [ ] `assignNames`의 `number` 가지(`assignNumbers`)를 `assignSteps`로 대신한다 — `nameKindOf`가 숫자 기본 이름(`K`)을 알아보게. 색 · `plain` 가지는 그대로
+- [ ] 새 함수 `fontSizeRoleNames(sizes: {px, category, count}[], existing)` — N4(분류 = count 합 최다, 같으면 body → label → heading → display · 단계 `krdsStepDef` · 겹치면 기준값 거리 → 곳 수 → 큰 크기 순으로 `-{px}` · 이미 있는 이름 재사용 · 차 있으면 `-{px}` → `-{px}-2`)
+- [ ] `STRUCTURAL`에 6-2 구조 이름 아홉(`profile` · `title-group` · `links` · `pagination` · `icon-group` · `button-group` · `column` · `grid` · `stack`) 더함(N1 — label 판정용)
+- [ ] `OLD_LADDER`를 N7대로 좁힘(`spacing` · `size` 두 마디 단계 + `none` · `thin` · `thick`만)
+- [ ] `colorRoleRef` · `colorRoleBases`는 그대로(곳 수 입력만 바뀜 — N6)
+
+**2. 추출 — `src/lib/extract.ts`**
+- [ ] `collectSpacing` · 반경(367–372) · 선 두께(393) · 투명도(404) · 크기: 쓰임 이름 = `K`(주인 없음). 반경은 알약 자리를 `radius/full`로 따로 센다(N2)
+- [ ] `collectText`: 줄 높이 · 자간 쓰임 `line-height` · `letter-spacing`(N5), 글자 크기는 쓰임에 분류(굵기 · 크기로 `krdsCategory(…, 'scan')`)를 싣는다(N4)
+- [ ] `collectPaints`(129–143): 가려진 칠하기 판정(N6 — 위에 보이는 불투명 SOLID 또는 FILL · CROP의 투명도 1 IMAGE · VIDEO) → 쓰임 항목 `covered`로 세고 `count`에 넣지 않음. `DraftToken.uses` 타입(`tokens.ts`)에 `covered?` · 분류 칸
+- [ ] `extractFromSelection`의 `ownerOf` 인자 · `acc.owner` 지움
+
+**3. 만들기 — `src/lib/variables.ts` · `src/code.ts`**
+- [ ] `createUsageRoles`(381–): 숫자 요청을 종류별로 묶어 `assignSteps`, 색은 `count`(없으면 `covered`)로 기준색, 글자 크기는 `fontSizeRoleNames`
+- [ ] `createSemanticTextStyles`: `pushAlias`(1050–)의 `font-size/{스타일 이름}` · `line-height/{스타일 이름}` · `letter-spacing/{스타일 이름}` → N4 · N5 이름(같은 px는 하나). 3단계 연결(1195 · 1212 · 1225)은 스타일 이름이 아니라 그 스타일 값의 변수로 찾기. 앵커 rename의 "시맨틱이 비면 현재 값으로 생성"(1080–1093) 조건도 값으로
+- [ ] 역할 변수 이름 바꾸기 없앰(§0 "6-2" ⑥): `roleRenames` · `roleSpecs` · `roleMoved`(978–995) · 3단계 뒤 되돌림(1250–1265) · `renameTextRoleVars`(1380–) · `applyTsRename`의 변수 단계(1483 부근) · `figma-lib.ts` 내보내기 지움. `ROLE_VAR_CATS` · `finalNameTaken`은 스타일 이름 바꾸기가 계속 쓰는지 확인 후 정리
+- [ ] `code.ts` `bindOwnerOf`(904) 지움, 1316 · 1387의 인자 지움(`highConfidenceComponentRole(…, { wideTab: false })` 호출도 함께 — §4.7 "묶기" C-D17 ①의 쓰임 이름 줄은 쓰이지 않게 됨)
+
+**4. 연결 — `src/lib/bind.ts`**
+- [ ] 숫자 자리 `usage` = `K`(1117–1175), `ctx.owner` · `opts.ownerOf` 지움(499 · 541–548)
+- [ ] 순서 2 숫자 가족 = `K` 가족(839 — `familyRe` → `assignSteps`의 가족 정규식), 순서 4 숫자 이름 = `assignSteps`(891 — 남은 자리만 · 곳 수)
+- [ ] 글자 순서 4 이름(1246 · 1265): 글자 크기 = `fontSizeRoleNames`(자리 글자의 분류), 줄 높이 · 자간 = `assignSteps`, 글꼴 `font-family/text` 그대로
+- [ ] 색 곳 수(857–862): 자리 `covered: true`는 빼고 셈(전부 가려졌으면 그것으로)
+
+**5. 이름 정리 — `src/lib/rename.ts` · `src/lib/naming.ts` · `src/lib/components.ts`**
+- [ ] `resolveRole` FRAME 분기 폴백(지금 `kids.length === 1 ? 'wrapper' : 'container'`와 자식 없는 `container`): ia-v4 §4.4 "역할 세분화 2차" 순서(B1 → C1 → B2 · C2 → C3 → C4 → B3 → C5 → C6 → D). 새 판정 함수 `isProfileLike` · `isTitleGroupLike` · `isLinksLike` · `isPaginationLike` · `isIconGroupLike` · `isButtonGroupLike` · `directionRole`. SECTION은 D만
+- [ ] `decide`: C1–C6는 맥락 + 역할 · passthrough(`REFINED_PASSTHROUGH`에 더함), D는 맥락 없는 이름 · passthrough(`PASSTHROUGH_ROLES` = `row`(폴백일 때) · `column` · `grid` · `stack`) — 1차 B1 `row`(맥락 + 역할)와 폴백 `row`(맥락 없음)를 판정 결과로 가른다
+- [ ] `naming.ts`: `EMITTED_ROLES`에 아홉 낱말, `container` · `wrapper`는 `RECOGNIZED_ROLES`로, `REFINED_ROLES`에 아홉 낱말(맥락에서 보통 낱말), `GENERIC_ROLES`에 `row` · `column` · `grid` · `stack`
+- [ ] `components.ts` `GENERIC_GROUP_NAMES`(1290)에 `row` · `column` · `grid` · `stack`
+
+**6. 메시지 · 화면** — ia-v4 B.28(`TS_RENAMED` 필드 · 글 4개 지움 · `onTsRenamed`)
+
+**7. 테스트(`test/`)**
+- [ ] 순수(`pure.test.mjs`): `assignSteps` — 빈 파일(7개 값 → 최다 md · 양쪽 사다리 · `2xs` · `2xl`), 같은 값 재사용, 이미 있는 `sm`=8 · `md`=12에 4 · 10 · 16(→ `xs` · `sm-2` · `lg`), 다른 값이 차지한 칸 건너뜀, 반경 알약 둘(`full` · `full-2`) · 알약 아닌 자리가 하나라도 있는 값은 사다리, `radius/md`(옛 단계 이름)가 같은 값이면 재사용 · 다른 값이면 차 있음(N7), `spacing/md`(두 마디)는 여전히 옛 이름. `fontSizeRoleNames` — 18px 스타일 10개(body · heading · label 섞임) → 하나, 18 · 20 → `body/large` · `body/large-20`, 이미 있는 `font-size/body/large`(다른 값) → `-18`. 색 — 가려진 회색 30곳 + 보이는 흰색 10곳 → 흰색 default
+- [ ] 연결 · 만들기 목(`figma.test.mjs`): 지금 기대값이 쓰임 이름(`spacing/card/gap` 등 17곳 · `radius/…` 11곳 · `font-size/text` 등)인 테스트는 새 이름으로 고친다(의도는 그대로 — 사유를 커밋에 적음). 만들기 → 연결 순서에서 연결이 만들기 이름을 재사용, 전에 만든 `spacing/card/gap`이 있어도 새 `spacing/gap/md`를 만들고 이미 붙은 곳은 그대로(N8), 텍스트 스타일 18px 10개 → 글자 크기 Semantic 1개에 모두 연결 · 줄 높이 px 정수 스타일은 값의 변수에, `renameTextRoleVars` 관련 13곳은 지우거나 "변수 이름이 그대로"로 고침
+- [ ] 이름 정리(`figma.test.mjs` · `pure.test.mjs`): C1–C6 · D 각 예(ia-v4 §4.4 표), 아닌 예(사각 아바타 + 이름 → `row` · 작은 라벨 위 큰 제목 → `text-group` · 아이콘 + 글자 가로 → `row` · 숫자 글자만 3개 → `pagination` · 링크 2개 → `row`), 자손 이름이 지금과 같음(passthrough), `title-group` 되읽기, 지금 `container` · `wrapper` 기대값(10곳 · `grouping` 3 · `reuse` 2)을 새 이름으로 — [등록] 묶기 테스트는 `container` 이름 픽스처를 그대로 두고 `row` 등도 일반어로 건너뛰는지 하나 더
+
+**8. verify-bind-flow (블록 29 — 다음 빈 번호)**
+- [ ] 블록 29: `TS_RENAMED`(새 모양 — `roleVars*` 없음)를 보내 [이름 다시 짓기] 결과 상태 줄에 "Semantic 변수"가 없고 건너뜀 0이면 `ok`, 건너뜀이 있으면 `warn`(ia-v4 B.28). 만들기 화면 Semantic 탭에 새 이름의 `roleRows`(`spacing/padding/md` · `font-size/body/large`)를 보내 줄 이름이 그대로 보임(모양 바뀜 없음 확인)
+
+**9. 화면 시안(정밀)** — ia-v4 B.28 마지막 두 줄(이름 표 · 만들기 Semantic 탭 · 이름 정리 트리 — 바뀌는 모양이 없어 짧게)
+
+**10. 마무리**
+- [ ] 4검사(tsc · `npm test` · `verify:i18n` 0 · `verify-bind-flow`) · `dist/` 다시 빌드
+- [ ] 실기 확인(사용자, 피그마 — QA 5 원본 `163:1523`의 새 복제본): 만들기 화면 전체 실행 → Semantic 수(109 → 약 50 — 추정) · 간격이 `spacing/padding|gap/{단계}`뿐 · 18px 글자 크기 변수 1개 · `color/background/default`가 흰색(0번 실험 결과대로) · 반경 120 · 150이 `radius/full` · `full-2` · 이름 정리 뒤 `container` · `wrapper` 0개, 내용 이름이 맞는지 눈으로(틀린 `profile` · `links`가 없는지)
+- [ ] ROADMAP 6-2 체크(실기 뒤)
