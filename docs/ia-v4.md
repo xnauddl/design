@@ -817,6 +817,7 @@
 | `component.extraMissing` | · 빈 조합 있음 | · 빈 변형 있음 |
 | `component.headMissing` | 빈 조합(미생성): | 빈 변형 |
 | `component.headIssue` | 처리 중 문제 {n}건: | 처리 중 문제 |
+| `component.headReused` | (상태 줄 꼬리 " · 기존 컴포넌트 재사용 {n}: {이름들}") | 기존 컴포넌트 재사용 — 베리언트 결과 맨 아래 구획 머리 띠 + 개수, 아래에 이름 한 줄씩(2026-11-19 사용자 결정 — ia-v3 §0 "[등록] 결과 표시"). 같은 결정으로 상태 줄의 " · 채움·크기가 달라 건너뛴" 꼬리도 지움("처리 중 문제"와 중복) |
 | `component.noChecked` | 체크한 후보가 없어요 — 묶을 항목을 체크하세요 | 등록할 후보를 체크해 주세요 |
 | `component.registered` | 컴포넌트 {total} (세트 {sets} · 단일 {singles}){extraPart} | 컴포넌트 {total} (변형 세트 {sets} · 컴포넌트 {singles}){extraPart} |
 | `component.extraSingles` | · 단일 {n} | · 컴포넌트 {n} |

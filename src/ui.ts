@@ -2785,19 +2785,17 @@ window.onmessage = (event: MessageEvent) => {
       // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
       const extraPart =
         (msg.skipped ? t('component.extraSkipped', { n: msg.skipped }) : '') +
-        reusedText(reused) +
         (msg.exposed ? t('component.extraProps', { n: msg.exposed }) : '') +
         (msg.icons ? t('component.extraIcons', { n: msg.icons }) : '') +
         placeTailText('component.propFailed', propFailed) +
-        placeTailText('component.fillKept', fillKept) +
         placeTailText('component.reuseKept', reuseKept) +
         placeTailText('component.placeCloned', cloned) +
         placeFailedText(misplaced);
       // 속성 값을 못 넣었거나(6번) 원본을 그대로 뒀거나 복사본으로 채웠거나 비운 자리(5번)가 있으면 성공이어도 경고(§4.7 "인스턴스 자리").
       // 등록 · 세트 · 재사용 중 하나라도 있으면 성공(꼬리가 있으면 경고 — §4.7 "재사용" 6번).
       setStatus('structureStatus', t('component.registered', { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? 'ok' : 'warn');
-      // 빈 조합(미생성) + 실패(진단) 리포트
-      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
+      // 빈 조합(미생성) + 실패(진단) + 재사용 리포트 — 채움·크기 · 재사용은 상태 줄이 아니라 여기에만(2026-11-19 사용자 결정 — 중복 없앰)
+      renderVariantReport(variantIssueSections(msg.missing, msg.failures, reused));
       break;
     }
     case 'VARIANTS_RESULT': {
@@ -4686,11 +4684,12 @@ function makeVariantReportRow(l: VariantReportLine): HTMLElement {
 }
 
 /** 등록·분류가 공유하는 구획(빈 조합 + 실패 진단) — 두 결과가 같은 리포트를 그린다. */
-function variantIssueSections(missing: string[], failures?: string[]): VariantReportSection[] {
+function variantIssueSections(missing: string[], failures?: string[], reused: readonly string[] = []): VariantReportSection[] {
   const f = failures || [];
   return [
     { head: t('component.headMissing'), items: missing },
     { head: t('component.headIssue'), items: f, warn: true, marker: 'bullet' },
+    { head: t('component.headReused'), items: [...reused], marker: 'bullet' },
   ];
 }
 
@@ -4801,16 +4800,10 @@ function renderSkipReasons(reasons: Record<string, number>): void {
 }
 
 /** 결과 줄 꼬리 — 이름은 3개까지 + " 외"(§4.7 "인스턴스 자리" 5번). 없으면 빈 문자열. */
-function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed' | 'component.fillKept' | 'component.reuseKept', names: readonly string[]): string {
+function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed' | 'component.reuseKept', names: readonly string[]): string {
   if (!names.length) return '';
   const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.placeFailedMore') : '');
   return t(key, { n: names.length, names: shown });
-}
-/** " · 기존 컴포넌트 재사용 {n}: {이름들}" — 이름 3개까지 + " 외"(§4.7 "재사용" 8번). 없으면 빈 문자열. */
-function reusedText(names: readonly string[]): string {
-  if (!names.length) return '';
-  const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.reusedMore') : '');
-  return t('component.reused', { n: names.length, names: shown });
 }
 /** " · 제자리에 못 둔 {n}개: {이름들}" */
 function placeFailedText(names: readonly string[]): string {

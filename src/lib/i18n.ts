@@ -66,10 +66,7 @@ export const STRINGS: Record<string, string> = {
   'common.beta': '베타',
   'layer.componentsBetaAria': '컴포넌트 (베타)',
   'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
-  'component.fillKept': ' · 채움·크기가 달라 건너뛴 {n}개: {names}',
   // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
-  'component.reused': ' · 기존 컴포넌트 재사용 {n}: {names}',
-  'component.reusedMore': ' 외',
   'component.reuseKept': ' · 구조가 달라 원본을 둔 {n}개: {names}',
   'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
 
@@ -764,6 +761,7 @@ export const STRINGS: Record<string, string> = {
   'component.badgeReuse': '재사용',
   'component.headMissing': '빈 변형',
   'component.headIssue': '처리 중 문제',
+  'component.headReused': '기존 컴포넌트 재사용',
   // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
   'component.fail.copyPlaced': '인스턴스 대신 복사본을 뒀어요({label} → {name}){causePart}',
   'component.fail.nothingPlaced': '제자리에 아무것도 두지 못했어요({label} → {name}){causePart}',
