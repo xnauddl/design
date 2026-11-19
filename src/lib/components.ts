@@ -1290,6 +1290,8 @@ function exactNameKey(name: string): string {
 export const GENERIC_GROUP_NAMES: ReadonlySet<string> = new Set([
   'container', 'wrapper', 'content', 'frame', 'group', 'section', 'main', 'header', 'footer', 'nav', 'aside',
   'item', 'list', 'image', 'icon', 'background', 'border', 'shape', 'text', 'divider', 'swatch', 'figure',
+  // 6-2 방향 이름(ia-v4 §4.4 "역할 세분화 2차" D — container · wrapper 자리). 내용 이름(C1–C6)은 맥락이 붙어 더하지 않는다.
+  'hstack', 'vstack', 'grid', 'zstack',
 ]);
 
 export function groupByExactName(children: readonly StructNode[]): StructGroup[] {

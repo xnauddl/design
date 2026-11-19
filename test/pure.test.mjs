@@ -282,9 +282,18 @@ test('역할 어휘 — 출력용/인식용 분리, 겹치지 않고 합집합�
 
 test('역할 어휘 — 검출기가 내는 이름은 출력용에 있다(어휘 어긋남 회귀 방지)', () => {
   // resolveRole()이 폴백으로 내는 이름들 — 어휘에서 빠지면 맥락 인식이 조용히 깨진다.
-  for (const r of ['shape', 'container', 'wrapper', 'input', 'thumbnail', 'overlay', 'modal', 'progress', 'indicator', 'status']) {
+  for (const r of ['shape', 'hstack', 'vstack', 'grid', 'zstack', 'profile', 'title-group', 'links', 'pagination', 'icon-group', 'button-group', 'input', 'thumbnail', 'overlay', 'modal', 'progress', 'indicator', 'status']) {
     assert.ok(EMITTED_ROLES.includes(r), `'${r}'이 EMITTED_ROLES에 없다`);
   }
+  // 6-2: container · wrapper는 더는 출력하지 않고 인식만(지난 정리 결과를 읽는 곳이 그대로 안다)
+  for (const r of ['container', 'wrapper']) {
+    assert.ok(!EMITTED_ROLES.includes(r) && RECOGNIZED_ROLES.includes(r), r);
+    assert.equal(pickScope(r), null);
+  }
+  for (const r of ['hstack', 'vstack', 'grid', 'zstack']) assert.equal(pickScope(r), null, r); // 일반 구조어
+  assert.equal(pickScope('header-icon-group'), 'header'); // 두 낱말 세분화 역할은 통째로 뗀다
+  assert.equal(pickScope('card-title-group'), 'card');
+  assert.equal(pickScope('footer-links'), 'footer');
   // aside가 출력 캐논, sidebar는 인식 전용 별칭(둘 다 맥락으로는 인식).
   assert.ok(EMITTED_ROLES.includes('aside'));
   assert.ok(RECOGNIZED_ROLES.includes('sidebar'));

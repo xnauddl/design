@@ -10,7 +10,7 @@
      · 전역 고우선: 오버레이/모달 → progress 안 indicator → field 안 input → 버튼/칩 → nav →
        status/thumbnail → 토큰 말단.
      · FRAME/GROUP/SECTION: progress → card/article → figure → field → list → list/nav-item →
-       영역(landmark) → section → container/wrapper.
+       영역(landmark) → section → 세분화 1차 · 2차(내용 이름) → 방향 이름(hstack · vstack · grid · zstack — 6-2).
      · 그 외 타입/기하: VECTOR=icon, 얇은 막대=divider, 이미지 타원=avatar, 채움=background 등.
      · HTML 랜드마크: 첫→header·마지막→footer·3분할 가운데→main·그 외 페이지 중간→section,
        가로 좁은 컬럼→aside, 가로 링크행→nav, 이미지+캡션→figure, 피드 안 카드형 항목→article
@@ -290,10 +290,13 @@ export function writeRoleFromName(node: SceneNode, name: string): boolean {
   return role && isKnownRole(role) ? writeRole(node, role) : false;
 }
 
-/** 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과. */
-const PASSTHROUGH_ROLES = new Set(['container', 'wrapper']);
-/** 세분화 1차 역할(ia-v4 §4.4 B1–B3) — 이름은 맥락 + 역할, 자식에게는 받은 맥락 통과. */
-const REFINED_PASSTHROUGH = new Set(['row', 'text-group', 'media']);
+/**
+ * 역할 없는 순수 레이아웃 폴백 — 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과.
+ * 6-2(ia-v4 §4.4 "역할 세분화 2차" D): `container` · `wrapper` 대신 방향 이름 — 이름 정리는 container · wrapper를 더는 만들지 않는다.
+ */
+const PASSTHROUGH_ROLES = new Set(['hstack', 'vstack', 'grid', 'zstack']);
+/** 세분화 1차 · 2차 역할(ia-v4 §4.4 B1–B3 · C1–C6) — 이름은 맥락 + 역할, 자식에게는 받은 맥락 통과. */
+const REFINED_PASSTHROUGH = new Set(['row', 'text-group', 'media', 'profile', 'title-group', 'links', 'pagination', 'icon-group', 'button-group']);
 /** 페인트(채움·선)에서 온 색 역할 — 자식 있는 컨테이너의 구조 역할을 덮지 못한다. */
 const PAINT_ROLES = new Set(['background', 'border', 'surface']);
 const hasChildren = (node: SceneNode): boolean => 'children' in node && node.children.length > 0;
@@ -355,7 +358,7 @@ function resolveRole(
         // 빈 컨테이너도 페이지 랜드마크 자리는 차지한다(자리표시 섹션).
         const emptyRegion = regionRole(node, pos, ctxScope, parentRole);
         if (emptyRegion) return emptyRegion;
-        return 'container';
+        return directionRole(node); // 6-2 D(지금 `container` 자리)
       }
       // 시맨틱 컨테이너(보수적): 명확한 패턴만 인정, 아니면 일반 container/wrapper.
       // 이 판정들은 랜드마크(header/footer/aside)보다 먼저다 — 그렇지 않으면 페이지 아래
@@ -373,13 +376,18 @@ function resolveRole(
       const region = regionRole(node, pos, ctxScope, parentRole); // HTML 랜드마크: header/footer/main/aside
       if (region) return region;
       if (isPageSection(pos, ctxScope)) return 'section'; // 역할 없는 페이지 중간 블록
-      // 세분화 1차(B1–B3) — 폴백 자리에서만, FRAME · GROUP만.
+      // 세분화 1차(B1–B3) · 2차(C1–C6, 6-2) — 폴백 자리에서만, FRAME · GROUP만(ia-v4 §4.4 "역할 세분화 2차" 합친 순서).
       if (node.type !== 'SECTION') {
         if (isRowLike(node, kids)) return 'row';
-        if (isTextGroupLike(node, kids)) return 'text-group';
+        if (isProfileLike(kids)) return 'profile';
+        if (isTextGroupLike(node, kids)) return isTitleGroupLike(node, kids) ? 'title-group' : 'text-group';
+        if (isPaginationLike(node, kids)) return 'pagination';
+        if (isLinksLike(node, kids)) return 'links';
         if (isMediaLike(kids)) return 'media';
+        if (isIconGroupLike(node, kids)) return 'icon-group';
+        if (isButtonGroupLike(kids)) return 'button-group';
       }
-      return kids.length === 1 ? 'wrapper' : 'container';
+      return directionRole(node); // 6-2 D — 지금 `kids.length === 1 ? 'wrapper' : 'container'` 자리
     }
     default:
       return kebab(node.type);
@@ -1072,3 +1080,167 @@ function isMediaLike(kids: readonly SceneNode[]): boolean {
   return shown.every((k) => isPhoto(k) || isIconish(k));
 }
 
+/* ---------- 역할 세분화 2차(ia-v4 §4.4 "역할 세분화 2차" C1–C6 · D — 6-2 결정 4 · Q6-2-3) ---------- */
+
+const AVATAR_WORDS = new Set(['avatar', 'profile']);
+const ARROW_TEXTS = new Set(['‹', '›', '<', '>', '«', '»', '←', '→']);
+/** 페이지 번호 사이의 생략 글자(6-2 구현 — 검토 3회차 사소 (b)): `…` · `...`. */
+const ELLIPSIS_TEXTS = new Set(['…', '...']);
+
+const textOf = (t: SceneNode): string => (typeof (t as { characters?: unknown }).characters === 'string' ? (t as TextNode).characters.trim() : '');
+
+/** 원형 사진 — 사진 채움 ELLIPSE, 또는 사진 채움 · 보이는 자식 없음 · 두 변 차 ≤ 1 · ≤ 64 · 반경 ≥ 짧은 변 절반인 RECTANGLE · FRAME. */
+function isRoundPhoto(node: SceneNode): boolean {
+  if (!hasImageFill(node)) return false;
+  if (node.type === 'ELLIPSE') return true;
+  if (node.type !== 'RECTANGLE' && node.type !== 'FRAME') return false;
+  if ('children' in node && node.children.some(isVisible)) return false;
+  const d = dims(node);
+  if (!d || Math.abs(d.w - d.h) > 1 || Math.max(d.w, d.h) > 64) return false;
+  return cornerRadiusOf(node) >= Math.min(d.w, d.h) / 2;
+}
+
+/** 아바타 같은 인스턴스 — 두 변 ≤ 64 · 거의 정사각형(0.8–1.25)인 INSTANCE이고 이름 낱말에 avatar · profile, 또는 자손에 원형 사진. */
+function isAvatarInstance(node: SceneNode): boolean {
+  if (node.type !== 'INSTANCE') return false;
+  const d = dims(node);
+  if (!d || d.w <= 0 || d.h <= 0 || d.w > 64 || d.h > 64) return false;
+  const ratio = d.w / d.h;
+  if (ratio < 0.8 || ratio > 1.25) return false;
+  if (kebab(node.name ?? '').split('-').some((w) => AVATAR_WORDS.has(w))) return true;
+  const hasRound = (x: SceneNode): boolean => 'children' in x && x.children.some((c) => isVisible(c) && (isRoundPhoto(c) || hasRound(c)));
+  return hasRound(node);
+}
+
+/** 아이콘만(C3 · C5) — 아이콘 같은 것이면서 아바타 같은 인스턴스가 아닌 것. */
+function isIconOnly(node: SceneNode): boolean {
+  return isIconish(node) && !isAvatarInstance(node);
+}
+
+/** 화살표 글자 — `‹ › < > « » ← →` 하나뿐인 TEXT. */
+function isArrowText(node: SceneNode): boolean {
+  return node.type === 'TEXT' && ARROW_TEXTS.has(textOf(node));
+}
+
+const isShortText = (k: SceneNode): boolean => k.type === 'TEXT' && shortOneLine(k as unknown as Parameters<typeof shortOneLine>[0]);
+
+/** C1 profile — 보이는 자식 정확히 2개: 원형 사진 · 아바타 같은 인스턴스 하나 + 짧은 한 줄 TEXT(또는 보이는 자식이 모두 TEXT 1–3개인 FRAME · GROUP). */
+function isProfileLike(kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  if (shown.length !== 2) return false;
+  const pic = shown.find((k) => isRoundPhoto(k) || isAvatarInstance(k));
+  if (!pic) return false;
+  const other = shown[0] === pic ? shown[1] : shown[0];
+  if (isShortText(other)) return true;
+  if (other.type !== 'FRAME' && other.type !== 'GROUP') return false;
+  const ts = other.children.filter(isVisible);
+  return ts.length >= 1 && ts.length <= 3 && ts.every((t) => t.type === 'TEXT');
+}
+
+const MIXED = (v: unknown): boolean => typeof v === 'symbol';
+function fontSizeOf(t: SceneNode): number | null {
+  const v = (t as { fontSize?: unknown }).fontSize;
+  return typeof v === 'number' ? v : null;
+}
+function fontWeightOf(t: SceneNode): number | null {
+  const w = (t as { fontWeight?: unknown }).fontWeight;
+  if (typeof w === 'number') return w;
+  if (MIXED(w)) return null;
+  const fn = (t as { fontName?: unknown }).fontName;
+  if (fn && typeof fn === 'object' && typeof (fn as FontName).style === 'string') {
+    const st = (fn as FontName).style.toLowerCase();
+    if (/black|heavy/.test(st)) return 900;
+    if (/extra\s*bold|ultra\s*bold/.test(st)) return 800;
+    if (/semi\s*bold|demi\s*bold/.test(st)) return 600;
+    if (/bold/.test(st)) return 700;
+    return 400;
+  }
+  return MIXED(fn) ? null : 400;
+}
+
+/** C2 title-group — B2를 만족하고 세로로 쌓였고, 맨 위 글자가 제목처럼(1.2배 이상, 또는 같거나 크고 굵기 600 이상인데 나머지가 모두 600 미만). */
+function isTitleGroupLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  if (layoutOf(node) === 'horizontal' || (node as { layoutMode?: string }).layoutMode === 'GRID') return false;
+  const sizes = shown.map(fontSizeOf);
+  const weights = shown.map(fontWeightOf);
+  if (sizes.some((x) => x == null) || weights.some((x) => x == null)) return false; // 섞인 글자(figma.mixed)가 있으면 아님
+  const yOf = (n: SceneNode): number => (typeof (n as { y?: unknown }).y === 'number' ? (n as { y: number }).y : 0);
+  let top = 0;
+  if (layoutOf(node) === 'vertical') top = 0; // 세로 오토레이아웃 — 첫 자식이 맨 위
+  else {
+    top = shown.reduce((best, k, i) => (yOf(k) < yOf(shown[best]) ? i : best), 0);
+    if (shown.some((k, i) => i !== top && sameLine(shown[top], k))) return false;
+  }
+  const ts = sizes[top] as number;
+  const tw = weights[top] as number;
+  const rest = shown.map((_, i) => i).filter((i) => i !== top);
+  if (rest.every((i) => ts >= 1.2 * (sizes[i] as number))) return true;
+  return tw >= 600 && rest.every((i) => ts >= (sizes[i] as number) && (weights[i] as number) < 600);
+}
+
+/**
+ * C3 pagination — 가로로 나란히 · 숫자 글자 2개 이상(또는 `/`가 든 숫자 글자 1개 이상) · 나머지는 아이콘만 · 화살표 글자 ·
+ * 숫자 글자 사이의 생략 글자(`…` · `...` — 구현 메모) · 숫자 글자는 화면 순서(x)로 가운데에 이어지고 아이콘 · 화살표는 양 끝에만.
+ */
+function isPaginationLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  if (shown.length < 2 || !sideBySide(node, shown)) return false;
+  const kind = (k: SceneNode): 'd' | 'l' | 'e' | null => {
+    if (k.type === 'TEXT' && isDigitsText(k) && textOf(k) !== '') return 'd';
+    if (k.type === 'TEXT' && ELLIPSIS_TEXTS.has(textOf(k))) return 'l';
+    if (isArrowText(k) || isIconOnly(k)) return 'e';
+    return null;
+  };
+  const ordered = layoutOf(node) === 'horizontal' ? shown : [...shown].sort((a, b) => xOf(a) - xOf(b));
+  const kinds = ordered.map(kind);
+  if (kinds.some((k) => k == null)) return false;
+  const digits = ordered.filter((_, i) => kinds[i] === 'd');
+  if (!(digits.length >= 2 || digits.some((d) => textOf(d).includes('/')))) return false;
+  // 모양: e* (d|l)+ e* — 가운데 줄은 숫자로 시작하고 끝난다(생략 글자는 숫자 사이에만)
+  const first = kinds.findIndex((k) => k !== 'e');
+  let last = kinds.length - 1;
+  while (last >= 0 && kinds[last] === 'e') last--;
+  if (first < 0 || kinds[first] !== 'd' || kinds[last] !== 'd') return false;
+  for (let i = first; i <= last; i++) if (kinds[i] === 'e') return false;
+  return true;
+}
+
+/** C4 links — 보이는 자식 3개 이상 · 가로로 나란히 · 짧은 한 줄 TEXT · 글자 버튼(A2) · 구분선만, 글자 · 글자 버튼 3개 이상. 숫자 글자가 절반을 넘으면 아님. */
+function isLinksLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  if (shown.length < 3 || !sideBySide(node, shown)) return false;
+  const isDivider = (k: SceneNode): boolean => k.type === 'LINE' || (k.type === 'RECTANGLE' && isThin(k));
+  let words = 0;
+  let digits = 0;
+  for (const k of shown) {
+    if (isShortText(k)) {
+      words++;
+      if (isDigitsText(k)) digits++;
+    } else if (isTextButtonLike(k)) words++;
+    else if (!isDivider(k)) return false;
+  }
+  if (words < 3) return false;
+  return digits * 2 <= words; // 숫자 글자가 절반을 넘으면 페이지 번호 쪽(C3 — 구현 메모)
+}
+
+/** C5 icon-group — 보이는 자식 2개 이상 · 모두 아이콘만 · 가로로 나란히. */
+function isIconGroupLike(node: SceneNode, kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  return shown.length >= 2 && shown.every(isIconOnly) && sideBySide(node, shown);
+}
+
+/** C6 button-group — 보이는 자식 2개 이상 · 모두 버튼(isButtonLike · isTextButtonLike), 방향은 보지 않는다. */
+function isButtonGroupLike(kids: readonly SceneNode[]): boolean {
+  const shown = kids.filter(isVisible);
+  return shown.length >= 2 && shown.every((k) => isButtonLike(k) || isTextButtonLike(k));
+}
+
+/** D 방향 이름 — 가로 오토레이아웃 hstack · 세로 vstack · 격자 grid · 오토레이아웃 없음(GROUP · 레이아웃 없는 FRAME · SECTION) zstack. */
+function directionRole(node: SceneNode): string {
+  const m = (node as { layoutMode?: string }).layoutMode;
+  if (m === 'HORIZONTAL') return 'hstack';
+  if (m === 'VERTICAL') return 'vstack';
+  if (m === 'GRID') return 'grid';
+  return 'zstack';
+}

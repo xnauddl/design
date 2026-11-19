@@ -9,9 +9,11 @@
  * (예외: 이색 노드 타입의 `kebab(node.type)` 폴백)
  */
 export const EMITTED_ROLES = [
-  // 구조 폴백(역할을 못 정했을 때)
-  'container',
-  'wrapper',
+  // 구조 폴백(역할을 못 정했을 때) — 6-2: container · wrapper 대신 방향 이름(ia-v4 §4.4 "역할 세분화 2차" D)
+  'hstack', // 가로 오토레이아웃
+  'vstack', // 세로 오토레이아웃
+  'grid', // 격자 오토레이아웃
+  'zstack', // 오토레이아웃 없음(겹쳐 놓을 수 있는 묶음)
   'shape',
   // HTML 랜드마크
   'header',
@@ -29,6 +31,13 @@ export const EMITTED_ROLES = [
   'row', // 이름표 글자 + 값 한 줄
   'text-group', // 글자만 2개 이상
   'media', // 사진(+ 작은 아이콘)만 담은 상자
+  // 역할 세분화 2차(ia-v4 §4.4 C1–C6, 6-2) — 안에 든 것으로 짓는 이름, 자식에게는 맥락을 통과시킨다
+  'profile', // 원형 사진 · 아바타 + 이름
+  'title-group', // 제목 + 글자 묶음
+  'links', // 가로 글자 링크 3개 이상
+  'pagination', // 페이지 번호
+  'icon-group', // 아이콘만 2개 이상
+  'button-group', // 버튼만 2개 이상
   // 컴포넌트
   'button',
   'chip',
@@ -62,6 +71,9 @@ export const EMITTED_ROLES = [
  * `sheet`/`drawer`/`dialog`/`popup`은 페이지 랜드마크 오검출을 막기 위한 인식 전용.
  */
 export const RECOGNIZED_ROLES = [
+  // 6-2 전 이름 정리가 만들던 구조 폴백 — 지난 결과의 이름을 읽는 곳(아이콘 프레임 ⓐ · pickScope 일반 구조어 · [등록] 일반어)이 그대로 안다
+  'container',
+  'wrapper',
   'content',
   'group',
   'body',
@@ -108,7 +120,9 @@ export function isKnownRole(seg: string): boolean {
 }
 
 /** 세분화 1차 역할(ia-v4 §4.4 B1–B3) — 자식에게 맥락을 통과시키는 이름 전용 역할. */
-const REFINED_ROLES = new Set(['row', 'text-group', 'media']);
+const REFINED_ROLES = new Set(['row', 'text-group', 'media', 'profile', 'title-group', 'links', 'pagination', 'icon-group', 'button-group']);
+/** 두 낱말 세분화 역할(6-2) — `pickScope`가 이름 끝의 이 역할을 통째로 뗀다(앞 낱말 icon · button · title이 맥락으로 읽히지 않게). */
+const REFINED_TWO_WORD = new Set(['title-group', 'icon-group', 'button-group']);
 
 /**
  * 맥락 판정용 역할 낱말인지 — 역할 어휘이되 세분화 1차 역할은 보통 낱말로 본다.
@@ -294,7 +308,7 @@ function isTokenValue(v: string): boolean {
 }
 
 /** 식별력이 없는 일반 구조 어휘 — 맥락 접두사로 쓰지 않는다(container-header 같은 군더더기 방지). */
-const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'content', 'group', 'section', 'body', 'main', 'shape']);
+const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'content', 'group', 'section', 'body', 'main', 'shape', 'hstack', 'vstack', 'grid', 'zstack']);
 
 /**
  * 이름에서 깨끗한 "맥락 1단계"를 뽑는다 — 숫자·단위·hex·일반 구조어를 버리고,
@@ -302,8 +316,10 @@ const GENERIC_ROLES = new Set(['frame', 'container', 'wrapper', 'content', 'grou
  * 예: 'card-header' → 'header' · 'button-primary' → 'button' · 'container' → null · 'wrapper-2' → null.
  */
 export function pickScope(name: string): string | null {
-  const segs = kebab(name)
-    .split('-')
+  let parts = kebab(name).split('-');
+  // 이름 끝의 두 낱말 세분화 역할(`header-icon-group`)은 통째로 뗀다 — 남은 앞부분이 맥락(6-2 구현 메모)
+  if (parts.length >= 2 && REFINED_TWO_WORD.has(parts.slice(-2).join('-'))) parts = parts.slice(0, -2);
+  const segs = parts
     .filter((s) => s && !/^\d+$/.test(s) && !UNIT_WORDS.has(s) && !/^[0-9a-f]{6}$/.test(s) && !GENERIC_ROLES.has(s));
   if (!segs.length) return null;
   const known = segs.filter(isScopeRole);

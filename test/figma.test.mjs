@@ -3,7 +3,7 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickScope as pickScopePure, highConfidenceComponentRole as hcRolePure } from '../dist/pure.mjs';
+import { pickScope as pickScopePure, highConfidenceComponentRole as hcRolePure, GENERIC_GROUP_NAMES as GENERIC_GROUP_NAMES_PURE, groupByExactName as groupByExactNamePure } from '../dist/pure.mjs';
 import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles, nameColorsByHue, resolveGlobalNames, isExtractOnlyColorName } from '../dist/pure.mjs';
 import {
   extractFromSelection,
@@ -2200,7 +2200,7 @@ test('renameSelection — 구 리네임이 남긴 토큰 베낌 이름(color-121
   assert.notEqual(frame.name, 'color-121210');
 });
 
-test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch, 이미지 → image, 빈 → container', async () => {
+test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch, 이미지 → image, 빈 → zstack(6-2 D — 전에는 container)', async () => {
   installFigma();
   const swatch = { type: 'FRAME', id: 's', name: 'Frame 1', fills: [{ type: 'SOLID', visible: true }], children: [] };
   const imageFrame = { type: 'FRAME', id: 'im', name: 'Frame 2', fills: [{ type: 'IMAGE', visible: true }], children: [] };
@@ -2211,7 +2211,7 @@ test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch,
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('s'), 'swatch'); // 색만 채운 빈 프레임 → swatch
   assert.equal(after.get('im'), 'image'); // 이미지 채움 → image
-  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container(맥락 없이 plain)
+  assert.equal(after.get('e'), 'zstack'); // 빈 프레임(오토레이아웃 없음) → zstack(맥락 없이 plain — 6-2 D)
 });
 
 test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아니라 컨테이너', async () => {
@@ -2228,8 +2228,8 @@ test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아�
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('card'), 'container'); // 색+자식 다수, 라운드/그림자 없음 → container(plain)
-  assert.equal(after.get('ci'), 'icon'); // 부모가 일반 container → 맥락 접두사 안 붙임
+  assert.equal(after.get('card'), 'zstack'); // 색+자식 다수, 라운드/그림자 없음 · 오토레이아웃 없음 → zstack(plain — 6-2 D, 전에는 container)
+  assert.equal(after.get('ci'), 'icon'); // 부모가 방향 이름(일반 구조어) → 맥락 접두사 안 붙임
 });
 
 test('renameSelection — 기하 신호: 얇은 막대→divider, 이미지 타원→avatar', async () => {
@@ -2264,7 +2264,7 @@ test('renameSelection — apply:false면 미리보기만(노드 이름 불변)',
   const { changes, applied } = await renameSelection([root], { apply: false, maxDepth: 3 });
   assert.equal(applied, false);
   assert.equal(changes.length, 1);
-  assert.equal(changes[0].after, 'container');
+  assert.equal(changes[0].after, 'zstack'); // 6-2 D
   assert.equal(node.name, 'Frame 1'); // 적용 안 함
 });
 
@@ -2445,8 +2445,8 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
   assert.equal(after.get('logo'), 'header-logo'); // 헤더 첫 자리의 작은 묶음
   assert.equal(after.get('nav'), 'header-nav'); // 헤더 안이면 깊이 3이어도 nav
   assert.equal(after.get('act'), 'header-actions'); // 마지막 자리의 텍스트 2개
-  // 중첩 컨테이너(ctxDepth 2)의 첫·끝 자리는 logo/actions가 아니라 일반 구조어로 남는다.
-  assert.ok(['container', 'wrapper'].includes(after.get('util')), `util → ${after.get('util')}`);
+  // 중첩 컨테이너(ctxDepth 2)의 첫·끝 자리는 logo/actions가 아니다 — 6-2 C6: 자식이 모두 글자 버튼이라 button-group(전에는 container)
+  assert.equal(after.get('util'), 'header-button-group');
   // 글자 1개 + 아이콘인 가로 묶음은 글자 버튼(ia-v4 §4.4 A2 — B.24에서 바뀜, 전에는 container/wrapper)
   assert.equal(after.get('sup'), 'header-button');
   assert.equal(after.get('lang'), 'header-button');
@@ -2722,7 +2722,7 @@ test('renameSelection — 스냅샷 토큰 베낌(line-height-150-percent-px)도
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [frame] };
   const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('f'), 'container'); // percent-px echo → 그대로 두지 않고 container로 정리
+  assert.equal(after.get('f'), 'zstack'); // percent-px echo → 그대로 두지 않고 방향 이름으로 정리(6-2 D)
   assert.notEqual(frame.name, 'line-height-150-percent-px');
 });
 
@@ -8633,4 +8633,195 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   assert.equal(await mainName(root2.children[0]), 'Style=Text');
   assert.equal(root2.children[2].type, 'FRAME');
   assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
+});
+
+/* ---------- 6-2 (ia-v3 A.21 7) — 만들기 → 연결 · 텍스트 스타일 값마다 하나 · 글자 순서 2 ---------- */
+
+test('6-2 — 만들기가 지은 단계 이름을 연결이 재사용한다(만들기 → 연결 순서)', async () => {
+  const figma = installFigma();
+  const t8 = { name: 'spacing/8', category: 'gap', sources: ['gap'], value: 8, uses: [{ name: 'spacing/gap', count: 1 }] };
+  const t16 = { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16, uses: [{ name: 'spacing/gap', count: 3 }] };
+  await createTokens([t8, t16], 16);
+  await createUsageRoles([t8, t16]);
+  const md = findVar(figma, 'Semantic', 'spacing/gap/md');
+  const sm = findVar(figma, 'Semantic', 'spacing/gap/sm');
+  assert.ok(md && sm);
+  const mk = (id, gap) => ({
+    type: 'FRAME', id, name: id, fills: [], layoutMode: 'VERTICAL', itemSpacing: gap, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', setBoundVariable() {},
+  });
+  // 연결 쪽 곳 수는 8이 더 많아도 — 만들기가 지은 이름을 순서 2(가족 재사용)로 쓴다
+  const dry = await bindSelection([mk('a', 8), mk('b', 8), mk('c', 16)], false);
+  assert.equal(dry.candidates.find((c) => c.nodeId === 'a').variableId, sm.id);
+  assert.equal(dry.candidates.find((c) => c.nodeId === 'c').variableId, md.id);
+});
+
+test('6-2 N4 · N5 — 텍스트 스타일 18px 10개 → 글자 크기 Semantic 1개에 모두 연결 · 줄 높이 px 정수는 값의 변수 · Title 이름은 값으로 분류', async () => {
+  const figma = installFigma();
+  const specs = [];
+  for (let i = 0; i < 10; i++) specs.push({ name: `body/large-${i}`, fontSize: 18, lineHeight: i < 6 ? 28 : 24, letterSpacing: 0, family: 'Inter', style: i < 3 ? 'Bold' : 'Regular', count: 1 });
+  specs.push({ name: 'Title/Hero', fontSize: 40, lineHeight: 48, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 1 }); // 첫 마디가 KRDS 분류 아님 → krdsCategory(보통 굵기 40 → heading — T1)
+  const r = await createSemanticTextStyles(specs);
+  assert.deepEqual(r.missing, []);
+  const fs18 = figma._state.variables.filter((v) => v.name.startsWith('font-size/') && findVar(figma, 'Semantic', v.name) === v && /\/large$/.test(v.name));
+  assert.equal(fs18.length, 1);
+  const fs = findVar(figma, 'Semantic', 'font-size/body/large');
+  assert.ok(fs);
+  for (let i = 0; i < 10; i++) assert.equal(figma._state.textStyles.find((s) => s.name === `body/large-${i}`).boundVariables.fontSize.id, fs.id);
+  assert.ok(findVar(figma, 'Semantic', 'font-size/heading/xlarge'), 'Title/Hero 40px → heading/xlarge');
+  // 줄 높이: 28(6곳) = md, 24(4곳) = sm, 48(1곳) = lg
+  const lh = (n) => findVar(figma, 'Semantic', n);
+  assert.equal(figma._state.textStyles.find((s) => s.name === 'body/large-0').boundVariables.lineHeight.id, lh('line-height/md').id);
+  assert.equal(figma._state.textStyles.find((s) => s.name === 'body/large-9').boundVariables.lineHeight.id, lh('line-height/sm').id);
+  assert.equal(figma._state.textStyles.find((s) => s.name === 'Title/Hero').boundVariables.lineHeight.id, lh('line-height/lg').id);
+  assert.equal(figma._state.variables.filter((v) => /^font-size\/body\/large-\d$/.test(v.name)).length, 0, '스타일 이름 변수는 없다');
+});
+
+test('6-2 N5 — 연결의 글자 순서 2는 옛 line-height/body/large-120보다 새 모양 line-height/md를 먼저 · 새 역할 글자 크기는 N4 이름', async () => {
+  const figma = installFigma();
+  await createTokens([
+    { name: 'line-height/24', category: 'lineHeight', sources: ['lineHeight'], value: 24, unit: 'px' },
+    { name: 'font-size/24', category: 'fontSize', sources: ['fontSize'], value: 24 },
+    { name: 'font-size/14', category: 'fontSize', sources: ['fontSize'], value: 14 },
+  ], 16);
+  await createSemanticAliases({ 'line-height/body/large-120': 'line-height/24', 'line-height/md': 'line-height/24' });
+  const t = (id, size, style = 'Regular') => ({
+    type: 'TEXT', id, name: id, characters: 'Hi', fontSize: size, fontName: { family: 'Inter', style },
+    lineHeight: { unit: 'PIXELS', value: 24 }, letterSpacing: { unit: 'PIXELS', value: 0 }, fills: [], boundVariables: {}, setRangeBoundVariable() {},
+  });
+  const dry = await bindSelection([t('a', 24), t('b', 14, 'Bold'), t('c', 14)], false);
+  const of = (id, f) => dry.candidates.find((c) => c.nodeId === id && c.field === f);
+  assert.equal(of('a', 'lineHeight').variableName, 'line-height/md');
+  assert.equal(of('a', 'fontSize').variableName, 'font-size/heading/medium'); // 24px — 크기로 heading(T1)
+  assert.equal(of('b', 'fontSize').variableName, 'font-size/body/small'); // 14px 자리 둘(굵게 1 · 보통 1) — 같으면 body
+});
+
+/* ---------- 6-2 역할 세분화 2차 (ia-v4 §4.4 "역할 세분화 2차" C1–C6 · D — ia-v3 A.21 7) ---------- */
+
+/** card 맥락 아래 노드 하나를 이름 정리하고 그 노드 · 자손의 새 이름을 돌려준다. */
+async function refine2(node) {
+  const r = await inCard(node);
+  return new Map(r.changes.map((c) => [c.id, c.after]));
+}
+const photo = (id, w = 40, h = 40, type = 'ELLIPSE', extra = {}) => ({ type, id, name: 'Ellipse', width: w, height: h, fills: imgFill, ...extra });
+const H = (id, children, extra = {}) => ({ type: 'FRAME', id, name: 'Frame 9', layoutMode: 'HORIZONTAL', width: 200, height: 40, children, ...extra });
+const VF = (id, children, extra = {}) => ({ type: 'FRAME', id, name: 'Frame 9', layoutMode: 'VERTICAL', width: 200, height: 120, children, ...extra });
+const G = (id, children, extra = {}) => ({ type: 'GROUP', id, name: 'Group 9', width: 200, height: 40, children, ...extra });
+const inst = (id, name, w = 24, h = 24, children = []) => ({ type: 'INSTANCE', id, name, width: w, height: h, children });
+/** 같은 줄(y 0, 높이 20)에 x로 나란한 자식들. */
+const row = (kids) => kids.map((k, i) => ({ y: 0, height: 20, x: i * 30, ...k }));
+
+test('6-2 C1 profile — GROUP [원형 사진 + 이름] · FRAME [아바타 인스턴스 + 글자 묶음 프레임] · 사각 아바타는 아님', async () => {
+  installFigma();
+  let m = await refine2(G('x', [photo('p'), T('n', 'Kim')]));
+  assert.equal(m.get('x'), 'card-profile');
+  m = await refine2(H('x', [inst('a', 'Avatar/Large', 56, 56), VF('tx', [T('n', 'Kim'), T('j', 'Designer')], { width: 120, height: 40 })], { height: 64 }));
+  assert.equal(m.get('x'), 'card-profile');
+  // 앞 판정이 먼저: FRAME [원형 사진 + 이름 글자] → figure(isFigureLike)
+  m = await refine2(H('x', [photo('p'), T('n', 'Kim')]));
+  assert.equal(m.get('x'), 'card-figure');
+  // 아닌 예: 가로 오토레이아웃의 사각 아바타(반경 없음) + 이름 → hstack
+  m = await refine2(H('x', [{ type: 'RECTANGLE', id: 'sq', name: 'r', width: 40, height: 40, fills: vis }, T('n', 'Kim')], { width: 300 }));
+  assert.equal(m.get('x'), 'hstack');
+  // 아닌 예: 오토레이아웃 FRAME [아바타 인스턴스 40 + 이름 글자] → A2 글자 버튼이 먼저(한계)
+  m = await refine2(H('x', [inst('a', 'avatar', 40, 40), T('n', 'Kim')]));
+  assert.equal(m.get('x'), 'card-button');
+});
+
+test('6-2 C2 title-group — 세로 [제목 32 Bold + 본문 16] · 작은 라벨 위 큰 제목은 text-group · 섞인 글자는 text-group · 되읽기', async () => {
+  installFigma();
+  let m = await refine2(VF('x', [T('t', 'Title', { fontSize: 32, fontWeight: 700 }), T('b', 'Body text', { fontSize: 16, fontWeight: 400 })]));
+  assert.equal(m.get('x'), 'card-title-group');
+  m = await refine2(VF('x', [T('t', 'Title', { fontSize: 16, fontWeight: 700 }), T('b', 'Body', { fontSize: 16, fontWeight: 400 })]));
+  assert.equal(m.get('x'), 'card-title-group', '같은 크기 · 굵기 600 이상 vs 나머지 600 미만');
+  m = await refine2(VF('x', [T('l', 'LABEL', { fontSize: 12 }), T('t', 'Big title', { fontSize: 32, fontWeight: 700 })]));
+  assert.equal(m.get('x'), 'card-text-group', '제목이 맨 위가 아님(한계)');
+  m = await refine2(VF('x', [T('t', 'Title', { fontSize: Symbol('mixed') }), T('b', 'Body', { fontSize: 16 })]));
+  assert.equal(m.get('x'), 'card-text-group', '섞인 글자 크기');
+  // 오토레이아웃이 아니면 맨 위 글자(y 최소)가 다른 글자와 겹치지 않아야
+  m = await refine2(G('x', [T('b', 'Body', { fontSize: 16, y: 40, height: 20 }), T('t', 'Title', { fontSize: 32, y: 0, height: 36 })], { height: 60 }));
+  assert.equal(m.get('x'), 'card-title-group');
+  const n = withPd({ type: 'FRAME', id: 'n', name: 'x' });
+  writeRoleFromName(n, 'card-title-group');
+  assert.equal(n._pd.get('dsRole'), 'title-group');
+  writeRoleFromName(n, 'header-icon-group');
+  assert.equal(n._pd.get('dsRole'), 'icon-group');
+});
+
+test('6-2 C3 pagination — [‹ 01 / 03 ›] · [1 2 3 4] · [1 2 3 … 10] · [01 / 03 + 화살표 아이콘 둘](GROUP) · 좋아요 줄은 hstack · 오토레이아웃 글자 하나 + 화살표는 button', async () => {
+  installFigma();
+  let m = await refine2(G('x', row([T('a', '‹'), T('b', '01'), T('c', '/'), T('d', '03'), T('e', '›')])));
+  assert.equal(m.get('x'), 'card-pagination');
+  m = await refine2(H('x', [T('a', '1'), T('b', '2'), T('c', '3'), T('d', '4')]));
+  assert.equal(m.get('x'), 'card-pagination');
+  m = await refine2(H('x', [T('a', '1'), T('b', '2'), T('c', '3'), T('l', '…'), T('d', '10')]));
+  assert.equal(m.get('x'), 'card-pagination', '숫자 사이 생략 글자(…)');
+  m = await refine2(H('x', [T('a', '1'), T('b', '2'), T('l', '...'), T('d', '9')]));
+  assert.equal(m.get('x'), 'card-pagination', '생략 글자(...)');
+  m = await refine2(G('x', row([V('l'), T('t', '01 / 03'), V('r')])));
+  assert.equal(m.get('x'), 'card-pagination');
+  // 아닌 예: 가로 오토레이아웃 [♥ 아이콘 · 12 · 💬 아이콘 · 34] → 숫자 사이에 아이콘 → hstack
+  m = await refine2(H('x', [V('h'), T('a', '12'), V('c'), T('b', '34')], { width: 300 }));
+  assert.equal(m.get('x'), 'hstack');
+  // 생략 글자가 끝이면 아님(가운데 줄은 숫자로 시작 · 끝)
+  m = await refine2(H('x', [T('l', '…'), T('a', '4'), T('b', '5')], { width: 300 }));
+  assert.notEqual(m.get('x'), 'card-pagination');
+  // 앞 판정이 먼저: 오토레이아웃 FRAME [01 / 03 + 화살표 아이콘 둘] → A2 button
+  m = await refine2(H('x', [V('l'), T('t', '01 / 03'), V('r')]));
+  assert.equal(m.get('x'), 'card-button');
+  // GROUP [♥ 12] → zstack(숫자 글자 1개 · `/` 없음)
+  m = await refine2(G('x', row([V('h'), T('a', '12')])));
+  assert.equal(m.get('x'), 'zstack');
+});
+
+test('6-2 C4 links — 푸터 [이용약관 | 개인정보 | 고객센터] · 링크 2개는 hstack · 숫자 글자가 절반을 넘으면 아님', async () => {
+  installFigma();
+  const bar = (id) => ({ type: 'RECTANGLE', id, name: 'r', width: 1, height: 12, fills: vis });
+  let m = await refine2(H('x', [T('a', '이용약관'), bar('d1'), T('b', '개인정보'), bar('d2'), T('c', '고객센터')], { width: 400 }));
+  assert.equal(m.get('x'), 'card-links');
+  // 링크 2개: 글자 둘이면 1차 B2(text-group)가 먼저 — 명세 "아닌 예"의 hstack은 B2가 먼저라 text-group(구현 메모)
+  m = await refine2(H('x', [T('a', '이용약관'), T('b', '개인정보')], { width: 400, height: 70 })); // 높이 64 초과 — B1 row가 아닌 자리
+  assert.equal(m.get('x'), 'card-text-group', '링크 2개 — C4 아님');
+  m = await refine2(H('x', [T('a', '1'), T('b', '2'), T('c', 'Next'), T('d', '3')], { width: 400 }));
+  assert.notEqual(m.get('x'), 'card-links', '숫자 글자 3/4');
+});
+
+test('6-2 C5 icon-group · C6 button-group — 헤더 아이콘 셋 · [취소 · 확인] · 아바타 + 아이콘 인스턴스는 hstack · 아이콘 + 글자는 hstack', async () => {
+  installFigma();
+  let m = await refine2(H('x', [inst('s', 'search'), V('c'), inst('m', 'menu', 20, 20)], { width: 120, height: 24 })); // 같은 모양 셋이면 list가 먼저
+  assert.equal(m.get('x'), 'card-icon-group');
+  const btn = (id, ch) => ({ type: 'FRAME', id, name: 'Frame', layoutMode: 'HORIZONTAL', cornerRadius: 8, height: 40, width: 80, fills: vis, children: [T(`${id}t`, ch)] });
+  m = await refine2(VF('x', [btn('b1', '취소'), btn('b2', '확인')]));
+  assert.equal(m.get('x'), 'card-button-group');
+  m = await refine2(H('x', [inst('a', 'avatar', 32, 32), inst('i', 'more', 24, 24)], { width: 120 }));
+  assert.equal(m.get('x'), 'hstack', '아바타 인스턴스는 아이콘만이 아니다');
+  m = await refine2(H('x', [V('i'), T('t', 'Label'), T('u', 'More label')], { width: 300, height: 100 }));
+  assert.equal(m.get('x'), 'hstack');
+});
+
+test('6-2 D — 방향 이름 hstack · vstack · grid · zstack(자식 1개 · 없음도), 자손 이름 · 맥락은 그대로(passthrough), SECTION은 D만', async () => {
+  installFigma();
+  const deep = () => ({ type: 'FRAME', id: 'in', name: 'Frame 3', cornerRadius: 4, fills: vis, width: 80, height: 80, children: [V('iv'), V('iv2')] });
+  let m = await refine2(H('x', [deep(), T('t2', 'a long body text that is longer than limit of short')], { width: 400, height: 200 }));
+  assert.equal(m.get('x'), 'hstack');
+  assert.equal(m.get('in'), 'card-icon', '자손은 card 맥락을 그대로 받는다(지금 container일 때와 같음)');
+  m = await refine2(VF('x', [deep()]));
+  assert.equal(m.get('x'), 'vstack', '자식 1개(전에는 wrapper)');
+  m = await refine2({ type: 'FRAME', id: 'x', name: 'Frame 9', layoutMode: 'GRID', width: 200, height: 200, children: [deep(), { ...deep(), id: 'in2' }] });
+  assert.equal(m.get('x'), 'grid');
+  const box = (id, x, y) => ({ type: 'FRAME', id, name: 'Frame', x, y, width: 80, height: 80, fills: [], children: [T(`${id}t`, 'a long body text that is longer than limit of short')] });
+  m = await refine2({ type: 'FRAME', id: 'x', name: 'Frame 9', layoutMode: 'NONE', width: 200, height: 200, children: [box('b1', 0, 0), box('b2', 20, 20)] });
+  assert.equal(m.get('x'), 'zstack', '오토레이아웃 없는 겹친 묶음');
+  m = await refine2({ type: 'FRAME', id: 'x', name: 'Frame 9', layoutMode: 'HORIZONTAL', width: 200, height: 40, children: [] });
+  assert.equal(m.get('x'), 'hstack', '자식 없음(전에는 container)');
+  m = await refine2({ type: 'SECTION', id: 'x', name: 'Section 1', width: 400, height: 400, children: [G('g', [photo('p'), T('n', 'Kim')])] });
+  assert.equal(m.get('x'), 'zstack', 'SECTION은 내용 판정 없이 D');
+  assert.equal(m.get('g'), 'card-profile');
+});
+
+test('6-2 — [등록] 같은 이름 묶기는 방향 이름도 일반어로 건너뛴다 · 세트 이름 폴백은 후보 이름만 본다', () => {
+  for (const n of ['hstack', 'vstack', 'grid', 'zstack', 'container', 'wrapper']) assert.ok(GENERIC_GROUP_NAMES_PURE.has(n), n);
+  assert.ok(!GENERIC_GROUP_NAMES_PURE.has('card-profile'));
+  const groups = groupByExactNamePure([{ id: 'a', name: 'hstack', type: 'FRAME', children: [] }, { id: 'b', name: 'hstack', type: 'FRAME', children: [] }]);
+  assert.equal(groups.length, 0);
 });
