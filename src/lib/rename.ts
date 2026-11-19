@@ -233,7 +233,7 @@ async function decide(
   // 역할 판정보다 먼저 구한다 — field→input, card→thumbnail처럼 맥락이 역할을 가르는 경우가 있다.
   const ctxScope = (ancestorName ? pickScope(ancestorName) : null) ?? (token?.context ? pickScope(token.context) : null);
   const role = resolveRole(node, token, pos, parentRole, ctxScope);
-  // 이름 힌트(ia-v4 §4.4 · B.26) — 머리 낱말이 역할 낱말이고 구조 판정이 약하거나 같으면 이름 그대로, 역할만 기록.
+  // 이름 힌트(ia-v4 §4.4 · B.28) — 머리 낱말이 역할 낱말이고 구조 판정이 약하거나 같으면 이름 그대로, 역할만 기록.
   // FRAME · GROUP · SECTION만(아이콘 프레임은 A1 규칙 그대로). 자식에게는 부모 역할 = 힌트 역할 · 맥락 = 역할 낱말.
   if (isContainerType(node) && !isIconFrameNode(node)) {
     const h = hintRole(node, pos.rootPrefix);
@@ -1036,7 +1036,7 @@ function namedByPlugin(name: string, role: string, rootPrefix: string | null): b
   return head.every((t, i) => EMITTED.has(t) || (i === 0 && rootPrefix != null && t === rootPrefix));
 }
 
-/* ---------- 이름 힌트(ia-v4 §4.4 "이름 힌트" · B.26) ---------- */
+/* ---------- 이름 힌트(ia-v4 §4.4 "이름 힌트" · B.28) ---------- */
 /** 영어 힌트 낱말 → 힌트 역할. */
 const HINT_EN: Readonly<Record<string, string>> = {
   gnb: 'nav', lnb: 'nav', snb: 'nav', nav: 'nav', navigation: 'nav', navbar: 'nav', menubar: 'nav',

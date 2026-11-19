@@ -8006,7 +8006,7 @@ test('B.24 ② 글자 버튼 — 숨긴 앞뒤 아이콘 + 글자 1개 → butto
     T(`${id}-t`, ch),
     { type: 'FRAME', id: `${id}-r`, name: 'arro_right', visible: false, width: 20, height: 20, children: [V(`${id}-rv`)] },
   ] });
-  // 픽스처 이름이 `button`(힌트 낱말)이라 이름은 그대로 두고 역할 button만 기록한다(B.26 이름 힌트 — 전에는 card-button)
+  // 픽스처 이름이 `button`(힌트 낱말)이라 이름은 그대로 두고 역할 button만 기록한다(B.28 이름 힌트 — 전에는 card-button)
   const roleOf = (r, id) => r.nodes.find((n) => n.id === id)?.role;
   let r = await inCard(btn('b'));
   assert.ok(!r.changes.some((c) => c.id === 'b'));
@@ -8017,7 +8017,7 @@ test('B.24 ② 글자 버튼 — 숨긴 앞뒤 아이콘 + 글자 1개 → butto
   r = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [list] }], { apply: false, maxDepth: 5 });
   // 깊이 1 가로 글자 칸 줄은 지금 규칙상 nav일 수 있다 — 어느 쪽이든 직속은 item(A2를 쓰지 않음)
   assert.ok(['list', 'nav'].includes(r.changes.find((c) => c.id === 'list')?.after));
-  // 직속 판정은 item(A2를 쓰지 않음) — 약한 판정이라 이름 힌트 button이 덮어 이름 그대로(B.26 — 전에는 list/nav-item)
+  // 직속 판정은 item(A2를 쓰지 않음) — 약한 판정이라 이름 힌트 button이 덮어 이름 그대로(B.28 — 전에는 list/nav-item)
   assert.ok(!r.changes.some((c) => c.id === 'x1'));
   assert.equal(roleOf(r, 'x1'), 'button');
   // 모바일 화면 깊이 1 상단 바
@@ -8058,7 +8058,7 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   const r3 = await inCard(app);
   const a3 = new Map(r3.changes.map((c) => [c.id, c.after]));
   assert.ok(!String(a3.get('app')).endsWith('field'), a3.get('app'));
-  // 이름 `button` + 글자 버튼 판정 button → 이름 그대로(B.26 이름 힌트 r === h — 전에는 card-button)
+  // 이름 `button` + 글자 버튼 판정 button → 이름 그대로(B.28 이름 힌트 r === h — 전에는 card-button)
   assert.ok(!a3.has('ab'));
   assert.equal(r3.nodes.find((n) => n.id === 'ab')?.role, 'button');
   assert.notEqual(hcRolePure(app), 'field');
@@ -8777,7 +8777,7 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
 });
 
-/* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.26, 2026-11-19) ---------- */
+/* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.28, 2026-11-19) ---------- */
 const solidFill = [{ type: 'SOLID', visible: true, color: { r: 0.9, g: 0.9, b: 0.9 } }];
 /** 실기 파일(`PC_상품상세_FOCAL 유토피아`) 구조 — 헤더 > gnb, Breadcrumb, Product tabs, 본문, 바닥글. */
 function focalPage() {
@@ -8816,7 +8816,7 @@ function focalPage() {
   return page;
 }
 
-test('B.26 실기 파일 구조 — 힌트 낱말 이름은 그대로 · 역할만 기록, 두 번 정리해도 같다', async () => {
+test('B.28 실기 파일 구조 — 힌트 낱말 이름은 그대로 · 역할만 기록, 두 번 정리해도 같다', async () => {
   installFigma();
   const page = focalPage();
   const byId = new Map();
@@ -8853,7 +8853,7 @@ test('B.26 실기 파일 구조 — 힌트 낱말 이름은 그대로 · 역할�
   }
 });
 
-test('B.26 머리 낱말 찾기 — 영어 맨 뒤 낱말 · 중립 꼬리 · 한글 맨 뒤 토막', () => {
+test('B.28 머리 낱말 찾기 — 영어 맨 뒤 낱말 · 중립 꼬리 · 한글 맨 뒤 토막', () => {
   const cases = {
     gnb: 'nav', 'special-nav': 'nav', 'gnb-menu': 'nav', 'gnb-area': 'nav', 'Product tabs': 'tabs', '상품상세 tab': 'tab',
     'Specification divider': 'divider', Breadcrumb: 'breadcrumb', Button: 'button', 'Button 2': 'button', CTA: 'button',
@@ -8866,7 +8866,7 @@ test('B.26 머리 낱말 찾기 — 영어 맨 뒤 낱말 · 중립 꼬리 · �
   for (const [name, want] of Object.entries(cases)) assert.equal(nameHintRole(name), want, name);
 });
 
-test('B.26 약한 판정 자리에서만 덮기 · 이 플러그인이 지은 이름 · 아이콘 프레임 · 선택 루트', async () => {
+test('B.28 약한 판정 자리에서만 덮기 · 이 플러그인이 지은 이름 · 아이콘 프레임 · 선택 루트', async () => {
   installFigma();
   // 글자 2개 자유 배치(text-group 자리) — 힌트가 있으면 이름 그대로
   const tg = (name, pd) => withPd({ type: 'FRAME', id: 'n', name, width: 200, height: 60, children: [T('a', 'A', { y: 0 }), T('b', 'B', { y: 30 })] }, pd);
@@ -8904,7 +8904,7 @@ test('B.26 약한 판정 자리에서만 덮기 · 이 플러그인이 지은 �
   assert.ok(!r.changes.some((c) => c.id === 'pdv'));
 });
 
-test('B.26 이름을 둘 때 dsNameKey — 맞는 키는 남기고(트리 노드에도 실음) 안 맞으면 지운다', async () => {
+test('B.28 이름을 둘 때 dsNameKey — 맞는 키는 남기고(트리 노드에도 실음) 안 맞으면 지운다', async () => {
   installFigma();
   const mk = (key) => withPd({ type: 'FRAME', id: 'nv', name: 'nav', width: 300, height: 40, children: [T('a', 'A', { y: 0 }), T('b', 'B', { y: 20 })] }, { dsRole: 'nav', dsNameKey: key });
   let nv = mk('focal-nav');
@@ -8919,7 +8919,7 @@ test('B.26 이름을 둘 때 dsNameKey — 맞는 키는 남기고(트리 노드
   assert.equal(r.nodes.find((n) => n.id === 'nv').nameKey, undefined);
 });
 
-test('B.26 보강 — 자식 없는 얇은 색 프레임은 divider · 두꺼운 띠는 swatch · 탭 맥락의 얇은 띠는 indicator', async () => {
+test('B.28 보강 — 자식 없는 얇은 색 프레임은 divider · 두꺼운 띠는 swatch · 탭 맥락의 얇은 띠는 indicator', async () => {
   installFigma();
   const strip = (id, w, h, type = 'FRAME') => ({ type, id, name: type === 'FRAME' ? 'Frame 3' : 'Rectangle 4', width: w, height: h, fills: solidFill, ...(type === 'FRAME' ? { children: [] } : {}) });
   let r = await inCard(strip('s1', 1280, 1), [strip('s2', 1920, 76), strip('s3', 200, 4), { ...strip('s4', 300, 2), fills: imgFill }]);
