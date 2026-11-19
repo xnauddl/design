@@ -2841,6 +2841,12 @@ window.onmessage = (event: MessageEvent) => {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
       if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       if (msg.op === 'UPDATE_VARIABLE') break;
+      // 사용 수 읽기 실패 — 진행 중 표시를 풀어 다음 읽기 · 창 다시 들어옴 다시 읽기가 막히지 않게(#110 검토 ②). 알림은 아래 공통 상태 줄 그대로.
+      if (msg.op === 'SCAN_USAGE' && msg.reqId != null) {
+        // 같은 기준에서는 저절로 다시 보내지 않는다 — 실패가 이어지면 창에 들어올 때마다 같은 경고가 뜬다. [읽기] · 작업 직후 · 기준이 바뀌면 다시.
+        if (msg.reqId === vmUsageReq) { vmUsageInFlight = false; usageFailedFor = baseKey(); reentry.release(); }
+        if (msg.reqId === layerLibReq) { layerLibReq = 0; layerLibUse = false; } // 판정 못 함 = 라이브러리 안 씀으로 두고 새 선택에서 다시 읽는다
+      }
       if (onUnusedError(msg)) break;
       if (onVarOpError(msg)) break;
       if (msg.op === 'PREVIEW_TEXT_STYLES') {
@@ -4963,6 +4969,12 @@ function dismissStickyOnAction(e: Event): void {
   if (e.type === 'keydown') {
     const k = (e as KeyboardEvent).key;
     if (k === 'Tab' || k.startsWith('Arrow') || k === 'Shift' || k === 'Home' || k === 'End' || k === 'PageUp' || k === 'PageDown' || k === 'Escape') return;
+    // ⌘ · Ctrl · Alt(조합 키 시작 · 창 전환)은 조작이 아니다 — 누를 수 있는 메시지를 지우지 않는다(#110 검토 ⑤).
+    const ke = e as KeyboardEvent;
+    if (k === 'Control' || k === 'Meta' || k === 'Alt' || k === 'AltGraph') return;
+    // 조합 키와 함께여도 조작인 것: Enter(⌘ · Ctrl+Enter 실행) · Option · AltGr로 친 글자(AltGr은 Ctrl+Alt로 온다).
+    const altText = k.length === 1 && ke.altKey && !ke.metaKey;
+    if (k !== 'Enter' && !altText && (ke.ctrlKey || ke.metaKey || ke.altKey)) return;
   }
   clearStatusLine();
 }
@@ -5891,6 +5903,8 @@ let deletedUse: { count: number; nodeIds: string[] } = { count: 0, nodeIds: [] }
 let vmUsageReq = 0;
 /** 사용 수 조회가 응답을 기다리는 중 — 겹쳐 보내지 않고, 창 다시 들어옴은 보류한다. */
 let vmUsageInFlight = false;
+/** 사용 수 읽기가 실패한 목록 기준(baseKey) — 같은 기준의 조용한 다시 읽기는 보내지 않는다. */
+let usageFailedFor: string | null = null;
 let vmUsageSig = '';
 
 interface SelInfo { ids: string[]; count: number; scanned: number; name: string }
@@ -6011,6 +6025,8 @@ function requestManagerUsage(why: 'quiet' | 'work' | 'selection' | 'user' = 'qui
     return;
   }
   if (vmUsageInFlight && why !== 'user') return; // 같은 종류의 직전 요청이 아직 끝나지 않았다(보류)
+  if ((why === 'quiet' || why === 'selection') && usageFailedFor === baseKey()) return; // 이 기준에서 실패했다 — 저절로 되풀이하지 않는다(#158 검토)
+  usageFailedFor = null;
   vmUsageReq = ++bindReqSeq;
   vmUsageInFlight = true;
   send({ type: 'SCAN_USAGE', reqId: vmUsageReq, nodeIds: baseline.ids });

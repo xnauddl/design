@@ -2888,6 +2888,64 @@ async function fillBoth(p) {
   await p.close();
 }
 
+{
+  /* ---------- 29 #110 검토 ② · ⑤(#158) — 사용 수 읽기 오류 · 조합 키와 상태 줄 버튼 ---------- */
+  const p = await open(480, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, sel(1, 0));
+  await p.waitForTimeout(450);
+  const u1 = (await sent(p, 'SCAN_USAGE')).at(-1);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'SCAN_USAGE', reqId: u1.reqId });
+  const n1 = (await sent(p, 'SCAN_USAGE')).length;
+  await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await p.waitForTimeout(600);
+  const n2 = (await sent(p, 'SCAN_USAGE')).length;
+  check('29 사용 수 읽기 오류 뒤 같은 기준 — 창 다시 들어옴으로 되풀이하지 않음(경고가 되풀이되지 않게)', n2 === n1, `${n1} → ${n2}`);
+  await recv(p, { ...sel(1, 0), ids: ['z9'] });
+  await p.waitForTimeout(450);
+  const n3 = (await sent(p, 'SCAN_USAGE')).length;
+  check('29 새 선택이면 사용 수를 다시 읽음(진행 중 표시가 풀림)', n3 > n2, `${n2} → ${n3}`);
+  // 변수 탭 — 오류 뒤에도 창 다시 들어옴 다시 읽기가 보류되지 않는다(전에는 진행 중 표시가 남아 멈췄다).
+  await goTab(p, 'variables');
+  await p.waitForTimeout(100);
+  await recv(p, { type: 'ERROR', message: 'boom', op: 'SCAN_USAGE', reqId: (await sent(p, 'SCAN_USAGE')).at(-1).reqId });
+  const v1 = (await sent(p, 'GET_VAR_TABLE')).length;
+  await p.waitForTimeout(2100);
+  await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await p.waitForTimeout(600);
+  const v2 = (await sent(p, 'GET_VAR_TABLE')).length;
+  check('29 변수 탭 — 사용 수 읽기 오류 뒤에도 창 다시 들어옴 다시 읽기(변수 표)가 나감', v2 > v1, `${v1} → ${v2}`);
+  // 누를 수 있는 메시지([라이선스 →]) — 유료 거절 응답 경로
+  const paid = () => recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
+  const actionShown = () => p.$eval('#statusAction', (b) => !b.hidden);
+  await paid();
+  await p.waitForTimeout(30);
+  const shown = await actionShown();
+  await p.keyboard.down('Meta');
+  await p.keyboard.up('Meta');
+  await p.keyboard.down('Control');
+  await p.keyboard.press('c');
+  await p.keyboard.up('Control');
+  await p.waitForTimeout(30);
+  check('29 ⌘ · Ctrl · Ctrl+C만으로는 상태 줄 [라이선스 →]가 남음', shown && (await actionShown()), String(shown));
+  await p.keyboard.down('Control');
+  await p.keyboard.down('Alt');
+  await p.keyboard.press('q');
+  await p.keyboard.up('Alt');
+  await p.keyboard.up('Control');
+  await p.waitForTimeout(30);
+  check('29 AltGr(Ctrl+Alt)로 친 글자는 조작 — 메시지를 지움', !(await actionShown()));
+  await paid();
+  await p.waitForTimeout(30);
+  await p.keyboard.down('Meta');
+  await p.keyboard.press('Enter');
+  await p.keyboard.up('Meta');
+  await p.waitForTimeout(30);
+  check('29 ⌘+Enter(실행)는 조작 — 메시지를 지움', !(await actionShown()));
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);

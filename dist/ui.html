@@ -6648,6 +6648,17 @@
       case "ERROR": {
         if (msg.op === "UPDATE_VARIABLE" || msg.op === "GET_VAR_TABLE") edMaybeSaved();
         if (msg.op === "UPDATE_VARIABLE") break;
+        if (msg.op === "SCAN_USAGE" && msg.reqId != null) {
+          if (msg.reqId === vmUsageReq) {
+            vmUsageInFlight = false;
+            usageFailedFor = baseKey();
+            reentry.release();
+          }
+          if (msg.reqId === layerLibReq) {
+            layerLibReq = 0;
+            layerLibUse = false;
+          }
+        }
         if (onUnusedError(msg)) break;
         if (onVarOpError(msg)) break;
         if (msg.op === "PREVIEW_TEXT_STYLES") {
@@ -8724,6 +8735,10 @@ ${opts.tip}` : text;
     if (e.type === "keydown") {
       const k = e.key;
       if (k === "Tab" || k.startsWith("Arrow") || k === "Shift" || k === "Home" || k === "End" || k === "PageUp" || k === "PageDown" || k === "Escape") return;
+      const ke = e;
+      if (k === "Control" || k === "Meta" || k === "Alt" || k === "AltGraph") return;
+      const altText = k.length === 1 && ke.altKey && !ke.metaKey;
+      if (k !== "Enter" && !altText && (ke.ctrlKey || ke.metaKey || ke.altKey)) return;
     }
     clearStatusLine();
   }
@@ -9650,6 +9665,7 @@ ${opts.tip}` : text;
   var deletedUse = { count: 0, nodeIds: [] };
   var vmUsageReq = 0;
   var vmUsageInFlight = false;
+  var usageFailedFor = null;
   var vmUsageSig = "";
   var curSel = { ids: [], count: 0, scanned: 0, name: "" };
   var baseline = null;
@@ -9781,6 +9797,8 @@ ${opts.tip}` : text;
       return;
     }
     if (vmUsageInFlight && why !== "user") return;
+    if ((why === "quiet" || why === "selection") && usageFailedFor === baseKey()) return;
+    usageFailedFor = null;
     vmUsageReq = ++bindReqSeq;
     vmUsageInFlight = true;
     send({ type: "SCAN_USAGE", reqId: vmUsageReq, nodeIds: baseline.ids });
