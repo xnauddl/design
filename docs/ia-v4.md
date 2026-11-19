@@ -943,37 +943,49 @@
 
 **이름 힌트 — 역할 낱말이 든 이름은 그대로 둔다 (2026-11-19 사용자 결정 B · "B + 보강 하나" — test 파일 `PC_상품상세_FOCAL 유토피아` 실기, 체크 B.26)**
 - **까닭(실기 관찰):** 원본의 `gnb`가 `container`로, `Breadcrumb` · `Product tabs`가 `section`으로, 탭 칸이 `container` · `wrapper`로, `Divider` 프레임이 `swatch`로 바뀌었다. 구조 판정은 이 노드들을 정하지 못했는데(자유 배치 · 자식 2개 · 자식 없는 색 띠), 이름이 이미 역할을 말하고 있었다.
-- **원칙의 예외(2026-11-18 "사람이 지은 이름도 덮음"을 좁힘):** 아래 **힌트 낱말**이 이름에 있고 구조 판정이 그와 어긋나지 않으면 **이름을 그대로 두고 역할만 기록한다**(A1 아이콘 모양 이름과 같은 방식 — `keepName`). 그 밖은 지금처럼 역할 이름으로 바꾼다.
+- **원칙의 예외(2026-11-18 "사람이 지은 이름도 덮음"을 좁힘):** 이름의 **머리 낱말**이 아래 힌트 낱말이고 구조 판정이 그와 어긋나지 않으면 **이름을 그대로 두고 역할만 기록한다**(A1 아이콘 모양 이름과 같은 방식 — `keepName`). 그 밖은 지금처럼 역할 이름으로 바꾼다.
 - **대상:** FRAME · GROUP · SECTION만(선택 루트 · 컴포넌트 · 인스턴스 · 글자 · 잠긴 레이어 · 아이콘 프레임은 지금 규칙 그대로 — 힌트를 보지 않는다).
 - **힌트 낱말 표(사용자 결정 "영어 + 한글"):**
 
-| 힌트 역할 | 영어 낱말(kebab 낱말과 정확히 같음) | 한글 낱말(원래 이름 안에 들어 있음) |
+| 힌트 역할 | 영어 낱말 | 한글 낱말 |
 |---|---|---|
-| `nav` | `gnb` · `lnb` · `snb` · `nav` · `navigation` · `navbar` · `menubar` | `내비` · `네비` |
+| `nav` | `gnb` · `lnb` · `snb` · `nav` · `navigation` · `navbar` · `menubar` | `내비` · `네비` · `네비게이션` · `내비게이션` |
 | `breadcrumb` | `breadcrumb` · `breadcrumbs` | `경로` |
-| `tabs` | `tabs` · `tabbar` · `tablist` | `탭메뉴` |
-| `tab` | `tab` | `탭`(`탭메뉴`가 아닌 자리) |
+| `tabs` | `tabs` · `tabbar` · `tablist` · `tabmenu` · `tabgroup` | `탭메뉴` |
+| `tab` | `tab` | `탭` |
 | `divider` | `divider` · `separator` | `구분선` |
 | `button` | `button` · `btn` · `cta` | `버튼` |
 
-  - 영어: 이름을 `kebab`으로 나눈 낱말 하나가 표의 낱말과 정확히 같아야 한다(`gnb-menu` → `gnb` ✓, `navigator` ✗, `tabular` ✗). `menu` 단독은 낱말이 아니다(`category-menu` 같은 햄버거 단추가 `nav`가 되지 않게 — 사용자 결정).
-  - 한글: `kebab`이 한글을 지우므로 원래 이름에서 찾는다(부분 문자열). `탭메뉴`를 `탭`보다 먼저 본다.
-  - 여러 낱말이 맞으면 **원래 이름에서 가장 뒤에 있는 것**(머리명사 — `tab-button` → `button`, `gnb-menu` → `nav`).
-- **이 플러그인이 전에 지은 이름은 힌트가 아니다:** A1 "뜻 없는 이름 ②ⓑ"와 같은 판정(레이어에 `dsRole`이 있고, 이름 낱말이 `dsRole` 낱말로 끝나며, 앞 낱말이 모두 출력 역할이거나 맨 앞 한 낱말만 루트 접두사)에 걸리면 힌트를 보지 않는다 — 그래야 한 번 정리한 `nav-item`(`dsRole` `item`)이 다시 정리할 때 `nav`로 바뀌지 않는다. 구조 폴백 이름(`container` 등)에는 힌트 낱말이 없다.
+- **머리 낱말 찾기(이름의 맨 뒤 낱말로 정한다 — 앞 낱말은 꾸밈말):**
+  1. 영어: 이름을 `kebab`으로 나눈 낱말 목록에서 맨 뒤의 숫자 낱말을 뗀다. 맨 뒤 낱말이 표의 영어 낱말이면 그 역할(`special-nav` → nav · `Product tabs` → tabs · `상품상세 tab` → `kebab`이 한글을 지워 `tab` → tab · `Specification divider` → divider).
+  2. 맨 뒤 낱말이 **중립 꼬리** `menu` · `bar` · `area` · `wrap` · `box`이고 바로 앞 낱말이 표의 영어 낱말이면 그 앞 낱말의 역할(`gnb-menu` → nav · `gnb-area` → nav). 단 `tab` 뒤에 `menu` · `bar` · `list` · `group`이 오면 `tabs`(`tab-menu` · `tab-list` → tabs).
+  3. 그 밖이면 영어 힌트 없음 — 맨 뒤가 다른 역할 · 구조 낱말인 이름은 그 낱말이 머리명사다(`nav-item` · `nav-link` · `tab-item` · `button-group` · `btn-wrapper` → 힌트 없음, 지금 규칙). `menu` 단독도 힌트가 아니다(`category-menu` 같은 햄버거 단추가 nav가 되지 않게 — 사용자 결정).
+  4. 영어 힌트가 없으면 한글: 원래 이름을 공백 · 문장부호로 나눈 **맨 뒤 토막**이 표의 한글 낱말로 끝나면 그 역할(`탭메뉴`를 `탭`보다, `네비게이션`을 `네비`보다 먼저 본다 — `상품상세탭` → tab · `GNB 메뉴`는 영어 1–2에서 이미 정해짐). 맨 뒤 토막만 보므로 `배송 경로 안내`(맨 뒤 `안내`)는 힌트가 아니다.
+  - `componentLike.ts` `isTabName`(§4.7 탭 묶기)은 이름 어디에든 `탭` · 탭 낱말이 있으면 탭으로 본다 — 그쪽은 이미 탭 모양인 칸을 고르는 보조 조건이고, 여기는 이름만으로 역할을 정하므로 머리 낱말로 좁힌다. 영어 낱말 목록은 같다(`tab` · `tabs` · `tabbar` · `tablist` · `tabmenu` · `tabgroup`).
+- **이 플러그인이 전에 지은 이름은 힌트가 아니다:** 레이어의 `dsRole`이 **힌트 역할과 다르고**, A1 "뜻 없는 이름 ②ⓑ"(이름 낱말이 `dsRole` 낱말로 끝나며 앞 낱말이 모두 출력 역할이거나 맨 앞 한 낱말만 루트 접두사)에 걸리면 힌트를 보지 않는다. 한 번 정리한 `header-button`(`dsRole` `button`)은 힌트 역할도 `button`이라 그대로 두고, `nav-item`(`dsRole` `item`)은 3번에서 이미 힌트가 없다. 힌트로 이름을 둔 노드는 `dsRole`이 힌트 역할과 같으므로 다시 정리해도 같은 결과다(멱등 — `Breadcrumb` · `Divider` · `Button`이 두 번째 정리에서 바뀌지 않는다).
 - **구조 판정과의 관계(사용자 결정 "약한 판정만 덮기"):** 지금 규칙으로 역할 `r`을 먼저 구한 뒤(판정 순서 · 맥락 그대로), 힌트 역할이 `h`이면:
   - `r`이 **약한 판정** — `container` · `wrapper` · `stack-x` · `stack-y` · `section` · `row` · `text-group` · `media` · `swatch` · `item` — 이면 역할 `h`, 이름 그대로.
   - `r === h`이면 역할 `r`, 이름 그대로(`Divider` 프레임이 보강으로 `divider` · 디자이너가 지은 `Button`이 글자 버튼 판정 `button`).
-  - 그 밖(`header` · `footer` · `card` · `list` · `field` · `button` ≠ `h` · `indicator` 등 확실한 판정)이면 지금처럼 `r`로 이름을 바꾼다(`Shared storefront navigation` → `header`).
-- **이름을 그대로 둘 때:** 역할 `h`(또는 `r`)를 `dsRole`에 기록하고, 루트 접두사는 떼지 않으며, 남아 있던 `dsNameKey`는 지운다(A1과 같음 — 바꿀 줄 아님 · 미리보기 트리에 보이지 않음). **안쪽은 정리한다**(아이콘 프레임과 다름). 자식에게 넘기는 것:
-  - 부모 역할(`parentRole`) = 기록한 역할(`nav` · `tabs` · `tab` …) — 그래서 `gnb` 안의 묶음은 지금 규칙대로 `item` 자리가 된다.
-  - 맥락 = **기록한 역할 낱말**(이름이 아님) — `gnb` 안은 맥락 `nav`, `Product tabs` 안은 `tabs`, `상품상세 tab` 안은 `tab`. 이름(`gnb` · `Product tabs`)을 맥락으로 쓰면 자손 이름이 `gnb-…` · `product-…`처럼 디자이너 낱말을 베끼게 된다. 맥락 통과(passthrough)는 하지 않는다 — `ctxDepth`는 0부터 다시, 자식 치수 기준 = 이 노드.
-- **새 출력 역할:** `breadcrumb` · `tabs` · `tab`을 `EMITTED_ROLES`에 더한다(사용자 결정 "새 역할 추가" — `tab`은 지금 인식 전용 `RECOGNIZED_ROLES`에서 옮긴다). 이 셋은 **힌트로만** 붙는다(구조 판정은 만들지 않음 — 3차 `tabs`는 그대로 다음 차수). 이름 짓기: 맥락 `tabs` 아래 역할 `tab`은 `tabs-tab`이 아니라 `tab`(맥락 == 역할 중복 빼기와 같은 취지 — 맥락이 역할의 복수형이면 뺀다). 다만 힌트로 붙는 노드는 이름을 그대로 두므로 이 규칙은 그 노드를 다시 루트로 고르는 등 드문 경우에만 쓰인다.
-- **보강 — 자식 없는 얇은 색 띠는 `divider`:** FRAME 분기의 "자식 없는 프레임"에서 색 채움이면 지금 `swatch`인데, **얇으면**(`isThin` — 짧은 변 2 이하 또는 긴 변 ≥ 짧은 변 × 25, 사각형이 이미 쓰는 조건) `divider`로 한다(사진 채움 → `image`는 그대로 먼저). 이름 힌트와 상관없이 적용된다 — `Divider` · `Specification divider`처럼 이름이 없거나 `Frame 3`이어도 `divider`.
-- **탭 안의 얇은 띠는 `indicator`(사용자 결정):** 맥락이 `tab`이고 자식 없는 FRAME · RECTANGLE이 색 채움이며 얇으면(`isThin`) 역할 `indicator`. 자리는 지금 `progress` 맥락의 채움 바 판정(`isBarFill` → `indicator`) 바로 다음 — 보강 `divider`보다 앞. 이름은 맥락 + 역할(`tab-indicator`) — 힌트 `tab`(`Active tab underline`)과 다르고 `indicator`는 확실한 판정이라 이름을 바꾼다.
-- **[등록] · 쓰임 이름에 미치는 영향:** [등록] 후보 자격은 지금처럼 구조만 본다(`dsRole`을 보지 않음 — 위 "역할 세분화 1차"와 같은 근거). 컴포넌트 기본 이름은 `dsRole` 머리명사이므로, 힌트로 이름을 둔 노드가 다른 이유로 후보가 되면 `Nav` · `Tab` · `Divider` · `Button`이 된다(지금 `container` · `wrapper`였을 때는 겹칠 때 되살리는 맥락이 달랐다 — 받아들인다). 쓰임 이름에는 주인이 없다(ia-v3 §2.12 12.12 N-D1 — 6-2 PR 뒤) — 바뀌지 않는다.
+  - 그 밖(`header` · `footer` · `card` · `list` · `field` · `h`와 다른 `button` · `indicator` 등 확실한 판정)이면 지금처럼 `r`로 이름을 바꾼다(`Shared storefront navigation` → `header`).
+- **이름을 그대로 둘 때:** 역할을 `dsRole`에 기록하고, 루트 접두사는 떼지 않으며, 남아 있던 `dsNameKey`는 지운다(A1과 같음 — 바꿀 줄 아님 · 미리보기 트리에 보이지 않음). **안쪽은 정리한다**(아이콘 프레임과 다름). 자식에게 넘기는 것은 **구조로 그 역할이 된 노드와 같다**:
+  - 부모 역할(`parentRole`) = 기록한 역할 — 그래서 `gnb` 안의 묶음은 지금 nav 안처럼 `item` 자리가 된다.
+  - 맥락 = **기록한 역할 낱말**(이름이 아님 · 통과 아님 — `ctxDepth`는 0부터, 자식 치수 기준 = 이 노드). 지금 구조로 `nav`가 된 노드도 자식에게 맥락 `nav`를 넘긴다(`header-nav` → `pickScope` → `nav`). 이름(`gnb` · `Product tabs`)을 맥락으로 쓰면 자손 이름이 `gnb-…` · `product-…`처럼 디자이너 낱말을 베끼게 된다.
+  - **영향(받아들임):** 헤더 안 힌트 노드의 자손은 맥락 `header`를 잃는다 — `isNavLike`(헤더 안 깊이 예외) · `isLogoLike` · `isActionsLike`가 그 안에서 서지 않는다. 그래서 `gnb` 안 오른쪽 링크 묶음 `special-nav`는 지금 `header-actions`가 아니라 `item` 자리 → 힌트 nav(이름 그대로)가 되고, `gnb` 안에 로고 묶음이 있으면 `header-logo`가 아니라 `nav-item`이 된다. 구조로 nav가 된 헤더 링크 행 안과 같은 결과다. 맥락 `item`이 없어지므로 `item` 자리였던 힌트 노드 안의 작은 사진은 `thumbnail`이 아니라 `image`가 된다(`THUMB_CONTEXTS`).
+- **새 출력 역할:** `breadcrumb` · `tabs` · `tab`을 `EMITTED_ROLES`에 더한다(사용자 결정 "새 역할 추가" — `tab`은 지금 인식 전용 `RECOGNIZED_ROLES`에서 옮긴다. 두 목록이 겹치면 안 된다는 기존 테스트 그대로 통과). 이 셋은 **힌트로만** 붙는다(구조 판정은 만들지 않음 — 3차 `tabs`는 그대로 다음 차수). `naming.ts` 주석 "`resolveRole()` 반환 후보와 1:1"은 "`resolveRole()` 반환 후보 + 이름 힌트 역할"로 고친다. 더할 때 바뀌는 곳(받아들임):
+  - `isScopeRole`이 `breadcrumb` · `tabs`도 역할 낱말로 친다(`tab`은 지금도). 그래서 `pickScope`가 이 낱말을 앞세우고, `Product tabs` · `Breadcrumb`을 **선택 루트로** 고르면 루트 접두사가 생기지 않는다(B.22 — 알려진 역할 낱말이면 떼지 않음, `card` 루트와 같다 — 자식 이름에 `tabs-…`가 남음). 맥락이 `tabs` · `breadcrumb`이면 페이지 부모로 보지 않는다(`isPageParent`).
+  - A1 ②ⓑ의 "앞 낱말이 출력 역할" 검사가 넓어진다 — `dsRole` `icon`이 기록된 `tab-icon` · `breadcrumb-icon` · `tabs-icon`은 뜻 없는 이름이 되어 다시 정리할 때 맥락 + `icon`으로 정리된다(이 플러그인이 지었을 수 있는 이름이므로 ⓑ의 취지대로).
+  - 컴포넌트 명사 목록(`COMPONENT_NOUNS`)에는 셋 다 이미 있다 — 바뀌지 않는다.
+- **보강 — 자식 없는 얇은 색 띠는 `divider`:** FRAME 분기의 "자식 없는 프레임"에서 색 채움이면 지금 `swatch`인데, **얇으면**(`isThin` — 짧은 변 2 이하 또는 긴 변 ≥ 짧은 변 × 25 — 이고 **짧은 변 4 이하**) `divider`로 한다(사진 채움 → `image`는 그대로 먼저). 짧은 변 상한은 프레임에만 둔다 — 1920×76 같은 색 띠 · 자리표시 배너가 divider가 되지 않게(사각형은 지금 `isThin` 그대로). 이름 힌트와 상관없이 적용된다(`Frame 3`인 1px 띠도 `divider`).
+- **탭 안의 얇은 띠는 `indicator`(사용자 결정):** 맥락이 `tab`이고 자식 없는 FRAME · RECTANGLE이 색 채움이며 얇으면(위 보강과 같은 조건 — `isThin` + 짧은 변 4 이하) 역할 `indicator`. 자리는 지금 `progress` 맥락의 채움 바 판정(`isBarFill` → `indicator`) 바로 다음 — 보강 `divider`보다 앞. 이름은 맥락 + 역할(`tab-indicator`) — 힌트 `tab`(`Active tab underline`의 머리 낱말은 `underline`이라 애초에 힌트 없음)과 상관없이 바꾼다.
+- **[등록]에 미치는 영향:** [등록] 후보 자격은 지금처럼 구조만 본다(`dsRole`을 보지 않음 — 위 "역할 세분화 1차"와 같은 근거). 컴포넌트 기본 이름(`componentBaseName`)은 **이름 끝 낱말이 `dsRole`과 같을 때만** 그 역할(`trustedRole`), 아니면 이름에서 구한다(`commonBaseName`) — 그래서 힌트로 이름을 둔 노드가 다른 이유로 후보가 되면 `Divider` · `Button` · `Tabs` · `Tab` · `Nav`(`special-nav`)는 역할 이름이고, `gnb`는 `Gnb`, `gnb-menu`는 `Menu`가 된다(받아들인다 — 디자이너 이름을 따른다). 쓰임 이름에는 주인이 없다(ia-v3 §2.12 12.12 N-D1 — 6-2 PR 뒤) — 바뀌지 않는다.
 - **화면:** 바뀌지 않는다. 미리보기 트리에서 힌트로 이름을 둔 줄은 바꿀 줄이 아니라 보이지 않는다(그 아래 바꿀 줄이 있으면 머리 줄로 회색 이름이 보인다 — 지금 규칙).
-- **예(실기 파일, 바뀌는 것):** `gnb`(`container` → 그대로, nav) · `special-nav` · `gnb-menu`(`header-actions` · `stack-x` → 그대로, nav — 부모가 nav라 `item` 자리 → 약한 판정) · `Breadcrumb`(`section` → 그대로) · `Product tabs`(`section` → 그대로, tabs) · 탭 칸 4개(→ 그대로, tab) · `Active tab underline`(`swatch` → `tab-indicator`) · `Divider` 4개 · `Specification divider` 2개(`swatch` → 그대로, divider) · 바닥글 `Button` 5개 · 앱 다운로드 `button`(`footer-button` · `item-button` → 그대로, button). 그대로: `Shared storefront navigation` → `header`, `category-menu`(아이콘 프레임), `Add to cart` · `Start subscription`(힌트 낱말 없음 → `wrapper`).
-- **한계(받아들임):** 힌트는 낱말만 본다 — 이름이 틀리면(`nav`라 지은 카드 묶음) 약한 판정 자리에서 틀린 역할을 따른다. 대문자 · 띄어쓰기 · 한글이 섞인 이름(`Product tabs`)은 그대로 남는다(사용자 결정 B). 이미 이 플러그인으로 정리해 이름이 바뀐 파일(`gnb` → `container`)은 원래 이름이 없어 되살리지 못한다(원본을 다시 정리해야 한다).
+- **예(실기 파일, 바뀌는 것):** `gnb`(`container` → 그대로, nav) · `special-nav` · `gnb-menu`(`header-actions` · `stack-x` → 그대로, nav — 부모가 nav라 `item` 자리) · `Breadcrumb`(`section` → 그대로) · `Product tabs`(`section` → 그대로, tabs) · 탭 칸 4개(→ 그대로, tab) · `Active tab underline`(`swatch` → `tab-indicator`) · `Divider` 4개 · `Specification divider` 2개(`swatch` → 그대로, divider) · 바닥글 `Button` 5개 · 앱 다운로드 `button`(`footer-button` · `item-button` → 그대로, button). 그대로: `Shared storefront navigation` → `header`, `category-menu`(아이콘 프레임), `Add to cart` · `Start subscription`(힌트 낱말 없음 → `wrapper`). 두 번째 정리에서도 같다.
+- **한계(받아들임):**
+  - 힌트는 낱말만 본다 — 이름이 틀리면(`nav`라 지은 카드 묶음) 약한 판정 자리에서 틀린 역할을 따른다.
+  - 대문자 · 띄어쓰기 · 한글이 섞인 이름(`Product tabs`)은 그대로 남는다(사용자 결정 B).
+  - 이미 이 플러그인으로 정리해 이름이 바뀐 파일(`gnb` → `container`)은 원래 이름이 없어 되살리지 못한다(원본을 다시 정리해야 한다).
+  - 세로 오토레이아웃 탭 칸(글자 + 얇은 색 밑줄 프레임)은 `isFieldLike`가 밑줄을 입력 상자로 읽어 `field`(확실한 판정)가 되므로 힌트 `tab`이 쓰이지 않는다(`tabs-field`). 실기 파일은 자유 배치라 해당 없음.
+  - 힌트 노드를 **선택 루트로** 고르면 루트는 지금처럼 이름을 두고(`keep: 'root'`) 힌트를 보지 않는다 — 자식은 부모 역할 없이 루트 이름의 맥락(`gnb`)을 받는다. 그 맥락이 역할 낱말이 아니면 루트 접두사로 보이는 이름에서 떼어진다(B.22).
 
 ### 4.5 컴포넌트 (베타)
 
@@ -2097,11 +2109,11 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 - [ ] 실기 확인(Figma) — 사용자
 ### B.26 이름 힌트 PR (2026-11-19 사용자 결정 B · "B + 보강 하나" · §4.4 "이름 힌트")
 
-- [ ] `rename.ts` 힌트 낱말 표 · 찾기(영어 kebab 낱말 정확히 · 한글 부분 문자열 · 가장 뒤 낱말) · 이 플러그인이 지은 이름 빼기(A1 ②ⓑ 판정 함께 씀)
+- [ ] `rename.ts` 힌트 낱말 표 · 머리 낱말 찾기(영어 맨 뒤 낱말 · 중립 꼬리 · `tab`+꼬리 → tabs · 한글 맨 뒤 토막) · 이 플러그인이 지은 이름 빼기(`dsRole` ≠ 힌트 역할 + A1 ②ⓑ)
 - [ ] `rename.ts` `decide`: FRAME · GROUP · SECTION에서 `r`이 약한 판정이거나 `r === h`면 `{ role, name: 지금 이름, keepName: true }`. 자식에게 부모 역할 = 기록한 역할 · 맥락 = 역할 낱말(통과 아님)
-- [ ] `rename.ts` 보강: 자식 없는 색 채움 프레임이 얇으면 `divider`(사진 채움 `image` 먼저)
+- [ ] `rename.ts` 보강: 자식 없는 색 채움 프레임이 얇고(`isThin`) 짧은 변 4 이하면 `divider`(사진 채움 `image` 먼저)
 - [ ] `rename.ts` 탭 맥락의 얇은 띠 → `indicator`(`isBarFill` 다음)
-- [ ] `naming.ts` `EMITTED_ROLES`에 `breadcrumb` · `tabs` · `tab`(`tab`은 `RECOGNIZED_ROLES`에서 옮김) · 맥락 `tabs` + 역할 `tab` → `tab`
-- [ ] 단위 테스트: 실기 파일 구조(헤더 > `gnb` 자유 배치 > `special-nav` · `gnb-menu`, `Breadcrumb`, `Product tabs` > `Divider` · 탭 칸 > `Active tab underline`, 바닥글 `Button`) — 위 "예" 그대로. `category-menu` 그대로 · `nav-item`(`dsRole` `item`) 다시 정리해도 `nav-item` · `Frame 3`인 1px 띠 → `divider` · `Shared storefront navigation` → `header`
-- [ ] 기존 테스트 기대값 확인 — 바뀌는 것은 사유와 함께 고친다(바닥글 `Button` · 얇은 `swatch` → `divider` 등)
+- [ ] `naming.ts` `EMITTED_ROLES`에 `breadcrumb` · `tabs` · `tab`(`tab`은 `RECOGNIZED_ROLES`에서 옮김) · 주석 고침
+- [ ] 단위 테스트: 실기 파일 구조(헤더 > `gnb` 자유 배치 > `special-nav` · `gnb-menu`, `Breadcrumb`, `Product tabs` > `Divider` · 탭 칸 > `Active tab underline`, 바닥글 `Button`) — "예" 그대로, **같은 트리를 두 번 정리해도 같음**(첫 정리의 `dsRole`을 둔 채). `category-menu` 그대로 · `nav-item`(`dsRole` `item`) · `nav-link` · `button-group` → 힌트 없음 · `tab-list` → tabs · `상품상세탭` → tab · `배송 경로 안내` → 힌트 없음 · `Frame 3`인 1280×1 띠 → `divider` · 1920×76 색 띠 → `swatch` · `Shared storefront navigation` → `header` · `Product tabs` 선택 루트 → 접두사 없음 · `tab-icon`(`dsRole` `icon`) 다시 정리 → 맥락 + `icon`
+- [ ] 기존 테스트 기대값 확인 — 바뀌는 것은 사유와 함께 고친다(이름에 힌트 낱말이 있는 픽스처 · 얇은 `swatch` → `divider` 등) · `pure.test.mjs` EMITTED/RECOGNIZED 겹침 테스트 통과
 - [ ] 4검사 · 실기 확인(사용자, 피그마 — 원본 `PC_상품상세_FOCAL 유토피아` 복제 → 이름 정리)
