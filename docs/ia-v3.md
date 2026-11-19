@@ -300,7 +300,7 @@
       4. 없으면 **새 역할**을 쓰임 이름으로 만든다(12.5). 값은 같은 값 · 맞는 용도의 로컬 Global(계층 1) 변수의 별칭이다. 그런 Global이 여럿이면 사용자 컬렉션 것을 먼저, 그 안에서 이름 순 첫 번째(§2.13 13.5). 없으면 지금처럼 "매칭 없음"(`no-match`)으로 건너뛴다 — 연결은 Global을 만들지 않는다(Global은 만들기에서).
       - **보는 순서는 1 → 3 → 2 → 4다**(숫자 · 색 묶음). 디자이너가 만든 변수가 플러그인의 쓰임 이름보다 먼저다 — 색은 쓰임 이름(밝기)이 순서 3의 결과에 달려 있기도 하다(12.4 처리 순서). 글자 묶음은 순서 3이 없어 1 → 2 → 4다.
       - 계층 없음(0) · 라이브러리 변수는 지금처럼 후보가 아니다. **Global은 더 이상 붙일 후보가 아니다**(별칭 대상으로만 찾는다). 순서 2 · 3의 "이름 순"은 새로 정하는 결정적 순서다(지금 코드의 "변수 목록 순 첫 일치" · 숫자 거리 순을 대신한다 — 값은 언제나 같으므로 거리는 0).
-    - **12.3 쓰임 이름 — 숫자 · 글자.** `{그룹}/{주인}/{속성}`. 주인이 없으면 `{그룹}/{속성}`, 속성이 없는 그룹이면 `{그룹}/{주인}`, 둘 다 없으면 `{그룹}/default`.
+    - **12.3 쓰임 이름 — 숫자 · 글자.** (6-2 PR부터 주인을 쓰지 않는다 — 12.12 N-D1. 아래는 지금 코드) `{그룹}/{주인}/{속성}`. 주인이 없으면 `{그룹}/{속성}`, 속성이 없는 그룹이면 `{그룹}/{주인}`, 둘 다 없으면 `{그룹}/default`.
       - **주인(레이어 역할):** 그 레이어 자신만 본다(조상은 보지 않음). ① 이름 정리가 남긴 역할(`dsRole` 플러그인 데이터)이 역할 어휘(`ROLE_VOCAB`)에 있고 구조 폴백(container · wrapper · shape · group · content · body)이 아니면 그것 ② 아니면 고신뢰 역할 판정 `highConfidenceComponentRole`의 결과(tab · button · chip · nav · progress · table · card · figure · field · list · heading) ③ 없으면 주인 없음.
         - ②의 입력은 `LikeNode`다. 찾기 · 만들기는 선택 루트마다 한 번 구조 색인(`toStructNode` — `code.ts`에서 `src/lib`로 옮긴다)을 만들어 노드 id로 찾는다(레이어마다 새로 만들지 않음).
         - 만들기와 연결은 같은 함수 · 같은 입력으로 주인을 정한다. 그 사이 이름 정리나 구조 변경으로 주인이 달라지면 연결은 순서 2에서 맞는 이름을 찾지 못해 새 역할을 만든다(예: `spacing/gap` → `spacing/card/gap`). 옛 역할은 지우지 않는다.
@@ -321,7 +321,7 @@
     - **12.4 쓰임 이름 — 색.** `color/{쓰임}/{밝기}`.
       - **쓰임:** TEXT의 채움 → `text`(구간마다 색이 다른 글자는 지금처럼 연결하지 않는다 — `fills`가 `figma.mixed`). 벡터(VECTOR · BOOLEAN_OPERATION · STAR · POLYGON · LINE)의 채움 · 선, 그리고 아이콘 틀(`isIconOrAvatar`의 아이콘 판정을 통과한 레이어) 안의 도형(RECTANGLE · ELLIPSE)의 채움 · 선 → `icon`. 프레임류(아이콘 틀 자신 포함)의 채움은 언제나 `background`, 선은 `border`. 그 밖의 채움 → `background`, 그 밖의 선 → `border`. 효과 색 → `shadow`.
       - **밝기 함수 하나**(`colorRoleBases(색 목록(hex · 배경 종류 · 곳 수 · 투명도), 이미 있는 default 값, 쓰임)` — 결과는 키별 밝기 이름과 **기준색 hex**(12.5 사다리 · inverse의 기준))를 만들기와 연결이 같이 쓴다.
-        - 기준색: `color/{쓰임}/default`가 이미 있으면 그 색. 없으면 목록에서 곳 수가 가장 많은 색(같으면 hex 순)이 `default`가 되고 기준색이 된다.
+        - 기준색: `color/{쓰임}/default`가 이미 있으면 그 색. 없으면 목록에서 곳 수가 가장 많은 색(같으면 hex 순)이 `default`가 되고 기준색이 된다(6-2 PR부터 배경 · 글자 · 아이콘은 쓰임별 기준값 — 12.12 N-D4).
         - 나머지: 유채색(OKLCH 채도 ≥ `palette.ts` `LOW_CHROMA`)은 `brand`. 무채색 · 유채색과 상관없이 아래 **합친 판정**이 맞을 때만 `inverse`다(brand보다 먼저).
           - 대상 쓰임: `text` · `icon` · `border`(배경 위에 놓이는 색). `background` · `shadow`에는 inverse가 없다.
           - 배경(`backgroundOf(node)` → 색 또는 모름): 그 레이어의 **조상**을 위로 올라가며 처음 만나는 보이는 채움. 형제 레이어(버튼 배경을 형제 사각형으로 그린 구조)는 보지 않는다 — 그런 글자는 inverse가 아니라 subtle · strong이 된다(한계, 실기 파일의 흰 글자 6개는 모두 프레임 자신의 채움 위라 해당 없음). 그 채움의 맨 위 보이는 칠하기가 불투명 SOLID면 그 색, 이미지 · 그라데이션 · 반투명이면 "모름". 페이지까지 채움이 없으면 "모름".
@@ -446,6 +446,50 @@
         - **직접 만든 변수(§4.9 `dsl.manual`):** 대상 토큰은 어느 이름(처음 이름 · 바뀐 이름)에서든 직접 만든 변수가 같은 값이면 그것을 쓰고(`reuse`), 다른 값이면 차지된 이름으로 보고 다음 이름으로 간다 — 대상 토큰은 덮지도 건너뛰지도 않는다. 건너뜀(`skippedManual` · 상태 `manual` · "직접 만든 변수" 태그)은 `uses`가 없는 토큰에만 남는다.
         - 이미 있는 이름은 옮기지 않는다(12.5와 같다).
       - **어디서 정하나:** 한 번의 추출 안의 반 단계는 지금처럼 UI가 추출 직후 이름을 지을 때(`huefyTokenColors` → `nameColorsByHue`, 순수) 정한다. 파일과 견주기는 파일을 아는 코드가 만들 때 정한다 — `createTokens`와 `previewCreateTokens`가 같은 순수 함수(`colorName.ts`에 새 `resolveGlobalNames(tokens, fileGlobals)` — 위 차지 판정 · 순서 · 재사용 · 반 단계 · `-a` · `-n`)로 토큰 이름 → 최종 이름을 정해, 미리보기와 실제 결과가 같다. 결과는 `CreateSummary.finalName`(토큰 이름 → 최종 이름)으로 돌려주고, `createUsageRoles`의 `roleRows.global`은 미리보기에서도 이 최종 이름을 쓴다(지금은 새 토큰이 `globalOf`에 없어 토큰 이름이 나온다). 이름이 바뀐 토큰은 미리보기 응답의 `tokenStates[토큰 이름].varName`에 최종 이름을 싣고(상태 `new`), 만들기 화면은 이름 칩을 `varName`이 있으면 그 이름으로 보인다(지금은 `reuse`일 때만 — `ui.ts` · `messages.ts` `TokenState` 주석도 고친다). 쓰임 역할(12.10)의 별칭 대상(`globalOf`)도 최종 이름의 변수다.
+    - **12.12 만드는 규칙 다시 정하기 (6-2 — 2026-11-19 사용자 결정 N-D1–N-D7, QA 5 결함 3 · 5 · 6 · Q5-D3).** QA 5 파일에서 Global 54개에 Semantic 109개가 생겼다(간격 값 17개에 역할 44개, 18px 글자 하나에 역할 10개). 기본 이름이 어색했고(`color/background/default` = #a3a3a3, `radius/default` = 150), 레이어 270개 중 68개가 `container` · `wrapper`로 남았다. 아래는 12.3 · 12.4 · 12.5 · 12.10과 이름 정리(ia-v4 §4.4)를 바꾼다. 둘이 다르면 이 절을 따른다.
+      - **N-D1 숫자 쓰임 이름은 주인을 쓰지 않는다(속성 단위).** 12.3 이름 표의 `{주인}` 칸을 모든 필드에서 뺀다 — 같은 속성 · 같은 값이면 카드든 버튼이든 같은 역할을 쓴다.
+
+        | 필드 | 바뀐 뒤 기본 이름 | 지금(12.3) |
+        |---|---|---|
+        | `itemSpacing` | `spacing/gap` | `spacing/{주인}/gap` |
+        | `counterAxisSpacing` · `gridRowGap` · `gridColumnGap` | `spacing/row-gap` · `spacing/column-gap` | `spacing/{주인}/…` |
+        | 여백 네 방향 | `spacing/padding` · `spacing/padding-x` · `spacing/padding-y` · `spacing/padding-left` … (속성 이름 고르는 법은 12.3 그대로) | `spacing/{주인}/padding…` |
+        | 모서리 | 모두 같으면 `radius/default`, 아니면 `radius/top-left` … | `radius/{주인}` · `radius/{주인}-top-left` … |
+        | 선 두께 | 모두 같으면 `stroke-width/default`, 아니면 `stroke-width/top` … | `stroke-width/{주인}` … |
+        | `opacity` | `opacity/default` | `opacity/{주인}` |
+        | 크기 · 글자 4필드 | 그대로(`size/icon` · `size/avatar` · `font-size/text` …) — 지금도 주인이 없다 | — |
+
+        - **`…/default` 이름의 꼬리는 마지막 마디를 바꾼다:** 기본 이름이 `{그룹}/default`면 크기 말이 `default` 자리에 들어간다 — `radius/default`(기준) · `radius/sm` · `radius/xs` · `radius/lg` · `radius/xl` · `radius/2xl`, `opacity/sm` …. 되돌림은 마지막 후보 + `-n`(`radius/2xl-2`). 기준 값 자신이 기본 이름을 받지 못하면 `radius/default-2`(12.5 되돌림 표 그대로). 그 밖의 숫자 이름은 12.5 그대로 끝에 붙인다(`spacing/gap-sm` · `radius/top-left-lg`). 가족(12.5)도 이에 맞춘다 — `radius/default`의 가족은 `radius/{default · sm · xs · 2xs · lg · xl · 2xl}`와 그 `-n`이다(`radius/full` · `radius/top-left`는 가족이 아님).
+        - **주인 판정은 쓰임 이름에 쓰지 않는다:** `pickOwner` · `dsRoleOwner` · 구조 색인(`toStructNode`)으로 주인을 구하던 일은 이름에 쓰이지 않으므로 연결 · 만들기에서 뺀다(다른 곳이 쓰면 그대로). 이름 정리가 남긴 `dsRole`은 이름 정리 · 판넬이 계속 쓴다.
+        - **이미 있는 역할:** 옛 이름(`spacing/card/gap` 등)은 옮기지 않고 지우지도 않는다(12.5 "이미 있는 이름"). 연결 순서 2는 새 기본 이름의 가족만 보므로, 옛 이름만 있는 파일에서는 같은 값이라도 새 이름(`spacing/gap`)을 하나 만든다. 디자이너가 만든 같은 값 변수는 지금처럼 순서 3이 먼저 쓴다. 이미 붙은 연결은 그대로다(12.8).
+      - **N-D2 텍스트 스타일의 역할 변수는 크기 단계마다 하나.** 텍스트 스타일 등록(`createSemanticTextStyles`)이 만드는 `font-size/…` · `line-height/…` · `letter-spacing/…`의 이름을 스타일 이름 전체가 아니라 **크기 단계 이름**으로 짓는다.
+        - 크기 단계 이름 = 스타일 이름(text-style-krds §1 `{분류}/{단계}[-크기][-w굵기][-줄높이%]` + §3.8 꼬리)에서 `-{크기}`까지만 남긴 것: `body/large-w500-120` → `body/large`, `body/large-18-w500-120` → `body/large-18`. 강제 꼬리(§3.8 마지막 수단)와 `-n`도 뺀다. 이름이 이 문법이 아니면(사용자가 지은 이름을 앵커로 쓰는 등) 스타일 이름 전체를 쓴다(지금과 같음).
+        - `font-size/{단계 이름}`: 같은 단계 이름은 글자 크기도 같다(§3 — 크기가 다르면 `-{크기}` 꼬리로 단계 이름이 갈림). 그 단계의 모든 스타일이 이 변수 하나를 쓴다. 그래도 값이 다르면(사용자 이름 등) 12.5 숫자 규칙(`-sm` · `-lg`)으로 가른다.
+        - `line-height/{단계 이름}` · `letter-spacing/{단계 이름}`: 지금처럼 px 정수일 때만 만든다(%는 스타일이 보관 — 지금과 같음). 한 단계 안에 값이 여럿이면 **N-D3** 꼬리로 가른다.
+        - 굵기 · 줄 높이 표시는 텍스트 스타일 이름에만 남는다(스타일 이름 규칙은 바뀌지 않는다).
+        - **이름 다시 짓기(text-style-krds §5)는 역할 변수 이름을 바꾸지 않는다:** 변수 이름이 더 이상 스타일 이름과 하나씩 맞지 않으므로(여러 스타일이 한 변수를 씀) §5 "역할 변수도 함께"를 이 규칙으로 만든 변수에는 하지 않는다. 옛 규칙으로 만든 변수(`font-size/{스타일 이름 전체}`)는 지금처럼 함께 바꾼다 — 판정: 변수 이름이 `{그룹}/{바꾸는 스타일의 지금 이름}`과 정확히 같을 때만. 한계(받아들임): 이름 다시 짓기로 스타일의 단계가 바뀌면(`body/large` → `body/medium`) 새 규칙 변수 이름은 옛 단계로 남는다(값 · 연결은 맞다).
+      - **N-D3 행간 · 자간 꼬리는 `tight` · `loose`.** 12.5의 숫자 크기 말 대신, `line-height/…` · `letter-spacing/…` 기본 이름에는 작은 쪽 `[-tight, -tighter, -tightest]`, 큰 쪽 `[-loose, -looser, -loosest]`를 쓴다(기준 · 받는 순서 · 되돌림은 12.5 숫자와 같다 — 기준은 그 단계에서 곳 수(스타일 수)가 가장 많은 값, 같으면 값 오름차순). 연결 경로의 `line-height/text` · `letter-spacing/text`(12.3)도 같다. 예: 18px 단계에 줄 높이 27px 스타일 3개 · 24px 1개 · 32px 1개 → `line-height/body/large`(27) · `-tight`(24) · `-loose`(32).
+      - **N-D4 색 기준색(default)은 쓰임별 기준값.** 12.4 "기준색"의 "곳 수가 가장 많은 색"을 쓰임마다 바꾼다(파일에 `color/{쓰임}/default`가 있으면 그 색 — 지금과 같음).
+
+        | 쓰임 | 기준색 | 지금 |
+        |---|---|---|
+        | `background` | 무채색(채도 < `LOW_CHROMA`) 중 **가장 밝은** 색(OKLCH L 최대, 같으면 곳 수 · hex 순) | 곳 수 1위 |
+        | `text` · `icon` | 무채색 중 **가장 진한** 색(L 최소, 같으면 곳 수 · hex 순) | 곳 수 1위 |
+        | `border` · `shadow` | 곳 수 1위(지금 그대로) | — |
+
+        - 그 쓰임에 무채색이 없으면 곳 수 1위(지금 규칙)로 돌아간다. 반투명 값은 hex로 본다(12.4 · 12.5와 같음 — 곳 수는 hex별 합).
+        - 나머지 이름 판정은 그대로다 — 배경 기준이 가장 밝으니 다른 무채 배경은 모두 `strong` 사다리(`strong` · `stronger` · `strongest`), 글자 기준이 가장 진하니 다른 무채 글자는 `subtle` 사다리. inverse 판정 조건 1(기준색이 극단)은 이 기준색으로 본다 — 흰 배경 · 검정 글자가 기준이 되는 경우가 늘어 inverse가 더 맞게 잡힌다(추정).
+        - 예(QA 5): 배경 #FFFFFF(곳 수 적음) · #A3A3A3(곳 수 1위) → `color/background/default` = #FFFFFF, `color/background/strong` = #A3A3A3(지금: `default` = #A3A3A3 · `subtlest` = #FFFFFF).
+      - **N-D5 알약 반경은 `radius/full` = 9999.** 모서리 반경이 그 레이어의 짧은 변 절반 이상이면(반경 ≥ min(너비, 높이) / 2 — 화면에서 모두 같은 알약 모양) **알약 반경**이다.
+        - 추출(만들기): 알약 반경은 원래 값(150 · 120 …)이 아니라 값 **9999** 하나로 모은다 — Global `radius/9999`(Global 숫자 이름 규칙 그대로), Semantic `radius/full`(→ `radius/9999` 별칭, 꼬리 없는 종류 `plain` — 값이 하나뿐). 모서리마다 다른 레이어는 알약 판정을 모서리별로 하고 이름은 `radius/top-left` 등 그대로(알약 모서리 값만 9999).
+        - 연결: 알약 반경 자리는 값 9999로 찾는다 — 같은 값 규칙(2.11)의 예외로, 레이어 값을 9999로 바꿔 붙인다(겉모습은 그대로). 순서 1 · 3에서 같은 값(원래 값)의 변수가 있으면 그것이 먼저다(디자이너 변수 존중 — 원래 값 그대로 붙음). 9999인 Global이 없으면 지금처럼 매칭 없음.
+        - 크기를 연결에 쓰는 경우(`size/icon` 등)와 무관하다. 아이콘 · 아바타 원(ELLIPSE)은 반경 필드가 없어 해당 없음.
+      - **N-D6 이름 정리 — 오토레이아웃 묶음은 `stack-x` · `stack-y`.** ia-v4 §4.4 폴백 자리(B1–B3 `row` · `text-group` · `media`도 아닐 때)에서 지금 `container`를 돌려주던 노드(자식 2개 이상)를 오토레이아웃 방향으로 나눈다: 가로(`layoutMode` `HORIZONTAL`) → `stack-x`, 세로(`VERTICAL`) → `stack-y`, 오토레이아웃 아님 · 격자(`GRID`) · GROUP · 자식 없는 프레임 → `container`(지금 그대로). `wrapper`(자식 1개)는 그대로다.
+        - 가로 이름이 `row`가 아닌 까닭: `row`는 B.24에서 "이름표 글자 + 값 한 줄"로 정했다(사용자 확인 2026-11-19 — `padding-x` · `padding-y`와 짝).
+        - `stack-x` · `stack-y`는 `container`와 똑같이 다룬다 — 맥락 없는 이름(`card-stack-y`가 아니라 `stack-y`), 자식에게 받은 맥락을 넘김(`PASSTHROUGH_ROLES`), 구조 폴백 이름(`STRUCT_FALLBACK_NAMES` · `GENERIC_ROLES` · 맥락 판정에서 보통 낱말), 역할 어휘(`ROLE_VOCAB` · 출력 역할)에 더함. [등록] 후보 자격과 무관(지금 `container`처럼).
+        - 다시 실행: 전에 `container`로 지은 오토레이아웃 노드는 이름 정리를 다시 하면 `stack-x` · `stack-y`로 바뀌는 줄로 미리보기에 나온다(전에 붙인 구조 폴백 이름은 다시 지을 수 있는 이름 — B.24 "전에 붙인 이름").
+      - **N-D7 다른 것은 그대로:** 이미 있는 변수 · 스타일 이름은 옮기지 않는다. Global 이름(12.11) · 색 꼬리(12.5 유채색 · 사다리 · 투명도 단계) · 붙이는 순서(12.2)는 그대로다. 화면은 바뀌지 않는다 — 만들기 · 연결 결과의 이름과 개수만 달라진다.
+      - **기대 효과(추정 — 구현 때 QA 5 입력으로 다시 셈, 부록 A.20):** 간격 역할 44 → 10~15, 글자 크기 역할 27 → 8~10, `container` 51 → 오토레이아웃 아닌 묶음만.
 13. **플러그인 컬렉션과 사용자 컬렉션 (2026-11-06 사용자 결정, #124 다음 PR).** 플러그인이 자동으로 만드는 변수는 플러그인 컬렉션에만 넣고, 사용자 컬렉션의 변수는 고치지 않되 찾아 쓴다.
     - **13.1 두 종류.**
       - **플러그인 컬렉션:** 플러그인이 변수를 만들고 · 값을 바꾸고 · 지우고 · 모드를 더하는 곳. Global 역할 하나, Semantic 역할 하나. Component 역할의 플러그인 컬렉션은 없다.
@@ -2777,3 +2821,26 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] ROADMAP 6-1a 체크 · `docs/qa/2026-11-17-qa5.md` A 결함 1 · 2 · 4에 "고침(A.18)" 표시 — qa5 표시는 함. ROADMAP은 "구현 끝 · 실기 확인 남음"만 적고 체크는 실기 뒤
 - 구현 메모(사소한 차이 — 구현 때 고침): ① 앵커된 소수 크기 스타일은 글자 크기뿐 아니라 줄 높이 · 자간의 `textStyle.missVar`도 넣지 않는다(단위 테스트 ④ "missing 0"과 맞춤 — 변수를 만들지 않으므로) ② 추출은 "더한 메인 id" 대신 `collectLocalMains`의 `mainOf` 키(메인을 걷는 인스턴스 id)를 넘겨 그 인스턴스만 `SKIP_INSTANCE`에서 뺀다(같은 뜻) ③ 추출 · 텍스트 스타일 세 길은 목록 기준 루트가 메인 루트 안에 있으면 그 루트를 빼고 메인 쪽이 덮는다(표본 · 줄이 두 번 세지지 않게 — 찾기의 방문 집합과 같은 효과. 그 글자의 `mainIds`는 메인 단위가 된다) ④ `artwork.ts` `keepLookAsync`는 검사 전 resize(`replaceMember`가 하던 것)를 먼저 한다 — 안쪽 자리가 크기에 따라 정해지므로 ⑤ 줄 번호는 이 PR 뒤 달라졌다(함수 이름으로 찾는다)
 - [ ] 실기 확인(사용자, 피그마 — QA 파일은 읽기 전용이므로 새 파일에 원본 붙여 넣기): ① 원본 → 이름 정리 → [등록] → 여행자 카드 4장 모두 인스턴스 · 카드 2~4 사진 자르는 위치 · "Levino gene" 한 줄이 원본과 같음 · 픽셀 차이 없음 ② 그 결과 프레임 선택 → 연결 화면에 "선택 밖 메인 컴포넌트 n개"(세트는 1로 셈) → [연결] → Components 페이지 메인(세트는 변형 모두)에 변수 연결 · 인스턴스 안쪽은 메인을 따름(덮어쓴 값 없음) · ⌘Z 한 번에 모두 풀림 ③ 26.67px 글자가 있는 파일에서 만들기(텍스트 스타일 켬) → `font-size/26_67` · `font-size/…-26_7` · 그 스타일 없음 · 알림 툴팁에 건너뛴 스타일 줄 · 그 글자는 스타일 연결 없음 ④ 무료로 값을 직접 고르기 › 색 › [팔레트 생성] → [팔레트 만들기] → [색 변수 만들기] → Global 색만 생김 · Semantic 없음
+
+## A.20 만드는 규칙 다시 정하기 PR — 6-2 (2026-11-19 사용자 결정 N-D1–N-D7, §2.12 12.12 · QA 5 결함 3 · 5 · 6)
+
+(A.19는 6-1b 컴포넌트 규칙 PR #153이 쓴다.)
+
+**1. 숫자 쓰임 이름(N-D1)**
+- [ ] `usageRoles.ts`: `composeName` · `paddingProp` · `radiusName` · `strokeName` · `simpleNumericName`에서 주인을 뺀다. `…/default` 이름의 꼬리는 마지막 마디를 바꾼다(`radius/sm` · `radius/lg`) — `nameKindOf` · `familyRe` · `assignNumbers` · 되돌림
+- [ ] 연결(`bind.ts`) · 만들기(`createUsageRoles`)에서 주인 계산(`pickOwner` · `dsRoleOwner` · 구조 색인)을 이름에 쓰지 않게 — 안 쓰게 된 코드는 지운다
+**2. 텍스트 스타일 역할 변수(N-D2 · N-D3)**
+- [ ] `createSemanticTextStyles` `pushAlias`: 역할 = 크기 단계 이름(`-w…` · `-{줄높이}` · 강제 꼬리 · `-n` 뺌, 문법 밖 이름은 전체). 한 단계에 값이 여럿이면 글자 크기는 `-sm` · `-lg`, 줄 높이 · 자간은 `-tight` · `-loose`(곳 수 = 스타일 수)
+- [ ] 스타일 ↔ 변수 연결(3단계)이 새 역할 이름으로 찾는다 · 등록 0단계 · 이름 다시 짓기의 역할 변수 바꾸기는 옛 규칙 이름(`{그룹}/{스타일 이름 전체}`)에만
+- [ ] 연결 경로의 `line-height/text` · `letter-spacing/text` 꼬리도 `-tight` · `-loose`
+**3. 색 기준색(N-D4)**
+- [ ] `colorRoleRef` · `colorRoleBases`: 배경 = 무채색 중 가장 밝은 색, 글자 · 아이콘 = 가장 진한 색, 테두리 · 그림자 = 곳 수 1위, 무채색이 없으면 곳 수 1위. 파일의 `default`가 먼저(그대로)
+**4. 알약 반경(N-D5)**
+- [ ] 추출: 반경 ≥ 짧은 변 / 2 → 값 9999(Global `radius/9999`) · Semantic `radius/full`. 연결: 알약 자리는 9999로 찾고 레이어 값을 9999로 바꿔 붙임(순서 1 · 3의 원래 값 변수가 먼저)
+**5. 이름 정리(N-D6)**
+- [ ] `rename.ts` 폴백: 자식 2개 이상 · `HORIZONTAL` → `stack-x`, `VERTICAL` → `stack-y`, 나머지 `container`. `PASSTHROUGH_ROLES` · `STRUCT_FALLBACK_NAMES` · `naming.ts` 역할 어휘 · `GENERIC_ROLES` · `isScopeRole`(보통 낱말)에 더함
+**6. 테스트 · 마무리**
+- [ ] 단위 테스트: ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 `spacing/gap` ② `radius` 8 · 24 · 4 → `radius/default` · `radius/lg` · `radius/sm` ③ 높이 40 · 반경 150 버튼 → `radius/full` = 9999 · 레이어 반경 9999 ④ `body/large-w500-120` · `body/large-w700-150` → `font-size/body/large` 하나 ⑤ 줄 높이 27 · 24 · 32(px) → `line-height/body/large` · `-tight` · `-loose` ⑥ 배경 #A3A3A3(곳 수 많음) · #FFFFFF → `default` = #FFFFFF · `strong` = #A3A3A3 ⑦ 가로 오토레이아웃 자식 2 → `stack-x`, 세로 → `stack-y`, 오토레이아웃 아님 → `container`, 자식 1 → `wrapper` ⑧ 옛 이름 `spacing/card/gap`만 있는 파일 → 새 `spacing/gap`을 만들고 옛 것은 그대로 ⑨ QA 5와 같은 모양의 입력에서 Semantic 수가 줄어듦(수를 적는다)
+- [ ] 기존 테스트 기대값 — 바뀌는 것은 사유와 함께 고친다(주인 이름 · 텍스트 스타일 역할 이름 · 배경 default · `container`)
+- [ ] 4검사 · `dist/` 다시 빌드
+- [ ] 실기 확인(사용자, 피그마): QA 5 원본 복제본 → 이름 정리 · 만들기 → Semantic 수 · 이름 · `stack-x` · `stack-y`를 봄
