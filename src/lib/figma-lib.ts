@@ -38,7 +38,7 @@ export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, col
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName, stripRootPrefix } from './rename';
 export type { RenameOutcome } from './rename';
-export { createIconRegistry, cleanupAfterRegister, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, photoLeafOf, visibleBox, imageMatrix, shiftMatrix, cornerImagePoints, snapshotOverrides, restoreOverrides, tallyRestoreFailures } from './artwork';
+export { createIconRegistry, cleanupAfterRegister, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, memberFitIssue, replaceMember, replaceMemberAsync, swapMemberAsync, copyOverridesAsync, keepLookAsync, photoLeafOf, visibleBox, imageMatrix, shiftMatrix, cornerImagePoints, snapshotOverrides, restoreOverrides, tallyRestoreFailures } from './artwork';
 export type { IconRegistry, VectorSlot, MemberResult, CopyDeps, KeepLookDeps } from './artwork';
 export { scanSimilar, componentizeSimilar, componentizeResultMessage } from './similarApply';
 export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, tallyFill } from './placement';

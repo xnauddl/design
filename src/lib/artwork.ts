@@ -966,3 +966,56 @@ export async function restoreOverrides(
   }
   return failedBy;
 }
+
+/** `swapMemberAsync`가 쓰는 [등록] 실행 상태 · 의존(§4.7 "묶기" 2번 · 5번 5단계). */
+export interface SwapCtx {
+  copy: CopyDeps;
+  keepLook: KeepLookDeps;
+  fit: FitOpts;
+  /** 9번 값 지키기의 기록 대상 · 이번 실행이 만든 인스턴스 id(C-D18 다시 맞추기에서 뺀다). */
+  keepRoots: KeepRoot[];
+  made: Set<string>;
+  failures: string[];
+  propFailed: string[];
+  fillKept: string[];
+  placeFailed: string[];
+}
+
+/**
+ * 멤버(또는 탭 칸 · Tab Bar 인스턴스가 될 바) 자리를 `comp`의 인스턴스로 바꾼다 — 인스턴스(만든 id 기록) → 9번 기록 → 덮어쓴 값
+ * 옮기기 → 화면을 지키는 옮기기 → 넣기 전 검사 → 넣고 멤버를 지움. 걸리면 원본 그대로(꼬리 `fillKept` · `placeFailed`).
+ * 세트 ⑤ 나머지 멤버 · 탭 칸 · Tab Bar 인스턴스가 함께 쓴다. 감싼 도형이면 앞붙이(`shapePrefix`).
+ */
+export async function swapMemberAsync(comp: ComponentNode, node: SceneNode, type: string, ctx: SwapCtx): Promise<MemberResult['result']> {
+  const name = node.name;
+  const prefix = shapePrefix(comp, type);
+  const make = async (): Promise<InstanceNode> => {
+    const inst = comp.createInstance();
+    ctx.made.add(inst.id);
+    try {
+      const entry: KeepRoot = { node: inst, name };
+      ctx.keepRoots.push(entry);
+      const bad = await copyOverridesAsync(node, inst, prefix, ctx.copy);
+      // 화면을 지키는 옮기기(§4.7 8번) — 자리만 다른 사진 틀은 자르기로, 폭만 다른 글자는 글자 자동 크기로
+      for (const l of await keepLookAsync(node, inst, prefix, ctx.keepLook)) if (!bad.includes(l)) bad.push(l);
+      for (const p of bad) ctx.failures.push(t('component.fail.propValue', { name, prop: p }));
+      if (bad.length) { ctx.propFailed.push(name); entry.counted = true; }
+      return inst;
+    } catch (e) {
+      try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
+      throw e;
+    }
+  };
+  const before = ctx.propFailed.length;
+  const r = await replaceMemberAsync(node, make, prefix, ctx.fit);
+  if (r.result === 'replaced') return r.result;
+  if (ctx.propFailed.length > before) ctx.propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
+  if (r.result === 'mismatch') {
+    ctx.fillKept.push(name);
+    ctx.failures.push(t('component.fail.fillKept', { name, causePart: t('component.fail.cause', { why: r.why ?? '' }) }));
+  } else {
+    ctx.placeFailed.push(name);
+    ctx.failures.push(t('component.fail.memberKept', { name, causePart: r.why ? t('component.fail.cause', { why: r.why }) : '' }));
+  }
+  return r.result;
+}

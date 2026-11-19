@@ -10340,6 +10340,45 @@
     }
     return failedBy;
   }
+  async function swapMemberAsync(comp, node, type, ctx) {
+    var _a;
+    const name = node.name;
+    const prefix = shapePrefix(comp, type);
+    const make = async () => {
+      const inst = comp.createInstance();
+      ctx.made.add(inst.id);
+      try {
+        const entry = { node: inst, name };
+        ctx.keepRoots.push(entry);
+        const bad = await copyOverridesAsync(node, inst, prefix, ctx.copy);
+        for (const l of await keepLookAsync(node, inst, prefix, ctx.keepLook)) if (!bad.includes(l)) bad.push(l);
+        for (const p of bad) ctx.failures.push(t("component.fail.propValue", { name, prop: p }));
+        if (bad.length) {
+          ctx.propFailed.push(name);
+          entry.counted = true;
+        }
+        return inst;
+      } catch (e) {
+        try {
+          if (!inst.removed) inst.remove();
+        } catch (e2) {
+        }
+        throw e;
+      }
+    };
+    const before = ctx.propFailed.length;
+    const r = await replaceMemberAsync(node, make, prefix, ctx.fit);
+    if (r.result === "replaced") return r.result;
+    if (ctx.propFailed.length > before) ctx.propFailed.splice(before);
+    if (r.result === "mismatch") {
+      ctx.fillKept.push(name);
+      ctx.failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_a = r.why) != null ? _a : "" }) }));
+    } else {
+      ctx.placeFailed.push(name);
+      ctx.failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
+    }
+    return r.result;
+  }
 
   // src/lib/similar.ts
   function flattenFrame(root) {
@@ -12602,53 +12641,25 @@
             containers.push({ container: comp, scopes: [comp] });
             restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
           };
-          const swapMember = async (comp, node, type) => {
-            var _a2;
-            const name = node.name;
-            const prefix = shapePrefix(comp, type);
-            const make = async () => {
-              const inst = comp.createInstance();
-              madeInstanceIds.add(inst.id);
-              try {
-                const entry = { node: inst, name };
-                keepRoots.push(entry);
-                const bad = await copyOverridesAsync(node, inst, prefix, {
-                  mainOf: (n) => n.getMainComponentAsync(),
-                  loadFont: (f) => figma.loadFontAsync(f),
-                  isIcon: (n) => iconFrameKeyOf(n) !== void 0,
-                  iconFor: (v) => {
-                    const key = artKeyOf(v);
-                    return key ? iconRegistry.ensure(key, v, v.name) : null;
-                  }
-                });
-                for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
-                for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
-                if (bad.length) {
-                  propFailed.push(name);
-                  entry.counted = true;
-                }
-                return inst;
-              } catch (e) {
-                try {
-                  if (!inst.removed) inst.remove();
-                } catch (e2) {
-                }
-                throw e;
+          const swapMember = (comp, node, type) => swapMemberAsync(comp, node, type, {
+            copy: {
+              mainOf: (n) => n.getMainComponentAsync(),
+              loadFont: (f) => figma.loadFontAsync(f),
+              isIcon: (n) => iconFrameKeyOf(n) !== void 0,
+              iconFor: (v) => {
+                const key = artKeyOf(v);
+                return key ? iconRegistry.ensure(key, v, v.name) : null;
               }
-            };
-            const before = propFailed.length;
-            const r = await replaceMemberAsync(node, make, prefix, fitOpts);
-            if (r.result === "replaced") return r.result;
-            if (propFailed.length > before) propFailed.splice(before);
-            if (r.result === "mismatch") {
-              fillKept.push(name);
-              failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_a2 = r.why) != null ? _a2 : "" }) }));
-            } else {
-              placeFailed.push(name);
-              failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
-            }
-            return r.result;
-          };
+            },
+            keepLook: KEEP_LOOK_DEPS,
+            fit: fitOpts,
+            keepRoots,
+            made: madeInstanceIds,
+            failures,
+            propFailed,
+            fillKept,
+            placeFailed
+          });
           const resolved = groups.map((g) => {
             var _a2;
             return (_a2 = nameByGroup.get(g)) != null ? _a2 : "";

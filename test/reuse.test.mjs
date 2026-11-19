@@ -16,7 +16,7 @@ import {
   tabBarReuseKey,
   matchTabReuse,
 } from '../dist/pure.mjs';
-import { copyOverridesAsync, keepLookAsync, replaceMemberAsync, createIconRegistry } from '../dist/figma-lib.mjs';
+import { copyOverridesAsync, keepLookAsync, replaceMemberAsync, createIconRegistry, swapMemberAsync } from '../dist/figma-lib.mjs';
 
 /* ---------- 재사용 키 (1번) ---------- */
 
@@ -529,4 +529,40 @@ test('④ matchTabReuse — 모든 Style이 한 세트에 있을 때만 Tab Item
   const one = { kind: 'tab', keys: [], itemKeys: ['iT1', 'iT2'], barKeys: ['bT'] };
   assert.deepEqual(matchTabReuse(one, [...items, { id: 'solo', key: 'bT', setId: null }]).bar.ids, ['solo'], 'Style 하나 — 단독 Tab Bar');
   assert.deepEqual(matchTabReuse(plan, [...items, ...items.map((x) => ({ ...x, id: x.id + 'c', setId: 'TI2' }))]).item, { ids: null, keepKey: false }, '복제된 세트 둘 — 키를 남기지 않는다');
+});
+
+test('swapMemberAsync(6-1b 공용 칸 바꾸기) — 글자 칸 → Tab Item 인스턴스(감싼 앞붙이 0): replaced · 크기가 맞지 않으면 mismatch(원본 그대로)', async () => {
+  const w = world();
+  const sizedRow = () => {
+    const row = w.node('FRAME', 'nav', { layoutMode: 'NONE' }, []);
+    row.insertChild = function (i, c) { if (c.parent?.children) c.parent.children.splice(c.parent.children.indexOf(c), 1); c.parent = this; this.children.splice(i, 0, c); };
+    row.appendChild = function (c) { this.insertChild(this.children.length, c); };
+    return row;
+  };
+  // Tab Item 변형(Default) — 컴포넌트가 TEXT를 감쌌다
+  const variant = w.comp('ti-default', () => [Object.assign(w.txt('About', 'About'), { width: 57, height: 20, loaded: true })]);
+  variant.children = variant.make();
+  variant.createInstance = () => Object.assign(w.inst('Tab Item', variant), { width: 57, height: 20, resize(a, b) { this.width = a; this.height = b; this.children[0].width = a; this.children[0].height = b; } });
+  const ctx = () => ({ copy: { mainOf: w.mainOf, loadFont: async () => {}, iconFor: () => null }, keepLook: { imageSize: async () => null }, fit: {},
+    keepRoots: [], made: new Set(), failures: [], propFailed: [], fillKept: [], placeFailed: [] });
+  const row = sizedRow();
+  const cell = Object.assign(w.txt('Services', 'Services'), { width: 57, height: 20 });
+  row.appendChild(cell);
+  const c1 = ctx();
+  assert.equal(await swapMemberAsync(variant, cell, 'TEXT', c1), 'replaced');
+  assert.equal(row.children[0].type, 'INSTANCE');
+  assert.equal(row.children[0].children[0].characters, 'Services', '칸 글자를 옮긴다');
+  assert.equal(c1.made.size, 1);
+  assert.equal(c1.keepRoots.length, 1);
+  assert.equal(cell.removed, true);
+  // 크기를 맞출 수 없는 인스턴스 — 검사에 걸려 원본 그대로, 꼬리 fillKept
+  variant.createInstance = () => Object.assign(w.inst('Tab Item', variant), { width: 57, height: 20, resize() {} });
+  const row2 = sizedRow();
+  const cell2 = Object.assign(w.txt('Destination', 'Destination'), { width: 75, height: 20 });
+  row2.appendChild(cell2);
+  const c2 = ctx();
+  assert.equal(await swapMemberAsync(variant, cell2, 'TEXT', c2), 'mismatch');
+  assert.equal(row2.children[0], cell2);
+  assert.deepEqual(c2.fillKept, ['Destination']);
+  assert.equal(c2.failures.length, 1);
 });

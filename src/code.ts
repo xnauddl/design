@@ -20,7 +20,7 @@ import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor, isKnownRole } from './lib/n
 import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
 import { tabInfo, highConfidenceComponentRole } from './lib/componentLike';
 import { pickOwner } from './lib/usageRoles';
-import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, type OverrideSnap } from './lib/artwork';
+import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
@@ -2090,47 +2090,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
          * 옮기기 → 넣기 전 검사(`fitOpts`) → 넣고 멤버를 지움. 걸리면 원본 그대로(꼬리 `fillKept` · `placeFailed`). 세트 ⑤ · 탭 칸 ·
          * Tab Bar 인스턴스가 함께 쓴다(§4.7 "묶기" 2번 · 5번 5단계). 아이콘 찾기는 `iconRegistry`(아래에서 만든다).
          */
-        const swapMember = async (comp: ComponentNode, node: SceneNode, type: string): Promise<'replaced' | 'mismatch' | 'placeFailed'> => {
-          const name = node.name;
-          const prefix = shapePrefix(comp, type);
-          const make = async (): Promise<InstanceNode> => {
-            const inst = comp.createInstance();
-            madeInstanceIds.add(inst.id);
-            try {
-              const entry: KeepRoot = { node: inst, name };
-              keepRoots.push(entry); // 9번 값 지키기의 기록 대상
-              const bad = await copyOverridesAsync(node, inst, prefix, {
-                mainOf: (n) => n.getMainComponentAsync(),
-                loadFont: (f) => figma.loadFontAsync(f),
-                isIcon: (n) => iconFrameKeyOf(n) !== undefined,
-                iconFor: (v) => {
-                  const key = artKeyOf(v);
-                  return key ? iconRegistry.ensure(key, v, v.name) : null;
-                },
-              });
-              // 화면을 지키는 옮기기(§4.7 8번) — 자리만 다른 사진 틀은 자르기로, 폭만 다른 글자는 글자 자동 크기로
-              for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
-              for (const p of bad) failures.push(t('component.fail.propValue', { name, prop: p }));
-              if (bad.length) { propFailed.push(name); entry.counted = true; }
-              return inst;
-            } catch (e) {
-              try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ }
-              throw e;
-            }
-          };
-          const before = propFailed.length;
-          const r = await replaceMemberAsync(node, make, prefix, fitOpts);
-          if (r.result === 'replaced') return r.result;
-          if (propFailed.length > before) propFailed.splice(before); // 원본 그대로 — 따질 속성 값이 없다
-          if (r.result === 'mismatch') {
-            fillKept.push(name);
-            failures.push(t('component.fail.fillKept', { name, causePart: t('component.fail.cause', { why: r.why ?? '' }) }));
-          } else {
-            placeFailed.push(name);
-            failures.push(t('component.fail.memberKept', { name, causePart: r.why ? t('component.fail.cause', { why: r.why }) : '' }));
-          }
-          return r.result;
-        };
+        const swapMember = (comp: ComponentNode, node: SceneNode, type: string) => swapMemberAsync(comp, node, type, {
+          copy: {
+            mainOf: (n) => n.getMainComponentAsync(),
+            loadFont: (f) => figma.loadFontAsync(f),
+            isIcon: (n) => iconFrameKeyOf(n) !== undefined,
+            iconFor: (v) => {
+              const key = artKeyOf(v);
+              return key ? iconRegistry.ensure(key, v, v.name) : null;
+            },
+          },
+          keepLook: KEEP_LOOK_DEPS, fit: fitOpts, keepRoots, made: madeInstanceIds, failures, propFailed, fillKept, placeFailed,
+        });
 
         // 이름은 정렬 전에 정했다(위) — 순서와 1:1로 옮긴다.
         const resolved = groups.map((g) => nameByGroup.get(g) ?? '');
