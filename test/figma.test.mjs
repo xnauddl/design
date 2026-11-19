@@ -8439,6 +8439,8 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   const r2 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: bars2.map((b) => b.id) }), 'COMPONENTS_RESULT')[0];
   assert.deepEqual(r2.reused, ['Tab Item', 'Tab Bar'], JSON.stringify(r2.failures));
   assert.equal(r2.sets, 0);
+  assert.deepEqual(r2.fillKept, [], '재사용 칸 맞추기 — 틀 칸(알약)도 기존 변형과 맞는다');
+  assert.equal(root2.children[3].type, 'INSTANCE', '알약 바도 기존 Tab Bar 인스턴스');
   assert.equal(root2.children[0].type, 'INSTANCE');
   assert.equal(await mainName(root2.children[0]), 'Style=Text');
   assert.equal(root2.children[2].type, 'FRAME');

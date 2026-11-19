@@ -2216,7 +2216,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (!hit) { origCell.set(`${it.style}|${it.state}`, it.cell); continue; }
             const comp = itemComp.get(`${it.style}|${it.state}`)!;
             const { root } = reuseRootOf(comp, it.cell.type);
-            origCell.set(`${it.style}|${it.state}`, toStructNode(root, true, await instanceMainsAsync([root])));
+            // 틀 칸이면 변형 자신이 루트(COMPONENT) — 칸(FRAME)과의 타입 차는 보지 않는다.
+            origCell.set(`${it.style}|${it.state}`, { ...toStructNode(root, true, await instanceMainsAsync([root])), type: it.cell.type });
           }
           // ② 칸 → Tab Item 인스턴스. 나머지 바(재사용이면 대표도)는 칸 맞추기로 바 전체를 먼저 거른다.
           const cellsDone = new Set<string>(); // 칸을 바꾼(걸려도 바 전체를 원본으로 두지 않은) 바

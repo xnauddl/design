@@ -12787,7 +12787,7 @@
               }
               const comp = itemComp.get(`${it.style}|${it.state}`);
               const { root } = reuseRootOf(comp, it.cell.type);
-              origCell.set(`${it.style}|${it.state}`, toStructNode(root, true, await instanceMainsAsync([root])));
+              origCell.set(`${it.style}|${it.state}`, __spreadProps(__spreadValues({}, toStructNode(root, true, await instanceMainsAsync([root]))), { type: it.cell.type }));
             }
             const cellsDone = /* @__PURE__ */ new Set();
             for (const b of tp.bars) {
