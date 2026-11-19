@@ -252,7 +252,8 @@ function aliasesState(list: readonly unknown[]): SlotState {
   return aliases.some((a) => !isLiveAlias(a)) ? 'deleted' : 'bound';
 }
 
-function nodeFieldState(node: SceneNode, field: string): SlotState {
+/** 한 값 속성 자리의 연결 상태 — 만들기 추출(`extract.ts` freeBy)도 같은 판정을 쓴다(IA v4 §4.1 "만들기 카드 — 상태 5"). */
+export function nodeFieldState(node: SceneNode, field: string): SlotState {
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const entry = bv?.[field];
   if (!entry) {
@@ -274,7 +275,7 @@ const STROKE_SIDE_FIELDS = ['strokeTopWeight', 'strokeRightWeight', 'strokeBotto
  * Figma는 setBoundVariableForPaint로 붙인 뒤 둘 다 채우지만, 테마 적용·외부 도구는
  * 노드 배열만 남기는 경우가 있어 한쪽만 보면 이미 연결된 자리를 다시 덮는다.
  */
-function colorState(
+export function colorState(
   x: Paint | Effect,
   node: SceneNode,
   field: 'fills' | 'strokes' | 'effects',
@@ -329,12 +330,12 @@ function stateReason(s: SlotState): 'already-bound' | 'deleted-var' | null {
  * 비율이 잠긴 레이어(ia-v3 §2.11 "비율 고정") — 피그마는 크기 변수를 한 축만 붙여 둔다(세로를 붙이면 가로 연결이 풀린다).
  * 새 API(targetAspectRatio)와 낡은 API(constrainProportions)를 둘 다 본다.
  */
-function aspectLocked(n: SceneNode): boolean {
+export function aspectLocked(n: SceneNode): boolean {
   const x = n as unknown as { targetAspectRatio?: unknown; constrainProportions?: boolean };
   return x.targetAspectRatio != null || x.constrainProportions === true;
 }
 /** 잠긴 레이어의 크기 연결 상태 — 두 축 중 연결된 축 하나로(삭제된 변수가 먼저). */
-function lockedSizeState(n: SceneNode): { state: SlotState; field: 'width' | 'height' } {
+export function lockedSizeState(n: SceneNode): { state: SlotState; field: 'width' | 'height' } {
   const w = nodeFieldState(n, 'width');
   const h = nodeFieldState(n, 'height');
   if (w === 'deleted' || h === 'deleted') return { state: 'deleted', field: w === 'deleted' ? 'width' : 'height' };
@@ -951,7 +952,7 @@ function entryDisplay(e: VarEntry, s: Slot): string {
 }
 
 /** 숫자 필드의 허용 용도. */
-const numAllowed = (field: string): readonly VariableScope[] => {
+export const numAllowed = (field: string): readonly VariableScope[] => {
   const scope = FIELD_SCOPE[field];
   return scope ? [scope] : ['ALL_SCOPES'];
 };

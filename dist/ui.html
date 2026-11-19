@@ -1736,6 +1736,8 @@
     "v4.noVarsFile": "\uC774 \uD30C\uC77C\uC5D4 \uC544\uC9C1 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "v4.reading": "\uC120\uD0DD\uC744 \uC77D\uB294 \uC911\u2026",
     "v4.libOnly": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uB9CC \uC368\uC694 \xB7 \uC5F0\uACB0\uC740 \uD53C\uADF8\uB9C8 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uD574\uC694",
+    "v4.libSame": "\uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0 \uAC19\uC740 \uAC12 {k}\uACF3 \u2014 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
+    // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
     "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
     "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
@@ -1834,6 +1836,8 @@
     "mkc.lockNoSem": "\u{1F512} \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
     "mkc.lockAfter": "\u{1F512} Semantic {r}\uAC1C",
     "mkc.titleMade": "Global \uBCC0\uC218 {c}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "mkc.titleLib": "\uBCC0\uC218\uAC00 \uC548 \uBD99\uC740 \uAC12 {n}\uACF3",
+    // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
     "mkc.subAfter": "\uAC19\uC740 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
     "mkc.link": "{o}\uACF3 \uC5F0\uACB0 \u2192",
     "mkc.noDefault": "\uAE30\uBCF8\uC73C\uB85C \uB9CC\uB4E4 \uAC12\uC774 \uC5C6\uC5B4\uC694",
@@ -2553,6 +2557,44 @@
     const m = candidateFields.length;
     return { m, k, s, n: m + k, byKind: order(byKind), noVarByKind: order(noVar) };
   }
+  var COLOR_CATS = /* @__PURE__ */ new Set(["color", "effectColor"]);
+  function libValueSame(tk, v) {
+    const val = v.value;
+    if (!val || val.kind === "alias") return false;
+    if (COLOR_CATS.has(tk.category)) {
+      if (v.type !== "COLOR" || val.kind !== "color" || typeof val.hex !== "string" || typeof tk.value !== "string") return false;
+      return colorKey(tk.value, tk.alpha) === colorKey(val.hex, val.alpha);
+    }
+    if (typeof tk.value !== "number" || v.type !== "FLOAT" || val.kind !== "number") return false;
+    const x = Number(val.text);
+    return Number.isFinite(x) && Math.round(x * 100) === Math.round(tk.value * 100);
+  }
+  function libScopeOk(v, key) {
+    if (!v.scopes || !key) return true;
+    return v.scopes.includes("ALL_SCOPES") || key.split("|").some((s) => v.scopes.includes(s));
+  }
+  function libSameSplit(tokens2, libs) {
+    var _a3, _b;
+    const left = [];
+    const leftPlaces = {};
+    let n = 0;
+    let L = 0;
+    for (const tk of tokens2) {
+      const groups = (_b = tk.freeBy) != null ? _b : { "": (_a3 = tk.count) != null ? _a3 : 0 };
+      let rest = 0;
+      for (const [key, places] of Object.entries(groups)) {
+        if (!(places > 0)) continue;
+        if (libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key))) L += places;
+        else rest += places;
+      }
+      if (rest > 0) {
+        left.push(tk);
+        leftPlaces[tk.name] = rest;
+        n += rest;
+      }
+    }
+    return { left, leftPlaces, n, L };
+  }
 
   // src/lib/bindGroups.ts
   function placeKey(c) {
@@ -3022,13 +3064,13 @@
     return state2 === false;
   }
   function mergeSameNameTokens(tokens2) {
-    var _a3, _b, _c;
+    var _a3, _b, _c, _d, _e;
     const out = [];
     const byName = /* @__PURE__ */ new Map();
     for (const t2 of tokens2) {
       const prev = byName.get(t2.name);
       if (!prev) {
-        const copy = __spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {});
+        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
         byName.set(t2.name, copy);
         out.push(copy);
         continue;
@@ -3044,6 +3086,10 @@
         }
       }
       if (t2.count != null) prev.count = Math.max((_c = prev.count) != null ? _c : 0, t2.count);
+      if (t2.freeBy) {
+        const fb = (_d = prev.freeBy) != null ? _d : prev.freeBy = {};
+        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_e = fb[k]) != null ? _e : 0) + n;
+      }
     }
     return out;
   }
@@ -7131,6 +7177,8 @@
   var mkExtractReq = 0;
   var mkReading = false;
   var mkOn = /* @__PURE__ */ new Map();
+  var mkOffByLib = /* @__PURE__ */ new Set();
+  var mkTouched = /* @__PURE__ */ new Set();
   var mkCollapsed = /* @__PURE__ */ new Set();
   var mkTreeFresh = true;
   var mkTab = null;
@@ -7169,10 +7217,29 @@
     var _a3;
     return ((_a3 = mkStates[tk.name]) == null ? void 0 : _a3.state) === "manual";
   };
-  var mkIsOn = (tk) => {
+  var mkOnNoLib = (tk) => {
     var _a3;
     return !mkLocked(tk) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : true);
   };
+  var mkIsOn = (tk) => {
+    var _a3;
+    return !mkLocked(tk) && (mkTouched.has(tk.name) || !mkOffByLib.has(tk.name)) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : true);
+  };
+  function mkSetOn(name, on) {
+    mkOn.set(name, on);
+    mkTouched.add(name);
+  }
+  function mkRecalcOffByLib() {
+    mkOffByLib.clear();
+    if (!baseline || !usageMap) return;
+    const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
+    if (!vmTableKnown && !prereqKnown) return;
+    const libs = libDirectNow();
+    if (!libs.length || !(localZero || mcKeep())) return;
+    const toks = mkTokens.filter((tk) => mkKind(tk) !== "text");
+    const left = new Set(libSameSplit(toks, libs).left.map((tk) => tk.name));
+    for (const tk of toks) if (!left.has(tk.name)) mkOffByLib.add(tk.name);
+  }
   var mkGlobalsOn = () => mkTokens.filter(mkIsOn);
   var mkSendTokens = () => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
   var mkTsName = (s) => {
@@ -7264,7 +7331,7 @@
     const prevByKind = /* @__PURE__ */ new Map();
     for (const tk of mkTokens) {
       const k = mkKind(tk);
-      if (k) prevByKind.set(k, [...(_a3 = prevByKind.get(k)) != null ? _a3 : [], mkIsOn(tk)]);
+      if (k) prevByKind.set(k, [...(_a3 = prevByKind.get(k)) != null ? _a3 : [], mkOnNoLib(tk)]);
     }
     mkTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
     for (const tk of mkTokens) {
@@ -7274,6 +7341,7 @@
       mkOn.set(tk.name, prev ? prev.some(Boolean) : k !== "text");
     }
     mkFor = baseKey();
+    mkRecalcOffByLib();
     if (!sameBase) mkTreeFresh = true;
     renderMakeScreen();
     mkSendPreview();
@@ -7358,7 +7426,7 @@
             cells,
             right: [mkLayers(tk.count)],
             sw: { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
-              mkOn.set(tk.name, !on);
+              mkSetOn(tk.name, !on);
               mkPreviewSoon();
               renderMakeScreen();
             } }
@@ -7374,7 +7442,7 @@
           children: rows,
           sw: { state: hs, label: t("tree.headAria", { name: KIND_HEAD[k] }), onToggle: () => {
             const to = headToggleTarget(hs);
-            for (const tk of list) if (!mkLocked(tk)) mkOn.set(tk.name, to);
+            for (const tk of list) if (!mkLocked(tk)) mkSetOn(tk.name, to);
             mkPreviewSoon();
             renderMakeScreen();
           } }
@@ -7907,7 +7975,7 @@
       if (on) mkTsOff.clear();
       else for (const s of mkTs) mkTsOff.add(tsSig(s));
     } else {
-      for (const tk of mkTokens) if (!mkLocked(tk)) mkOn.set(tk.name, on);
+      for (const tk of mkTokens) if (!mkLocked(tk)) mkSetOn(tk.name, on);
       mkPreviewSoon();
     }
     renderMakeScreen();
@@ -9219,6 +9287,7 @@ ${opts.tip}` : text;
       mkTreeFresh = true;
       mkTab = null;
       mkCancelNote = "";
+      mkRecalcOffByLib();
       if (!mkRunning && !mkResults) readMake();
       else renderMakeScreen();
     }
@@ -9812,7 +9881,10 @@ ${opts.tip}` : text;
     }
     if (msg.reqId !== vmUsageReq) return;
     vmUsageInFlight = false;
-    const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => l.id), msg.deleted.count]);
+    const sig = JSON.stringify([msg.usage, msg.libraryVars.map((l) => {
+      var _a3, _b;
+      return [l.id, (_a3 = l.value) != null ? _a3 : null, (_b = l.scopes) != null ? _b : null];
+    }), msg.deleted.count]);
     const changed = sig !== vmUsageSig || usageMap === null;
     vmUsageSig = sig;
     if (changed) {
@@ -11939,6 +12011,8 @@ ${opts.tip}` : text;
   var mcSendBase = "";
   var mcDeferred = false;
   var mcFailedFor = null;
+  var mcSendSig = "";
+  var mcPrevSig = "";
   var mcMemo = null;
   var mcCreating = null;
   var mcJust = /* @__PURE__ */ new Set();
@@ -11956,13 +12030,30 @@ ${opts.tip}` : text;
     const k = mkKind(tk);
     return !!k && k !== "text";
   });
+  var libDirectNow = () => usageMap ? libVars.filter((l) => {
+    var _a3, _b;
+    return ((_b = (_a3 = usageMap.get(l.id)) == null ? void 0 : _a3.places) != null ? _b : 0) > 0;
+  }) : [];
+  function mcLibSplit() {
+    const libs = libDirectNow();
+    return libs.length ? libSameSplit(mcPicked(), libs) : null;
+  }
+  var mcShown = () => {
+    var _a3, _b;
+    return (_b = (_a3 = mcLibSplit()) == null ? void 0 : _a3.left) != null ? _b : mcPicked();
+  };
+  var mcSigOf = (toks) => JSON.stringify(toks.map((tk) => {
+    var _a3;
+    return [tk.name, tk.value, (_a3 = tk.alpha) != null ? _a3 : 1];
+  }));
+  var mcExtracting = () => mcInFlight && mcPreviewReq === 0;
   var mcState = (name) => {
     var _a3;
     return mcJust.has(name) ? "reuse" : (_a3 = mcStates[name]) == null ? void 0 : _a3.state;
   };
   var mcRemembered = (name) => !!mcMemo && mcMemo.base === baseKey() && (mcMemo.names.has(name) || mcJust.has(name));
   var mcMadeCount = () => mcTokens.filter((tk) => mcRemembered(tk.name) && mcState(tk.name) === "reuse").length;
-  var mcNewTokens = () => mcPicked().filter((tk) => mcState(tk.name) === "new");
+  var mcNewTokens = () => mcShown().filter((tk) => mcState(tk.name) === "new");
   function mcKeep() {
     if (isPaid || !mcMemo || !baseline || mcMemo.base !== baseKey()) return false;
     return mcMadeCount() >= 1;
@@ -11997,7 +12088,17 @@ ${opts.tip}` : text;
     else if (msg.type === "ERROR") {
       if (rid === mcExtractReq || rid === mcPreviewReq) {
         mcInFlight = false;
-        if (mcSendBase === baseKey()) mcFailedFor = mcSendBase;
+        const extractFailed = rid === mcExtractReq && mcPreviewReq === 0;
+        if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && mcLibSplit() && !mcShown().length) {
+          mcPrevFor = mcFor;
+          mcPrevSig = mcSigOf([]);
+          renderSelHome();
+          return true;
+        }
+        if (mcSendBase === baseKey()) {
+          mcFailedFor = mcSendBase;
+          if (extractFailed) mcFor = null;
+        }
         renderSelHome();
       } else if (rid === mcCreateReq) {
         mcCreateReq = 0;
@@ -12020,26 +12121,51 @@ ${opts.tip}` : text;
     huefyTokenColors(raw);
     mcTokens = mergeSameNameTokens(raw).filter((tk) => mkKind(tk));
     mcFor = mcSendBase;
-    const picked = mcPicked();
-    if (!picked.length) {
+    const shown = mcShown();
+    if (!shown.length) {
       mcStates = {};
       mcR = 0;
       mcG = 0;
       mcPrevFor = mcFor;
+      mcPrevSig = mcSigOf([]);
       mcInFlight = false;
       mcFailedFor = null;
       renderSelHome();
       return;
     }
+    mcSendPreview(shown);
+    renderSelHome();
+  }
+  function mcSendPreview(toks) {
+    mcSendSig = mcSigOf(toks);
+    mcInFlight = true;
+    mcSendBase = baseKey();
     mcPreviewReq = mcNextReq();
     opSilent = true;
-    send({ type: "CREATE_TOKENS", tokens: picked, base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
+    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
     opSilent = false;
+  }
+  function mcResync() {
+    const base = baseKey();
+    if (mcFor !== base || mcPrevFor !== base || mcFailedFor === base) return false;
+    if (mcInFlight) return true;
+    const shown = mcShown();
+    const sig = mcSigOf(shown);
+    if (sig === mcPrevSig) return false;
+    if (!shown.length) {
+      mcPrevSig = sig;
+      mcG = 0;
+      mcR = 0;
+      return false;
+    }
+    mcSendPreview(shown);
+    return true;
   }
   function onMcPreview(msg) {
     var _a3, _b;
     mcInFlight = false;
     if (mcSendBase !== baseKey()) return;
+    mcPrevSig = mcSendSig;
     mcStates = (_a3 = msg.tokenStates) != null ? _a3 : {};
     mcG = msg.created + msg.updated;
     mcR = (_b = msg.roles) != null ? _b : 0;
@@ -12082,7 +12208,7 @@ ${opts.tip}` : text;
     renderSelHome();
   }
   function mcRows() {
-    return mcPicked().map((tk, i) => ({ tk, i })).sort((a, b) => {
+    return mcShown().map((tk, i) => ({ tk, i })).sort((a, b) => {
       var _a3, _b;
       return ((_a3 = b.tk.count) != null ? _a3 : 0) - ((_b = a.tk.count) != null ? _b : 0) || a.i - b.i;
     }).slice(0, 4).map((x) => x.tk);
@@ -12092,15 +12218,15 @@ ${opts.tip}` : text;
     const other = otherWriteOp();
     return other ? t("bind.waitOp", { op: other }) : null;
   }
-  function renderMakeCard(put, keep) {
+  function renderMakeCard(put, keep, lib) {
     var _a3, _b, _c, _d;
     const base = baseKey();
     const c = keep ? mcMadeCount() : 0;
-    const title = keep ? t("mkc.titleMade", { c }) : t("v4.noVarsFile");
+    const title = keep ? t("mkc.titleMade", { c }) : lib ? lib.n != null ? t("mkc.titleLib", { n: lib.n }) : t("v4.reading") : t("v4.noVarsFile");
     const findHere = selFindFor === base && !selFindInFlight;
     if (mcFailedFor === base) {
       if (mcInFlight) {
-        put(selCard({ title, subs: [t("v4.reading")] }));
+        put(lib && lib.n == null ? selCard({ title }) : selCard({ title, subs: [t("v4.reading")] }));
         return;
       }
       const rd = selBtn(t("v4.reread"), () => {
@@ -12115,7 +12241,8 @@ ${opts.tip}` : text;
       put(selCard({ title: t("mkc.readFailed"), actions: [rd] }));
       return;
     }
-    const ready = mcFor === base && mcPrevFor === base;
+    const resending = mcResync();
+    const ready = mcFor === base && mcPrevFor === base && !resending;
     if (!keep && (!ready || mcInFlight)) {
       put(selCard({ title, subs: [t("v4.reading")] }));
       return;
@@ -12140,7 +12267,7 @@ ${opts.tip}` : text;
     };
     const tsLine = (hasMain) => {
       const n = bindPreviewed && findHere ? tsAllNodes().size : 0;
-      if (!n || reading) return;
+      if (!n || reading || lib) return;
       const row = document.createElement("div");
       row.className = "mk-ts";
       const l = document.createElement("span");
@@ -12182,7 +12309,7 @@ ${opts.tip}` : text;
       if (right) d.appendChild(right);
       card.appendChild(d);
     };
-    const picked = mcPicked();
+    const picked = mcShown();
     if (!mcTokens.length) {
       sub([t("make.zero")]);
       tsLine(false);
@@ -12358,15 +12485,17 @@ ${opts.tip}` : text;
         put(reading());
         return finishSelFocus(hadFocus);
       }
-      const libDirect = libVars.filter((l) => {
-        var _a4, _b;
-        return ((_b = (_a4 = usageMap == null ? void 0 : usageMap.get(l.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
-      });
+      const libDirect = libDirectNow();
       if (libDirect.length) {
+        const base = baseKey();
+        const split = mcFor === base ? mcLibSplit() : null;
+        const makeShown = mcFailedFor === base ? !split || split.left.length > 0 : !!split && split.left.length > 0;
         const subs = [];
         const actions = [];
-        tsOnlyExtra(subs, actions);
+        if (split && split.L > 0 && !mcExtracting()) subs.push(t("v4.libSame", { k: split.L }));
+        if (!bindFindFailed) tsOnlyExtra(subs, actions, makeShown);
         put(selCard({ title: t("v4.libOnly"), subs, actions }));
+        if (makeShown) renderMakeCard(put, false, { n: split ? split.n : null });
         renderUsesCard(put);
       } else {
         renderMakeCard(put, mcKeep());
@@ -12412,13 +12541,13 @@ ${opts.tip}` : text;
       }
     });
   }
-  function tsOnlyExtra(subs, actions) {
+  function tsOnlyExtra(subs, actions, secondary = false) {
     const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
     if (!n) return;
     subs.push(t("v4.tsPlaces", { t: n }));
     const b = selBtn(t("v4.linkN", { n }), (el) => {
       showSelSub("bind", el);
-    }, !actions.length);
+    }, !actions.length && !secondary);
     b.dataset.k = "tsLink";
     actions.push(b);
   }

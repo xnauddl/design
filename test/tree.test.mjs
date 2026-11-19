@@ -64,3 +64,48 @@ test('용어 — 화면 문구에 Semantic 변수 뜻의 "역할"이 남지 않�
   const left = Object.entries(STRINGS).filter(([k, v]) => typeof v === 'string' && v.includes('역할') && !allowed.has(k)).map(([k]) => k);
   assert.deepEqual(left, []);
 });
+
+/* ---------- 상태 5 만들기 카드 — 라이브러리와 같은 값(IA v4 §4.1 "만들기 카드 — 상태 5" · B.30) ---------- */
+import { libSameSplit } from '../dist/pure.mjs';
+
+const tok = (name, category, value, freeBy, extra = {}) => ({ name, category, value, sources: [], count: 3, ...(freeBy ? { freeBy } : {}), ...extra });
+const libC = (hex, extra = {}) => ({ type: 'COLOR', value: { kind: 'color', hex, ...(extra.alpha != null ? { alpha: extra.alpha } : {}) }, ...(extra.scopes ? { scopes: extra.scopes } : {}) });
+const libN = (text, scopes) => ({ type: 'FLOAT', value: { kind: 'number', text }, ...(scopes ? { scopes } : {}) });
+
+test('libSameSplit — 색: hex 대소문자는 같음 · #3366FF와 #3366FF 50%는 다름', () => {
+  const fills = { 'ALL_FILLS|FRAME_FILL': 2 };
+  assert.equal(libSameSplit([tok('c', 'color', '#3366ff', fills)], [libC('#3366FF')]).L, 2);
+  const half = libSameSplit([tok('c', 'color', '#3366ff', fills)], [libC('#3366FF', { alpha: 0.5 })]);
+  assert.deepEqual([half.L, half.n, half.left.length], [0, 2, 1]);
+  // 토큰이 반투명이면 같은 투명도의 변수만(소수 둘째 자리)
+  assert.equal(libSameSplit([tok('c', 'color', '#3366ff', fills, { alpha: 0.5 })], [libC('#3366FF', { alpha: 0.502 })]).L, 2);
+});
+
+test('libSameSplit — 숫자는 소수 둘째 자리(8 = 8.004) · 타입이 다르면 비교하지 않음', () => {
+  assert.equal(libSameSplit([tok('s', 'gap', 8, { GAP: 4 })], [libN('8.004')]).L, 4);
+  assert.equal(libSameSplit([tok('s', 'gap', 8, { GAP: 4 })], [libN('8.01')]).n, 4);
+  assert.equal(libSameSplit([tok('s', 'gap', 8, { GAP: 4 })], [{ type: 'STRING', value: { kind: 'string', text: '8' } }]).n, 4);
+});
+
+test('libSameSplit — 스코프가 안 맞으면 남은 값 · ALL_SCOPES는 통과 · 스코프 없는 옛 응답은 통과', () => {
+  const r = tok('r', 'radius', 8, { CORNER_RADIUS: 4 });
+  const miss = libSameSplit([r], [libN('8', ['GAP'])]);
+  assert.deepEqual([miss.L, miss.n, miss.left.map((x) => x.name)], [0, 4, ['r']]);
+  assert.equal(libSameSplit([r], [libN('8', ['ALL_SCOPES'])]).L, 4);
+  assert.equal(libSameSplit([r], [libN('8')]).L, 4);
+});
+
+test('libSameSplit — 별칭 · 값 없는 라이브러리 변수는 비교하지 않음', () => {
+  const s = tok('s', 'gap', 8, { GAP: 2 });
+  assert.equal(libSameSplit([s], [{ type: 'FLOAT', value: { kind: 'alias', aliasId: 'x', aliasName: 'x' } }]).n, 2);
+  assert.equal(libSameSplit([s], [{ type: 'FLOAT' }]).n, 2);
+});
+
+test('libSameSplit — freeBy 없음 = count 한 묶음 · free 0은 어디에도 세지 않음 · 한 토큰이 같은 값 · 남은 자리를 함께', () => {
+  const old = libSameSplit([tok('o', 'gap', 8)], [libN('8', ['CORNER_RADIUS'])]); // 묶음 키가 없어 스코프를 보지 않는다
+  assert.equal(old.L, 3);
+  const zero = libSameSplit([tok('z', 'gap', 8, {})], []);
+  assert.deepEqual([zero.L, zero.n, zero.left.length], [0, 0, 0]);
+  const mix = libSameSplit([tok('m', 'color', '#101828', { 'ALL_FILLS|TEXT_FILL': 2, 'ALL_FILLS|FRAME_FILL': 3 })], [libC('#101828', { scopes: ['FRAME_FILL'] })]);
+  assert.deepEqual([mix.L, mix.n, mix.leftPlaces.m], [3, 2, 2]);
+});
