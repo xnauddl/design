@@ -2842,25 +2842,37 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 (A.19는 6-1b 컴포넌트 규칙 PR #153이 쓴다.)
 
 **1. 숫자 쓰임 이름(N-D1)**
-- [ ] `usageRoles.ts`: `composeName` · `paddingProp` · `radiusName` · `strokeName` · `simpleNumericName`에서 주인을 뺀다. `…/default` 이름의 꼬리는 마지막 마디를 바꾼다(`radius/sm` · `radius/lg`) — `nameKindOf` · `familyRe` · `assignNumbers` · 되돌림
-- [ ] 연결(`bind.ts`) · 만들기(`createUsageRoles` · `extract.ts`)에서 쓰임 이름용 주인 계산을 뺀다 — 다른 곳(`inUiRole`)이 쓰는 함수는 그대로
+- [x] `usageRoles.ts`: `composeName` · `paddingProp` · `radiusName` · `strokeName` · `simpleNumericName`에서 주인을 뺀다. `…/default` 이름의 꼬리는 마지막 마디를 바꾼다(`radius/sm` · `radius/lg`) — `nameKindOf` · `familyRe` · `assignNumbers` · 되돌림
+- [x] 연결(`bind.ts`) · 만들기(`createUsageRoles` · `extract.ts`)에서 쓰임 이름용 주인 계산을 뺀다 — 다른 곳(`inUiRole`)이 쓰는 함수는 그대로
 **2. 텍스트 스타일 역할 변수(N-D2 · N-D2a · N-D3)**
-- [ ] `nameKrdsStyles`가 `sizeKey`를 함께 돌려주고 `TextStyleSpec.step`에 싣는다(이름 문자열을 다시 읽지 않음 · `step` 없으면 스타일 이름 전체)
-- [ ] `createSemanticTextStyles`: 역할 최종 이름을 `assignNames`로(파일 Semantic = 차지, 같은 값 가족 = 재사용, 글자 크기 `-sm` · `-lg`, 줄 높이 · 자간 `-tight` · `-loose`, 곳 수 = 스타일 수) — 이름으로 덮어쓰지 않음. 스타일 → 최종 이름 표로 3단계 연결 · 앵커 경로(`semNames.has` · `pushAlias`)가 찾음. 새 변수에 `dsl.textStep`
-- [ ] 재사용은 표시(`dsl.textStep`) 있는 변수만 · 표시는 `step`으로 지은 변수에만
-- [ ] 이름 다시 짓기 · 등록 0단계: 옛 규칙 변수(표시 없음 · 이름 = `{그룹}/{스타일 지금 이름}`)에 연결된 스타일만 변수 이름 함께 바꾸기 · 새 규칙 변수에 연결된 스타일은 (이름 다시 짓기에서만) 새 `sizeKey` ≠ 지금 표시 변수의 단계면 N-D2a — `TsRenameRow` · `TsRenameItem.step`(새 단계 변수로 옮겨 연결 — 없으면 만듦 · 글꼴 불러옴 · 실패는 "옮기지 못함" · ⌘Z 한 번) · 새 키 `textStyle.renameRoleMoveError` · `textStyle.renameRoleMoveNames`
-- [ ] `-tight` · `-loose` 꼬리 말: `nameKindOf`(줄 높이 · 자간 종류) · `familyRe` · 꼬리 목록 · 연결 경로의 `line-height/text` · `letter-spacing/text`
+- [x] `nameKrdsStyles`가 `sizeKey`를 함께 돌려주고 `TextStyleSpec.step`에 싣는다(이름 문자열을 다시 읽지 않음 · `step` 없으면 스타일 이름 전체)
+- [x] `createSemanticTextStyles`: 역할 최종 이름을 `assignNames`로(파일 Semantic = 차지, 같은 값 가족 = 재사용, 글자 크기 `-sm` · `-lg`, 줄 높이 · 자간 `-tight` · `-loose`, 곳 수 = 스타일 수) — 이름으로 덮어쓰지 않음. 스타일 → 최종 이름 표로 3단계 연결 · 앵커 경로(`semNames.has` · `pushAlias`)가 찾음. 새 변수에 `dsl.textStep`
+- [x] 재사용은 표시(`dsl.textStep`) 있는 변수만 · 표시는 `step`으로 지은 변수에만
+- [x] 이름 다시 짓기 · 등록 0단계: 옛 규칙 변수(표시 없음 · 이름 = `{그룹}/{스타일 지금 이름}`)에 연결된 스타일만 변수 이름 함께 바꾸기 · 새 규칙 변수에 연결된 스타일은 (이름 다시 짓기에서만) 새 `sizeKey` ≠ 지금 표시 변수의 단계면 N-D2a — `TsRenameRow` · `TsRenameItem.step`(새 단계 변수로 옮겨 연결 — 없으면 만듦 · 글꼴 불러옴 · 실패는 "옮기지 못함" · ⌘Z 한 번) · 새 키 `textStyle.renameRoleMoveError` · `textStyle.renameRoleMoveNames`
+- [x] `-tight` · `-loose` 꼬리 말: `nameKindOf`(줄 높이 · 자간 종류) · `familyRe` · 꼬리 목록 · 연결 경로의 `line-height/text` · `letter-spacing/text`
 **3. 색 기준색(N-D4)**
-- [ ] `colorRoleRef` · `colorRoleBases`: 배경 = 불투명 무채색 중 가장 밝은 색, 글자 · 아이콘 = 가장 진한 색, 테두리 · 그림자 = 곳 수 1위, 불투명 무채색이 없으면 곳 수 1위. 파일의 `default`가 먼저(그대로)
+- [x] `colorRoleRef` · `colorRoleBases`: 배경 = 불투명 무채색 중 가장 밝은 색, 글자 · 아이콘 = 가장 진한 색, 테두리 · 그림자 = 곳 수 1위, 불투명 무채색이 없으면 곳 수 1위. 파일의 `default`가 먼저(그대로)
 **4. 알약 반경(N-D5)**
-- [ ] 모서리마다 알약 판정(반경 ≥ 짧은 변 / 2) → 9999로 바꾼 뒤 "모두 같음" · `radius/full`은 `plain` 종류
-- [ ] 추출: 알약은 9999로 셈 → Global `radius/9999` · Semantic `radius/full`
-- [ ] 연결: 순서 1 · 3은 원래 값, 순서 2 · 4 · 무료(`globalFor`)는 9999 · 붙이면 레이어 값 9999 · 연결 직전 다시 확인은 "원래 값이 같고 지금도 알약"
+- [x] 모서리마다 알약 판정(반경 ≥ 짧은 변 / 2) → 9999로 바꾼 뒤 "모두 같음" · `radius/full`은 `plain` 종류
+- [x] 추출: 알약은 9999로 셈 → Global `radius/9999` · Semantic `radius/full`
+- [x] 연결: 순서 1 · 3은 원래 값, 순서 2 · 4 · 무료(`globalFor`)는 9999 · 붙이면 레이어 값 9999 · 연결 직전 다시 확인은 "원래 값이 같고 지금도 알약"
 **5. 이름 정리(N-D6)**
-- [ ] `rename.ts` 폴백: 자식 2개 이상 · `HORIZONTAL` → `stack-x`, `VERTICAL` → `stack-y`, 나머지 `container`. `PASSTHROUGH_ROLES` · `STRUCT_FALLBACK_NAMES` · `naming.ts` 역할 어휘 · 출력 역할 · `GENERIC_ROLES` · `usageRoles.ts` `STRUCTURAL`에 더함
-- [ ] `pickScope`: 이름 전체가 구조 폴백 이름(`container` · `wrapper` · `stack-x` · `stack-y`)이면 `null`
+- [x] `rename.ts` 폴백: 자식 2개 이상 · `HORIZONTAL` → `stack-x`, `VERTICAL` → `stack-y`, 나머지 `container`. `PASSTHROUGH_ROLES` · `STRUCT_FALLBACK_NAMES` · `naming.ts` 역할 어휘 · 출력 역할 · `GENERIC_ROLES` · `usageRoles.ts` `STRUCTURAL`에 더함
+- [x] `pickScope`: 이름 전체가 구조 폴백 이름(`container` · `wrapper` · `stack-x` · `stack-y`)이면 `null`
 **6. 테스트 · 마무리**
-- [ ] 단위 테스트: ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 `spacing/gap` ② 반경 8(10곳) · 24(3곳) · 4(2곳) → `radius/default` · `radius/lg` · `radius/sm` ③ 높이 40 · 반경 150 버튼 → `radius/full` = 9999 · 레이어 반경 9999, 높이 40 · [20, 0, 0, 20] → `radius/full`, [20, 8, 20, 8] → `radius/top-left`(9999) · `radius/top-right`(8) ④ `body/large-w500-120` · `body/large-w700-150` → `font-size/body/large` 하나 · 파일에 `font-size/body/large` = 19가 있으면 18은 `-sm`(덮지 않음) ⑤ 줄 높이 27(3) · 24 · 32(px) → `line-height/body/large` · `-tight` · `-loose` ⑥ 배경 #A3A3A3(곳 수 많음) · #FFFFFF → `default` = #FFFFFF · `strong` = #A3A3A3, 글자 #000000@30%만 있고 불투명 무채색 없음 → 곳 수 1위 ⑦ 가로 오토레이아웃 자식 2 → `stack-x`, 세로 → `stack-y`, 오토레이아웃 아님 → `container`, 자식 1 → `wrapper` · `stack-x`를 루트로 다시 고르면 자식 맥락 없음 ⑧ 옛 이름 `spacing/card/gap`만 있는 파일 → 새 `spacing/gap`을 만들고 옛 것은 그대로 ⑨ 이름 다시 짓기 `body/large-w500-120` → `body/medium-…`(새 규칙 변수) → 스타일이 `font-size/body/medium`에 붙고 `font-size/body/large`는 남음 · 옛 규칙 변수에 붙은 스타일은 변수 이름만 함께 바뀜 · 옛 스타일 `body/large`가 쓰던 표시 없는 `font-size/body/large` = 18이 있는 파일에 `body/large-w700`(18)을 등록 → 그 변수를 재사용하지 않고 `font-size/body/large-2`(표시 있음)를 만듦 ⑩ QA 5와 같은 모양의 입력에서 Semantic 수가 줄어듦(수를 적는다)
-- [ ] 기존 테스트 기대값 — 바뀌는 것은 사유와 함께 고친다(주인 이름 · 텍스트 스타일 역할 이름 · 배경 default · `container`)
-- [ ] 4검사 · `dist/` 다시 빌드
+- [x] 단위 테스트: ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 `spacing/gap` ② 반경 8(10곳) · 24(3곳) · 4(2곳) → `radius/default` · `radius/lg` · `radius/sm` ③ 높이 40 · 반경 150 버튼 → `radius/full` = 9999 · 레이어 반경 9999, 높이 40 · [20, 0, 0, 20] → `radius/full`, [20, 8, 20, 8] → `radius/top-left`(9999) · `radius/top-right`(8) ④ `body/large-w500-120` · `body/large-w700-150` → `font-size/body/large` 하나 · 파일에 `font-size/body/large` = 19가 있으면 18은 `-sm`(덮지 않음) ⑤ 줄 높이 27(3) · 24 · 32(px) → `line-height/body/large` · `-tight` · `-loose` ⑥ 배경 #A3A3A3(곳 수 많음) · #FFFFFF → `default` = #FFFFFF · `strong` = #A3A3A3, 글자 #000000@30%만 있고 불투명 무채색 없음 → 곳 수 1위 ⑦ 가로 오토레이아웃 자식 2 → `stack-x`, 세로 → `stack-y`, 오토레이아웃 아님 → `container`, 자식 1 → `wrapper` · `stack-x`를 루트로 다시 고르면 자식 맥락 없음 ⑧ 옛 이름 `spacing/card/gap`만 있는 파일 → 새 `spacing/gap`을 만들고 옛 것은 그대로 ⑨ 이름 다시 짓기 `body/large-w500-120` → `body/medium-…`(새 규칙 변수) → 스타일이 `font-size/body/medium`에 붙고 `font-size/body/large`는 남음 · 옛 규칙 변수에 붙은 스타일은 변수 이름만 함께 바뀜 · 옛 스타일 `body/large`가 쓰던 표시 없는 `font-size/body/large` = 18이 있는 파일에 `body/large-w700`(18)을 등록 → 그 변수를 재사용하지 않고 `font-size/body/large-2`(표시 있음)를 만듦 ⑩ QA 5와 같은 모양의 입력에서 Semantic 수가 줄어듦(수를 적는다)
+- [x] 기존 테스트 기대값 — 바뀌는 것은 사유와 함께 고친다(주인 이름 · 텍스트 스타일 역할 이름 · 배경 default · `container`)
+- [x] 4검사 · `dist/` 다시 빌드
 - [ ] 실기 확인(사용자, 피그마): QA 5 원본 복제본 → 이름 정리 · 만들기 → Semantic 수 · 이름 · `stack-x` · `stack-y`를 봄
+
+**구현 메모(6-2 PR)**
+- ⑩ 측정(단위 테스트 고정 입력 — 주인 8종 × 프레임 4개, gap 6가지 · padding 4가지 / 18px 글자 10개 = 굵기 5 × 줄 높이 27 · 24px): 간격 Semantic 64 → 10, 글자 크기 · 줄 높이 Semantic 20 → 6(굵은 글자는 KRDS 분류가 heading이라 크기 단계가 `body/large` · `heading/small` 둘 — 단계마다 font-size 1 + line-height 2). 실기 QA 5 수는 실기 확인에서 센다.
+- `nameKrdsStyles`는 반환형을 바꾸지 않고 `opts.steps` 배열에 크기 단계를 채운다(앵커는 ''). 행 라벨 이름(`nameTextStylesWithRowLabels`의 라벨 · 사용자가 고친 이름 — 등록 표 입력칸 · 만들기 화면 `mkTsNames`)은 `step`을 싣지 않는다(사용자가 지은 이름 — N-D2).
+- step 없는 요청(스타일 이름 전체 — 옛 규칙)의 재사용은 **같은 이름 · 같은 값** 변수만으로 했다(옛 규칙은 스타일 하나에 변수 하나라 이름이 같아야 그 스타일 것). 이름이 같고 값이 다르면 덮지 않고 꼬리(`-sm` …)를 받는다(N-D2 "이름으로 덮어쓰지 않음").
+- 등록이 앵커 스타일을 처리할 때 그 스타일이 새 규칙 변수(표시 있음)에 붙어 있으면 연결을 그대로 두고 그 변수 이름으로 3단계를 찾는다(앵커 경로의 "없으면 만듦"이 `font-size/{스타일 이름}`을 새로 만들어 옮겨 붙이지 않게).
+- 등록 0단계 · 이름 다시 짓기의 "옛 규칙 변수 이름 함께 바꾸기"는 스타일의 글자 크기 연결이 표시 없는 `font-size/{지금 이름}`일 때만 한다(전에는 연결과 무관하게 이름으로 찾았다 — 12.12 "그 밖은 아무것도 하지 않는다"). `renameTextRoleVars`도 표시 있는 변수는 건너뛴다.
+- N-D2a의 별칭 대상 Global은 `createTokens`(만들기와 같은 재사용 · 이름 규칙)로 얻는다.
+- N-D6: `stack-x` · `stack-y`를 [등록] 같은 이름 묶기에서 빼는 일반 구조어(`components.ts` `GENERIC_GROUP_NAMES`)에도 더했다 — "[등록] 후보 자격과 무관(지금 `container`처럼)"을 지키려면 필요(빼지 않으면 페이지의 모든 `stack-y`가 한 세트로 묶인다). `pickScope`의 "이름 전체가 구조 폴백 이름" 판정은 같은 부모 안 겹침 꼬리(`stack-x-2`)도 뗀 뒤 본다.
+- 알약 연결: 후보(`BindCandidate`)와 연결 항목(`APPLY_SELECTED` items)에 `pillFrom`(찾을 때 읽은 원래 값)을 실어 연결 직전 다시 확인에 쓴다. 붙일 때 레이어 값을 9999로 먼저 쓴 뒤 연결한다.
+- 주인 계산 제거: `code.ts` `bindOwnerOf`, `BindOptions.ownerOf`, 찾기 `ctx.owner`, 추출 `acc.owner` · `extractFromSelection`의 주인 인자를 뺐다. `pickOwner` · `dsRoleOwner`(`inUiRole`) · `structIndex`(다른 곳이 씀)는 그대로.
+
