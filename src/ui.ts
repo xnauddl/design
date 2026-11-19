@@ -8132,6 +8132,9 @@ let mcInFlight = false;
 let mcSendBase = '';
 /** 쓰기 중이라 미룬 카드 읽기(§7). */
 let mcDeferred = false;
+/** 미룬 카드 읽기가 사용자가 누른 읽기였던 기준 — 큰 선택(300개 넘음)에서 [읽기]가 찾기(APPLY)와 함께 나가 미뤄져도
+ *  찾기가 끝난 뒤 사용자 읽기로 다시 보낸다(자동 읽기 규칙에 막혀 "선택을 읽는 중…"에 멈추지 않게). 보내면 지운다. */
+let mcDeferUserFor: string | null = null;
 /** 추출 · 미리보기가 ERROR로 끝난 기준 — 카드 자리만 찾기 실패 모습(F-D3). 성공하면 지운다. */
 let mcFailedFor: string | null = null;
 /** 마지막으로 미리보기를 보낸 토큰 집합(이름 · 값)과, 그 응답을 받은 집합 — 지금 보여 줄 집합과 다르면 다시 보낸다(§4.1 "만들기 카드 — 상태 5"). */
@@ -8189,9 +8192,11 @@ function mcNeed(): boolean {
 /** 카드 읽기 — 추출(+ 결과가 오면 미리보기). 카드 1 찾기와 같은 때 · 같은 규칙(조용한 읽기 · 300개 규칙 — §4.1 "읽기"). */
 function mcRead(user = false): void {
   if (!baseline || isMini || activeTab !== 'select' || !mcNeed()) return;
+  if (mcDeferUserFor === baseKey()) user = true;
   if (!user && baseline.scanned > BIG_SELECTION) return;
-  if (bindLinking || opBusy() || wizardRunning) { mcDeferred = true; return; }
+  if (bindLinking || opBusy() || wizardRunning) { mcDeferred = true; if (user) mcDeferUserFor = baseKey(); return; }
   mcDeferred = false;
+  mcDeferUserFor = null;
   mcInFlight = true;
   mcSendBase = baseKey();
   mcExtractReq = mcNextReq();
@@ -8616,7 +8621,7 @@ function finishSelFocus(key: string | null): void {
 }
 /** 로컬 변수 0개인데 이 기준의 카드 읽기가 없으면 시작한다(쓰는 변수 결과를 기다리지 않는다 — §4.1 "읽기"). */
 function mcKick(): void {
-  if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || baseline.scanned > BIG_SELECTION) return;
+  if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || (baseline.scanned > BIG_SELECTION && mcDeferUserFor !== baseKey())) return;
   queueMicrotask(() => { if (!mcInFlight && mcFor !== baseKey()) { mcRead(); if (mcInFlight) renderSelHome(); } });
 }
 /** 텍스트 스타일만 연결하기(§4.1) — 5 · 6번 카드와 noTier 카드 1 안에 "텍스트 스타일 {t}곳" + [{t}곳 연결]. */

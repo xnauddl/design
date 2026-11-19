@@ -21,6 +21,7 @@
     23 UX 검수 C(IA v4 §4.3a · B.14): 색 Layer · 빈 상태 잠금 · 주 버튼 · 팔레트 띠 · 컴포넌트 문구 · 머리 띠
     25 라이선스 구매 버튼(IA v4 §4.10 · B.21): 늘 보임 · 자리표시자면 잠금 · 티어별 글 · 툴팁 꼬리
     30 상태 5 만들기 카드(IA v4 §4.1 · B.30): 남은 값 · 같은 값 줄 · 추출 전 · 실패 · 미리보기 다시 보냄 · 만들기 화면 기본 끔
+    31 큰 선택 [읽기] — 찾기 중 미룬 만들기 카드 읽기를 찾기가 끝난 뒤 보냄("선택을 읽는 중…" 멈춤 수정)
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -3172,6 +3173,30 @@ async function backHome30(p, libs) {
   const pvs = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview);
   const last = pvs.at(-1);
   check('30 ⑨ 라이브러리 변수 값만 바뀜 → 미리보기 다시 보냄(#101828 빠지고 #3366ff 들어감) · 그동안 읽는 중', pvs.length === n0 + 1 && last.tokens.some((tk) => String(tk.value).toLowerCase() === '#3366ff') && !last.tokens.some((tk) => tk.value === '#101828') && (await titles30(p))[1].startsWith('변수가 안 붙은 값') && (await p.$eval('#selCards .sel-card >> nth=1', (e) => e.innerText)).includes('선택을 읽는 중…'), JSON.stringify(last?.tokens?.map((tk) => tk.name)));
+  await p.close();
+}
+
+{
+  // 31 큰 선택(300개 넘음) · 로컬 변수 0개 — [읽기]를 누르면 만들기 카드도 읽는다(찾기 APPLY 진행 중이라 미룬 추출을 찾기가 끝난 뒤 보냄 — "선택을 읽는 중…"에 멈추지 않음)
+  const p = await open(480, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+  await recv(p, { ...sel(1, 0), scanned: 4000, ids: ['big1'], firstName: 'PC_main_BK' });
+  await p.waitForTimeout(450);
+  check('31 큰 선택 — 자동으로 읽지 않음([읽기] 카드 · 추출 없음)', (await p.$('[data-k="read"]')) !== null && (await sent(p, 'EXTRACT')).length === 0);
+  await p.click('[data-k="read"]');
+  await p.waitForTimeout(30);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, { ...preview(ap.reqId), candidates: [], bound: 0, counts: { 'no-match': { gap: 2, color: 2 } } });
+  const pt = (await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1);
+  if (pt) await recv(p, tsPrev(pt.reqId));
+  await p.waitForTimeout(40);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  check('31 [읽기] 뒤 — 만들기 카드 추출 EXTRACT{기준} 보냄', !!ex && ex.nodeIds?.[0] === 'big1', String((await sent(p, 'EXTRACT')).length));
+  if (ex) await cardAnswer(p);
+  check('31 [읽기] 뒤 — 카드가 "선택을 읽는 중…"에 멈추지 않고 값 줄을 그림', (await cardRows(p)).length === 4 && !(await cardText(p)).includes('선택을 읽는 중'), await cardText(p).catch(() => ''));
   await p.close();
 }
 

@@ -5425,6 +5425,18 @@ test('비율 고정 — 잠김 꺼짐이면 두 축, targetAspectRatio로만 잠
   assert.deepEqual(sizeCands(tar), ['width']);
 });
 
+test('비율 고정 — targetAspectRatio가 있는 노드(null 포함)는 constrainProportions를 읽지 않는다(피그마 콘솔 경고)', async () => {
+  installFigma();
+  await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
+  let reads = 0;
+  const watch = (n) => { delete n.constrainProportions; Object.defineProperty(n, 'constrainProportions', { get() { reads++; return true; }, configurable: true }); return n; };
+  const open = await bindSelection([watch(lockedIcon('g', { targetAspectRatio: null }))], false);
+  assert.deepEqual(sizeCands(open), ['width', 'height']);
+  const tar = await bindSelection([watch(lockedIcon('h', { targetAspectRatio: { x: 1, y: 1 } }))], false);
+  assert.deepEqual(sizeCands(tar), ['width']);
+  assert.equal(reads, 0);
+});
+
 test('비율 고정 — 연결 직전 다시 확인: width · height를 함께 보내면 width만 붙고 height는 changed', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'size/20', category: 'size', sources: ['size'], value: 20 }], 16);
