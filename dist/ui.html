@@ -79,7 +79,7 @@
        구분점을 각 문자열에 넣으면 앞이 비었을 때 점만 남는다(Paid는 자물쇠가 빈 칸).
        :not(:empty)로 내용 있는 것끼리만 이어 그 경우를 없앴다.
        자물쇠(.lock)는 이 사슬에서 빠진다 — 뒤 라벨과 한 덩어리로 읽혀야 한다(와이어 rev l:
-       `🔒 변수화` · `🔒 후보 24` · `🔒 닮은 프레임`). Paid로 자물쇠가 비면 그냥 사라진다. */
+       `🔒 변수화` · `🔒 후보 24`). Paid로 자물쇠가 비면 그냥 사라진다. */
     h2 .muted:not(.lock):not(:empty) ~ .muted:not(.lock):not(:empty)::before { content: '· '; }
     .warn    { color: var(--warn); }
     .ok      { color: var(--ok); }
@@ -371,10 +371,6 @@
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
     .toolbar.flush { padding-bottom: 0; border-bottom: 0; }
-    /* 툴바가 두 줄인 카드(구조: 스캔 2 / 쓰기 2) — 윗줄은 선을 긋지 않고 아랫줄만 본문과 가른다. */
-    .toolbar:has(+ .toolbar-2) { padding-bottom: 0; border-bottom: 0; }
-    /* 둘째 버튼 줄은 첫째 줄(버튼 높이 27px) 바로 아래에 고정 — 같은 높이에 붙으면 겹친다. */
-    .toolbar-2 { margin-top: 0; top: calc(var(--toolbar-top, 95px) + 27px); }
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
@@ -1068,20 +1064,14 @@
       </div>
     </div>
 
-    <!-- 구조 — 컴포넌트 등록과 닮은 프레임 컴포넌트화는 같은 일(구조 만들기)이라 한 카드다.
-         목록은 그룹 머리(컴포넌트 후보 · 닮은 프레임)로 나눈다. -->
+    <!-- 구조 — 컴포넌트 후보 찾기 · 등록(닮은 프레임 찾기 · 하나로 합치기는 2026-11-19 제거, ia-v4 §4.3a). -->
     <div class="step" id="structureCard" data-apply-step="structure">
       <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span></h2>
-      <div class="hint" data-i18n="component.hint">후보를 찾아 등록하거나, 닮은 프레임을 하나의 컴포넌트로 합쳐요 · 닮은 프레임 찾기는 무료</div>
+      <div class="hint" data-i18n="component.hint">후보를 찾아 컴포넌트로 등록해요</div>
       <div class="toolbar">
         <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">컴포넌트 후보 찾기</button>
-        <button id="btnScanSimilar" data-i18n="similar.scanBtn" data-i18n-tip="similar.scanHelp" data-tip="구조가 같고 내용만 다른 프레임을 찾아 보여 줘요. 파일은 안 바꿔요.">닮은 프레임 찾기</button>
-      </div>
-      <!-- 쓰기 버튼은 둘째 줄(와이어) — 스캔 2 + 쓰기 2를 한 줄에 넣으면 400px에서 접힌다. -->
-      <div class="toolbar toolbar-2">
         <span class="grow"></span>
         <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.">등록</button>
-        <button id="btnComponentize" data-i18n="similar.componentizeBtn" data-i18n-tip="similar.componentizeHelp" data-tip="고른 원본을 컴포넌트로, 나머지는 인스턴스로 바꿔요. 나머지 프레임의 연결과 값은 원본을 따라요.">하나로 합치기</button>
       </div>
       <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
@@ -1091,8 +1081,6 @@
       <div id="compTree" class="results"></div>
       <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
       <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
-      <div class="r-group r-ghead" id="similarGroup" style="display:none"><span data-i18n="structure.groupSimilar">닮은 프레임</span><span class="r-gcnt" id="similarGroupCount"></span></div>
-      <div id="similarList" class="results"></div>
       <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
            낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
       <div id="variantRow" hidden>
@@ -1472,9 +1460,6 @@
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
     "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
-    // 닮은 프레임 컴포넌트화
-    "similar.scanBtn": "\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30",
-    "similar.componentizeBtn": "\uD558\uB098\uB85C \uD569\uCE58\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -2066,9 +2051,8 @@
     // 컴포넌트 / 베리언트
     "structure.title": "\uCEF4\uD3EC\uB10C\uD2B8",
     "structure.groupComp": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4",
-    "structure.groupSimilar": "\uB2EE\uC740 \uD504\uB808\uC784",
     "structure.groupVariant": "\uC120\uD0DD\uD55C \uCEF4\uD3EC\uB10C\uD2B8 \uC815\uB9AC",
-    "component.hint": "\uD6C4\uBCF4\uB97C \uCC3E\uC544 \uB4F1\uB85D\uD558\uAC70\uB098, \uB2EE\uC740 \uD504\uB808\uC784\uC744 \uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCCD0\uC694 \xB7 \uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\uB294 \uBB34\uB8CC",
+    "component.hint": "\uD6C4\uBCF4\uB97C \uCC3E\uC544 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD574\uC694",
     "component.scanBtn": "\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30",
     "component.registerBtn": "\uB4F1\uB85D",
     "component.classifyBtn": "\uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uAE30",
@@ -2077,9 +2061,6 @@
     "component.registerHelp": "\uCCB4\uD06C\uD55C \uD6C4\uBCF4\uB97C Components \uD398\uC774\uC9C0\uC5D0 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uB4F1\uB85D\uD558\uACE0, \uC6D0\uB798 \uC790\uB9AC\uC5D0\uB294 \uC778\uC2A4\uD134\uC2A4\uB97C \uB0A8\uACA8\uC694. \uB0A8\uAE34 \uC778\uC2A4\uD134\uC2A4\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uB530\uB77C\uC694.",
     "component.classifyHelp": "\uC774\uBBF8 \uB9CC\uB4E0 \uCEF4\uD3EC\uB10C\uD2B8\uB97C \uC774\uB984\uC774 \uAC19\uC740 \uAC83\uB07C\uB9AC \uBCC0\uD615 \uC138\uD2B8\uB85C \uBB36\uC5B4\uC694.",
     "component.genMissingHelp": "\uC120\uD0DD\uD55C \uBCC0\uD615 \uC138\uD2B8\uC758 \uBE60\uC9C4 \uC870\uD569\uC744 \uCCAB \uBCC0\uD615\uC744 \uBCF5\uC81C\uD574 \uCC44\uC6CC\uC694.",
-    "similar.scanHelp": "\uAD6C\uC870\uAC00 \uAC19\uACE0 \uB0B4\uC6A9\uB9CC \uB2E4\uB978 \uD504\uB808\uC784\uC744 \uCC3E\uC544 \uBCF4\uC5EC \uC918\uC694. \uD30C\uC77C\uC740 \uC548 \uBC14\uAFD4\uC694.",
-    "similar.componentizeHelp": "\uACE0\uB978 \uC6D0\uBCF8\uC744 \uCEF4\uD3EC\uB10C\uD2B8\uB85C, \uB098\uBA38\uC9C0\uB294 \uC778\uC2A4\uD134\uC2A4\uB85C \uBC14\uAFD4\uC694. \uB098\uBA38\uC9C0 \uD504\uB808\uC784\uC758 \uC5F0\uACB0\uACFC \uAC12\uC740 \uC6D0\uBCF8\uC744 \uB530\uB77C\uC694.",
-    "similar.needScan": "\uBA3C\uC800 \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.needScan": "\uBA3C\uC800 \u2018\uCEF4\uD3EC\uB10C\uD2B8 \uD6C4\uBCF4 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
     "component.autoNamed": "\uC774\uB984 \uC5C6\uB294 \uB808\uC774\uC5B4 {n}\uAC1C \u2014 \u2018\uC774\uB984 \uC815\uB9AC\u2019\uB97C \uBA3C\uC800 \uD558\uBA74 \uD6C4\uBCF4\uAC00 \uB3FC\uC694",
     "component.fromName": "\uC6D0\uB798 \uC774\uB984 {name}",
@@ -2175,36 +2156,6 @@
     "component.fail.iconSwapErr": "\uC544\uC774\uCF58 \uC790\uB9AC \uAD50\uCCB4 \uC2E4\uD328({layer}): {error}",
     "component.fail.photoNoSlot": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}) \u2014 \uC790\uB9AC\uB97C \uCC3E\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "component.fail.photo": "\uC0AC\uC9C4 \uC774\uC2DD \uC2E4\uD328({path}): {error}",
-    // 레이어 › 컴포넌트 — 닮은 프레임 묶기
-    "similar.scanning": "\uB2EE\uC740 \uD504\uB808\uC784\uC744 \uCC3E\uB294 \uC911\u2026",
-    "similar.componentizing": "\uD558\uB098\uC758 \uCEF4\uD3EC\uB10C\uD2B8\uB85C \uD569\uCE58\uB294 \uC911\u2026",
-    "similar.failed": "\uD569\uCE58\uC9C0 \uBABB\uD588\uC5B4\uC694{warnPart}",
-    "similar.failedWarn": " \u2014 {warning}",
-    "similar.resMaster": "\uC6D0\uBCF8 {name}",
-    "similar.resInstances": "\uC778\uC2A4\uD134\uC2A4 {n}\uAC1C",
-    "similar.resProps": "\uC18D\uC131 {n}\uAC1C",
-    "similar.resImages": "\uC774\uBBF8\uC9C0 {n}\uAC1C",
-    "similar.resKept": " \xB7 \uB0A8\uACA8\uB454 \uAC83 {n}\uAC74: {warning}",
-    "similar.metaText": "\uD14D\uC2A4\uD2B8 {filled}/{total}",
-    "similar.metaImages": "\uC774\uBBF8\uC9C0 {n}",
-    "similar.metaEmpty": "\uBE48 \uCE78 {n}",
-    "similar.recommended": "\uC6D0\uBCF8 \uCD94\uCC9C",
-    "similar.needTwo": "\uAD6C\uC870\uAC00 \uAC19\uC740 \uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uC788\uC5B4\uC57C \uD574\uC694",
-    "similar.none": "\uD569\uCE60 \uD504\uB808\uC784\uC774 \uC5C6\uC5B4\uC694 \u2014 {why}",
-    "similar.openText": "\uD14D\uC2A4\uD2B8 {n}",
-    "similar.openSwap": "\uC544\uC774\uCF58 \uAD50\uCCB4 {n}",
-    "similar.openImage": "\uC774\uBBF8\uC9C0 {n}",
-    "similar.opened": "\uC18D\uC131\uC73C\uB85C \uC5F4\uB9BC: {list}",
-    "similar.noVarying": "\uAC00\uBCC0 \uC704\uCE58\uAC00 \uC5C6\uC5B4 \uC18D\uC131\uC740 \uB9CC\uB4E4\uC9C0 \uC54A\uC544\uC694",
-    "similar.excluded": " \xB7 \uC81C\uC678 {n}\uAC1C({why})",
-    "similar.scanned": "\uB300\uC0C1 {n}\uAC1C \xB7 {openPart}{skipPart}",
-    "similar.noMaster": "\uC6D0\uBCF8 \uD504\uB808\uC784\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "similar.tooFew": "\uB300\uC0C1 \uD504\uB808\uC784\uC774 2\uAC1C\uBCF4\uB2E4 \uC801\uC5B4\uC694. \uB2E4\uC2DC \u2018\uB2EE\uC740 \uD504\uB808\uC784 \uCC3E\uAE30\u2019\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
-    "similar.overrideFail": "{name}: \uC18D\uC131 \uC624\uBC84\uB77C\uC774\uB4DC \uC2E4\uD328 \u2014 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "similar.placeFail": "{name}: \uC81C\uC790\uB9AC\uC5D0 \uB458 \uC218 \uC5C6\uC5B4 \uC6D0\uBCF8\uC744 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "similar.why.needTwo": "\uD504\uB808\uC784\uC774 2\uAC1C \uC774\uC0C1 \uD544\uC694",
-    "similar.why.mismatch": "\uAD6C\uC870 \uBD88\uC77C\uCE58",
-    "similar.why.fewSame": "\uB3D9\uC77C \uAD6C\uC870 \uD504\uB808\uC784 2\uAC1C \uBBF8\uB9CC",
     // 만들기 › 색 · 토큰
     "create.hintPreview": "\u2018\uBBF8\uB9AC\uBCF4\uAE30\u2019\uB97C \uB204\uB974\uC138\uC694.",
     "create.hintNoSel": "\uB808\uC774\uC5B4\uB97C \uBA3C\uC800 \uC120\uD0DD\uD558\uC138\uC694.",
@@ -5903,7 +5854,7 @@
     }
   }
   var PAID_LOCK = "\u{1F512}";
-  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing", "btnComponentize"];
+  var COMPONENT_FIELDS = ["btnScanComp", "btnRegisterComp", "btnClassifyVariants", "btnGenMissing"];
   var PAID_FIELDS = [
     ...COMPONENT_FIELDS,
     // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
@@ -5931,7 +5882,6 @@
     renderBindPrereq();
     updateEmptyLocks();
   }
-  var similarScanned = false;
   var baseLocked = (el) => !!el.dataset.baseLock;
   function setEmptyLock(el, msg) {
     if (el.dataset.baseLock === "paid") return;
@@ -5961,25 +5911,19 @@
     setEmptyLock(colorVars, colorsVisible() ? null : t("color.needColors"));
     setCardPrimary([extract, colorVars], baseLocked(colorVars) ? [extract] : [colorVars, extract]);
     const scan = $("btnScanComp");
-    const similar = $("btnScanSimilar");
     const reg = $("btnRegisterComp");
-    const merge = $("btnComponentize");
     const eligible = compEligibleCount();
     const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
     const noBase = !baseline;
     const prevActive = document.activeElement;
-    const lockedBefore = prevActive === scan || prevActive === similar ? baseLocked(prevActive) : true;
+    const lockedBefore = prevActive === scan ? baseLocked(prevActive) : true;
     setEmptyLock(scan, noBase ? t("status.noSelection") : null);
-    setEmptyLock(similar, noBase ? t("status.noSelection") : null);
     setEmptyLock(
       reg,
       !compScanned ? t("component.needScan") : !eligible ? t("component.noEligibleShort") : !checked ? t("component.noChecked") : null
     );
-    const canMerge = similarMemberIds.length >= 2 && !!similarMasterId;
-    setEmptyLock(merge, canMerge ? null : t(similarScanned ? "similar.needTwo" : "similar.needScan"));
-    const first = eligible > 0 ? reg : canMerge ? merge : scan;
-    const order = isPaid ? [first, merge, scan] : [first, similar];
-    setCardPrimary([scan, similar, reg, merge], order);
+    const first = eligible > 0 ? reg : scan;
+    setCardPrimary([scan, reg], [first, scan]);
     if (!lockedBefore && baseLocked(prevActive)) compFocusPrimary();
   }
   function setLockTitle(el, locked) {
@@ -6077,7 +6021,6 @@
     });
   }
   var compScanReq = 0;
-  var similarScanReq = 0;
   var structStatusFind = false;
   function setFindStatus(text, cls) {
     setStatus("structureStatus", text, cls);
@@ -6189,20 +6132,6 @@
     const toModeId = $("darkToMode").value;
     send(__spreadValues({ type: "GENERATE_DARK_MODE", collectionId, fromModeId }, toModeId ? { toModeId } : {}));
   });
-  var similarMemberIds = [];
-  var similarMasterId = null;
-  function startSimilarScan() {
-    var _a3;
-    setFindStatus(t("similar.scanning"), "");
-    similarScanReq = ++bindReqSeq;
-    send({ type: "SCAN_SIMILAR", nodeIds: (_a3 = baseline == null ? void 0 : baseline.ids) != null ? _a3 : [], reqId: similarScanReq });
-  }
-  $("btnScanSimilar").addEventListener("click", startSimilarScan);
-  $("btnComponentize").addEventListener("click", () => {
-    if (similarMemberIds.length < 2 || !similarMasterId) return;
-    setStatus("structureStatus", t("similar.componentizing"), "");
-    send({ type: "COMPONENTIZE_SIMILAR", masterId: similarMasterId, frameIds: similarMemberIds });
-  });
   $("btnRegisterComp").addEventListener("click", () => {
     var _a3;
     const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
@@ -6278,7 +6207,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6672,29 +6601,6 @@
         setStatus("darkStatus", t("dark.done", { modePart, n: msg.realiased, c: msg.created, skipPart }), "ok");
         break;
       }
-      case "SIMILAR_CANDIDATES":
-        if (msg.reqId !== similarScanReq) break;
-        similarScanReq = 0;
-        renderSimilar(msg);
-        break;
-      case "COMPONENTIZE_RESULT": {
-        if (!msg.instances) {
-          const misplaced0 = (_w = msg.placeFailed) != null ? _w : [];
-          const first = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced0));
-          const warnPart = first ? t("similar.failedWarn", { warning: first }) : "";
-          setStatus("structureStatus", t("similar.failed", { warnPart }) + placeFailedText(misplaced0), "warn");
-          break;
-        }
-        const parts = [t("similar.resMaster", { name: msg.master }), t("similar.resInstances", { n: msg.instances })];
-        if (msg.properties) parts.push(t("similar.resProps", { n: msg.properties }));
-        if (msg.images) parts.push(t("similar.resImages", { n: msg.images }));
-        const misplaced = (_x = msg.placeFailed) != null ? _x : [];
-        const others = msg.warnings.length - misplaced.length;
-        const firstOther = msg.warnings.find((w) => !isPlaceFailWarning(w, misplaced));
-        const warn = others > 0 && firstOther ? t("similar.resKept", { n: others, warning: firstOther }) : "";
-        setStatus("structureStatus", `${parts.join(" \xB7 ")}${warn}${placeFailedText(misplaced)}`, msg.warnings.length ? "warn" : "ok");
-        break;
-      }
       case "PREMIUM_REQUIRED": {
         showPaidReason();
         break;
@@ -6725,11 +6631,9 @@
           selFindInFlight = false;
           renderSelHome();
         }
-        if (msg.op === "SCAN_COMPONENT_CANDIDATES" || msg.op === "SCAN_SIMILAR") {
-          const want = msg.op === "SCAN_COMPONENT_CANDIDATES" ? compScanReq : similarScanReq;
-          if (!want || msg.reqId != null && msg.reqId !== want) break;
-          if (msg.op === "SCAN_COMPONENT_CANDIDATES") compScanReq = 0;
-          else similarScanReq = 0;
+        if (msg.op === "SCAN_COMPONENT_CANDIDATES") {
+          if (!compScanReq || msg.reqId != null && msg.reqId !== compScanReq) break;
+          compScanReq = 0;
         }
         if (msg.op === "APPLY_TS_RENAME") {
           onTsRenameError(msg);
@@ -6777,9 +6681,7 @@
     REGISTER_COMPONENTS: "structureStatus",
     CLASSIFY_VARIANTS: "structureStatus",
     GENERATE_MISSING_VARIANTS: "structureStatus",
-    SCAN_SIMILAR: "structureStatus",
-    // 컴포넌트 화면 여섯 작업 모두(ia-v4 §4.5 "상태 줄")
-    COMPONENTIZE_SIMILAR: "structureStatus",
+    // 컴포넌트 화면 네 작업 모두(ia-v4 §4.5 "상태 줄")
     RENAME_APPLY: "renameStatus",
     // 이름 정리 [이름 바꾸기]
     GENERATE_DARK_MODE: "darkStatus",
@@ -6869,7 +6771,7 @@
     el.innerHTML = "";
     if (id === "licenseStatus") el.removeAttribute("title");
     const linkRetry = op === "APPLY_SELECTED" ? lastLinkItems : null;
-    const scanRetry = op === "SCAN_COMPONENT_CANDIDATES" ? "comp" : op === "SCAN_SIMILAR" ? "similar" : null;
+    const scanRetry = op === "SCAN_COMPONENT_CANDIDATES";
     const retry = linkRetry || scanRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
     const onRetry = f.retryable && (linkRetry || scanRetry || retry) ? () => {
       var _a3;
@@ -6878,10 +6780,8 @@
         return;
       }
       if (scanRetry) {
-        const btn = scanRetry === "comp" ? $("btnScanComp") : $("btnScanSimilar");
-        if (scanRetry === "comp") startCompScan();
-        else startSimilarScan();
-        btn.focus({ preventScroll: true });
+        startCompScan();
+        $("btnScanComp").focus({ preventScroll: true });
         return;
       }
       if (!retry) return;
@@ -8460,7 +8360,6 @@
   function clearCompLists() {
     const hadFocus = compFocusInLists();
     compScanReq = 0;
-    similarScanReq = 0;
     compScanned = false;
     compCandidates = [];
     compChecked.clear();
@@ -8469,12 +8368,6 @@
     $("compTreeCount").textContent = "";
     $("compTreeGroup").style.display = "none";
     $("compTreeCtrls").style.display = "none";
-    similarMemberIds = [];
-    similarMasterId = null;
-    similarScanned = false;
-    clearMount($("similarList"));
-    $("similarGroupCount").textContent = "";
-    $("similarGroup").style.display = "none";
     if (structStatusFind) setStatus("structureStatus", "", "");
     updateEmptyLocks();
     refreshTreeEmptyStates();
@@ -8484,7 +8377,7 @@
     if (activeTab !== "select" || selSub !== "structure") return false;
     const a = document.activeElement;
     if (!a || a === document.body) return true;
-    return ["compTree", "similarList", "compTreeCtrls"].some((id) => $(id).contains(a));
+    return ["compTree", "compTreeCtrls"].some((id) => $(id).contains(a));
   }
   function compFocusPrimary() {
     var _a3;
@@ -8603,67 +8496,11 @@
   function placeFailedText(names) {
     return placeTailText("component.placeFailed", names);
   }
-  function isPlaceFailWarning(w, names) {
-    return names.some((name) => w === t("similar.placeFail", { name }));
-  }
   function showApplyProgress(label, cancellable = true) {
     $("applyProgress").style.display = "";
     $("applyBarFill").style.width = "0%";
     $("applyProgressText").textContent = label;
     $("btnApplyCancel").hidden = !cancellable;
-  }
-  function makeSimilarRow(m, recommendedId) {
-    const radio = document.createElement("input");
-    radio.type = "radio";
-    radio.name = "similarMaster";
-    radio.value = m.id;
-    radio.checked = m.id === similarMasterId;
-    radio.addEventListener("change", () => {
-      if (radio.checked) similarMasterId = m.id;
-    });
-    const parts = [t("similar.metaText", { filled: m.textFilled, total: m.textTotal })];
-    if (m.images) parts.push(t("similar.metaImages", { n: m.images }));
-    if (m.emptyLayers) parts.push(t("similar.metaEmpty", { n: m.emptyLayers }));
-    const card = resultCard({
-      check: radio,
-      title: m.name,
-      summary: parts.join(" \xB7 "),
-      summaryMono: true,
-      meta: m.id === recommendedId ? t("similar.recommended") : ""
-    });
-    if (m.id === recommendedId) card.querySelector(".r-meta").className = "tag tag-set";
-    card.addEventListener("click", (e) => {
-      if (e.target.tagName === "INPUT") return;
-      radio.checked = true;
-      radio.dispatchEvent(new Event("change"));
-    });
-    return card;
-  }
-  function renderSimilar(msg) {
-    const hadFocus = compFocusInLists();
-    if (hadFocus) queueMicrotask(compFocusPrimary);
-    similarMemberIds = msg.metas.map((m) => m.id);
-    similarMasterId = msg.recommendedMasterId;
-    similarScanned = true;
-    $("similarGroupCount").textContent = msg.metas.length ? t("tree.count", { n: msg.metas.length }) : "";
-    $("similarGroup").style.display = msg.metas.length ? "" : "none";
-    updateEmptyLocks();
-    const box = $("similarList");
-    renderChunked(box, msg.metas, (m) => makeSimilarRow(m, msg.recommendedMasterId));
-    if (!msg.metas.length) {
-      const why = msg.excluded.length ? msg.excluded[0].reason : t("similar.needTwo");
-      setFindStatus(t("similar.none", { why }), "warn");
-      return;
-    }
-    const texts = msg.varying.filter((v) => v.type === "TEXT").length;
-    const swaps = msg.varying.length - texts;
-    const opened = [];
-    if (texts) opened.push(t("similar.openText", { n: texts }));
-    if (swaps) opened.push(t("similar.openSwap", { n: swaps }));
-    if (msg.imageVarying.length) opened.push(t("similar.openImage", { n: msg.imageVarying.length }));
-    const openPart = opened.length ? t("similar.opened", { list: opened.join(" \xB7 ") }) : t("similar.noVarying");
-    const skipPart = msg.excluded.length ? t("similar.excluded", { n: msg.excluded.length, why: msg.excluded[0].reason }) : "";
-    setFindStatus(t("similar.scanned", { n: msg.metas.length, openPart, skipPart }), "ok");
   }
   function updateApplyProgress(done, total) {
     $("applyProgress").style.display = "";
@@ -9039,8 +8876,6 @@ ${opts.tip}` : text;
     REGISTER_COMPONENTS: { results: ["COMPONENTS_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
     CLASSIFY_VARIANTS: { results: ["VARIANTS_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
     GENERATE_MISSING_VARIANTS: { results: ["GENERATE_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
-    SCAN_SIMILAR: { results: ["SIMILAR_CANDIDATES"], label: "op.components", go: goLayer("structure"), write: false },
-    COMPONENTIZE_SIMILAR: { results: ["COMPONENTIZE_RESULT"], label: "op.components", go: goLayer("structure"), write: true },
     EXPORT: { results: ["EXPORT_RESULT"], label: "op.export", go: () => showTab("variables"), write: false },
     UNBIND_DELETED: { results: ["DELETED_UNBOUND"], label: "op.unbind", go: () => {
       showTab("select");
@@ -9070,8 +8905,6 @@ ${opts.tip}` : text;
     // CLASSIFY_VARIANTS
     "btnGenMissing",
     // GENERATE_MISSING_VARIANTS
-    "btnComponentize",
-    // COMPONENTIZE_SIMILAR
     "btnMakeRun"
     // 만들기 화면 실행(§4.3)
   ];
@@ -9120,7 +8953,7 @@ ${opts.tip}` : text;
     if (def.write) renderWaitLocks();
   }
   function opReceived(m) {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (m.type === "PROGRESS") {
       if (m.op === "unused") return;
       opProg = m.total > 0 ? Math.min(1, m.done / m.total) : null;
@@ -9155,7 +8988,6 @@ ${opts.tip}` : text;
       if (m.type === "DARK_MODE_RESULT" && m.error) failed = true;
       if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a3 = m.failures) == null ? void 0 : _a3.length) != null ? _b : 0) > 0) failed = true;
       if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.reuseKept) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeCloned) == null ? void 0 : _i.length) != null ? _j : 0) + ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
-      if (m.type === "COMPONENTIZE_RESULT" && ((_n = (_m = m.placeFailed) == null ? void 0 : _m.length) != null ? _n : 0) > 0) failed = true;
       if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
       if (m.type === "VARIABLES_DELETED") {
         if (m.cancelled) cancelled = true;
@@ -9164,7 +8996,7 @@ ${opts.tip}` : text;
       if (cancelled) {
         if (isMini) renderMiniMark();
       } else opFinished(!failed, def);
-      const reread = m.type === "VARIABLES_DELETED" ? m.deleted > 0 : m.type === "COMPONENTIZE_RESULT" ? changedFile(m) : !failed || changedFile(m);
+      const reread = m.type === "VARIABLES_DELETED" ? m.deleted > 0 : !failed || changedFile(m);
       if (def.write && reread) readScreen("work");
       return;
     }
@@ -9172,7 +9004,6 @@ ${opts.tip}` : text;
   function changedFile(m) {
     var _a3, _b;
     if (m.type === "COMPONENTS_RESULT") return m.registered > 0 || m.sets > 0 || ((_b = (_a3 = m.reused) == null ? void 0 : _a3.length) != null ? _b : 0) > 0;
-    if (m.type === "COMPONENTIZE_RESULT") return !!m.master;
     if (m.type === "VARIANTS_RESULT") return m.sets > 0;
     return false;
   }

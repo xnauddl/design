@@ -14,7 +14,6 @@ export * from './licenseToken';
 export * from './exporters';
 export * from './themeGen';
 export * from './components';
-export * from './similar';
 export * from './componentLike';
 export * from './textStyles';
 export * from './undo';

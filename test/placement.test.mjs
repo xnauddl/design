@@ -7,7 +7,7 @@
    실제 피그마가 아니라 목이다 — 실기 확인은 부록 A.5의 마지막 항목. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, componentizeSimilar, swapVectorSlots, componentizeResultMessage, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath, snapshotOverrides, restoreOverrides, keepLookAsync, photoLeafOf, visibleBox, imageMatrix, shiftMatrix } from '../dist/figma-lib.mjs';
+import { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, swapVectorSlots, applyInstancePropValues, propIdsByName, tallyFill, replaceMember, shapePrefix, memberFitIssue, transplantImageFills, joinPath, snapshotOverrides, restoreOverrides, keepLookAsync, photoLeafOf, visibleBox, imageMatrix, shiftMatrix } from '../dist/figma-lib.mjs';
 
 let seq = 0;
 const SELF_DELETING = new Set(['GROUP', 'BOOLEAN_OPERATION']);
@@ -251,51 +251,6 @@ test('자리 잡기 — 오토레이아웃 부모는 x·y를 쓰지 않고, 절�
   assert.deepEqual([ib.x, ib.y], [5, 7]);
 });
 
-test('묶기 — 그룹 안 닮은 프레임: 인스턴스가 같은 그룹·같은 자리, 그룹·페이지 맨 위 그대로', async () => {
-  const page = mk('PAGE', {}, []);
-  const txt = (name, characters) => mk('TEXT', { name, characters, componentPropertyReferences: {} });
-  const A = mk('FRAME', { name: 'Card', x: 10, y: 20, width: 100, height: 80 }, [txt('Title', 'A'), txt('Desc', 'same')]);
-  const B = mk('FRAME', { name: 'Card', x: 130, y: 20, width: 100, height: 80 }, [txt('Title', 'B'), txt('Desc', 'same')]);
-  const group = mk('GROUP', { name: 'Cards', x: 10, y: 20 }, [A, B]);
-  const screen = mk('FRAME', { name: 'Screen', x: 500, y: 0, width: 400, height: 400 }, [group]);
-  page.appendChild(screen);
-  installFigma(page);
-  const before = { nodes: count(page), absB: absXY(B) };
-
-  const r = await componentizeSimilar(A, [A, B]);
-
-  assert.equal(r.instances, 1);
-  assert.deepEqual(r.placeFailed, []);
-  assert.equal(B.removed, true);
-  assert.equal(group.removed, false, '그룹이 남아야 한다');
-  const inst = figma._created[0];
-  assert.deepEqual(group.children, [A, inst], '마스터 그 자리 + B 자리에 인스턴스');
-  assert.deepEqual([inst.x, inst.y], [130, 20]);
-  assert.deepEqual(absXY(inst), before.absB);
-  assert.deepEqual(page.children, [screen], '페이지 맨 위 그대로');
-  assert.equal(count(page), before.nodes, '노드 수 그대로');
-});
-
-test('묶기 — 넣기 실패면 인스턴스를 지우고 원본을 그대로 둔다(페이지 맨 위 대체 없음)', async () => {
-  const page = mk('PAGE', {}, []);
-  const txt = (name, characters) => mk('TEXT', { name, characters, componentPropertyReferences: {} });
-  const A = mk('FRAME', { name: 'Card', x: 0, y: 0 }, [txt('Title', 'A')]);
-  const B = mk('FRAME', { name: 'Other', x: 50, y: 0 }, [txt('Title', 'B')]);
-  const box = mk('FRAME', { name: 'Box' }, [A, B]);
-  page.appendChild(box);
-  installFigma(page);
-  box.insertChild = () => { throw new Error('잠긴 부모'); }; // 넣기 실패
-
-  const r = await componentizeSimilar(A, [A, B]);
-
-  assert.equal(r.instances, 0);
-  assert.deepEqual(r.placeFailed, ['Other']);
-  assert.ok(r.warnings.some((w) => w.startsWith('Other: 제자리')));
-  assert.equal(B.removed, false, '원본을 지키기');
-  assert.deepEqual(box.children, [A, B]);
-  assert.deepEqual(page.children, [box], '페이지 맨 위에 인스턴스가 남지 않는다');
-});
-
 /* ---------- 코드 대조 검토 뒤 (2026-11-04) — 실패 경로 · 크기 규칙 · 복사본 ---------- */
 
 const anchors = (root) => all(root).filter((n) => n.name === '__dsl_anchor');
@@ -334,7 +289,7 @@ test('표지 — 크기·위치를 그룹에 넣기 전에 정한다', () => {
   releaseOrigin(o);
 });
 
-test('표지 — [묶기]·아이콘 자리 교체(anchor: false)와 불리언 연산 부모에는 넣지 않는다', () => {
+test('표지 — 아이콘 자리 교체 · 속성 접힘 멤버(anchor: false)와 불리언 연산 부모에는 넣지 않는다', () => {
   const { page, group, v } = iconFixture();
   installFigma(page);
   const o = captureOrigin(v[0], { anchor: false });
@@ -496,23 +451,6 @@ test('아이콘 자리 교체 — 같은 순서·위치·제약을 이어받고 
 });
 
 /* ---------- 검토 2회차 (2026-11-04) ---------- */
-
-test('[묶기] 결과 메시지 — 결과의 필드를 빠짐없이 싣는다(placeFailed 포함)', async () => {
-  const page = mk('PAGE', {}, []);
-  const txt = (name, characters) => mk('TEXT', { name, characters, componentPropertyReferences: {} });
-  const A = mk('FRAME', { name: 'Card', x: 0, y: 0 }, [txt('Title', 'A')]);
-  const B = mk('FRAME', { name: 'Other', x: 50, y: 0 }, [txt('Title', 'B')]);
-  const box = mk('FRAME', { name: 'Box' }, [A, B]);
-  page.appendChild(box);
-  installFigma(page);
-  box.insertChild = () => { throw new Error('잠긴 부모'); };
-  const r = await componentizeSimilar(A, [A, B]);
-  const m = componentizeResultMessage(r);
-  assert.equal(m.type, 'COMPONENTIZE_RESULT');
-  assert.deepEqual(m.placeFailed, ['Other'], 'placeFailed가 실려야 꼬리·⚠가 동작한다');
-  for (const k of Object.keys(r)) assert.ok(k in m, `결과 필드 ${k}가 메시지에 없다`);
-  assert.ok(r.warnings.every((w) => !/습니다|합니다/.test(w)), '해요체');
-});
 
 test('속성 값 넣기 — 한 번에 실패하면 속성마다, 거절된 이름만 돌려주고 나머지는 넣는다', () => {
   const applied = {};

@@ -793,7 +793,6 @@ export function applyInstancePropValues(
 /**
  * 사진은 컴포넌트 속성이 될 수 없지만 인스턴스의 `fills`는 오버라이드된다 —
  * 멤버 원본의 fill을 같은 경로에 이식해 접힌 뒤에도 각자 사진을 지킨다.
- * (닮은 프레임 컴포넌트화가 쓰는 방식과 같다.)
  */
 export function transplantImageFills(
   inst: SceneNode,
