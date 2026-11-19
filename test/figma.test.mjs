@@ -8142,3 +8142,103 @@ test('B.24 ⑨–⑬ 맥락 통과 · 판넬 역할 되읽기 · 접두사 · �
   assert.equal(pickScopePure('card-media'), 'card');
 });
 
+
+/* ---------- 6-1b 컴포넌트 규칙 — SCAN_COMPONENT_CANDIDATES(ia-v3 A.19 6번 figma.test ①–⑥) ---------- */
+
+const hexRgb = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
+const sn = (o) => ({ visible: true, getPluginData: () => '', setPluginData() {}, ...o });
+const solid61 = (h) => [{ type: 'SOLID', visible: true, color: hexRgb(h) }];
+const txt61 = (id, chars, color, o = {}) => sn({ type: 'TEXT', id, name: chars, characters: chars, width: 40, height: 20, fills: solid61(color),
+  fontSize: 14, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'PIXELS', value: 20 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+  textStyleId: '', boundVariables: {}, getRangeAllFontNames() { return [this.fontName]; }, getRangeBoundVariable() { return null; }, ...o });
+function link(n, parent) {
+  n.parent = parent;
+  for (const c of n.children ?? []) link(c, n);
+  return n;
+}
+function allNodes(n, out = []) { out.push(n); for (const c of n.children ?? []) allNodes(c, out); return out; }
+const menu61 = (id, n = 5, active = 0, name = 'nav') => sn({ type: 'FRAME', id, name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [],
+  children: ['About', 'Services', 'Offers', 'Seats', 'Destination'].slice(0, n).map((c, i) => txt61(`${id}-${i}`, c, i === active ? '#000000' : '#7a7a7a')) });
+const pill61 = (id) => sn({ type: 'FRAME', id, name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa'),
+  children: ['Economy', 'Business Class', 'Fast Class'].map((l, i) => sn({ type: 'FRAME', id: `${id}-${i}`, name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24,
+    fills: i === 1 ? solid61('#3d5fdb') : [], children: [txt61(`${id}-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')] })) });
+/** 목 인스턴스 — 메인(세트 변형 또는 단독). `syncThrows`면 동기 mainComponent가 던진다(dynamic-page 흉내). */
+function inst61(id, main, { syncThrows = false } = {}) {
+  const n = sn({ type: 'INSTANCE', id, name: 'item', width: 160, height: 200, fills: [], children: [], getMainComponentAsync: async () => main });
+  Object.defineProperty(n, 'mainComponent', { get() { if (syncThrows) throw new Error('sync main in dynamic-page'); return null; } });
+  return n;
+}
+function variant61(id, setName, setKey, pd = {}) {
+  const set = { type: 'COMPONENT_SET', id: `${setKey}-id`, key: setKey, name: setName };
+  return { type: 'COMPONENT', id, key: `${id}-key`, name: 'State=Default', parent: set, width: 160, height: 200, children: [], visible: true, fills: [], getPluginData: (k) => pd[k] ?? '' };
+}
+async function scan61(rootKids, o = {}) {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  figma.loadAllPagesAsync = async () => {};
+  const root = link(sn({ type: 'FRAME', id: 'root', name: o.rootName ?? 'Flightin website', width: 1440, height: 900, fills: [], children: rootKids }), { type: 'PAGE', id: 'page' });
+  registerNodes(figma, allNodes(root));
+  const out = await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 1 });
+  return ofType(out, 'COMPONENT_CANDIDATES')[0];
+}
+const label61 = (n) => (n.group ? `${n.group} · ${n.variant}` : n.single);
+
+test('6-1b ① ② — 탭 바 둘(nav · card) → Tab Bar · Style=Text / Pill, 칸은 후보 아님 · 같은 Style 칸 4 바 → Tab Item · Style=Text', async () => {
+  const r = await scan61([menu61('m1', 5), menu61('m2', 5, 2), menu61('m3', 4), pill61('p')]);
+  const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
+  assert.equal(label61(by.m1), 'Tab Bar · Style=Text');
+  assert.equal(label61(by.m2), 'Tab Bar · Style=Text', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
+  assert.equal(label61(by.m3), 'Tab Item · Style=Text', '칸 수가 다른 바 — 칸만');
+  assert.equal(label61(by.p), 'Tab Bar · Style=Pill');
+  assert.ok(r.nodes.every((n) => n.defaultOn || !n.eligible));
+  assert.ok(!r.nodes.some((n) => /^(m\d|p)-/.test(n.id)), '칸은 후보 아님');
+  const one = await scan61([menu61('m1', 5)]);
+  assert.equal(label61(one.nodes.find((n) => n.id === 'm1')), 'Tab Bar', 'Style 하나 → 단독 Tab Bar');
+});
+
+const bkList = (id, mainOf, o) => sn({ type: 'FRAME', id, name: 'BkList', layoutMode: 'HORIZONTAL', width: 900, height: 200, itemSpacing: 16, fills: [],
+  children: Array.from({ length: 5 }, (_, i) => inst61(`${id}-${i}`, mainOf(i), o)) });
+
+test('6-1b ③ ④ — C-D18: 다른 컴포넌트 세트를 담은 같은 이름 목록 둘 → -Type1 · -Type2(동기 mainComponent가 던져도 같다)', async () => {
+  for (const syncThrows of [false, true]) {
+    const card = variant61('card-v', 'Card', 'S-card');
+    const cell = variant61('cell-v', 'TabCell', 'S-cell');
+    const r = await scan61([bkList('k1', () => card, { syncThrows }), bkList('k2', () => cell, { syncThrows })], { rootName: 'Booking' });
+    const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
+    assert.match(label61(by.k1), /-Type1$/, String(syncThrows));
+    assert.match(label61(by.k2), /-Type2$/, String(syncThrows));
+    assert.ok(by.k1.single && by.k2.single, '저마다 단독');
+  }
+  // 같은 세트(다른 변형)면 한 가족
+  const a = variant61('card-a', 'Card', 'S-card');
+  const b = variant61('card-b', 'Card', 'S-card');
+  const r2 = await scan61([bkList('k1', () => a), bkList('k2', () => b)], { rootName: 'Booking' });
+  const by2 = Object.fromEntries(r2.nodes.map((n) => [n.id, n]));
+  assert.ok(!/-Type/.test(label61(by2.k1)), '한 가족');
+});
+
+test('6-1b ⑤ — 칸이 모두 Tab Item 인스턴스인 줄은 후보 목록에 없고 자동 이름 수에도 없다', async () => {
+  const ti = variant61('ti-v', 'Tab Item', 'S-ti', { 'dsl.reuse': 'variant:role:tab-item:abc' });
+  const row = (id, name) => sn({ type: 'FRAME', id, name, layoutMode: 'HORIZONTAL', width: 400, height: 20, fills: [],
+    children: Array.from({ length: 4 }, (_, i) => Object.assign(inst61(`${id}-${i}`, ti), { width: 60, height: 20 })) });
+  const other = variant61('x-v', 'Other', 'S-x');
+  const plain = sn({ type: 'FRAME', id: 'pl', name: 'Frame 9', layoutMode: 'HORIZONTAL', width: 400, height: 20, fills: [],
+    children: Array.from({ length: 4 }, (_, i) => Object.assign(inst61(`pl-${i}`, other), { width: 60, height: 20 })) });
+  const r = await scan61([row('r1', 'nav-4'), row('r2', 'Frame 7'), plain]);
+  assert.ok(!r.nodes.some((n) => n.id === 'r1' || n.id === 'r2'));
+  assert.equal(r.autoNamed, 1, 'Tab Item 줄(Frame 7)은 세지 않고, 다른 인스턴스 줄(Frame 9)만');
+});
+
+test('6-1b ⑥ — EXTRACT: 이름 tabs인 굵기 표지 줄의 쓰임 이름 주인은 6-1b 전과 같다(엄격한 구조만 tab)', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const row = sn({ type: 'FRAME', id: 'w', name: 'tabs', layoutMode: 'HORIZONTAL', width: 300, height: 20, itemSpacing: 24, fills: [],
+    children: ['Home', 'Trips', 'Deals'].map((c, i) => txt61(`w-${i}`, c, '#111111', { fontWeight: i === 0 ? 700 : 400 })) });
+  const strict = menu61('m', 5);
+  const root = link(sn({ type: 'FRAME', id: 'root', name: 'root', width: 900, height: 400, fills: [], children: [row, strict] }), { type: 'PAGE', id: 'page' });
+  registerNodes(figma, allNodes(root));
+  const out = await p.send({ type: 'EXTRACT', nodeIds: ['w', 'm'] });
+  const uses = ofType(out, 'EXTRACT_RESULT')[0].tokens.flatMap((t) => (t.uses ?? []).map((u) => u.name));
+  assert.ok(uses.some((u) => /\/tab\//.test(u) || /\/tab$/.test(u)), `엄격한 구조 메뉴는 tab: ${uses}`);
+  assert.ok(uses.some((u) => /\/nav\//.test(u) || /\/nav$/.test(u)), `넓힌 구조 tabs 줄은 지금처럼 nav: ${uses}`);
+});

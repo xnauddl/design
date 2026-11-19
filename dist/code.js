@@ -8994,6 +8994,40 @@
     const sets = countable(covering);
     return result(sets.length, () => sets[0]);
   }
+  function matchTabReuse(plan, comps, grade = () => "strict", barOk = () => true) {
+    var _a, _b, _c, _d;
+    const itemKeys = (_a = plan.itemKeys) != null ? _a : [];
+    const barKeys = (_b = plan.barKeys) != null ? _b : [];
+    const cover = (keys, kind, allowSingle, extra) => {
+      const groups = [...new Set(comps.map((c) => c.setId))];
+      const covering = [];
+      for (const setId of groups) {
+        const pools = setId ? [comps.filter((c) => c.setId === setId)] : allowSingle && keys.length === 1 ? comps.filter((c) => !c.setId).map((c) => [c]) : [];
+        for (const pool of pools) {
+          const picked = [];
+          let g = "strict";
+          for (let k = 0; k < keys.length; k++) {
+            const graded = pool.filter((c) => c.key === keys[k] && extra(c.id)).map((c) => ({ item: c, grade: grade(kind, k, c.id) }));
+            const hit = countable(graded);
+            if (hit.length !== 1) {
+              g = "fail";
+              break;
+            }
+            if (graded.find((x) => x.item === hit[0]).grade === "loose") g = "loose";
+            picked.push(hit[0].id);
+          }
+          if (g !== "fail" && keys.length) covering.push({ item: picked, grade: g });
+        }
+      }
+      const sets = countable(covering);
+      return sets.length === 1 ? { ids: sets[0], keepKey: true } : { ids: null, keepKey: sets.length === 0 };
+    };
+    const item = cover(itemKeys, "item", false, () => true);
+    if (!item.ids) return { item, bar: { ids: null, keepKey: true } };
+    const itemSetId = (_d = (_c = comps.find((c) => c.id === item.ids[0])) == null ? void 0 : _c.setId) != null ? _d : "";
+    const bar = cover(barKeys, "bar", true, (id) => barOk(id, itemSetId));
+    return { item, bar };
+  }
   function reusePairCheck(a, b, asInstance = /* @__PURE__ */ new Set(), iconInstances = /* @__PURE__ */ new Set(), skipFamily = /* @__PURE__ */ new Set()) {
     let viaIcon = false;
     const isVec = (n) => VECTOR_TYPES.has(n.type) || !!n.iconFrame;
@@ -9330,6 +9364,11 @@
     var _a;
     return ((_a = n.children) != null ? _a : []).filter((c) => c.visible !== false);
   };
+  function tabCellMatches(orig, cell) {
+    const d = pairDiff(orig, cell);
+    if (d.split || d.rootFill || d.colorPaths.length || d.rootPad || d.innerPad) return false;
+    return tabCellLook(orig) === tabCellLook(cell);
+  }
   function tabBarRootMatches(rep, bar) {
     if (visibleKids(rep).length !== visibleKids(bar).length) return false;
     const d = pairDiff(rep, bar);
@@ -11370,9 +11409,9 @@
     }
   }
   var VECTOR_TYPES2 = /* @__PURE__ */ new Set(["VECTOR", "BOOLEAN_OPERATION", "STAR", "POLYGON", "LINE"]);
-  function iconFrameKeyOf(node) {
+  function iconFrameKeyOf(node, asMain = false) {
     var _a;
-    if (node.type !== "FRAME" && node.type !== "GROUP") return void 0;
+    if (node.type !== "FRAME" && node.type !== "GROUP" && !(asMain && node.type === "COMPONENT")) return void 0;
     const size = (n) => `${Math.round(n.width * 100) / 100}x${Math.round(n.height * 100) / 100}`;
     if (node.width > 96 || node.height > 96) return void 0;
     if (imageHashOf2(node) !== void 0) return void 0;
@@ -11406,7 +11445,65 @@
     var _a;
     return (_a = vectorKeyOf(node)) != null ? _a : iconFrameKeyOf(node);
   }
-  function toStructNode(node, isRoot = true) {
+  var TAB_ITEM_SET_RE = /^Tab Item( \d+)?$/;
+  async function instanceMainsAsync(roots, into = /* @__PURE__ */ new Map()) {
+    const structOf = /* @__PURE__ */ new Map();
+    const read = async (n) => {
+      if (into.has(n.id)) return;
+      try {
+        const main = await n.getMainComponentAsync();
+        if (!main) return;
+        const set = main.parent && main.parent.type === "COMPONENT_SET" ? main.parent : null;
+        let icon = false;
+        try {
+          icon = !!main.getPluginData(ICON_KEY);
+        } catch (e) {
+        }
+        if (!icon) icon = iconFrameKeyOf(main, true) !== void 0;
+        let tabItemMain = false;
+        if (set) {
+          let rk = "";
+          try {
+            rk = main.getPluginData(REUSE_KEY);
+          } catch (e) {
+          }
+          tabItemMain = rk.startsWith("variant:role:tab-item:") || TAB_ITEM_SET_RE.test(set.name);
+        }
+        let mainStruct;
+        if (!set) {
+          mainStruct = structOf.get(main.id);
+          if (!mainStruct) {
+            mainStruct = toStructNode(main);
+            structOf.set(main.id, mainStruct);
+          }
+        }
+        into.set(n.id, {
+          familyKey: set ? set.key || set.id : main.key || main.id,
+          inSet: !!set,
+          icon,
+          mainKey: main.key || main.id,
+          mainId: main.id,
+          tabItemMain,
+          mainStruct
+        });
+      } catch (e) {
+      }
+    };
+    const walk3 = async (n, isRoot) => {
+      if (n.type === "INSTANCE") {
+        if (!isRoot) await read(n);
+        return;
+      }
+      if (!isRoot && iconFrameKeyOf(n) !== void 0) return;
+      if ("children" in n) for (const c of n.children) await walk3(c, false);
+    };
+    for (const r of roots) {
+      if (r.type === "INSTANCE") await read(r);
+      await walk3(r, true);
+    }
+    return into;
+  }
+  function toStructNode(node, isRoot = true, mains) {
     const a = node;
     const num = (v) => typeof v === "number" ? v : void 0;
     const kids = "children" in node ? node.children : [];
@@ -11420,16 +11517,20 @@
       }
     }
     const iconKey = isRoot ? void 0 : iconFrameKeyOf(node);
+    const im = node.type === "INSTANCE" ? mains == null ? void 0 : mains.get(node.id) : void 0;
     if (node.type === "INSTANCE") {
-      try {
-        const main = node.mainComponent;
-        mainComponentKey = main ? main.key || main.id : null;
-      } catch (e) {
-        mainComponentKey = null;
+      if (im) mainComponentKey = im.mainKey;
+      else {
+        try {
+          const main = node.mainComponent;
+          mainComponentKey = main ? main.key || main.id : null;
+        } catch (e) {
+          mainComponentKey = null;
+        }
       }
     }
     const nameKey = readNameKey(node);
-    return __spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+    return __spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       id: node.id,
       name: node.name
     }, nameKey ? { nameKey } : {}), {
@@ -11462,11 +11563,12 @@
       characters
     }), node.type === "TEXT" ? { fontWeight: node.fontWeight, textDecoration: node.textDecoration } : {}), {
       y: num(a.y),
-      mainComponentKey,
+      mainComponentKey
+    }), im ? __spreadValues({ mainFamilyKey: im.familyKey, mainInSet: im.inSet, iconMain: im.icon, tabItemMain: im.tabItemMain }, im.mainStruct ? { mainStruct: im.mainStruct } : {}) : {}), {
       role: readRole(node)
     }), iconKey ? { iconFrame: true, vectorKey: iconKey } : {}), {
       // INSTANCE 안은 자식 컴포넌트 소관 — 접힘 비교·속성 노출과 동일하게 펼치지 않음. 아이콘 프레임도 그림 하나.
-      children: node.type === "INSTANCE" || iconKey ? [] : kids.map((k) => toStructNode(k, false))
+      children: node.type === "INSTANCE" || iconKey ? [] : kids.map((k) => toStructNode(k, false, mains))
     });
   }
   function bindOwnerOf(roots) {
@@ -11478,14 +11580,14 @@
       return pickOwner(role, s ? highConfidenceComponentRole(s, { wideTab: false }) : null, isKnownRole);
     };
   }
-  function structIndex(roots) {
+  function structIndex(roots, mains) {
     const out = /* @__PURE__ */ new Map();
     const add2 = (n) => {
       var _a;
       out.set(n.id, n);
       for (const c of (_a = n.children) != null ? _a : []) add2(c);
     };
-    for (const r of roots) add2(toStructNode(r));
+    for (const r of roots) add2(toStructNode(r, true, mains));
     return out;
   }
   function ownComponentLayersWithPath(root) {
@@ -11515,10 +11617,11 @@
     }
     return (_b = cur == null ? void 0 : cur.vectorKey) != null ? _b : null;
   }
-  function propDefaultFor(target, type) {
+  function propDefaultFor(target, type, mains) {
+    var _a, _b;
     if (type === "TEXT") return target.type === "TEXT" ? target.characters : "";
     if (type === "BOOLEAN") return target.visible;
-    return target.type === "INSTANCE" && target.mainComponent ? target.mainComponent.key || target.mainComponent.id : "";
+    return target.type === "INSTANCE" ? (_b = (_a = mains == null ? void 0 : mains.get(target.id)) == null ? void 0 : _a.mainId) != null ? _b : "" : "";
   }
   function isEffectivelyVisible3(node) {
     let p = node;
@@ -11554,7 +11657,7 @@
   function propValuesFromNode(root, plan) {
     return propValuesFromStruct(toStructNode(root), plan);
   }
-  function exposeProperties(container, scopes) {
+  function exposeProperties(container, scopes, mains) {
     const rep = scopes[0];
     if (!rep) return [];
     const layered = ownComponentLayersWithPath(rep);
@@ -11566,16 +11669,16 @@
         characters: node.type === "TEXT" ? node.characters : void 0
       }))
     );
-    return exposePropertiesFromPlan(container, scopes, plan);
+    return exposePropertiesFromPlan(container, scopes, plan, mains);
   }
-  function exposePropertiesFromPlan(container, scopes, plan) {
+  function exposePropertiesFromPlan(container, scopes, plan, mains) {
     var _a;
     const out = [];
     for (const p of plan) {
       const repTarget = resolvePropTarget(scopes[0], p);
       if (!repTarget) continue;
       try {
-        const id = container.addComponentProperty(p.propName, p.type, propDefaultFor(repTarget, p.type));
+        const id = container.addComponentProperty(p.propName, p.type, propDefaultFor(repTarget, p.type, mains));
         for (const scope of scopes) {
           const target = resolvePropTarget(scope, p);
           if (!target) continue;
@@ -11597,10 +11700,10 @@
     }
     return false;
   }
-  function groupForRegister(nodes, index) {
+  function groupForRegister(nodes, index, mains) {
     const structs = nodes.map((n) => {
       var _a;
-      return (_a = index == null ? void 0 : index.get(n.id)) != null ? _a : toStructNode(n);
+      return (_a = index == null ? void 0 : index.get(n.id)) != null ? _a : toStructNode(n, true, mains);
     });
     const desc = /* @__PURE__ */ new Map();
     const descOf = (a) => {
@@ -11682,6 +11785,90 @@
     }
     return { list, byId };
   }
+  var setOrName = (c) => {
+    var _a;
+    return ((_a = c.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? c.parent.name : c.name;
+  };
+  async function decideTabReuse(g, list, byId, asInstance) {
+    var _a, _b;
+    const tp = g.tab;
+    const plan = reusePlanFor(g);
+    if (!plan) return { hit: null, keepKey: true };
+    const grades = /* @__PURE__ */ new Map();
+    const structOfComp = /* @__PURE__ */ new Map();
+    const compStruct = async (comp, type) => {
+      const { root } = reuseRootOf(comp, type);
+      const ck = `${comp.id}|${root.id}`;
+      let st = structOfComp.get(ck);
+      if (!st) {
+        st = toStructNode(root, true, await instanceMainsAsync([root]));
+        structOfComp.set(ck, st);
+      }
+      return { struct: st, icons: await iconInstanceIds(root) };
+    };
+    for (let k = 0; k < tp.items.length; k++) {
+      for (const c of list) {
+        if (c.key !== plan.itemKeys[k]) continue;
+        const comp = byId.get(c.id);
+        if (!comp) continue;
+        const { struct, icons } = await compStruct(comp, tp.items[k].cell.type);
+        grades.set(`item|${k}|${c.id}`, reusePairGrade(tp.items[k].cell, struct, asInstance, icons));
+      }
+    }
+    const barCells = /* @__PURE__ */ new Map();
+    for (let k = 0; k < tp.styles.length; k++) {
+      const rep = tp.styles[k].rep;
+      const cellIds = new Set(((_a = rep.children) != null ? _a : []).filter((c) => c.visible !== false).map((c) => c.id));
+      for (const c of list) {
+        if (c.key !== plan.barKeys[k]) continue;
+        const comp = byId.get(c.id);
+        if (!comp) continue;
+        const { struct, icons } = await compStruct(comp, rep.type);
+        grades.set(`bar|${k}|${c.id}`, reusePairGrade(rep, struct, cellIds, icons));
+        const kids = comp.children.filter((x) => x.visible !== false);
+        const sets = [];
+        for (const x of kids) {
+          if (x.type !== "INSTANCE") {
+            sets.push(null);
+            continue;
+          }
+          try {
+            const m2 = await x.getMainComponentAsync();
+            sets.push(m2 && ((_b = m2.parent) == null ? void 0 : _b.type) === "COMPONENT_SET" ? m2.parent.id : null);
+          } catch (e) {
+            sets.push(null);
+          }
+        }
+        barCells.set(c.id, { n: kids.length, sets });
+      }
+    }
+    const barKeyIndex = (id) => {
+      var _a2, _b2;
+      return plan.barKeys.indexOf((_b2 = (_a2 = list.find((c) => c.id === id)) == null ? void 0 : _a2.key) != null ? _b2 : "");
+    };
+    const m = matchTabReuse(plan, list, (kind, k, id) => {
+      var _a2;
+      return (_a2 = grades.get(`${kind}|${k}|${id}`)) != null ? _a2 : "fail";
+    }, (id, setId) => {
+      var _a2;
+      const info = barCells.get(id);
+      const k = barKeyIndex(id);
+      if (!info || k < 0) return false;
+      const n = ((_a2 = tp.styles[k].rep.children) != null ? _a2 : []).filter((c) => c.visible !== false).length;
+      return info.n === n && info.sets.every((x) => x === setId);
+    });
+    const tabKeep = { item: m.item.keepKey, bar: m.bar.keepKey };
+    if (!m.item.ids) return { hit: null, keepKey: true, tabKeep };
+    const items = m.item.ids.map((id) => byId.get(id)).filter((c) => !!c);
+    if (items.length !== tp.items.length) return { hit: null, keepKey: true, tabKeep };
+    const bars = m.bar.ids ? m.bar.ids.map((id) => byId.get(id)).filter((c) => !!c) : null;
+    const okBars = bars && bars.length === tp.styles.length ? bars : null;
+    return {
+      hit: { comps: [], name: setOrName(items[0]), shown: [], iconIds: [], tab: { items, itemName: setOrName(items[0]), bars: okBars, barName: okBars ? setOrName(okBars[0]) : "" } },
+      keepKey: true,
+      tabKeep
+    };
+  }
   async function decideReuse(groups, exclude, asInstance) {
     var _a;
     const { list, byId } = await reuseCandidates(exclude);
@@ -11689,6 +11876,14 @@
     const out = [];
     const rootCache = /* @__PURE__ */ new Map();
     for (const g of groups) {
+      if (g.tab) {
+        try {
+          out.push(await decideTabReuse(g, list, byId, asInstance));
+        } catch (e) {
+          out.push({ hit: null, keepKey: true });
+        }
+        continue;
+      }
       let hit = null;
       let keepKey = true;
       try {
@@ -11709,7 +11904,7 @@
               const ck = `${c.id}|${root.id}`;
               let cached = rootCache.get(ck);
               if (!cached) {
-                cached = { struct: toStructNode(root), icons: await iconInstanceIds(root) };
+                cached = { struct: toStructNode(root, true, await instanceMainsAsync([root])), icons: await iconInstanceIds(root) };
                 rootCache.set(ck, cached);
               }
               icons.set(`${k}|${c.id}`, cached.icons);
@@ -12184,7 +12379,8 @@
         case "SCAN_COMPONENT_CANDIDATES": {
           if (!requireComponents()) break;
           const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible3);
-          const rootStructs = roots.map((n) => toStructNode(n));
+          const scanMains = await instanceMainsAsync(roots);
+          const rootStructs = roots.map((n) => toStructNode(n, true, scanMains));
           const candidates = scanComponentCandidates(rootStructs);
           const scanIndex = /* @__PURE__ */ new Map();
           const addIdx = (n) => {
@@ -12208,15 +12404,33 @@
           let nodes = pruned;
           try {
             const eligibleNodes = pruned.filter((c) => c.eligible).map((c) => liveById.get(c.id)).filter((n) => !!n);
-            const groups = groupForRegister(eligibleNodes, scanIndex);
+            const groups = groupForRegister(eligibleNodes, scanIndex, scanMains);
             const groupNames = resolvePlanNames(groups, await existingComponentNames(new Set(eligibleNodes.map((n) => n.id))));
             const defaultChecked = /* @__PURE__ */ new Set();
             for (const g of groups) for (const m of g.members) if (defaultOnFor(g, m)) defaultChecked.add(m.id);
             const reuseHits = (await decideReuse(groups, new Set(eligibleNodes.map((n) => n.id)), defaultChecked)).map((d) => d.hit);
             const preview = /* @__PURE__ */ new Map();
             groups.forEach((g, gi) => {
+              var _a2, _b2, _c2;
               const name = groupNames[gi];
               const on = (id) => defaultChecked.has(id);
+              if (g.tab) {
+                const many = g.tab.styles.length > 1;
+                const hit = (_a2 = reuseHits[gi]) == null ? void 0 : _a2.tab;
+                for (const b of g.tab.bars) {
+                  const asBar = b.rep || b.asBar;
+                  const label = asBar ? many ? { group: name, variant: `Style=${b.style}` } : { single: name } : { group: g.tab.itemName, variant: `Style=${b.style}` };
+                  let reuse;
+                  if (hit && asBar && hit.bars) {
+                    const comp = hit.bars[g.tab.styles.findIndex((sp) => sp.style === b.style)];
+                    reuse = { name: comp && ((_b2 = comp.parent) == null ? void 0 : _b2.type) === "COMPONENT_SET" ? `${comp.parent.name} \xB7 ${comp.name}` : (_c2 = comp == null ? void 0 : comp.name) != null ? _c2 : hit.barName };
+                  } else if (hit && !asBar) {
+                    reuse = { name: `${hit.itemName} \xB7 Style=${b.style}` };
+                  }
+                  preview.set(b.bar.id, __spreadValues(__spreadProps(__spreadValues({}, label), { defaultOn: on(b.bar.id) }), reuse ? { reuse } : {}));
+                }
+                return;
+              }
               if (g.subfamilies.length === 1) {
                 if (g.members.length === 1) preview.set(g.members[0].id, { single: name, defaultOn: on(g.members[0].id) });
                 else for (const m of g.members) preview.set(m.id, { single: name, propsOnly: true, defaultOn: on(m.id) });
@@ -12229,7 +12443,7 @@
             });
             groups.forEach((g, gi) => {
               const hit = reuseHits[gi];
-              if (!hit) return;
+              if (!hit || g.tab) return;
               g.members.forEach((m, k) => {
                 var _a2;
                 return preview.set(m.id, __spreadProps(__spreadValues({}, (_a2 = preview.get(m.id)) != null ? _a2 : {}), { reuse: { name: hit.shown[k] } }));
@@ -12250,7 +12464,8 @@
           await figma.loadAllPagesAsync();
           let registered = 0;
           let skipped = 0;
-          const sIndex = structIndex(selection());
+          const regMains = await instanceMainsAsync(selection());
+          const sIndex = structIndex(selection(), regMains);
           const eligible = (n) => sceneComponentEligible(n, sIndex);
           let targets;
           let setsOnly = false;
@@ -12286,7 +12501,8 @@
             else skipped++;
           }
           const byId = new Map(valid.map((n) => [n.id, n]));
-          let groups = groupForRegister(valid, sIndex);
+          await instanceMainsAsync(valid.filter((n) => !sIndex.has(n.id)), regMains);
+          let groups = groupForRegister(valid, sIndex, regMains);
           if (setsOnly) groups = groups.filter((g) => g.members.length >= 2);
           const existingNames = await existingComponentNames(new Set(valid.map((n) => n.id)));
           const nameByGroup = /* @__PURE__ */ new Map();
@@ -12369,8 +12585,10 @@
             }
           };
           const keepRoots = [];
+          const madeInstanceIds = /* @__PURE__ */ new Set();
           const instanceOf = (comp, name) => () => {
             const inst = comp.createInstance();
+            madeInstanceIds.add(inst.id);
             keepRoots.push({ node: inst, name });
             return inst;
           };
@@ -12383,6 +12601,53 @@
             singles.push(comp.name);
             containers.push({ container: comp, scopes: [comp] });
             restore([{ o, make: instanceOf(comp, o.name), label: comp.name }]);
+          };
+          const swapMember = async (comp, node, type) => {
+            var _a2;
+            const name = node.name;
+            const prefix = shapePrefix(comp, type);
+            const make = async () => {
+              const inst = comp.createInstance();
+              madeInstanceIds.add(inst.id);
+              try {
+                const entry = { node: inst, name };
+                keepRoots.push(entry);
+                const bad = await copyOverridesAsync(node, inst, prefix, {
+                  mainOf: (n) => n.getMainComponentAsync(),
+                  loadFont: (f) => figma.loadFontAsync(f),
+                  isIcon: (n) => iconFrameKeyOf(n) !== void 0,
+                  iconFor: (v) => {
+                    const key = artKeyOf(v);
+                    return key ? iconRegistry.ensure(key, v, v.name) : null;
+                  }
+                });
+                for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
+                for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
+                if (bad.length) {
+                  propFailed.push(name);
+                  entry.counted = true;
+                }
+                return inst;
+              } catch (e) {
+                try {
+                  if (!inst.removed) inst.remove();
+                } catch (e2) {
+                }
+                throw e;
+              }
+            };
+            const before = propFailed.length;
+            const r = await replaceMemberAsync(node, make, prefix, fitOpts);
+            if (r.result === "replaced") return r.result;
+            if (propFailed.length > before) propFailed.splice(before);
+            if (r.result === "mismatch") {
+              fillKept.push(name);
+              failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_a2 = r.why) != null ? _a2 : "" }) }));
+            } else {
+              placeFailed.push(name);
+              failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
+            }
+            return r.result;
           };
           const resolved = groups.map((g) => {
             var _a2;
@@ -12408,13 +12673,234 @@
           });
           const shownNames = (_c = msg.names) != null ? _c : {};
           const groupNames = groups.map((g, gi) => {
+            if (g.tab) return resolved[gi];
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
           });
+          const registerTabGroup = async (g, barName, decision) => {
+            var _a2, _b2, _c2, _d2, _e2, _f2, _g2;
+            const tp = g.tab;
+            const hit = (_b2 = (_a2 = decision.hit) == null ? void 0 : _a2.tab) != null ? _b2 : null;
+            const keepItemKey = (_d2 = (_c2 = decision.tabKeep) == null ? void 0 : _c2.item) != null ? _d2 : true;
+            const keepBarKey = (_f2 = (_e2 = decision.tabKeep) == null ? void 0 : _e2.bar) != null ? _f2 : true;
+            const liveOf = async (id) => {
+              var _a3;
+              const n = (_a3 = byId.get(id)) != null ? _a3 : await figma.getNodeByIdAsync(id);
+              return n && !n.removed ? n : null;
+            };
+            const itemComp = /* @__PURE__ */ new Map();
+            const okStyle = /* @__PURE__ */ new Set();
+            if (hit) {
+              tp.items.forEach((it, k) => itemComp.set(`${it.style}|${it.state}`, hit.items[k]));
+              for (const sp of tp.styles) okStyle.add(sp.style);
+            } else {
+              const made = [];
+              for (const sp of tp.styles) {
+                const mine = [];
+                let ok = true;
+                for (const it of tp.items.filter((x) => x.style === sp.style)) {
+                  const cell = await liveOf(it.cell.id);
+                  try {
+                    if (!cell) throw new Error("cell gone");
+                    const cl = cell.clone();
+                    page.appendChild(cl);
+                    try {
+                      const comp = figma.createComponentFromNode(cl);
+                      comp.name = it.variant;
+                      mine.push(comp);
+                      made.push({ comp, it });
+                    } catch (e) {
+                      try {
+                        if (!cl.removed) cl.remove();
+                      } catch (e2) {
+                      }
+                      throw e;
+                    }
+                  } catch (e) {
+                    ok = false;
+                    failures.push(t("component.fail.componentize", { name: it.cell.name, error: errText(e) }));
+                    break;
+                  }
+                }
+                if (ok) okStyle.add(sp.style);
+                else for (const c of mine) {
+                  try {
+                    c.remove();
+                  } catch (e) {
+                  }
+                  made.splice(made.findIndex((x) => x.comp === c), 1);
+                }
+              }
+              if (made.length) {
+                let set = null;
+                try {
+                  set = figma.combineAsVariants(made.map((x) => x.comp), page);
+                } catch (e) {
+                  failures.push(t("component.fail.combine", { set: tp.itemName, error: errText(e) }));
+                }
+                if (!set) {
+                  for (const x of made) {
+                    try {
+                      x.comp.remove();
+                    } catch (e) {
+                    }
+                  }
+                  okStyle.clear();
+                } else {
+                  set.name = tp.itemName;
+                  try {
+                    arrangeSet(set);
+                  } catch (e) {
+                    failures.push(t("component.fail.arrange", { set: set.name, error: errText(e) }));
+                  }
+                  placeOnPage(set);
+                  sets++;
+                  registered += made.length;
+                  containers.push({ container: set, scopes: made.map((x) => x.comp) });
+                  for (const x of made) {
+                    itemComp.set(`${x.it.style}|${x.it.state}`, x.comp);
+                    try {
+                      x.comp.setPluginData(REUSE_KEY, keepItemKey ? tabItemReuseKey(x.it.cell, x.it.style, x.it.state) : "");
+                    } catch (e) {
+                    }
+                  }
+                }
+              }
+            }
+            if (!okStyle.size) return;
+            const origCell = /* @__PURE__ */ new Map();
+            for (const it of tp.items) {
+              if (!hit) {
+                origCell.set(`${it.style}|${it.state}`, it.cell);
+                continue;
+              }
+              const comp = itemComp.get(`${it.style}|${it.state}`);
+              const { root } = reuseRootOf(comp, it.cell.type);
+              origCell.set(`${it.style}|${it.state}`, toStructNode(root, true, await instanceMainsAsync([root])));
+            }
+            const cellsDone = /* @__PURE__ */ new Set();
+            for (const b of tp.bars) {
+              if (!okStyle.has(b.style)) continue;
+              const barNode = await liveOf(b.bar.id);
+              if (!barNode) {
+                skipped++;
+                continue;
+              }
+              if (!b.rep || hit) {
+                const bad = b.cells.some((c, i) => !tabCellMatches(origCell.get(`${b.style}|${b.states[i]}`), c));
+                if (bad) {
+                  fillKept.push(barNode.name);
+                  failures.push(t("component.fail.fillKept", { name: barNode.name, causePart: "" }));
+                  continue;
+                }
+              }
+              for (let i = 0; i < b.cells.length; i++) {
+                const cellNode = await liveOf(b.cells[i].id);
+                if (!cellNode) continue;
+                await swapMember(itemComp.get(`${b.style}|${b.states[i]}`), cellNode, b.cells[i].type);
+              }
+              cellsDone.add(b.bar.id);
+            }
+            const barComp = /* @__PURE__ */ new Map();
+            if (hit == null ? void 0 : hit.bars) {
+              tp.styles.forEach((sp, k) => barComp.set(sp.style, hit.bars[k]));
+            } else {
+              const madeBars = [];
+              for (const sp of tp.styles) {
+                if (!cellsDone.has(sp.rep.id)) continue;
+                const node = await liveOf(sp.rep.id);
+                if (!node) continue;
+                const o = captureOrigin2(node);
+                try {
+                  const comp = figma.createComponentFromNode(node);
+                  registered++;
+                  madeBars.push({ comp, o, sp });
+                } catch (e) {
+                  releaseOrigin(o);
+                  failures.push(t("component.fail.componentize", { name: sp.rep.name, error: errText(e) }));
+                }
+              }
+              const finish = (comp, sp) => {
+                barComp.set(sp.style, comp);
+                try {
+                  comp.setPluginData(REUSE_KEY, keepBarKey ? tabBarReuseKey(sp.rep, sp.style) : "");
+                } catch (e) {
+                }
+                for (const k of comp.children) if (k.type === "INSTANCE") {
+                  try {
+                    k.isExposedInstance = true;
+                  } catch (e) {
+                  }
+                }
+              };
+              const asSingle = (x) => {
+                try {
+                  x.comp.name = barName;
+                } catch (e) {
+                }
+                placeOnPage(x.comp);
+                singles.push(x.comp.name);
+                keepRoots.push({ node: x.comp, name: x.comp.name });
+                finish(x.comp, x.sp);
+                restore([{ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.comp.name }]);
+              };
+              if (madeBars.length >= 2) {
+                let set = null;
+                try {
+                  set = figma.combineAsVariants(madeBars.map((x) => x.comp), (_g2 = pageOf2(madeBars[0].comp)) != null ? _g2 : figma.currentPage);
+                } catch (e) {
+                  failures.push(t("component.fail.combine", { set: barName, error: errText(e) }));
+                }
+                if (set) {
+                  set.name = barName;
+                  for (const x of madeBars) {
+                    x.comp.name = `Style=${x.sp.style}`;
+                    finish(x.comp, x.sp);
+                  }
+                  page.appendChild(set);
+                  try {
+                    arrangeSet(set);
+                  } catch (e) {
+                    failures.push(t("component.fail.arrange", { set: set.name, error: errText(e) }));
+                  }
+                  set.x = cursorX;
+                  set.y = 0;
+                  cursorX += set.width + 48;
+                  sets++;
+                  keepRoots.push({ node: set, name: set.name });
+                  restore(madeBars.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.comp.name })));
+                } else {
+                  for (const x of madeBars) asSingle(x);
+                }
+              } else {
+                for (const x of madeBars) asSingle(x);
+              }
+            }
+            const barTargets = tp.bars.filter((b) => cellsDone.has(b.bar.id) && barComp.has(b.style) && (b.asBar || b.rep && !!(hit == null ? void 0 : hit.bars)));
+            for (const b of barTargets) {
+              const comp = barComp.get(b.style);
+              const node = await liveOf(b.bar.id);
+              if (!node) continue;
+              if (!b.rep && !tabBarRootMatches(__spreadProps(__spreadValues({}, toStructNode(comp)), { type: node.type }), toStructNode(node))) {
+                fillKept.push(node.name);
+                failures.push(t("component.fail.fillKept", { name: node.name, causePart: "" }));
+                continue;
+              }
+              await swapMember(comp, node, b.bar.type);
+            }
+            if (hit) {
+              reused.push(hit.itemName);
+              if (hit.bars) reused.push(hit.barName);
+            }
+          };
           try {
             for (let gi = 0; gi < groups.length; gi++) {
               const g = groups[gi];
               const setName = groupNames[gi];
+              if (g.tab) {
+                await registerTabGroup(g, setName, reuseDecisions[gi]);
+                continue;
+              }
               const hit = reuseHits[gi];
               if (hit) {
                 let any = false;
@@ -12427,7 +12913,8 @@
                   const comp = hit.comps[k];
                   const name = node.name;
                   const { root, prefix } = reuseRootOf(comp, g.members[k].type);
-                  if (reusePairIssue(toStructNode(node), toStructNode(root), /* @__PURE__ */ new Set(), hit.iconIds[k])) {
+                  const nowMains = await instanceMainsAsync([node, root]);
+                  if (reusePairIssue(toStructNode(node, true, nowMains), toStructNode(root, true, nowMains), /* @__PURE__ */ new Set(), hit.iconIds[k], madeInstanceIds)) {
                     reuseKept.push(name);
                     failures.push(t("component.fail.reuseShape", { name }));
                     continue;
@@ -12437,6 +12924,7 @@
                   const newIcons = [];
                   const make = async () => {
                     const inst = comp.createInstance();
+                    madeInstanceIds.add(inst.id);
                     try {
                       const entry = { node: inst, name };
                       keepRoots.push(entry);
@@ -12603,7 +13091,7 @@
                   );
                   let collapsedExposed = 0;
                   try {
-                    collapsedExposed = exposePropertiesFromPlan(master, [master], plan).length;
+                    collapsedExposed = exposePropertiesFromPlan(master, [master], plan, await instanceMainsAsync([master])).length;
                   } catch (e) {
                     failures.push(t("component.fail.expose", { name: master.name, error: errText(e) }));
                   }
@@ -12625,6 +13113,7 @@
                       let inst = null;
                       try {
                         inst = master.createInstance();
+                        madeInstanceIds.add(inst.id);
                         const entry = { node: inst, name };
                         keepRoots.push(entry);
                         const badProps = applyInstancePropValues(inst, ids, vals);
@@ -12655,6 +13144,7 @@
                   const slotPlan = plan.some((p) => !!p.headingSlot);
                   const asyncMakerFor = (member, name) => async () => {
                     const inst = master.createInstance();
+                    madeInstanceIds.add(inst.id);
                     try {
                       keepRoots.push({ node: inst, name });
                       const bad = await copyOverridesAsync(member, inst, prefix, {
@@ -12734,7 +13224,6 @@
                 }
               }
               const placeExtras = async (x) => {
-                var _a2;
                 for (let k = 0; k < x.sf.members.length; k++) {
                   if (k === x.sf.master) continue;
                   const node = byId.get(x.sf.members[k].id);
@@ -12742,48 +13231,7 @@
                     skipped++;
                     continue;
                   }
-                  const name = node.name;
-                  const prefix = shapePrefix(x.comp, x.type);
-                  const make = async () => {
-                    const inst = x.comp.createInstance();
-                    try {
-                      const entry = { node: inst, name };
-                      keepRoots.push(entry);
-                      const bad = await copyOverridesAsync(node, inst, prefix, {
-                        mainOf: (n) => n.getMainComponentAsync(),
-                        loadFont: (f) => figma.loadFontAsync(f),
-                        isIcon: (n) => iconFrameKeyOf(n) !== void 0,
-                        iconFor: (v) => {
-                          const key = artKeyOf(v);
-                          return key ? iconRegistry.ensure(key, v, v.name) : null;
-                        }
-                      });
-                      for (const l of await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS)) if (!bad.includes(l)) bad.push(l);
-                      for (const p of bad) failures.push(t("component.fail.propValue", { name, prop: p }));
-                      if (bad.length) {
-                        propFailed.push(name);
-                        entry.counted = true;
-                      }
-                      return inst;
-                    } catch (e) {
-                      try {
-                        if (!inst.removed) inst.remove();
-                      } catch (e2) {
-                      }
-                      throw e;
-                    }
-                  };
-                  const before = propFailed.length;
-                  const r = await replaceMemberAsync(node, make, prefix, fitOpts);
-                  if (r.result === "replaced") continue;
-                  if (propFailed.length > before) propFailed.splice(before);
-                  if (r.result === "mismatch") {
-                    fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_a2 = r.why) != null ? _a2 : "" }) }));
-                  } else {
-                    placeFailed.push(name);
-                    failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
-                  }
+                  await swapMember(x.comp, node, x.type);
                 }
               };
               if (made.length < 2) {
@@ -12843,9 +13291,10 @@
             }
           }
           let exposed = exposedEarly;
+          const exposeMains = await instanceMainsAsync(containers.map((c) => c.scopes[0]).filter((x) => !!x));
           for (const c of containers) {
             try {
-              exposed += exposeProperties(c.container, c.scopes).length;
+              exposed += exposeProperties(c.container, c.scopes, exposeMains).length;
             } catch (e) {
               failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
