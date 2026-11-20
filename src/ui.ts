@@ -6138,6 +6138,11 @@ function releaseLibRedraw(): void {
 }
 
 function onVarTable(msg: Extract<CodeToUi, { type: 'VAR_TABLE' }>): void {
+  // 상세가 열린 변수가 없는 표는 그 변수가 생기기 전에 읽기 시작한 낡은 표다.
+  // 적용하면 줄이 사라지고, 복제 상세를 닫을 때 포커스가 첫 머리(color 그룹)로 떨어진다(§4.9).
+  // 저장 뒤 표를 기다리는 중이면 빠짐(지워짐)도 받아야 하므로 그대로 둔다.
+  const openId = ed && !ed.create && !ed.saving?.awaitingTable ? ed.v.id : null;
+  if (openId && !msg.vars.some((v) => v.id === openId)) return;
   const sig = JSON.stringify([msg.collections, msg.vars]);
   const edRebase = !!ed?.saving?.awaitingTable;
   const first = !vmTableKnown;

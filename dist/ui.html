@@ -10030,9 +10030,11 @@ ${opts.tip}` : text;
     doLibRedraw();
   }
   function onVarTable(msg) {
-    var _a3;
+    var _a3, _b;
+    const openId = ed && !ed.create && !((_a3 = ed.saving) == null ? void 0 : _a3.awaitingTable) ? ed.v.id : null;
+    if (openId && !msg.vars.some((v) => v.id === openId)) return;
     const sig = JSON.stringify([msg.collections, msg.vars]);
-    const edRebase = !!((_a3 = ed == null ? void 0 : ed.saving) == null ? void 0 : _a3.awaitingTable);
+    const edRebase = !!((_b = ed == null ? void 0 : ed.saving) == null ? void 0 : _b.awaitingTable);
     const first = !vmTableKnown;
     vmTableKnown = true;
     if (sig === vmTableSig && !first) {
