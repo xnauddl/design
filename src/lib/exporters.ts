@@ -134,21 +134,71 @@ export function cssVarName(name: string): string {
   return cssVar(name);
 }
 
-function toCss(tokens: ExportToken[], opts: ExportOptions): string {
-  const lines: string[] = [':root {'];
-  for (const t of tokens) {
-    if (t.aliasOf) {
-      lines.push(`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`);
-    } else {
-      lines.push(`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`);
-      // italic이면 동반 font-style 변수
-      if (t.kind === 'fontWeight' && splitWeightStyle(t.value as string | number).italic) {
-        lines.push(`  ${cssVar(t.name)}-style: italic;`);
-      }
-    }
+/** 한 변수의 CSS 줄(italic 굵기면 짝 줄 `-style: italic`이 바로 아래). */
+function tokenCssLines(t: ExportToken, opts: ExportOptions): string[] {
+  if (t.aliasOf) return [`  ${cssVar(t.name)}: var(${cssVar(t.aliasOf)});`];
+  const out = [`  ${cssVar(t.name)}: ${cssLiteral(t, opts)};`];
+  if (t.kind === 'fontWeight' && splitWeightStyle(t.value as string | number).italic) {
+    out.push(`  ${cssVar(t.name)}-style: italic;`);
   }
-  lines.push('}');
-  return lines.join('\n');
+  return out;
+}
+
+/*
+ * CSS 파일 모양(ia-v3 §4.4 "CSS 파일 모양" — 2026-11-20 사용자 결정):
+ * 계층 먼저(GLOBAL → SEMANTIC → TEXT STYLES 블록마다 `:root`), 블록 안은 종류 묶음,
+ * 묶음 안은 Figma 이름 `localeCompare` 순. 빈 묶음 · 빈 블록은 주석까지 생략.
+ * 머리 주석은 코드 상수(번역하지 않음 — 내보낸 파일은 코드).
+ */
+const CSS_RULE = '='.repeat(74);
+const cssBlockHead = (title: string): string[] => [`/* ${CSS_RULE}`, `   ${title}`, `   ${CSS_RULE} */`];
+const CSS_HEAD = {
+  Global: 'GLOBAL (Primitive) — raw values. Do not use directly in components.',
+  Semantic: 'SEMANTIC — UI roles mapped to Global. Use these in components.',
+  textStyles: 'TEXT STYLES',
+} as const;
+
+/** 종류 묶음 순서(사용자 예시 · 시안 순서 — 화면 종류 순서와 일부러 다름, ia-v4 §2.7). */
+const CSS_GROUPS: readonly { head: string; kinds: readonly TokenKind[] }[] = [
+  { head: 'Color', kinds: ['color'] },
+  { head: 'Typography', kinds: ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily', 'fontWeight'] },
+  { head: 'Spacing', kinds: ['spacing'] },
+  { head: 'Radius', kinds: ['radius'] },
+  { head: 'Size', kinds: ['size'] },
+  { head: 'Stroke', kinds: ['strokeWidth'] },
+  { head: 'Opacity', kinds: ['opacity'] },
+  { head: 'Other', kinds: ['effectFloat', 'other'] },
+];
+
+const byName = <T extends { name: string }>(a: T, b: T): number => a.name.localeCompare(b.name);
+
+/** 한 계층의 블록 — 변수가 없으면 null. */
+function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', opts: ExportOptions): string[] | null {
+  const mine = tokens.filter((t) => t.collection === tier);
+  if (!mine.length) return null;
+  const body: string[] = [];
+  for (const g of CSS_GROUPS) {
+    const inGroup = mine.filter((t) => g.kinds.includes(t.kind)).sort(byName);
+    if (!inGroup.length) continue;
+    if (body.length) body.push('');
+    body.push(`  /* ${g.head} */`);
+    for (const t of inGroup) body.push(...tokenCssLines(t, opts));
+  }
+  return [...cssBlockHead(CSS_HEAD[tier]), ':root {', ...body, '}'];
+}
+
+function toCss(tokens: ExportToken[], opts: ExportOptions, textStyles: readonly ExportTextStyle[]): string {
+  const blocks: string[][] = [];
+  for (const tier of ['Global', 'Semantic'] as const) {
+    const b = tierBlock(tokens, tier, opts);
+    if (b) blocks.push(b);
+  }
+  if (textStyles.length) {
+    const sorted = [...textStyles].sort(byName);
+    blocks.push([...cssBlockHead(CSS_HEAD.textStyles), ':root {', ...textStylesToCss(sorted, opts), '}']);
+  }
+  if (!blocks.length) return ':root {\n}'; // 껍데기 — 저장 전에 exportHasTokens가 거른다
+  return blocks.map((b) => b.join('\n')).join('\n\n');
 }
 
 /* ---------- W3C DTCG JSON 내보내기 ---------- */
@@ -288,12 +338,7 @@ function textStylesToW3C(styles: readonly ExportTextStyle[], opts: ExportOptions
 /** 형식에 따라 토큰(+텍스트 스타일)을 코드 문자열로 내보낸다. */
 export function exportTokens(tokens: ExportToken[], opts: ExportOptions, textStyles: readonly ExportTextStyle[] = []): string {
   const list = dedupeByName(tokens);
-  if (opts.format === 'css') {
-    const css = toCss(list, opts);
-    if (!textStyles.length) return css;
-    const body = css.slice(0, css.lastIndexOf('}')); // ':root {' … 마지막 '}' 앞
-    return `${body}${textStylesToCss(textStyles, opts).join('\n')}\n}`;
-  }
+  if (opts.format === 'css') return toCss(list, opts, textStyles);
   const root = JSON.parse(toW3C(list, opts)) as W3CNode;
   textStylesToW3C(textStyles, opts, root);
   return JSON.stringify(root, null, 2);

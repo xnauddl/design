@@ -3228,13 +3228,13 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 결정: 계층 먼저(GLOBAL → SEMANTIC → TEXT STYLES) · 블록 안은 종류별 묶음 · 영어 주석 · 이름 · 값은 그대로. 참고 자료: uxkm "SCSS 변수 네이밍 규칙 · 실무 변수 구성"(이름 규칙은 가져오지 않음 — 지금 규칙이 이미 같거나 Figma 변수에 더 맞음), 사용자가 준 CSS 예시(계층 블록 · 설명 주석 · Dark 덮어쓰기 블록).
 
-- [ ] `exporters.ts` CSS: `dedupeByName` 뒤 계층(`collection`)으로 나눠 블록마다 `:root`, 블록 머리 주석(코드 상수), 블록 안은 종류 묶음(`kind` → 묶음 표 — §4.4) · 묶음 주석 `/* {종류} */` · 빈 묶음 · 빈 블록 생략 · 블록 · 묶음 사이 빈 줄
-- [ ] 텍스트 스타일은 따로 TEXT STYLES 블록(지금 같은 `:root` 끝에 붙이던 것 — `exportTokens`)
-- [ ] 변수 · 스타일이 모두 없으면 `:root {\n}` 그대로(`exportHasTokens` · 테스트 "빈 입력" 그대로)
-- [ ] W3C JSON · 이름 · 값 · rem · italic 짝 줄 · dedupe 규칙은 바뀌지 않음을 테스트로 고정
-- [ ] 단위 테스트: 블록 순서 · 종류 묶음 순서 · 빈 묶음 생략 · 묶음 하나여도 종류 주석 · Global만 / Semantic만 / 텍스트 스타일만 · 묶음 안 이름순(**섞인 순서로 넣어도** 이름순 — `exporters.ts`가 정렬) · Global과 Semantic 같은 이름은 GLOBAL에만 · 머리 주석 모양(`=` 74개)
-- [ ] 기존 테스트(`test/pure.test.mjs` exportTokens 묶음) 기대값 — 바뀌는 것은 사유와 함께
-- [ ] 4검사 · `dist/` 다시 빌드
+- [x] `exporters.ts` CSS: `dedupeByName` 뒤 계층(`collection`)으로 나눠 블록마다 `:root`, 블록 머리 주석(코드 상수), 블록 안은 종류 묶음(`kind` → 묶음 표 — §4.4) · 묶음 주석 `/* {종류} */` · 빈 묶음 · 빈 블록 생략 · 블록 · 묶음 사이 빈 줄
+- [x] 텍스트 스타일은 따로 TEXT STYLES 블록(지금 같은 `:root` 끝에 붙이던 것 — `exportTokens`)
+- [x] 변수 · 스타일이 모두 없으면 `:root {\n}` 그대로(`exportHasTokens` · 테스트 "빈 입력" 그대로)
+- [x] W3C JSON · 이름 · 값 · rem · italic 짝 줄 · dedupe 규칙은 바뀌지 않음을 테스트로 고정
+- [x] 단위 테스트: 블록 순서 · 종류 묶음 순서 · 빈 묶음 생략 · 묶음 하나여도 종류 주석 · Global만 / Semantic만 / 텍스트 스타일만 · 묶음 안 이름순(**섞인 순서로 넣어도** 이름순 — `exporters.ts`가 정렬) · Global과 Semantic 같은 이름은 GLOBAL에만 · 머리 주석 모양(`=` 74개)
+- [x] 기존 테스트(`test/pure.test.mjs` exportTokens 묶음) 기대값 — 바꿀 것 없음(포함 · 정규식 검사라 모두 그대로 통과), 새 검사 3개(시안과 같은 전체 출력 · 받은 순서 무관 / 빈 블록 · 빈 묶음 · 묶음 하나 / 묶음 순서 · Other · italic · dedupe)
+- [x] 4검사 · `dist/` 다시 빌드
 - [ ] 실기 확인(사용자, 피그마): 변수 탭 ⋯ › 코드로 내보내기 › CSS → 블록 · 묶음 모양
 
 **다음 PR(이번에 하지 않음 — 2026-11-20 사용자 결정)**
