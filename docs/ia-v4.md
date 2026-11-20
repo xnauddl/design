@@ -1520,7 +1520,7 @@
 │ 라이트 색을 뒤집어 다크 모드 값을 채워요                 │ 안내(dark.hint — 새 글은 B.20 PR 1, 툴팁 dark.hintTip)
 │ Semantic 컬렉션 [Semantic ▾]  라이트 [Light ▾]           │ 입력 줄(넘치면 두 줄)
 │ 다크 [Dark (없으면 만들어요) ▾]                          │
-│ ░ 먼저 변수 만들기에서 Semantic 변수를 만들어 주세요 [변수 만들기 →] ░ │ 전제 안내 띠(있을 때만)
+│ ░ 먼저 변수 만들기에서 Global 변수를 만들어 주세요 [변수 만들기 →] ░ │ 전제 안내 띠(있을 때만)
 │ 상태 줄                                                   │
 ├──────────────────────────────────────────────────────────┤
 │                                          [다크 만들기]   │ 아래 고정 52
@@ -1528,7 +1528,7 @@
 ```
 
 - 입력 · 판정 · 보내는 메시지는 지금 다크 카드 그대로 — 고르개 `darkCollection` · `darkFromMode` · `darkToMode`(Semantic 우선 · 고른 값 이어받기 · 플레이스홀더 "Dark (없으면 만들어요)" — `refreshDarkOptions` · `refreshDarkModes`), 실행 `GENERATE_DARK_MODE{collectionId, fromModeId, toModeId?}`, 결과 처리 · 문구(`dark.done` · `dark.fillFailed` 등)도 그대로. 단계 칩 · [다음 →]은 없다.
-- 전제 안내는 테두리 없는 옅은 띠(§2.8). 글은 지금 `#darkPrereq` 네 가지 그대로 고르되, 링크가 가는 곳이 바뀌므로 두 글을 바꾼다: `dark.prereqNoVars` "먼저 토큰 만들기에서 변수를 만드세요." → "먼저 변수 만들기에서 Semantic 변수를 만들어 주세요", 링크 `prereq.gotoCreate` "토큰 만들기로 →" → "변수 만들기 →"(→ 선택 탭 › 만들기 화면. 목록 기준 가드 없음 — 기준이 없으면 §4.3 "선택 없음" 모습, 포커스는 §4.3 들어올 때 규칙. `goToCreate`를 바꾼다 — 지금은 값을 직접 고르기 › 토큰 `showPick('token')` · `btnCreate` 포커스, `ui.ts` 1683–1687). 두 글은 §2.4 규칙에 맞아 이대로 확정(2026-11-16 UX 라이팅 명세).
+- 전제 안내는 테두리 없는 옅은 띠(§2.8). 글은 지금 `#darkPrereq` 네 가지 그대로 고르되, 링크가 가는 곳이 바뀌므로 두 글을 바꾼다: `dark.prereqNoVars` "먼저 토큰 만들기에서 변수를 만드세요." → "먼저 변수 만들기에서 Global 변수를 만들어 주세요"(D-T1 — 대상이 플러그인 Global), 링크 `prereq.gotoCreate` "토큰 만들기로 →" → "변수 만들기 →"(→ 선택 탭 › 만들기 화면. 목록 기준 가드 없음 — 기준이 없으면 §4.3 "선택 없음" 모습, 포커스는 §4.3 들어올 때 규칙. `goToCreate`를 바꾼다 — 지금은 값을 직접 고르기 › 토큰 `showPick('token')` · `btnCreate` 포커스, `ui.ts` 1683–1687). 두 글은 §2.4 규칙에 맞아 이대로 확정(2026-11-16 UX 라이팅 명세).
 - **상태**
 
 | 상태 | 모습 |
@@ -1536,13 +1536,13 @@
 | 무료 | 무료 잠금 안내(위) |
 | 변수 목록 읽는 중(첫 `VARIABLES` 전) | 띠 `dark.prereqLoading`, [다크 만들기] 전제 잠금(같은 사유) |
 | 첫 읽기 실패(아직 `VARIABLES`를 한 번도 받지 못했는데 `GET_VARIABLES{reqId}`가 `ERROR` — T-P24로 가로챔. 시작할 때의 읽기를 지워 이 화면의 읽기가 첫 읽기다) | 전제 안내 띠 자리에 빨강 띠 "컬렉션 목록을 읽지 못했어요"(새 키 `tools.darkReadFail`) + [다시 시도](같은 읽기를 다시 — 다시 보내는 동안은 위 "읽는 중"), 고르개는 비운 채, [다크 만들기] 전제 잠금(같은 사유). 포커스: 들어올 때 이 모습이면 [다시 시도], 화면에 있는 채 이 모습이 되어 포커스가 사라진 요소(고르개)에 있었으면 [다시 시도]. 한 번이라도 받은 뒤의 다시 읽기 실패는 아래 "컬렉션 목록 다시 읽기 실패" |
-| 플러그인 Semantic 없음 | 띠 `dark.prereqNoVars`(바뀐 글) + [변수 만들기 →], 버튼 전제 잠금 |
+| 플러그인 Global 없음(D-T1) | 띠 `dark.prereqNoVars`(바뀐 글) + [변수 만들기 →], 버튼 전제 잠금 |
 | 모드가 있는 컬렉션 없음 · 고르지 않음 | 띠 `dark.prereqNoModes` · `dark.prereqPick`(링크 없음), 버튼 전제 잠금 |
 | 보통 | [다크 만들기] 주 버튼 |
 | 만드는 중 | 상태 줄 `dark.running`, 버튼 대기 잠금(위 "도구 화면 공통") |
 | 실행에 `PREMIUM_REQUIRED`(UI는 유료, 플러그인은 무료로 봄 — `code.ts` 2397 `requirePaid('tokens')`) | "만드는 중"을 끝내고(작업 끝남 · 쓰기 잠금 풀림 — `opReceived`의 `PREMIUM_REQUIRED` 처리) 무료 잠금 안내로 바꾼다(T-P23과 같은 모습 · 포커스 규칙). 공통 상태 줄에 유료 사유 `status.paid` + [라이선스 →](`showPaidReason` — 지금 처리 그대로) |
 | 다 됨 · 일부만 · 대상 없음 | 상태 줄 — 지금 `DARK_MODE_RESULT` 처리 글 그대로(`dark.done` ok · `dark.fillFailed` warn). 그 화면에 없으면 공통 상태 줄에도(T-P7) |
-| 거절(`DARK_MODE_RESULT.error` — 컬렉션 없음 · 플러그인 Semantic 아님 · 모드 추가 실패 · 같은 모드 등 `dark.err*`) | 상태 줄 warn(지금 그대로 — `ui.ts` 2429–2431 `setStatus('darkStatus', msg.error, 'warn')`) |
+| 거절(`DARK_MODE_RESULT.error` — 컬렉션 없음 · 플러그인 Global 아님 · 기본 모드를 다크로 고름 · 모드 추가 실패 · 같은 모드 등 `dark.err*`) | 상태 줄 warn(지금 그대로 — `ui.ts` 2429–2431 `setStatus('darkStatus', msg.error, 'warn')`) |
 | 오류(`ERROR{op: 'GENERATE_DARK_MODE'}` — 예외) | 상태 줄 빨강 띠(§2.8 — `OP_STATUS`가 이 화면 상태 줄로) |
 | 컬렉션 목록 다시 읽기 실패(`ERROR{op: 'GET_VARIABLES'}`) | 고르개 · 고른 값은 예전 목록 그대로, 상태 줄 warn "컬렉션 목록을 다시 읽지 못했어요"(새 키 `tools.darkRefreshFail`) — 다음 다시 읽기 때(T-P10) 다시 보낸다(T-P21) |
 
@@ -2102,7 +2102,7 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 - [ ] 560 창에서 탭 셋 글이 한 줄 · 잘리지 않음, 도구 목록 설명이 한 줄(넘치면 말줄임).
 - [ ] 브랜드 팔레트로 실제 파일에 만들기 — 플러그인 Global에 `color/{계열}/{단계}` 66개(기본), Semantic이 생기지 않음, 같은 기준 색으로 한 번 더 누르면 새로 생기지 않고 알림도 없음, 기준 색을 바꾸면 "기존 변수 {n}개의 값이 바뀌어요"가 실행 전에 보이고 누르면 값이 바뀜 · ⌘Z 한 번에 되돌아감(T-D6), 무료 키로도 됨.
 - [ ] Esc — 만들기 화면 "만든 뒤" 체크 · 도구 고르개 · 색 피커에서 Esc로 돌아감, hex · 글꼴 칸 · 열린 이름 칸에서는 돌아가지 않음(T-D7).
-- [ ] 다크 모드 — 만들기 화면에서 변수를 만든 직후 도구 탭 다크 화면 고르개에 새 Semantic 컬렉션이 보임(T-P10), 만든 뒤 피그마 변수 패널에 Dark 모드 값.
+- [ ] 다크 모드 — 만들기 화면에서 변수를 만든 직후 도구 탭 다크 화면 고르개에 새 Global 컬렉션이 보임(T-P10 — D-T1), 만든 뒤 피그마 변수 패널에 Dark 모드 값.
 - [ ] 텍스트 스타일 — 선택 없이 6개 만들기. **꼬리 붙은 이름**: 같은 이름 · 다른 값의 스타일이 있는 파일에서만 꼬리, 만든 뒤 ←로 나갔다 다시 들어오면 "있음" 6줄(꺼짐)이고 꼬리 붙은 새 줄 · 중복 스타일이 생기지 않음(T-P20). 글꼴 칸을 파일에 없는 글꼴로 바꾸면 알림, 만든 뒤 이름이 바뀌지 않음.
 - [ ] ＋ 메뉴 두 항목 · 준비 현황 다섯 줄의 도착(§4.6 표), 무료 키에서 🔒 · 잠금 안내.
 
@@ -2121,7 +2121,7 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 - [ ] 변수 · 용도 · 혼용(#1 · #9 · #16 · #20): `err.scopeAction` → "‘변수 만들기’를 다시 실행해 용도를 고쳐 주세요", `export.empty` → "내보낼 변수가 없어요 — 먼저 변수를 만들어 주세요", `wizard.seq.darkNoTarget` → "모드가 있는 컬렉션이 없어 건너뛰었어요 — 먼저 변수를 만들어 주세요", `wizard.seq.darkNothing` → "채울 색이 없어요 — Global을 가리키는 Semantic 색이 필요해요", `pipeline.hint.needTokens` → "변수를 먼저 만드세요"
 - [ ] 글꼴 · 사유 이름(#6 · #7 · #36): `err.fontAction` → "그 글꼴을 설치하거나 켠 뒤 다시 시도해 주세요", `reason.font` · `apply.reason.font` · `v4.unbindFail.font` → "글꼴을 불러오지 못함", `export.fontUnitTip` → "글꼴 크기 단위 — rem은 기준 크기로 나눠요", `reason.empty-text` → "빈 글자", `reason.instance-children` → "인스턴스 안쪽", `reason.no-autolayout` → "오토 레이아웃 아님"
 - [ ] 적용 · 생성 · 갱신(#8 · #24 · #58): `common.applyingVars` → "색 변수를 만드는 중…"(도구 팔레트 "만드는 중"), `wizard.seq.renameDone` → "이름 {count}개 정리", `wizard.seq.createDone` → "새로 {created} · 바뀜 {updated}", `wizard.seq.textStyles` → "텍스트 스타일 새로 {created} · 바뀜 {updated}", `create.sumGlobals` → "Global {n}개(새로 {c} · 바뀜 {u})"(도구 팔레트 다 됨 줄 `CREATE_RESULT.summary`도 이 글), `textStyle.registered` → "텍스트 스타일 {n}개를 만들었어요(새로 {c} · 바뀜 {u})"(`{b}`는 글에서 뺀다 — 도구 탭은 레이어에 연결하지 않음, #58)
-- [ ] 다크(#10 · #42 · #56 · #57): `dark.hint` → "라이트 색을 뒤집어 다크 모드 값을 채워요"(40자 넘던 둘째 절은 툴팁으로 — UW-P11), `dark.hintTip` → "고르개 이름은 피그마 변수 컬렉션 · 모드 이름이에요. 색상 · 채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 것은 건너뛰어요. 다크용 색은 dark/… 이름으로 따로 만들어요.", `dark.done` → "{modePart}다크 값 {n}개를 채웠어요 · 새 dark/ 색 {c}개{skipPart}", `dark.prereqNoModes` → "모드가 있는 컬렉션(보통 Semantic)을 골라 주세요", `dark.prereqPick` → "컬렉션과 라이트 모드를 골라 주세요"(전제 띠이자 [다크 만들기] 잠금 사유 — UW-P19, 같은 띠의 `dark.prereqNoVars` "…만들어 주세요"와 맞춤), `dark.modeAdded` → "다크 모드는 추가했어요 · "(가운데 마침표 — `ui.ts` 2408), `dark.modeAddedShort` → "다크 모드를 추가했어요 · "(뒤 `dark.done` 해요체와 섞임 — UW-P17), `wizard.seq.dark` → "다크 값 {realiased}개 채움"(`ui.ts` 3443 — "연결" 아님, #57), `wizard.seq.darkSkip` → " · 건너뜀 {n}개(값을 직접 넣은 색)", `dark.errNoCol` → "컬렉션을 찾을 수 없어요", `dark.errAddModePlan` → "플랜에서 모드를 더 만들 수 없을 수 있어요", `dark.errSameMode` → "라이트와 다크가 같은 모드예요 — 라이트에 다른 모드를 골라 주세요"
+- [ ] 다크(#10 · #42 · #56 · #57 — **D-T1 뒤에는 `dark.hintTip` · `dark.done` · `dark.prereqNoModes` 뜻을 ia-v3 13.7 "다크" 글에 맞추고 말투만 이 PR 규칙으로 고친다 — 아래 글의 "Semantic이 Global을 가리키는 것만" · "dark/…" · "새 dark/ 색 {c}개" · "보통 Semantic"은 쓰지 않는다**): `dark.hint` → "라이트 색을 뒤집어 다크 모드 값을 채워요"(40자 넘던 둘째 절은 툴팁으로 — UW-P11), `dark.hintTip` → "고르개 이름은 피그마 변수 컬렉션 · 모드 이름이에요. 색상 · 채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 것은 건너뛰어요. 다크용 색은 dark/… 이름으로 따로 만들어요.", `dark.done` → "{modePart}다크 값 {n}개를 채웠어요 · 새 dark/ 색 {c}개{skipPart}", `dark.prereqNoModes` → "모드가 있는 컬렉션(보통 Semantic)을 골라 주세요", `dark.prereqPick` → "컬렉션과 라이트 모드를 골라 주세요"(전제 띠이자 [다크 만들기] 잠금 사유 — UW-P19, 같은 띠의 `dark.prereqNoVars` "…만들어 주세요"와 맞춤), `dark.modeAdded` → "다크 모드는 추가했어요 · "(가운데 마침표 — `ui.ts` 2408), `dark.modeAddedShort` → "다크 모드를 추가했어요 · "(뒤 `dark.done` 해요체와 섞임 — UW-P17), `wizard.seq.dark` → "다크 값 {realiased}개 채움"(`ui.ts` 3443 — "연결" 아님, #57), `wizard.seq.darkSkip` → " · 건너뜀 {n}개(값을 직접 넣은 색)", `dark.errNoCol` → "컬렉션을 찾을 수 없어요", `dark.errAddModePlan` → "플랜에서 모드를 더 만들 수 없을 수 있어요", `dark.errSameMode` → "라이트와 다크가 같은 모드예요 — 라이트에 다른 모드를 골라 주세요"
 - [ ] 오류 띠(#15 · #17 · #19 · #48 — 끝 마침표를 지워 만들기 화면 결과의 `{message} — {action}`(`ui.ts` 3472)이 "…요. — …"가 되지 않게): `err.font` → "글꼴을 불러오지 못했어요", `err.prop` → "속성 값이 맞지 않아요(예: 게시하지 않은 컴포넌트)", `err.propAction` → "컴포넌트를 게시하거나 대상 레이어를 확인해 주세요", `err.readonly` → "편집 권한이 없거나 읽기 전용 파일이에요", `err.readonlyAction` → "편집할 수 있는 파일에서 다시 시도해 주세요", `err.network` → "네트워크 오류가 났어요", `err.networkAction` → "인터넷 상태를 확인하고 다시 시도해 주세요", `err.storage` → "이 기기에 설정을 저장하지 못했어요", `err.storageAction` → "잠시 뒤 다시 시도해 주세요", `err.unknownAction` → "선택을 확인하고 다시 시도해 주세요", `err.badHex` → "색 코드가 맞지 않아요: {value}"
 - [ ] 끝맺음 · 마침표(#18 — UW-D1 · #19): `palette.invalidHex` → "기준 색을 #RRGGBB 형식으로 입력해 주세요", `palette.invalidHex2` → "보조색을 #RRGGBB 형식으로 입력해 주세요", `license.needKey` → "라이선스 키를 입력해 주세요", `extract.skipHidden` → "숨긴 레이어는 건너뛰었어요 — 보이게 한 뒤 다시 읽어 주세요"(40자 안 — UW-P11), `extract.skipGradient` → "그라디언트 · 이미지 채움은 변수로 만들 수 없어 건너뛰었어요", `extract.skipFraction` → "소수 값(26.67px 등)은 단계 값이 아니라서 변수에서 뺐어요", `component.noEligible` → "선택 아래에 등록할 수 있는 프레임이 없어요", `vm.dNoUses` → "선택 안에서는 쓰이지 않아요", `similar.noMaster` → "원본 프레임을 찾을 수 없어요", `textStyle.warnMixed` → "부분 서식(혼합) 글자는 건너뛰었어요"(`test/figma.test.mjs` 3367의 부분 문자열 "부분 서식"은 그대로), 한 문장 툴팁 `component.classifyHelp` → "이미 만든 컴포넌트를 이름이 같은 것끼리 변형 세트로 묶어요" · `component.genMissingHelp` → "선택한 변형 세트의 빠진 조합을 첫 변형을 복제해 채워요"(마침표만 뺌). 여러 문장 툴팁(`component.scanHelp` · `component.registerHelp` · `similar.scanHelp` · `similar.componentizeHelp` · `license.clearTip` · `dark.hintTip`)은 마침표 유지
 - [ ] 라이선스(#18 · #27 · #29 · #43 · #46): `license.verify` → "키 확인", `license.clear` → "이 기기에서 해제", `common.verifying` → "키를 확인하는 중…", `license.setupHint` → "배포 전이라 키 확인 · 구독 링크는 아직 동작하지 않아요", `license.clearTip` → "이 기기의 활성화를 반납해요. 새 기기에서 같은 키를 다시 확인하면 돼요.", `license.manageTip` → "결제 수단 · 기기 활성화를 관리하는 페이지를 열어요"(B.21과 같은 글 — 먼저 들어가는 PR이 바꾸고 나중 PR은 확인만), `license.priceHint` → "유료 연 $39 · 기기 1대", `license.err.server.expired` → "구독이 끝났어요 — 구독을 다시 시작해 주세요"(버튼 이름을 말하지 않는다 — 서버가 만료로 거절해도 이전 캐시로 유료가 남을 수 있어 버튼 글이 티어마다 달라서다, B.21), `license.err.server.invalid` → "키가 맞지 않아요 — 키를 다시 확인해 주세요", `license.err.server.limit` → "기기 한도를 넘었어요 — 다른 기기에서 해제한 뒤 다시 확인해 주세요"(공백 포함 38자 — 버튼 이름은 툴팁 `license.clearTip`이 말함), `license.noteApplied` → "라이선스 키를 확인했어요"(`code.ts` 1474 — "적용", #8), `license.err.server.server` → "키 확인 서버에 문제가 있어요 — 잠시 뒤 다시 시도해 주세요"
