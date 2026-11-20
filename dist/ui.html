@@ -453,9 +453,13 @@
     .r-group:first-child { margin-top: 0; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
-    .skip-head { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; }
+    /* 묶음 머리 — 트리 머리 모양(ia-v4 §2.8 · TR-D13 · TR-P14): 높이 32 · 글 왼쪽 2(.skip-row 글과 맞춤) · 위 1px 선(첫 묶음 머리 없음) · 배경 없음 · 12px 600 */
+    .skip-head { display: flex; align-items: center; height: 32px; padding: 0 2px; border-top: 1px solid var(--border); background: none; font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .skip-list .skip-head:first-child { border-top: 0; }
     /* 건너뛴 곳 줄 — 두 줄(ia-v4 §4.2 "두 줄 · 설명만"): 첫 줄 이름 · 수 · [선택 ›](손볼 곳만), 둘째 줄 설명. 아래 구분선만(§2.8) */
     .skip-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    /* 묶음 머리 바로 앞 줄 · 목록 맨 끝 줄은 아래 구분선 없음(2px 두 줄 막기 — TR-P14 · TR-P23, renderSkipReasons가 붙임) */
+    .skip-row.skip-nb { border-bottom: 0; }
     .skip-row .skip-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .skip-row .skip-name { white-space: nowrap; flex: 0 0 auto; }
     .skip-row .skip-n { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
@@ -728,13 +732,43 @@
     .tr-sub { color: var(--text-2); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
     .tr-note { font-size: 11px; color: var(--text-2); padding: 6px 2px 6px 24px; border-bottom: 1px solid var(--border); line-height: 1.45; }
     .tr.off .bv-val, .tr.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
-    .tr.off .bv-arrow, .tr.off .bv-tw, .tr.off .tr-new { color: var(--text-2); }
-    .tr.off .tr-new { font-weight: 500; }
+    .tr.off .bv-arrow, .tr.off .bv-tw { color: var(--text-2); }
     .tr.off .bv-sw { filter: grayscale(1); }
-    .tr .tr-old { color: var(--text-2); text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-    .tr .tr-new { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
     .tr input.tr-edit { width: 130px; height: 22px; min-height: 22px; font: 500 11px var(--mono); padding: 0 6px; border: 1.5px solid var(--accent); border-radius: 4px; }
     .tr .bv-var.dup { box-shadow: 0 0 0 1.5px var(--warn); }
+    /* 트리 3화면 변수 목록 모양(ia-v4 §2.7 "변수 목록 모양 — TR 뒤" · TR-D1–TR-D17) — 연결 · 만들기 · 이름 정리 트리(.tree.vlike)만.
+       안 쓰는 변수 팝업 트리 · 읽는 중 자리 줄 · 만들기 결과 줄은 지금 모양 그대로(TR-D12 · TR-P15 — 줄 · 머리 규칙은 [data-tkey]에만). */
+    .tree.vlike .tr[data-tkey] { height: 32px; min-height: 32px; gap: 0; padding-right: 8px; border-bottom: 0; }
+    .tree.vlike .tr-head[data-tkey] { border-top: 1px solid var(--border); background: none; }
+    .tree.vlike .tr-head[data-tkey]:first-child, .tree.vlike .tr-head[data-tkey].tr-inner { border-top: 0; }
+    .tree.vlike button.tr-car { width: 10px; font: 600 12px/1 var(--font); color: var(--muted); justify-content: flex-start; }
+    .tree.vlike .tr-head[data-tkey] .tr-name { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .tree.vlike .tr-head[data-tkey] .tr-cnt { margin-left: 8px; }
+    .tree.vlike .tr .grow { min-width: 8px; }
+    .tree.vlike .tr-lead { flex: none; }
+    .tree.vlike .vr-sw { position: relative; overflow: hidden; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--swatch-line); }
+    .tree.vlike .vr-mk { width: 16px; text-align: center; font: 600 11px/16px var(--font); color: var(--text-2); }
+    .tree.vlike .ts-aa { text-align: center; }
+    .tree.vlike .tr-lt { flex: none; margin-left: 8px; font-size: 12px; font-weight: 400; line-height: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+    .tree.vlike .tr > .tr-lt:first-child { margin-left: 0; }
+    .tree.vlike .tr-car + .tr-lt { margin-left: 4px; }
+    .tree.vlike .tr-lt.fill { flex: 0 1 auto; min-width: 0; margin-right: 8px; }
+    .tree.vlike .tr-lt.fill ~ .grow { display: none; }
+    .tree.vlike .tr-lt.fill + .vchip { margin-left: auto; flex-shrink: 0; max-width: 70%; } /* Semantic 탭 — 이름이 먼저 준다(변수 목록과 같음, TR-D10) */
+    /* 붙은 칩 — 글 길이만큼, 모자라면 옅은 칸 먼저 · 다음 짙은 칸이 준다(TR-P11). 옅은 칸 최대 230 */
+    .tree.vlike .vchip { flex: 0 1 auto; min-width: 0; margin-left: 8px; }
+    .tree.vlike .vchip .al { flex: 0 1 auto; min-width: 34px; max-width: 230px; }
+    .tree.vlike .vchip .vl { flex: 0 0.0001 auto; min-width: 0; }
+    .tree.vlike .vchip.dup { box-shadow: 0 0 0 1.5px var(--warn); }
+    .tree.vlike .tr-tag, .tree.vlike .bv-new { flex: none; margin-left: 4px; }
+    .tree.vlike .tr input.tr-edit { flex: 0 1 auto; min-width: 0; width: 230px; margin-left: 8px; }
+    /* 끈 줄(TR-D6) — 글 --text-2 · 짙은 칸 --surface-2 · 동그라미 흑백, opacity 없음 */
+    .tree.vlike .tr.off .tr-lt, .tree.vlike .tr.off .vchip .al { color: var(--text-2); }
+    .tree.vlike .tr.off .vchip .vl { background: var(--surface-2); color: var(--text-2); }
+    .tree.vlike .tr.off .vr-sw { filter: grayscale(1); }
+    /* 흐린 소수 크기 줄(§4.3 · TR-D14) — 글 · Aa · 칩 --muted, 짙은 칸 바탕 --surface-2 */
+    .tree.vlike .tr.ts-decimal .tr-lt { color: var(--muted); }
+    .tree.vlike .tr.ts-decimal .vchip .vl { background: var(--surface-2); color: var(--muted); }
     button.bv-switch[aria-checked="mixed"] .bv-track { background: var(--accent); }
     button.bv-switch[aria-checked="mixed"] .bv-track::after { left: 8px; width: 12px; height: 4px; top: 6px; border-radius: 2px; }
     button.bv-switch[aria-disabled="true"] { opacity: .45; cursor: default; }
@@ -2611,7 +2645,7 @@
     return `${c.nodeId}|${c.field}|${(_a3 = c.index) != null ? _a3 : ""}|${c.variableId}`;
   }
   function groupByVariable(cands) {
-    var _a3, _b, _c, _d;
+    var _a3, _b, _c, _d, _e;
     const byVar = /* @__PURE__ */ new Map();
     for (const c of cands) {
       const arr = byVar.get(c.variableId);
@@ -2643,7 +2677,8 @@
       const keys = lines.flatMap((l) => l.keys);
       const nr = list.find((c) => c.newRole);
       const variableAlpha = (_c = list.find((c) => c.variableAlpha != null)) == null ? void 0 : _c.variableAlpha;
-      groups.push(__spreadValues(__spreadProps(__spreadValues({ variableId, variableName: list[0].variableName, variableValue }, variableAlpha != null ? { variableAlpha } : {}), { count: keys.length, keys, lines }), nr ? { newRoleOf: (_d = nr.newRoleGlobalName) != null ? _d : "" } : {}));
+      const resolvedType = (_d = list.find((c) => c.resolvedType)) == null ? void 0 : _d.resolvedType;
+      groups.push(__spreadValues(__spreadProps(__spreadValues(__spreadValues({ variableId, variableName: list[0].variableName, variableValue }, variableAlpha != null ? { variableAlpha } : {}), resolvedType ? { resolvedType } : {}), { count: keys.length, keys, lines }), nr ? { newRoleOf: (_e = nr.newRoleGlobalName) != null ? _e : "" } : {}));
     }
     groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
     return groups;
@@ -3139,6 +3174,10 @@
   }
 
   // src/treeList.ts
+  var VL_HEAD_X = 8;
+  var vlContentX = (level, multi) => multi ? 21 + 9 * (level - 1) : 16;
+  var vlLineX = (k) => 12 + 9 * k;
+  var VL_LINE = "var(--border)";
   var state = /* @__PURE__ */ new WeakMap();
   function swEl(sw, locked) {
     const b = document.createElement("button");
@@ -3169,26 +3208,40 @@
     mount.replaceChildren();
     mount.setAttribute("role", "treegrid");
     const flat = [];
-    const walk = (list, parentKey, level) => {
+    const vl = opts.look === "vlike";
+    mount.classList.toggle("vlike", vl);
+    const isBox = (x) => {
+      var _a4;
+      return !!x.head || !!((_a4 = x.children) == null ? void 0 : _a4.length);
+    };
+    const multi = vl && items.some((it) => {
+      var _a4;
+      return isBox(it) && ((_a4 = it.children) != null ? _a4 : []).some(isBox);
+    });
+    const rowsOut = [];
+    const walk = (list, parentKey, level, anc) => {
       var _a4, _b2, _c2, _d;
       for (const it of list) {
         flat.push({ item: it, parentKey, level });
         const row = document.createElement("div");
-        row.className = `tr ${it.head ? "tr-head" : "tr-row"}${it.head || it.group ? " tr-group" : ""}${it.off ? " off" : ""}${it.cls ? " " + it.cls : ""}`;
+        const grp = !vl && (it.head || it.group);
+        row.className = `tr ${it.head ? "tr-head" : "tr-row"}${grp ? " tr-group" : ""}${vl && it.head && level > 0 ? " tr-inner" : ""}${it.off ? " off" : ""}${it.cls ? " " + it.cls : ""}`;
         row.setAttribute("role", "row");
         row.setAttribute("aria-level", String(level + 1));
         row.dataset.tkey = it.key;
         row.tabIndex = -1;
-        row.style.paddingLeft = `${it.indent}px`;
         const hasKids = !!((_a4 = it.children) == null ? void 0 : _a4.length);
         const open = hasKids && !opts.collapsed.has(it.key);
+        const x = !vl ? it.indent : level === 0 ? VL_HEAD_X : vlContentX(level, multi);
+        row.style.paddingLeft = `${x}px`;
         if (hasKids) row.setAttribute("aria-expanded", String(open));
-        if (hasKids || it.head) {
+        const withCar = hasKids || !!it.head;
+        if (withCar) {
           const car = document.createElement("button");
           car.type = "button";
           car.className = "tr-car";
           car.tabIndex = -1;
-          car.textContent = open ? "\u25BC" : "\u25B6";
+          car.textContent = vl ? open ? "\u25BE" : "\u25B8" : open ? "\u25BC" : "\u25B6";
           car.setAttribute("aria-label", open ? opts.collapseLabel : opts.expandLabel);
           if (!hasKids) car.style.visibility = "hidden";
           if (opts.locked) car.setAttribute("aria-disabled", "true");
@@ -3201,13 +3254,20 @@
         }
         if (it.head) {
           const nm = document.createElement("span");
-          nm.className = `tr-name${it.muted ? " muted" : ""}`;
+          nm.className = `tr-name${it.muted && !vl ? " muted" : ""}`;
           nm.textContent = (_b2 = it.name) != null ? _b2 : "";
           const ct = document.createElement("span");
           ct.className = "tr-cnt";
           ct.textContent = (_c2 = it.countText) != null ? _c2 : "";
           row.append(nm, ct);
         } else row.append(...(_d = it.cells) != null ? _d : []);
+        if (vl && opts.col != null && !it.head) {
+          const lt = row.querySelector(":scope > .tr-lt:not(.fill)");
+          if (lt) {
+            const lx = x + (withCar ? 14 : 0) + (row.querySelector(":scope > .tr-lead") ? 24 : 0);
+            lt.style.width = `${Math.max(0, opts.col - 8 - lx)}px`;
+          }
+        }
         const grow = document.createElement("span");
         grow.className = "grow";
         row.appendChild(grow);
@@ -3215,7 +3275,8 @@
         if (it.sw) row.appendChild(swEl(it.sw, !!opts.locked));
         if (it.aria) row.setAttribute("aria-label", it.aria);
         mount.appendChild(row);
-        if (open) walk(it.children, it.key, level + 1);
+        rowsOut.push({ row, anc, level });
+        if (open) walk(it.children, it.key, level + 1, [...anc, it.key]);
       }
     };
     const toggle = (key) => {
@@ -3225,7 +3286,8 @@
       opts.rerender();
       focusRow(mount, key);
     };
-    walk(items, null, 0);
+    walk(items, null, 0, []);
+    if (vl) vlDecorate(rowsOut, multi);
     state.set(mount, { flat, opts });
     const rows = Array.from(mount.querySelectorAll("[data-tkey]"));
     const target = focusKey2 && rows.find((r) => r.dataset.tkey === focusKey2) || rows[0];
@@ -3240,6 +3302,36 @@
         mount.dataset.focusKey = r.dataset.tkey;
         for (const x of Array.from(mount.querySelectorAll("[data-tkey]"))) x.tabIndex = x === r ? 0 : -1;
       });
+    }
+  }
+  function vlDecorate(rows, multi) {
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i].level !== 0) continue;
+      let j = i + 1;
+      while (j < rows.length && rows[j].level > 0) j++;
+      if (j === i + 1) continue;
+      rows[i + 1].row.style.marginTop = "4px";
+      rows[j - 1].row.style.marginBottom = "16px";
+    }
+    if (!multi) return;
+    for (let i = 0; i < rows.length; i++) {
+      const { row, anc } = rows[i];
+      if (!anc.length) continue;
+      const imgs = [];
+      const sizes = [];
+      const pos = [];
+      anc.forEach((key, k) => {
+        const next = rows[i + 1];
+        const last = !next || next.anc[k] !== key;
+        imgs.push(`linear-gradient(${VL_LINE}, ${VL_LINE})`);
+        sizes.push(`1px ${last ? 16 : 32}px`);
+        pos.push(`${vlLineX(k)}px 0`);
+      });
+      row.style.backgroundImage = imgs.join(", ");
+      row.style.backgroundSize = sizes.join(", ");
+      row.style.backgroundPosition = pos.join(", ");
+      row.style.backgroundRepeat = "no-repeat";
+      row.classList.add("tr-lined");
     }
   }
   function focusRow(mount, key) {
@@ -4622,6 +4714,9 @@
     return `${t2.category}|${v}|${(_a3 = t2.unit) != null ? _a3 : ""}`;
   }
   var alphaTail = (alpha) => alpha != null && alpha < 1 && alphaPct(alpha) < 100 ? ` ${alphaPct(alpha)}%` : "";
+  var BIND_COL = 88;
+  var MAKE_COL = 96;
+  var RENAME_COL = 150;
   function creatableTokens() {
     return tokens.filter((t2) => t2.category !== "color");
   }
@@ -7130,17 +7225,16 @@
     $("renameTop").hidden = !show;
     const roots = show ? buildRenameTree(renameNodes) : [];
     const toItem = (it) => {
-      var _a3, _b, _c;
+      var _a3, _b;
       const children = it.children.map(toItem);
       if (it.kind === "head") {
         const st = headState(it.descendants.map((id) => ({ on: !renameOff.has(id) })));
         return {
           key: it.id,
           head: true,
-          muted: true,
           name: it.name,
           countText: t("tree.count", { n: it.descendants.length }),
-          indent: it.level * 16,
+          indent: it.level * 9,
           children,
           sw: { state: st, label: t("tree.headAria", { name: it.name }), onToggle: () => {
             const to = headToggleTarget(st);
@@ -7150,22 +7244,17 @@
         };
       }
       const on = !renameOff.has(it.id);
-      const old = document.createElement("span");
-      old.className = "tr-old";
-      old.textContent = it.name;
+      const old = trLeft(it.name);
       old.title = it.name;
-      const nw = document.createElement("b");
-      nw.className = "tr-new";
-      nw.textContent = (_a3 = it.after) != null ? _a3 : "";
-      nw.title = (_b = it.after) != null ? _b : "";
-      const cells = [old, arrowEl(), nw];
+      old.dataset.tipFixed = "1";
+      const cells = [old, trChip((_a3 = it.after) != null ? _a3 : "", null)];
       return {
         key: it.id,
-        indent: it.level * 16 + (children.length ? 0 : 22),
+        indent: it.level * 9,
         off: !on,
         cells,
         children,
-        sw: { state: on, label: t("rename.switchAria", { name: (_c = it.after) != null ? _c : "" }), onToggle: () => {
+        sw: { state: on, label: t("rename.switchAria", { name: (_b = it.after) != null ? _b : "" }), onToggle: () => {
           on ? renameOff.add(it.id) : renameOff.delete(it.id);
           renderRenameScreen();
         } }
@@ -7184,7 +7273,8 @@
       };
       walk(items);
     }
-    renderTree($("renameTree"), items, { collapsed: renameCollapsed, rerender: renderRenameScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse") });
+    renderTree($("renameTree"), items, { collapsed: renameCollapsed, rerender: renderRenameScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse"), look: "vlike", col: RENAME_COL });
+    tipTruncatedNames($("renameTree"));
     const k = show ? renameOnCount() : 0;
     const btn = $("btnRename");
     btn.textContent = show && renameRows().length ? t("rename.applyN", { k }) : t("rename.applyBtn");
@@ -7464,9 +7554,13 @@
     mkTsFor = baseKey();
     renderMakeScreen();
   }
-  function mkValueChip(tk) {
+  function mkValueText(tk) {
     const v = typeof tk.value === "number" && tk.unit === "percent" ? `${tk.value}%` : String(tk.value);
-    return valueChip(v, tk.alpha);
+    return trValueText(v, tk.alpha);
+  }
+  function mkLead(tk) {
+    const color = (tk.category === "color" || tk.category === "effectColor") && isHexColor(String(tk.value));
+    return trLead(color ? "COLOR" : tk.category === "fontFamily" ? "STRING" : "FLOAT", String(tk.value), tk.alpha);
   }
   function mkTag(text, tip, warn = false) {
     const s = document.createElement("span");
@@ -7475,12 +7569,7 @@
     s.title = tip;
     return s;
   }
-  function mkLayers(n) {
-    const s = document.createElement("span");
-    s.className = "bv-tw";
-    s.textContent = t("make.layers", { n: n != null ? n : 0 });
-    return s;
-  }
+  var mkLayers = (n) => trLeft(t("make.layers", { n: n != null ? n : 0 }));
   function mkTabsVisible() {
     const out = [];
     if (mkTokens.length) out.push("global", "semantic");
@@ -7504,16 +7593,15 @@
           const locked = mkLocked(tk);
           const on = mkIsOn(tk);
           const name = (st == null ? void 0 : st.varName) ? st.varName : tk.name;
-          const cells = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value), void 0, false)];
+          const cells = [mkLead(tk), mkLayers(tk.count), trChip(name, mkValueText(tk))];
           if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
           else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
           else if ((st == null ? void 0 : st.state) === "manual") cells.push(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
           return {
             key: `g:${tk.name}`,
-            indent: 24,
+            indent: 16,
             off: !on,
             cells,
-            right: [mkLayers(tk.count)],
             sw: { state: on, disabled: locked, label: t("make.rowAria", { name }), onToggle: () => {
               mkSetOn(tk.name, !on);
               mkPreviewSoon();
@@ -7554,10 +7642,7 @@
           indent: 0,
           children: rows.map((r) => {
             const tk = byTok.get(r.token);
-            const eq = document.createElement("span");
-            eq.className = "tr-sub";
-            eq.textContent = `= ${r.global}`;
-            return { key: `s:${r.name}`, indent: 24, cells: [varChip(r.name, String(tk.value)), eq] };
+            return { key: `s:${r.name}`, indent: 16, cells: [mkLead(tk), trLeft(r.name, true), trChip(r.global, mkValueText(tk))] };
           })
         });
       }
@@ -7566,52 +7651,36 @@
       for (const x of withDecimals(mkTs, mkTsDecimal)) {
         if ("decimal" in x) {
           const c = x.decimal;
-          const aa2 = document.createElement("span");
-          aa2.className = "ts-aa";
-          aa2.setAttribute("aria-hidden", "true");
-          aa2.textContent = "Aa";
           const sum = tsSummary(c);
-          const sub2 = document.createElement("span");
-          sub2.className = "tr-sub";
-          sub2.textContent = sum;
           const why = document.createElement("span");
           why.className = "tr-sub ts-why";
           why.textContent = t("textStyle.decimalRow");
-          items.push({ key: `td:${tsSig(c)}`, indent: 0, cls: "ts-decimal", cells: [aa2, sub2], right: [mkLayers(c.count), why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
+          items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: "ts-decimal", cells: [trLeadAa(), mkLayers(c.count), trChip(null, sum)], right: [why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
           continue;
         }
         const s = x;
         const sig = tsSig(s);
         const on = !mkTsOff.has(sig);
-        const aa = document.createElement("span");
-        aa.className = "ts-aa";
-        aa.setAttribute("aria-hidden", "true");
-        aa.textContent = "Aa";
-        const cells = [aa];
+        const cells = [trLeadAa(), mkLayers(s.count)];
         if (mkEditSig === sig) cells.push(mkEditInput(s));
         else {
-          const chip = varChip(mkTsName(s), "Aa", void 0, false);
+          const chip = trChip(mkTsName(s), tsSummary(s));
           const c = mkTsConflict(s);
           if (c) {
             chip.classList.add("dup");
             chip.title = t(c === "dup" ? "make.tsDup" : "make.tsExists");
           }
-          chip.addEventListener("dblclick", () => {
+          chip.querySelector(".al").addEventListener("dblclick", () => {
             if (!mkRunning) mkStartEdit(sig);
           });
           cells.push(chip);
         }
-        const sub = document.createElement("span");
-        sub.className = "tr-sub";
-        sub.textContent = tsSummary(s);
-        cells.push(sub);
         if (s.boundStyleId) cells.push(mkTag(t("make.tagHas"), t("make.tsHasTip")));
         items.push({
           key: `t:${sig}`,
-          indent: 0,
+          indent: 8,
           off: !on,
           cells,
-          right: [mkLayers(s.count)],
           onEdit: () => mkStartEdit(sig),
           sw: { state: on, label: t("make.rowAria", { name: mkTsName(s) }), onToggle: () => {
             on ? mkTsOff.add(sig) : mkTsOff.delete(sig);
@@ -7822,7 +7891,7 @@
       }
       const collapsed = mkRunning ? new Set(items.map((i) => i.key)) : mkCollapsed;
       tree.setAttribute("aria-label", mkTabName(tab));
-      renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse"), locked: mkRunning });
+      renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse"), locked: mkRunning, look: "vlike", col: tab === "semantic" ? void 0 : MAKE_COL });
       tipTruncatedNames(tree);
     } else tree.replaceChildren();
     if (tabMoved) $(`makeTab-${tab}`).focus();
@@ -8220,8 +8289,7 @@
     } else chip.textContent = value;
     return chip;
   }
-  function varChip(name, value, newRoleOf, mark = true) {
-    const markOn = mark;
+  function varChip(name, value) {
     const chip = document.createElement("span");
     chip.className = "bv-chip bv-var";
     const mk = document.createElement("span");
@@ -8231,33 +8299,63 @@
     const nm = document.createElement("span");
     nm.className = "bv-name";
     nm.textContent = name;
-    if (newRoleOf != null) {
-      const badge = document.createElement("span");
-      badge.className = "bv-new";
-      badge.textContent = t("bind.newRole");
-      badge.setAttribute("role", "img");
-      badge.setAttribute("aria-label", t("bind.newRoleAria"));
-      chip.append(badge, ...markOn ? [mk] : [], nm);
-      chip.dataset.tip = t("bind.newRoleTip", { global: newRoleOf });
-      chip.title = chip.dataset.tip;
-    } else chip.append(...markOn ? [mk] : [], nm);
+    chip.append(mk, nm);
     return chip;
   }
-  var arrowEl = () => {
-    const a = document.createElement("span");
-    a.className = "bv-arrow";
-    a.setAttribute("aria-hidden", "true");
-    a.textContent = "\u2192";
-    return a;
-  };
+  function trLead(type, hex, alpha) {
+    const l = document.createElement("span");
+    l.setAttribute("aria-hidden", "true");
+    if (type === "COLOR" && hex) {
+      l.className = "tr-lead vr-sw";
+      paintSwatch(l, __spreadValues({ kind: "color", hex }, alpha != null && alpha < 1 ? { alpha } : {}));
+    } else {
+      l.className = "tr-lead vr-mk";
+      l.textContent = varTypeMark(type === "COLOR" ? "FLOAT" : type);
+    }
+    return l;
+  }
+  function trLeadAa() {
+    const aa = document.createElement("span");
+    aa.className = "tr-lead ts-aa";
+    aa.setAttribute("aria-hidden", "true");
+    aa.textContent = "Aa";
+    return aa;
+  }
+  var typeOfValue = (v) => isHexColor(v) ? "COLOR" : "FLOAT";
+  function trLeft(text, fill = false) {
+    const s = document.createElement("span");
+    s.className = `tr-lt${fill ? " fill" : ""}`;
+    s.textContent = text;
+    return s;
+  }
+  function trChip(name, value) {
+    const chip = document.createElement("span");
+    chip.className = "vchip";
+    if (name != null) {
+      const al = document.createElement("span");
+      al.className = "al";
+      const ar = document.createElement("span");
+      ar.setAttribute("aria-hidden", "true");
+      ar.textContent = "\u2192 ";
+      al.append(ar, name);
+      chip.appendChild(al);
+    }
+    if (value != null) {
+      const vl = document.createElement("span");
+      vl.className = "vl";
+      vl.textContent = value;
+      chip.appendChild(vl);
+    }
+    return chip;
+  }
+  var trValueText = (value, alpha) => isHexColor(value) ? value.toUpperCase() + alphaTail(alpha) : value;
   function tipTruncatedNames(root) {
     requestAnimationFrame(() => {
-      var _a3;
-      for (const nm of Array.from(root.querySelectorAll(".bv-name"))) {
-        const chip = nm.parentElement;
-        if (chip.dataset.tip) continue;
-        if (nm.scrollWidth > nm.clientWidth + 1) chip.title = (_a3 = nm.textContent) != null ? _a3 : "";
-        else chip.removeAttribute("title");
+      var _a3, _b, _c;
+      for (const el of Array.from(root.querySelectorAll(".tr-lt, .vchip .al, .vchip .vl"))) {
+        if (el.dataset.tipFixed) continue;
+        if (el.scrollWidth > el.clientWidth + 1) el.title = el.classList.contains("al") ? (_b = (_a3 = el.lastChild) == null ? void 0 : _a3.textContent) != null ? _b : "" : (_c = el.textContent) != null ? _c : "";
+        else el.removeAttribute("title");
       }
     });
   }
@@ -8337,16 +8435,23 @@
         const list = rows.filter((g) => g.kind === kind);
         if (!list.length) continue;
         const children = list.map((g) => {
+          var _a4;
           const on = rowOn(g);
-          const cnt = document.createElement("span");
-          cnt.className = "bv-tw";
-          cnt.textContent = t("bind.count", { k: g.count });
+          const cells = [trLead((_a4 = g.resolvedType) != null ? _a4 : typeOfValue(g.variableValue), g.variableValue, g.variableAlpha), trLeft(t("bind.count", { k: g.count })), trChip(g.variableName, trValueText(g.variableValue, g.variableAlpha))];
+          if (g.newRoleOf != null) {
+            const badge = document.createElement("span");
+            badge.className = "bv-new";
+            badge.textContent = t("bind.newRole");
+            badge.setAttribute("role", "img");
+            badge.setAttribute("aria-label", t("bind.newRoleAria"));
+            badge.title = t("bind.newRoleTip", { global: g.newRoleOf });
+            cells.push(badge);
+          }
           return {
             key: g.rowKey,
-            indent: 24,
+            indent: 16,
             off: !on,
-            cells: [valueChip(g.variableValue, g.variableAlpha), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
-            right: [cnt],
+            cells,
             sw: { state: on, label: t("bind.switchAria", { name: g.variableName }), onToggle: () => {
               for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k);
               renderBindTree();
@@ -8377,17 +8482,7 @@
         };
         const children = bindTsRows.map((r) => {
           const on = !bindTsOff.has(r.styleId);
-          const aa = document.createElement("span");
-          aa.className = "ts-aa";
-          aa.setAttribute("aria-hidden", "true");
-          aa.textContent = "Aa";
-          const nm = document.createElement("span");
-          nm.className = "bv-chip bv-var";
-          nm.innerHTML = `<span class="bv-name">${escapeHtml(r.name)}</span>`;
-          const cnt = document.createElement("span");
-          cnt.className = "bv-tw";
-          cnt.textContent = t("bind.count", { k: r.nodeIds.length });
-          return { key: `ts:${r.styleId}`, indent: 24, off: !on, cells: [aa, arrowEl(), nm], right: [cnt], sw: { state: on, label: t("bind.switchAria", { name: r.name }), onToggle: () => {
+          return { key: `ts:${r.styleId}`, indent: 16, off: !on, cells: [trLeadAa(), trLeft(t("bind.count", { k: r.nodeIds.length })), trChip(r.name, null)], sw: { state: on, label: t("bind.switchAria", { name: r.name }), onToggle: () => {
             tsToggle(r, !on);
             renderBindTree();
           } } };
@@ -8413,7 +8508,7 @@
         for (const it of items) if (((_a3 = it.sw) == null ? void 0 : _a3.state) === false) bindCollapsed.add(it.key);
       }
     }
-    renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse") });
+    renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t("tree.expand"), collapseLabel: t("tree.collapse"), look: "vlike", col: BIND_COL });
     tipTruncatedNames(tree);
     renderBindChrome();
     bindFocusFirst();
@@ -8696,6 +8791,10 @@
       head(t("v4.skipKeepHead"));
       for (const r of keep) box.appendChild(varRow(r));
       for (const k of tsKeys) box.appendChild(row(t("tsSkip." + k), t("v4.layerCount", { n: bindTsSkips[k] }), "", []));
+    }
+    for (const r of Array.from(box.querySelectorAll(":scope > .skip-row"))) {
+      const nx = r.nextElementSibling;
+      if (!nx || nx.classList.contains("skip-head")) r.classList.add("skip-nb");
     }
   }
   function placeTailText(key, names) {

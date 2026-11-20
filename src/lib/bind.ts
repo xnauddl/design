@@ -813,7 +813,7 @@ function resolveSlots(ctx: Ctx): void {
   const colorLeft: { slot: Slot; cands: VarEntry[] }[] = [];
   const emit = (s: Slot, e: VarEntry, viaPill = false): void => {
     res.bound++;
-    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill));
+    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type));
   };
   const globalFor = (cands: VarEntry[]): VarEntry | null => {
     // 직접 값 Global만(별칭 변수는 사슬을 만든다 — 13.3), 사용자 컬렉션 먼저.
@@ -907,7 +907,7 @@ function resolveSlots(ctx: Ctx): void {
     res.bound++;
     const g = p.global as VarEntry;
     preview.candidates.push({
-      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null),
+      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null, g.type), // 타입 = 가리킬 Global(TR-18)
       newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
       newRoleGlobalName: spec.globalName,
     });
@@ -924,7 +924,7 @@ interface NewRoleSpec {
 /** 순서 2 · 4 · 무료가 찾는 값 — 알약 자리면 9999(12.12 N-D5), 아니면 원래 값. */
 const slotValue = (s: Slot): number | string => s.pill ?? s.value;
 
-function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number, viaPill = false): BindCandidate {
+function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number, viaPill = false, resolvedType?: VariableResolvedDataType): BindCandidate {
   return {
     nodeId: s.node.id,
     field: s.field,
@@ -935,6 +935,7 @@ function candOf(s: Slot, variableId: string, variableName: string, tier: number,
     variableName,
     tier,
     variableValue,
+    ...(resolvedType ? { resolvedType } : {}),
     ...(variableAlpha != null ? { variableAlpha } : {}),
     ...(s.mainId ? { mainId: s.mainId } : {}),
     // 9999로 붙이는 알약 자리 — 연결 직전 다시 확인은 "원래 값이 같고 지금도 알약"(12.12 N-D5)
