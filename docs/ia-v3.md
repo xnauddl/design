@@ -3338,4 +3338,4 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [ ] 고르개 세 개 · `refreshDarkOptions` · `refreshDarkModes` · `pickDarkTarget` 지움(2026-11-20 사용자 결정 — `test/wizard.test.mjs`의 `pickDarkTarget` 테스트 · import, `ui.ts` import도) · `renderDarkGate` · `ensureDarkMode` 기본 모드 건너뜀(`figma.test.mjs`에 그 경우) · `noTarget` · 전제 띠 둘 · 문구(13.7 "문구 바뀜" · 결과 글 · 팝업 글)
 - [ ] 새 변수의 기본이 아닌 모드 칸 = 기본 모드 값(플러그인 Global에 `createVariable` 하는 곳) · `needsMigration` 작업 추적(표시 없이 끝냄) · `messages.ts` 타입
 - [ ] 단위 테스트: 칸 채우기 ①②③ · `same` · 손댄 칸 · 중간 밝기(C = Light) · `dark/…` 건너뜀 · 옛 다크 모드 판정(브랜드 모드는 아님) · 옮겨지는 역할 / `lost` / 팝업 `userRoles` 판정 · `dark/X`가 별칭 · 손댄 X 칸 · 옮긴 값 기록(직접 만든 `dark/X`는 기록 없음) · 옮긴 뒤 모드 안 지움 · Dark 모드 찾기(이름 dark · 없으면 만듦) · 준비 현황 상태 글
-- [ ] 4검사 · `dist/` 다시 빌드 · 실기 확인(새 파일 · 옛 구조 파일 · 새 변수의 Dark 칸을 Figma가 무엇으로 채우는지)
+- [ ] 4검사 · `dist/` 다시 빌드 · 실기 확인(새 파일 · 옛 구조 파일 · 새 변수의 Dark 칸을 Figma가 무엇으로 채우는지 · 기본 모드 이름이 Dark인 파일 — 같은 이름 모드를 Figma가 허용하는지, 막히면 `dark.errAddMode`)
