@@ -2453,10 +2453,10 @@ test('normalizeUiSize — mini만 최소화, 예전 large·{h}·깨진 값은 �
   }
   assert.equal(uiHeight('default'), 510);
   assert.equal(uiHeight('mini'), 104);
-  assert.equal(uiWidth('default'), 480);
+  assert.equal(uiWidth('default'), 560);
   assert.equal(uiWidth('mini'), 140); // 최소화는 폭도 줄인다(Tokens Studio처럼 작은 사각형)
   assert.ok(uiWidth('mini') >= 70); // 피그마 창 최소 폭
-  assert.equal(UI_WIDTH, 480); // #17: 가로 고정
+  assert.equal(UI_WIDTH, 560); // #17: 가로 고정
   assert.deepEqual(Object.keys(UI_HEIGHT).sort(), ['default', 'mini']); // 크게(860)는 없다
 });
 
@@ -3369,4 +3369,22 @@ test('A.18 nameTextStylesWithRowLabels — decimalRows를 돌려주고, 라벨�
   assert.equal(r2.decimalRows.length, 1);
   assert.equal(r2.decimalRows[0].fontSize, 26.67);
   assert.deepEqual(r2.styles.map((x) => x.name), r.styles.map((x) => x.name), '다른 스타일 이름은 바뀌지 않는다');
+});
+
+/* ---------- 변수 탭 목록 줄(ia-v4 §4.6 "목록 줄 — V1 뒤" · V-D2 · V-D5 · B.17) ---------- */
+test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 끝 두 마디 · 종류 표시', async () => {
+  const { varValueText, lastTwo, varTypeMark } = await import('../dist/pure.mjs');
+  assert.equal(varValueText({ kind: 'color', hex: '#ffffff' }), '#FFFFFF');
+  assert.equal(varValueText({ kind: 'color', hex: '#101828', alpha: 128 / 255 }), '#101828 50%');
+  assert.equal(varValueText({ kind: 'color', hex: '#101828', alpha: 20 / 255 }), '#101828 8%');
+  assert.equal(varValueText({ kind: 'color', hex: '#101828', alpha: 254 / 255 }), '#101828'); // 반올림해 100%면 꼬리 없음
+  assert.equal(varValueText(undefined), '—');
+  assert.equal(varValueText(null), '—');
+  assert.equal(varValueText({ kind: 'number', text: '1.456' }), '1.46');
+  assert.equal(varValueText({ kind: 'string', text: 'Inter' }), 'Inter');
+  assert.equal(varValueText({ kind: 'bool', text: 'false' }), 'false');
+  assert.equal(lastTwo('color/gray/0'), 'gray/0');
+  assert.equal(lastTwo('Brand/color/accent'), 'color/accent');
+  assert.equal(lastTwo('(삭제된 변수)'), '(삭제된 변수)');
+  assert.deepEqual(['FLOAT', 'STRING', 'BOOLEAN', 'COLOR'].map(varTypeMark), ['#', 'Aa', '✓', '']);
 });

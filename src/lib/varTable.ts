@@ -4,6 +4,7 @@
    - 왼쪽 트리(컬렉션 → 그룹)와 오른쪽 표(그룹 머리 + 행)를 만들 데이터, 필터, 복사 문자열.
    ============================================================ */
 import { t } from './i18n';
+import { alphaPct } from './tokens';
 import { varKind, VAR_KIND_ORDER, type VarKind } from './varKind';
 
 export type VarType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
@@ -63,6 +64,27 @@ export function groupPath(name: string): string {
 export function leafName(name: string): string {
   const i = name.lastIndexOf('/');
   return i < 0 ? name : name.slice(i + 1);
+}
+
+/* ---------- 변수 탭 목록 줄(ia-v4 §4.6 "목록 줄 — V1 뒤" · V-D2 · V-D5) ---------- */
+/** 붙은 칩 옅은 칸 — 가리키는 변수 이름의 끝 두 마디("color/gray/0" → "gray/0", "/" 없으면 그대로). */
+export function lastTwo(name: string): string {
+  return name.split('/').slice(-2).join('/');
+}
+/** 값 글(V-D2) — 색 "#RRGGBB"(투명도가 반올림해 100% 아니면 " {p}%"), 셀 없음 "—", 숫자 소수 둘째 자리, 글자 · 참거짓 그대로. 별칭은 따라간 셀을 넘긴다. */
+export function varValueText(cell: VarCell | null | undefined): string {
+  if (!cell) return '—';
+  if (cell.kind === 'color') {
+    const p = cell.alpha != null ? alphaPct(cell.alpha) : 100;
+    return cell.hex.toUpperCase() + (p < 100 ? ` ${p}%` : '');
+  }
+  if (cell.kind === 'number') { const n = Number(cell.text); return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : cell.text; }
+  if (cell.kind === 'alias') return `→ ${cell.aliasName}`;
+  return cell.text;
+}
+/** 색 아닌 줄의 종류 표시(V-D1 · U-a) — 변수 타입으로. */
+export function varTypeMark(type: VarType): string {
+  return type === 'FLOAT' ? '#' : type === 'STRING' ? 'Aa' : type === 'BOOLEAN' ? '✓' : '';
 }
 
 
