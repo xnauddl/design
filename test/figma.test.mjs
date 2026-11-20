@@ -1661,6 +1661,27 @@ test('bindSelection — 역할 별칭(text)이 같은 값의 Semantic 거울(col
   assert.equal(roleTarget(figma, gap), findVar(figma, 'Global', 'spacing/8').id);
 });
 
+test('bindSelection — 피그마가 id로 돌려주는 지운 로컬 변수(원격 아님)도 삭제된 변수로 본다', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }], 16);
+  // 피그마는 지운 로컬 변수도 getVariableByIdAsync로 돌려준다(로컬 목록에는 없고 remote 거짓). 라이브러리는 remote 참.
+  const orig = figma.variables.getVariableByIdAsync;
+  const ghost = { id: 'VariableID:soft', name: 'swatch/keep', remote: false, resolvedType: 'COLOR', valuesByMode: {} };
+  const lib = { id: 'VariableID:lib', name: 'brand/accent', remote: true, resolvedType: 'COLOR', valuesByMode: {} };
+  figma.variables.getVariableByIdAsync = async (id) => (id === ghost.id ? ghost : id === lib.id ? lib : orig(id));
+  const mk = (id, vid) => ({
+    type: 'FRAME', id, name: id,
+    fills: [{ type: 'SOLID', color: { r: 0.6667, g: 0, b: 0 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: vid } } }],
+    boundVariables: { fills: [{ type: 'VARIABLE_ALIAS', id: vid }] },
+    layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
+  });
+  const r1 = await bindSelection([mk('soft', ghost.id)], false);
+  assert.equal(r1.reasons['deleted-var'], 1);
+  const r2 = await bindSelection([mk('libn', lib.id)], false);
+  assert.equal(r2.reasons['deleted-var'], undefined);
+  assert.equal(r2.reasons['already-bound'], 1);
+});
+
 test('bindSelection — 지워진 변수를 가리키는 자리는 덮어쓰지 않고 "삭제된 변수에 연결됨"으로 건너뜀', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'color/aa0000', category: 'color', sources: ['fill'], value: '#aa0000' }], 16);

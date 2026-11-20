@@ -8,7 +8,7 @@
      4 첫 전제 상태 전에는 ‘먼저 토큰을 생성…’ 경고를 띄우지 않는다
      5 찾는 중 선택이 바뀌면 진행률을 숨긴다
      6 시작 직후 GET_PREREQ는 한 번
-     7 480 폭에서도 ‘다음 →’은 툴바 오른쪽 끝
+     7 560 폭에서도 ‘다음 →’은 툴바 오른쪽 끝
     11 연결 화면(IA v4 §4.2 · B.2): 자동 찾기 + 텍스트 스타일 미리보기 · 카드 1 숫자 · 종류 머리 · (변수, 종류) 줄 · 스위치 ·
        스타일 먼저 · 모두 켜기/끄기 · 건너뜀 칩 · 연결(textStyles 함께) · 첫 화면 + 상태 줄 · 이어받기 · 취소 · 텍스트 스타일만 · 오류
      9 변수 탭(IA v3 PR 2): 불러오는 중·시작 화면·목록, 칩·펼침·간접·LIB·삭제된 변수, 목록 기준, 큰 선택·[읽기], ↻,
@@ -38,7 +38,7 @@ const check = (name, cond, detail = '') => {
 };
 
 const pageErrors = [];
-async function open(width = 480, tab = 'layer') {
+async function open(width = 560, tab = 'layer') {
   const p = await browser.newPage({ viewport: { width, height: 510 } });
   p.on("pageerror", (e) => { pageErrors.push(e.message); console.log("PAGEERROR", e.message, (e.stack||"").split("\n").slice(0,3).join(" | ")); });
   await p.addInitScript(() => {
@@ -179,12 +179,31 @@ const nestedCards = (p) => p.evaluate(() => {
 });
 const rowShape = (p, s) => p.$eval(s, (e) => { const c = getComputedStyle(e); return { top: c.borderTopWidth, bottom: c.borderBottomWidth, radius: c.borderTopLeftRadius, bg: c.backgroundColor, minH: c.minHeight, pl: c.paddingLeft }; });
 const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset.id));
+/** 변수 탭 목록 모양(V-D5 · V-D6) — 그룹 머리 "[마디]"(단 k면 앞에 ">"를 k − 1개 — aria-level), 겹친 단 묶음(role 없음 — V-P3)을 따라 들어가며 줄(role=row)마다:
+ *  목록 줄은 "이름|옅은 칸|짙은 칸"(없는 칸은 빈 글자 — 짙은 칸이 숨으면 "-"), 알약 · 격자 묶음은 항목 글(동그라미는 "dot")을 ","로.
+ *  묶음에 role이 있거나 모르는 것이면 "?{class}". */
+const treeShape = (p) => p.$eval('#varTree', (root) => {
+  const out = [];
+  const walk = (el) => {
+    for (const x of el.children) {
+      if (x.classList.contains('vt-group')) out.push(`${'>'.repeat(Number(x.getAttribute('aria-level') ?? 1) - 1)}[${x.querySelector('.lb').textContent}]`);
+      else if (x.classList.contains('vt-grp') && !x.hasAttribute('role')) walk(x);
+      else if (x.getAttribute('role') === 'row') {
+        const c = x.querySelector('.vt-row');
+        if (c) out.push([c.querySelector('.nm').textContent, c.querySelector('.vchip .al')?.textContent ?? '', c.querySelector('.vchip .vl')?.textContent ?? '-'].join('|'));
+        else out.push([...x.querySelectorAll('.vp-item')].map((i) => i.textContent || 'dot').join(','));
+      } else out.push(`?${x.className}`);
+    }
+  };
+  walk(root);
+  return out;
+});
 /** 사이드바 항목 [이름, 숫자] (결정 B). */
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
 const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.dataset.key).catch(() => null);
 {
   // B.3 변수 탭(IA v4 §4.6~§4.9) — 머리 줄 · 사이드바 · 팔레트 · 줄 · 클릭 연결 · 메뉴 · 상세 · 새 변수 · 복제 · 삭제
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   check('9 첫 표 전에는 불러오는 중', await visible(p, '#varLoading'));
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -203,17 +222,17 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 처음에는 첫 컬렉션', (await sideSelected(p)) === 'side:col:s');
   check('9 모드 ▾(보이는 모드 2개 이상)', await visible(p, '#modeSelect'));
   // Semantic = 줄(끝 이름 · 값 알약), 그룹 머리, 사용 칸 없음
-  check('9 Semantic 줄 — 그룹 머리 + 끝 이름 · 값 "→ 900" · 사용 칸 없음', JSON.stringify(await p.$$eval('#varTree > *', (e) => e.map((x) => x.textContent.trim()))) === JSON.stringify(['▾color/text', 'default→ 900']) && (await p.$('.vt-row .use')) === null, JSON.stringify(await p.$$eval('#varTree > *', (e) => e.map((x) => x.textContent.trim()))));
+  check('9 Semantic 줄 — 경로 마디마다 머리(color › text — V-D6) + 끝 이름 · 칩 옅은 칸 "→ gray/900" → 짙은 칸 "#111111" · 사용 칸 없음(V-D5)', JSON.stringify(await treeShape(p)) === JSON.stringify(['[color]', '>[text]', 'default|→ gray/900|#111111']) && (await p.$('.vt-row .use')) === null, JSON.stringify(await treeShape(p)));
   // Global = 팔레트 — 종류 순서(간격 → 반경 → 색), 알약 · 동그라미
   await p.click('#varSide [data-key="side:col:g"]');
-  const pal = await p.$$eval('#varTree > *', (e) => e.map((x) => (x.classList.contains('vt-group') ? `[${x.querySelector('.lb').textContent}]` : [...x.querySelectorAll('.vp-item')].map((i) => i.textContent || 'dot').join(','))));
-  check('9 Global 팔레트 — 종류 순서 간격 → 반경 → 색 · 알약 값 · 색은 동그라미 + 끝 이름', JSON.stringify(pal) === JSON.stringify(['[spacing]', '8', '[radius]', '4', '[color/gray]', '0,900']), JSON.stringify(pal));
+  const pal = await treeShape(p);
+  check('9 Global 팔레트 — 종류 순서 간격 → 반경 → 색(color › gray — V-D6) · 알약 값 · 색은 줄마다 하나(짙은 칸만 — V1 · V-D5)', JSON.stringify(pal) === JSON.stringify(['[spacing]', '8', '[radius]', '4', '[color]', '>[gray]', '0||#FFFFFF', '900||#111111']), JSON.stringify(pal));
   check('9 알약 툴팁 · 접근성 이름 "{전체 이름}, {값}"', (await p.getAttribute('.vp-item[data-id="sp8"]', 'title')) === 'spacing/8 / 8' && (await p.getAttribute('.vp-item[data-id="sp8"]', 'aria-label')) === 'spacing/8, 8');
   const widths = await p.evaluate(() => {
     const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width ?? -1);
     return { win: window.innerWidth, side: w('.vl-side'), hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
   });
-  check('9 §8 폭 — 창 480 · 사이드바 128 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 480, side: 128, hscroll: 0 }), JSON.stringify(widths));
+  check('9 §8 폭 — 창 560 · 사이드바 128 · 가로 스크롤 0', JSON.stringify(widths) === JSON.stringify({ win: 560, side: 128, hscroll: 0 }), JSON.stringify(widths));
   // 그룹 접기(기억)
   await p.click('#varTree .vt-group >> nth=0');
   check('9 그룹 머리 클릭 → 접힘(▸)', (await p.getAttribute('#varTree .vt-group >> nth=0', 'aria-expanded')) === 'false' && (await p.$('.vp-item[data-id="sp8"]')) === null);
@@ -238,11 +257,19 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await recv(p, { type: 'VARIABLE_APPLIED', reqId: av2.reqId, applied: 0, skipped: 2, skipReasons: { 'no-prop': 2 }, name: 'radius/4' });
   check('9 하나도 못 붙임 → "선택한 레이어에 radius/4을 붙일 곳이 없어요"', (await p.textContent('#statusText')) === '선택한 레이어에 radius/4을 붙일 곳이 없어요');
   // 키보드 — ↓ 다음 줄 · ←→ 줄 안
-  await p.focus('.vp-item[data-id="g0"]');
+  // 키보드(V1 뒤 — §4.6 "키보드"): 색 줄은 ↑ ↓ 줄 하나씩 · ← → 무시, 알약 묶음 안은 ← →
+  await p.focus('.vt-row[data-id="g0"]');
   await p.keyboard.press('ArrowRight');
-  check('9 → 줄 안 다음 동그라미', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9');
+  check('9 색 줄에서 → 무시(그 줄 그대로)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g0');
+  await p.keyboard.press('ArrowLeft');
+  check('9 색 줄에서 ← = 담은 머리(gray — V-D6 V-P4)', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'g:g|color/gray', await p.evaluate(() => document.activeElement?.dataset?.key));
+  await p.keyboard.press('ArrowRight');
+  check('9 펴 있는 머리에서 → = 내용 첫 줄(V-P4)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g0');
+  await p.keyboard.press('ArrowDown');
+  check('9 ↓ 다음 색 줄 하나', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9');
   await p.keyboard.press('ArrowUp');
-  check('9 ↑ 위 줄(그룹 머리)', (await p.evaluate(() => document.activeElement?.classList.contains('vt-group'))));
+  await p.keyboard.press('ArrowUp');
+  check('9 ↑ ↑ 위 색 줄 → 그룹 머리', (await p.evaluate(() => document.activeElement?.classList.contains('vt-group'))));
   // 우클릭 메뉴 — 다른 곳에 연결 ▸ · 상세… · 복제 · 삭제
   await rightClick(p, '.vp-item[data-id="sp8"]');
   check('9 우클릭 메뉴 항목', JSON.stringify(await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.childNodes[0].textContent))) === JSON.stringify(['다른 곳에 연결 ▸', '상세', '복제', '삭제']), JSON.stringify(await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent))));
@@ -299,7 +326,12 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await recv(p, { type: 'VARIABLE_DUPLICATED', reqId: dv.reqId, newId: 'sp8c' });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...VARS, { id: 'sp8c', name: 'spacing/8-copy', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: '8' } }, scopes: ['GAP'], description: '' }] });
   check('9 복제 뒤 상세 열림 · 이름 칸 포커스', (await p.$('.modal')) !== null && (await p.evaluate(() => document.activeElement?.value)) === 'spacing/8-copy');
+  // 복제 전에 읽기 시작한 표가 복사본 없이 늦게 온다. 줄을 지우면 닫을 때 포커스가 첫 그룹 머리로 떨어진다.
+  const gvtBefore = (await sent(p, 'GET_VAR_TABLE')).length;
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.keyboard.press('Escape');
+  check('9 상세가 열린 동안 버린 표가 있으면 닫을 때 새 표 요청(GET_VAR_TABLE 한 번)', (await sent(p, 'GET_VAR_TABLE')).length === gvtBefore + 1);
+  check('9 복제 상세를 닫으면 복사본 줄(늦은 표가 복사본을 빼도 첫 머리가 아님)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'sp8c', await p.evaluate(() => `${document.activeElement?.dataset?.key ?? ''} ${document.activeElement?.textContent ?? ''}`));
   // 삭제 — 확인 팝업(처음 포커스 [취소]) · m(가리키는 변수 수)
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await rightClick(p, '.vp-item[data-id="g9"]');
@@ -343,7 +375,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 }
 {
   // 선택 탭 카드(v4 §4.1) — 카드 1 숫자 · 카드 2 직접만 · 카드 3 [선택] · [연결 풀기]
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   check('9 선택 없음 → "디자인에서 레이어를 선택하세요" · 할 일 세 버튼 잠금', (await p.textContent('#selCards')).includes('디자인에서 레이어를 선택하세요') && (await locked(p, '#btnGoMake')) && (await locked(p, '#btnGoRename')) && (await locked(p, '#btnGoComponents')));
@@ -409,7 +441,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   // 변수 탭에서 쓰는 변수 결과(내용이 바뀐 응답)가 와도 포커스 · 스크롤 그대로(변수 탭 목록은 페이지가 스크롤한다)
   await p.click('#varSide [data-key="side:col:g"]');
   await p.waitForTimeout(30);
-  await p.setViewportSize({ width: 480, height: 240 });
+  await p.setViewportSize({ width: 560, height: 240 });
   await p.focus('.vp-item[data-id="r4"]');
   await p.evaluate(() => window.scrollTo(0, 40));
   await p.waitForTimeout(30);
@@ -417,7 +449,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, { tx: { places: 2, layers: 1 }, g9: { places: 1, layers: 1 }, L1: { places: 1, layers: 1 } }, { libraryVars: [{ id: 'L1', name: 'core/blue/500', collection: 'Core', type: 'COLOR', value: { kind: 'color', hex: '#3366FF' }, aliasTargets: [] }], deleted: { count: 3, nodeIds: ['x'] } }));
   await p.waitForTimeout(40);
   check('9 변수 탭에서 쓰는 변수 결과가 와도 그대로 — 포커스 · window.scrollY', y9 > 0 && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'r4' && (await p.evaluate(() => window.scrollY)) === y9, `${y9} / ${await p.evaluate(() => window.scrollY)} / ${await p.evaluate(() => document.activeElement?.dataset?.id)}`);
-  await p.setViewportSize({ width: 480, height: 510 });
+  await p.setViewportSize({ width: 560, height: 510 });
   await p.click('#tabbtn-select');
   await p.waitForTimeout(30);
   await p.click('[data-k="unbind"]');
@@ -437,7 +469,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 }
 {
   // 상태 5 — 로컬 변수 0개 + 라이브러리만: 카드 2(라이브러리 1)에 버튼 없음 · 변수 탭은 빈 화면 · 사이드바 없음(B.15)
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await recv(p, { ...sel(1, 1), scanned: 40, ids: ['1:2'] });
@@ -455,7 +487,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 
 /* 7 — '다음 →'은 툴바 오른쪽 끝(만들기 › 색) */
 {
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await goSub(p, 'pick');
@@ -471,7 +503,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 }
 
 // 탭 바(+[—])가 한 줄
-for (const w of [480]) {
+for (const w of [560]) {
   const p = await open(w);
   const r = await p.evaluate(() => ({ h: Math.round(document.querySelector('.tabs').getBoundingClientRect().height), hs: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
   check(`9 ${w}px 탭 바 한 줄·가로 스크롤 없음`, r.h <= 40 && !r.hs, `높이 ${r.h}px`);
@@ -486,7 +518,7 @@ const reenter = (p) => p.evaluate(() => {
   window.dispatchEvent(new FocusEvent('focus'));
 });
 {
-  const p = await open(480, null);
+  const p = await open(560, null);
   check('10 처음 열면 선택 탭(v4 §2.1)', (await p.$eval('.tab-btn.active', (e) => e.id)) === 'tabbtn-select');
   check('10 머리 = [선택 | 변수] + ⚙ + —', JSON.stringify(await p.$$eval('#tabBar .tab-btn', (e) => e.map((x) => x.textContent))) === JSON.stringify(['선택', '변수']) && (await visible(p, '#btnSettings')) && (await visible(p, '#btnMinimize')));
   check('10 선택 표시줄 없음(탭 바 바로 아래가 탭 내용)', (await p.$('#selBarWrap')) === null);
@@ -522,7 +554,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 창 다시 들어옴(④): 합쳐서 1번, 2초 안 재진입은 간격 끝에 1번, 창 안 이동 0회, 메뉴 열림 중 보류
-  const p = await open(480, "variables");
+  const p = await open(560, "variables");
   await recv(p, PREREQ);
   await recv(p, sel(0, 0));
   await p.waitForTimeout(50);
@@ -556,7 +588,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 최소화(§4.9)
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, PREREQ);
   await recv(p, { ...sel(1, 0), scanned: 400 });
   await p.waitForTimeout(450);
@@ -596,7 +628,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 잠금(§2.3): 포커스 가능, 누르면 공통 상태 줄에 사유 + [라이선스 →]
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await goSub(p, 'pick');
@@ -626,7 +658,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 510에서 아래 버튼 줄이 스크롤해도 보임(§2.5 · §4.2 아래 고정) + §8 목록 높이 실측
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await openSel(p);
   const many = Array.from({ length: 40 }, (_, i) => cand('n1', 'itemSpacing', `v${i}`, `spacing/${i}`));
   await found(p, { candidates: many });
@@ -649,7 +681,7 @@ const reenter = (p) => p.evaluate(() => {
 /* 11 — 연결 화면(IA v4 §4.2 · PR B.2) */
 /* B.2 — 연결 화면 ⑦: 자동 찾기 + 텍스트 스타일 미리보기 · 카드 1 숫자 · 줄 · 스위치 · 스타일 먼저 · 건너뜀 칩 · 연결 · 첫 화면 복귀 */
 {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await openSel(p);
   const a = await sent(p, 'APPLY');
   const ts = await sent(p, 'PREVIEW_TEXT_STYLES');
@@ -732,7 +764,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 기준이 같으면 끈 스위치 이어받기(조용한 재계산) · 후보 0 · 취소 · 오류
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await openSel(p);
   await found(p, { candidates: B2_CANDS.slice(0, 3) });
   await p.click('[data-k="link"]');
@@ -753,7 +785,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // [읽기]로 시작한 찾기 — 진행률 · 취소 → "읽기를 취소했어요 · [다시 읽기]"
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 0), scanned: 400 });
@@ -767,7 +799,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 텍스트 스타일만 모습(noTier) — 변수 찾기 없음 · 카드 1 안에 [{t}곳 연결] · 연결 화면은 스타일 줄만
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await openSel(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 3 });
   check('B2 noTier → 변수 찾기 없이 텍스트 스타일 미리보기만', (await sent(p, 'APPLY')).length === 0 && (await sent(p, 'PREVIEW_TEXT_STYLES')).length === 1);
   await recv(p, tsPrev((await sent(p, 'PREVIEW_TEXT_STYLES')).at(-1).reqId, B2_TS, { hasStyle: 1 }));
@@ -783,7 +815,7 @@ const reenter = (p) => p.evaluate(() => {
 }
 {
   // 찾기 오류 → 읽는 중에 멈추지 않음 · [다시 시도]는 찾기 / 텍스트 스타일 미리보기 오류는 변수 연결을 막지 않음
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await openSel(p);
   const id = await lastReq(p, 'APPLY');
   await recv(p, { ...preview(id), candidates: B2_CANDS.slice(0, 2) });
@@ -816,7 +848,7 @@ async function openEditList(opts = {}) {
   let p;
   if (opts.clock) {
     // 10초 시간 초과는 가짜 시계로 — 설치는 페이지를 열기 전에.
-    p = await browser.newPage({ viewport: { width: 480, height: 510 } });
+    p = await browser.newPage({ viewport: { width: 560, height: 510 } });
     p.on('pageerror', (e) => pageErrors.push(e.message));
     await p.clock.install();
     await p.addInitScript(() => {
@@ -825,7 +857,7 @@ async function openEditList(opts = {}) {
     });
     await p.goto(url);
     await goTab(p, 'variables');
-  } else p = await open(480, 'variables');
+  } else p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS });
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
@@ -1043,7 +1075,7 @@ async function saveAndGet(p) {
     num('hid', 'misc/hidden', 1, []),
     { id: 'rc', name: 'radius/card', collectionId: 's', type: 'FLOAT', values: { l: { kind: 'alias', aliasId: 'r8', aliasName: 'radius/8' }, d: { kind: 'alias', aliasId: 'f14', aliasName: 'font-size/14' } }, scopes: ['CORNER_RADIUS'], description: '' },
   ];
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: PCOLS, vars: PVARS });
   await p.focus('#varTree [data-id="rc"]');
@@ -1078,7 +1110,7 @@ async function saveAndGet(p) {
 
 /* ---------- 13 컴포넌트 결과 줄 꼬리 (§4.7 "인스턴스 자리" 5·6번, QA #3 검토 2회차) ---------- */
 {
-  const p = await open(480, 'layer');
+  const p = await open(560, 'layer');
   await goSub(p, 'structure');
   const st = () => p.$eval('#structureStatus', (e) => ({ text: e.textContent, cls: e.className }));
   await recv(p, {
@@ -1156,7 +1188,7 @@ async function saveAndGet(p) {
 
 /* ---------- 16 새 역할 표시 — "N" 배지 · 이미 붙은 연결은 그대로(§4.6 · §2.12, 2026-11-06 결정 B · IA v4 §4.2) ---------- */
 {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await openSel(p);
   const nr = { name: 'color/text/inverse', globalId: 'g0', scopes: ['TEXT_FILL'] };
   const newCand = (id) => ({ nodeId: id, field: 'fills', index: 0, currentValue: '#ffffff', variableId: 'new:color/text/inverse', variableName: 'color/text/inverse', tier: 2, variableValue: '#ffffff', newRole: nr, newRoleGlobalName: 'color/gray/0' });
@@ -1182,7 +1214,7 @@ async function saveAndGet(p) {
 /* ---------- 14 컴포넌트(베타) — 언제나 보임 · [베타] 배지 · 각주 없음 (§4.7 "베타", QA #3 불합격 4, 2026-11-05 결정) ---------- */
 {
   // v4 §4.1 할 일 — [변수 만들기] · [이름 정리] · [컴포넌트 베타](언제나 보임, 선택이 없으면 잠금)
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   check('14 할 일 버튼 셋 — [변수 만들기] · [이름 정리] · [컴포넌트 베타]', (await visible(p, '#btnGoMake')) && (await visible(p, '#btnGoRename')) && (await visible(p, '#btnGoComponents')) && (await p.textContent('#selTools')).trim().startsWith('할 일'));
   check('14 배지 — 할 일 버튼 · 카드 제목, aria-hidden', (await p.$$eval('#btnGoComponents .beta-badge[aria-hidden="true"], #structureCard h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) === 2);
   check('14 배지 주황(#C2410C 글자 · #FFF1E6 바탕)', JSON.stringify(await p.$eval('#btnGoComponents .beta-badge', (e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor])) === JSON.stringify(['rgb(194, 65, 12)', 'rgb(255, 241, 230)']));
@@ -1205,7 +1237,7 @@ async function saveAndGet(p) {
 
 /* ---------- 17 변수 만들기 화면(IA v4 §4.3 · B.4) — Global · Semantic · 텍스트 스타일 트리 · 실행 순서 ---------- */
 {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -1303,7 +1335,7 @@ async function saveAndGet(p) {
 }
 {
   // 일부 실패(연결 0곳) — 결과만 · [닫기] 하나 / 바로 연결 끔 → 상태 줄 [연결하기 →] / 무료
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { ...sel(1, 0), ids: ['w2'] });
@@ -1336,7 +1368,7 @@ async function saveAndGet(p) {
 }
 {
   // 연결 0곳이어도 이유가 '이미 모두 연결됨'뿐이면 ✓ · 다 됨(2026-11-19 사용자 결정 — ia-v4 §4.3 "연결 0곳 사유")
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { ...sel(1, 0), ids: ['w2b'] });
@@ -1365,7 +1397,7 @@ async function saveAndGet(p) {
   await p.close();
 }
 {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { ...sel(1, 0), ids: ['w3'] });
@@ -1413,7 +1445,7 @@ async function saveAndGet(p) {
 
 /* ---------- 18 이름 정리 화면(IA v4 §4.4 · B.4) — 소속 트리 · 스위치 · [k개 이름 바꾸기] ---------- */
 {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, PREREQ);
   await recv(p, { ...sel(1, 0), ids: ['r0'], firstName: 'Product card' });
   await p.click('#btnGoRename');
@@ -1444,7 +1476,7 @@ async function saveAndGet(p) {
 
 /* ---------- 19 텍스트 스타일 KRDS(docs/text-style-krds.md §4 · §5) — 표시 · 구분선 줄 · [이름 다시 짓기] ---------- */
 {
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasTextStyles: true });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -1508,7 +1540,7 @@ async function saveAndGet(p) {
 
 /* ---------- 20 선택 탭 카드의 [변수 만들기 →] 없앰(IA v4 §4.1 · B.11) — 입구는 할 일 하나 ---------- */
 {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
@@ -1531,7 +1563,7 @@ async function saveAndGet(p) {
 }
 {
   // (c) 상태 6 — 로컬 변수 0개: 만들기 카드(무료 규칙 F3). 텍스트 스타일 후보가 있으면 맨 아래 [{t}곳 연결] — 만들기 버튼이 있으면 보조, 없으면 주 버튼
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
@@ -1554,7 +1586,7 @@ const makeHot = (p) => p.$eval('#btnGoMake', (b) => b.classList.contains('primar
 const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards button.primary').length + (document.getElementById('btnGoMake').classList.contains('primary') ? 1 : 0));
 {
   // 상태 7 — 카드 1 읽는 중 · m > 0이면 보조, m = 0 · k > 0이면 주 버튼, 찾은 값이 모두 연결되면 보조
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
@@ -1580,7 +1612,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 }
 {
   // 상태 6 — 만들기 카드(무료 규칙 F3): 할 일 [변수 만들기]는 상태 6에서 늘 보조(카드 주 버튼이 하나)
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await p.waitForTimeout(60);
@@ -1611,7 +1643,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 }
 {
   // 상태 5 — 라이브러리 변수만 씀: 만들 값이 있어도 보조
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
@@ -1627,7 +1659,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 }
 {
   // noTier — 로컬 변수는 있지만 계층 컬렉션이 없음: 만들 값 있으면 주 버튼
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 3 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
@@ -1650,7 +1682,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 
 /* ---------- 22 카드 안 카드 없애기(IA v4 §2.8 · B.12) ---------- */
 {
-  const p = await open(480, 'layer');
+  const p = await open(560, 'layer');
   await goSub(p, 'structure');
   await compFound(p, [
     { id: 'r', name: 'Frame', type: 'FRAME', depth: 0, parentId: null, eligible: false },
@@ -1699,7 +1731,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 }
 {
   // 선택 탭 첫 화면(카드 1~3) · 연결 화면 — 카드 안 카드 0
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
@@ -1723,7 +1755,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 
 {
   // 값을 직접 고르기 — 실제 흐름(추출 결과 · 토큰 미리보기)으로 색 · 토큰 목록과 격자 정리 띠를 채운다
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -1773,7 +1805,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 }
 {
   // 내보내기 팝업 오류 — 팝업(.modal) 안 빨강 띠
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.click('#btnVarMore');
@@ -1792,7 +1824,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
 const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.filter((x) => x.getClientRects().length).map((x) => x.id));
 {
   // 색(유료) — 빈 상태 · 토큰 단계 미리보기만 · 추출 뒤 · 팔레트 띠
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -1847,7 +1879,7 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
 }
 {
   // 연결 중(대기 잠금)에도 색이 있는 색 단계의 주 버튼은 그대로
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
   const a = await sent(p, 'APPLY');
@@ -1868,7 +1900,7 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
 }
 {
   // 무료 — 잠긴 버튼에는 주 버튼을 두지 않는다
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -1885,7 +1917,7 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
 }
 {
   // 컴포넌트(유료) — 잠금 · 주 버튼 · 제목 줄 · 머리 띠 · 문구 · 후보 줄 이름
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -1934,7 +1966,7 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
 /* ---------- 24 무료 규칙 · 첫 화면 만들기 카드(ia-v4 B.18 — §4.1 "만들기 카드" · §4.3a · §4.9 · F1–F10) ---------- */
 /** 로컬 변수 0개 파일 · 선택 1개 → 찾기 · 쓰는 변수 응답까지. 만들기 카드의 추출은 응답하지 않은 채 돌려준다. */
 async function openZero(tier = 'free', { table = { collections: [], vars: [] }, prereq = { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 } } = {}) {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier, unlimited: tier === 'paid', source: 'dev' });
   await recv(p, prereq);
   await recv(p, { type: 'VAR_TABLE', ...table });
@@ -2055,7 +2087,7 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
   const RATIO = { id: 'u', name: 'Tokens', tier: 2, modes: [{ modeId: 'um', name: 'Mode 1' }], defaultModeId: 'um', tierWhy: { kind: 'ratio', alias: 4, counted: 4 } };
   const UVARS = [{ id: 'u1', name: 'color/brand', collectionId: 'u', type: 'COLOR', values: { um: { kind: 'alias', aliasId: 'g9', aliasName: 'color/gray/900' } }, scopes: [], description: '' }];
   const varsPage = async (collections, vars) => {
-    const p = await open(480, 'variables');
+    const p = await open(560, 'variables');
     await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
     await recv(p, PREREQ);
     await recv(p, { type: 'VAR_TABLE', collections, vars });
@@ -2138,7 +2170,7 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
 }
 {
   // 무료 값을 직접 고르기 › 색 · 토큰(F8) — Global만 · Semantic 0 · CREATE_SEMANTICS 없음
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2171,7 +2203,7 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
 }
 {
   // 무료 연결 — N 배지 · newRoles 꼬리 없음(플러그인이 새 Semantic 후보를 보내지 않는다 — test/figma.test.mjs) · 준비 현황 › Semantic 매핑
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2199,7 +2231,7 @@ const shownPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.
 const compRows = (p) => p.$$eval('#compTree .r-card', (e) => e.length);
 const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.contains('retry-btn') ? 'retry' : document.activeElement?.id ?? ''));
 async function compScreen(extra = {}) {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -2284,7 +2316,7 @@ async function fillBoth(p) {
 }
 {
   // 다른 화면 쓰기(연결) 뒤 후보 목록 비움 · #variantReport는 남음
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
   const a = await sent(p, 'APPLY');
@@ -2361,7 +2393,7 @@ async function fillBoth(p) {
 }
 {
   // C-D14 — 연결 실패: 아래 고정 [{o}곳 연결]은 보조, 다시 연결 결과 뒤 되돌아옴
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
   const a = await sent(p, 'APPLY');
@@ -2382,7 +2414,7 @@ async function fillBoth(p) {
 }
 {
   // C-D14 — 라이선스 카드 · 내보내기 팝업(주 버튼 하나)
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.click('#btnSettings');
@@ -2416,7 +2448,7 @@ async function fillBoth(p) {
 }
 {
   // 이름 다시 짓기 오류(APPLY_TS_RENAME) → 팝업 안 알림 줄(B.19 오류 갈래 · T-P29 ④)
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasTextStyles: true });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2458,7 +2490,7 @@ async function fillBoth(p) {
 }
 {
   // 오류 자리 폴백 — 이름 정리 [이름 바꾸기] · 변수 탭 레이어 선택
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, PREREQ);
   await recv(p, { ...sel(1, 0), ids: ['r0'], firstName: 'Product card' });
   await p.click('#btnGoRename');
@@ -2477,7 +2509,7 @@ async function fillBoth(p) {
   await p.close();
 }
 {
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, sel(1, 0));
@@ -2496,7 +2528,7 @@ async function fillBoth(p) {
 }
 {
   // 만들기 화면 실행(마법사)이 보낸 요청의 오류는 카드에 띄우지 않음
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { ...sel(1, 0), ids: ['w2'] });
@@ -2542,7 +2574,7 @@ async function fillBoth(p) {
 
 {
   // 26 라이선스 구매 버튼(IA v4 §4.10 · B.21) — 늘 보이고, 결제 링크가 자리표시자면 잠긴다. 글은 티어별.
-  const p = await open(480, 'settings');
+  const p = await open(560, 'settings');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'none' });
   await p.waitForTimeout(30);
   const lk = () => p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); const r = b.getBoundingClientRect(); return { text: b.textContent, title: b.title, dis: b.getAttribute('aria-disabled'), shown: r.width > 0 && r.height > 0 && getComputedStyle(document.getElementById('licenseLinkRow')).display !== 'none' }; });
@@ -2566,7 +2598,7 @@ async function fillBoth(p) {
 
 /* ---------- 27 안 쓰는 변수 찾기(docs/unused-vars.md) ---------- */
 {
-  const p = await open(480, 'variables');
+  const p = await open(560, 'variables');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.click('#btnVarMore');
@@ -2613,7 +2645,7 @@ async function fillBoth(p) {
 
 {
   // 28e 브랜드 팔레트 무료(ia-v4 §4.3a · A.18 4) — 무료에서 [팔레트 생성] · [팔레트 만들기] 열림, [색 변수 만들기]는 Global만
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2641,7 +2673,7 @@ async function fillBoth(p) {
   const S24 = { name: 'heading/medium', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 3, nodeIds: ['t1'] };
   const D2667 = { fontSize: 26.67, lineHeight: 36, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'SemiBold', count: 4, uiCount: 0, sample: 'Title', styleIds: [], nodeIds: ['t2'] };
   const openMake = async (styles) => {
-    const p = await open(480, 'select');
+    const p = await open(560, 'select');
     await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
     await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
     await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2695,7 +2727,7 @@ async function fillBoth(p) {
   // 28f · 28g 값을 직접 고르기 › 타이포 #tsList 흐린 카드 · [등록] 0개 잠금
   const D2667 = { fontSize: 26.67, lineHeight: 36, lineHeightPercent: 0, letterSpacing: 0, letterSpacingPercent: 0, family: 'Inter', style: 'SemiBold', count: 4, uiCount: 0, sample: 'Title', styleIds: [], nodeIds: ['t2'] };
   const openTs = async () => {
-    const p = await open(480, 'variables');
+    const p = await open(560, 'variables');
     await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
     await recv(p, { ...PREREQ, hasTextStyles: true });
     await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2750,7 +2782,7 @@ async function fillBoth(p) {
   const cm = (field, v, name, mainId, nodeId = 'n1') => ({ nodeId, field, currentValue: '8', variableId: v, variableName: name, tier: 2, ...(mainId ? { mainId } : {}) });
   const MAINS = [{ id: 'S', name: 'Traveler Card', page: 'Components' }, { id: 'M', name: 'Badge', page: 'Components' }];
   const CANDS = [cm('itemSpacing', 'vA', 'spacing/a', 'S', 'm1'), cm('paddingLeft', 'vB', 'spacing/b', 'M', 'm2'), cm('paddingTop', 'vC', 'spacing/c', undefined, 'n1')];
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
   await found(p, { candidates: CANDS, mains: MAINS, reasons: {}, counts: {} });
@@ -2798,7 +2830,7 @@ async function fillBoth(p) {
 }
 {
   // 28b 텍스트 스타일 줄만(메인 안 글자) → c = 1 · textStyles[].mainIds · 28c 목록 기준이 바뀌면 줄 없음 · noTier면 줄 없음
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
   await found(p, { candidates: [], mains: [{ id: 'S', name: 'Traveler Card', page: 'Components' }], reasons: {}, counts: {} }, [{ styleId: 'st1', name: 'body/medium', nodeIds: ['t1', 't2'], mainIds: ['S', null] }]);
@@ -2838,7 +2870,7 @@ async function fillBoth(p) {
 }
 {
   // 28d 건너뛴 곳(결정 A 확장 — 손볼 곳 예외): 두 줄 · 설명만 · [선택 ›]은 손볼 곳 줄만
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await openSel(p);
   const sk = [
@@ -2876,7 +2908,7 @@ async function fillBoth(p) {
   check('28d 손볼 곳 줄(fraction)에 [선택 ›] 1개 — 첫 줄 오른쪽', fixR?.sel === 1 && fixR.selOk, JSON.stringify(fixR));
   check('28d 그대로 둬도 되는 곳 줄(숨긴 레이어 · 라이브러리 컴포넌트)에는 [선택 ›] 0개(레이어 항목이 있어도)', keepR.length === 2 && keepR.every((r) => r.sel === 0), JSON.stringify(keepR));
   check('28d "라이브러리 컴포넌트" 줄 설명', libR?.help === '라이브러리 컴포넌트라 이 파일에서 연결할 수 없어요', JSON.stringify(libR));
-  check('28d 480px — 이름 줄바꿈 없음 · 설명 잘림 없음', rows.every((r) => r.nameOneLine && r.noClip), JSON.stringify(rows));
+  check('28d 560px — 이름 줄바꿈 없음 · 설명 잘림 없음', rows.every((r) => r.nameOneLine && r.noClip), JSON.stringify(rows));
   check('28d 줄에 테두리 · 둥근 모서리 · 따로 바탕 없음(§2.8)', rows.every((r) => !r.card));
   const stops = await p.$$eval('#bindSkips button, #bindSkips [tabindex]:not([tabindex="-1"]), #bindSkips a, #bindSkips input', (e) => e.map((x) => x.className));
   check('28d 목록 안 탭 정지점은 손볼 곳 줄의 [선택 ›]뿐', stops.length === 1 && stops[0].includes('skip-sel'), JSON.stringify(stops));
@@ -2887,7 +2919,7 @@ async function fillBoth(p) {
 
 {
   // 28c 만들기 실행 — 연결 mainsBound ['a'] + 텍스트 스타일 mainsApplied ['a', 'b'] → 다 됨 줄에 메인 없음 · 카드 1 ✓ 아래 2개
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -2922,7 +2954,7 @@ async function fillBoth(p) {
 
 {
   /* ---------- 29 #110 검토 ② · ⑤(#158) — 사용 수 읽기 오류 · 조합 키와 상태 줄 버튼 ---------- */
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await recv(p, sel(1, 0));
@@ -2999,7 +3031,7 @@ const T30 = [
 const isLibSame30 = (tk) => tk.name === 'spacing/8' || String(tk.value).toLowerCase() === '#3366ff';
 /** 상태 5로 연다 — 로컬 변수 0개 + 라이브러리 변수 직접 사용. 추출에는 아직 답하지 않는다. */
 async function openLib30({ tier = 'free', usage = true, find = true, prereq = { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 } } = {}) {
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier, unlimited: tier === 'paid', source: 'dev' });
   await recv(p, prereq);
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -3068,10 +3100,10 @@ async function backHome30(p, libs) {
   check('30 ① 포커스 대체 = 카드 영역 첫 버튼(만들기 카드의 첫 [＋ 만들기])', await p.evaluate(() => document.querySelector('#selCards button')?.closest('.sel-card')?.querySelector('.t')?.textContent === '변수가 안 붙은 값 15곳'));
   if (process.env.STATE5_SHOT) {
     // 화면 시안 대조용(로컬에서만) — 할 일 줄이 화면 아래에 붙어 있어 전체 높이 창으로 찍는다
-    await p.setViewportSize({ width: 480, height: 720 });
+    await p.setViewportSize({ width: 560, height: 720 });
     await p.waitForTimeout(60);
     await p.screenshot({ path: process.env.STATE5_SHOT });
-    await p.setViewportSize({ width: 480, height: 510 });
+    await p.setViewportSize({ width: 560, height: 510 });
     await p.waitForTimeout(60);
   }
   // ⑤ 텍스트 스타일 후보 + 만들기 카드 → [{t}곳 연결]은 안내 카드(같은 값 줄 아래)에 보조
@@ -3208,7 +3240,7 @@ async function backHome30(p, libs) {
 
 {
   // 31 큰 선택(300개 넘음) · 로컬 변수 0개 — [읽기]를 누르면 만들기 카드도 읽는다(찾기 APPLY 진행 중이라 미룬 추출을 찾기가 끝난 뒤 보냄 — "선택을 읽는 중…"에 멈추지 않음)
-  const p = await open(480, 'select');
+  const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
   await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
@@ -3227,6 +3259,509 @@ async function backHome30(p, libs) {
   check('31 [읽기] 뒤 — 만들기 카드 추출 EXTRACT{기준} 보냄', !!ex && ex.nodeIds?.[0] === 'big1', String((await sent(p, 'EXTRACT')).length));
   if (ex) await cardAnswer(p);
   check('31 [읽기] 뒤 — 카드가 "선택을 읽는 중…"에 멈추지 않고 값 줄을 그림', (await cardRows(p)).length === 4 && !(await cardText(p)).includes('선택을 읽는 중'), await cardText(p).catch(() => ''));
+  await p.close();
+}
+
+{
+  // 9v V PR(ia-v4 §4.6 "목록 줄 — V1 뒤" · V-D5 · §4.1 머리 줄 U-b · §8 · B.17) — 줄 모양 · 붙은 칩 · 특수한 경우 · 라이브러리 값 다시 그리기(미루기 · 포커스) · 그룹 · 사이드바 · 글자 · 폭
+  const VC = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm' },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l' },
+    { id: 'c', name: 'Comp', tier: 3, modes: [{ modeId: 'k', name: 'Mode 1' }], defaultModeId: 'k' },
+  ];
+  const Cc = (hex, alpha) => (alpha != null ? { kind: 'color', hex, alpha } : { kind: 'color', hex });
+  const Al = (aliasId, aliasName, remote) => ({ kind: 'alias', aliasId, aliasName, ...(remote ? { remote: true } : {}) });
+  const gv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 'g', type, values: { m: cell }, scopes, description: '' });
+  const sv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 's', type, values: { l: cell, d: cell }, scopes, description: '' });
+  const cv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 'c', type, values: { k: cell }, scopes, description: '' });
+  const VV = [
+    gv('vsp16', 'spacing/16', 'FLOAT', { kind: 'number', text: '16' }, ['GAP']), gv('vsp24', 'spacing/24', 'FLOAT', { kind: 'number', text: '24' }, ['GAP']),
+    gv('vg0', 'color/gray/0', 'COLOR', Cc('#FFFFFF')), gv('vg9', 'color/gray/900', 'COLOR', Cc('#101828')), gv('vga', 'color/gray/900-a50', 'COLOR', Cc('#101828', 128 / 255)),
+    gv('vgx', 'color/gray/almost', 'COLOR', Cc('#101828', 254 / 255)),
+    gv('vgl', 'color/gray/brand-accent', 'COLOR', Al('L2', 'Brand/color/accent', true)), gv('vgd', 'color/gray/gone', 'COLOR', Al('zz', '(삭제된 변수)')),
+    gv('vff', 'font-family/base', 'STRING', { kind: 'string', text: 'Inter' }, ['FONT_FAMILY']),
+    sv('vbg', 'color/background/default', 'COLOR', Al('vg0', 'color/gray/0')),
+    sv('vlong', 'color/background/disabled-on-inverse-surface-with-a-very-long-name-for-ellipsis', 'COLOR', Al('vg9', 'color/gray/900')),
+    sv('vscr', 'color/background/scrim', 'COLOR', Al('vga', 'color/gray/900-a50')), sv('vhov', 'color/background/hover', 'COLOR', Cc('#101828', 20 / 255)),
+    sv('vlp', 'color/background/primary', 'COLOR', Al('L1', 'Brand/color/primary', true)), sv('vla', 'color/background/accent', 'COLOR', Al('L2', 'Brand/color/accent', true)),
+    sv('vdl', 'color/background/legacy', 'COLOR', Al('zz', '(삭제된 변수)')),
+    { id: 'vnp', name: 'color/background/pressed', collectionId: 's', type: 'COLOR', values: { d: Cc('#53389E') }, scopes: [], description: '' },
+    sv('vcg', 'spacing/card/gap', 'FLOAT', Al('vsp16', 'spacing/16'), ['GAP']), sv('vfb', 'spacing/card/family', 'STRING', Al('vff', 'font-family/base')),
+    sv('vdn', 'spacing/card/dense', 'BOOLEAN', { kind: 'bool', text: 'false' }),
+    cv('vpx', 'button/padding-x', 'FLOAT', { kind: 'number', text: '12' }, ['GAP']),
+  ];
+  const LIB1 = [{ id: 'L1', name: 'Brand/color/primary', collection: 'Brand', type: 'COLOR', value: Cc('#7F56D9'), aliasTargets: [] }];
+  const p = await open(560, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: VC, vars: VV });
+  await p.click('#varSide [data-key="side:col:s"]');
+  const rowOf = (id) => p.$eval(`.vt-row[data-id="${id}"]`, (c) => {
+    const r = c.parentElement; const cs = getComputedStyle(c); const rs = getComputedStyle(r);
+    const nm = c.querySelector('.nm'); const t = c.querySelector('.nm .t'); const chip = c.querySelector('.vchip');
+    const al = chip.querySelector('.al'); const vl = chip.querySelector('.vl'); const sw = c.querySelector('.vr-sw'); const mk = c.querySelector('.vr-mk');
+    const R = (e) => e.getBoundingClientRect();
+    return {
+      rowRole: r.getAttribute('role'), rowKey: r.dataset.key ?? null, cellRole: c.getAttribute('role'), cells: r.querySelectorAll('[role=gridcell]').length,
+      h: Math.round(R(r).height), cellH: Math.round(R(c).height), rowBorder: rs.borderBottomWidth, cellBorder: cs.borderBottomWidth, cursor: cs.cursor,
+      nameRight: Math.round(R(nm).right), chipLeft: Math.round(R(chip).left), chipRight: Math.round(R(chip).right), cellRight: Math.round(R(c).right), chipH: Math.round(R(chip).height),
+      nowrap: getComputedStyle(t).whiteSpace === 'nowrap', ellipsis: getComputedStyle(t).textOverflow === 'ellipsis', clipped: t.scrollWidth > t.clientWidth, nameH: Math.round(R(t).height),
+      al: al?.textContent ?? null, vl: vl?.textContent ?? null, vlClipped: vl ? vl.scrollWidth > vl.clientWidth : null,
+      sw: sw ? { bg: sw.style.background, ck: sw.classList.contains('ck'), border: getComputedStyle(sw).borderTopWidth + ' ' + getComputedStyle(sw).borderTopColor, w: Math.round(R(sw).width) } : null,
+      mk: mk?.textContent ?? null, aria: c.getAttribute('aria-label'), title: c.title, x: Math.round(R(c).left),
+    };
+  });
+  const bg = await rowOf('vbg');
+  check('9v 줄 — row 안 gridcell 하나(포커스 · data-key는 gridcell) · 높이 32 · 구분선 없음 · cursor pointer', bg.rowRole === 'row' && bg.rowKey === null && bg.cellRole === 'gridcell' && bg.cells === 1 && bg.h === 32 && bg.cellH === 32 && bg.rowBorder === '0px' && bg.cellBorder === '0px' && bg.cursor === 'pointer', JSON.stringify(bg));
+  check('9v 별칭 줄 — 칩 옅은 칸 "→ gray/0" + 짙은 칸 "#FFFFFF" · 칩 높이 20 · 오른쪽 끝 · 이름 남는 폭(이름 끝 + 4 = 칩 시작)', bg.al === '→ gray/0' && bg.vl === '#FFFFFF' && bg.chipH === 20 && bg.chipRight === bg.cellRight && bg.nameRight + 4 === bg.chipLeft, JSON.stringify(bg));
+  check('9v 동그라미 16 · 테두리 1px 검정', bg.sw?.w === 16 && bg.sw.border === '1px rgb(0, 0, 0)', JSON.stringify(bg.sw));
+  check('9v 별칭 줄 접근성 이름 "{전체 이름}, {값 글}, → {대상 전체 이름}" · 툴팁 "{전체 이름} / → {대상}"', bg.aria === 'color/background/default, #FFFFFF, → color/gray/0' && bg.title === 'color/background/default / → color/gray/0', `${bg.aria} | ${bg.title}`);
+  const lg = await rowOf('vlong');
+  check('9v 긴 이름 — 한 줄(nowrap) · 말줄임 · 줄 높이 32 그대로 · 칩 오른쪽 끝', lg.nowrap && lg.ellipsis && lg.clipped && lg.nameH === 16 && lg.h === 32 && lg.chipRight === lg.cellRight && lg.nameRight + 4 === lg.chipLeft, JSON.stringify(lg));
+  const scr = await rowOf('vscr');
+  const hov = await rowOf('vhov');
+  check('9v 투명도 50% — 짙은 칸 "#101828 50%" 잘림 없음 · 동그라미 바둑판', scr.vl === '#101828 50%' && scr.vlClipped === false && scr.sw.ck, JSON.stringify(scr));
+  check('9v 직접 값 8% — 짙은 칸만 "#101828 8%" · 접근성 이름 값 글(V-P2)', hov.al === null && hov.vl === '#101828 8%' && hov.aria === 'color/background/hover, #101828 8%' && hov.title === 'color/background/hover / #101828 8%', JSON.stringify(hov));
+  const la = await rowOf('vla');
+  const dl = await rowOf('vdl');
+  check('9v libVars에 없는 라이브러리 대상 — 옅은 칸 "→ color/accent"만 · 빈 원 · 접근성 이름 값 없음', la.al === '→ color/accent' && la.vl === null && la.sw.bg === 'transparent' && !la.sw.ck && la.aria === 'color/background/accent, → Brand/color/accent', JSON.stringify(la));
+  check('9v 삭제된 대상 — 옅은 칸 "→ (삭제된 변수)"만 · 빈 원', dl.al === '→ (삭제된 변수)' && dl.vl === null && dl.sw.bg === 'transparent' && dl.aria === 'color/background/legacy, → (삭제된 변수)', JSON.stringify(dl));
+  const np = await rowOf('vnp');
+  check('9v 셀 없음 — 짙은 칸 "—" · 빈 원 · 접근성 이름 "—"', np.al === null && np.vl === '—' && np.sw.bg === 'transparent' && np.aria === 'color/background/pressed, —', JSON.stringify(np));
+  const cg = await rowOf('vcg');
+  const fb = await rowOf('vfb');
+  const dn = await rowOf('vdn');
+  check('9v 색 아닌 줄 — 종류 표시 # · Aa · ✓ · 짙은 칸 값(별칭은 따라간 값)', cg.mk === '#' && cg.al === '→ spacing/16' && cg.vl === '16' && cg.sw === null && fb.mk === 'Aa' && fb.vl === 'Inter' && dn.mk === '✓' && dn.al === null && dn.vl === 'false', JSON.stringify([cg.mk, cg.al, cg.vl, fb.mk, fb.vl, dn.mk, dn.al, dn.vl]));
+  check('9v 색 아닌 별칭 줄 접근성 이름 "spacing/card/gap, 16, → spacing/16"', cg.aria === 'spacing/card/gap, 16, → spacing/16', cg.aria);
+  // 그룹 · 묶음
+  const grp = await p.evaluate(() => {
+    const heads = [...document.querySelectorAll('#varTree > .vt-group')];
+    const R = (e) => e.getBoundingClientRect();
+    // 줄 x(머리 x 기준): 안쪽 단이 없는 단 1 그룹은 16, 막대 있는 나무는 21 + 9 × (줄 aria-level − 2)(V-D6 "가로 자리").
+    return heads.map((h, i) => { const cs = getComputedStyle(h); const g = h.nextElementSibling; const row = g?.querySelector('.vt-row'); const lvl = row ? Number(row.parentElement.getAttribute('aria-level')) : 0; const bar = g?.classList.contains('has-bar'); return { h: Math.round(R(h).height), top: cs.borderTopWidth, first: i === 0, pos: cs.position, fs: cs.fontSize, g: g?.getAttribute('role') ?? null, bar, lvl, dx: row ? Math.round(R(row).left - R(h).left) : null, want: bar ? 21 + 9 * (lvl - 2) : 16, pb: g ? getComputedStyle(g).paddingBottom : null }; });
+  });
+  check('9v 그룹 머리 32 · 위 1px 선(맨 위는 없음) · 고정 아님 · 12px · 묶음 role 없음(V-P3) · 줄 x = 머리 x + 16(막대 있는 나무는 21 + 9(n − 1)) · 묶음 아래 16', grp.length >= 2 && grp.every((g) => g.h === 32 && g.top === (g.first ? '0px' : '1px') && g.pos !== 'sticky' && g.fs === '12px' && g.g === null && g.dx === g.want && g.pb === '16px'), JSON.stringify(grp));
+  // Component — 색 아닌 줄
+  await p.click('#varSide [data-key="side:col:c"]');
+  const px = await rowOf('vpx');
+  check('9v Component button/padding-x — # · 짙은 칸 "12"만', px.mk === '#' && px.al === null && px.vl === '12', JSON.stringify(px));
+  // Global — 색은 줄마다 하나, 옅은 칸 없음(따라갈 수 없을 때만 — ⓐ)
+  await p.click('#varSide [data-key="side:col:g"]');
+  const gshape = await treeShape(p);
+  check('9v Global — 알약 묶음 → 색 줄마다 하나 · 옅은 칸 없음 · 따라갈 수 없는 별칭만 옅은 칸 + 짙은 칸 숨김(ⓐ)', JSON.stringify(gshape) === JSON.stringify(['[spacing]', '16,24', '[color]', '>[gray]', '0||#FFFFFF', '900||#101828', '900-a50||#101828 50%', 'almost||#101828', 'brand-accent|→ color/accent|-', 'gone|→ (삭제된 변수)|-', '[font-family]', 'Inter']), JSON.stringify(gshape));
+  const gl = await rowOf('vgl');
+  check('9v Global 따라갈 수 없는 별칭 — 빈 원', gl.sw.bg === 'transparent' && !gl.sw.ck, JSON.stringify(gl.sw));
+  const gx = await rowOf('vgx');
+  check('9v 반올림해 100%면 % 없음 · 바둑판 없음', gx.vl === '#101828' && !gx.sw.ck, JSON.stringify(gx));
+  const gap8 = await p.evaluate(() => { const l = document.querySelector('#varTree .vp-line.vp-pill'); const r = document.querySelector('#varTree .vt-group + .vt-grp .vp-line + .vt-r') ?? [...document.querySelectorAll('#varTree .vt-grp')].map((g) => g.querySelector(':scope > .vp-line + .vt-r')).find(Boolean); return { pillGap: getComputedStyle(l).columnGap, pillH: Math.round(l.querySelector('.vp-item').getBoundingClientRect().height), pillFs: getComputedStyle(l.querySelector('.vp-item')).fontSize, lineToRow: r ? Math.round(r.getBoundingClientRect().top - r.previousElementSibling.getBoundingClientRect().bottom) : null }; });
+  check('9v Global 알약 높이 26 · 11.5px · 사이 6', gap8.pillGap === '6px' && gap8.pillH === 26 && gap8.pillFs === '11.5px', JSON.stringify(gap8));
+  // 알약 묶음과 색 줄 사이 8 — 같은 그룹에 둘 다 있는 경우
+  await recv(p, { type: 'VAR_TABLE', collections: VC, vars: [...VV, gv('vgn', 'color/gray/weight', 'FLOAT', { kind: 'number', text: '2' })] });
+  const mix = await p.evaluate(() => { const r = [...document.querySelectorAll('#varTree .vt-grp > .vp-line + .vt-r')][0]; return r ? Math.round(r.getBoundingClientRect().top - r.previousElementSibling.getBoundingClientRect().bottom) : null; });
+  check('9v 같은 그룹 알약 묶음과 색 줄 사이 8', mix === 8, String(mix));
+  await recv(p, { type: 'VAR_TABLE', collections: VC, vars: VV });
+  // 키보드 — 알약 묶음 안은 ← →
+  await p.focus('.vp-item[data-id="vsp16"]');
+  await p.keyboard.press('ArrowRight');
+  const kr = await p.evaluate(() => document.activeElement?.dataset?.id);
+  await p.keyboard.press('ArrowDown');
+  const kd = await p.evaluate(() => document.activeElement?.className);
+  await p.keyboard.press('ArrowDown');
+  const kdi = await p.evaluate(() => document.activeElement?.dataset?.key);
+  await p.keyboard.press('ArrowDown');
+  const kd2 = await p.evaluate(() => document.activeElement?.dataset?.id);
+  check('9v 알약 묶음 안 → · ↓ 그룹 머리(color) · ↓ 안쪽 머리(gray — V-D6) · ↓ 첫 색 줄', kr === 'vsp24' && /vt-group/.test(kd) && kdi === 'g:g|color/gray' && kd2 === 'vg0', JSON.stringify([kr, kd, kdi, kd2]));
+  // 격자 간격 8 · 접근성 이름 V-D3
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button >> text=색 격자로 보기');
+  const grid = await p.evaluate(() => { const l = document.querySelector('.vp-line.vp-dot'); return { gap: getComputedStyle(l).columnGap, aria: l.querySelector('[data-id="vga"]').getAttribute('aria-label'), ck: !!l.querySelector('[data-id="vga"] .vp-dot.ck') }; });
+  check('9v 격자 — 간격 8 · 50% 동그라미 바둑판 · 접근성 이름 값 글', grid.gap === '8px' && grid.ck && grid.aria === 'color/gray/900-a50, #101828 50%', JSON.stringify(grid));
+  await p.click('#btnVarMore');
+  await p.click('.ctx-menu button >> text=색 목록으로 보기').catch(() => {});
+  // 사이드바
+  const side = await p.$$eval('#varSide .vs-item', (e) => e.map((x) => { const s = getComputedStyle(x); const b = getComputedStyle(x.querySelector('.vs-badge')); return { sel: x.getAttribute('aria-selected') === 'true', h: Math.round(x.getBoundingClientRect().height), bg: s.backgroundColor, fs: s.fontSize, fw: s.fontWeight, badge: b.backgroundColor, badgeFs: b.fontSize, num: getComputedStyle(x.querySelector('.vs-num')).fontSize }; }));
+  check('9v 사이드바 — 항목 28 · 12px · 고른 항목 배경 #ededed · 굵게 · 배지 검정(10px) · 수 11px', side.every((x) => x.h === 28 && x.fs === '12px' && x.badgeFs === '10px' && x.num === '11px') && side.filter((x) => x.sel).every((x) => x.bg === 'rgb(237, 237, 237)' && x.fw === '600' && x.badge === 'rgb(0, 0, 0)') && side.some((x) => x.sel) && side.filter((x) => !x.sel).every((x) => x.fw === '400'), JSON.stringify(side));
+  // 11px 아래 글자 0(배지 10px만) · 560 가로 스크롤 0
+  const small = await p.evaluate(() => {
+    const bad = [];
+    const BADGE = /(\.vt-section \.badge|\.tier-chip \.badge|\.vs-badge|\.lib-tag|\.beta-badge|\.bv-new|\.mini-badge|\.tag\b|\.tr-tag|\.pstep \.pdot|\.bs-dot|\.mk-info|\.mk-row \.sw\.n)/;
+    for (const sh of document.styleSheets) for (const r of sh.cssRules) {
+      const m = r.style && /^([\d.]+)px$/.exec(r.style.fontSize);
+      if (!m) continue;
+      const v = parseFloat(m[1]);
+      if (v < 10 || (v < 11 && !BADGE.test(r.selectorText))) bad.push(`${r.selectorText} ${v}`);
+    }
+    return { bad, base: getComputedStyle(document.body).fontSize, hs: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  check('9v 기본 글자 12px · 11px 아래 글자 0(배지 10px만) · 560 가로 스크롤 0', small.base === '12px' && small.bad.length === 0 && small.hs === 0, JSON.stringify(small));
+  // 라이브러리 값 다시 그리기 — USAGE_RESULT가 오면 새 libVars로(③), 기준이 없어지면(①) · 큰 선택 기준(②)이면 비움
+  await p.click('#varSide [data-key="side:col:s"]');
+  const vlOf = (id) => p.$eval(`.vt-row[data-id="${id}"] .vchip`, (c) => [c.querySelector('.al')?.textContent ?? '', c.querySelector('.vl')?.textContent ?? '-'].join('|'));
+  const usage = async (libs = LIB1) => { const u = (await sent(p, 'SCAN_USAGE')).at(-1); await recv(p, usageResult(u.reqId, { vlp: { places: 1, layers: 1 } }, { libraryVars: libs })); await p.waitForTimeout(30); };
+  await recv(p, { ...sel(1, 0), ids: ['v1'] });
+  await p.waitForTimeout(450);
+  await usage();
+  check('9v USAGE_RESULT 뒤 — libVars의 라이브러리 별칭 짙은 칸 "#7F56D9"(다시 그림)', (await vlOf('vlp')) === '→ color/primary|#7F56D9', await vlOf('vlp'));
+  await recv(p, { ...sel(1, 0), ids: ['v1'] });
+  await p.waitForTimeout(450);
+  check('9v 같은 기준 키로 다시 고름 — 값 그대로', (await vlOf('vlp')) === '→ color/primary|#7F56D9', await vlOf('vlp'));
+  await recv(p, { ...sel(0, 0), ids: [] });
+  await p.waitForTimeout(30);
+  check('9v 기준이 없어지면 — 라이브러리 별칭 짙은 칸 숨음(옅은 칸만)', (await vlOf('vlp')) === '→ color/primary|-', await vlOf('vlp'));
+  await recv(p, { ...sel(1, 0), ids: ['v2'] });
+  await p.waitForTimeout(450);
+  await usage();
+  await recv(p, { ...sel(1, 0), scanned: 4000, ids: ['big'] });
+  await p.waitForTimeout(30);
+  check('9v 큰 선택 기준 — 라이브러리 별칭 짙은 칸 숨음', (await vlOf('vlp')) === '→ color/primary|-', await vlOf('vlp'));
+  // 읽는 새 기준(④)도 먼저 비움
+  await recv(p, { ...sel(1, 0), ids: ['v3'] });
+  await p.waitForTimeout(450);
+  await usage();
+  await recv(p, { ...sel(1, 0), ids: ['v4'] });
+  await p.waitForTimeout(30);
+  check('9v 읽는 새 기준 — 응답 전 짙은 칸 숨음 · 응답 뒤 다시 보임', (await vlOf('vlp')) === '→ color/primary|-' && (await (async () => { await p.waitForTimeout(450); await usage(); return vlOf('vlp'); })()) === '→ color/primary|#7F56D9', await vlOf('vlp'));
+  /** 새 기준(libVars 비움) → USAGE_RESULT를 받을 준비. */
+  let baseN = 10;
+  const freshBase = async () => { await recv(p, { ...sel(1, 0), ids: [`b${baseN++}`] }); await p.waitForTimeout(450); };
+  const focusedId = () => p.evaluate(() => document.activeElement?.dataset?.id ?? document.activeElement?.className);
+  // 메뉴가 열린 채 USAGE_RESULT → 미룸(그대로) → Esc 뒤 다시 그림 · 포커스 같은 줄
+  await freshBase();
+  await rightClick(p, '.vt-row[data-id="vbg"]');
+  await usage();
+  const heldMenu = await vlOf('vlp');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(30);
+  check('9v 메뉴 열린 채 USAGE_RESULT — 미룸 · Esc 뒤 다시 그림 · 포커스 같은 줄', heldMenu === '→ color/primary|-' && (await vlOf('vlp')) === '→ color/primary|#7F56D9' && (await focusedId()) === 'vbg', JSON.stringify([heldMenu, await vlOf('vlp'), await focusedId()]));
+  // 메뉴 → 상세 → 닫기
+  await freshBase();
+  await rightClick(p, '.vt-row[data-id="vbg"]');
+  await usage();
+  await p.click('.ctx-menu button >> text=상세');
+  await p.waitForTimeout(30);
+  const heldModal = await vlOf('vlp');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(30);
+  check('9v 메뉴 열린 채 USAGE_RESULT → 상세 → 닫기 — 팝업 동안 미룸 · 닫은 뒤 다시 그림 · 포커스 같은 줄', heldModal === '→ color/primary|-' && (await p.$('.modal')) === null && (await vlOf('vlp')) === '→ color/primary|#7F56D9' && (await focusedId()) === 'vbg', JSON.stringify([heldModal, await vlOf('vlp'), await focusedId()]));
+  // 메뉴 → 삭제 → [취소]
+  await freshBase();
+  await rightClick(p, '.vt-row[data-id="vbg"]');
+  await usage();
+  await p.click('.ctx-menu button >> text=삭제');
+  await p.waitForTimeout(30);
+  await p.click('.modal button >> text=취소');
+  await p.waitForTimeout(30);
+  check('9v 메뉴 열린 채 USAGE_RESULT → 삭제 → [취소] — 다시 그림 · 포커스 같은 줄', (await vlOf('vlp')) === '→ color/primary|#7F56D9' && (await focusedId()) === 'vbg', JSON.stringify([await vlOf('vlp'), await focusedId()]));
+  // 메뉴 → 삭제 → [삭제] → 다음 줄
+  await freshBase();
+  await rightClick(p, '.vt-row[data-id="vbg"]');
+  await usage();
+  await p.click('.ctx-menu button >> text=삭제');
+  await p.waitForTimeout(30);
+  await p.click('.modal button.danger');
+  const delV = (await sent(p, 'DELETE_VARIABLE')).at(-1);
+  await recv(p, { type: 'VARIABLE_DELETED', reqId: delV.reqId, id: 'vbg' });
+  await recv(p, { type: 'VAR_TABLE', collections: VC, vars: VV.filter((v) => v.id !== 'vbg') });
+  await p.waitForTimeout(30);
+  const afterDel = await focusedId();
+  check('9v 메뉴 열린 채 USAGE_RESULT → 삭제 — 포커스 다음 줄', delV.id === 'vbg' && afterDel === 'vlong', String(afterDel));
+  await recv(p, { type: 'VAR_TABLE', collections: VC, vars: VV });
+  // USAGE_RESULT가 온 뒤 우클릭 → Esc · 복제 · 삭제 → [취소] 각각 포커스 같은 줄
+  await freshBase();
+  await usage();
+  await rightClick(p, '.vt-row[data-id="vscr"]');
+  await p.keyboard.press('Escape');
+  const f1 = await focusedId();
+  await rightClick(p, '.vt-row[data-id="vscr"]');
+  await p.click('.ctx-menu button >> text=복제');
+  await p.waitForTimeout(30);
+  const f2 = await focusedId();
+  const dup = (await sent(p, 'DUPLICATE_VARIABLE')).at(-1);
+  await recv(p, { type: 'VARIABLE_DUPLICATED', reqId: dup.reqId, newId: 'vscr-copy-none' });
+  await p.waitForTimeout(20);
+  await p.keyboard.press('Escape').catch(() => {});
+  await rightClick(p, '.vt-row[data-id="vscr"]');
+  await p.click('.ctx-menu button >> text=삭제');
+  await p.click('.modal button >> text=취소');
+  await p.waitForTimeout(30);
+  const f3 = await focusedId();
+  check('9v USAGE_RESULT 뒤 우클릭 → Esc · 복제 · 삭제 → [취소] 각각 포커스 같은 줄', f1 === 'vscr' && f2 === 'vscr' && f3 === 'vscr', JSON.stringify([f1, f2, f3]));
+  // Tab으로 들어온 줄 포커스 — 다시 그린 뒤에도 같은 줄
+  await freshBase();
+  await p.focus('#varSide .vs-item[aria-selected="true"]');
+  await p.keyboard.press('Tab');
+  for (let i = 0; i < 6; i++) await p.keyboard.press('ArrowDown');
+  const tabbed = await focusedId();
+  await usage();
+  check('9v Tab · 화살표로 온 줄 포커스 — 다시 그린 뒤 같은 줄', !!tabbed && (await focusedId()) === tabbed && (await vlOf('vlp')) === '→ color/primary|#7F56D9', JSON.stringify([tabbed, await focusedId()]));
+  // 메뉴 열린 채 USAGE_RESULT → 다른 줄 클릭 → 그 변수로 APPLY_VARIABLE 한 번, 그 뒤 다시 그림
+  await freshBase();
+  await rightClick(p, '.vt-row[data-id="vbg"]');
+  await usage();
+  const nApply = (await sent(p, 'APPLY_VARIABLE')).length;
+  await p.click('.vt-row[data-id="vhov"]');
+  await p.waitForTimeout(40);
+  const ap9 = await sent(p, 'APPLY_VARIABLE');
+  check('9v 메뉴 열린 채 USAGE_RESULT → 다른 줄 클릭 — APPLY_VARIABLE 한 번(그 변수) · 다시 그림', ap9.length === nApply + 1 && ap9.at(-1).id === 'vhov' && (await vlOf('vlp')) === '→ color/primary|#7F56D9', JSON.stringify([ap9.length - nApply, ap9.at(-1)?.id, await vlOf('vlp')]));
+  await recv(p, { type: 'VARIABLE_APPLIED', reqId: ap9.at(-1).reqId, applied: 1, skipped: 0, skipReasons: {}, name: 'color/background/hover' });
+  // 포인터 눌림 동안 미룸 — 끌어서 바깥에서 뗌 · 우클릭 뒤에도 다시 그림
+  await freshBase();
+  const box = await p.$eval('.vt-row[data-id="vhov"]', (e) => { const r = e.getBoundingClientRect(); return { x: r.left + 20, y: r.top + 10 }; });
+  await p.mouse.move(box.x, box.y);
+  await p.mouse.down();
+  await usage();
+  const heldPtr = await vlOf('vlp');
+  await p.mouse.move(box.x, 4, { steps: 3 });
+  await p.mouse.up();
+  await p.waitForTimeout(30);
+  check('9v 포인터 눌림 동안 미룸 · 끌어서 바깥에서 뗀 뒤 다시 그림', heldPtr === '→ color/primary|-' && (await vlOf('vlp')) === '→ color/primary|#7F56D9', JSON.stringify([heldPtr, await vlOf('vlp')]));
+  await freshBase();
+  await p.mouse.move(box.x, box.y);
+  await p.mouse.down({ button: 'right' });
+  await usage();
+  const heldR = await vlOf('vlp');
+  await p.mouse.up({ button: 'right' });
+  await p.waitForTimeout(30);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(30);
+  check('9v 우클릭(누름 동안 미룸) 뒤 다시 그림', heldR === '→ color/primary|-' && (await vlOf('vlp')) === '→ color/primary|#7F56D9', JSON.stringify([heldR, await vlOf('vlp')]));
+  check('9v 카드 안 카드 0(변수 탭)', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
+  await p.close();
+}
+{
+  // 9v 선택 탭 머리 줄(§4.1 U-b) — 긴 이름 + 기준 다름: 높이 32 · 이름 말줄임 · "지금 선택과 달라요 · [기준 바꾸기]" 한 줄
+  const p = await open(560, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), ids: ['h1'], firstName: 'Flightin website — 홈 화면 · 로그인 상태 · 결제 단계 3 / 모바일 시안 / 아주 긴 이름' });
+  await p.waitForTimeout(450);
+  await recv(p, { ...sel(1, 0), ids: ['h2'], firstName: 'Footer', selfSelect: true });
+  await p.waitForTimeout(60);
+  const hd = await p.$eval('.sel-head', (h) => { const b = h.querySelector('b'); const d = h.querySelector('.sel-diff'); const R = (e) => e.getBoundingClientRect(); return { h: Math.round(R(h).height), wrap: getComputedStyle(h).flexWrap, clipped: b.scrollWidth > b.clientWidth, nameW: Math.round(R(b).width), diff: !!d, diffH: d ? Math.round(R(d).height) : 0, diffRight: d ? Math.round(R(d).right) : 0, headRight: Math.round(R(h).right) }; });
+  check('9v 선택 탭 머리 줄 — 긴 이름 + 기준 다름: 높이 32 · nowrap · 이름 말줄임(200 넘게 씀) · 기준 다름 한 줄 오른쪽 끝', hd.h === 32 && hd.wrap === 'nowrap' && hd.clipped && hd.nameW > 200 && hd.diff && hd.diffH <= 24 && hd.diffRight === hd.headRight, JSON.stringify(hd));
+  await p.close();
+}
+
+{
+  // 9d V-D6(ia-v4 §4.6 "그룹 — 경로 마디마다 머리(V-D6)" · V-P3–V-P9 · §4.8 · B.17 "V-D6 추가 구현") — 단 나누기 · 단마다 접기 · 세로 선 · 가로 자리 · 접근성 · 키보드 · 포커스 · 검색
+  const DC = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm' },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l' },
+  ];
+  const Cc = (hex) => ({ kind: 'color', hex });
+  const Al = (aliasId, aliasName) => ({ kind: 'alias', aliasId, aliasName });
+  const gv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 'g', type, values: { m: cell }, scopes, description: '' });
+  const sv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 's', type, values: { l: cell, d: cell }, scopes, description: '' });
+  const DV = [
+    gv('dsp16', 'spacing/16', 'FLOAT', { kind: 'number', text: '16' }, ['GAP']), gv('dsp24', 'spacing/24', 'FLOAT', { kind: 'number', text: '24' }, ['GAP']),
+    gv('dg0', 'color/gray/0', 'COLOR', Cc('#FFFFFF')), gv('dg9', 'color/gray/900', 'COLOR', Cc('#101828')),
+    gv('db5', 'color/blue/500', 'COLOR', Cc('#2E90FA')), gv('db6', 'color/blue/600', 'COLOR', Cc('#1570EF')),
+    gv('dff', 'font-family/base', 'STRING', { kind: 'string', text: 'Inter' }, ['FONT_FAMILY']),
+    sv('dcv', 'canvas', 'COLOR', Al('dg0', 'color/gray/0')),
+    sv('dsu', 'color/surface', 'COLOR', Al('dg0', 'color/gray/0')),
+    sv('dbd', 'color/background/default', 'COLOR', Al('dg0', 'color/gray/0')), sv('dbs', 'color/background/subtle', 'COLOR', Al('dg9', 'color/gray/900')),
+    sv('dtd', 'color/text/default', 'COLOR', Al('dg9', 'color/gray/900')),
+    sv('dhd', 'color/brand/primary/hover/default', 'COLOR', Al('dg0', 'color/gray/0')),
+    sv('dhs', 'color/brand/primary/hover/strong-emphasis-on-inverse-dark-surface-pressed', 'COLOR', Al('db6', 'color/blue/600')),
+    sv('ddp', 'a/b/c/d/e/f/deep', 'COLOR', Al('db6', 'color/blue/600')),
+    sv('dcg', 'spacing/card/gap', 'FLOAT', Al('dsp16', 'spacing/16'), ['GAP']),
+    sv('drc', 'radius/card', 'FLOAT', { kind: 'number', text: '8' }, ['CORNER_RADIUS']),
+  ];
+  const p = await open(560, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  await p.click('#varSide [data-key="side:col:g"]');
+  const heads = () => p.$$eval('#varTree .vt-group', (e) => e.map((h) => [h.dataset.key, h.getAttribute('aria-level'), h.getAttribute('aria-expanded'), h.title]));
+  const act = () => p.evaluate(() => document.activeElement?.dataset?.key ?? document.activeElement?.id ?? null);
+  const stop = () => p.evaluate(() => document.querySelector('#varTree [tabindex="0"]')?.dataset?.key ?? null);
+  const clickHead = (k) => p.click(`#varTree .vt-group[data-key="g:${k.includes('|') ? k : `g|${k}`}"]`);
+  const more = async (label) => { await p.click('#btnVarMore'); await p.click(`.ctx-menu button >> text=${label}`); };
+  /** 자리 재기 — 오른쪽 목록 왼쪽 끝 0 기준. 선(::before)이 있는 묶음 · 머리 · 줄 · 알약 묶음. */
+  const geo = () => p.evaluate(() => {
+    const T = document.getElementById('varTree').getBoundingClientRect();
+    const X = (v) => Math.round((v - T.left) * 10) / 10;
+    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const probe = document.createElement('i'); probe.style.background = border; document.body.appendChild(probe); const borderRgb = getComputedStyle(probe).backgroundColor; probe.remove();
+    const grps = [...document.querySelectorAll('#varTree .vt-grp')].map((g) => {
+      const s = getComputedStyle(g, '::before'); const r = g.getBoundingClientRect();
+      const kids = [...g.children]; const head = g.previousElementSibling;
+      const has = s.content !== 'none' && s.content !== 'normal';
+      const contentH = kids.length ? kids.at(-1).getBoundingClientRect().bottom - kids[0].getBoundingClientRect().top : 0;
+      return { key: head?.classList.contains('vt-group') ? head.dataset.key : 'top', cls: g.className, role: g.getAttribute('role'), bar: has,
+        x: has ? X(r.left + parseFloat(s.left)) : null, w: has ? parseFloat(s.width) : null, h: has ? Math.round(r.height - parseFloat(s.top) - parseFloat(s.bottom)) : null,
+        contentH: Math.round(contentH), bg: has ? s.backgroundColor : null, bw: has ? s.borderTopWidth + ' ' + s.borderLeftWidth : null, radius: has ? s.borderTopLeftRadius : null, borderRgb };
+    });
+    const hs = [...document.querySelectorAll('#varTree .vt-group')].map((h) => { const cs = getComputedStyle(h); const r = h.getBoundingClientRect(); return { key: h.dataset.key, x: X(r.left), tw: X(h.querySelector('.tw').getBoundingClientRect().left), right: X(r.right), h: Math.round(r.height), bt: cs.borderTopWidth, pl: cs.paddingLeft }; });
+    const rows = Object.fromEntries([...document.querySelectorAll('#varTree .vt-row')].map((c) => { const r = c.getBoundingClientRect(); const t = c.querySelector('.nm .t'); return [c.dataset.id, { x: X(r.left), w: Math.round(r.width * 10) / 10, right: X(r.right), lvl: c.parentElement.getAttribute('aria-level'), name: Math.round(c.querySelector('.nm').getBoundingClientRect().width * 10) / 10, clipped: t.scrollWidth > t.clientWidth }]; }));
+    const lines = [...document.querySelectorAll('#varTree .vp-line')].map((l) => ({ first: l.querySelector('.vp-item')?.dataset.id, x: X(l.getBoundingClientRect().left), lvl: l.getAttribute('aria-level') }));
+    return { grps, hs, rows, lines, hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  const G = (g, key) => g.grps.find((x) => x.key === key);
+  const H = (g, key) => g.hs.find((x) => x.key === key);
+
+  // 단 나누기 · 순서 · 키 · 툴팁(V-P7 · V-P8)
+  const gs = await treeShape(p);
+  check('9d Global — 경로 마디마다 머리(color › gray · blue) · 단 안 바로 든 변수 → 아래 단 · 종류 순서', JSON.stringify(gs) === JSON.stringify(['[spacing]', '16,24', '[color]', '>[gray]', '0||#FFFFFF', '900||#101828', '>[blue]', '500||#2E90FA', '600||#1570EF', '[font-family]', 'Inter']), JSON.stringify(gs));
+  const gh = await heads();
+  check('9d 접기 키 `{컬렉션 id}|{그 단까지의 경로}` · aria-level 단 · 머리 툴팁 경로 전체(V-P8)', JSON.stringify(gh) === JSON.stringify([['g:g|spacing', '1', 'true', 'spacing'], ['g:g|color', '1', 'true', 'color'], ['g:g|color/gray', '2', 'true', 'color/gray'], ['g:g|color/blue', '2', 'true', 'color/blue'], ['g:g|font-family', '1', 'true', 'font-family']]), JSON.stringify(gh));
+  check('9d 머리 글은 마디 하나(V-P8)', JSON.stringify(await p.$$eval('#varTree .vt-group .lb', (e) => e.map((x) => x.textContent))) === JSON.stringify(['spacing', 'color', 'gray', 'blue', 'font-family']));
+  // 접근성(V-P3)
+  const aria = await p.evaluate(() => ({ role: document.getElementById('varTree').getAttribute('role'), grpRoles: [...document.querySelectorAll('#varTree .vt-grp')].map((g) => g.getAttribute('role')), row: document.querySelector('.vt-row[data-id="dg0"]').parentElement.getAttribute('aria-level'), pill: document.querySelector('.vp-item[data-id="dsp16"]').closest('.vp-line').getAttribute('aria-level'), ff: document.querySelector('.vp-item[data-id="dff"]').closest('.vp-line').getAttribute('aria-level') }));
+  check('9d #varTree treegrid · 단 묶음 role 없음 · aria-level 줄 = 단 + 1 · 알약 묶음 = 단 + 1', aria.role === 'treegrid' && aria.grpRoles.every((r) => r === null) && aria.row === '3' && aria.pill === '2' && aria.ff === '2', JSON.stringify(aria));
+  // 가로 자리 · 세로 선(Global)
+  let g = await geo();
+  const brd = g.grps[0].borderRgb;
+  const sp = G(g, 'g:g|spacing'); const co = G(g, 'g:g|color'); const gr = G(g, 'g:g|color/gray'); const bl = G(g, 'g:g|color/blue');
+  check('9d 안쪽 단 없는 단 1 그룹(spacing · font-family) — 선 0 · 알약 x 16', !sp.bar && !G(g, 'g:g|font-family').bar && g.lines.find((l) => l.first === 'dsp16').x === 16 && g.lines.find((l) => l.first === 'dff').x === 16, JSON.stringify([sp, g.lines]));
+  check('9d 안쪽 단 있는 나무 — 모든 단에 선(color · gray · blue)', co.bar && gr.bar && bl.bar, JSON.stringify([co, gr, bl]));
+  check('9d 선 — 폭 1 · 배경 --border · 테두리 0 · 반경 0', [co, gr, bl].every((x) => x.w === 1 && x.bg === brd && x.bw === '0px 0px' && x.radius === '0px'), JSON.stringify([co, gr, bl, brd]));
+  check('9d 선 x 12(단 1) · 21(단 2) · 선 → 다음 선 8 · 선 → 줄 8', co.x === 12 && gr.x === 21 && bl.x === 21 && gr.x - (co.x + 1) === 8 && g.rows.dg0.x - (gr.x + 1) === 8, JSON.stringify([co.x, gr.x, bl.x, g.rows.dg0.x]));
+  check('9d 선 길이 = 내용 높이 − 16', [co, gr, bl].every((x) => x.h === x.contentH - 16), JSON.stringify([co, gr, bl].map((x) => [x.key, x.h, x.contentH])));
+  check('9d 단 2 줄 x 30 · 오른쪽 끝 400 · 폭 370 · aria-level 3', g.rows.dg0.x === 30 && g.rows.dg0.right === 400 && g.rows.dg0.w === 370 && g.rows.db6.x === 30 && g.rows.dg0.lvl === '3', JSON.stringify(g.rows.dg0));
+  const ih = H(g, 'g:g|color/gray');
+  check('9d 안쪽 머리 32 · 위 선 0 · 왼쪽 여백 0 · x 21(▾ 칸 왼쪽 끝 = 단 2 선 x) · 오른쪽 끝 400', ih.h === 32 && ih.bt === '0px' && ih.pl === '0px' && ih.x === 21 && ih.tw === 21 && ih.right === 400, JSON.stringify(ih));
+  check('9d 단 1 머리 ▾ 칸 x 8 · 위 1px 선(맨 위 머리는 0)', H(g, 'g:g|color').tw === 8 && H(g, 'g:g|color').bt === '1px' && H(g, 'g:g|spacing').bt === '0px', JSON.stringify(g.hs));
+  // 단마다 따로 접기
+  await clickHead('color/gray');
+  let sh = await treeShape(p);
+  g = await geo();
+  check('9d gray 접음 → gray 아래만 숨음 · blue 그대로 · color 선 그대로', JSON.stringify(sh) === JSON.stringify(['[spacing]', '16,24', '[color]', '>[gray]', '>[blue]', '500||#2E90FA', '600||#1570EF', '[font-family]', 'Inter']) && G(g, 'g:g|color').bar, JSON.stringify(sh));
+  await clickHead('color/blue');
+  g = await geo();
+  check('9d gray · blue 모두 접어도 color 선 그대로(나무 모양으로 정함) · 길이 = 내용 높이 − 16', G(g, 'g:g|color').bar && G(g, 'g:g|color').h === G(g, 'g:g|color').contentH - 16, JSON.stringify(G(g, 'g:g|color')));
+  await clickHead('color/blue');
+  await clickHead('color');
+  sh = await treeShape(p);
+  check('9d color 접음 → gray · blue 머리와 줄 모두 숨음', JSON.stringify(sh) === JSON.stringify(['[spacing]', '16,24', '[color]', '[font-family]', 'Inter']), JSON.stringify(sh));
+  await clickHead('color');
+  check('9d color 폄 → gray는 접힌 채 · blue는 펴진 채', JSON.stringify((await heads()).map((h) => h[2])) === JSON.stringify(['true', 'true', 'false', 'true', 'true']), JSON.stringify(await heads()));
+  await clickHead('color/gray');
+  // ⋯ 모두 접기 → 단 1 머리만 · 하나 펴면 아래 단 접힌 채
+  await more('사이드바 모두 접기');
+  check('9d ⋯ 모두 접기 → 단 1 머리만', JSON.stringify(await heads()) === JSON.stringify([['g:g|spacing', '1', 'false', 'spacing'], ['g:g|color', '1', 'false', 'color'], ['g:g|font-family', '1', 'false', 'font-family']]), JSON.stringify(await heads()));
+  await clickHead('color');
+  check('9d 하나 펴면 아래 단은 접힌 채', JSON.stringify((await heads()).map((h) => [h[0], h[2]])) === JSON.stringify([['g:g|spacing', 'false'], ['g:g|color', 'true'], ['g:g|color/gray', 'false'], ['g:g|color/blue', 'false'], ['g:g|font-family', 'false']]), JSON.stringify(await heads()));
+  await more('사이드바 모두 펼치기');
+  // 키보드(V-P4)
+  await p.focus('#varTree .vt-group[data-key="g:g|color"]');
+  await p.keyboard.press('ArrowLeft');
+  const k1 = [await act(), (await heads())[1][2]];
+  await p.keyboard.press('ArrowRight');
+  const k2 = [await act(), (await heads())[1][2]];
+  await p.keyboard.press('ArrowRight');
+  const k3 = await act();
+  check('9d 머리 ← 접기 · → 펴기 · 펴 있으면 → 내용 첫 줄(안쪽 머리)', k1[0] === 'g:g|color' && k1[1] === 'false' && k2[0] === 'g:g|color' && k2[1] === 'true' && k3 === 'g:g|color/gray', JSON.stringify([k1, k2, k3]));
+  await p.keyboard.press('ArrowLeft');
+  const k4 = [await act(), (await heads())[2][2]];
+  await p.keyboard.press('ArrowLeft');
+  const k5 = await act();
+  check('9d 안쪽 머리 ← 접기 · 접혔으면 ← 윗단 머리', k4[0] === 'g:g|color/gray' && k4[1] === 'false' && k5 === 'g:g|color', JSON.stringify([k4, k5]));
+  await p.keyboard.press('ArrowLeft');
+  await p.keyboard.press('ArrowLeft');
+  check('9d 접힌 단 1 머리 ← 그대로', (await act()) === 'g:g|color');
+  await p.keyboard.press('ArrowRight');
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('ArrowRight');
+  await p.keyboard.press('ArrowRight');
+  const k6 = await act();
+  await p.keyboard.press('ArrowLeft');
+  const k7 = await act();
+  check('9d 줄 ← = 담은 머리(gray)', k6 === 'v:dg0' && k7 === 'g:g|color/gray', JSON.stringify([k6, k7]));
+  await p.keyboard.press('ArrowUp');
+  const u1 = await act();
+  const seq = [];
+  for (let i = 0; i < 4; i++) { await p.keyboard.press('ArrowDown'); seq.push(await act()); }
+  check('9d ↑ ↓ 모든 단 머리를 한 줄로(gray ↑ color · ↓ gray · 0 · 900 · blue)', u1 === 'g:g|color' && JSON.stringify(seq) === JSON.stringify(['g:g|color/gray', 'v:dg0', 'v:dg9', 'g:g|color/blue']), JSON.stringify([u1, seq]));
+  await p.focus('.vp-item[data-id="dsp24"]');
+  await p.keyboard.press('ArrowLeft');
+  const pk1 = await act();
+  await p.keyboard.press('ArrowLeft');
+  const pk2 = await act();
+  check('9d 알약 묶음 ← 앞 알약 · 첫 항목 ← 담은 머리', pk1 === 'v:dsp16' && pk2 === 'g:g|spacing', JSON.stringify([pk1, pk2]));
+  // 포커스(V-P5) — 이름이 바뀌어 접힌 단 아래로 감 → 보이는 가장 바깥의 접힌 윗단 머리
+  await clickHead('color/blue');
+  await p.focus('.vt-row[data-id="dg0"]');
+  await p.keyboard.press('ArrowDown');
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV.map((v) => (v.id === 'dg9' ? { ...v, name: 'color/blue/900' } : v)) });
+  check('9d VAR_TABLE로 접힌 단 아래로 감 → 포커스 · 정지점이 접힌 blue 머리', (await act()) === 'g:g|color/blue' && (await stop()) === 'g:g|color/blue', JSON.stringify([await act(), await stop()]));
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  await clickHead('color/blue');
+  // ⋯ 모두 접기에 포커스 줄이 숨음 → 정지점이 보이는 가장 바깥의 접힌 윗단 머리(color)
+  await p.focus('.vt-row[data-id="dg0"]');
+  await p.keyboard.press('ArrowDown');
+  await more('사이드바 모두 접기');
+  check('9d ⋯ 모두 접기로 포커스 줄이 숨음 → 정지점 = 보이는 가장 바깥의 접힌 윗단 머리(color)', (await stop()) === 'g:g|color', String(await stop()));
+  // 상세에서 접힌 단 아래로 이름 고침 → 닫기 → 포커스가 접힌 윗단 머리(§4.8)
+  await more('사이드바 모두 펼치기');
+  await clickHead('color/blue');
+  await p.focus('.vt-row[data-id="dg9"]');
+  await p.keyboard.press('Enter');
+  await p.fill('.modal input[aria-label="이름(전체 경로)"]', 'color/blue/900');
+  await p.click('.modal .m-foot button.primary');
+  const up = (await sent(p, 'UPDATE_VARIABLE')).at(-1);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: up.reqId, ok: true, applied: ['name'] });
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV.map((v) => (v.id === 'dg9' ? { ...v, name: 'color/blue/900' } : v)) });
+  await p.click('.modal .m-foot button:not(.primary)');
+  check('9d 상세 — 접힌 단 아래로 이름 고침 → 닫기 → 포커스 접힌 blue 머리 · 상태 줄 "지금 목록에 보이지 않아요"', (await act()) === 'g:g|color/blue' && (await p.textContent('#statusText')) === 'color/blue/900은 지금 목록에 보이지 않아요', JSON.stringify([await act(), await p.textContent('#statusText')]));
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  // 새 변수 뒤 모든 윗단 펴짐
+  await more('사이드바 모두 접기');
+  await p.click('#btnAddVar');
+  await p.click('.ctx-menu button >> text=새 변수');
+  await p.fill('.modal .ed-field input >> nth=0', 'color/gray/weight');
+  await p.fill('.modal .ed-field input >> nth=1', '2');
+  await p.click('.modal button >> text=만들기');
+  const cv = (await sent(p, 'CREATE_VARIABLE')).at(-1);
+  await recv(p, { type: 'VARIABLE_CREATED', reqId: cv.reqId, id: 'dnew' });
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: [...DV, gv('dnew', 'color/gray/weight', 'FLOAT', { kind: 'number', text: '2' })] });
+  const nh = Object.fromEntries((await heads()).map((h) => [h[0], h[2]]));
+  check('9d 새 변수 뒤 그 변수로 포커스 · 모든 윗단(color · gray) 펴짐 · 다른 단은 접힌 채', (await act()) === 'v:dnew' && nh['g:g|color'] === 'true' && nh['g:g|color/gray'] === 'true' && nh['g:g|color/blue'] === 'false' && nh['g:g|spacing'] === 'false', JSON.stringify([await act(), nh]));
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  // [→](varJump) — 접힌 color › gray 아래 대상으로 가면 모든 윗단 펴짐
+  await clickHead('color/gray');
+  await clickHead('color');
+  await p.click('#varSide [data-key="side:col:s"]');
+  await p.focus('.vt-row[data-id="dbd"]');
+  await p.keyboard.press('Enter');
+  await p.click('.modal .ed-go >> nth=0');
+  await p.waitForTimeout(50);
+  const jh = Object.fromEntries((await heads()).map((h) => [h[0], h[2]]));
+  check('9d [→] → 대상 줄 포커스 · 모든 윗단(color · gray) 펴짐', (await act()) === 'v:dg0' && jh['g:g|color'] === 'true' && jh['g:g|color/gray'] === 'true', JSON.stringify([await act(), jh]));
+  await more('사이드바 모두 펼치기');
+  // Semantic — 머리 없는 맨 위 · 막대 없는 단 1 그룹 · 단 4 · 단 6
+  await p.click('#varSide [data-key="side:col:s"]');
+  const ss = await treeShape(p);
+  check('9d Semantic — 머리 없는 맨 위 → 단 1 · color 안 바로 든 surface → 아래 단 · 단 4 경로도 머리 4단(깊이 제한 없음)', ss[0] === 'canvas|→ gray/0|#FFFFFF' && ss.includes('[color]') && ss.indexOf('surface|→ gray/0|#FFFFFF') === ss.indexOf('[color]') + 1 && ss.includes('>[background]') && ss.includes('>[brand]') && ss.includes('>>[primary]') && ss.includes('>>>[hover]') && ss.includes('>>>>>[f]'), JSON.stringify(ss));
+  g = await geo();
+  const top = G(g, 'top');
+  check('9d 머리 없는 맨 위 — 줄 x 8 · 폭 392 · 선 없음 · aria-level 1', !top.bar && g.rows.dcv.x === 8 && g.rows.dcv.w === 392 && g.rows.dcv.lvl === '1', JSON.stringify([top, g.rows.dcv]));
+  check('9d 단 1 잎 그룹(radius — 안쪽 단 없음) — 선 0 · 줄 x 16 · 폭 384', !G(g, 'g:s|radius').bar && g.rows.drc.x === 16 && g.rows.drc.w === 384, JSON.stringify([G(g, 'g:s|radius'), g.rows.drc]));
+  check('9d 단 1 바로 든 줄(color/surface) x 21 · 폭 379', g.rows.dsu.x === 21 && g.rows.dsu.w === 379, JSON.stringify(g.rows.dsu));
+  const hv = G(g, 'g:s|color/brand/primary/hover');
+  check('9d 단 3 선 x 30 · 단 4 선 x 39 · 단 4 줄 x 48 · 폭 352 · 오른쪽 끝 400 · 선 길이 = 내용 높이 − 16', G(g, 'g:s|color/brand/primary').x === 30 && hv.x === 39 && g.rows.dhd.x === 48 && g.rows.dhd.w === 352 && g.rows.dhd.right === 400 && g.grps.filter((x) => x.bar).every((x) => x.h === x.contentH - 16), JSON.stringify([G(g, 'g:s|color/brand/primary'), hv, g.rows.dhd]));
+  check('9d 깊은 이름 말줄임 · 단 6 경로(x 66)에서도 가로 스크롤 0', g.rows.dhs.clipped && g.rows.ddp.x === 66 && g.hscroll === 0, JSON.stringify([g.rows.dhs, g.rows.ddp, g.hscroll]));
+  check('9d 깊은 머리 툴팁 경로 전체 · 글 마디 하나', (await p.getAttribute('#varTree .vt-group[data-key="g:s|color/brand/primary/hover"]', 'title')) === 'color/brand/primary/hover' && (await p.textContent('#varTree .vt-group[data-key="g:s|color/brand/primary/hover"] .lb')) === 'hover');
+  await p.focus('.vt-row[data-id="dcv"]');
+  await p.keyboard.press('ArrowLeft');
+  check('9d 머리 없는 맨 위 줄 ← 그대로', (await act()) === 'v:dcv');
+  await more('사이드바 모두 접기');
+  check('9d ⋯ 모두 접기 → 머리 없는 맨 위 줄은 그대로 보임 · 단 1 머리만', (await p.$('.vt-row[data-id="dcv"]')) !== null && (await heads()).every((h) => h[1] === '1' && h[2] === 'false'), JSON.stringify(await heads()));
+  await more('사이드바 모두 펼치기');
+  // 검색(V-P6) — 경로 한 줄 머리 · 선 없음 · 줄 x 16
+  await p.fill('#varSearch', 'default');
+  g = await geo();
+  const sl = await p.$$eval('#varTree .vt-group', (e) => e.map((h) => [h.querySelector('.lb').textContent, h.getAttribute('aria-level')]));
+  check('9d 검색 — 경로 한 줄 머리(aria-level 1) · 줄 aria-level 2', sl.some((x) => x[0] === 'S Semantic › color/brand/primary/hover') && sl.every((x) => x[1] === '1') && g.rows.dhd.lvl === '2', JSON.stringify(sl));
+  check('9d 검색 묶음 — 선 0 · 줄 x 16 · 폭 384', g.grps.every((x) => !x.bar) && Object.values(g.rows).every((r) => r.x === 16 && r.w === 384), JSON.stringify([g.grps.map((x) => x.cls), g.rows]));
+  // 검색 중 "/" 없는 검색 머리 접기 → 검색 지움 → 맨 위 줄 그대로 보임
+  await p.fill('#varSearch', 'canvas');
+  await clickHead('s|');
+  check('9d 검색 중 "/" 없는 검색 머리 접기 → 줄 숨음', (await p.$('.vt-row[data-id="dcv"]')) === null);
+  await p.focus('#varSearch');
+  await p.keyboard.press('Escape');
+  check('9d 검색 지우면 머리 없는 맨 위 줄 그대로 보임(`{컬렉션 id}|` 키 무시)', (await p.$('.vt-row[data-id="dcv"]')) !== null);
+  check('9d 카드 안 카드 0(선 · 안쪽 머리 · 묶음은 카드 아님 — §2.8)', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
   await p.close();
 }
 
