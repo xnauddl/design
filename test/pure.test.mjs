@@ -3000,6 +3000,44 @@ test('paletteGroups — 종류 순서 · 피그마 순서 · "/" 없는 변수 �
   assert.deepEqual(sr.map((g) => g.label), ['S Semantic › color', 'G Global › color/gray'], '검색 — 사이드바 순서(Component → Semantic → Global)');
 });
 
+test('paletteTree — 경로 마디마다 단 · 키 · 깊이 · 순서 · 막대(V-D6 — §4.6 "그룹 — 경로 마디마다 머리")', async () => {
+  const { paletteTree, flattenPaletteTree, varAncestorKeys } = await import('../dist/pure.mjs');
+  const cols = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'M' }], defaultModeId: 'm' },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'm2', name: 'M' }], defaultModeId: 'm2' },
+  ];
+  const v = (id, name, type, col = 'g') => ({ id, name, type, collectionId: col, values: {}, scopes: [], description: '' });
+  const vars = [
+    v('1', 'color/gray/0', 'COLOR'), v('2', 'radius/4', 'FLOAT'), v('3', 'color/blue/500', 'COLOR'), v('4', 'base', 'FLOAT'),
+    v('5', 'color/accent', 'COLOR'), v('6', 'spacing/8', 'FLOAT'), v('7', 'color/gray/9', 'COLOR'), v('x', 'color/text', 'COLOR', 's'),
+    v('8', 'a/b/c/d/deep', 'COLOR'), v('9', 'color/blue/sub/inner/x', 'COLOR'),
+  ];
+  const flat = flattenPaletteTree(paletteTree(cols, vars, 'g'));
+  assert.deepEqual(flat.map((n) => [n.key, n.label, n.depth, n.rows.map((r) => r.id), n.bar]), [
+    ['g|', '', 0, ['4'], false],
+    ['g|spacing', 'spacing', 1, ['6'], false],
+    ['g|radius', 'radius', 1, ['2'], false],
+    ['g|color', 'color', 1, ['5'], true],
+    ['g|color/gray', 'gray', 2, ['1', '7'], true],
+    ['g|color/blue', 'blue', 2, ['3'], true],
+    ['g|color/blue/sub', 'sub', 3, [], true],
+    ['g|color/blue/sub/inner', 'inner', 4, ['9'], true],
+    ['g|a', 'a', 1, [], true],
+    ['g|a/b', 'b', 2, [], true],
+    ['g|a/b/c', 'c', 3, [], true],
+    ['g|a/b/c/d', 'd', 4, ['8'], true],
+  ], '맨 위 "/" 없음 → 단 1(종류 순서 · 피그마 순서) · 단 안은 바로 든 변수 → 아래 단 · 하나뿐이어도 합치지 않음 · 깊이 제한 없음 · 안쪽 단 있는 나무만 막대');
+  const deep = flat.find((n) => n.key === 'g|color/blue/sub/inner');
+  assert.equal(deep.path, 'color/blue/sub/inner', '툴팁용 경로 전체');
+  assert.deepEqual(deep.ancestors, ['g|color', 'g|color/blue', 'g|color/blue/sub'], '윗단 키(바깥 → 안)');
+  // 아래 단끼리 종류 순서 — 그 단 아래 피그마 순서 첫 변수의 종류(색보다 간격이 앞)
+  const kinds = flattenPaletteTree(paletteTree(cols, [v('a', 'x/c/1', 'COLOR'), v('b', 'x/s/gap', 'FLOAT')].map((r) => (r.id === 'b' ? { ...r, scopes: ['GAP'] } : r)), 'g'));
+  assert.deepEqual(kinds.map((n) => n.key), ['g|x', 'g|x/s', 'g|x/c'], '아래 단 종류 순서(간격 → 색)');
+  assert.deepEqual(paletteTree(cols, vars, null), [], '컬렉션 없음 → 빈 나무');
+  assert.deepEqual(varAncestorKeys({ collectionId: 'g', name: 'color/gray/0' }), ['g|color', 'g|color/gray']);
+  assert.deepEqual(varAncestorKeys({ collectionId: 'g', name: 'base' }), []);
+});
+
 test('사이드바 — sidebarCollections 계층 순서 · 수(IA v4 §4.6)', async () => {
   const { sidebarCollections } = await import('../dist/pure.mjs');
   const cols = [

@@ -179,17 +179,25 @@ const nestedCards = (p) => p.evaluate(() => {
 });
 const rowShape = (p, s) => p.$eval(s, (e) => { const c = getComputedStyle(e); return { top: c.borderTopWidth, bottom: c.borderBottomWidth, radius: c.borderTopLeftRadius, bg: c.backgroundColor, minH: c.minHeight, pl: c.paddingLeft }; });
 const rowIds = (p) => p.$$eval('#varTree .vt-row', (e) => e.map((x) => x.dataset.id));
-/** 변수 탭 목록 모양(V-D5) — 그룹 머리 "[경로]", 그 아래 묶음(role=rowgroup) 안의 줄(role=row)마다:
- *  목록 줄은 "이름|옅은 칸|짙은 칸"(없는 칸은 빈 글자 — 짙은 칸이 숨으면 "-"), 알약 · 격자 묶음은 항목 글(동그라미는 "dot")을 ","로. */
-const treeShape = (p) => p.$$eval('#varTree > *', (e) => e.flatMap((x) => {
-  if (x.classList.contains('vt-group')) return [`[${x.querySelector('.lb').textContent}]`];
-  if (x.getAttribute('role') !== 'rowgroup') return [`?${x.className}`];
-  return [...x.querySelectorAll(':scope > [role=row]')].map((r) => {
-    const c = r.querySelector('.vt-row');
-    if (c) return [c.querySelector('.nm').textContent, c.querySelector('.vchip .al')?.textContent ?? '', c.querySelector('.vchip .vl')?.textContent ?? '-'].join('|');
-    return [...r.querySelectorAll('.vp-item')].map((i) => i.textContent || 'dot').join(',');
-  });
-}));
+/** 변수 탭 목록 모양(V-D5 · V-D6) — 그룹 머리 "[마디]"(단 k면 앞에 ">"를 k − 1개 — aria-level), 겹친 단 묶음(role 없음 — V-P3)을 따라 들어가며 줄(role=row)마다:
+ *  목록 줄은 "이름|옅은 칸|짙은 칸"(없는 칸은 빈 글자 — 짙은 칸이 숨으면 "-"), 알약 · 격자 묶음은 항목 글(동그라미는 "dot")을 ","로.
+ *  묶음에 role이 있거나 모르는 것이면 "?{class}". */
+const treeShape = (p) => p.$eval('#varTree', (root) => {
+  const out = [];
+  const walk = (el) => {
+    for (const x of el.children) {
+      if (x.classList.contains('vt-group')) out.push(`${'>'.repeat(Number(x.getAttribute('aria-level') ?? 1) - 1)}[${x.querySelector('.lb').textContent}]`);
+      else if (x.classList.contains('vt-grp') && !x.hasAttribute('role')) walk(x);
+      else if (x.getAttribute('role') === 'row') {
+        const c = x.querySelector('.vt-row');
+        if (c) out.push([c.querySelector('.nm').textContent, c.querySelector('.vchip .al')?.textContent ?? '', c.querySelector('.vchip .vl')?.textContent ?? '-'].join('|'));
+        else out.push([...x.querySelectorAll('.vp-item')].map((i) => i.textContent || 'dot').join(','));
+      } else out.push(`?${x.className}`);
+    }
+  };
+  walk(root);
+  return out;
+});
 /** 사이드바 항목 [이름, 숫자] (결정 B). */
 const sideItems = (p) => p.$$eval('#varSide .vs-item', (e) => e.map((x) => [x.querySelector('.vs-name').textContent, x.querySelector('.vs-num').textContent]));
 const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.dataset.key).catch(() => null);
@@ -214,11 +222,11 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 처음에는 첫 컬렉션', (await sideSelected(p)) === 'side:col:s');
   check('9 모드 ▾(보이는 모드 2개 이상)', await visible(p, '#modeSelect'));
   // Semantic = 줄(끝 이름 · 값 알약), 그룹 머리, 사용 칸 없음
-  check('9 Semantic 줄 — 그룹 머리 + 끝 이름 · 칩 옅은 칸 "→ gray/900" → 짙은 칸 "#111111" · 사용 칸 없음(V-D5)', JSON.stringify(await treeShape(p)) === JSON.stringify(['[color/text]', 'default|→ gray/900|#111111']) && (await p.$('.vt-row .use')) === null, JSON.stringify(await treeShape(p)));
+  check('9 Semantic 줄 — 경로 마디마다 머리(color › text — V-D6) + 끝 이름 · 칩 옅은 칸 "→ gray/900" → 짙은 칸 "#111111" · 사용 칸 없음(V-D5)', JSON.stringify(await treeShape(p)) === JSON.stringify(['[color]', '>[text]', 'default|→ gray/900|#111111']) && (await p.$('.vt-row .use')) === null, JSON.stringify(await treeShape(p)));
   // Global = 팔레트 — 종류 순서(간격 → 반경 → 색), 알약 · 동그라미
   await p.click('#varSide [data-key="side:col:g"]');
   const pal = await treeShape(p);
-  check('9 Global 팔레트 — 종류 순서 간격 → 반경 → 색 · 알약 값 · 색은 줄마다 하나(짙은 칸만 — V1 · V-D5)', JSON.stringify(pal) === JSON.stringify(['[spacing]', '8', '[radius]', '4', '[color/gray]', '0||#FFFFFF', '900||#111111']), JSON.stringify(pal));
+  check('9 Global 팔레트 — 종류 순서 간격 → 반경 → 색(color › gray — V-D6) · 알약 값 · 색은 줄마다 하나(짙은 칸만 — V1 · V-D5)', JSON.stringify(pal) === JSON.stringify(['[spacing]', '8', '[radius]', '4', '[color]', '>[gray]', '0||#FFFFFF', '900||#111111']), JSON.stringify(pal));
   check('9 알약 툴팁 · 접근성 이름 "{전체 이름}, {값}"', (await p.getAttribute('.vp-item[data-id="sp8"]', 'title')) === 'spacing/8 / 8' && (await p.getAttribute('.vp-item[data-id="sp8"]', 'aria-label')) === 'spacing/8, 8');
   const widths = await p.evaluate(() => {
     const w = (sel) => Math.round(document.querySelector(sel)?.getBoundingClientRect().width ?? -1);
@@ -254,7 +262,9 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.keyboard.press('ArrowRight');
   check('9 색 줄에서 → 무시(그 줄 그대로)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g0');
   await p.keyboard.press('ArrowLeft');
-  check('9 색 줄에서 ← 무시', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g0');
+  check('9 색 줄에서 ← = 담은 머리(gray — V-D6 V-P4)', (await p.evaluate(() => document.activeElement?.dataset?.key)) === 'g:g|color/gray', await p.evaluate(() => document.activeElement?.dataset?.key));
+  await p.keyboard.press('ArrowRight');
+  check('9 펴 있는 머리에서 → = 내용 첫 줄(V-P4)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g0');
   await p.keyboard.press('ArrowDown');
   check('9 ↓ 다음 색 줄 하나', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9');
   await p.keyboard.press('ArrowUp');
@@ -3322,9 +3332,10 @@ async function backHome30(p, libs) {
   const grp = await p.evaluate(() => {
     const heads = [...document.querySelectorAll('#varTree > .vt-group')];
     const R = (e) => e.getBoundingClientRect();
-    return heads.map((h, i) => { const cs = getComputedStyle(h); const g = h.nextElementSibling; const row = g?.querySelector('.vt-row'); return { h: Math.round(R(h).height), top: cs.borderTopWidth, first: i === 0, pos: cs.position, fs: cs.fontSize, g: g?.getAttribute('role'), dx: row ? Math.round(R(row).left - R(h).left) : null, pb: g ? getComputedStyle(g).paddingBottom : null }; });
+    // 줄 x(머리 x 기준): 안쪽 단이 없는 단 1 그룹은 16, 막대 있는 나무는 21 + 9 × (줄 aria-level − 2)(V-D6 "가로 자리").
+    return heads.map((h, i) => { const cs = getComputedStyle(h); const g = h.nextElementSibling; const row = g?.querySelector('.vt-row'); const lvl = row ? Number(row.parentElement.getAttribute('aria-level')) : 0; const bar = g?.classList.contains('has-bar'); return { h: Math.round(R(h).height), top: cs.borderTopWidth, first: i === 0, pos: cs.position, fs: cs.fontSize, g: g?.getAttribute('role') ?? null, bar, lvl, dx: row ? Math.round(R(row).left - R(h).left) : null, want: bar ? 21 + 9 * (lvl - 2) : 16, pb: g ? getComputedStyle(g).paddingBottom : null }; });
   });
-  check('9v 그룹 머리 32 · 위 1px 선(맨 위는 없음) · 고정 아님 · 12px · 묶음 role=rowgroup · 줄 x = 머리 x + 16 · 묶음 아래 16', grp.length >= 2 && grp.every((g) => g.h === 32 && g.top === (g.first ? '0px' : '1px') && g.pos !== 'sticky' && g.fs === '12px' && g.g === 'rowgroup' && g.dx === 16 && g.pb === '16px'), JSON.stringify(grp));
+  check('9v 그룹 머리 32 · 위 1px 선(맨 위는 없음) · 고정 아님 · 12px · 묶음 role 없음(V-P3) · 줄 x = 머리 x + 16(막대 있는 나무는 21 + 9(n − 1)) · 묶음 아래 16', grp.length >= 2 && grp.every((g) => g.h === 32 && g.top === (g.first ? '0px' : '1px') && g.pos !== 'sticky' && g.fs === '12px' && g.g === null && g.dx === g.want && g.pb === '16px'), JSON.stringify(grp));
   // Component — 색 아닌 줄
   await p.click('#varSide [data-key="side:col:c"]');
   const px = await rowOf('vpx');
@@ -3332,7 +3343,7 @@ async function backHome30(p, libs) {
   // Global — 색은 줄마다 하나, 옅은 칸 없음(따라갈 수 없을 때만 — ⓐ)
   await p.click('#varSide [data-key="side:col:g"]');
   const gshape = await treeShape(p);
-  check('9v Global — 알약 묶음 → 색 줄마다 하나 · 옅은 칸 없음 · 따라갈 수 없는 별칭만 옅은 칸 + 짙은 칸 숨김(ⓐ)', JSON.stringify(gshape) === JSON.stringify(['[spacing]', '16,24', '[color/gray]', '0||#FFFFFF', '900||#101828', '900-a50||#101828 50%', 'almost||#101828', 'brand-accent|→ color/accent|-', 'gone|→ (삭제된 변수)|-', '[font-family]', 'Inter']), JSON.stringify(gshape));
+  check('9v Global — 알약 묶음 → 색 줄마다 하나 · 옅은 칸 없음 · 따라갈 수 없는 별칭만 옅은 칸 + 짙은 칸 숨김(ⓐ)', JSON.stringify(gshape) === JSON.stringify(['[spacing]', '16,24', '[color]', '>[gray]', '0||#FFFFFF', '900||#101828', '900-a50||#101828 50%', 'almost||#101828', 'brand-accent|→ color/accent|-', 'gone|→ (삭제된 변수)|-', '[font-family]', 'Inter']), JSON.stringify(gshape));
   const gl = await rowOf('vgl');
   check('9v Global 따라갈 수 없는 별칭 — 빈 원', gl.sw.bg === 'transparent' && !gl.sw.ck, JSON.stringify(gl.sw));
   const gx = await rowOf('vgx');
@@ -3351,8 +3362,10 @@ async function backHome30(p, libs) {
   await p.keyboard.press('ArrowDown');
   const kd = await p.evaluate(() => document.activeElement?.className);
   await p.keyboard.press('ArrowDown');
+  const kdi = await p.evaluate(() => document.activeElement?.dataset?.key);
+  await p.keyboard.press('ArrowDown');
   const kd2 = await p.evaluate(() => document.activeElement?.dataset?.id);
-  check('9v 알약 묶음 안 → · ↓ 그룹 머리 · ↓ 첫 색 줄', kr === 'vsp24' && /vt-group/.test(kd) && kd2 === 'vg0', JSON.stringify([kr, kd, kd2]));
+  check('9v 알약 묶음 안 → · ↓ 그룹 머리(color) · ↓ 안쪽 머리(gray — V-D6) · ↓ 첫 색 줄', kr === 'vsp24' && /vt-group/.test(kd) && kdi === 'g:g|color/gray' && kd2 === 'vg0', JSON.stringify([kr, kd, kdi, kd2]));
   // 격자 간격 8 · 접근성 이름 V-D3
   await p.click('#btnVarMore');
   await p.click('.ctx-menu button >> text=색 격자로 보기');
@@ -3521,6 +3534,229 @@ async function backHome30(p, libs) {
   await p.waitForTimeout(60);
   const hd = await p.$eval('.sel-head', (h) => { const b = h.querySelector('b'); const d = h.querySelector('.sel-diff'); const R = (e) => e.getBoundingClientRect(); return { h: Math.round(R(h).height), wrap: getComputedStyle(h).flexWrap, clipped: b.scrollWidth > b.clientWidth, nameW: Math.round(R(b).width), diff: !!d, diffH: d ? Math.round(R(d).height) : 0, diffRight: d ? Math.round(R(d).right) : 0, headRight: Math.round(R(h).right) }; });
   check('9v 선택 탭 머리 줄 — 긴 이름 + 기준 다름: 높이 32 · nowrap · 이름 말줄임(200 넘게 씀) · 기준 다름 한 줄 오른쪽 끝', hd.h === 32 && hd.wrap === 'nowrap' && hd.clipped && hd.nameW > 200 && hd.diff && hd.diffH <= 24 && hd.diffRight === hd.headRight, JSON.stringify(hd));
+  await p.close();
+}
+
+{
+  // 9d V-D6(ia-v4 §4.6 "그룹 — 경로 마디마다 머리(V-D6)" · V-P3–V-P9 · §4.8 · B.17 "V-D6 추가 구현") — 단 나누기 · 단마다 접기 · 세로 선 · 가로 자리 · 접근성 · 키보드 · 포커스 · 검색
+  const DC = [
+    { id: 'g', name: 'Global', tier: 1, modes: [{ modeId: 'm', name: 'Mode 1' }], defaultModeId: 'm' },
+    { id: 's', name: 'Semantic', tier: 2, modes: [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }], defaultModeId: 'l' },
+  ];
+  const Cc = (hex) => ({ kind: 'color', hex });
+  const Al = (aliasId, aliasName) => ({ kind: 'alias', aliasId, aliasName });
+  const gv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 'g', type, values: { m: cell }, scopes, description: '' });
+  const sv = (id, name, type, cell, scopes = []) => ({ id, name, collectionId: 's', type, values: { l: cell, d: cell }, scopes, description: '' });
+  const DV = [
+    gv('dsp16', 'spacing/16', 'FLOAT', { kind: 'number', text: '16' }, ['GAP']), gv('dsp24', 'spacing/24', 'FLOAT', { kind: 'number', text: '24' }, ['GAP']),
+    gv('dg0', 'color/gray/0', 'COLOR', Cc('#FFFFFF')), gv('dg9', 'color/gray/900', 'COLOR', Cc('#101828')),
+    gv('db5', 'color/blue/500', 'COLOR', Cc('#2E90FA')), gv('db6', 'color/blue/600', 'COLOR', Cc('#1570EF')),
+    gv('dff', 'font-family/base', 'STRING', { kind: 'string', text: 'Inter' }, ['FONT_FAMILY']),
+    sv('dcv', 'canvas', 'COLOR', Al('dg0', 'color/gray/0')),
+    sv('dsu', 'color/surface', 'COLOR', Al('dg0', 'color/gray/0')),
+    sv('dbd', 'color/background/default', 'COLOR', Al('dg0', 'color/gray/0')), sv('dbs', 'color/background/subtle', 'COLOR', Al('dg9', 'color/gray/900')),
+    sv('dtd', 'color/text/default', 'COLOR', Al('dg9', 'color/gray/900')),
+    sv('dhd', 'color/brand/primary/hover/default', 'COLOR', Al('dg0', 'color/gray/0')),
+    sv('dhs', 'color/brand/primary/hover/strong-emphasis-on-inverse-dark-surface-pressed', 'COLOR', Al('db6', 'color/blue/600')),
+    sv('ddp', 'a/b/c/d/e/f/deep', 'COLOR', Al('db6', 'color/blue/600')),
+    sv('dcg', 'spacing/card/gap', 'FLOAT', Al('dsp16', 'spacing/16'), ['GAP']),
+    sv('drc', 'radius/card', 'FLOAT', { kind: 'number', text: '8' }, ['CORNER_RADIUS']),
+  ];
+  const p = await open(560, 'variables');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  await p.click('#varSide [data-key="side:col:g"]');
+  const heads = () => p.$$eval('#varTree .vt-group', (e) => e.map((h) => [h.dataset.key, h.getAttribute('aria-level'), h.getAttribute('aria-expanded'), h.title]));
+  const act = () => p.evaluate(() => document.activeElement?.dataset?.key ?? document.activeElement?.id ?? null);
+  const stop = () => p.evaluate(() => document.querySelector('#varTree [tabindex="0"]')?.dataset?.key ?? null);
+  const clickHead = (k) => p.click(`#varTree .vt-group[data-key="g:${k.includes('|') ? k : `g|${k}`}"]`);
+  const more = async (label) => { await p.click('#btnVarMore'); await p.click(`.ctx-menu button >> text=${label}`); };
+  /** 자리 재기 — 오른쪽 목록 왼쪽 끝 0 기준. 선(::before)이 있는 묶음 · 머리 · 줄 · 알약 묶음. */
+  const geo = () => p.evaluate(() => {
+    const T = document.getElementById('varTree').getBoundingClientRect();
+    const X = (v) => Math.round((v - T.left) * 10) / 10;
+    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const probe = document.createElement('i'); probe.style.background = border; document.body.appendChild(probe); const borderRgb = getComputedStyle(probe).backgroundColor; probe.remove();
+    const grps = [...document.querySelectorAll('#varTree .vt-grp')].map((g) => {
+      const s = getComputedStyle(g, '::before'); const r = g.getBoundingClientRect();
+      const kids = [...g.children]; const head = g.previousElementSibling;
+      const has = s.content !== 'none' && s.content !== 'normal';
+      const contentH = kids.length ? kids.at(-1).getBoundingClientRect().bottom - kids[0].getBoundingClientRect().top : 0;
+      return { key: head?.classList.contains('vt-group') ? head.dataset.key : 'top', cls: g.className, role: g.getAttribute('role'), bar: has,
+        x: has ? X(r.left + parseFloat(s.left)) : null, w: has ? parseFloat(s.width) : null, h: has ? Math.round(r.height - parseFloat(s.top) - parseFloat(s.bottom)) : null,
+        contentH: Math.round(contentH), bg: has ? s.backgroundColor : null, bw: has ? s.borderTopWidth + ' ' + s.borderLeftWidth : null, radius: has ? s.borderTopLeftRadius : null, borderRgb };
+    });
+    const hs = [...document.querySelectorAll('#varTree .vt-group')].map((h) => { const cs = getComputedStyle(h); const r = h.getBoundingClientRect(); return { key: h.dataset.key, x: X(r.left), tw: X(h.querySelector('.tw').getBoundingClientRect().left), right: X(r.right), h: Math.round(r.height), bt: cs.borderTopWidth, pl: cs.paddingLeft }; });
+    const rows = Object.fromEntries([...document.querySelectorAll('#varTree .vt-row')].map((c) => { const r = c.getBoundingClientRect(); const t = c.querySelector('.nm .t'); return [c.dataset.id, { x: X(r.left), w: Math.round(r.width * 10) / 10, right: X(r.right), lvl: c.parentElement.getAttribute('aria-level'), name: Math.round(c.querySelector('.nm').getBoundingClientRect().width * 10) / 10, clipped: t.scrollWidth > t.clientWidth }]; }));
+    const lines = [...document.querySelectorAll('#varTree .vp-line')].map((l) => ({ first: l.querySelector('.vp-item')?.dataset.id, x: X(l.getBoundingClientRect().left), lvl: l.getAttribute('aria-level') }));
+    return { grps, hs, rows, lines, hscroll: document.documentElement.scrollWidth - document.documentElement.clientWidth };
+  });
+  const G = (g, key) => g.grps.find((x) => x.key === key);
+  const H = (g, key) => g.hs.find((x) => x.key === key);
+
+  // 단 나누기 · 순서 · 키 · 툴팁(V-P7 · V-P8)
+  const gs = await treeShape(p);
+  check('9d Global — 경로 마디마다 머리(color › gray · blue) · 단 안 바로 든 변수 → 아래 단 · 종류 순서', JSON.stringify(gs) === JSON.stringify(['[spacing]', '16,24', '[color]', '>[gray]', '0||#FFFFFF', '900||#101828', '>[blue]', '500||#2E90FA', '600||#1570EF', '[font-family]', 'Inter']), JSON.stringify(gs));
+  const gh = await heads();
+  check('9d 접기 키 `{컬렉션 id}|{그 단까지의 경로}` · aria-level 단 · 머리 툴팁 경로 전체(V-P8)', JSON.stringify(gh) === JSON.stringify([['g:g|spacing', '1', 'true', 'spacing'], ['g:g|color', '1', 'true', 'color'], ['g:g|color/gray', '2', 'true', 'color/gray'], ['g:g|color/blue', '2', 'true', 'color/blue'], ['g:g|font-family', '1', 'true', 'font-family']]), JSON.stringify(gh));
+  check('9d 머리 글은 마디 하나(V-P8)', JSON.stringify(await p.$$eval('#varTree .vt-group .lb', (e) => e.map((x) => x.textContent))) === JSON.stringify(['spacing', 'color', 'gray', 'blue', 'font-family']));
+  // 접근성(V-P3)
+  const aria = await p.evaluate(() => ({ role: document.getElementById('varTree').getAttribute('role'), grpRoles: [...document.querySelectorAll('#varTree .vt-grp')].map((g) => g.getAttribute('role')), row: document.querySelector('.vt-row[data-id="dg0"]').parentElement.getAttribute('aria-level'), pill: document.querySelector('.vp-item[data-id="dsp16"]').closest('.vp-line').getAttribute('aria-level'), ff: document.querySelector('.vp-item[data-id="dff"]').closest('.vp-line').getAttribute('aria-level') }));
+  check('9d #varTree treegrid · 단 묶음 role 없음 · aria-level 줄 = 단 + 1 · 알약 묶음 = 단 + 1', aria.role === 'treegrid' && aria.grpRoles.every((r) => r === null) && aria.row === '3' && aria.pill === '2' && aria.ff === '2', JSON.stringify(aria));
+  // 가로 자리 · 세로 선(Global)
+  let g = await geo();
+  const brd = g.grps[0].borderRgb;
+  const sp = G(g, 'g:g|spacing'); const co = G(g, 'g:g|color'); const gr = G(g, 'g:g|color/gray'); const bl = G(g, 'g:g|color/blue');
+  check('9d 안쪽 단 없는 단 1 그룹(spacing · font-family) — 선 0 · 알약 x 16', !sp.bar && !G(g, 'g:g|font-family').bar && g.lines.find((l) => l.first === 'dsp16').x === 16 && g.lines.find((l) => l.first === 'dff').x === 16, JSON.stringify([sp, g.lines]));
+  check('9d 안쪽 단 있는 나무 — 모든 단에 선(color · gray · blue)', co.bar && gr.bar && bl.bar, JSON.stringify([co, gr, bl]));
+  check('9d 선 — 폭 1 · 배경 --border · 테두리 0 · 반경 0', [co, gr, bl].every((x) => x.w === 1 && x.bg === brd && x.bw === '0px 0px' && x.radius === '0px'), JSON.stringify([co, gr, bl, brd]));
+  check('9d 선 x 12(단 1) · 21(단 2) · 선 → 다음 선 8 · 선 → 줄 8', co.x === 12 && gr.x === 21 && bl.x === 21 && gr.x - (co.x + 1) === 8 && g.rows.dg0.x - (gr.x + 1) === 8, JSON.stringify([co.x, gr.x, bl.x, g.rows.dg0.x]));
+  check('9d 선 길이 = 내용 높이 − 16', [co, gr, bl].every((x) => x.h === x.contentH - 16), JSON.stringify([co, gr, bl].map((x) => [x.key, x.h, x.contentH])));
+  check('9d 단 2 줄 x 30 · 오른쪽 끝 400 · 폭 370 · aria-level 3', g.rows.dg0.x === 30 && g.rows.dg0.right === 400 && g.rows.dg0.w === 370 && g.rows.db6.x === 30 && g.rows.dg0.lvl === '3', JSON.stringify(g.rows.dg0));
+  const ih = H(g, 'g:g|color/gray');
+  check('9d 안쪽 머리 32 · 위 선 0 · 왼쪽 여백 0 · x 21(▾ 칸 왼쪽 끝 = 단 2 선 x) · 오른쪽 끝 400', ih.h === 32 && ih.bt === '0px' && ih.pl === '0px' && ih.x === 21 && ih.tw === 21 && ih.right === 400, JSON.stringify(ih));
+  check('9d 단 1 머리 ▾ 칸 x 8 · 위 1px 선(맨 위 머리는 0)', H(g, 'g:g|color').tw === 8 && H(g, 'g:g|color').bt === '1px' && H(g, 'g:g|spacing').bt === '0px', JSON.stringify(g.hs));
+  // 단마다 따로 접기
+  await clickHead('color/gray');
+  let sh = await treeShape(p);
+  g = await geo();
+  check('9d gray 접음 → gray 아래만 숨음 · blue 그대로 · color 선 그대로', JSON.stringify(sh) === JSON.stringify(['[spacing]', '16,24', '[color]', '>[gray]', '>[blue]', '500||#2E90FA', '600||#1570EF', '[font-family]', 'Inter']) && G(g, 'g:g|color').bar, JSON.stringify(sh));
+  await clickHead('color/blue');
+  g = await geo();
+  check('9d gray · blue 모두 접어도 color 선 그대로(나무 모양으로 정함) · 길이 = 내용 높이 − 16', G(g, 'g:g|color').bar && G(g, 'g:g|color').h === G(g, 'g:g|color').contentH - 16, JSON.stringify(G(g, 'g:g|color')));
+  await clickHead('color/blue');
+  await clickHead('color');
+  sh = await treeShape(p);
+  check('9d color 접음 → gray · blue 머리와 줄 모두 숨음', JSON.stringify(sh) === JSON.stringify(['[spacing]', '16,24', '[color]', '[font-family]', 'Inter']), JSON.stringify(sh));
+  await clickHead('color');
+  check('9d color 폄 → gray는 접힌 채 · blue는 펴진 채', JSON.stringify((await heads()).map((h) => h[2])) === JSON.stringify(['true', 'true', 'false', 'true', 'true']), JSON.stringify(await heads()));
+  await clickHead('color/gray');
+  // ⋯ 모두 접기 → 단 1 머리만 · 하나 펴면 아래 단 접힌 채
+  await more('사이드바 모두 접기');
+  check('9d ⋯ 모두 접기 → 단 1 머리만', JSON.stringify(await heads()) === JSON.stringify([['g:g|spacing', '1', 'false', 'spacing'], ['g:g|color', '1', 'false', 'color'], ['g:g|font-family', '1', 'false', 'font-family']]), JSON.stringify(await heads()));
+  await clickHead('color');
+  check('9d 하나 펴면 아래 단은 접힌 채', JSON.stringify((await heads()).map((h) => [h[0], h[2]])) === JSON.stringify([['g:g|spacing', 'false'], ['g:g|color', 'true'], ['g:g|color/gray', 'false'], ['g:g|color/blue', 'false'], ['g:g|font-family', 'false']]), JSON.stringify(await heads()));
+  await more('사이드바 모두 펼치기');
+  // 키보드(V-P4)
+  await p.focus('#varTree .vt-group[data-key="g:g|color"]');
+  await p.keyboard.press('ArrowLeft');
+  const k1 = [await act(), (await heads())[1][2]];
+  await p.keyboard.press('ArrowRight');
+  const k2 = [await act(), (await heads())[1][2]];
+  await p.keyboard.press('ArrowRight');
+  const k3 = await act();
+  check('9d 머리 ← 접기 · → 펴기 · 펴 있으면 → 내용 첫 줄(안쪽 머리)', k1[0] === 'g:g|color' && k1[1] === 'false' && k2[0] === 'g:g|color' && k2[1] === 'true' && k3 === 'g:g|color/gray', JSON.stringify([k1, k2, k3]));
+  await p.keyboard.press('ArrowLeft');
+  const k4 = [await act(), (await heads())[2][2]];
+  await p.keyboard.press('ArrowLeft');
+  const k5 = await act();
+  check('9d 안쪽 머리 ← 접기 · 접혔으면 ← 윗단 머리', k4[0] === 'g:g|color/gray' && k4[1] === 'false' && k5 === 'g:g|color', JSON.stringify([k4, k5]));
+  await p.keyboard.press('ArrowLeft');
+  await p.keyboard.press('ArrowLeft');
+  check('9d 접힌 단 1 머리 ← 그대로', (await act()) === 'g:g|color');
+  await p.keyboard.press('ArrowRight');
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('ArrowRight');
+  await p.keyboard.press('ArrowRight');
+  const k6 = await act();
+  await p.keyboard.press('ArrowLeft');
+  const k7 = await act();
+  check('9d 줄 ← = 담은 머리(gray)', k6 === 'v:dg0' && k7 === 'g:g|color/gray', JSON.stringify([k6, k7]));
+  await p.keyboard.press('ArrowUp');
+  const u1 = await act();
+  const seq = [];
+  for (let i = 0; i < 4; i++) { await p.keyboard.press('ArrowDown'); seq.push(await act()); }
+  check('9d ↑ ↓ 모든 단 머리를 한 줄로(gray ↑ color · ↓ gray · 0 · 900 · blue)', u1 === 'g:g|color' && JSON.stringify(seq) === JSON.stringify(['g:g|color/gray', 'v:dg0', 'v:dg9', 'g:g|color/blue']), JSON.stringify([u1, seq]));
+  await p.focus('.vp-item[data-id="dsp24"]');
+  await p.keyboard.press('ArrowLeft');
+  const pk1 = await act();
+  await p.keyboard.press('ArrowLeft');
+  const pk2 = await act();
+  check('9d 알약 묶음 ← 앞 알약 · 첫 항목 ← 담은 머리', pk1 === 'v:dsp16' && pk2 === 'g:g|spacing', JSON.stringify([pk1, pk2]));
+  // 포커스(V-P5) — 이름이 바뀌어 접힌 단 아래로 감 → 보이는 가장 바깥의 접힌 윗단 머리
+  await clickHead('color/blue');
+  await p.focus('.vt-row[data-id="dg0"]');
+  await p.keyboard.press('ArrowDown');
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV.map((v) => (v.id === 'dg9' ? { ...v, name: 'color/blue/900' } : v)) });
+  check('9d VAR_TABLE로 접힌 단 아래로 감 → 포커스 · 정지점이 접힌 blue 머리', (await act()) === 'g:g|color/blue' && (await stop()) === 'g:g|color/blue', JSON.stringify([await act(), await stop()]));
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  await clickHead('color/blue');
+  // ⋯ 모두 접기에 포커스 줄이 숨음 → 정지점이 보이는 가장 바깥의 접힌 윗단 머리(color)
+  await p.focus('.vt-row[data-id="dg0"]');
+  await p.keyboard.press('ArrowDown');
+  await more('사이드바 모두 접기');
+  check('9d ⋯ 모두 접기로 포커스 줄이 숨음 → 정지점 = 보이는 가장 바깥의 접힌 윗단 머리(color)', (await stop()) === 'g:g|color', String(await stop()));
+  // 상세에서 접힌 단 아래로 이름 고침 → 닫기 → 포커스가 접힌 윗단 머리(§4.8)
+  await more('사이드바 모두 펼치기');
+  await clickHead('color/blue');
+  await p.focus('.vt-row[data-id="dg9"]');
+  await p.keyboard.press('Enter');
+  await p.fill('.modal input[aria-label="이름(전체 경로)"]', 'color/blue/900');
+  await p.click('.modal .m-foot button.primary');
+  const up = (await sent(p, 'UPDATE_VARIABLE')).at(-1);
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: up.reqId, ok: true, applied: ['name'] });
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV.map((v) => (v.id === 'dg9' ? { ...v, name: 'color/blue/900' } : v)) });
+  await p.click('.modal .m-foot button:not(.primary)');
+  check('9d 상세 — 접힌 단 아래로 이름 고침 → 닫기 → 포커스 접힌 blue 머리 · 상태 줄 "지금 목록에 보이지 않아요"', (await act()) === 'g:g|color/blue' && (await p.textContent('#statusText')) === 'color/blue/900은 지금 목록에 보이지 않아요', JSON.stringify([await act(), await p.textContent('#statusText')]));
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  // 새 변수 뒤 모든 윗단 펴짐
+  await more('사이드바 모두 접기');
+  await p.click('#btnAddVar');
+  await p.click('.ctx-menu button >> text=새 변수');
+  await p.fill('.modal .ed-field input >> nth=0', 'color/gray/weight');
+  await p.fill('.modal .ed-field input >> nth=1', '2');
+  await p.click('.modal button >> text=만들기');
+  const cv = (await sent(p, 'CREATE_VARIABLE')).at(-1);
+  await recv(p, { type: 'VARIABLE_CREATED', reqId: cv.reqId, id: 'dnew' });
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: [...DV, gv('dnew', 'color/gray/weight', 'FLOAT', { kind: 'number', text: '2' })] });
+  const nh = Object.fromEntries((await heads()).map((h) => [h[0], h[2]]));
+  check('9d 새 변수 뒤 그 변수로 포커스 · 모든 윗단(color · gray) 펴짐 · 다른 단은 접힌 채', (await act()) === 'v:dnew' && nh['g:g|color'] === 'true' && nh['g:g|color/gray'] === 'true' && nh['g:g|color/blue'] === 'false' && nh['g:g|spacing'] === 'false', JSON.stringify([await act(), nh]));
+  await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
+  // [→](varJump) — 접힌 color › gray 아래 대상으로 가면 모든 윗단 펴짐
+  await clickHead('color/gray');
+  await clickHead('color');
+  await p.click('#varSide [data-key="side:col:s"]');
+  await p.focus('.vt-row[data-id="dbd"]');
+  await p.keyboard.press('Enter');
+  await p.click('.modal .ed-go >> nth=0');
+  await p.waitForTimeout(50);
+  const jh = Object.fromEntries((await heads()).map((h) => [h[0], h[2]]));
+  check('9d [→] → 대상 줄 포커스 · 모든 윗단(color · gray) 펴짐', (await act()) === 'v:dg0' && jh['g:g|color'] === 'true' && jh['g:g|color/gray'] === 'true', JSON.stringify([await act(), jh]));
+  await more('사이드바 모두 펼치기');
+  // Semantic — 머리 없는 맨 위 · 막대 없는 단 1 그룹 · 단 4 · 단 6
+  await p.click('#varSide [data-key="side:col:s"]');
+  const ss = await treeShape(p);
+  check('9d Semantic — 머리 없는 맨 위 → 단 1 · color 안 바로 든 surface → 아래 단 · 단 4 경로도 머리 4단(깊이 제한 없음)', ss[0] === 'canvas|→ gray/0|#FFFFFF' && ss.includes('[color]') && ss.indexOf('surface|→ gray/0|#FFFFFF') === ss.indexOf('[color]') + 1 && ss.includes('>[background]') && ss.includes('>[brand]') && ss.includes('>>[primary]') && ss.includes('>>>[hover]') && ss.includes('>>>>>[f]'), JSON.stringify(ss));
+  g = await geo();
+  const top = G(g, 'top');
+  check('9d 머리 없는 맨 위 — 줄 x 8 · 폭 392 · 선 없음 · aria-level 1', !top.bar && g.rows.dcv.x === 8 && g.rows.dcv.w === 392 && g.rows.dcv.lvl === '1', JSON.stringify([top, g.rows.dcv]));
+  check('9d 단 1 잎 그룹(radius — 안쪽 단 없음) — 선 0 · 줄 x 16 · 폭 384', !G(g, 'g:s|radius').bar && g.rows.drc.x === 16 && g.rows.drc.w === 384, JSON.stringify([G(g, 'g:s|radius'), g.rows.drc]));
+  check('9d 단 1 바로 든 줄(color/surface) x 21 · 폭 379', g.rows.dsu.x === 21 && g.rows.dsu.w === 379, JSON.stringify(g.rows.dsu));
+  const hv = G(g, 'g:s|color/brand/primary/hover');
+  check('9d 단 3 선 x 30 · 단 4 선 x 39 · 단 4 줄 x 48 · 폭 352 · 오른쪽 끝 400 · 선 길이 = 내용 높이 − 16', G(g, 'g:s|color/brand/primary').x === 30 && hv.x === 39 && g.rows.dhd.x === 48 && g.rows.dhd.w === 352 && g.rows.dhd.right === 400 && g.grps.filter((x) => x.bar).every((x) => x.h === x.contentH - 16), JSON.stringify([G(g, 'g:s|color/brand/primary'), hv, g.rows.dhd]));
+  check('9d 깊은 이름 말줄임 · 단 6 경로(x 66)에서도 가로 스크롤 0', g.rows.dhs.clipped && g.rows.ddp.x === 66 && g.hscroll === 0, JSON.stringify([g.rows.dhs, g.rows.ddp, g.hscroll]));
+  check('9d 깊은 머리 툴팁 경로 전체 · 글 마디 하나', (await p.getAttribute('#varTree .vt-group[data-key="g:s|color/brand/primary/hover"]', 'title')) === 'color/brand/primary/hover' && (await p.textContent('#varTree .vt-group[data-key="g:s|color/brand/primary/hover"] .lb')) === 'hover');
+  await p.focus('.vt-row[data-id="dcv"]');
+  await p.keyboard.press('ArrowLeft');
+  check('9d 머리 없는 맨 위 줄 ← 그대로', (await act()) === 'v:dcv');
+  await more('사이드바 모두 접기');
+  check('9d ⋯ 모두 접기 → 머리 없는 맨 위 줄은 그대로 보임 · 단 1 머리만', (await p.$('.vt-row[data-id="dcv"]')) !== null && (await heads()).every((h) => h[1] === '1' && h[2] === 'false'), JSON.stringify(await heads()));
+  await more('사이드바 모두 펼치기');
+  // 검색(V-P6) — 경로 한 줄 머리 · 선 없음 · 줄 x 16
+  await p.fill('#varSearch', 'default');
+  g = await geo();
+  const sl = await p.$$eval('#varTree .vt-group', (e) => e.map((h) => [h.querySelector('.lb').textContent, h.getAttribute('aria-level')]));
+  check('9d 검색 — 경로 한 줄 머리(aria-level 1) · 줄 aria-level 2', sl.some((x) => x[0] === 'S Semantic › color/brand/primary/hover') && sl.every((x) => x[1] === '1') && g.rows.dhd.lvl === '2', JSON.stringify(sl));
+  check('9d 검색 묶음 — 선 0 · 줄 x 16 · 폭 384', g.grps.every((x) => !x.bar) && Object.values(g.rows).every((r) => r.x === 16 && r.w === 384), JSON.stringify([g.grps.map((x) => x.cls), g.rows]));
+  // 검색 중 "/" 없는 검색 머리 접기 → 검색 지움 → 맨 위 줄 그대로 보임
+  await p.fill('#varSearch', 'canvas');
+  await clickHead('s|');
+  check('9d 검색 중 "/" 없는 검색 머리 접기 → 줄 숨음', (await p.$('.vt-row[data-id="dcv"]')) === null);
+  await p.focus('#varSearch');
+  await p.keyboard.press('Escape');
+  check('9d 검색 지우면 머리 없는 맨 위 줄 그대로 보임(`{컬렉션 id}|` 키 무시)', (await p.$('.vt-row[data-id="dcv"]')) !== null);
+  check('9d 카드 안 카드 0(선 · 안쪽 머리 · 묶음은 카드 아님 — §2.8)', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
   await p.close();
 }
 

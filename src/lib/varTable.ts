@@ -556,3 +556,82 @@ export function paletteGroups(cols: readonly VarCollection[], vars: readonly Var
   }
   return out;
 }
+
+/** 변수 탭 오른쪽 목록의 단(V-D6 — §4.6 "그룹 — 경로 마디마다 머리"). */
+export interface PaletteNode {
+  /** 접기 기억 키 — `{collectionId}|{그 단까지의 경로}`. 머리 없는 맨 위는 `{collectionId}|`. */
+  key: string;
+  /** 머리 글 — 마디 하나(V-P8). 머리 없는 맨 위는 빈 글. */
+  label: string;
+  /** 그 단까지의 경로 전체(툴팁 — V-P8). */
+  path: string;
+  collectionId: string;
+  /** 단(1부터). 머리 없는 맨 위는 0. */
+  depth: number;
+  /** 윗단 머리 키들(바깥 → 안). */
+  ancestors: string[];
+  /** 그 경로에 바로 든 변수(피그마 순서). */
+  rows: VarRow[];
+  /** 아래 단(V-P7 순서). */
+  children: PaletteNode[];
+  /** 이 단이 든 나무(단 1 그룹)에 안쪽 단이 있나 — 있으면 나무의 모든 단에 세로 막대. */
+  bar: boolean;
+}
+/**
+ * 경로 마디 나무(V-D6 — 검색이 아닐 때). 컬렉션 colId 하나.
+ * 단 안 순서 = 바로 든 변수 → 아래 단(종류 순서 — 그 단 아래 피그마 순서 첫 변수의 종류, 같으면 그 첫 변수 순서).
+ * 맨 위 = "/" 없는 변수(머리 없음, depth 0) → 단 1. 아래 단이 하나뿐이어도 합치지 않음 · 깊이 제한 없음.
+ */
+export function paletteTree(cols: readonly VarCollection[], vars: readonly VarRow[], colId: string | null): PaletteNode[] {
+  const col = cols.find((c) => c.id === colId);
+  if (!col) return [];
+  type Work = PaletteNode & { first: number; firstKind: VarKind; kids: Map<string, Work> };
+  const mk = (path: string, label: string, depth: number, ancestors: string[], first: number, firstKind: VarKind): Work =>
+    ({ key: `${col.id}|${path}`, label, path, collectionId: col.id, depth, ancestors, rows: [], children: [], bar: false, first, firstKind, kids: new Map() });
+  let top: Work | null = null;
+  const roots = new Map<string, Work>();
+  vars.forEach((v, idx) => {
+    if (v.collectionId !== col.id) return;
+    const cut = v.name.lastIndexOf('/');
+    const path = cut < 0 ? '' : v.name.slice(0, cut);
+    const kind = varKind(v);
+    if (!path) { (top ??= mk('', '', 0, [], idx, kind)).rows.push(v); return; }
+    const segs = path.split('/');
+    let level = roots;
+    let node: Work | null = null;
+    const anc: string[] = [];
+    for (let i = 0; i < segs.length; i++) {
+      const p = segs.slice(0, i + 1).join('/');
+      let n = level.get(segs[i]);
+      if (!n) { n = mk(p, segs[i], i + 1, [...anc], idx, kind); level.set(segs[i], n); }
+      anc.push(n.key);
+      node = n;
+      level = n.kids;
+    }
+    node!.rows.push(v);
+  });
+  const sortKids = (m: Map<string, Work>): Work[] => [...m.values()].sort((a, b) =>
+    (VAR_KIND_ORDER.indexOf(a.firstKind) - VAR_KIND_ORDER.indexOf(b.firstKind)) || a.first - b.first);
+  const finish = (n: Work, bar: boolean): PaletteNode => {
+    const children = sortKids(n.kids).map((k) => finish(k, bar));
+    return { key: n.key, label: n.label, path: n.path, collectionId: n.collectionId, depth: n.depth, ancestors: n.ancestors, rows: n.rows, children, bar };
+  };
+  const out: PaletteNode[] = [];
+  if (top) out.push(finish(top, false));
+  for (const r of sortKids(roots)) out.push(finish(r, r.kids.size > 0));
+  return out;
+}
+/** 나무를 미리 순서(머리 → 바로 든 변수 → 아래 단)로 편 목록. */
+export function flattenPaletteTree(nodes: readonly PaletteNode[]): PaletteNode[] {
+  const out: PaletteNode[] = [];
+  const walk = (n: PaletteNode): void => { out.push(n); n.children.forEach(walk); };
+  nodes.forEach(walk);
+  return out;
+}
+/** 그 변수의 윗단 머리 키들(바깥 → 안 — 마지막이 바로 담은 머리). "/" 없는 변수는 빈 배열. */
+export function varAncestorKeys(v: Pick<VarRow, 'collectionId' | 'name'>): string[] {
+  const cut = v.name.lastIndexOf('/');
+  if (cut <= 0) return [];
+  const segs = v.name.slice(0, cut).split('/');
+  return segs.map((_, i) => `${v.collectionId}|${segs.slice(0, i + 1).join('/')}`);
+}

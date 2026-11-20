@@ -15,7 +15,7 @@ import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/lic
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
-import { leafName, lastTwo, varValueText, varTypeMark, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteGroup } from './lib/varTable';
+import { leafName, lastTwo, varValueText, varTypeMark, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, paletteTree, flattenPaletteTree, varAncestorKeys, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteNode } from './lib/varTable';
 import { varKind, APPLY_TARGETS, targetAllowed, scopeFits, scopesForNew, type ApplyTarget } from './lib/varKind';
 import { createReentryScheduler } from './lib/reread';
 import type { VarInfo } from './shared/messages';
@@ -6370,29 +6370,58 @@ function renderVarList(): void {
   $('varSide').classList.toggle('dim', searching);
   ($('btnSearchClear') as HTMLElement).hidden = !query;
   const colId = sel.kind === 'col' ? sel.id : null;
-  const groups = paletteGroups(vmCols, vmVars, colId, query);
-  lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
   const lines: HTMLElement[] = [];
-  for (const g of groups) {
-    const col = vmCols.find((c) => c.id === g.collectionId);
-    const open = !grpCollapsed.has(g.key);
-    if (g.head) lines.push(groupHeadEl(g, open));
-    if (!open) continue;
-    // 머리 아래 묶음(V-D5) — 줄 · 알약 묶음 · 격자 묶음을 담는 rowgroup(들여 씀, 카드 아님 — §2.8).
-    const grp = document.createElement('div');
-    grp.className = 'vt-grp';
-    grp.setAttribute('role', 'rowgroup');
-    const global = col?.tier === 1;
+  /** 단 내용 — 바로 든 변수(Global은 알약 묶음 → 색 줄, 그 밖은 피그마 순서), aria-level = level. */
+  const fillRows = (grp: HTMLElement, rows: VarRow[], collectionId: string, level: number): void => {
+    const global = vmCols.find((c) => c.id === collectionId)?.tier === 1;
     if (global) {
-      const colors = g.rows.filter((v) => v.type === 'COLOR');
-      const others = g.rows.filter((v) => v.type !== 'COLOR');
-      if (others.length) grp.appendChild(paletteLineEl(others, 'pill'));
+      const colors = rows.filter((v) => v.type === 'COLOR');
+      const others = rows.filter((v) => v.type !== 'COLOR');
+      if (others.length) grp.appendChild(paletteLineEl(others, 'pill', level));
       if (colors.length) {
-        if (colorView === 'grid') grp.appendChild(paletteLineEl(colors, 'dot'));
-        else for (const v of colors) grp.appendChild(varRowEl(v, true));
+        if (colorView === 'grid') grp.appendChild(paletteLineEl(colors, 'dot', level));
+        else for (const v of colors) grp.appendChild(varRowEl(v, true, level));
       }
-    } else for (const v of g.rows) grp.appendChild(varRowEl(v, false));
-    lines.push(grp);
+    } else for (const v of rows) grp.appendChild(varRowEl(v, false, level));
+  };
+  if (searching) {
+    // 검색(V-P6) — 지금처럼 경로 한 줄 머리 · 평평한 묶음(막대 없음 · x 16).
+    const groups = paletteGroups(vmCols, vmVars, colId, query);
+    lastRightCols = [...new Set(groups.map((g) => g.collectionId))];
+    for (const g of groups) {
+      const open = !grpCollapsed.has(g.key);
+      lines.push(groupHeadEl(g.key, g.label, g.label, 1, open, false));
+      if (!open) continue;
+      // 머리 아래 묶음(V-D5) — 들여 씀, 카드 아님(§2.8). V-D6 뒤 role 없음(treegrid 안 일반 요소).
+      const grp = document.createElement('div');
+      grp.className = 'vt-grp';
+      fillRows(grp, g.rows, g.collectionId, 2);
+      lines.push(grp);
+    }
+  } else {
+    // 경로 마디마다 머리(V-D6 — §4.6) — 단마다 따로 접기, 안쪽 단이 있는 나무만 세로 막대.
+    lastRightCols = colId ? [colId] : [];
+    const build = (n: PaletteNode, into: HTMLElement[]): void => {
+      if (n.depth === 0) {
+        // 머리 없는 맨 위(V-P9) — 늘 그림(접기 키와 상관없음) · 막대 없음 · 왼쪽 8.
+        const grp = document.createElement('div');
+        grp.className = 'vt-grp top';
+        fillRows(grp, n.rows, n.collectionId, 1);
+        into.push(grp);
+        return;
+      }
+      const open = !grpCollapsed.has(n.key);
+      into.push(groupHeadEl(n.key, n.label, n.path, n.depth, open, n.depth > 1));
+      if (!open) return;
+      const grp = document.createElement('div');
+      grp.className = n.depth > 1 ? 'vt-grp inner' : n.bar ? 'vt-grp has-bar' : 'vt-grp';
+      fillRows(grp, n.rows, n.collectionId, n.depth + 1);
+      const sub: HTMLElement[] = [];
+      for (const c of n.children) build(c, sub);
+      grp.append(...sub);
+      into.push(grp);
+    };
+    for (const n of paletteTree(vmCols, vmVars, colId)) build(n, lines);
   }
   if (!lines.length) {
     const d = document.createElement('div');
@@ -6415,6 +6444,11 @@ function renderVarList(): void {
   const focusables = gridItems();
   let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : undefined;
   for (const f of focusables) f.tabIndex = -1;
+  if (!target && focusKey) {
+    // 윗단이 접혀 그려지지 않았으면 보이는 가장 바깥의 접힌 윗단 머리로(V-P5).
+    const anchor = foldAnchor(focusKey, focusables);
+    if (anchor) { target = anchor; focusKey = anchor.dataset.key ?? null; }
+  }
   target = target ?? focusables[0];
   target?.setAttribute('tabindex', '0');
   if (target && hadFocus) target.focus({ preventScroll: true });
@@ -6424,12 +6458,42 @@ function renderVarList(): void {
 function gridItems(): HTMLElement[] {
   return Array.from($('varTree').querySelectorAll<HTMLElement>('[data-key]'));
 }
-/** 그룹 머리 — [▾/▸] + 경로. Enter · Space · 클릭 = 접기 · 펼치기. */
-function groupHeadEl(g: PaletteGroup, open: boolean): HTMLElement {
+/** 접혀 숨은 항목(focusKey — `v:{id}` · `g:{키}`)을 숨긴 보이는 가장 바깥의 접힌 윗단 머리(V-P5). 검색 중이면 그 검색 머리. 없으면 undefined. */
+function foldAnchor(fk: string, items: HTMLElement[]): HTMLElement | undefined {
+  let keys: string[];
+  if (fk.startsWith('v:')) {
+    const v = vmVars.find((x) => x.id === fk.slice(2));
+    if (!v) return undefined;
+    const anc = varAncestorKeys(v);
+    // 검색은 단이 없다 — 그 변수의 검색 머리(경로 한 줄 키, "/" 없으면 `{컬렉션 id}|`)만.
+    keys = query.trim() ? [anc[anc.length - 1] ?? `${v.collectionId}|`] : anc;
+  } else if (fk.startsWith('g:') && !query.trim()) {
+    const k = fk.slice(2);
+    const bar = k.indexOf('|');
+    const segs = k.slice(bar + 1).split('/');
+    keys = segs.slice(0, -1).map((_, i) => `${k.slice(0, bar)}|${segs.slice(0, i + 1).join('/')}`);
+  } else return undefined;
+  for (const k of keys) {
+    if (!grpCollapsed.has(k)) continue;
+    const h = items.find((x) => x.dataset.key === `g:${k}`);
+    if (h) return h;
+  }
+  return undefined;
+}
+/** 항목을 담은 머리(V-P4) — 묶음 바로 앞 형제. 머리 없는 맨 위 · 단 1 머리는 없음. */
+function headOf(el: HTMLElement): HTMLElement | undefined {
+  const grp = el.classList.contains('vt-group') ? el.parentElement : el.closest('.vt-grp');
+  if (!grp || !grp.classList.contains('vt-grp') || grp.classList.contains('top')) return undefined;
+  const h = grp.previousElementSibling as HTMLElement | null;
+  return h?.classList.contains('vt-group') ? h : undefined;
+}
+/** 그룹 머리 — [▾/▸] + 마디 하나(검색이면 경로 한 줄). Enter · Space · 클릭 = 접기 · 펼치기, → ← = 펴기 · 접기 · 내용 · 윗단(V-P4). */
+function groupHeadEl(key: string, label: string, tip: string, level: number, open: boolean, inner: boolean): HTMLElement {
   const d = document.createElement('div');
-  d.className = 'vt-group';
-  d.dataset.key = `g:${g.key}`;
+  d.className = inner ? 'vt-group inner' : 'vt-group';
+  d.dataset.key = `g:${key}`;
   d.setAttribute('role', 'row');
+  d.setAttribute('aria-level', String(level));
   d.setAttribute('aria-expanded', String(open));
   const tw = document.createElement('span');
   tw.className = 'tw';
@@ -6437,27 +6501,49 @@ function groupHeadEl(g: PaletteGroup, open: boolean): HTMLElement {
   tw.textContent = open ? '▾' : '▸';
   const lb = document.createElement('span');
   lb.className = 'lb';
-  lb.textContent = g.label;
-  d.title = g.label;
+  lb.textContent = label;
+  d.title = tip;
   d.append(tw, lb);
+  const focusSelf = (): void => { gridItems().find((x) => x.dataset.key === focusKey)?.focus(); };
   const toggle = (): void => {
-    if (open) grpCollapsed.add(g.key); else grpCollapsed.delete(g.key);
+    // 단마다 따로 — 자기 키만 넣고 뺀다(윗단 · 아래 단 키는 그대로).
+    if (open) grpCollapsed.add(key); else grpCollapsed.delete(key);
     focusKey = d.dataset.key ?? null;
     renderVarList();
-    gridItems().find((x) => x.dataset.key === focusKey)?.focus();
+    focusSelf();
+  };
+  const go = (target: HTMLElement | null | undefined): void => {
+    if (!target) return;
+    gridItems().forEach((x) => (x.tabIndex = -1));
+    target.tabIndex = 0;
+    focusKey = target.dataset.key ?? null;
+    target.focus();
   };
   d.addEventListener('click', toggle);
   d.addEventListener('keydown', (ev) => {
     if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); return; }
+    if (ev.key === 'ArrowRight') {
+      ev.preventDefault();
+      if (!open) toggle();
+      else go((d.nextElementSibling as HTMLElement | null)?.querySelector<HTMLElement>('[data-key]'));
+      return;
+    }
+    if (ev.key === 'ArrowLeft') {
+      ev.preventDefault();
+      if (open) toggle();
+      else go(headOf(d));
+      return;
+    }
     gridKey(ev, d);
   });
   return d;
 }
 /** Global 팔레트 묶음 — 알약(숫자 · 글자 · 참거짓) · 격자 보기 동그라미(24px, 동그라미만). 색 목록 보기는 줄(varRowEl). */
-function paletteLineEl(rows: VarRow[], mode: 'pill' | 'dot'): HTMLElement {
+function paletteLineEl(rows: VarRow[], mode: 'pill' | 'dot', level: number): HTMLElement {
   const line = document.createElement('div');
   line.className = `vp-line vp-${mode}`;
   line.setAttribute('role', 'row');
+  line.setAttribute('aria-level', String(level));
   for (const v of rows) {
     const cell = currentModeCell(v);
     const b = document.createElement('div');
@@ -6483,10 +6569,11 @@ function paletteLineEl(rows: VarRow[], mode: 'pill' | 'dot'): HTMLElement {
 }
 /** 목록 줄(§4.6 "목록 줄 — V1 뒤" · V-D5) — row(높이만) 안의 gridcell 하나: 왼쪽 동그라미(색) · 종류 표시(색 아님) 16 → 이름(남는 폭 · 말줄임),
  *  오른쪽 끝 붙은 칩 = 옅은 칸(별칭 "→ {끝 두 마디}" — Global은 따라갈 수 없을 때만, ⓐ) + 짙은 칸(값 글 — 따라갈 수 없으면 숨김). */
-function varRowEl(v: VarRow, global: boolean): HTMLElement {
+function varRowEl(v: VarRow, global: boolean, level: number): HTMLElement {
   const row = document.createElement('div');
   row.className = 'vt-r';
   row.setAttribute('role', 'row');
+  row.setAttribute('aria-level', String(level));
   const d = document.createElement('div');
   d.className = 'vt-row';
   d.dataset.key = `v:${v.id}`;
@@ -6597,7 +6684,9 @@ function gridKey(ev: KeyboardEvent, el: HTMLElement): void {
   if (k === 'ArrowDown') toLine(li + 1);
   else if (k === 'ArrowUp') toLine(li - 1);
   else if (k === 'ArrowRight' && ii >= 0 && inLine.length > 1) go(inLine[Math.min(inLine.length - 1, ii + 1)]);
-  else if (k === 'ArrowLeft' && ii >= 0 && inLine.length > 1) go(inLine[Math.max(0, ii - 1)]);
+  else if (k === 'ArrowLeft' && ii > 0) go(inLine[ii - 1]);
+  else if (k === 'ArrowLeft' && ii === 0 && !el.classList.contains('vt-group') && headOf(el)) go(headOf(el)); // 줄 · 묶음 첫 항목 ← = 담은 머리(V-P4)
+  else if (k === 'ArrowLeft' && ii === 0 && inLine.length > 1) go(el);
   else if (k === 'Home') go(all[0]);
   else if (k === 'End') go(all[all.length - 1]);
   else if (k === 'PageDown') toLine(li + 10);
@@ -6668,7 +6757,8 @@ let detailUsesEl: HTMLElement | null = null;
 function focusAfterDetail(id: string): { el: HTMLElement; present: boolean } {
   const items = gridItems();
   const hit = items.find((x) => x.dataset.key === `v:${id}`);
-  const el = hit ?? items[0] ?? $('varSearch');
+  // 접힘으로 숨었으면 보이는 가장 바깥의 접힌 윗단 머리, 검색으로 숨었으면 첫 항목(§4.8 · V-P5).
+  const el = hit ?? foldAnchor(`v:${id}`, items) ?? items[0] ?? $('varSearch');
   items.forEach((x) => (x.tabIndex = -1));
   el.tabIndex = 0;
   focusKey = el.dataset.key ?? null;
@@ -7734,8 +7824,7 @@ function varJump(id: string): void {
   ($('varSearch') as HTMLInputElement).value = '';
   sideSel = { kind: 'col', id: v.collectionId };
   sideUserPick = v.collectionId; // [→]도 직접 고름(§4.9 F9)
-  const cut = v.name.lastIndexOf('/');
-  grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? '' : v.name.slice(0, cut)}`);
+  for (const k of [`${v.collectionId}|`, ...varAncestorKeys(v)]) grpCollapsed.delete(k); // 모든 윗단 키(V-D6)
   focusKey = `v:${v.id}`;
   renderVarList();
   const item = gridItems().find((x) => x.dataset.key === focusKey);
@@ -7822,10 +7911,8 @@ function revealVar(v: VarRow): void {
   if (activeTab !== 'variables') showTab('variables');
   query = '';
   ($('varSearch') as HTMLInputElement).value = '';
-  const cut = v.name.lastIndexOf('/');
-  const gk = `${v.collectionId}|${cut < 0 ? '' : v.name.slice(0, cut)}`;
   sideSel = { kind: 'col', id: v.collectionId };
-  grpCollapsed.delete(gk);
+  for (const k of [`${v.collectionId}|`, ...varAncestorKeys(v)]) grpCollapsed.delete(k); // 모든 윗단 키(V-D6)
   focusKey = `v:${v.id}`;
   renderVarList();
 }
@@ -8030,7 +8117,11 @@ function openAddMenu(): void {
 /** ⋯ "그룹 모두 펼치기 / 접기" — 지금 컬렉션(검색 중이면 보이는 것)의 그룹. */
 function setAllGroups(open: boolean): void {
   const sel = currentSel();
-  const keys = paletteGroups(vmCols, vmVars, sel.kind === 'col' ? sel.id : null, query).map((g) => g.key);
+  const colId = sel.kind === 'col' ? sel.id : null;
+  // 검색이 아니면 모든 단 키(머리 없는 맨 위 `{컬렉션 id}|`는 넣지 않음 — V-D6), 검색 중이면 보이는 검색 머리 키.
+  const keys = query.trim()
+    ? paletteGroups(vmCols, vmVars, colId, query).map((g) => g.key)
+    : flattenPaletteTree(paletteTree(vmCols, vmVars, colId)).filter((n) => n.depth > 0).map((n) => n.key);
   for (const k of keys) {
     if (open) grpCollapsed.delete(k); else grpCollapsed.add(k);
   }
