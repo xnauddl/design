@@ -36,6 +36,8 @@ export interface ExportToken {
   aliasOf?: string;
   /** #16: 원본 단위 표기(Variable.description). lineHeight/letterSpacing 출력 시 px보다 우선("160%"). */
   description?: string;
+  /** 원래 변수 id(내부용 — 모드 블록이 기본 모드의 남는 변수와 짝을 맞출 때). 출력에 쓰지 않는다. */
+  id?: string;
 }
 
 /**
@@ -148,7 +150,7 @@ function tokenCssLines(t: ExportToken, opts: ExportOptions): string[] {
 /*
  * CSS 파일 모양(ia-v3 §4.4 "CSS 파일 모양" — 2026-11-20 사용자 결정):
  * 계층 먼저(GLOBAL → SEMANTIC → TEXT STYLES 블록마다 `:root`), 블록 안은 종류 묶음,
- * 묶음 안은 Figma 이름 `localeCompare` 순. 빈 묶음 · 빈 블록은 주석까지 생략.
+ * 묶음 안은 Figma 이름 코드 단위 비교 순. 빈 묶음 · 빈 블록은 주석까지 생략.
  * 머리 주석은 코드 상수(번역하지 않음 — 내보낸 파일은 코드).
  */
 const CSS_RULE = '='.repeat(74);
@@ -184,9 +186,8 @@ const CSS_GROUP_OF: Record<TokenKind, CssGroup> = {
 const byName = <T extends { name: string }>(a: T, b: T): number => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
 /** 한 계층의 블록 — 변수가 없으면 null. */
-function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', opts: ExportOptions): string[] | null {
-  const mine = tokens.filter((t) => t.collection === tier);
-  if (!mine.length) return null;
+/** 종류 묶음으로 나눈 블록 몸통(`/* Color *\/` 묶음 · 묶음 안 이름순 · 묶음 사이 빈 줄). */
+function groupBody(mine: readonly ExportToken[], opts: ExportOptions): string[] {
   const body: string[] = [];
   for (const g of CSS_GROUP_ORDER) {
     // `?? 'Other'`는 타입 밖 값(검사를 거치지 않은 메시지 등)에 대한 런타임 안전망 — 타입 안에서는 위 Record가 빠짐없음을 보장한다.
@@ -196,14 +197,46 @@ function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', 
     body.push(`  /* ${g} */`);
     for (const t of inGroup) body.push(...tokenCssLines(t, opts));
   }
-  return [...cssBlockHead(CSS_HEAD[tier]), ':root {', ...body, '}'];
+  return body;
 }
 
-function toCss(tokens: ExportToken[], opts: ExportOptions, textStyles: readonly ExportTextStyle[]): string {
+function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', opts: ExportOptions): string[] | null {
+  const mine = tokens.filter((t) => t.collection === tier);
+  if (!mine.length) return null;
+  return [...cssBlockHead(CSS_HEAD[tier]), ':root {', ...groupBody(mine, opts), '}'];
+}
+
+const TIER_UPPER = { Global: 'GLOBAL', Semantic: 'SEMANTIC' } as const;
+const cssAttr = (v: string): string => v.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+/**
+ * 한 계층의 모드 블록(ia-v3 §4.4 "모드 블록") — 기본 모드의 남는 변수(`base`, dedupe 뒤)마다
+ * 그 모드의 줄이 기본 줄과 다를 때만. 넣을 것이 없으면 null.
+ */
+function modeBlock(base: readonly ExportToken[], mode: ExportModeSet, tier: 'Global' | 'Semantic', opts: ExportOptions): string[] | null {
+  const byId = new Map(mode.tokens.filter((t) => t.id !== undefined).map((t) => [t.id as string, t]));
+  const changed: ExportToken[] = [];
+  for (const b of base) {
+    if (b.collection !== tier || b.id === undefined) continue;
+    const m = byId.get(b.id);
+    if (!m) continue; // ③ — 이 모드에서는 끝까지 풀리지 않음: 이 블록에서만 뺀다
+    if (tokenCssLines(m, opts).join('\n') !== tokenCssLines(b, opts).join('\n')) changed.push(m);
+  }
+  if (!changed.length) return null;
+  const title = `${TIER_UPPER[tier]} — ${mode.titles[tier].replace(/\*\//g, '*\\/')} mode (only values that differ)`;
+  return [...cssBlockHead(title), `[data-theme="${cssAttr(mode.key)}"] {`, ...groupBody(changed, opts), '}'];
+}
+
+function toCss(tokens: ExportToken[], opts: ExportOptions, textStyles: readonly ExportTextStyle[], modes: readonly ExportModeSet[]): string {
   const blocks: string[][] = [];
   for (const tier of ['Global', 'Semantic'] as const) {
     const b = tierBlock(tokens, tier, opts);
-    if (b) blocks.push(b);
+    if (!b) continue;
+    blocks.push(b);
+    for (const m of modes) {
+      const mb = modeBlock(tokens, m, tier, opts); // 계층 블록 바로 뒤, 블록 키 순
+      if (mb) blocks.push(mb);
+    }
   }
   if (textStyles.length) {
     const sorted = [...textStyles].sort(byName);
@@ -315,6 +348,10 @@ export interface ExportVarInput {
   alias?: string;
   /** 별칭이 아니면 값(색은 이미 `#rrggbb[aa]`). */
   value?: string | number | boolean;
+  /** 속한 컬렉션 id(모드 블록용). */
+  collectionId?: string;
+  /** 기본이 아닌 모드 값(모드 id → 값). 모드 블록용. */
+  modeValues?: Record<string, ExportModeValue>;
 }
 
 /** 원래 변수를 포함해 읽는 상한(연결 쪽 `bind.ts` `resolveValue`와 같다). */
@@ -327,20 +364,93 @@ const ALIAS_READ_LIMIT = 12;
  * 이름 · 계층 · 종류는 원래 변수, 설명은 ①이면 원래 · ②면 값을 준 변수.
  */
 export function resolveExportTokens(vars: readonly ExportVarInput[]): ExportToken[] {
+  return resolveWith(vars, (v) => v);
+}
+
+/** 한 변수의 한 모드 값(별칭 대상 id 또는 값). */
+export interface ExportModeValue {
+  alias?: string;
+  value?: string | number | boolean;
+}
+
+/** 내보내기 입력 — 로컬 컬렉션 하나(13.5 순서 — 사용자 컬렉션 먼저 · 목록 순으로 넘긴다). */
+export interface ExportCollectionInput {
+  id: string;
+  tier: number;
+  defaultModeId: string;
+  modes: readonly { modeId: string; name: string }[];
+}
+
+/** 모드 블록 하나의 재료 — 블록 키 · 계층별 머리 이름 · 그 모드로 푼 토큰(dedupe 전, `id` 있음). */
+export interface ExportModeSet {
+  key: string;
+  titles: { Global: string; Semantic: string };
+  tokens: ExportToken[];
+}
+
+/** 모드 키 — 앞뒤 공백을 떼고 소문자, 공백 묶음은 `-`(ia-v3 §4.4 "선택자"). 한글 등은 그대로. */
+export function exportModeKey(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, '-');
+}
+
+/**
+ * 기본이 아닌 모드마다 푼 토큰(ia-v3 §4.4 "모드 블록"). 블록 키 = 로컬 컬렉션 전부의 기본이 아닌 모드 키
+ * (자기 기본 모드와 같은 키 · 빈 키는 뺌, 한 컬렉션 안 같은 키는 목록 순 첫 것). 각 변수는 자기 컬렉션에
+ * 그 키 모드가 있으면 그 값, 없으면 기본 모드 값. ⓪ · 남는 변수는 기본 모드 기준 그대로. 키 순(코드 단위).
+ */
+export function resolveExportModes(vars: readonly ExportVarInput[], cols: readonly ExportCollectionInput[]): ExportModeSet[] {
+  const modeOfKey = new Map<string, Map<string, string>>(); // 컬렉션 id → 키 → 모드 id
+  const keys: string[] = [];
+  const titles = new Map<string, { Global?: string; Semantic?: string; any?: string }>();
+  for (const c of cols) {
+    const def = c.modes.find((m) => m.modeId === c.defaultModeId);
+    const defKey = def ? exportModeKey(def.name) : '';
+    const mine = new Map<string, string>();
+    for (const m of c.modes) {
+      if (m.modeId === c.defaultModeId) continue;
+      const k = exportModeKey(m.name);
+      if (!k || k === defKey || mine.has(k)) continue;
+      mine.set(k, m.modeId);
+      if (!keys.includes(k)) keys.push(k);
+      const ti = titles.get(k) ?? {};
+      if (ti.any === undefined) ti.any = m.name;
+      if (c.tier === 1 && ti.Global === undefined) ti.Global = m.name;
+      if (c.tier === 2 && ti.Semantic === undefined) ti.Semantic = m.name;
+      titles.set(k, ti);
+    }
+    modeOfKey.set(c.id, mine);
+  }
+  keys.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return keys.map((k) => {
+    const ti = titles.get(k) ?? {};
+    const tokens = resolveWith(vars, (v) => {
+      const mid = v.collectionId !== undefined ? modeOfKey.get(v.collectionId)?.get(k) : undefined;
+      const mv = mid !== undefined ? v.modeValues?.[mid] : undefined;
+      return mv ? { ...v, alias: mv.alias, value: mv.value } : v;
+    });
+    return { key: k, titles: { Global: ti.Global ?? ti.any ?? k, Semantic: ti.Semantic ?? ti.any ?? k }, tokens };
+  });
+}
+
+/**
+ * 공통 풀기 — ⓪(기본 모드 사슬) · 남는 변수는 늘 기본 모드로 정하고, ① · ②는 `read`가 돌려준 값으로 따라간다.
+ * `read`로 따라가다 끝까지 풀리지 않으면(③) 그 변수는 이 결과에서만 뺀다.
+ */
+function resolveWith(vars: readonly ExportVarInput[], read: (v: ExportVarInput) => ExportVarInput): ExportToken[] {
   const byId = new Map(vars.map((v) => [v.id, v]));
-  const reachesValue = (v: ExportVarInput): boolean => {
-    const seen = new Set([v.id]);
-    let cur = v;
+  const reaches = (start: ExportVarInput, rd: (v: ExportVarInput) => ExportVarInput): boolean => {
+    const seen = new Set([start.id]);
+    let cur = rd(start);
     for (let reads = 1; cur.alias !== undefined; reads++) {
       if (reads >= ALIAS_READ_LIMIT) return false;
       const next = byId.get(cur.alias);
       if (!next || seen.has(next.id)) return false;
       seen.add(next.id);
-      cur = next;
+      cur = rd(next);
     }
     return true;
   };
-  const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reachesValue(v));
+  const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x));
   // 남는 변수 — dedupeByName과 같은 규칙(같은 이름이면 Global, 같은 계층이면 앞의 것)
   const winner = new Map<string, ExportVarInput>();
   for (const v of ok) {
@@ -348,22 +458,29 @@ export function resolveExportTokens(vars: readonly ExportVarInput[]): ExportToke
     if (!prev || (prev.tier === 2 && v.tier === 1)) winner.set(v.name, v);
   }
   const survivors = new Set([...winner.values()].map((v) => v.id));
-  return ok.map((v) => {
-    const tok: ExportToken = { name: v.name, collection: v.tier === 1 ? 'Global' : 'Semantic', type: v.type, kind: v.kind };
-    let cur = v;
+  const out: ExportToken[] = [];
+  for (const v of ok) {
+    if (read !== undefined && !reaches(v, read)) continue; // ③ (이 모드에서만)
+    const tok: ExportToken = { id: v.id, name: v.name, collection: v.tier === 1 ? 'Global' : 'Semantic', type: v.type, kind: v.kind };
+    let cur = read(v);
+    let done = false;
     while (cur.alias !== undefined) {
-      const next = byId.get(cur.alias) as ExportVarInput; // ⓪에서 닿는 것을 확인함
+      const next = byId.get(cur.alias) as ExportVarInput; // 위에서 닿는 것을 확인함
       if (survivors.has(next.id)) {
         tok.aliasOf = next.name; // ①
         if (v.description) tok.description = v.description;
-        return tok;
+        done = true;
+        break;
       }
-      cur = next;
+      cur = read(next);
     }
-    tok.value = cur.value as string | number; // ② (참거짓도 그대로)
-    if (cur.description) tok.description = cur.description;
-    return tok;
-  });
+    if (!done) {
+      tok.value = cur.value as string | number; // ② (참거짓도 그대로)
+      if (cur.description) tok.description = cur.description;
+    }
+    out.push(tok);
+  }
+  return out;
 }
 
 /**
@@ -371,7 +488,9 @@ export function resolveExportTokens(vars: readonly ExportVarInput[]): ExportToke
  * 거울: ⓐ 자기 이름을 가리키는 별칭 ⓑ 둘 다 별칭이면 같은 대상, 둘 다 값이면 값 · 설명 · 종류가 같음.
  * 견줄 Global은 남는 것(앞의 것). 같은 계층 안 겹침은 세지 않는다.
  */
-export function exportClashes(tokens: readonly ExportToken[]): string[] {
+export function exportClashes(tokens: readonly ExportToken[], modes: readonly ExportModeSet[] = []): string[] {
+  // 모드마다도 거울을 본다 — 하나라도 거울이 아니면 겹침(ia-v3 §4.4 "같은 이름 Global · Semantic" › 모드)
+  if (modes.length) return [...new Set([tokens, ...modes.map((m) => m.tokens)].flatMap((l) => exportClashes(l)))].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const globalOf = new Map<string, ExportToken>();
   for (const tk of tokens) if (tk.collection === 'Global' && !globalOf.has(tk.name)) globalOf.set(tk.name, tk);
   const out = new Set<string>();
@@ -446,9 +565,14 @@ function textStylesToW3C(styles: readonly ExportTextStyle[], opts: ExportOptions
 }
 
 /** 형식에 따라 토큰(+텍스트 스타일)을 코드 문자열로 내보낸다. */
-export function exportTokens(tokens: ExportToken[], opts: ExportOptions, textStyles: readonly ExportTextStyle[] = []): string {
+export function exportTokens(
+  tokens: ExportToken[],
+  opts: ExportOptions,
+  textStyles: readonly ExportTextStyle[] = [],
+  modes: readonly ExportModeSet[] = [],
+): string {
   const list = dedupeByName(tokens);
-  if (opts.format === 'css') return toCss(list, opts, textStyles);
+  if (opts.format === 'css') return toCss(list, opts, textStyles, modes); // 모드 블록은 CSS만(W3C는 기본 모드만 — A.24)
   const root = JSON.parse(toW3C(list, opts)) as W3CNode;
   textStylesToW3C(textStyles, opts, root);
   return JSON.stringify(root, null, 2);

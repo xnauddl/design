@@ -17,7 +17,7 @@ import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './l
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor } from './lib/naming';
-import { ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportTokens, resolveExportTokens } from './lib/exporters';
+import { ExportCollectionInput, ExportModeValue, ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportTokens, resolveExportModes, resolveExportTokens } from './lib/exporters';
 import { tabInfo } from './lib/componentLike';
 import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
@@ -1751,19 +1751,24 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
           const col = colById.get(v.variableCollectionId);
           if (!col) continue;
-          const raw = v.valuesByMode[col.defaultModeId];
-          const inp: ExportVarInput = { id: v.id, name: v.name, tier: tiers.get(col.id) ?? 0, type: v.resolvedType, kind: kindOf(v) };
+          // 한 모드 값 → 별칭 대상 id 또는 값(색은 투명도가 있으면 #rrggbbaa — 변수 탭과 같은 기준, ia-v3 §2.11)
+          const read = (raw: VariableValue | undefined): ExportModeValue => {
+            if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') return { alias: (raw as VariableAlias).id };
+            if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) return { value: exportColorHex(raw as RGBA) };
+            return { value: raw as string | number | boolean };
+          };
+          const inp: ExportVarInput = { id: v.id, name: v.name, tier: tiers.get(col.id) ?? 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, ...read(v.valuesByMode[col.defaultModeId]) };
           if (v.description) inp.description = v.description; // #16: 원본 단위("160%") 내보내기 우선
-          if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
-            inp.alias = (raw as VariableAlias).id;
-          } else if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
-            inp.value = exportColorHex(raw as RGBA); // 투명도가 있으면 #rrggbbaa — 변수 탭과 같은 기준(ia-v3 §2.11)
-          } else {
-            inp.value = raw as string | number | boolean;
-          }
+          // 기본이 아닌 모드 값 — 모드 블록(ia-v3 §4.4 "모드 블록")
+          const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
+          if (others.length) inp.modeValues = Object.fromEntries(others.map((m) => [m.modeId, read(v.valuesByMode[m.modeId])]));
           inputs.push(inp);
         }
         const tokens = resolveExportTokens(inputs); // 내보내는 계층(1 · 2)만, 별칭은 남는 변수를 가리키거나 값으로 풂
+        const modeCols: ExportCollectionInput[] = [...cols]
+          .sort((a, b) => rank(a.id) - rank(b.id)) // 13.5 순서 — 모드 블록 머리 이름의 "첫 컬렉션"
+          .map((c) => ({ id: c.id, tier: tiers.get(c.id) ?? 0, defaultModeId: c.defaultModeId, modes: c.modes }));
+        const modes = resolveExportModes(inputs, modeCols);
         // 이름순은 코드 단위 비교(언어 설정 무관 — exporters.ts와 같은 기준). W3C 키 순서를 정하고, CSS는 exporters가 묶음마다 다시 정렬한다.
         // 같은 이름끼리는 안정 정렬이라 13.5 순서(위 rank)가 남는다 — dedupe가 그 첫 것을 쓴다.
         tokens.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
@@ -1784,8 +1789,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           format: msg.format,
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
-        }, styles);
-        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens) });
+        }, styles, modes);
+        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes) });
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
