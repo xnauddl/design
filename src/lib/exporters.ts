@@ -189,6 +189,7 @@ function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', 
   if (!mine.length) return null;
   const body: string[] = [];
   for (const g of CSS_GROUP_ORDER) {
+    // `?? 'Other'`는 타입 밖 값(검사를 거치지 않은 메시지 등)에 대한 런타임 안전망 — 타입 안에서는 위 Record가 빠짐없음을 보장한다.
     const inGroup = mine.filter((t) => (CSS_GROUP_OF[t.kind] ?? 'Other') === g).sort(byName);
     if (!inGroup.length) continue;
     if (body.length) body.push('');

@@ -12537,7 +12537,7 @@
             inputs.push(inp);
           }
           const tokens = resolveExportTokens(inputs);
-          tokens.sort((a, b) => a.name.localeCompare(b.name));
+          tokens.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
           const styles = (await figma.getLocalTextStylesAsync()).map((st) => ({
             name: st.name,
             fontFamily: st.fontName.family,
@@ -12546,7 +12546,7 @@
             lineHeight: st.lineHeight.unit === "AUTO" ? { unit: "auto", value: 0 } : { unit: st.lineHeight.unit === "PERCENT" ? "percent" : "px", value: st.lineHeight.value },
             letterSpacing: { unit: st.letterSpacing.unit === "PERCENT" ? "percent" : "px", value: st.letterSpacing.value }
           }));
-          styles.sort((a, b) => a.name.localeCompare(b.name));
+          styles.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
           const content = exportTokens(tokens, {
             format: msg.format,
             fontSizeUnit: msg.fontSizeUnit,

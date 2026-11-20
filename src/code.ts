@@ -1764,7 +1764,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           inputs.push(inp);
         }
         const tokens = resolveExportTokens(inputs); // 내보내는 계층(1 · 2)만, 별칭은 남는 변수를 가리키거나 값으로 풂
-        tokens.sort((a, b) => a.name.localeCompare(b.name));
+        // 이름순은 코드 단위 비교(언어 설정 무관 — exporters.ts와 같은 기준). W3C 키 순서를 정하고, CSS는 exporters가 묶음마다 다시 정렬한다.
+        // 같은 이름끼리는 안정 정렬이라 13.5 순서(위 rank)가 남는다 — dedupe가 그 첫 것을 쓴다.
+        tokens.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
         // 텍스트 스타일도 함께 — 행간·자간 %는 변수가 아니라 스타일에 있다(A안). %는 그대로 낸다.
         const styles: ExportTextStyle[] = (await figma.getLocalTextStylesAsync()).map((st) => ({
           name: st.name,
@@ -1777,7 +1779,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               : { unit: st.lineHeight.unit === 'PERCENT' ? 'percent' : 'px', value: st.lineHeight.value },
           letterSpacing: { unit: st.letterSpacing.unit === 'PERCENT' ? 'percent' : 'px', value: st.letterSpacing.value },
         }));
-        styles.sort((a, b) => a.name.localeCompare(b.name));
+        styles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)); // 코드 단위 비교(위와 같은 기준)
         const content = exportTokens(tokens, {
           format: msg.format,
           fontSizeUnit: msg.fontSizeUnit,
