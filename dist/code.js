@@ -2662,7 +2662,7 @@
     const colorLeft = [];
     const emit = (s, e, viaPill = false) => {
       res.bound++;
-      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill));
+      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type));
     };
     const globalFor = (cands) => {
       var _a2;
@@ -2743,7 +2743,8 @@
       }
       res.bound++;
       const g = p.global;
-      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null)), {
+      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null, g.type)), {
+        // 타입 = 가리킬 Global(TR-18)
         newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
         newRoleGlobalName: spec.globalName
       }));
@@ -2753,8 +2754,8 @@
     var _a;
     return (_a = s.pill) != null ? _a : s.value;
   };
-  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha, viaPill = false) {
-    return __spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha, viaPill = false, resolvedType) {
+    return __spreadValues(__spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
@@ -2764,7 +2765,7 @@
       variableName,
       tier,
       variableValue
-    }), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), viaPill && typeof s.value === "number" ? { pillFrom: s.value } : {});
+    }), resolvedType ? { resolvedType } : {}), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), viaPill && typeof s.value === "number" ? { pillFrom: s.value } : {});
   }
   function entryAlpha(e) {
     return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;

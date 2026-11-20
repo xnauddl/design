@@ -14,6 +14,8 @@ export interface GroupCand extends BindItem {
   variableValue?: string;
   /** 변수 투명도(1이면 없음 — ia-v3 §2.11 "반투명 색 토큰"). */
   variableAlpha?: number;
+  /** 붙을 변수의 타입(ia-v4 §2.7 TR-P19 — 줄 동그라미 · 종류 표시). */
+  resolvedType?: 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
   /** 새 역할(§2.12) — 연결할 때 만든다. 가리킬 Global 이름. */
   newRole?: unknown;
   newRoleGlobalName?: string;
@@ -36,6 +38,8 @@ export interface VarGroup {
   variableName: string;
   variableValue: string;
   variableAlpha?: number;
+  /** 붙을 변수의 타입(없으면 값 글로 가른다 — TR-18). */
+  resolvedType?: 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
   /** 곳 수(= keys.length). */
   count: number;
   keys: string[];
@@ -86,7 +90,8 @@ export function groupByVariable(cands: readonly GroupCand[]): VarGroup[] {
     const keys = lines.flatMap((l) => l.keys);
     const nr = list.find((c) => c.newRole);
     const variableAlpha = list.find((c) => c.variableAlpha != null)?.variableAlpha;
-    groups.push({ variableId, variableName: list[0].variableName, variableValue, ...(variableAlpha != null ? { variableAlpha } : {}), count: keys.length, keys, lines, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}) });
+    const resolvedType = list.find((c) => c.resolvedType)?.resolvedType;
+    groups.push({ variableId, variableName: list[0].variableName, variableValue, ...(variableAlpha != null ? { variableAlpha } : {}), ...(resolvedType ? { resolvedType } : {}), count: keys.length, keys, lines, ...(nr ? { newRoleOf: nr.newRoleGlobalName ?? '' } : {}) });
   }
   groups.sort((a, b) => b.count - a.count || a.variableName.localeCompare(b.variableName));
   return groups;

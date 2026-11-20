@@ -89,8 +89,8 @@ const locked = (p, sel) => p.getAttribute(sel, 'aria-disabled').then((v) => v ==
 const named = async (p, sel, name) => (await p.getByRole('button', { name, exact: true }).count()) >= 1 && (await p.$eval(sel, (e, n) => e.textContent.trim() === n, name));
 const emptyText = (p) => p.$eval('#bindEmpty', (e) => (e.hidden ? null : e.querySelector('.be-text')?.textContent ?? ''));
 const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return p.textContent('#statusText'); };
-/** 목록(트리 §2.7) — 머리는 "이름 {n}개", 줄은 [이름, 곳 수, 켬]. */
-const bindList = (p) => p.$$eval('#bindTree > .tr', (e) => e.map((x) => (x.classList.contains('tr-head') ? `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}` : [x.querySelector('.bv-name').textContent, x.querySelector('.bv-tw').textContent, x.querySelector('.bv-switch').getAttribute('aria-checked') === 'true'])));
+/** 목록(트리 §2.7) — 머리는 "이름 {n}개", 줄은 [이름(옅은 칸 — "→ " 뺌), 곳 수(왼쪽 글), 켬](TR 뒤 — ia-v4 §2.7 "변수 목록 모양"). */
+const bindList = (p) => p.$$eval('#bindTree > .tr', (e) => e.map((x) => (x.classList.contains('tr-head') ? `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}` : [x.querySelector('.vchip .al').textContent.replace(/^→ /, ''), x.querySelector('.tr-lt').textContent, x.querySelector('.bv-switch').getAttribute('aria-checked') === 'true'])));
 const TS0 = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
 const tsPrev = (reqId, rows = [], skipReasons = {}) => ({ type: 'TEXT_STYLES_PREVIEW', reqId, rows, skipReasons: { ...TS0, ...skipReasons } });
 /** 찾기 응답(변수 + 텍스트 스타일) — 마지막 APPLY 차례로. */
@@ -157,7 +157,7 @@ async function cardAnswer(p, tokens = MC_TOKENS, states = null, roles = 4) {
 }
 /** 카드 안 카드 찾기(ia-v4 §2.8 · B.12) — 보이는 카드(.step · .sel-card · .modal) 안에서 테두리나 그림자 + 둥근 모서리 + 배경을 모두 가진 요소. */
 const nestedCards = (p) => p.evaluate(() => {
-  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.mk-row .sw,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker';
+  const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.mk-row .sw,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker,.vr-sw';
   document.activeElement?.blur?.();
   const clear = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'transparent';
   const isCard = (e) => {
@@ -702,15 +702,15 @@ const reenter = (p) => p.evaluate(() => {
     JSON.stringify(list) === JSON.stringify(['Spacing 2곳', ['spacing/8', '2곳', true], 'Radius 1곳', ['spacing/8', '1곳', true], 'Color 1곳', ['color/text/default', '1곳', true], 'Typography 1곳', ['font/size/16', '1곳', true], 'Text Style 2곳', ['body/medium', '2곳', true]]),
     JSON.stringify(list));
   check('B2 [7곳 연결] 주 버튼 · 단계 표시 · [찾기] · 필터 없음', (await named(p, '#btnApplyConfirm', '7곳 연결')) && !(await locked(p, '#btnApplyConfirm')) && (await p.$('#bindSteps')) === null && (await p.$('#btnApply')) === null && (await p.$('#bindFilter')) === null);
-  check('B2 줄 이름 칩 — 종류 표시(● · #) 없음(값 칩과 중복)', (await p.$$eval('#bindTree .tr-row .bv-var .bv-mark', (e) => e.length)) === 0);
-  check('B2 목록 treegrid · 접근성 이름 · 머리 줄 = 이름 · 개수 · 스위치만(미리보기 없음)', (await p.getAttribute('#bindTree', 'role')) === 'treegrid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수' && (await p.$$eval('#bindTree .tr-head', (e) => e.every((h) => !h.querySelector('.bv-chip') && !!h.querySelector('.bv-switch')))));
+  check('B2 줄 옅은 칸 — 종류 표시(● · #) 없음(종류는 왼쪽 동그라미 · 표시 — TR-D3)', (await p.$$eval('#bindTree .tr-row .vchip .bv-mark', (e) => e.length)) === 0 && (await p.$$eval('#bindTree .tr-row .vchip .al', (e) => e.length > 0 && e.every((a) => !/[●#T] /.test(a.textContent.replace(/^→ /, ''))))));
+  check('B2 목록 treegrid · 접근성 이름 · 머리 줄 = 이름 · 개수 · 스위치만(미리보기 없음)', (await p.getAttribute('#bindTree', 'role')) === 'treegrid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수' && (await p.$$eval('#bindTree .tr-head', (e) => e.every((h) => !h.querySelector('.bv-chip, .vchip') && !!h.querySelector('.bv-switch')))));
   // 스위치 — 줄 단위
-  check('B.12 트리 머리 줄 = 회색 머리 띠(.tr-group · --surface-2)', (await p.$$eval('#bindTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)'))));
+  check('TR-D1 트리 머리 줄 — 띠 없음(배경 투명 · .tr-group 없음) · 위 1px 선(첫 머리 0) · 이름 12px 600 --text-2', (await p.$$eval('#bindTree .tr-head', (e) => e.length > 1 && e.every((h, i) => { const cs = getComputedStyle(h); const n = getComputedStyle(h.querySelector('.tr-name')); return !h.classList.contains('tr-group') && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopWidth === (i === 0 ? '0px' : '1px') && n.fontSize === '12px' && n.fontWeight === '600' && n.color === 'rgb(94, 99, 107)'; }))));
   await p.hover('#bindTree .tr-row >> nth=0');
   const trHover = await p.$eval('#bindTree .tr-row', (e) => getComputedStyle(e).backgroundColor);
   await p.hover('#bindTree .tr-head >> nth=0');
   const headHover = await p.$eval('#bindTree .tr-head', (e) => getComputedStyle(e).backgroundColor);
-  check('B.12 마우스 올림 띠 — 트리 줄은 --surface-hover · 머리 줄은 그대로', trHover === 'rgb(236, 238, 240)' && headHover === 'rgb(244, 245, 246)', `${trHover} / ${headHover}`);
+  check('B.12 마우스 올림 띠 — 트리 줄은 --surface-hover · 머리 줄은 그대로(투명 — TR-D1)', trHover === 'rgb(236, 238, 240)' && headHover === 'rgba(0, 0, 0, 0)', `${trHover} / ${headHover}`);
   await p.mouse.move(0, 0);
   await p.click('#bindTree .tr-row >> nth=1 >> .bv-switch'); // 반경 줄
   check('B2 반경 줄만 끔 → 간격 줄은 켠 채 · [6곳 연결]', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]) && (await named(p, '#btnApplyConfirm', '6곳 연결')));
@@ -1197,11 +1197,12 @@ async function saveAndGet(p) {
   await p.click('[data-k="link"]');
   const chips = await p.$$eval('#bindTree .tr-row', (cards) => cards.map((c) => {
     const b = c.querySelector('.bv-new');
-    return { name: c.querySelector('.bv-name')?.textContent, badge: b?.textContent, role: b?.getAttribute('role'), aria: b?.getAttribute('aria-label'), tip: c.querySelector('.bv-var')?.getAttribute('title') };
+    const ch = c.querySelector('.vchip');
+    return { name: c.querySelector('.vchip .al')?.lastChild?.textContent, badge: b?.textContent, role: b?.getAttribute('role'), aria: b?.getAttribute('aria-label'), tip: b?.getAttribute('title'), chipTip: ch?.getAttribute('title') ?? null, after: !!b && ch.compareDocumentPosition(b) === Node.DOCUMENT_POSITION_FOLLOWING && b.previousElementSibling === ch };
   }));
   const inv = chips.find((x) => x.name === 'color/text/inverse');
   check('16 새 Semantic 줄 — "N" 배지 · role=img · 읽기 이름 "새 Semantic"', !!inv && inv.badge === 'N' && inv.role === 'img' && inv.aria === '새 Semantic', JSON.stringify(inv));
-  check('16 칩 툴팁 "color/gray/0을 가리켜요"', inv?.tip === 'color/gray/0을 가리켜요', JSON.stringify(inv));
+  check('16 N 배지 툴팁 "color/gray/0을 가리켜요"(TR-P12 — 칩에는 없음) · 배지는 칩 바로 뒤(TR-D9)', inv?.tip === 'color/gray/0을 가리켜요' && inv.chipTip === null && inv.after, JSON.stringify(inv));
   check('16 이미 있는 역할 줄은 "N" 없음', chips.find((x) => x.name === 'spacing/8')?.badge === undefined);
   const badgeStyle = await p.$eval('#bindTree .bv-new', (e) => { const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color, cs.borderTopWidth, cs.fontWeight]; });
   check('16 "N" 배지 — 채운 바탕(#0a6dbf) · 흰 글자 · 테두리 없음 · 600', JSON.stringify(badgeStyle) === JSON.stringify(['rgb(10, 109, 191)', 'rgb(255, 255, 255)', '0px', '600']), JSON.stringify(badgeStyle));
@@ -1257,25 +1258,25 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(50);
   const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
-  check('B.12 만들기 트리 머리 줄 = 회색 머리 띠', await p.$$eval('#makeTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)')));
+  check('TR-D1 만들기 트리 머리 줄 — 띠 없음 · 위 선(첫 머리 0)', await p.$$eval('#makeTree .tr-head', (e) => e.length > 0 && e.every((h, i) => !h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgba(0, 0, 0, 0)' && getComputedStyle(h).borderTopWidth === (i === 0 ? '0px' : '1px'))));
   check('17 만들 수 미리보기 — preview · reqId · 켠 줄만(글자 종류는 기본 끔)', pv?.preview === true && typeof pv.reqId === 'number' && JSON.stringify(pv.tokens.map((x) => x.name)) === JSON.stringify(['spacing/16', 'spacing/8']), JSON.stringify(pv?.tokens?.map((x) => x.name)));
   await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 1, updated: 0, summary: '', roles: 1, skippedManual: 0,
     tokenStates: { 'spacing/16': { state: 'new' }, 'spacing/8': { state: 'update' } }, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
   await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [{ name: 'body/medium', sig: '99|0|0|Inter|Regular' }],
     styles: [{ name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] }] });
   await p.waitForTimeout(50);
-  check('17 Text Style 탭 줄에 .ts-off 없음 · 요약은 tsSummary 글 그대로(KRDS 크기 표시 없음 — text-style-krds §4)', await p.evaluate(() => { const m = [...document.querySelectorAll('#makeTabs [role="tab"]')].find((x) => x.textContent.startsWith('Text Style')); m?.click(); const sub = document.querySelector('#makeTree .tr-sub'); const ok = !!sub && document.querySelectorAll('#makeTree .ts-off').length === 0 && sub.children.length === 0 && sub.textContent.startsWith('Inter') && !/[○⚠]/.test(sub.textContent); document.getElementById('makeTab-global')?.click(); return ok; }));
+  check('17 Text Style 탭 줄에 .ts-off 없음 · 요약은 tsSummary 글 그대로(KRDS 크기 표시 없음 — text-style-krds §4)', await p.evaluate(() => { const m = [...document.querySelectorAll('#makeTabs [role="tab"]')].find((x) => x.textContent.startsWith('Text Style')); m?.click(); const sub = document.querySelector('#makeTree .vchip .vl'); const ok = !!sub && document.querySelectorAll('#makeTree .ts-off').length === 0 && sub.children.length === 0 && sub.textContent.startsWith('Inter') && !/[○⚠]/.test(sub.textContent); document.getElementById('makeTab-global')?.click(); return ok; }));
   check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', 'Text Style1']), JSON.stringify(await tabsOf(p)));
   const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
   check('17 Global 탭 — 종류 머리만(묶음 머리 없음) · 글자(꺼져 접힘)', JSON.stringify(heads) === JSON.stringify(['Spacing 2개', 'Typography 1개']) && (await p.getAttribute('#makeTree [data-tkey="gk:text"]', 'aria-expanded')) === 'false', JSON.stringify(heads));
   check('17 Global 탭 도구 줄 — "켠 값만 변수로 만들어요" · ⓘ 없음 · 모두 켜기 · 끄기', (await p.textContent('#makeTopText')) === '켠 값만 변수로 만들어요' && !(await visible(p, '#makeInfo')) && (await visible(p, '#makeAllOn')));
-  check('17 상태 태그 "있음"(update) · "Layer 2" · 이름 칩에 종류 표시 없음', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('Layer 2') && (await p.$$eval('#makeTree [data-tkey^="g:"] .bv-var .bv-mark', (e) => e.length)) === 0);
+  check('17 상태 태그 "있음"(update — 칩 뒤, TR-D9) · "Layer 2" · 옅은 칸에 종류 표시 없음', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.$eval('#makeTree [data-tkey="g:spacing/8"] .tr-tag', (e) => e.previousElementSibling?.classList.contains('vchip'))) && (await p.textContent('#makeTree [data-tkey="g:spacing/8"] .tr-lt')) === 'Layer 2' && (await p.$$eval('#makeTree [data-tkey^="g:"] .vchip .bv-mark', (e) => e.length)) === 0 && (await p.textContent('#makeTree [data-tkey="g:spacing/8"] .vchip .al')) === '→ spacing/8');
   // 탭 키보드 — → 로 Semantic(바로 고름)
   await p.focus('#makeTab-global');
   await p.keyboard.press('ArrowRight');
   await p.waitForTimeout(20);
   check('17 → 키로 Semantic 탭 — 포커스 · 고름 · 도구 줄 ⓘ · 링크 없음', (await p.evaluate(() => document.activeElement?.id)) === 'makeTab-semantic' && (await p.getAttribute('#makeTab-semantic', 'aria-selected')) === 'true' && (await p.textContent('#makeTopText')) === '켠 Global을 따라 함께 만들어요' && (await visible(p, '#makeInfo')) && !(await visible(p, '#makeAllOn')) && (await p.getAttribute('#makePanel', 'aria-labelledby')) === 'makeTab-semantic');
-  check('17 Semantic 탭 — 종류 머리 › Semantic 줄(칩 종류 표시 그대로)', (await p.textContent('#makeTree')).includes('spacing/card/gap') && (await p.textContent('#makeTree')).includes('= spacing/16') && (await p.$$eval('#makeTree .bv-mark', (e) => e.length)) === 1);
+  check('17 Semantic 탭 — 종류 머리 › Semantic 줄(왼쪽 종류 표시 # · 옅은 칸 "→ spacing/16" · "= …" 글 · .bv-mark 없음 — TR-D10)', (await p.textContent('#makeTree .tr-row .tr-lt')) === 'spacing/card/gap' && (await p.textContent('#makeTree .tr-row .vchip .al')) === '→ spacing/16' && (await p.textContent('#makeTree .tr-row .tr-lead')) === '#' && !(await p.textContent('#makeTree')).includes('= spacing/16') && (await p.$$eval('#makeTree .bv-mark', (e) => e.length)) === 0);
   await p.focus('#makeInfo');
   await p.waitForTimeout(20);
   const tipUp = () => p.$eval('#uiTip', (e) => !e.hidden && e.classList.contains('show'));
@@ -1295,7 +1296,7 @@ async function saveAndGet(p) {
   // 이름 고치기 — 더블클릭 → 칸 → Enter 저장
   await p.click('#makeTab-ts');
   await p.waitForTimeout(20);
-  await p.dblclick('#makeTree [data-tkey^="t:"] .bv-var');
+  await p.dblclick('#makeTree [data-tkey^="t:"] .vchip .al');
   await p.waitForTimeout(30);
   await p.fill('#makeTree input.tr-edit', 'body/base');
   await p.keyboard.press('Enter');
@@ -1460,7 +1461,7 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(30);
   const rows = await p.$$eval('#renameTree .tr', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
-  check('B.12 이름 정리 트리 머리 줄 = 회색 머리 띠 · 맥락 머리 이름은 회색 그대로', await p.$$eval('#renameTree .tr-head', (e) => e.length > 0 && e.every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)') && e.filter((h) => h.querySelector('.tr-name.muted')).every((h) => getComputedStyle(h.querySelector('.tr-name.muted')).color === 'rgb(94, 99, 107)')));
+  check('TR-D1 이름 정리 트리 머리 줄 — 띠 없음 · 이름 12px 600 --text-2(맥락 머리 따로 회색 없음 — .muted 없음)', await p.$$eval('#renameTree .tr-head', (e) => e.length > 0 && e.every((h) => !h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgba(0, 0, 0, 0)' && !h.querySelector('.tr-name.muted') && getComputedStyle(h.querySelector('.tr-name')).fontWeight === '600' && getComputedStyle(h.querySelector('.tr-name')).color === 'rgb(94, 99, 107)')));
   check('18 소속 트리 — 그대로 조상 머리 "Product card 2개" · 바꿀 줄 · 보존 줄 숨김', rows.length === 3 && rows[0].includes('Product card') && rows[0].includes('2개') && rows[1].includes('Frame 12') && rows[1].includes('card-header') && !rows.some((x) => x.includes('Title')), JSON.stringify(rows));
   check('18 머리 오른쪽 "Product card · 바꿀 이름 2개" · [2개 이름 바꾸기]', (await p.textContent('#subRight')) === 'Product card · 바꿀 이름 2개' && (await p.textContent('#btnRename')) === '2개 이름 바꾸기');
   await p.click('#renameTree [data-tkey="a1"] .bv-switch');
@@ -2626,6 +2627,7 @@ async function fillBoth(p) {
   await p.waitForTimeout(40);
   check('27 결과 — 제목은 그린 줄 수(표에 없는 id 뺌) · 요약 · 주의 띠(주황)', (await p.textContent('.modal h3')) === '안 쓰는 변수 2개' && (await p.textContent('.modal .unused-sum')).includes('8,240') && (await p.textContent('.modal .banner.caution')) === '다른 파일에서 쓰는 변수는 확인하지 못해요', await p.textContent('.modal h3'));
   check('27 트리 — 머리 띠 · 처음 모두 끔', (await p.$$eval('.modal .unused-tree .tr-head', (e) => e.length)) === 1 && (await p.$$eval('.modal .unused-tree .tr-row .bv-switch', (e) => e.every((x) => x.getAttribute('aria-checked') === 'false'))));
+  check('27 안 쓰는 변수 트리는 지금 모양 그대로(TR-D12) — .vlike 없음 · 머리 띠(.tr-group · --surface-2) · ▼/▶', await p.$$eval('.modal .unused-tree', (e) => e.length === 1 && !e[0].classList.contains('vlike') && [...e[0].querySelectorAll('.tr-head')].every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)' && /[▼▶]/.test(h.querySelector('.tr-car').textContent))));
   check('27 chain 태그', (await p.$$eval('.modal .unused-tree .tr-tag', (e) => e.map((x) => x.textContent))).includes('안 쓰는 변수만 가리킴'));
   check('27 k = 0 → [선택한 0개 지우기] aria-disabled', (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) === 'true');
   await p.click('.modal .unused-tree .tr-row .bv-switch');
@@ -3762,6 +3764,228 @@ async function backHome30(p, libs) {
   await p.keyboard.press('Escape');
   check('9d 검색 지우면 머리 없는 맨 위 줄 그대로 보임(`{컬렉션 id}|` 키 무시)', (await p.$('.vt-row[data-id="dcv"]')) !== null);
   check('9d 카드 안 카드 0(선 · 안쪽 머리 · 묶음은 카드 아님 — §2.8)', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
+  await p.close();
+}
+
+/* ---------- 32 트리 3화면 변수 목록 모양(IA v4 §2.7 "변수 목록 모양 — TR 뒤" · B.31 · TR-D1–TR-D17 · TR-P4–TR-P23) ---------- */
+/** 트리 줄 재기 — x는 트리 왼쪽 끝 기준. */
+const trGeo = (p, sel) => p.$eval(sel, (T) => {
+  const tl = T.getBoundingClientRect().left;
+  const r = (n) => Math.round(n * 10) / 10;
+  const probe = (v) => { const d = document.createElement('i'); d.style.color = `var(${v})`; document.body.appendChild(d); const c = getComputedStyle(d).color; d.remove(); return c; };
+  const rows = [...T.querySelectorAll(':scope > .tr[data-tkey]')].map((e) => {
+    const cs = getComputedStyle(e); const b = e.getBoundingClientRect();
+    const lt = e.querySelector(':scope > .tr-lt'); const ch = e.querySelector(':scope > .vchip'); const al = ch?.querySelector('.al'); const vl = ch?.querySelector('.vl');
+    const tag = e.querySelector(':scope > .tr-tag, :scope > .bv-new'); const sw = e.querySelector(':scope > .bv-switch'); const ld = e.querySelector(':scope > .tr-lead'); const car = e.querySelector(':scope > .tr-car');
+    const nm = e.querySelector(':scope > .tr-name');
+    return {
+      k: e.dataset.tkey, head: e.classList.contains('tr-head'), off: e.classList.contains('off'), h: r(b.height), mt: cs.marginTop, mb: cs.marginBottom, bb: cs.borderBottomWidth, bt: cs.borderTopWidth, bg: cs.backgroundColor, right: r(b.right - tl),
+      txt: e.textContent, car: car?.textContent ?? null, carX: car ? r(car.getBoundingClientRect().left - tl) : null,
+      nmX: nm ? r(nm.getBoundingClientRect().left - tl) : null, nmFs: nm ? getComputedStyle(nm).fontSize : null, nmFw: nm ? getComputedStyle(nm).fontWeight : null, nmC: nm ? getComputedStyle(nm).color : null,
+      ltX: lt ? r(lt.getBoundingClientRect().left - tl) : null, ltW: lt ? r(lt.getBoundingClientRect().width) : null, ltCut: lt ? lt.scrollWidth > lt.clientWidth + 1 : null, ltTitle: lt?.getAttribute('title') ?? null, ltText: lt?.textContent ?? null,
+      ltC: lt ? getComputedStyle(lt).color : null, ltFw: lt ? getComputedStyle(lt).fontWeight : null, ltDeco: lt ? getComputedStyle(lt).textDecorationLine : null,
+      chX: ch ? r(ch.getBoundingClientRect().left - tl) : null, chR: ch ? r(ch.getBoundingClientRect().right - tl) : null, chTitle: ch?.getAttribute('title') ?? null,
+      al: al?.textContent ?? null, alW: al ? r(al.getBoundingClientRect().width) : null, alCut: al ? al.scrollWidth > al.clientWidth + 1 : null, alTitle: al?.getAttribute('title') ?? null, alC: al ? getComputedStyle(al).color : null, alArrowHidden: al ? al.firstElementChild?.getAttribute('aria-hidden') === 'true' : null,
+      vl: vl?.textContent ?? null, vlX: vl ? r(vl.getBoundingClientRect().left - tl) : null, vlBg: vl ? getComputedStyle(vl).backgroundColor : null, vlC: vl ? getComputedStyle(vl).color : null,
+      tagX: tag ? r(tag.getBoundingClientRect().left - tl) : null, tagR: tag ? r(tag.getBoundingClientRect().right - tl) : null, tagTitle: tag?.getAttribute('title') ?? null,
+      swX: sw ? r(sw.getBoundingClientRect().left - tl) : null, swR: sw ? r(sw.getBoundingClientRect().right - tl) : null, swAria: sw?.getAttribute('aria-label') ?? null,
+      ld: ld ? { t: ld.textContent, sw: ld.classList.contains('vr-sw'), ck: ld.classList.contains('ck'), w: r(ld.getBoundingClientRect().width), x: r(ld.getBoundingClientRect().left - tl), bw: getComputedStyle(ld).borderTopWidth, bc: getComputedStyle(ld).borderTopColor, f: getComputedStyle(ld).filter, o: getComputedStyle(ld).opacity } : null,
+      bgPos: e.style.backgroundPosition, bgSize: e.style.backgroundSize,
+    };
+  });
+  return { rows, w: r(T.getBoundingClientRect().width), vlike: T.classList.contains('vlike'), hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth || T.scrollWidth > T.clientWidth,
+    text: probe('--text'), text2: probe('--text-2'), muted: probe('--muted'), line: probe('--swatch-line') };
+});
+const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
+{
+  const p = await open(560, 'select');
+  await p.setViewportSize({ width: 560, height: 1400 });
+  await openSel(p);
+  const tc = (nodeId, field, variableId, variableName, v, resolvedType, extra = {}) => ({ nodeId, field, currentValue: v, variableId, variableName, tier: 2, variableValue: v, resolvedType, ...extra });
+  const cands = [];
+  for (let i = 0; i < 10000; i++) cands.push(tc('b' + i, 'fills', 'bgd', 'color/background/default', '#FFFFFF', 'COLOR', { index: 0 }));
+  cands.push(tc('h1', 'fills', 'new:color/brand/primary-hover', 'color/brand/primary-hover', '#1570EF', 'COLOR', { index: 0, newRole: { name: 'color/brand/primary-hover', globalId: 'g0', scopes: [] }, newRoleGlobalName: 'color/blue/600' }));
+  cands.push(tc('h2', 'fills', 'trn', 'color/overlay/scrim', '#000000', 'COLOR', { index: 0, variableAlpha: 0.5 }));
+  cands.push(tc('n1', 'paddingLeft', 'ci', 'spacing/card/inset', '8', 'FLOAT'), tc('n2', 'paddingLeft', 'ci', 'spacing/card/inset', '8', 'FLOAT'), tc('n1', 'itemSpacing', 'cg', 'spacing/card/gap', '16', 'FLOAT'));
+  cands.push(tc('n1', 'paddingTop', 'lg', 'spacing/a-very-long-semantic-variable-name/for-truncation-check/inset', '24', 'FLOAT'));
+  cands.push(tc('n1', 'topLeftRadius', 'rc', 'radius/card', '8', 'FLOAT'));
+  cands.push(tc('n3', 'opacity', 'op', 'opacity/label', 'half', 'STRING'), tc('n4', 'visible', 'vb', 'flag/visible', 'true', 'BOOLEAN'));
+  await found(p, { candidates: cands, bound: cands.length, skipped: 6, reasons: { fraction: 2, 'size-fraction': 1, 'space-between': 2, 'hug-fill': 1 } }, [{ styleId: 'S:h2', name: 'Heading/H2', nodeIds: ['x1', 'x2'] }]);
+  await p.click('[data-k="link"]');
+  await p.waitForTimeout(100);
+  await p.click('#bindTree [data-tkey="cg|gap"] > .bv-switch');
+  await p.click('#bindTree [data-tkey="kind:radius"] > .tr-car');
+  await p.mouse.move(1, 1);
+  await tipWait(p);
+  let g = await trGeo(p, '#bindTree');
+  const R = Object.fromEntries(g.rows.map((x) => [x.k, x]));
+  const rows = g.rows.filter((x) => !x.head); const heads = g.rows.filter((x) => x.head);
+  check('32 연결 트리 .vlike · 줄 · 머리 높이 32 · 아래 테두리 0 · 배경 투명(마우스 올림 아님)', g.vlike && g.rows.every((x) => x.h === 32 && x.bb === '0px' && x.bg === 'rgba(0, 0, 0, 0)'), JSON.stringify(g.rows.map((x) => [x.k, x.h, x.bb, x.bg])));
+  check('32 머리 — 위 1px 선(첫 머리 0) · 이름 12px 600 --text-2 · ▾/▸ · 이름 x 22(▾ 칸 8)', heads.every((x, i) => x.bt === (i === 0 ? '0px' : '1px') && x.nmFs === '12px' && x.nmFw === '600' && x.nmC === g.text2 && x.carX === 8 && x.nmX === 22) && R['kind:gap'].car === '▾' && R['kind:radius'].car === '▸', JSON.stringify(heads.map((x) => [x.k, x.bt, x.nmFs, x.nmFw, x.nmC, x.car, x.carX, x.nmX])));
+  const swRs = [...new Set(g.rows.map((x) => x.swR).filter((x) => x != null))];
+  check('32 머리 스위치 x = 줄 스위치 x(오른쪽 여백 8 — 줄 끝)', swRs.length === 1 && swRs[0] === g.w - 8, JSON.stringify([swRs, g.w]));
+  const gapRows = g.rows.slice(g.rows.findIndex((x) => x.k === 'kind:gap') + 1, g.rows.findIndex((x) => x.k === 'kind:radius'));
+  check('32 그룹 여백 — 펼친 머리 아래 첫 줄 위 4 · 마지막 줄 아래 16 · 접힌 머리 아래 0', gapRows[0].mt === '4px' && gapRows.at(-1).mb === '16px' && gapRows.slice(0, -1).every((x) => x.mb === '0px') && R['kind:radius'].mb === '0px' && R['kind:color'].mt === '0px', JSON.stringify(gapRows.map((x) => [x.k, x.mt, x.mb])));
+  check('32 칩 시작 x 88 — 모든 줄(N 배지 · 넘치는 왼쪽 글 줄 포함, TR-D5 · TR-D16) · 왼쪽 글 x 40 · 폭 40', rows.every((x) => x.chX === 88 && x.ltX === 40 && x.ltW === 40), JSON.stringify(rows.map((x) => [x.k, x.chX, x.ltX, x.ltW])));
+  const bd = R['bgd|color'];
+  check('32 "10000곳" — 왼쪽 글 말줄임 · title "10000곳" · 줄 글에 전체 개수 · 칩 x 그대로(TR-D11 · TR-D16 — 999곳까지 다 보임)', bd.ltCut && bd.ltTitle === '10000곳' && bd.txt.includes('10000곳') && bd.chX === 88, JSON.stringify(bd));
+  check('32 "2곳" 잘리지 않음 → title 없음', R['ci|gap'].ltCut === false && R['ci|gap'].ltTitle === null);
+  const nr = R['new:color/brand/primary-hover|color'];
+  check('32 N 배지 — 칩 끝 + 4 · 툴팁 = 배지 title · 칩 title 없음(TR-D9 · TR-P12)', nr.tagX === nr.chR + 4 && nr.tagTitle === 'color/blue/600을 가리켜요' && nr.chTitle === null, JSON.stringify(nr));
+  check('32 태그 · 배지와 스위치 사이 ≥ 8(TR-P22)', rows.filter((x) => x.tagR != null && x.swX != null).every((x) => x.swX - x.tagR >= 8));
+  check('32 옅은 칸 = "→ {전체 이름}"("→"는 aria-hidden) · 짙은 칸 = 값 글', R['ci|gap'].al === '→ spacing/card/inset' && R['ci|gap'].alArrowHidden && R['ci|gap'].vl === '8' && bd.vl === '#FFFFFF' && R['trn|color'].vl === '#000000 50%');
+  check('32 칩 너비 = 글 길이(넉넉한 줄 — 스위치까지 늘지 않음 · 옅은 칸 잘림 없음)', !R['ci|gap'].alCut && R['ci|gap'].chR < R['ci|gap'].swX - 100, JSON.stringify(R['ci|gap']));
+  const lg = R['lg|gap'];
+  check('32 긴 이름 — 옅은 칸 최대 230 · 말줄임 · title = 전체 이름(→ 뺌)', lg.alW <= 230 && lg.alCut && lg.alTitle === 'spacing/a-very-long-semantic-variable-name/for-truncation-check/inset', JSON.stringify([lg.alW, lg.alCut, lg.alTitle]));
+  const typeRows = Object.values(R).filter((x) => x.ld);
+  const byName = (n) => typeRows.find((x) => x.al === `→ ${n}`);
+  check('32 종류 표시 — FLOAT "#" · STRING "Aa" · BOOLEAN "✓" · COLOR 동그라미 16 · 테두리 1px --swatch-line', byName('spacing/card/inset')?.ld.t === '#' && byName('opacity/label')?.ld.t === 'Aa' && byName('flag/visible')?.ld.t === '✓' && bd.ld.sw && bd.ld.w === 16 && bd.ld.bw === '1px' && bd.ld.bc === g.line && bd.ld.x === 16, JSON.stringify(typeRows.map((x) => [x.al, x.ld])));
+  check('32 투명 색 동그라미 — 바둑판(.ck — TR-P4)', R['trn|color'].ld.ck === true);
+  const off = R['cg|gap'];
+  check('32 끈 줄 — 옅은 칸 · 왼쪽 글 --text-2 · 짙은 칸 배경 --surface-2 · 글 --text-2 · opacity 1(TR-D6)', off.off && off.alC === g.text2 && off.ltC === g.text2 && off.vlBg === 'rgb(244, 245, 246)' && off.vlC === g.text2 && off.ld.o === '1', JSON.stringify(off));
+  await p.click('#bindTree [data-tkey="bgd|color"] > .bv-switch');
+  await p.mouse.move(1, 1);
+  check('32 끈 색 줄 동그라미 흑백(grayscale) · opacity 1', await p.$eval('#bindTree [data-tkey="bgd|color"] .vr-sw', (e) => getComputedStyle(e).filter === 'grayscale(1)' && getComputedStyle(e).opacity === '1'));
+  await p.click('#bindTree [data-tkey="bgd|color"] > .bv-switch');
+  const ts = R['ts:S:h2'];
+  check('32 Text Style 줄 — [Aa] "2곳" · 옅은 칸만 "→ Heading/H2"(짙은 칸 없음 — TR-D14)', ts.ld.t === 'Aa' && ts.ltText === '2곳' && ts.al === '→ Heading/H2' && ts.vl === null && ts.chX === 88);
+  check('32 줄 읽는 순서 — "2곳" → 이름 → 값(TR-P9) · 스위치 aria-label 그대로', R['ci|gap'].txt.startsWith('#2곳→ spacing/card/inset8') && R['ci|gap'].swAria === 'spacing/card/inset 연결', JSON.stringify(R['ci|gap'].txt));
+  check('32 세로 선 0(연결 — 한 단) · 가로 스크롤 0', g.rows.every((x) => !x.bgPos) && !g.hscroll);
+  // 건너뛴 곳 묶음 머리(TR-D13 · TR-P14 · TR-P23)
+  await p.click('#bindSkipToggle');
+  const sk = await p.$$eval('#bindSkips > *', (e) => e.map((x) => { const cs = getComputedStyle(x); const t = x.classList.contains('skip-head') ? x : x.querySelector('.skip-name'); const rg = document.createRange(); rg.selectNodeContents(t); return { head: x.classList.contains('skip-head'), h: Math.round(x.getBoundingClientRect().height), bg: cs.backgroundColor, bt: cs.borderTopWidth, bb: cs.borderBottomWidth, fs: cs.fontSize, fw: cs.fontWeight, c: cs.color, tx: Math.round(rg.getBoundingClientRect().left) }; }));
+  const sh = sk.filter((x) => x.head), sr = sk.filter((x) => !x.head);
+  check('32 건너뛴 곳 묶음 머리 — 32 · 배경 투명 · 위 1px 선(첫 묶음 머리 0) · 12px 600 --text-2', sh.length === 2 && sh.every((x, i) => x.h === 32 && x.bg === 'rgba(0, 0, 0, 0)' && x.bt === (i === 0 ? '0px' : '1px') && x.fs === '12px' && x.fw === '600' && x.c === g.text2), JSON.stringify(sh));
+  check('32 묶음 머리 글 x = .skip-row 글 x(왼쪽 2)', new Set(sk.map((x) => x.tx)).size === 1, JSON.stringify(sk.map((x) => x.tx)));
+  check('32 머리 앞 .skip-row · 목록 맨 끝 줄 아래 구분선 0(TR-P14 · TR-P23) · 다른 줄은 1px', sk.every((x, i) => x.head || x.bb === ((!sk[i + 1] || sk[i + 1].head) ? '0px' : '1px')) && sr.some((x) => x.bb === '1px'), JSON.stringify(sk.map((x) => [x.head, x.bb])));
+  check('32 카드 안 카드 0 — 연결(줄 · 칩 · 배지는 카드 아님)', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
+  await p.close();
+}
+{
+  // 만들기 — Global(태그 · 잠긴 줄 · 끈 줄 · "Layer 100") · Semantic(오른쪽 끝) · Text Style(흐린 소수 크기 줄 · 이름 고치기)
+  const p = await open(560, 'select');
+  await p.setViewportSize({ width: 560, height: 1200 });
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 0), ids: ['w1'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(50);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
+    { name: 'color/gray/50', category: 'color', value: '#F2F4F7', sources: ['fills'], count: 3 },
+    { name: 'color/x/500', category: 'color', value: '#7F56D9', alpha: 0.5, sources: ['fills'], count: 100 },
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4 },
+    { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2 },
+  ] });
+  await p.waitForTimeout(50);
+  const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  const names = pv.tokens.map((x) => x.name);
+  const purple = names.find((n) => n.startsWith('color/') && n !== 'color/gray/50');
+  const st = Object.fromEntries(names.map((n) => [n, { state: 'new' }]));
+  st['color/gray/50'] = { state: 'update' };
+  st[purple] = { state: 'reuse', varName: 'color/brand/primary-container-hover-pressed' };
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 3, updated: 0, summary: '', roles: 1, skippedManual: 0, tokenStates: st, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [],
+    styles: [{ name: 'Heading/H2', fontSize: 24, lineHeight: 32, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 6, nodeIds: ['t1'], boundStyleId: 'S:x' }],
+    decimalRows: [{ fontSize: 26.67, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'SemiBold', count: 4, nodeIds: ['t4'] }] });
+  await p.waitForTimeout(50);
+  await p.mouse.move(1, 1);
+  await tipWait(p);
+  let g = await trGeo(p, '#makeTree');
+  let rows = g.rows.filter((x) => !x.head);
+  const R = Object.fromEntries(g.rows.map((x) => [x.k, x]));
+  check('32 만들기 Global — 줄 32 · 구분선 0 · 칩 x 96 · 왼쪽 글 x 40 · 폭 48', g.vlike && g.rows.every((x) => x.h === 32 && x.bb === '0px') && rows.every((x) => x.chX === 96 && x.ltX === 40 && x.ltW === 48), JSON.stringify(rows.map((x) => [x.k, x.chX, x.ltX, x.ltW])));
+  const lp = R[`g:${purple}`];
+  check('32 만들기 "Layer 100" — 말줄임 · title · 줄 글에 전체(TR-D11)', lp.ltCut && lp.ltTitle === 'Layer 100' && lp.txt.includes('Layer 100'), JSON.stringify(lp));
+  check('32 만들기 태그 — 칩 끝 + 4(TR-D9) · 태그 · 스위치 줄지 않음 · 좁으면 옅은 칸 먼저 말줄임(TR-P11)', rows.filter((x) => x.tagX != null).every((x) => x.tagX === x.chR + 4 && x.swX - x.tagR >= 8) && lp.alCut && !lp.vl.endsWith('…') && lp.vl === '#7F56D9 50%', JSON.stringify(rows.map((x) => [x.k, x.chR, x.tagX, x.tagR, x.swX, x.alCut])));
+  check('32 만들기 동그라미 — 색 · 투명 바둑판 · 숫자 "#"', R['g:color/gray/50'].ld.sw && lp.ld.ck && R['g:spacing/16'].ld.t === '#');
+  check('32 만들기 머리 스위치 x = 줄 스위치 x · 가로 스크롤 0', new Set(g.rows.map((x) => x.swR).filter((x) => x != null)).size === 1 && !g.hscroll);
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(30);
+  g = await trGeo(p, '#makeTree');
+  const sr = g.rows.find((x) => !x.head);
+  check('32 만들기 Semantic — 칩 오른쪽 끝(줄 끝 − 8, 칩 열 없음 — TR-D10) · 왼쪽 이름 · 스위치 없음', sr.chR === g.w - 8 && sr.ltText === 'spacing/card/gap' && sr.swR === null && sr.al === '→ spacing/16' && sr.vl === '16', JSON.stringify(sr));
+  await p.click('#makeTab-ts');
+  await p.waitForTimeout(30);
+  g = await trGeo(p, '#makeTree');
+  const dec = g.rows.find((x) => x.k.startsWith('td:')), tr = g.rows.find((x) => x.k.startsWith('t:'));
+  check('32 Text Style 탭 — 머리 없음 · 줄 x 8 · [Aa] "Layer 6" · 칩 x 96 [→ 이름 | 값 요약] · "있음" 칩 뒤', !g.rows.some((x) => x.head) && tr.ld.x === 8 && tr.ld.t === 'Aa' && tr.ltText === 'Layer 6' && tr.ltW === 56 && tr.chX === 96 && tr.al === '→ Heading/H2' && tr.vl.startsWith('Inter') && tr.tagX === tr.chR + 4, JSON.stringify(tr));
+  check('32 흐린 소수 크기 줄 — 짙은 칸만 · 시작 x 96(TR-P21) · 글 --muted · 짙은 칸 배경 --surface-2', dec.al === null && dec.vlX === 96 && dec.ltC === g.muted && dec.vlBg === 'rgb(244, 245, 246)' && dec.vlC === g.muted, JSON.stringify(dec));
+  await p.dblclick('#makeTree [data-tkey^="t:"] .vchip .al');
+  await p.waitForTimeout(30);
+  const ed = await p.$eval('#makeTree input.tr-edit', (e) => { const tl = e.closest('.tree').getBoundingClientRect().left; const b = e.getBoundingClientRect(); return [Math.round(b.left - tl), Math.round(b.width)]; });
+  check('32 이름 고치기 칸 = 옅은 칸 자리(x 96 · 폭 230)', ed[0] === 96 && ed[1] === 230, JSON.stringify(ed));
+  await p.keyboard.press('Escape');
+  check('32 카드 안 카드 0 — 만들기', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
+  await p.close();
+}
+{
+  // 이름 정리 — 여러 단(세로 선 · 단마다 9 · 안쪽 머리 · 깊은 줄 말줄임) · 한 단 · 맨 바깥이 바꿀 줄(TR-P13)
+  const renameWith = async (nodes) => {
+    const p = await open(560, 'select');
+    await p.setViewportSize({ width: 560, height: 1200 });
+    await recv(p, PREREQ);
+    await recv(p, { ...sel(1, 0), ids: ['r0'], firstName: 'Product card' });
+    await p.click('#btnGoRename');
+    await p.waitForTimeout(30);
+    const rq = (await sent(p, 'RENAME')).at(-1);
+    await recv(p, { type: 'RENAME_RESULT', reqId: rq.reqId, applied: false, changes: [], nodes });
+    await p.waitForTimeout(30);
+    await p.mouse.move(1, 1);
+    await tipWait(p);
+    return p;
+  };
+  const N = (id, name, depth, parentId, ex = {}) => ({ id, name, type: 'FRAME', depth, parentId, ...ex });
+  let p = await renameWith([
+    N('r0', 'Product card', 0, null, { keep: 'root' }),
+    N('a', 'Frame 12', 1, 'r0', { after: 'card-header' }), N('a1', 'Ellipse 2', 2, 'a', { after: 'avatar' }), N('a2', 'Text 3', 2, 'a', { after: 'name' }),
+    N('g', 'Group 7', 1, 'r0'), N('g1', 'Frame 14', 2, 'g', { after: 'meta' }), N('g11', 'Text 5 copy copy copy (final final)', 3, 'g1', { after: 'price-label-discounted-very-long-name-for-check-of-truncation' }),
+  ]);
+  let g = await trGeo(p, '#renameTree');
+  let R = Object.fromEntries(g.rows.map((x) => [x.k, x]));
+  check('32 이름 정리 — 줄 32 · 구분선 0 · 칩 x 150(모든 바꿀 줄)', g.vlike && g.rows.every((x) => x.h === 32 && x.bb === '0px') && g.rows.filter((x) => !x.head).every((x) => x.chX === 150), JSON.stringify(g.rows.map((x) => [x.k, x.chX])));
+  check('32 이름 정리 여러 단 — 단 2 x 21(▾ 21 · 이름 35) · 단 3 잎 x 30 · 안쪽 머리 위 선 0 · 단 4 x 39', R.a.carX === 21 && R.a.ltX === 35 && R.a1.ltX === 30 && R.g.carX === 21 && R.g.bt === '0px' && R.g1.carX === 30 && R.g11.ltX === 39, JSON.stringify(g.rows.map((x) => [x.k, x.carX, x.ltX, x.bt])));
+  check('32 이름 정리 세로 선 — x 12 · 21(줄마다 조각, 1px) · 단 마지막 줄은 16(길이 = 내용 높이 − 16)', R.a.bgPos === '12px 0px' && R.a1.bgPos === '12px 0px, 21px 0px' && R.a1.bgSize === '1px 32px, 1px 32px' && R.a2.bgSize === '1px 32px, 1px 16px' && R.g11.bgSize === '1px 16px, 1px 16px, 1px 16px' && R.r0.bgPos === '', JSON.stringify(g.rows.map((x) => [x.k, x.bgPos, x.bgSize])));
+  check('32 이름 정리 지금 이름 — 보통 글(400 · --text · 취소선 없음) · 늘 title · 짙은 칸 없음', g.rows.filter((x) => !x.head).every((x) => x.ltFw === '400' && x.ltC === g.text && x.ltDeco === 'none' && x.ltTitle === x.ltText && x.vl === null), JSON.stringify(g.rows.map((x) => [x.k, x.ltFw, x.ltC, x.ltDeco, x.ltTitle])));
+  check('32 이름 정리 새 이름 title — 잘렸을 때만(TR-P12)', R.a.alTitle === null && R.g11.alCut && R.g11.alTitle === 'price-label-discounted-very-long-name-for-check-of-truncation', JSON.stringify([R.a.alTitle, R.g11.alTitle]));
+  check('32 이름 정리 깊은 줄 왼쪽 글 말줄임 · 줄 글에 전체 이름(TR-D11) · 맥락 머리 칩 없음', R.g11.ltCut && R.g11.txt.includes('Text 5 copy copy copy (final final)') && R.g.chX === null && R.r0.chX === null);
+  check('32 이름 정리 줄 읽기 — 지금 이름 → 새 이름 → 스위치(TR-P9)', R.a.txt.startsWith('▾Frame 12→ card-header') && R.a.swAria === 'card-header(으)로 바꾸기', JSON.stringify(R.a.txt));
+  // 접힌 단 1 머리 아래 여백 0(TR-P17)
+  await p.click('#renameTree [data-tkey="r0"] > .tr-car');
+  await p.mouse.move(1, 1);
+  g = await trGeo(p, '#renameTree');
+  check('32 접힌 단 1 머리 — 내용 · 여백 없음(TR-P17)', g.rows.length === 1 && g.rows[0].mb === '0px' && g.rows[0].car === '▸');
+  await p.click('#renameTree [data-tkey="r0"] > .tr-car');
+  // 키보드 — ↓ · ← · Space · Enter
+  await p.focus('#renameTree [data-tkey="r0"]');
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('ArrowDown');
+  await p.keyboard.press('Space');
+  check('32 이름 정리 키보드 — ↓↓ Space → 단 3 줄 끔', (await p.getAttribute('#renameTree [data-tkey="a1"] > .bv-switch', 'aria-checked')) === 'false');
+  await p.keyboard.press('ArrowLeft');
+  check('32 이름 정리 키보드 — ← 부모 줄', (await p.evaluate(() => document.activeElement?.dataset.tkey)) === 'a');
+  check('32 카드 안 카드 0 — 이름 정리', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
+  await p.close();
+  p = await renameWith([
+    N('r0', 'Product card', 0, null, { keep: 'root' }),
+    N('a', 'Rectangle 4', 1, 'r0', { after: 'thumbnail' }), N('b', 'Text 3', 1, 'r0', { after: 'title' }),
+  ]);
+  g = await trGeo(p, '#renameTree');
+  check('32 이름 정리 한 단 — 선 0 · 잎 x 16 · 이름 폭 126(TR-P16) · 칩 x 150', g.rows.every((x) => !x.bgPos) && g.rows.filter((x) => !x.head).every((x) => x.ltX === 16 && x.ltW === 126 && x.chX === 150), JSON.stringify(g.rows.map((x) => [x.k, x.ltX, x.ltW, x.bgPos])));
+  await p.close();
+  p = await renameWith([
+    N('r0', 'Frame 1', 0, null, { after: 'product-card' }),
+    N('a', 'Frame 12', 1, 'r0', { after: 'card-header' }), N('a1', 'Ellipse 2', 2, 'a', { after: 'avatar' }), N('b', 'Rectangle 4', 1, 'r0', { after: 'thumbnail' }),
+  ]);
+  g = await trGeo(p, '#renameTree');
+  R = Object.fromEntries(g.rows.map((x) => [x.k, x]));
+  check('32 이름 정리 루트가 바꿀 줄(TR-P13) — 위 선 0 · ▾ x 8 · 이름 x 22 · 폭 120 · 내용 선 x 12 · 위 4 · 아래 16', R.r0 && !R.r0.head && R.r0.bt === '0px' && R.r0.carX === 8 && R.r0.ltX === 22 && R.r0.ltW === 120 && R.a.bgPos === '12px 0px' && R.a.mt === '4px' && R.b.mb === '16px' && R.b.ltX === 21, JSON.stringify(g.rows.map((x) => [x.k, x.bt, x.carX, x.ltX, x.ltW, x.bgPos, x.mt, x.mb])));
+  await p.close();
+  // 단 1 잎 바꿀 줄 x 8 — 선택 루트가 잎(컨테이너 아님)
+  p = await renameWith([N('r0', 'Rectangle 9', 0, null, { after: 'thumbnail' })]);
+  g = await trGeo(p, '#renameTree');
+  check('32 이름 정리 루트 잎 바꿀 줄 — x 8 · 이름 폭 134 · 선 0', g.rows.length === 1 && g.rows[0].ltX === 8 && g.rows[0].ltW === 134 && !g.rows[0].bgPos, JSON.stringify(g.rows));
   await p.close();
 }
 

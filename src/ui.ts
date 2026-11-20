@@ -280,6 +280,11 @@ function tokenKey(t: DraftToken): string {
 }
 /** 투명도 꼬리(" 8%") — 반올림해 100%면 빈 글(ia-v4 §4.6 값 글 · V-D2). */
 const alphaTail = (alpha?: number): string => (alpha != null && alpha < 1 && alphaPct(alpha) < 100 ? ` ${alphaPct(alpha)}%` : '');
+/** 칩 열 x — 트리 왼쪽 끝 기준(ia-v4 §2.7 TR-D5 · TR-D16). */
+const BIND_COL = 88;
+const MAKE_COL = 96;
+const RENAME_COL = 150;
+
 
 /** 이 카드가 고르는 대상(색 외 토큰). */
 function creatableTokens(): DraftToken[] {
@@ -3248,22 +3253,18 @@ function renderRenameScreen(): void {
     if (it.kind === 'head') {
       const st = headState(it.descendants.map((id) => ({ on: !renameOff.has(id) })));
       return {
-        key: it.id, head: true, muted: true, name: it.name, countText: t('tree.count', { n: it.descendants.length }), indent: it.level * 16, children,
+        key: it.id, head: true, name: it.name, countText: t('tree.count', { n: it.descendants.length }), indent: it.level * 9, children,
         sw: { state: st, label: t('tree.headAria', { name: it.name }), onToggle: () => { const to = headToggleTarget(st); for (const id of it.descendants) to ? renameOff.delete(id) : renameOff.add(id); renderRenameScreen(); } },
       };
     }
     const on = !renameOff.has(it.id);
-    const old = document.createElement('span');
-    old.className = 'tr-old';
-    old.textContent = it.name;
+    // [▾] {지금 이름 — 보통 글 · 늘 title} … [→ 새 이름](옅은 칸만 — 잘렸을 때만 title) … 스위치(ia-v4 §4.4 TR 뒤)
+    const old = trLeft(it.name);
     old.title = it.name;
-    const nw = document.createElement('b');
-    nw.className = 'tr-new';
-    nw.textContent = it.after ?? '';
-    nw.title = it.after ?? '';
-    const cells: HTMLElement[] = [old, arrowEl(), nw];
+    old.dataset.tipFixed = '1';
+    const cells: HTMLElement[] = [old, trChip(it.after ?? '', null)];
     return {
-      key: it.id, indent: it.level * 16 + (children.length ? 0 : 22), off: !on, cells, children,
+      key: it.id, indent: it.level * 9, off: !on, cells, children,
       sw: { state: on, label: t('rename.switchAria', { name: it.after ?? '' }), onToggle: () => { on ? renameOff.add(it.id) : renameOff.delete(it.id); renderRenameScreen(); } },
     };
   };
@@ -3274,7 +3275,8 @@ function renderRenameScreen(): void {
     const walk = (list: TreeItem[]): void => { for (const it of list) { if (it.head && it.sw?.state === false) renameCollapsed.add(it.key); if (it.children) walk(it.children); } };
     walk(items);
   }
-  renderTree($('renameTree'), items, { collapsed: renameCollapsed, rerender: renderRenameScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse') });
+  renderTree($('renameTree'), items, { collapsed: renameCollapsed, rerender: renderRenameScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), look: 'vlike', col: RENAME_COL });
+  tipTruncatedNames($('renameTree'));
   const k = show ? renameOnCount() : 0;
   const btn = $('btnRename');
   btn.textContent = show && renameRows().length ? t('rename.applyN', { k }) : t('rename.applyBtn');
@@ -3529,9 +3531,15 @@ function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): 
   renderMakeScreen();
 }
 
-function mkValueChip(tk: DraftToken): HTMLElement {
+/** 만들기 줄 값 글(V-D2) — 투명도 토큰은 "50%"처럼 단위, 색은 "#RRGGBB {p}%". */
+function mkValueText(tk: DraftToken): string {
   const v = typeof tk.value === 'number' && tk.unit === 'percent' ? `${tk.value}%` : String(tk.value);
-  return valueChip(v, tk.alpha);
+  return trValueText(v, tk.alpha);
+}
+/** 만들기 줄 앞 표시(TR-D3) — 색 · effectColor 동그라미, fontFamily "Aa", 나머지 숫자 "#". */
+function mkLead(tk: DraftToken): HTMLElement {
+  const color = (tk.category === 'color' || tk.category === 'effectColor') && isHexColor(String(tk.value));
+  return trLead(color ? 'COLOR' : tk.category === 'fontFamily' ? 'STRING' : 'FLOAT', String(tk.value), tk.alpha);
 }
 function mkTag(text: string, tip: string, warn = false): HTMLElement {
   const s = document.createElement('span');
@@ -3540,12 +3548,8 @@ function mkTag(text: string, tip: string, warn = false): HTMLElement {
   s.title = tip;
   return s;
 }
-function mkLayers(n: number | undefined): HTMLElement {
-  const s = document.createElement('span');
-  s.className = 'bv-tw';
-  s.textContent = t('make.layers', { n: n ?? 0 });
-  return s;
-}
+/** 왼쪽 글 "Layer {n}"(TR-D4). */
+const mkLayers = (n: number | undefined): HTMLElement => trLeft(t('make.layers', { n: n ?? 0 }));
 
 /** 보이는 만들기 탭(§4.3 "보이는 탭"). */
 function mkTabsVisible(): MkTab[] {
@@ -3574,12 +3578,13 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
         const locked = mkLocked(tk);
         const on = mkIsOn(tk);
         const name = st?.varName ? st.varName : tk.name; // reuse = 그 변수 이름, new = 파일과 견줘 바뀐 최종 이름(ia-v3 §2.12 12.11)
-        const cells: HTMLElement[] = [mkValueChip(tk), arrowEl(), varChip(name, String(tk.value), undefined, false)];
+        // [동그라미 · 종류 표시] "Layer {n}" … [→ 이름 | 값] [태그 — 칩 뒤, TR-D9] … 스위치(ia-v4 §4.3 TR 뒤)
+        const cells: HTMLElement[] = [mkLead(tk), mkLayers(tk.count), trChip(name, mkValueText(tk))];
         if (st?.state === 'update') cells.push(mkTag(t('make.tagHas'), t('make.tagHasTip')));
         else if (st?.state === 'reuse') cells.push(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
         else if (st?.state === 'manual') cells.push(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
         return {
-          key: `g:${tk.name}`, indent: 24, off: !on, cells, right: [mkLayers(tk.count)],
+          key: `g:${tk.name}`, indent: 16, off: !on, cells,
           sw: { state: on, disabled: locked, label: t('make.rowAria', { name }), onToggle: () => { mkSetOn(tk.name, !on); mkPreviewSoon(); renderMakeScreen(); } },
         };
       });
@@ -3599,10 +3604,8 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
         key: `sk:${k}`, head: true, name: KIND_HEAD[k], countText: t('tree.count', { n: rows.length }), indent: 0,
         children: rows.map((r) => {
           const tk = byTok.get(r.token)!;
-          const eq = document.createElement('span');
-          eq.className = 'tr-sub';
-          eq.textContent = `= ${r.global}`;
-          return { key: `s:${r.name}`, indent: 24, cells: [varChip(r.name, String(tk.value)), eq] };
+          // [동그라미 · 종류 표시] {Semantic 이름}(남는 폭) … [→ Global 이름 | 값](오른쪽 끝 — 칩 열 없음, TR-D10)
+          return { key: `s:${r.name}`, indent: 16, cells: [mkLead(tk), trLeft(r.name, true), trChip(r.global, mkValueText(tk))] };
         }),
       });
     }
@@ -3611,44 +3614,31 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
     for (const x of withDecimals(mkTs, mkTsDecimal)) {
       if ('decimal' in x) {
         // 흐린 줄 — "Aa" · (이름 칩 없음) · 값 요약 · "Layer {n}" · 스위치 자리에 사유. 고치기 · 켜기 없음.
+        // [Aa] "Layer {n}" … [짙은 칸만 — 값 요약, 열 96 — TR-P21] · 스위치 자리에 사유
         const c = x.decimal;
-        const aa = document.createElement('span');
-        aa.className = 'ts-aa';
-        aa.setAttribute('aria-hidden', 'true');
-        aa.textContent = 'Aa';
         const sum = tsSummary(c);
-        const sub = document.createElement('span');
-        sub.className = 'tr-sub';
-        sub.textContent = sum;
         const why = document.createElement('span');
         why.className = 'tr-sub ts-why';
         why.textContent = t('textStyle.decimalRow');
-        items.push({ key: `td:${tsSig(c)}`, indent: 0, cls: 'ts-decimal', cells: [aa, sub], right: [mkLayers(c.count), why], aria: `${sum} · ${t('textStyle.decimalRow')}` });
+        items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: 'ts-decimal', cells: [trLeadAa(), mkLayers(c.count), trChip(null, sum)], right: [why], aria: `${sum} · ${t('textStyle.decimalRow')}` });
         continue;
       }
       const s = x;
       const sig = tsSig(s);
       const on = !mkTsOff.has(sig);
-      const aa = document.createElement('span');
-      aa.className = 'ts-aa';
-      aa.setAttribute('aria-hidden', 'true');
-      aa.textContent = 'Aa';
-      const cells: HTMLElement[] = [aa];
+      // [Aa] "Layer {n}" … [→ 스타일 이름 | 값 요약] ["있음"] … 스위치(TR-D14) — 이름 고치기 칸은 옅은 칸 자리
+      const cells: HTMLElement[] = [trLeadAa(), mkLayers(s.count)];
       if (mkEditSig === sig) cells.push(mkEditInput(s));
       else {
-        const chip = varChip(mkTsName(s), 'Aa', undefined, false);
+        const chip = trChip(mkTsName(s), tsSummary(s)); // 값 요약 — KRDS 크기 표시 없음(docs/text-style-krds.md §4)
         const c = mkTsConflict(s);
         if (c) { chip.classList.add('dup'); chip.title = t(c === 'dup' ? 'make.tsDup' : 'make.tsExists'); }
-        chip.addEventListener('dblclick', () => { if (!mkRunning) mkStartEdit(sig); });
+        chip.querySelector('.al')!.addEventListener('dblclick', () => { if (!mkRunning) mkStartEdit(sig); });
         cells.push(chip);
       }
-      const sub = document.createElement('span');
-      sub.className = 'tr-sub';
-      sub.textContent = tsSummary(s); // KRDS 크기 표시 없음(docs/text-style-krds.md §4)
-      cells.push(sub);
       if (s.boundStyleId) cells.push(mkTag(t('make.tagHas'), t('make.tsHasTip')));
       items.push({
-        key: `t:${sig}`, indent: 0, off: !on, cells, right: [mkLayers(s.count)], onEdit: () => mkStartEdit(sig),
+        key: `t:${sig}`, indent: 8, off: !on, cells, onEdit: () => mkStartEdit(sig),
         sw: { state: on, label: t('make.rowAria', { name: mkTsName(s) }), onToggle: () => { on ? mkTsOff.add(sig) : mkTsOff.delete(sig); renderMakeScreen(); } },
       });
     }
@@ -3833,7 +3823,7 @@ function renderMakeScreen(): void {
     // 실행 중에는 모두 접는다(끝나면 실행 전 접기 상태로).
     const collapsed = mkRunning ? new Set(items.map((i) => i.key)) : mkCollapsed;
     tree.setAttribute('aria-label', mkTabName(tab));
-    renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), locked: mkRunning });
+    renderTree(tree, items, { collapsed, rerender: renderMakeScreen, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), locked: mkRunning, look: 'vlike', col: tab === 'semantic' ? undefined : MAKE_COL });
     tipTruncatedNames(tree);
   } else tree.replaceChildren();
   if (tabMoved) $(`makeTab-${tab}`).focus();
@@ -4236,10 +4226,8 @@ function valueChip(value: string, alpha?: number): HTMLElement {
   } else chip.textContent = value;
   return chip;
 }
-/** 변수 칩 — 타입 표시 + 이름(길면 말줄임 + 툴팁). */
-/** 변수 이름 칩. mark = 종류 표시(● · # · T) — 왼쪽에 값 칩이 있는 줄은 끈다(§4.2 · §4.3). */
-function varChip(name: string, value: string, newRoleOf?: string, mark = true): HTMLElement {
-  const markOn = mark;
+/** 변수 이름 칩(안 쓰는 변수 팝업 — ia-v4 §2.7 TR-D12, 그대로) — 종류 표시(● · # · T) + 이름(길면 말줄임 + 툴팁). */
+function varChip(name: string, value: string): HTMLElement {
   const chip = document.createElement('span');
   chip.className = 'bv-chip bv-var';
   const mk = document.createElement('span');
@@ -4249,34 +4237,72 @@ function varChip(name: string, value: string, newRoleOf?: string, mark = true): 
   const nm = document.createElement('span');
   nm.className = 'bv-name';
   nm.textContent = name;
-  if (newRoleOf != null) {
-    // 새 역할(§2.12) — 연결할 때 Semantic에 만든다.
-    const badge = document.createElement('span');
-    badge.className = 'bv-new';
-    badge.textContent = t('bind.newRole');
-    badge.setAttribute('role', 'img');
-    badge.setAttribute('aria-label', t('bind.newRoleAria'));
-    chip.append(badge, ...(markOn ? [mk] : []), nm);
-    chip.dataset.tip = t('bind.newRoleTip', { global: newRoleOf });
-    chip.title = chip.dataset.tip;
-  } else chip.append(...(markOn ? [mk] : []), nm);
+  chip.append(mk, nm);
   return chip;
 }
-const arrowEl = (): HTMLElement => {
-  const a = document.createElement('span');
-  a.className = 'bv-arrow';
-  a.setAttribute('aria-hidden', 'true');
-  a.textContent = '→';
-  return a;
-};
-/** 말줄임된 변수 이름에만 툴팁(그리고 난 뒤 잰다). */
+
+/* ---------- 트리 3화면 줄 부품(ia-v4 §2.7 "변수 목록 모양 — TR 뒤" · TR-D3–TR-D6) ---------- */
+type TrType = 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
+/** 줄 앞 16 칸 — 색이면 동그라미(투명도가 100%가 아니면 바둑판 위 — TR-P4, 변수 탭 vr-sw와 같음), 아니면 종류 표시(V-D1). */
+function trLead(type: TrType, hex?: string, alpha?: number): HTMLElement {
+  const l = document.createElement('span');
+  l.setAttribute('aria-hidden', 'true');
+  if (type === 'COLOR' && hex) {
+    l.className = 'tr-lead vr-sw';
+    paintSwatch(l, { kind: 'color', hex, ...(alpha != null && alpha < 1 ? { alpha } : {}) });
+  } else {
+    l.className = 'tr-lead vr-mk';
+    l.textContent = varTypeMark(type === 'COLOR' ? 'FLOAT' : type);
+  }
+  return l;
+}
+/** 텍스트 스타일 줄 앞 "Aa"(.ts-aa — 칸 폭 16 그대로). */
+function trLeadAa(): HTMLElement {
+  const aa = document.createElement('span');
+  aa.className = 'tr-lead ts-aa';
+  aa.setAttribute('aria-hidden', 'true');
+  aa.textContent = 'Aa';
+  return aa;
+}
+/** 값 글로 가르는 타입(연결 후보에 타입이 없을 때 — TR-18): "#"로 시작하는 hex면 색, 아니면 숫자. */
+const typeOfValue = (v: string): TrType => (isHexColor(v) ? 'COLOR' : 'FLOAT');
+/** 왼쪽 글(TR-D5) — 폭은 renderTree가 칩 열로 정한다(`fill`이면 남는 폭 — 만들기 Semantic 탭, TR-D10). 잘리면 title(tipTruncatedNames). */
+function trLeft(text: string, fill = false): HTMLElement {
+  const s = document.createElement('span');
+  s.className = `tr-lt${fill ? ' fill' : ''}`;
+  s.textContent = text;
+  return s;
+}
+/** 붙은 칩(TR-D3 · TR-D4) — 옅은 칸 "→ {전체 이름}"("→"는 aria-hidden) · 짙은 칸 값 글. 어느 쪽이든 null이면 그 칸 없음. */
+function trChip(name: string | null, value: string | null): HTMLElement {
+  const chip = document.createElement('span');
+  chip.className = 'vchip';
+  if (name != null) {
+    const al = document.createElement('span');
+    al.className = 'al';
+    const ar = document.createElement('span');
+    ar.setAttribute('aria-hidden', 'true');
+    ar.textContent = '→ ';
+    al.append(ar, name);
+    chip.appendChild(al);
+  }
+  if (value != null) {
+    const vl = document.createElement('span');
+    vl.className = 'vl';
+    vl.textContent = value;
+    chip.appendChild(vl);
+  }
+  return chip;
+}
+/** 짙은 칸 값 글(V-D2) — 색 "#RRGGBB"(투명도가 100%가 아니면 " {p}%"), 그 밖은 그대로. */
+const trValueText = (value: string, alpha?: number): string => (isHexColor(value) ? value.toUpperCase() + alphaTail(alpha) : value);
+/** 말줄임된 글에만 툴팁(그리고 난 뒤 잰다) — 트리 왼쪽 글 · 옅은 칸(이름만) · 짙은 칸(TR-D11 · TR-P12 · TR-D17). 늘 툴팁인 글(data-tip-fixed)은 그대로. */
 function tipTruncatedNames(root: HTMLElement): void {
   requestAnimationFrame(() => {
-    for (const nm of Array.from(root.querySelectorAll<HTMLElement>('.bv-name'))) {
-      const chip = nm.parentElement as HTMLElement;
-      if (chip.dataset.tip) continue;
-      if (nm.scrollWidth > nm.clientWidth + 1) chip.title = nm.textContent ?? '';
-      else chip.removeAttribute('title');
+    for (const el of Array.from(root.querySelectorAll<HTMLElement>('.tr-lt, .vchip .al, .vchip .vl'))) {
+      if (el.dataset.tipFixed) continue;
+      if (el.scrollWidth > el.clientWidth + 1) el.title = el.classList.contains('al') ? (el.lastChild?.textContent ?? '') : el.textContent ?? '';
+      else el.removeAttribute('title');
     }
   });
 }
@@ -4364,15 +4390,23 @@ function renderBindTree(): void {
       if (!list.length) continue;
       const children: TreeItem[] = list.map((g) => {
         const on = rowOn(g);
-        const cnt = document.createElement('span');
-        cnt.className = 'bv-tw';
-        cnt.textContent = t('bind.count', { k: g.count });
+        // [동그라미 · 종류 표시] "{e}곳" … [→ 변수 이름 | 값] [N 배지] … 스위치(ia-v4 §4.2 TR 뒤 — 종류는 붙을 변수 타입, TR-P19)
+        const cells: HTMLElement[] = [trLead(g.resolvedType ?? typeOfValue(g.variableValue), g.variableValue, g.variableAlpha), trLeft(t('bind.count', { k: g.count })), trChip(g.variableName, trValueText(g.variableValue, g.variableAlpha))];
+        if (g.newRoleOf != null) {
+          // 새 역할(§2.12) — 연결할 때 Semantic에 만든다. 배지는 칩 뒤(TR-D9), 툴팁도 배지에(TR-P12).
+          const badge = document.createElement('span');
+          badge.className = 'bv-new';
+          badge.textContent = t('bind.newRole');
+          badge.setAttribute('role', 'img');
+          badge.setAttribute('aria-label', t('bind.newRoleAria'));
+          badge.title = t('bind.newRoleTip', { global: g.newRoleOf });
+          cells.push(badge);
+        }
         return {
           key: g.rowKey,
-          indent: 24,
+          indent: 16,
           off: !on,
-          cells: [valueChip(g.variableValue, g.variableAlpha), arrowEl(), varChip(g.variableName, g.variableValue, g.newRoleOf, false)],
-          right: [cnt],
+          cells,
           sw: { state: on, label: t('bind.switchAria', { name: g.variableName }), onToggle: () => { for (const k of g.keys) on ? bindChecked.delete(k) : bindChecked.add(k); renderBindTree(); } },
         };
       });
@@ -4390,17 +4424,8 @@ function renderBindTree(): void {
       };
       const children: TreeItem[] = bindTsRows.map((r) => {
         const on = !bindTsOff.has(r.styleId);
-        const aa = document.createElement('span');
-        aa.className = 'ts-aa';
-        aa.setAttribute('aria-hidden', 'true');
-        aa.textContent = 'Aa';
-        const nm = document.createElement('span');
-        nm.className = 'bv-chip bv-var';
-        nm.innerHTML = `<span class="bv-name">${escapeHtml(r.name)}</span>`;
-        const cnt = document.createElement('span');
-        cnt.className = 'bv-tw';
-        cnt.textContent = t('bind.count', { k: r.nodeIds.length });
-        return { key: `ts:${r.styleId}`, indent: 24, off: !on, cells: [aa, arrowEl(), nm], right: [cnt], sw: { state: on, label: t('bind.switchAria', { name: r.name }), onToggle: () => { tsToggle(r, !on); renderBindTree(); } } };
+        // [Aa] "{e}곳" … [→ 스타일 이름](옅은 칸만 — TR-D14)
+        return { key: `ts:${r.styleId}`, indent: 16, off: !on, cells: [trLeadAa(), trLeft(t('bind.count', { k: r.nodeIds.length })), trChip(r.name, null)], sw: { state: on, label: t('bind.switchAria', { name: r.name }), onToggle: () => { tsToggle(r, !on); renderBindTree(); } } };
       });
       const st = headState(bindTsRows.map((r) => ({ on: !bindTsOff.has(r.styleId) })));
       items.push({
@@ -4415,7 +4440,7 @@ function renderBindTree(): void {
       for (const it of items) if (it.sw?.state === false) bindCollapsed.add(it.key);
     }
   }
-  renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse') });
+  renderTree(tree, items, { collapsed: bindCollapsed, rerender: renderBindTree, expandLabel: t('tree.expand'), collapseLabel: t('tree.collapse'), look: 'vlike', col: BIND_COL });
   tipTruncatedNames(tree);
   renderBindChrome();
   bindFocusFirst();
@@ -4771,6 +4796,11 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     head(t('v4.skipKeepHead'));
     for (const r of keep) box.appendChild(varRow(r));
     for (const k of tsKeys) box.appendChild(row(t('tsSkip.' + k), t('v4.layerCount', { n: bindTsSkips[k] }), '', []));
+  }
+  // 묶음 머리 바로 앞 줄 · 목록 맨 끝 줄은 아래 구분선을 뺀다(다음 머리 위 선 · 카드 아래 선과 두 줄 — TR-P14 · TR-P23)
+  for (const r of Array.from(box.querySelectorAll<HTMLElement>(':scope > .skip-row'))) {
+    const nx = r.nextElementSibling;
+    if (!nx || nx.classList.contains('skip-head')) r.classList.add('skip-nb');
   }
 }
 

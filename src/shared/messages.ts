@@ -90,6 +90,8 @@ export interface BindCandidate {
   tier: number;
   /** 변수 값(표시용 — 연결 목록의 변수 묶음 줄, §4.6). */
   variableValue?: string;
+  /** 붙을 변수의 타입(연결 줄 동그라미 · 종류 표시 — ia-v4 §2.7 TR-P19). 새 역할이면 가리킬 Global의 타입. */
+  resolvedType?: 'COLOR' | 'FLOAT' | 'STRING' | 'BOOLEAN';
   /** 색: 현재 칠하기 · 그림자의 투명도(소수 둘째 자리) — 1이면 없음. 값 칩 "#000000 8%"(ia-v3 §2.11). */
   currentAlpha?: number;
   /** 색: 변수 값의 투명도(소수 둘째 자리) — 1이면 없음. */

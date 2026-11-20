@@ -51,7 +51,20 @@ export interface TreeOptions {
   collapseLabel: string;
   /** 잠금(실행 중) — 스위치 · 접기 단추 · 이름 고치기를 막는다. */
   locked?: boolean;
+  /** 변수 목록 모양(ia-v4 §2.7 "변수 목록 모양 — TR 뒤") — 연결 · 만들기 · 이름 정리 세 트리만 넘긴다(TR-D12 · TR-P20).
+   *  없으면 지금 모양(.tr-group 띠 · ▼/▶ · 들여쓰기 = item.indent) — 안 쓰는 변수 팝업. */
+  look?: 'vlike';
+  /** vlike: 칩 열 x(트리 왼쪽 끝 기준 — 이름 정리 150 · 연결 88 · 만들기 96, TR-D5). 왼쪽 글 `.tr-lt`의 폭 = 열 − 글 x − 8. 없으면 폭을 정하지 않음. */
+  col?: number;
 }
+
+/** vlike 줄 x(TR-D2 · TR-D7 · TR-P13 · TR-P16) — 단 1(level 0) 머리 · 접을 수 있는 줄 8(▾ 칸 8–18), 단 1 잎 줄 8,
+ *  단 n+1 줄 = 단 n 내용 x: 여러 단 나무 21 + 9(n − 1), 한 단 16. */
+const VL_HEAD_X = 8;
+const vlContentX = (level: number, multi: boolean): number => (multi ? 21 + 9 * (level - 1) : 16);
+/** 세로 선 x — 단 k(level k − 1 그릇)의 내용 왼쪽 선(TR-D7). */
+const vlLineX = (k: number): number => 12 + 9 * k;
+const VL_LINE = 'var(--border)';
 
 interface Flat {
   item: TreeItem;
@@ -91,26 +104,36 @@ export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts:
   mount.replaceChildren();
   mount.setAttribute('role', 'treegrid');
   const flat: Flat[] = [];
-  const walk = (list: readonly TreeItem[], parentKey: string | null, level: number): void => {
+  const vl = opts.look === 'vlike';
+  mount.classList.toggle('vlike', vl);
+  // 여러 단 나무(TR-D7) — 단 1 그릇(머리 · 접을 수 있는 줄) 아래에 단 2 그릇이 하나라도 있으면. 접힘이 아니라 나무 모양으로.
+  const isBox = (x: TreeItem): boolean => !!x.head || !!x.children?.length;
+  const multi = vl && items.some((it) => isBox(it) && (it.children ?? []).some(isBox));
+  /** 펼친 줄의 조상 그릇 key(바깥부터) — 세로 선 · 그룹 여백용. */
+  const rowsOut: { row: HTMLElement; anc: string[]; level: number }[] = [];
+  const walk = (list: readonly TreeItem[], parentKey: string | null, level: number, anc: string[]): void => {
     for (const it of list) {
       flat.push({ item: it, parentKey, level });
       const row = document.createElement('div');
-      // 트리 머리 줄은 회색 머리 띠(.tr-group — ia-v4 §2.7 · §2.8 B안 ②)
-      row.className = `tr ${it.head ? 'tr-head' : 'tr-row'}${it.head || it.group ? ' tr-group' : ''}${it.off ? ' off' : ''}${it.cls ? ' ' + it.cls : ''}`;
+      // 트리 머리 줄은 회색 머리 띠(.tr-group — ia-v4 §2.7 · §2.8 B안 ②). vlike는 띠 없이 위 1px 선(TR-D1 — CSS `.tree.vlike .tr-head[data-tkey]`)
+      const grp = !vl && (it.head || it.group);
+      row.className = `tr ${it.head ? 'tr-head' : 'tr-row'}${grp ? ' tr-group' : ''}${vl && it.head && level > 0 ? ' tr-inner' : ''}${it.off ? ' off' : ''}${it.cls ? ' ' + it.cls : ''}`;
       row.setAttribute('role', 'row');
       row.setAttribute('aria-level', String(level + 1));
       row.dataset.tkey = it.key;
       row.tabIndex = -1;
-      row.style.paddingLeft = `${it.indent}px`;
       const hasKids = !!it.children?.length;
       const open = hasKids && !opts.collapsed.has(it.key);
+      const x = !vl ? it.indent : level === 0 ? VL_HEAD_X : vlContentX(level, multi);
+      row.style.paddingLeft = `${x}px`;
       if (hasKids) row.setAttribute('aria-expanded', String(open));
-      if (hasKids || it.head) {
+      const withCar = hasKids || !!it.head;
+      if (withCar) {
         const car = document.createElement('button');
         car.type = 'button';
         car.className = 'tr-car';
         car.tabIndex = -1;
-        car.textContent = open ? '▼' : '▶';
+        car.textContent = vl ? (open ? '▾' : '▸') : open ? '▼' : '▶';
         car.setAttribute('aria-label', open ? opts.collapseLabel : opts.expandLabel);
         if (!hasKids) car.style.visibility = 'hidden';
         if (opts.locked) car.setAttribute('aria-disabled', 'true');
@@ -123,13 +146,21 @@ export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts:
       }
       if (it.head) {
         const nm = document.createElement('span');
-        nm.className = `tr-name${it.muted ? ' muted' : ''}`;
+        nm.className = `tr-name${it.muted && !vl ? ' muted' : ''}`;
         nm.textContent = it.name ?? '';
         const ct = document.createElement('span');
         ct.className = 'tr-cnt';
         ct.textContent = it.countText ?? '';
         row.append(nm, ct);
       } else row.append(...(it.cells ?? []));
+      // 왼쪽 글 고정 폭(TR-D5 · TR-D11) — 열 − 글 x − 8, 모자라면 0(칩은 글 x + 8에 선다). 글 x = 줄 x + ▾(10 + 4) + 동그라미(16 + 8).
+      if (vl && opts.col != null && !it.head) {
+        const lt = row.querySelector<HTMLElement>(':scope > .tr-lt:not(.fill)');
+        if (lt) {
+          const lx = x + (withCar ? 14 : 0) + (row.querySelector(':scope > .tr-lead') ? 24 : 0);
+          lt.style.width = `${Math.max(0, opts.col - 8 - lx)}px`;
+        }
+      }
       const grow = document.createElement('span');
       grow.className = 'grow';
       row.appendChild(grow);
@@ -137,7 +168,8 @@ export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts:
       if (it.sw) row.appendChild(swEl(it.sw, !!opts.locked));
       if (it.aria) row.setAttribute('aria-label', it.aria);
       mount.appendChild(row);
-      if (open) walk(it.children!, it.key, level + 1);
+      rowsOut.push({ row, anc, level });
+      if (open) walk(it.children!, it.key, level + 1, [...anc, it.key]);
     }
   };
   const toggle = (key: string): void => {
@@ -147,7 +179,8 @@ export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts:
     opts.rerender();
     focusRow(mount, key);
   };
-  walk(items, null, 0);
+  walk(items, null, 0, []);
+  if (vl) vlDecorate(rowsOut, multi);
   state.set(mount, { flat, opts });
   const rows = Array.from(mount.querySelectorAll<HTMLElement>('[data-tkey]'));
   const target = (focusKey && rows.find((r) => r.dataset.tkey === focusKey)) || rows[0];
@@ -162,6 +195,40 @@ export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts:
       mount.dataset.focusKey = r.dataset.tkey;
       for (const x of Array.from(mount.querySelectorAll<HTMLElement>('[data-tkey]'))) x.tabIndex = x === r ? 0 : -1;
     });
+  }
+}
+
+/** vlike 꾸밈 — 그룹 여백(TR-D2 · TR-P17)과 이름 정리 세로 선 조각(TR-D7 · TR-P7). 줄은 평평한 채 바깥 여백 · 배경 그림으로. */
+function vlDecorate(rows: { row: HTMLElement; anc: string[]; level: number }[], multi: boolean): void {
+  // 그룹 여백: 단 1 그릇(level 0 머리 · 접을 수 있는 줄)의 보이는 내용 — 첫 줄 위 4 · 마지막 줄 아래 16. 접힌 그릇은 내용이 없어 여백도 없다.
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].level !== 0) continue;
+    let j = i + 1;
+    while (j < rows.length && rows[j].level > 0) j++;
+    if (j === i + 1) continue;
+    rows[i + 1].row.style.marginTop = '4px';
+    rows[j - 1].row.style.marginBottom = '16px';
+  }
+  if (!multi) return;
+  // 세로 선: 줄마다 조상 그릇(단 k)의 선 x에 1px 조각 — 그 그릇의 마지막 보이는 내용 줄만 위 16까지(길이 = 내용 높이 − 16).
+  for (let i = 0; i < rows.length; i++) {
+    const { row, anc } = rows[i];
+    if (!anc.length) continue;
+    const imgs: string[] = [];
+    const sizes: string[] = [];
+    const pos: string[] = [];
+    anc.forEach((key, k) => {
+      const next = rows[i + 1];
+      const last = !next || next.anc[k] !== key;
+      imgs.push(`linear-gradient(${VL_LINE}, ${VL_LINE})`);
+      sizes.push(`1px ${last ? 16 : 32}px`);
+      pos.push(`${vlLineX(k)}px 0`);
+    });
+    row.style.backgroundImage = imgs.join(', ');
+    row.style.backgroundSize = sizes.join(', ');
+    row.style.backgroundPosition = pos.join(', ');
+    row.style.backgroundRepeat = 'no-repeat';
+    row.classList.add('tr-lined');
   }
 }
 

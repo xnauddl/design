@@ -453,9 +453,13 @@
     .r-group:first-child { margin-top: 0; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
-    .skip-head { font-size: 11px; color: var(--text-2); padding: 8px 2px 4px; }
+    /* 묶음 머리 — 트리 머리 모양(ia-v4 §2.8 · TR-D13 · TR-P14): 높이 32 · 글 왼쪽 2(.skip-row 글과 맞춤) · 위 1px 선(첫 묶음 머리 없음) · 배경 없음 · 12px 600 */
+    .skip-head { display: flex; align-items: center; height: 32px; padding: 0 2px; border-top: 1px solid var(--border); background: none; font-size: 12px; font-weight: 600; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .skip-list .skip-head:first-child { border-top: 0; }
     /* 건너뛴 곳 줄 — 두 줄(ia-v4 §4.2 "두 줄 · 설명만"): 첫 줄 이름 · 수 · [선택 ›](손볼 곳만), 둘째 줄 설명. 아래 구분선만(§2.8) */
     .skip-row { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
+    /* 묶음 머리 바로 앞 줄 · 목록 맨 끝 줄은 아래 구분선 없음(2px 두 줄 막기 — TR-P14 · TR-P23, renderSkipReasons가 붙임) */
+    .skip-row.skip-nb { border-bottom: 0; }
     .skip-row .skip-line { display: flex; align-items: center; gap: 6px; min-width: 0; }
     .skip-row .skip-name { white-space: nowrap; flex: 0 0 auto; }
     .skip-row .skip-n { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; }
@@ -728,13 +732,43 @@
     .tr-sub { color: var(--text-2); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; flex: 0 1 auto; }
     .tr-note { font-size: 11px; color: var(--text-2); padding: 6px 2px 6px 24px; border-bottom: 1px solid var(--border); line-height: 1.45; }
     .tr.off .bv-val, .tr.off .bv-var { background: var(--surface-2); border-color: var(--border); color: var(--text-2); }
-    .tr.off .bv-arrow, .tr.off .bv-tw, .tr.off .tr-new { color: var(--text-2); }
-    .tr.off .tr-new { font-weight: 500; }
+    .tr.off .bv-arrow, .tr.off .bv-tw { color: var(--text-2); }
     .tr.off .bv-sw { filter: grayscale(1); }
-    .tr .tr-old { color: var(--text-2); text-decoration: line-through; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; }
-    .tr .tr-new { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
     .tr input.tr-edit { width: 130px; height: 22px; min-height: 22px; font: 500 11px var(--mono); padding: 0 6px; border: 1.5px solid var(--accent); border-radius: 4px; }
     .tr .bv-var.dup { box-shadow: 0 0 0 1.5px var(--warn); }
+    /* 트리 3화면 변수 목록 모양(ia-v4 §2.7 "변수 목록 모양 — TR 뒤" · TR-D1–TR-D17) — 연결 · 만들기 · 이름 정리 트리(.tree.vlike)만.
+       안 쓰는 변수 팝업 트리 · 읽는 중 자리 줄 · 만들기 결과 줄은 지금 모양 그대로(TR-D12 · TR-P15 — 줄 · 머리 규칙은 [data-tkey]에만). */
+    .tree.vlike .tr[data-tkey] { height: 32px; min-height: 32px; gap: 0; padding-right: 8px; border-bottom: 0; }
+    .tree.vlike .tr-head[data-tkey] { border-top: 1px solid var(--border); background: none; }
+    .tree.vlike .tr-head[data-tkey]:first-child, .tree.vlike .tr-head[data-tkey].tr-inner { border-top: 0; }
+    .tree.vlike button.tr-car { width: 10px; font: 600 12px/1 var(--font); color: var(--muted); justify-content: flex-start; }
+    .tree.vlike .tr-head[data-tkey] .tr-name { margin-left: 4px; font-size: 12px; font-weight: 600; color: var(--text-2); }
+    .tree.vlike .tr-head[data-tkey] .tr-cnt { margin-left: 8px; }
+    .tree.vlike .tr .grow { min-width: 8px; }
+    .tree.vlike .tr-lead { flex: none; }
+    .tree.vlike .vr-sw { position: relative; overflow: hidden; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--swatch-line); }
+    .tree.vlike .vr-mk { width: 16px; text-align: center; font: 600 11px/16px var(--font); color: var(--text-2); }
+    .tree.vlike .ts-aa { text-align: center; }
+    .tree.vlike .tr-lt { flex: none; margin-left: 8px; font-size: 12px; font-weight: 400; line-height: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+    .tree.vlike .tr > .tr-lt:first-child { margin-left: 0; }
+    .tree.vlike .tr-car + .tr-lt { margin-left: 4px; }
+    .tree.vlike .tr-lt.fill { flex: 0 1 auto; min-width: 0; margin-right: 8px; }
+    .tree.vlike .tr-lt.fill ~ .grow { display: none; }
+    .tree.vlike .tr-lt.fill + .vchip { margin-left: auto; flex-shrink: 0; max-width: 70%; } /* Semantic 탭 — 이름이 먼저 준다(변수 목록과 같음, TR-D10) */
+    /* 붙은 칩 — 글 길이만큼, 모자라면 옅은 칸 먼저 · 다음 짙은 칸이 준다(TR-P11). 옅은 칸 최대 230 */
+    .tree.vlike .vchip { flex: 0 1 auto; min-width: 0; margin-left: 8px; }
+    .tree.vlike .vchip .al { flex: 0 1 auto; min-width: 34px; max-width: 230px; }
+    .tree.vlike .vchip .vl { flex: 0 0.0001 auto; min-width: 0; }
+    .tree.vlike .vchip.dup { box-shadow: 0 0 0 1.5px var(--warn); }
+    .tree.vlike .tr-tag, .tree.vlike .bv-new { flex: none; margin-left: 4px; }
+    .tree.vlike .tr input.tr-edit { flex: 0 1 auto; min-width: 0; width: 230px; margin-left: 8px; }
+    /* 끈 줄(TR-D6) — 글 --text-2 · 짙은 칸 --surface-2 · 동그라미 흑백, opacity 없음 */
+    .tree.vlike .tr.off .tr-lt, .tree.vlike .tr.off .vchip .al { color: var(--text-2); }
+    .tree.vlike .tr.off .vchip .vl { background: var(--surface-2); color: var(--text-2); }
+    .tree.vlike .tr.off .vr-sw { filter: grayscale(1); }
+    /* 흐린 소수 크기 줄(§4.3 · TR-D14) — 글 · Aa · 칩 --muted, 짙은 칸 바탕 --surface-2 */
+    .tree.vlike .tr.ts-decimal .tr-lt { color: var(--muted); }
+    .tree.vlike .tr.ts-decimal .vchip .vl { background: var(--surface-2); color: var(--muted); }
     button.bv-switch[aria-checked="mixed"] .bv-track { background: var(--accent); }
     button.bv-switch[aria-checked="mixed"] .bv-track::after { left: 8px; width: 12px; height: 4px; top: 6px; border-radius: 2px; }
     button.bv-switch[aria-disabled="true"] { opacity: .45; cursor: default; }
