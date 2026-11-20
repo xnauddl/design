@@ -102,6 +102,7 @@
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
+    "export.clash": "Global\uACFC \uC774\uB984\uC774 \uAC19\uC740 Semantic {n}\uAC1C\uB294 Global \uAC12\uB9CC \uB0C8\uC5B4\uC694: {names}",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -4057,6 +4058,58 @@
       if (!prev || prev.collection === "Semantic" && t2.collection === "Global") seen.set(t2.name, t2);
     }
     return [...seen.values()];
+  }
+  var ALIAS_READ_LIMIT = 12;
+  function resolveExportTokens(vars) {
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const reachesValue = (v) => {
+      const seen = /* @__PURE__ */ new Set([v.id]);
+      let cur = v;
+      for (let reads = 1; cur.alias !== void 0; reads++) {
+        if (reads >= ALIAS_READ_LIMIT) return false;
+        const next = byId.get(cur.alias);
+        if (!next || seen.has(next.id)) return false;
+        seen.add(next.id);
+        cur = next;
+      }
+      return true;
+    };
+    const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reachesValue(v));
+    const winner = /* @__PURE__ */ new Map();
+    for (const v of ok) {
+      const prev = winner.get(v.name);
+      if (!prev || prev.tier === 2 && v.tier === 1) winner.set(v.name, v);
+    }
+    const survivors = new Set([...winner.values()].map((v) => v.id));
+    return ok.map((v) => {
+      const tok = { name: v.name, collection: v.tier === 1 ? "Global" : "Semantic", type: v.type, kind: v.kind };
+      let cur = v;
+      while (cur.alias !== void 0) {
+        const next = byId.get(cur.alias);
+        if (survivors.has(next.id)) {
+          tok.aliasOf = next.name;
+          if (v.description) tok.description = v.description;
+          return tok;
+        }
+        cur = next;
+      }
+      tok.value = cur.value;
+      if (cur.description) tok.description = cur.description;
+      return tok;
+    });
+  }
+  function exportClashes(tokens) {
+    const globalOf = /* @__PURE__ */ new Map();
+    for (const tk of tokens) if (tk.collection === "Global" && !globalOf.has(tk.name)) globalOf.set(tk.name, tk);
+    const out = /* @__PURE__ */ new Set();
+    for (const s of tokens) {
+      if (s.collection !== "Semantic") continue;
+      const g = globalOf.get(s.name);
+      if (!g) continue;
+      const mirror = s.aliasOf === s.name || (s.aliasOf !== void 0 && g.aliasOf !== void 0 ? s.aliasOf === g.aliasOf : s.aliasOf === void 0 && g.aliasOf === void 0 && s.value === g.value && s.description === g.description && s.kind === g.kind);
+      if (!mirror) out.add(s.name);
+    }
+    return [...out].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   }
   var TYPO_PREFIX = "typography";
   var pct = (n) => `${Number(n.toFixed(2))}%`;
@@ -12076,7 +12129,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -12461,38 +12514,29 @@
           const colById = new Map(cols.map((c) => [c.id, c]));
           const vars = await figma.variables.getLocalVariablesAsync();
           const tiers = collectionTiers(cols, vars);
-          const nameById = new Map(vars.map((v) => [v.id, v.name]));
-          const tokens = [];
           const owned = ownedIds(cols);
           const colIdx = new Map(cols.map((c, i) => [c.id, i]));
           const rank = (id) => {
             var _a2;
             return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
           };
+          const inputs = [];
           for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
             const col = colById.get(v.variableCollectionId);
-            const tier = col ? tiers.get(col.id) : 0;
-            if (!col || tier !== 1 && tier !== 2) continue;
+            if (!col) continue;
             const raw = v.valuesByMode[col.defaultModeId];
-            const t2 = {
-              name: v.name,
-              collection: tier === 1 ? "Global" : "Semantic",
-              // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
-              type: v.resolvedType,
-              kind: kindOf(v)
-            };
-            if (v.description) t2.description = v.description;
+            const inp = { id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v) };
+            if (v.description) inp.description = v.description;
             if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-              const target = nameById.get(raw.id);
-              if (!target) continue;
-              t2.aliasOf = target;
+              inp.alias = raw.id;
             } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-              t2.value = exportColorHex(raw);
+              inp.value = exportColorHex(raw);
             } else {
-              t2.value = raw;
+              inp.value = raw;
             }
-            tokens.push(t2);
+            inputs.push(inp);
           }
+          const tokens = resolveExportTokens(inputs);
           tokens.sort((a, b) => a.name.localeCompare(b.name));
           const styles = (await figma.getLocalTextStylesAsync()).map((st) => ({
             name: st.name,
@@ -12508,7 +12552,7 @@
             fontSizeUnit: msg.fontSizeUnit,
             base: msg.base
           }, styles);
-          post({ type: "EXPORT_RESULT", format: msg.format, content });
+          post({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens) });
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {
@@ -12778,7 +12822,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_c = msg.names) != null ? _c : {};
+          const shownNames = (_d = msg.names) != null ? _d : {};
           const groupNames = groups.map((g, gi) => {
             if (g.tab) return resolved[gi];
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
@@ -13077,7 +13121,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_e = r.why) != null ? _e : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -13157,7 +13201,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_e = snaps[preferLive]) != null ? _e : snaps[0];
+                  const masterSnap = (_f = snaps[preferLive]) != null ? _f : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -13178,7 +13222,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_g = (_f = structs[preferLive]) == null ? void 0 : _f.type) != null ? _g : "");
+                  const prefix = shapePrefix(master, (_h = (_g = structs[preferLive]) == null ? void 0 : _g.type) != null ? _h : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -13284,7 +13328,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_h = r.why) != null ? _h : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_i = r.why) != null ? _i : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -13301,7 +13345,7 @@
               const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_i = sf.members[sf.master]) != null ? _i : sf.members[0];
+                const head = (_j = sf.members[sf.master]) != null ? _j : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
@@ -13351,7 +13395,7 @@
               }
               let set;
               try {
-                const home = (_j = pageOf2(made[0].comp)) != null ? _j : figma.currentPage;
+                const home = (_k = pageOf2(made[0].comp)) != null ? _k : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -13440,7 +13484,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_k = nodes[0].parent) != null ? _k : figma.currentPage;
+              const parent = (_l = nodes[0].parent) != null ? _l : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

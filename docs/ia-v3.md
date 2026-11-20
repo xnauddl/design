@@ -3263,12 +3263,12 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 
 결정: ④ 남지 않는 변수(계층 1 · 2가 아님, 또는 dedupe에서 짐)를 가리키는 별칭은 값으로 풀기(남는 변수를 만나면 그것을 가리킴) · ⑤ 같은 이름 Global · Semantic은 Global을 남기고 거울이 아니면 팝업 상태 줄에 알림 · 한글 CSS 이름은 나중에.
 
-- [ ] `code.ts` EXPORT: 별칭 따라가기(⓪ ③에 걸리는 변수 먼저 빼고 남는 변수 정함 → ① 남는 변수 → 가리킴 ② 남지 않는 변수 → 그 컬렉션 기본 모드 값으로 계속 ③ 없음 · 순환 · 12번 읽기 초과 → 내보내지 않음), 이름 · 계층 · 종류는 원래 변수, 설명은 ①이면 원래 · ②면 값을 준 변수
-- [ ] `exporters.ts` `exportClashes(tokens)`: 거울 판정(ⓐ 자기 이름 별칭 · ⓑ 별칭 쌍은 `aliasOf`, 값 쌍은 `value` · `description` · `kind`) 밖의 Global · Semantic 같은 이름 → 이름 단위(중복 없음) 이름순 목록
-- [ ] `messages.ts` `EXPORT_RESULT.clashes: string[]` · `code.ts`가 실어 보냄
-- [ ] `ui.ts` EXPORT_RESULT: 겹침이 있으면 `export.saved` + " " + `export.clash`(names 앞 3개 · 넘치면 `list.usesMore`) · `warn`, 없으면 지금 그대로
-- [ ] `i18n.ts` 새 키 `export.clash`
-- [ ] 단위 테스트: 별칭 풀기 — 순수 함수로 빼서 시험(계층 0 대상 1단 · 2단 · Component 계층 대상 · dedupe에서 진 변수 대상 · 중간에 남는 변수 · 순환 · 12번 읽기 초과 · 없는 대상 · 설명은 값을 준 변수 것 · ⓪ 예(끊긴 Global `A` · 값 Semantic `A` · `B` → Global `A`는 빠짐)) · `exportClashes`(자기 이름 별칭 = 거울 · 같은 필드 = 거울 · 둘 다 같은 대상 별칭 = 거울 · 다른 값 · 다른 대상 · 값 쌍에서 설명만 다름 = 겹침 · 별칭 쌍에서 설명만 다름 = 거울 · 한쪽만 별칭 = 겹침 · Global이 별칭인 경우 · 같은 이름 Semantic 여럿(하나만 겹침이어도 이름 1개) · 같은 계층 겹침은 안 셈 · 이름순)
-- [ ] `ui.ts` 상태 줄 글: `saved + " " + clash` 이어 붙임 · 3개 초과 `list.usesMore` — 검사(verify-bind-flow 또는 단위)
-- [ ] 4검사 · `dist/` 다시 빌드
+- [x] `code.ts` EXPORT: 별칭 따라가기(⓪ ③에 걸리는 변수 먼저 빼고 남는 변수 정함 → ① 남는 변수 → 가리킴 ② 남지 않는 변수 → 그 컬렉션 기본 모드 값으로 계속 ③ 없음 · 순환 · 12번 읽기 초과 → 내보내지 않음), 이름 · 계층 · 종류는 원래 변수, 설명은 ①이면 원래 · ②면 값을 준 변수
+- [x] `exporters.ts` `exportClashes(tokens)`: 거울 판정(ⓐ 자기 이름 별칭 · ⓑ 별칭 쌍은 `aliasOf`, 값 쌍은 `value` · `description` · `kind`) 밖의 Global · Semantic 같은 이름 → 이름 단위(중복 없음) 이름순 목록
+- [x] `messages.ts` `EXPORT_RESULT.clashes: string[]` · `code.ts`가 실어 보냄
+- [x] `ui.ts` EXPORT_RESULT: 겹침이 있으면 `export.saved` + " " + `export.clash`(names 앞 3개 · 넘치면 `list.usesMore`) · `warn`, 없으면 지금 그대로
+- [x] `i18n.ts` 새 키 `export.clash`
+- [x] 단위 테스트: 별칭 풀기 — 순수 함수로 빼서 시험(계층 0 대상 1단 · 2단 · Component 계층 대상 · dedupe에서 진 변수 대상 · 중간에 남는 변수 · 순환 · 12번 읽기 초과 · 없는 대상 · 설명은 값을 준 변수 것 · ⓪ 예(끊긴 Global `A` · 값 Semantic `A` · `B` → Global `A`는 빠짐)) · `exportClashes`(자기 이름 별칭 = 거울 · 같은 필드 = 거울 · 둘 다 같은 대상 별칭 = 거울 · 다른 값 · 다른 대상 · 값 쌍에서 설명만 다름 = 겹침 · 별칭 쌍에서 설명만 다름 = 거울 · 한쪽만 별칭 = 겹침 · Global이 별칭인 경우 · 같은 이름 Semantic 여럿(하나만 겹침이어도 이름 1개) · 같은 계층 겹침은 안 셈 · 이름순)
+- [x] `ui.ts` 상태 줄 글: `saved + " " + clash` 이어 붙임 · 3개 초과 `list.usesMore` — 단위 검사(`exportClashNotice`) + 실제 화면 확인(Playwright로 팝업에 `EXPORT_RESULT` 넣어 글 · `warn` 클래스 확인)
+- [x] 4검사 · `dist/` 다시 빌드
 - [ ] 실기 확인(사용자, 피그마): 계층 밖 컬렉션을 가리키는 Semantic · 같은 이름 다른 값 Semantic이 있는 파일에서 CSS 내보내기 → 값으로 풀림 · 상태 줄 알림

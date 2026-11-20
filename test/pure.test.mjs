@@ -50,6 +50,9 @@ import {
   textToSemanticMap,
   exportTokens,
   exportHasTokens,
+  resolveExportTokens,
+  exportClashes,
+  exportClashNotice,
   splitWeightStyle,
   parseVariantName,
   formatVariant,
@@ -717,6 +720,92 @@ test('exportTokens CSS — 묶음 안 이름순은 코드 단위 비교(언어 �
   const values = [...exportTokens(tokens, OPTS).matchAll(/: (#0000\d\d);/g)].map((m) => m[1]);
   // 대문자 Z(0x5A) < 소문자 a(0x61) < b — localeCompare라면 언어 설정에 따라 Z가 뒤로 갈 수 있다
   assert.deepEqual(values, ['#000001', '#000002', '#000003']);
+});
+
+/* ---- 별칭 풀기 · 같은 이름 알림 (ia-v3 §4.4 · A.23) ---- */
+const EV = (id, name, tier, extra = {}) => ({ id, name, tier, type: 'COLOR', kind: 'color', ...extra });
+const byN = (toks) => Object.fromEntries(toks.map((x) => [`${x.collection}:${x.name}`, x]));
+
+test('resolveExportTokens — ① 남는 변수는 가리키고 ② 내보내지 않는 대상은 값으로 푼다', () => {
+  const toks = byN(resolveExportTokens([
+    EV('g1', 'color/gray/900', 1, { value: '#101828' }),
+    EV('x1', 'brand/ink', 0, { value: '#1d2939', description: 'ink' }), // 계층 아님
+    EV('x2', 'brand/mid', 0, { alias: 'x1' }), // 2단
+    EV('x3', 'brand/to-g', 0, { alias: 'g1' }), // 중간에 남는 변수
+    EV('c1', 'comp/btn', 3, { value: '#ff0000' }), // Component 계층
+    EV('s1', 'color/text/default', 2, { alias: 'x1', description: '안내 글' }),
+    EV('s2', 'color/text/two', 2, { alias: 'x2' }),
+    EV('s3', 'color/text/via', 2, { alias: 'x3' }),
+    EV('s4', 'color/text/comp', 2, { alias: 'c1' }),
+    EV('s5', 'color/text/g', 2, { alias: 'g1', description: 'keep' }),
+  ]));
+  assert.equal(toks['Semantic:color/text/default'].value, '#1d2939');
+  assert.equal(toks['Semantic:color/text/default'].description, 'ink'); // 값을 준 변수의 설명(원래 변수 설명은 안 씀)
+  assert.equal(toks['Semantic:color/text/two'].value, '#1d2939');
+  assert.equal(toks['Semantic:color/text/via'].aliasOf, 'color/gray/900'); // 남는 변수를 만나면 가리킴
+  assert.equal(toks['Semantic:color/text/comp'].value, '#ff0000');
+  assert.equal(toks['Semantic:color/text/g'].aliasOf, 'color/gray/900');
+  assert.equal(toks['Semantic:color/text/g'].description, 'keep'); // ①이면 원래 변수 설명
+  assert.ok(!('Global:brand/ink' in toks) && !('Global:comp/btn' in toks)); // 계층 0 · 3은 내보내지 않음
+});
+
+test('resolveExportTokens — ③ 없는 대상 · 순환 · 12번 초과는 빠지고, ⓪ 뒤에 남는 변수를 정한다', () => {
+  const chain = [];
+  for (let i = 0; i < 12; i++) chain.push(EV(`k${i}`, `x/k${i}`, 0, i === 11 ? { value: '#000000' } : { alias: `k${i + 1}` }));
+  const out = resolveExportTokens([
+    EV('a', 'color/gone', 2, { alias: 'nope' }),
+    EV('l1', 'loop/a', 0, { alias: 'l2' }),
+    EV('l2', 'loop/b', 0, { alias: 'l1' }),
+    EV('b', 'color/loop', 2, { alias: 'l1' }),
+    ...chain,
+    EV('ok11', 'color/eleven', 2, { alias: 'k1' }), // 자신 + k1..k11 = 12번 읽기 → 닿음
+    EV('far', 'color/far', 2, { alias: 'k0' }), // 자신 + 12개 = 13번 → 빠짐
+    // ⓪ 예: 끊긴 Global A · 값 Semantic A · B → Global A
+    EV('gA', 'color/A', 1, { alias: 'nope' }),
+    EV('sA', 'color/A', 2, { value: '#123456' }),
+    EV('sB', 'color/B', 2, { alias: 'gA' }),
+  ]);
+  const names = out.map((x) => `${x.collection}:${x.name}`);
+  assert.ok(!names.includes('Semantic:color/gone'));
+  assert.ok(!names.includes('Semantic:color/loop'));
+  assert.ok(names.includes('Semantic:color/eleven'));
+  assert.ok(!names.includes('Semantic:color/far'));
+  assert.ok(!names.includes('Global:color/A') && !names.includes('Semantic:color/B'));
+  assert.equal(out.find((x) => x.name === 'color/A').value, '#123456'); // Semantic A가 남는 변수
+});
+
+test('resolveExportTokens — dedupe에서 진 변수를 가리키면 값으로 푼다(이름이 같은 다른 값으로 풀리지 않게)', () => {
+  const out = resolveExportTokens([
+    EV('g', 'color/p', 1, { value: '#0000ff' }),
+    EV('s', 'color/p', 2, { value: '#ff0000' }), // Global에 져서 남지 않음
+    EV('r', 'color/role', 2, { alias: 's' }),
+  ]);
+  assert.equal(out.find((x) => x.name === 'color/role').value, '#ff0000');
+  assert.equal(out.find((x) => x.name === 'color/role').aliasOf, undefined);
+});
+
+test('exportClashes — 거울(자기 이름 별칭 · 같은 대상 별칭 · 같은 값 쌍)은 세지 않고, 이름 단위 · 이름순', () => {
+  const G = (name, extra) => ({ name, collection: 'Global', type: 'COLOR', kind: 'color', ...extra });
+  const S = (name, extra) => ({ name, collection: 'Semantic', type: 'COLOR', kind: 'color', ...extra });
+  const toks = [
+    G('m/self', { value: '#000000' }), S('m/self', { aliasOf: 'm/self' }), // ⓐ
+    G('m/same', { value: '#111111' }), S('m/same', { value: '#111111' }), // 값 쌍 같음
+    G('m/alias', { aliasOf: 't' }), S('m/alias', { aliasOf: 't', description: '다른 설명' }), // 별칭 쌍 — 설명은 안 봄
+    G('z/val', { value: '#000000' }), S('z/val', { value: '#ffffff' }), // 다른 값
+    G('c/desc', { value: '#000000', description: 'a' }), S('c/desc', { value: '#000000', description: 'b' }), // 값 쌍 설명 다름
+    G('b/one', { value: '#000000' }), S('b/one', { aliasOf: 'other' }), // 한쪽만 별칭
+    G('a/multi', { value: '#000000' }), S('a/multi', { aliasOf: 'a/multi' }), S('a/multi', { value: '#999999' }), // 여럿 중 하나 겹침 → 이름 1개
+    S('only/sem', { value: '#000000' }), S('only/sem', { value: '#ffffff' }), // 같은 계층 겹침은 안 셈
+    G('g/dup', { value: '#000000' }), G('g/dup', { value: '#ffffff' }),
+  ];
+  assert.deepEqual(exportClashes(toks), ['a/multi', 'b/one', 'c/desc', 'z/val']);
+});
+
+test('exportClashNotice — 앞 3개 · 넘치면 "외 {n}개" · 없으면 빈 글', () => {
+  assert.equal(exportClashNotice([]), '');
+  assert.equal(exportClashNotice(['color/primary', 'spacing/md']), 'Global과 이름이 같은 Semantic 2개는 Global 값만 냈어요: color/primary, spacing/md');
+  assert.equal(exportClashNotice(['a', 'b', 'c', 'd']), 'Global과 이름이 같은 Semantic 4개는 Global 값만 냈어요: a, b, c 외 1개');
+  assert.equal(exportClashNotice(['a', 'b', 'c', 'd', 'e']), 'Global과 이름이 같은 Semantic 5개는 Global 값만 냈어요: a, b, c 외 2개');
 });
 
 test('exportHasTokens — 껍데기만 있는 결과는 저장 대상이 아님(#8)', () => {
