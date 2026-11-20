@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <style>
     /* ── 디자인 시스템 v2 (라이트 고정) ───────────────────────────────
-       색·간격·반경·타이포를 토큰화. 좁은 패널(≈320–480px)에 맞춘 11px 베이스.
+       색·간격·반경·타이포를 토큰화. 좁은 패널(560px — ia-v4 §8 V2)에 맞춘 12px 베이스(V3 — 11px 아래는 배지 10px만).
        JS가 참조하는 id/클래스명은 그대로 두고 스타일만 재설계. */
     :root {
       color-scheme: light;
@@ -45,6 +45,13 @@
       --danger-subtle: #fdecec;
       --danger-border: #f4c9cc;
 
+      /* 변수 탭 목록 줄(ia-v4 §4.6 "목록 줄 — V1 뒤" · V-D5) */
+      --vchip-dark:    #2b2a2a;   /* 붙은 칩 짙은 칸(값) 바탕 */
+      --vchip-dark-fg: #d8d8d8;   /* 붙은 칩 짙은 칸 글 */
+      --vchip-fg:      #000000;   /* 붙은 칩 옅은 칸(별칭) 글 */
+      --swatch-line:   #000000;   /* 목록 줄 동그라미 테두리 */
+      --side-sel:      #ededed;   /* 사이드바 고른 항목 바탕 */
+
       /* 반경 */
       --r-sm: 5px;
       --r:    7px;
@@ -54,7 +61,7 @@
       --shadow-sm: 0 1px 1.5px rgba(20,22,28,.05);
       --shadow:    0 1px 2px rgba(20,22,28,.06), 0 2px 6px rgba(20,22,28,.05);
 
-      --fs:   11px;
+      --fs:   12px;
       --font: "Inter", -apple-system, "Segoe UI", "Apple SD Gothic Neo", sans-serif;
       --mono: ui-monospace, "SF Mono", Menlo, monospace;
     }
@@ -83,7 +90,7 @@
     h2 .muted:not(.lock):not(:empty) ~ .muted:not(.lock):not(:empty)::before { content: '· '; }
     .warn    { color: var(--warn); }
     .ok      { color: var(--ok); }
-    code     { font-family: var(--mono); font-size: 10.5px; color: var(--text-2); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+    code     { font-family: var(--mono); font-size: 11px; color: var(--text-2); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
     b        { font-weight: 600; }
 
     /* ── 카드 ── */
@@ -201,9 +208,9 @@
     .tab-section > * { margin-bottom: 10px; }
 
     /* ── IA v4 선택 탭(§4.1 · §8) ── */
-    .sel-head { display: flex; align-items: center; gap: 6px; min-height: 32px; flex-wrap: wrap; }
-    .sel-head b { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-    .sel-head .sel-diff { margin-left: auto; color: var(--text-2); font-size: 10.5px; display: inline-flex; gap: 4px; align-items: center; }
+    .sel-head { display: flex; align-items: center; gap: 6px; min-height: 32px; flex-wrap: nowrap; }
+    .sel-head b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+    .sel-head .sel-diff { flex: none; white-space: nowrap; margin-left: auto; color: var(--text-2); font-size: 11px; display: inline-flex; gap: 4px; align-items: center; }
     .sel-empty { padding: 48px 8px; text-align: center; color: var(--text-2); }
     .sel-empty .sub { margin-top: 4px; font-size: 11px; }
     .sel-card { display: flex; align-items: center; gap: 10px; min-height: 56px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface); margin-bottom: 8px; }
@@ -224,7 +231,7 @@
     .mk-lab { font-size: 11px; color: var(--text-2); margin: 10px 0 2px; }
     .mk-row { display: flex; align-items: center; gap: 10px; min-height: 30px; padding: 3px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
     .mk-row .sw { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.15); flex: 0 0 auto; }
-    .mk-row .sw.n { border-radius: 3px; background: var(--surface-2); box-shadow: none; font-size: 9px; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
+    .mk-row .sw.n { border-radius: 3px; background: var(--surface-2); box-shadow: none; font-size: 10px; display: flex; align-items: center; justify-content: center; color: var(--text-2); }
     .mk-row .v { font-family: var(--mono); font-size: 11.5px; width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mk-row .nm { flex: 1 1 auto; min-width: 0; color: var(--text-2); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mk-row .c { color: var(--text-2); font-size: 11px; flex: 0 0 auto; text-align: right; min-width: 52px; }
@@ -257,13 +264,13 @@
     .steps-3 { grid-template-columns: repeat(3, 1fr); }
     .step-chip {
       display: block; padding: 6px 2px; border: 1px solid var(--border); background: var(--surface);
-      border-radius: var(--r-sm); color: var(--text-2); font-size: 10px; line-height: 1.25; text-align: center;
+      border-radius: var(--r-sm); color: var(--text-2); font-size: 11px; line-height: 1.25; text-align: center;
     }
     .step-chip:hover:not([aria-current="step"]) { background: var(--surface-hover); color: var(--text); }
     .step-chip[aria-current="step"] { border-color: var(--accent-border); background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
     .step-chip .n { display: block; font-size: 11px; font-weight: 600; }
 
-    .ctx-menu .menu-note { display: block; font-size: 10px; color: var(--muted); font-weight: 400; }
+    .ctx-menu .menu-note { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
     .ctx-menu button[aria-disabled="true"] { color: var(--muted); }
 
     /* ── 콜아웃(안내 노트) ── */
@@ -275,7 +282,7 @@
     .step .ux { margin-top: 8px; }
     .ux-h { display: flex; align-items: center; gap: 6px; }
     .ux-t { font-size: var(--fs); font-weight: 600; color: var(--accent-strong); }
-    .hint { color: var(--text-2); font-size: 10.5px; }
+    .hint { color: var(--text-2); font-size: 11px; }
 
     /* ── 고정 툴팁(#uiTip) ──
        버튼 ::after는 가장자리에서 잘리고 가로 스크롤을 만든다.
@@ -285,7 +292,7 @@
       max-width: min(240px, calc(100vw - 16px));
       padding: 6px 8px; border-radius: var(--r-sm);
       background: #1b1b1f; color: #fff;
-      font: 400 10.5px/1.4 var(--font);
+      font: 400 11px/1.4 var(--font);
       white-space: normal; text-align: left;
       box-shadow: var(--shadow);
       pointer-events: none;
@@ -297,7 +304,7 @@
     /* ── 빈 상태 (캐논 108:2 패턴) ── */
     .empty-state { text-align: center; padding: 14px 10px; color: var(--text-2); }
     .empty-state .es-title { font-weight: 600; color: var(--text); }
-    .empty-state .es-guide { margin-top: 4px; font-size: 10.5px; }
+    .empty-state .es-guide { margin-top: 4px; font-size: 11px; }
     .empty-state button { margin-top: 8px; }
 
     /* ── 에러 콜아웃(위험) ── */
@@ -315,7 +322,7 @@
     #pipelineSteps { margin: 6px 0; }
     .pstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 4px 6px; margin: 0 -6px; cursor: pointer; border-radius: var(--r-sm); }
     .pstep:hover { background: var(--surface-2); }
-    .pstep .pdot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 9px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
+    .pstep .pdot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 10px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
     .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
     .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
     .pstep.blocked { opacity: .55; }
@@ -323,7 +330,7 @@
        '못 한다'로 읽히므로 점만 비우고 글자는 그대로 둔다. */
     .pstep.todo .pstat { color: var(--muted); }
     .pstep .plabel { color: var(--text); }
-    .pstep .pstat  { font-size: 10px; }
+    .pstep .pstat  { font-size: 11px; }
     .pstep.done .pstat    { color: var(--ok); }
     .pstep.ready .pstat   { color: var(--accent-strong); }
     .pstep.blocked .pstat { color: var(--muted); }
@@ -333,15 +340,15 @@
     /* ── 안내 띠 — 테두리 없는 옅은 띠(카드 안 카드 금지, ia-v4 §2.8) ── */
     .banner {
       display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-      font-size: 10.5px; line-height: 1.35; padding: 7px 9px; margin-bottom: 10px;
+      font-size: 11px; line-height: 1.35; padding: 7px 9px; margin-bottom: 10px;
       background: var(--accent-subtle);
       border-radius: var(--r-sm); color: var(--accent-strong);
     }
-    .banner .link { font-size: 10.5px; }
+    .banner .link { font-size: 11px; }
     /* 주의 띠(안 쓰는 변수 — docs/unused-vars.md §3): 안내 띠 모양 + 주황 */
     .banner.caution { background: var(--warn-subtle); color: var(--warn); margin-bottom: 0; }
     .unused-body { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-    .unused-sum { font-size: 10.5px; }
+    .unused-sum { font-size: 11px; }
     .unused-none { padding: 20px 0; text-align: center; color: var(--text-2); }
 
     /* ── 마법사 미니 파이프 — 세로 목록 대신 칩 4개로 진행만 ── */
@@ -350,7 +357,7 @@
        그대로 먹어, 아래 범례가 버튼에서 한 칸 더 떨어져 보인다. */
     .pipe-mini:empty { display: none; }
     .pipe-mini span {
-      font: 500 10px/1.5 var(--mono); padding: 2px 7px; border-radius: 999px;
+      font: 500 11px/1.5 var(--mono); padding: 2px 7px; border-radius: 999px;
       border: 1px solid var(--border); background: var(--surface-2); color: var(--muted);
     }
     .pipe-mini span.active { border-color: var(--accent); background: var(--accent-subtle); color: var(--accent-strong); }
@@ -405,7 +412,7 @@
     .col-role { display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; align-items: center; padding: 6px 0; border-top: 1px solid var(--border); }
     .col-role:first-child { border-top: none; }
     .col-role .name { font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .col-role .sub { grid-column: 1 / -1; font-size: 10px; color: var(--muted); }
+    .col-role .sub { grid-column: 1 / -1; font-size: 11px; color: var(--muted); }
     .col-role select { max-width: 150px; }
     .r-top { display: grid; grid-template-columns: 16px 1fr auto; gap: 7px; align-items: center; }
     .r-top.no-check { grid-template-columns: 1fr auto; }
@@ -414,13 +421,13 @@
     .r-title.mono, .r-sum.mono { font-family: var(--mono); }
     .r-title input { font: inherit; border: 0; background: transparent; padding: 0; width: 100%; color: inherit; }
     .r-title input:focus { outline: 1px solid var(--accent); border-radius: 3px; }
-    .r-sum { font-size: 10px; color: var(--muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .r-meta { font-size: 10px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
+    .r-sum { font-size: 11px; color: var(--muted); line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .r-meta { font-size: 11px; font-family: var(--mono); color: var(--muted); white-space: nowrap; }
     .r-title.has-swatch { display: flex; align-items: center; gap: 6px; }
     .r-swatch { width: 13px; height: 13px; border-radius: 3px; border: 1px solid rgba(0,0,0,.18); flex: 0 0 auto; }
     /* 역할 입력처럼 메타 자리에 오는 편집 요소 — 행 폭을 밀지 않게 고정 폭. */
     /* 역할 드롭다운 — `한글 · role` 병기라 자유 입력칸보다 넓어야 잘리지 않는다. */
-    .r-role { width: 126px; font-size: 10px; padding: 3px 4px; }
+    .r-role { width: 126px; font-size: 11px; padding: 3px 4px; }
     /* 모아 놓은 색 한 줄 — 목록은 팔레트 한 벌이면 60행이 넘는다. 램프가 고른지, 빠진
        계열이 없는지는 스크롤 전에 여기서 본다(와이어 `palette-row`). */
     .palette-row { display: flex; gap: 3px; flex-wrap: wrap; }
@@ -430,8 +437,8 @@
        행과 기본 램프 폴백만 고칠 수 있다(둘 다 근거로 삼을 글자가 없다). 칸 순서는 스캔 행의
        요약(`폰트 · 크기 / 행간 / 자간 · 굵기`)과 같게 둔다 — 같은 목록에서 눈이 옮겨 다닌다. */
     /* min-width:0 — 행이 grid라 이게 없으면 이 줄의 min-content가 행 폭을 패널 밖으로 민다. */
-    .ts-edit { display: flex; align-items: center; gap: 3px; font-size: 10px; min-width: 0; }
-    .ts-edit input { font-family: var(--mono); font-size: 10px; padding: 2px 3px; min-width: 0; }
+    .ts-edit { display: flex; align-items: center; gap: 3px; font-size: 11px; min-width: 0; }
+    .ts-edit input { font-family: var(--mono); font-size: 11px; padding: 2px 3px; min-width: 0; }
     .ts-edit .ts-family { flex: 1 1 auto; }
     .ts-edit .ts-sep { color: var(--muted); flex: 0 0 auto; }
     /* 스피너를 걷어 폭을 숫자에 쓴다(400px 고정 패널) — 위/아래 키는 그대로 먹는다. */
@@ -440,7 +447,7 @@
     .ts-edit input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     /* 그룹 머리 — 트리의 루트나 리포트의 구분줄. 카드가 아니라 라벨이다. */
     .r-group {
-      font-size: 10px; font-weight: 600; color: var(--muted); letter-spacing: .02em;
+      font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em;
       margin: 6px 0 0; padding-left: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
     .r-group:first-child { margin-top: 0; }
@@ -483,7 +490,7 @@
     /* 띠 위의 입력 칸은 흰 바탕(--surface) — 띠와 같은 회색이면 칸이 보이지 않는다 */
     .palette-band input[type="text"], .palette-band input[type="color"], .palette-band select { background: var(--surface); }
     .palette-run { justify-content: flex-end; }
-    .pb-caret { display: inline-block; margin-left: 2px; font-size: 9px; color: var(--text-2); }
+    .pb-caret { display: inline-block; margin-left: 2px; font-size: 11px; color: var(--text-2); }
     #colorSection > * + * { margin-top: 6px; }
     .tidy { background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
@@ -571,33 +578,33 @@
     .ed-field input[type="text"]:focus { box-shadow: none; border: 0; }
     .ed-field .bf-swatch { margin: 0; flex: 0 0 auto; }
     .ed-field .ed-grow { flex: 1 1 auto; min-width: 0; }
-    button.ed-dd { flex: 0 0 auto; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 0; border-left: 1px solid var(--border); border-radius: 0 var(--r-sm) var(--r-sm) 0; background: none; color: var(--text-2); font-size: 10px; }
+    button.ed-dd { flex: 0 0 auto; width: 24px; height: 24px; min-height: 24px; padding: 0; border: 0; border-left: 1px solid var(--border); border-radius: 0 var(--r-sm) var(--r-sm) 0; background: none; color: var(--text-2); font-size: 11px; }
     button.ed-pillbtn { flex: 1 1 auto; min-width: 0; height: 24px; min-height: 24px; padding: 0; border: 0; background: none; text-align: left; display: flex; align-items: center; }
     button.ed-pillbtn:hover:not(:disabled) { background: none; }
     .ed-pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; background: var(--accent-subtle); color: var(--accent-strong); border-radius: 4px; padding: 1px 6px; font: 11px var(--mono); }
     .ed-pill .bf-swatch { margin: 0; }
     .ed-pill.warn { background: var(--warn-subtle); color: var(--warn); }
-    .ed-ferr { color: var(--danger); font: 10.5px/1.4 var(--font); margin-top: 3px; }
-    .ed-fwarn { color: var(--warn); font: 10.5px/1.4 var(--font); margin-top: 3px; }
+    .ed-ferr { color: var(--danger); font: 11px/1.4 var(--font); margin-top: 3px; }
+    .ed-fwarn { color: var(--warn); font: 11px/1.4 var(--font); margin-top: 3px; }
     .ed-changes { border-top: 1px dashed var(--border-2); padding-top: 6px; display: flex; flex-direction: column; gap: 3px; }
-    .ed-changes .ed-ch-h { color: var(--muted); font-size: 10.5px; }
-    .ed-changes .mono { font-family: var(--mono); font-size: 10.5px; }
+    .ed-changes .ed-ch-h { color: var(--muted); font-size: 11px; }
+    .ed-changes .mono { font-family: var(--mono); font-size: 11px; }
     .ed-changes .muted { color: var(--muted); }
     .ed-changes .w { color: var(--warn); }
     .ed-picker { border: 1px solid var(--accent); border-radius: 6px; margin-top: 4px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.08); font-family: var(--font); background: var(--surface); }
     .ed-picker input.ed-psearch { width: 100%; height: 28px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; padding: 0 8px; font-size: 11px; box-shadow: none; }
     .ed-picker input.ed-psearch:focus { box-shadow: inset 0 0 0 1.5px var(--accent); border-color: var(--border); }
     .ed-pscroll { max-height: 200px; overflow-y: auto; }
-    .ed-phead { padding: 5px 8px 2px; font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ed-phead { padding: 5px 8px 2px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .ed-opt { display: flex; align-items: center; gap: 6px; min-height: 24px; padding: 2px 8px; font: 11px var(--mono); cursor: pointer; outline: none; }
     .ed-opt:hover, .ed-opt:focus { background: var(--accent-subtle); }
     .ed-opt[aria-disabled="true"] { color: var(--muted); cursor: not-allowed; }
     .ed-opt .bf-swatch { margin: 0; }
-    .ed-opt .ed-ov { color: var(--text-2); font-size: 10px; }
+    .ed-opt .ed-ov { color: var(--text-2); font-size: 11px; }
     .ed-opt .ck { margin-left: auto; color: var(--accent-strong); }
     .ed-opt.ed-raw { font-family: var(--font); color: var(--accent-strong); border-bottom: 1px solid var(--border); }
     .ed-opt.ed-raw .mono { font-family: var(--mono); color: var(--text-2); }
-    .ed-pnote { padding: 5px 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 10px; }
+    .ed-pnote { padding: 5px 8px; border-top: 1px solid var(--border); color: var(--muted); font-size: 11px; }
     .ed-pnone { padding: 8px; color: var(--text-2); font-size: 11px; }
     .ed-alert { padding: 5px 8px; border-radius: 5px; font-size: 11px; background: var(--surface-2); color: var(--text-2); }
     .ed-alert.err { background: var(--danger-subtle); color: var(--danger); }
@@ -611,7 +618,7 @@
     .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: 4px 8px; margin: 0; font-size: 11.5px; }
     .modal dt { color: var(--muted); }
     .modal dd { margin: 0; font-family: var(--mono); word-break: break-all; }
-    .chip { display: inline-block; font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
+    .chip { display: inline-block; font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin: 0 3px 3px 0; color: var(--text-2); font-family: var(--font); }
     /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
     /* 하위 탭 13px · 높이 32 · 간격 20(§4.6 — 11px은 실기에서 탭으로 읽히지 않았다) */
     .subtabs { display: flex; gap: 20px; border-bottom: 1px solid var(--border); margin: 0 0 10px; }
@@ -630,7 +637,7 @@
     .bind-steps .bs + .bs::before { content: ''; width: 18px; height: 1px; background: var(--border-2); margin-right: 1px; }
     .bs-dot {
       width: 16px; height: 16px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
-      font: 600 9.5px/1 var(--font); border: 1px solid var(--border-2); color: var(--muted); background: var(--surface); box-sizing: border-box;
+      font: 600 10px/1 var(--font); border: 1px solid var(--border-2); color: var(--muted); background: var(--surface); box-sizing: border-box;
     }
     .bs.now { color: var(--text); font-weight: 600; }
     .bs.now .bs-dot { background: var(--text); border-color: var(--text); color: var(--on-accent); }
@@ -645,12 +652,12 @@
     /* 배지 줄 */
     .bind-badges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-height: 24px; }
     .bind-badges .grow { flex: 1 1 auto; }
-    .bd { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 10.5px/1 var(--font); white-space: nowrap; }
+    .bd { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font: 600 11px/1 var(--font); white-space: nowrap; }
     .bd-found { background: var(--ok-subtle); color: var(--ok); cursor: default; }
     button.bd-skip { min-height: 24px; height: 24px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); }
     button.bd-skip:hover:not([aria-disabled="true"]) { background: var(--surface-hover); }
     .bind-badges .skip-list { order: 10; flex: 1 0 100%; margin-top: 0; }
-    button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 10.5px; }
+    button.bd-all { min-height: 24px; height: 24px; padding: 0 6px; border: none; background: none; color: var(--accent-strong); font-size: 11px; }
     button.bd-all:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
     .bind-filter-row input { width: 170px; }
     /* 빈 상태 — 목록 자리 점선 상자 */
@@ -665,7 +672,7 @@
     .bind-empty.done .be-text { color: var(--ok, #12805c); font-weight: 600; }
     .be-text { font-size: var(--fs); }
     /* "값 → 변수" 칩 — 연결 화면 트리 줄 · 빈 상태에서 쓴다 */
-    .bv-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font: 500 10.5px/1 var(--mono); white-space: nowrap; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
+    .bv-chip { display: inline-flex; align-items: center; gap: 4px; height: 20px; padding: 0 6px; border-radius: 4px; font: 500 11px/1 var(--mono); white-space: nowrap; flex: 0 0 auto; font-variant-numeric: tabular-nums; }
     .bv-val { background: var(--surface); border: 1px solid var(--border-2); color: var(--text); }
     .bv-sw { width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.18); flex: 0 0 auto; }
     .bv-arrow { color: var(--accent-strong); font-weight: 600; flex: 0 0 auto; }
@@ -675,7 +682,7 @@
     .bv-new { font: 600 10px/14px var(--font); background: var(--accent-strong); color: #fff; border-radius: 3px; padding: 0 4px; flex: 0 0 auto; }
     .bv-mark { flex: 0 0 auto; font-family: var(--font); font-weight: 700; }
     .bind-empty .bv-var { max-width: 140px; }
-    button.bv-tw { height: 24px; min-height: 24px; padding: 0 4px; border: none; background: none; color: var(--text-2); font-weight: 500; font-size: 10.5px; flex: 0 0 auto; }
+    button.bv-tw { height: 24px; min-height: 24px; padding: 0 4px; border: none; background: none; color: var(--text-2); font-weight: 500; font-size: 11px; flex: 0 0 auto; }
     button.bv-tw:hover:not([aria-disabled="true"]) { background: var(--surface-2); }
     /* 스위치 — 보이는 트랙 28×16, 누를 수 있는 영역 32×24 */
     button.bv-switch { width: 32px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
@@ -709,7 +716,7 @@
     @media (prefers-reduced-motion: reduce) { #applyProgress .row::before, .unused-prog .row::before { animation: none; } }
     .ux.danger { --band-ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 2.2 14.3 13.3H1.7Z' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M8 6.6v3.2' stroke='%23000' stroke-width='1.6' stroke-linecap='round'/%3E%3Ccircle cx='8' cy='11.6' r='.9'/%3E%3C/svg%3E"); }
     .ux.danger .ux-h::before { background-color: var(--danger); }
-    button.tr-car { width: 22px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--text-2); font-size: 10px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
+    button.tr-car { width: 22px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--text-2); font-size: 11px; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; }
     button.tr-car:hover:not([aria-disabled="true"]) { background: none; color: var(--text); }
     .tr-name { font-weight: 600; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .tr-group .tr-name { font-size: 12.5px; }
@@ -743,7 +750,7 @@
     .mk-tabs .n { font-size: 11px; font-weight: 400; color: var(--text-2); font-variant-numeric: tabular-nums; }
     .mk-tabs .mk-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--warn); }
     .mk-bar { min-height: 32px; padding: 0 2px; }
-    .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: 50%; border: 1px solid var(--border-2, var(--border)); background: none; font: 600 9px/12px var(--font); color: var(--text-2); cursor: help; flex: 0 0 auto; }
+    .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: 50%; border: 1px solid var(--border-2, var(--border)); background: none; font: 600 10px/12px var(--font); color: var(--text-2); cursor: help; flex: 0 0 auto; }
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--text); }
     .make-tabnote { font-size: 11px; color: var(--text-2); padding: 10px 2px; border-bottom: 1px solid var(--border); }
     .make-foot { position: sticky; bottom: 24px; background: var(--bg, #fff); border-top: 1px solid var(--border); margin-top: 8px; padding: 6px 0 8px; z-index: 2; }
@@ -765,7 +772,7 @@
     .bind-done .grow { flex: 1 1 auto; }
     .ts-aa { font: 700 11px/1 var(--font); color: var(--text-2); width: 16px; }
     .tier-chip {
-      height: 24px; padding: 0 9px; border-radius: 999px; font-size: 10.5px; font-weight: 600;
+      height: 24px; padding: 0 9px; border-radius: 999px; font-size: 11px; font-weight: 600;
       border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
     }
     .tier-chip[aria-checked="true"] { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent-strong); }
@@ -791,13 +798,13 @@
     .chip-row { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1 1 auto; min-width: 0; scroll-behavior: smooth; }
     .chip-row::-webkit-scrollbar { display: none; }
     .tier-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-    .tier-chip .badge { font: 700 9px/14px var(--font); min-width: 14px; height: 14px; padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; }
+    .tier-chip .badge { font: 700 10px/14px var(--font); min-width: 14px; height: 14px; padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; }
     .tier-chip .num { font-weight: 500; color: var(--text-2); }
     .tier-chip[aria-checked="true"] .num { color: var(--accent-strong); }
-    .mode-select { height: 24px; padding: 0 4px; font-size: 10.5px; max-width: 96px; }
+    .mode-select { height: 24px; padding: 0 4px; font-size: 11px; max-width: 96px; }
     .search-box { display: inline-flex; align-items: center; gap: 2px; flex: 0 1 auto; min-width: 160px; }
     .search-box input { width: 100%; height: 24px; padding: 2px 6px; }
-    .situation { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); font-size: 10.5px; }
+    .situation { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 0 0 6px; padding: 6px 8px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--text-2); font-size: 11px; }
     .situation[hidden] { display: none; }
     /* 목록(treegrid) — 행은 28px. 구역 머리·그룹 머리는 고정(두 겹). */
     .var-tree { display: flex; flex-direction: column; }
@@ -806,16 +813,11 @@
       height: 26px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border-2);
       font-weight: 700; color: var(--text); cursor: default;
     }
-    .vt-section .badge { font: 700 9px/14px var(--font); padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); }
-    .vt-section .num, .vt-group .num { margin-left: auto; font-weight: 500; color: var(--text-2); font-size: 10.5px; }
-    .vt-group {
-      position: sticky; top: calc(var(--head-top, 81px) + 26px); z-index: 1; display: flex; align-items: center; gap: 6px;
-      height: 26px; padding: 0 6px; background: var(--surface); border-bottom: 1px solid var(--border);
-      color: var(--text-2); font-weight: 600; cursor: pointer; user-select: none;
-    }
+    .vt-section .badge { font: 700 10px/14px var(--font); padding: 0 3px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); }
+    .vt-section .num, .vt-group .num { margin-left: auto; font-weight: 500; color: var(--text-2); font-size: 11px; }
     .vt-group .tw { width: 10px; color: var(--muted); }
     .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-    .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 10.5px; }
+    .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 11px; }
     /* ── 변수 목록 결정 B(§4.4): 머리줄 고정 · 사이드바(128px, 고정 + 따로 스크롤) · 오른쪽 목록 머리 고정 ── */
     #varList .list-head { position: sticky; top: var(--tabs-h, 41px); z-index: 3; background: var(--bg); padding: 2px 0 6px; margin: 0; }
     .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--border); }
@@ -824,19 +826,19 @@
       max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--border);
       padding: 4px 3px; background: var(--surface);
     }
-    .vs-item { display: flex; align-items: center; gap: 3px; min-height: 28px; padding: 0 4px; border-radius: 5px; color: var(--text); cursor: pointer; font-size: 11px; }
+    .vs-item { display: flex; align-items: center; gap: 3px; height: 28px; min-height: 28px; padding: 0 8px; border-radius: 5px; color: var(--text); cursor: pointer; font-size: 12px; font-weight: 400; }
     .vs-item.lv2 { padding-left: 18px; color: var(--text); }
     .vs-item.muted { color: var(--text-2); }
     .vs-item.danger { color: var(--danger); }
-    .vs-item[aria-selected="true"] { background: var(--accent-subtle); color: var(--accent-strong); font-weight: 600; }
+    .vs-item[aria-selected="true"] { background: var(--side-sel); color: #000; font-weight: 600; }
     .vs-item:hover:not([aria-selected="true"]), .vs-item:focus-visible { background: var(--surface-hover); outline: none; }
     .vs-item:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
     .vs-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .vs-num { flex: 0 0 auto; font-size: 9.5px; color: var(--text-2); font-weight: 500; }
-    .vs-item[aria-selected="true"] .vs-num { color: var(--accent-strong); }
-    .vs-tw { width: 12px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; font-size: 9px; margin-left: -3px; }
-    .vs-badge { font: 700 9px/14px var(--font); min-width: 12px; padding: 0 2px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; flex: 0 0 auto; }
-    .vs-item[aria-selected="true"] .vs-badge { background: #d6ebff; color: var(--accent-strong); }
+    .vs-num { flex: 0 0 auto; font-size: 11px; line-height: 1; color: var(--text-2); font-weight: 500; }
+    .vs-item[aria-selected="true"] .vs-num { color: #000; }
+    .vs-tw { width: 12px; height: 24px; min-height: 24px; padding: 0; border: none; background: none; color: var(--muted); flex: 0 0 auto; font-size: 11px; margin-left: -3px; }
+    .vs-badge { font: 700 10px/14px var(--font); min-width: 12px; padding: 0 2px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); text-align: center; flex: 0 0 auto; }
+    .vs-item[aria-selected="true"] .vs-badge { background: #000; color: #fff; }
     .vs-sep { height: 1px; background: var(--border); margin: 5px 4px; }
     .vl-main { flex: 1 1 auto; min-width: 0; }
     .vl-head { position: sticky; top: var(--side-top, 75px); z-index: 2; display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 4px 0 8px; background: var(--surface); border-bottom: 1px solid var(--border); }
@@ -847,34 +849,55 @@
     .list-head .search-box { flex: 1 1 auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
     .list-head .search-box input { flex: 1 1 auto; min-width: 0; height: 26px; }
     .vl-side.dim .vs-item[aria-selected="true"] { opacity: .5; }
-    .vt-group { display: flex; align-items: center; gap: 4px; height: 24px; padding: 0 8px; font-size: 10.5px; font-weight: 600; color: var(--text-2); cursor: default; white-space: nowrap; overflow: hidden; }
-    .vt-group .tw { width: 10px; flex: none; }
+    /* 그룹(V-D5): 머리 32 · 위 1px 선(맨 위 머리는 없음) · 머리 아래 묶음 들여 씀 — 띠 · 카드가 아니다(§2.8). */
+    .vt-group { display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 8px; border-top: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--text-2); cursor: default; white-space: nowrap; overflow: hidden; }
+    #varTree > .vt-group:first-child { border-top: 0; }
+    .vt-group .tw { width: 10px; flex: none; font-size: 12px; font-weight: 600; }
     .vt-group .lb { overflow: hidden; text-overflow: ellipsis; }
-    .vt-group:hover { background: var(--surface-hover); }
-    .vp-line { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 8px 8px; }
+    .vt-group:hover, .vt-group:focus-visible { background: var(--surface-hover); outline: none; }
+    .vt-group.inner { border-top: 0; padding: 0; }
+    /* 머리 아래 묶음(V-D5) · 단(V-D6 — §4.6 "그룹 — 경로 마디마다 머리"): 안쪽 단이 없는 단 1 그룹 · 검색 묶음은 막대 없이 x 16,
+       안쪽 단이 있는 나무만 단마다 1px 세로 선(막대 x 12 + 9(n − 1) · 내용 x 21 + 9(n − 1) · 선 → 다음 선 · 내용 8). 머리 없는 맨 위는 x 8. 카드 아님(§2.8). */
+    .vt-grp { position: relative; padding: 4px 8px 16px 16px; }
+    .vt-grp.top { padding-left: 8px; }
+    .vt-grp.has-bar { padding-left: 21px; }
+    .vt-grp.inner { padding: 0 0 0 9px; }
+    .vt-grp.has-bar::before, .vt-grp.inner::before { content: ""; position: absolute; width: 1px; background: var(--border); border: 0; border-radius: 0; left: 12px; top: 4px; bottom: 32px; pointer-events: none; }
+    .vt-grp.inner::before { left: 0; top: 0; bottom: 16px; }
+    .vt-grp > .vp-line + * { margin-top: 8px; }
+    .vp-line { display: flex; flex-wrap: wrap; gap: 6px; }
     .vp-item { cursor: pointer; outline: none; }
-    .vp-pill .vp-item { height: 24px; padding: 0 8px; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 12px; font-family: var(--mono); font-size: 10.5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--surface); }
-    .vp-swatch .vp-item { height: 28px; padding: 0 8px 0 4px; display: inline-flex; align-items: center; gap: 6px; border-radius: 14px; font-size: 11px; }
-    .vp-swatch .vp-dot { width: 18px; height: 18px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); flex: none; }
+    .vp-pill .vp-item { height: 26px; padding: 0 8px; display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 13px; font-family: var(--mono); font-size: 11.5px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: var(--surface); }
     .vp-dot.vp-dot { display: inline-block; }
-    .vp-dot-wrap { display: contents; }
-    .vp-dot .vp-item, .vp-line.vp-dot { gap: 7px; }
+    .vp-line.vp-dot { gap: 8px; }
     .vp-line.vp-dot .vp-item { width: 24px; height: 24px; display: inline-flex; border-radius: 50%; }
-    .vp-line.vp-dot .vp-item .vp-dot { width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+    .vp-line.vp-dot .vp-item .vp-dot { position: relative; overflow: hidden; width: 24px; height: 24px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
     .vp-item:hover { background: var(--surface-hover); }
     .vp-item:focus-visible { box-shadow: 0 0 0 1.5px var(--accent); }
     .vp-item.menu-open { box-shadow: 0 0 0 1.5px var(--accent); }
-    .vt-row.vt-row { grid-template-columns: minmax(0, 1fr) 180px; }
-    .vt-row .vr-val { min-width: 0; display: flex; }
-    .vr-pill { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--surface-2); font-family: var(--mono); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .vt-row.menu-open { background: var(--surface-hover); }
+    /* 투명도(V-P1): 옅은 회색 바둑판(4px 칸) 위에 그 투명도로 — 칠은 안쪽 <i>. */
+    .ck { background-color: #fff; background-image: linear-gradient(45deg, #d0d5dd 25%, transparent 25%, transparent 75%, #d0d5dd 75%), linear-gradient(45deg, #d0d5dd 25%, transparent 25%, transparent 75%, #d0d5dd 75%); background-size: 8px 8px; background-position: 0 0, 4px 4px; }
+    .ck > i { position: absolute; inset: 0; border-radius: inherit; }
+    /* 목록 줄(V-D5): row는 높이만, 안의 gridcell 하나가 포커스 · 배치 — 왼쪽 동그라미(종류 표시) · 이름, 오른쪽 끝 붙은 칩. 구분선 없음. */
+    .vt-r { height: 32px; }
+    .vt-row { display: flex; align-items: center; height: 32px; padding: 6px 0; cursor: pointer; outline: none; overflow: hidden; }
+    .vt-row:hover, .vt-row:focus-visible, .vt-row.menu-open { background: var(--surface-hover); }
+    .vt-row:focus-visible { box-shadow: inset 0 0 0 1.5px var(--accent); }
+    .vt-row .vr-sw { position: relative; overflow: hidden; flex: none; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--swatch-line); }
+    .vt-row .vr-mk { flex: none; width: 16px; text-align: center; font: 600 11px/16px var(--font); color: var(--text-2); }
+    .vt-row .nm { flex: 1 1 auto; min-width: 0; display: flex; margin-left: 8px; font-size: 12px; font-weight: 400; color: var(--text); line-height: 16px; }
+    .vt-row .nm .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .vchip { flex: none; display: flex; margin-left: 4px; height: 20px; border-radius: 999px; overflow: hidden; }
+    .vchip .al, .vchip .vl { padding: 2px 8px; font: 11px/16px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vchip .al { background: var(--surface-2); color: var(--vchip-fg); max-width: 180px; }
+    .vchip .vl { background: var(--vchip-dark); color: var(--vchip-dark-fg); max-width: 120px; }
     .vt-tip { position: fixed; z-index: 60; max-width: 300px; padding: 4px 8px; border-radius: 4px; background: #222; color: #fff; font-size: 11px; pointer-events: none; white-space: pre-wrap; }
     .ed-titlewrap { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
     .ed-titlewrap > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ed-copy { border: 0; background: transparent; color: var(--accent); font-size: 11px; padding: 2px 4px; cursor: pointer; white-space: nowrap; }
     .ed-copyname { margin-left: auto; font-weight: 400; }
     .ed-css { display: flex; align-items: center; gap: 4px; }
-    .ed-css code { font-family: var(--mono); font-size: 10.5px; }
+    .ed-css code { font-family: var(--mono); font-size: 11px; }
     .ed-go { width: 26px; height: 26px; flex: none; }
     .uses-head { margin-bottom: 4px; }
     .ed-dl dd { position: relative; }
@@ -882,27 +905,13 @@
     .ed-pbody { flex: 1 1 auto; min-height: 0; overflow: auto; }
     .ed-plink { flex: none; height: 24px; border: 0; border-top: 1px solid var(--border); background: var(--surface); color: var(--accent); text-align: left; padding: 0 8px; font-size: 11px; cursor: pointer; }
     .ed-plink[hidden] { display: none; }
-    .ed-ptag { font-size: 10px; color: var(--muted); background: var(--surface-2); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
+    .ed-ptag { font-size: 11px; color: var(--muted); background: var(--surface-2); border-radius: 3px; padding: 0 4px; margin-left: 4px; }
     .ed-type { height: 26px; }
     button.danger { background: var(--danger, #d0342c); color: #fff; border-color: transparent; }
-    .vt-path { min-height: 22px; display: flex; align-items: center; padding: 0 8px; font-size: 10px; font-weight: 600; color: var(--text-2); background: var(--surface-2); border-bottom: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .vt-path:focus-visible { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
-    .vt-row { display: grid; grid-template-columns: minmax(0, 1fr) 130px 34px 24px; align-items: center; height: 28px; padding: 0 2px 0 8px; border-bottom: 1px solid var(--border); cursor: default; }
-    .vt-row:hover, .vt-row:focus-visible, .vt-group:focus-visible, .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
-    .vt-row[aria-selected="true"] { background: var(--accent-subtle); }
-    .vt-row .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
-    .vt-row .nm .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .vt-row.direct .nm { font-weight: 600; color: var(--text); }
-    .vt-row.indirect .nm, .vt-row.none .nm { font-weight: 400; color: var(--text); }
-    .vt-row.unused .nm { color: var(--text-2); }
-    .vt-row .val { font-family: var(--mono); font-size: 10.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 4px; }
-    .vt-row .use { text-align: right; font-size: 10.5px; color: var(--text-2); white-space: nowrap; }
-    .vt-row .ic { width: 13px; flex: 0 0 13px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 10px; }
-    .vt-row .more { visibility: hidden; width: 24px; height: 24px; padding: 0; border: none; background: transparent; color: var(--text-2); }
-    .vt-row:hover .more, .vt-row:focus-within .more, .vt-row.menu-open .more, .vt-row:focus .more { visibility: visible; }
-    .alias-pill { font-family: var(--mono); font-size: 10px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; background: var(--surface-2); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 0; line-height: 1.4; }
+    .vt-section:focus-visible, .vt-line:focus-visible { background: var(--surface-hover); outline: none; }
+    .alias-pill { font-family: var(--mono); font-size: 11px; border: 1px solid var(--border); border-radius: 999px; padding: 1px 6px; background: var(--surface-2); color: var(--text-2); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-height: 0; line-height: 1.4; }
     .alias-pill:hover { color: var(--accent-strong); border-color: var(--accent-border); }
-    .lib-tag { font: 700 8.5px/12px var(--font); padding: 0 3px; border-radius: 3px; border: 1px solid var(--border-2); color: var(--text-2); flex: 0 0 auto; }
+    .lib-tag { font: 700 10px/12px var(--font); padding: 0 3px; border-radius: 3px; border: 1px solid var(--border-2); color: var(--text-2); flex: 0 0 auto; }
     .vt-line { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; color: var(--text-2); border-bottom: 1px solid var(--border); cursor: pointer; }
     .vt-lib { margin-top: 10px; }
     .vt-empty { padding: 14px 6px; color: var(--text-2); }
@@ -918,10 +927,10 @@
       position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; height: 24px;
       display: flex; align-items: center; gap: 6px; padding: 0 12px;
       background: var(--surface-2); border-top: 1px solid var(--border);
-      font-size: 10.5px; color: var(--text-2);
+      font-size: 11px; color: var(--text-2);
     }
     .status-line .sl-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .status-line .sl-action { flex: 0 0 auto; font-size: 10.5px; min-height: 20px; }
+    .status-line .sl-action { flex: 0 0 auto; font-size: 11px; min-height: 20px; }
     .status-line.ok .sl-text { color: var(--ok); }
     .status-line.warn .sl-text { color: var(--warn); }
 
@@ -946,7 +955,7 @@
     @keyframes mini-spin { to { transform: rotate(360deg); } }
     .mini-badge {
       position: absolute; right: -6px; top: -6px; width: 14px; height: 14px; border-radius: 50%;
-      font: 700 9px/14px var(--font); text-align: center; color: #fff;
+      font: 700 10px/14px var(--font); text-align: center; color: #fff;
     }
     .mini-badge.ok { background: var(--ok); }
     .mini-badge.fail { background: var(--danger); }
@@ -994,7 +1003,7 @@
     <div class="vl-split">
       <div class="vl-side" id="varSide" role="listbox" data-i18n-aria-label="list.sideAria" aria-label="변수 컬렉션"></div>
       <div class="vl-main">
-        <div class="var-tree" id="varTree" role="grid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
+        <div class="var-tree" id="varTree" role="treegrid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
    </div>
@@ -3566,6 +3575,25 @@
     const i = name.lastIndexOf("/");
     return i < 0 ? name : name.slice(i + 1);
   }
+  function lastTwo(name) {
+    return name.split("/").slice(-2).join("/");
+  }
+  function varValueText(cell) {
+    if (!cell) return "\u2014";
+    if (cell.kind === "color") {
+      const p = cell.alpha != null ? alphaPct(cell.alpha) : 100;
+      return cell.hex.toUpperCase() + (p < 100 ? ` ${p}%` : "");
+    }
+    if (cell.kind === "number") {
+      const n = Number(cell.text);
+      return Number.isFinite(n) ? String(Math.round(n * 100) / 100) : cell.text;
+    }
+    if (cell.kind === "alias") return `\u2192 ${cell.aliasName}`;
+    return cell.text;
+  }
+  function varTypeMark(type) {
+    return type === "FLOAT" ? "#" : type === "STRING" ? "Aa" : type === "BOOLEAN" ? "\u2713" : "";
+  }
   function tierBadge(c) {
     if (c.tier === 1) return "G";
     if (c.tier === 2) return "S";
@@ -3761,6 +3789,63 @@
       }
     }
     return out;
+  }
+  function paletteTree(cols, vars, colId) {
+    const col = cols.find((c) => c.id === colId);
+    if (!col) return [];
+    const mk = (path, label, depth, ancestors, first, firstKind) => ({ key: `${col.id}|${path}`, label, path, collectionId: col.id, depth, ancestors, rows: [], children: [], bar: false, first, firstKind, kids: /* @__PURE__ */ new Map() });
+    let top = null;
+    const roots = /* @__PURE__ */ new Map();
+    vars.forEach((v, idx) => {
+      if (v.collectionId !== col.id) return;
+      const cut = v.name.lastIndexOf("/");
+      const path = cut < 0 ? "" : v.name.slice(0, cut);
+      const kind = varKind(v);
+      if (!path) {
+        (top != null ? top : top = mk("", "", 0, [], idx, kind)).rows.push(v);
+        return;
+      }
+      const segs = path.split("/");
+      let level = roots;
+      let node = null;
+      const anc = [];
+      for (let i = 0; i < segs.length; i++) {
+        const p = segs.slice(0, i + 1).join("/");
+        let n = level.get(segs[i]);
+        if (!n) {
+          n = mk(p, segs[i], i + 1, [...anc], idx, kind);
+          level.set(segs[i], n);
+        }
+        anc.push(n.key);
+        node = n;
+        level = n.kids;
+      }
+      node.rows.push(v);
+    });
+    const sortKids = (m) => [...m.values()].sort((a, b) => VAR_KIND_ORDER.indexOf(a.firstKind) - VAR_KIND_ORDER.indexOf(b.firstKind) || a.first - b.first);
+    const finish = (n, bar) => {
+      const children = sortKids(n.kids).map((k) => finish(k, bar));
+      return { key: n.key, label: n.label, path: n.path, collectionId: n.collectionId, depth: n.depth, ancestors: n.ancestors, rows: n.rows, children, bar };
+    };
+    const out = [];
+    if (top) out.push(finish(top, false));
+    for (const r of sortKids(roots)) out.push(finish(r, r.kids.size > 0));
+    return out;
+  }
+  function flattenPaletteTree(nodes) {
+    const out = [];
+    const walk = (n) => {
+      out.push(n);
+      n.children.forEach(walk);
+    };
+    nodes.forEach(walk);
+    return out;
+  }
+  function varAncestorKeys(v) {
+    const cut = v.name.lastIndexOf("/");
+    if (cut <= 0) return [];
+    const segs = v.name.slice(0, cut).split("/");
+    return segs.map((_, i) => `${v.collectionId}|${segs.slice(0, i + 1).join("/")}`);
   }
 
   // src/lib/reread.ts
@@ -4536,7 +4621,7 @@
     const v = typeof t2.value === "string" && t2.value.startsWith("#") ? colorKey(t2.value, t2.alpha) : t2.value;
     return `${t2.category}|${v}|${(_a3 = t2.unit) != null ? _a3 : ""}`;
   }
-  var alphaTail = (alpha) => alpha != null && alpha < 1 ? ` ${alphaPct(alpha)}%` : "";
+  var alphaTail = (alpha) => alpha != null && alpha < 1 && alphaPct(alpha) < 100 ? ` ${alphaPct(alpha)}%` : "";
   function creatableTokens() {
     return tokens.filter((t2) => t2.category !== "color");
   }
@@ -9199,10 +9284,12 @@ ${opts.tip}` : text;
   document.addEventListener("pointerup", () => {
     pointerDown = false;
     reentry.release();
+    setTimeout(releaseLibRedraw, 0);
   }, true);
   document.addEventListener("pointercancel", () => {
     pointerDown = false;
     reentry.release();
+    setTimeout(releaseLibRedraw, 0);
   }, true);
   applyStaticI18n();
   applyCardChrome();
@@ -9518,6 +9605,7 @@ ${opts.tip}` : text;
     menuOnClose = null;
     cb == null ? void 0 : cb();
     reentry.release();
+    queueMicrotask(releaseLibRedraw);
   }
   function openMenu(x, y, items, returnFocus, onClose) {
     var _a3;
@@ -9637,6 +9725,7 @@ ${opts.tip}` : text;
     modalReturnFocus = null;
     (_a3 = typeof rf === "function" ? rf() : rf) == null ? void 0 : _a3.focus();
     reentry.release();
+    queueMicrotask(releaseLibRedraw);
   }
   function requestCloseModal(how) {
     if (modalBeforeClose && !modalBeforeClose(how)) return;
@@ -9737,6 +9826,8 @@ ${opts.tip}` : text;
   var vmTableKnown = false;
   var vmTableSig = "";
   var libVars = [];
+  var varListGen = 0;
+  var libRedrawAt = null;
   var usageMap = null;
   var deletedUse = { count: 0, nodeIds: [] };
   var vmUsageReq = 0;
@@ -9807,6 +9898,7 @@ ${opts.tip}` : text;
   function setBaseline(b) {
     const prevKey = baseKey();
     baseline = b;
+    const keyChanged = baseKey() !== prevKey;
     if (baseKey() !== prevKey) {
       clearCompLists();
       renderVariantReport([]);
@@ -9838,7 +9930,7 @@ ${opts.tip}` : text;
     }
     if (!b) {
       usageMap = null;
-      libVars = [];
+      clearLibVars();
       deletedUse = { count: 0, nodeIds: [] };
       vmUsageSig = "";
       renderSelHome();
@@ -9847,10 +9939,12 @@ ${opts.tip}` : text;
     if (b.scanned > BIG_SELECTION || wizardRunning) {
       usageMap = null;
       selFindFor = null;
+      if (keyChanged) clearLibVars();
       renderSelHome();
       return;
     }
     usageMap = null;
+    if (keyChanged) clearLibVars();
     renderSelHome();
     if (!usageVisible() || isMini) return;
     vmUsageTimer = setTimeout(() => {
@@ -9896,16 +9990,56 @@ ${opts.tip}` : text;
     vmUsageSig = sig;
     if (changed) {
       usageMap = new Map(Object.entries(msg.usage));
+      const libChanged = libSig(msg.libraryVars) !== libSig(libVars);
       libVars = msg.libraryVars;
       deletedUse = msg.deleted;
+      if (libChanged) libRedraw();
     }
     renderSelHome();
     reentry.release();
   }
-  function onVarTable(msg) {
+  var libSig = (l) => JSON.stringify(l.map((x) => {
     var _a3;
+    return [x.id, (_a3 = x.value) != null ? _a3 : null];
+  }));
+  function clearLibVars() {
+    if (!libVars.length) return;
+    libVars = [];
+    libRedraw();
+  }
+  var libRedrawHeld = () => !!menuEl || !!modalEl || pointerDown;
+  function libRedraw() {
+    if (!vmOpen || varScreen() !== "list") return;
+    if (libRedrawHeld()) {
+      if (libRedrawAt === null) libRedrawAt = varListGen;
+      return;
+    }
+    doLibRedraw();
+  }
+  function doLibRedraw() {
+    libRedrawAt = null;
+    const a = document.activeElement;
+    if (a && $("varTree").contains(a) && a.dataset.key) focusKey = a.dataset.key;
+    renderVarList();
+  }
+  function releaseLibRedraw() {
+    if (libRedrawAt === null || libRedrawHeld()) return;
+    if (libRedrawAt !== varListGen || !vmOpen) {
+      libRedrawAt = null;
+      return;
+    }
+    doLibRedraw();
+  }
+  var varTableDropped = false;
+  function onVarTable(msg) {
+    var _a3, _b;
+    const openId = ed && !ed.create && !((_a3 = ed.saving) == null ? void 0 : _a3.awaitingTable) ? ed.v.id : null;
+    if (openId && !msg.vars.some((v) => v.id === openId)) {
+      varTableDropped = true;
+      return;
+    }
     const sig = JSON.stringify([msg.collections, msg.vars]);
-    const edRebase = !!((_a3 = ed == null ? void 0 : ed.saving) == null ? void 0 : _a3.awaitingTable);
+    const edRebase = !!((_b = ed == null ? void 0 : ed.saving) == null ? void 0 : _b.awaitingTable);
     const first = !vmTableKnown;
     vmTableKnown = true;
     if (sig === vmTableSig && !first) {
@@ -10052,11 +10186,10 @@ ${opts.tip}` : text;
     var _a3;
     return v.values[(_a3 = modeIdFor(vmCols.find((c) => c.id === v.collectionId))) != null ? _a3 : ""];
   }
-  function resolveSwatch(cell) {
+  function resolveCell(cell) {
     let c = cell;
     for (let i = 0; i < 8 && c; i++) {
-      if (c.kind === "color") return c.hex;
-      if (c.kind !== "alias") return null;
+      if (c.kind !== "alias") return c;
       const id = c.aliasId;
       const local = vmVars.find((v) => v.id === id);
       if (local) {
@@ -10082,7 +10215,31 @@ ${opts.tip}` : text;
   function cellTipText(cell) {
     if (!cell) return "\u2014";
     if (cell.kind === "alias") return `\u2192 ${cell.aliasName}`;
-    return cellText(cell);
+    return varValueText(cell);
+  }
+  function itemAria(v, cell) {
+    if ((cell == null ? void 0 : cell.kind) === "alias") {
+      const r = resolveCell(cell);
+      return r ? `${v.name}, ${varValueText(r)}, \u2192 ${cell.aliasName}` : `${v.name}, \u2192 ${cell.aliasName}`;
+    }
+    return `${v.name}, ${varValueText(cell)}`;
+  }
+  function paintSwatch(el, cell) {
+    const r = cell ? resolveCell(cell) : null;
+    if (!r || r.kind !== "color") {
+      el.style.background = "transparent";
+      return;
+    }
+    const pct = r.alpha != null ? alphaPct(r.alpha) : 100;
+    if (pct >= 100) {
+      el.style.background = r.hex;
+      return;
+    }
+    el.classList.add("ck");
+    const i = document.createElement("i");
+    i.style.background = r.hex;
+    i.style.opacity = String(r.alpha);
+    el.appendChild(i);
   }
   var lastRightCols = [];
   var grpCollapsed = /* @__PURE__ */ new Set();
@@ -10102,6 +10259,7 @@ ${opts.tip}` : text;
     renderVarList();
   }
   function renderVarList() {
+    var _a3;
     if (!vmOpen || varScreen() !== "list") return;
     const sel = currentSel();
     renderSidebar(sel);
@@ -10113,20 +10271,54 @@ ${opts.tip}` : text;
     $("varSide").classList.toggle("dim", searching);
     $("btnSearchClear").hidden = !query;
     const colId = sel.kind === "col" ? sel.id : null;
-    const groups = paletteGroups(vmCols, vmVars, colId, query);
-    lastRightCols = searching ? [...new Set(groups.map((g) => g.collectionId))] : colId ? [colId] : [];
     const lines = [];
-    for (const g of groups) {
-      const col = vmCols.find((c) => c.id === g.collectionId);
-      const open = !grpCollapsed.has(g.key);
-      if (g.head) lines.push(groupHeadEl(g, open));
-      if (!open) continue;
-      if ((col == null ? void 0 : col.tier) === 1) {
-        const colors = g.rows.filter((v) => v.type === "COLOR");
-        const others = g.rows.filter((v) => v.type !== "COLOR");
-        if (others.length) lines.push(paletteLineEl(others, "pill"));
-        if (colors.length) lines.push(paletteLineEl(colors, colorView === "grid" ? "dot" : "swatch"));
-      } else for (const v of g.rows) lines.push(varRowEl(v));
+    const fillRows = (grp, rows, collectionId, level) => {
+      var _a4;
+      const global = ((_a4 = vmCols.find((c) => c.id === collectionId)) == null ? void 0 : _a4.tier) === 1;
+      if (global) {
+        const colors = rows.filter((v) => v.type === "COLOR");
+        const others = rows.filter((v) => v.type !== "COLOR");
+        if (others.length) grp.appendChild(paletteLineEl(others, "pill", level));
+        if (colors.length) {
+          if (colorView === "grid") grp.appendChild(paletteLineEl(colors, "dot", level));
+          else for (const v of colors) grp.appendChild(varRowEl(v, true, level));
+        }
+      } else for (const v of rows) grp.appendChild(varRowEl(v, false, level));
+    };
+    if (searching) {
+      const groups = paletteGroups(vmCols, vmVars, colId, query);
+      lastRightCols = [...new Set(groups.map((g) => g.collectionId))];
+      for (const g of groups) {
+        const open = !grpCollapsed.has(g.key);
+        lines.push(groupHeadEl(g.key, g.label, g.label, 1, open, false));
+        if (!open) continue;
+        const grp = document.createElement("div");
+        grp.className = "vt-grp";
+        fillRows(grp, g.rows, g.collectionId, 2);
+        lines.push(grp);
+      }
+    } else {
+      lastRightCols = colId ? [colId] : [];
+      const build = (n, into) => {
+        if (n.depth === 0) {
+          const grp2 = document.createElement("div");
+          grp2.className = "vt-grp top";
+          fillRows(grp2, n.rows, n.collectionId, 1);
+          into.push(grp2);
+          return;
+        }
+        const open = !grpCollapsed.has(n.key);
+        into.push(groupHeadEl(n.key, n.label, n.path, n.depth, open, n.depth > 1));
+        if (!open) return;
+        const grp = document.createElement("div");
+        grp.className = n.depth > 1 ? "vt-grp inner" : n.bar ? "vt-grp has-bar" : "vt-grp";
+        fillRows(grp, n.rows, n.collectionId, n.depth + 1);
+        const sub = [];
+        for (const c of n.children) build(c, sub);
+        grp.append(...sub);
+        into.push(grp);
+      };
+      for (const n of paletteTree(vmCols, vmVars, colId)) build(n, lines);
     }
     if (!lines.length) {
       const d = document.createElement("div");
@@ -10144,9 +10336,17 @@ ${opts.tip}` : text;
     }
     renderModeSelect();
     tree.append(...lines);
+    varListGen++;
     const focusables = gridItems();
     let target = focusKey ? focusables.find((x) => x.dataset.key === focusKey) : void 0;
     for (const f of focusables) f.tabIndex = -1;
+    if (!target && focusKey) {
+      const anchor = foldAnchor(focusKey, focusables);
+      if (anchor) {
+        target = anchor;
+        focusKey = (_a3 = anchor.dataset.key) != null ? _a3 : null;
+      }
+    }
     target = target != null ? target : focusables[0];
     target == null ? void 0 : target.setAttribute("tabindex", "0");
     if (target && hadFocus) target.focus({ preventScroll: true });
@@ -10155,11 +10355,39 @@ ${opts.tip}` : text;
   function gridItems() {
     return Array.from($("varTree").querySelectorAll("[data-key]"));
   }
-  function groupHeadEl(g, open) {
+  function foldAnchor(fk, items) {
+    var _a3;
+    let keys;
+    if (fk.startsWith("v:")) {
+      const v = vmVars.find((x) => x.id === fk.slice(2));
+      if (!v) return void 0;
+      const anc = varAncestorKeys(v);
+      keys = query.trim() ? [(_a3 = anc[anc.length - 1]) != null ? _a3 : `${v.collectionId}|`] : anc;
+    } else if (fk.startsWith("g:") && !query.trim()) {
+      const k = fk.slice(2);
+      const bar = k.indexOf("|");
+      const segs = k.slice(bar + 1).split("/");
+      keys = segs.slice(0, -1).map((_, i) => `${k.slice(0, bar)}|${segs.slice(0, i + 1).join("/")}`);
+    } else return void 0;
+    for (const k of keys) {
+      if (!grpCollapsed.has(k)) continue;
+      const h = items.find((x) => x.dataset.key === `g:${k}`);
+      if (h) return h;
+    }
+    return void 0;
+  }
+  function headOf(el) {
+    const grp = el.classList.contains("vt-group") ? el.parentElement : el.closest(".vt-grp");
+    if (!grp || !grp.classList.contains("vt-grp") || grp.classList.contains("top")) return void 0;
+    const h = grp.previousElementSibling;
+    return (h == null ? void 0 : h.classList.contains("vt-group")) ? h : void 0;
+  }
+  function groupHeadEl(key, label, tip, level, open, inner) {
     const d = document.createElement("div");
-    d.className = "vt-group";
-    d.dataset.key = `g:${g.key}`;
+    d.className = inner ? "vt-group inner" : "vt-group";
+    d.dataset.key = `g:${key}`;
     d.setAttribute("role", "row");
+    d.setAttribute("aria-level", String(level));
     d.setAttribute("aria-expanded", String(open));
     const tw = document.createElement("span");
     tw.className = "tw";
@@ -10167,33 +10395,58 @@ ${opts.tip}` : text;
     tw.textContent = open ? "\u25BE" : "\u25B8";
     const lb = document.createElement("span");
     lb.className = "lb";
-    lb.textContent = g.label;
-    d.title = g.label;
+    lb.textContent = label;
+    d.title = tip;
     d.append(tw, lb);
+    const focusSelf = () => {
+      var _a3;
+      (_a3 = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _a3.focus();
+    };
     const toggle = () => {
-      var _a3, _b;
-      if (open) grpCollapsed.add(g.key);
-      else grpCollapsed.delete(g.key);
+      var _a3;
+      if (open) grpCollapsed.add(key);
+      else grpCollapsed.delete(key);
       focusKey = (_a3 = d.dataset.key) != null ? _a3 : null;
       renderVarList();
-      (_b = gridItems().find((x) => x.dataset.key === focusKey)) == null ? void 0 : _b.focus();
+      focusSelf();
+    };
+    const go = (target) => {
+      var _a3;
+      if (!target) return;
+      gridItems().forEach((x) => x.tabIndex = -1);
+      target.tabIndex = 0;
+      focusKey = (_a3 = target.dataset.key) != null ? _a3 : null;
+      target.focus();
     };
     d.addEventListener("click", toggle);
     d.addEventListener("keydown", (ev) => {
+      var _a3;
       if (ev.key === "Enter" || ev.key === " ") {
         ev.preventDefault();
         toggle();
+        return;
+      }
+      if (ev.key === "ArrowRight") {
+        ev.preventDefault();
+        if (!open) toggle();
+        else go((_a3 = d.nextElementSibling) == null ? void 0 : _a3.querySelector("[data-key]"));
+        return;
+      }
+      if (ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        if (open) toggle();
+        else go(headOf(d));
         return;
       }
       gridKey(ev, d);
     });
     return d;
   }
-  function paletteLineEl(rows, mode) {
-    var _a3;
+  function paletteLineEl(rows, mode, level) {
     const line = document.createElement("div");
     line.className = `vp-line vp-${mode}`;
     line.setAttribute("role", "row");
+    line.setAttribute("aria-level", String(level));
     for (const v of rows) {
       const cell = currentModeCell(v);
       const b = document.createElement("div");
@@ -10201,48 +10454,70 @@ ${opts.tip}` : text;
       b.dataset.key = `v:${v.id}`;
       b.dataset.id = v.id;
       b.setAttribute("role", "gridcell");
-      const tip = `${v.name} / ${cellTipText(cell)}`;
-      b.title = tip;
-      b.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
-      if (mode === "pill") b.textContent = cellText(cell);
-      else {
+      b.title = `${v.name} / ${cellTipText(cell)}`;
+      if (mode === "pill") {
+        b.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
+        b.textContent = cellText(cell);
+      } else {
+        b.setAttribute("aria-label", itemAria(v, cell));
         const dot = document.createElement("span");
         dot.className = "vp-dot";
-        dot.style.background = (_a3 = resolveSwatch(cell)) != null ? _a3 : "transparent";
+        paintSwatch(dot, cell);
         b.appendChild(dot);
-        if (mode === "swatch") {
-          const nm = document.createElement("span");
-          nm.className = "vp-name";
-          nm.textContent = leafName(v.name);
-          b.appendChild(nm);
-        }
       }
       wireItem(b, v);
       line.appendChild(b);
     }
     return line;
   }
-  function varRowEl(v) {
+  function varRowEl(v, global, level) {
+    const row = document.createElement("div");
+    row.className = "vt-r";
+    row.setAttribute("role", "row");
+    row.setAttribute("aria-level", String(level));
     const d = document.createElement("div");
     d.className = "vt-row";
     d.dataset.key = `v:${v.id}`;
     d.dataset.id = v.id;
-    d.setAttribute("role", "row");
+    d.setAttribute("role", "gridcell");
     const cell = currentModeCell(v);
+    const alias = (cell == null ? void 0 : cell.kind) === "alias" ? cell : null;
+    const r = alias ? resolveCell(alias) : null;
+    const lead = document.createElement("span");
+    lead.setAttribute("aria-hidden", "true");
+    if (v.type === "COLOR") {
+      lead.className = "vr-sw";
+      paintSwatch(lead, cell);
+    } else {
+      lead.className = "vr-mk";
+      lead.textContent = varTypeMark(v.type);
+    }
     const nm = document.createElement("span");
     nm.className = "nm";
-    nm.textContent = leafName(v.name);
-    const val = document.createElement("span");
-    val.className = "vr-val";
-    const pill = document.createElement("span");
-    pill.className = `vr-pill${(cell == null ? void 0 : cell.kind) === "alias" ? " alias" : ""}`;
-    pill.innerHTML = `${v.type === "COLOR" ? swatchHtml(resolveSwatch(cell)) : ""}${escapeHtml(cellText(cell))}`;
-    val.appendChild(pill);
+    const tx = document.createElement("span");
+    tx.className = "t";
+    tx.textContent = leafName(v.name);
+    nm.appendChild(tx);
+    const chip = document.createElement("span");
+    chip.className = "vchip";
+    if (alias && (!global || !r)) {
+      const al = document.createElement("span");
+      al.className = "al";
+      al.textContent = `\u2192 ${lastTwo(alias.aliasName)}`;
+      chip.appendChild(al);
+    }
+    if (!alias || r) {
+      const vl = document.createElement("span");
+      vl.className = "vl";
+      vl.textContent = varValueText(alias ? r : cell);
+      chip.appendChild(vl);
+    }
     d.title = `${v.name} / ${cellTipText(cell)}`;
-    d.setAttribute("aria-label", `${v.name}, ${cellTipText(cell)}`);
-    d.append(nm, val);
+    d.setAttribute("aria-label", itemAria(v, cell));
+    d.append(lead, nm, chip);
     wireItem(d, v);
-    return d;
+    row.appendChild(d);
+    return row;
   }
   function wireItem(el, v) {
     el.addEventListener("click", (e) => {
@@ -10342,7 +10617,9 @@ ${opts.tip}` : text;
     if (k === "ArrowDown") toLine(li + 1);
     else if (k === "ArrowUp") toLine(li - 1);
     else if (k === "ArrowRight" && ii >= 0 && inLine.length > 1) go(inLine[Math.min(inLine.length - 1, ii + 1)]);
-    else if (k === "ArrowLeft" && ii >= 0 && inLine.length > 1) go(inLine[Math.max(0, ii - 1)]);
+    else if (k === "ArrowLeft" && ii > 0) go(inLine[ii - 1]);
+    else if (k === "ArrowLeft" && ii === 0 && !el.classList.contains("vt-group") && headOf(el)) go(headOf(el));
+    else if (k === "ArrowLeft" && ii === 0 && inLine.length > 1) go(el);
     else if (k === "Home") go(all[0]);
     else if (k === "End") go(all[all.length - 1]);
     else if (k === "PageDown") toLine(li + 10);
@@ -10384,11 +10661,12 @@ ${opts.tip}` : text;
     showStatusLine(t("apply.done", { n: msg.applied, name: msg.name }) + (msg.skipped ? t("apply.skipped", { m: msg.skipped }) : "") + t("apply.undo"), { cls: msg.skipped ? "warn" : "ok", tip });
   }
   function openVarMenuFor(v, el, x, y) {
-    var _a3;
+    var _a3, _b;
     const r = el.getBoundingClientRect();
+    focusKey = (_a3 = el.dataset.key) != null ? _a3 : null;
     el.classList.add("menu-open");
     const kind = varKind(v);
-    const targets = (_a3 = APPLY_TARGETS[kind]) != null ? _a3 : [];
+    const targets = (_b = APPLY_TARGETS[kind]) != null ? _b : [];
     const items = [];
     if (targets.length) {
       const sub = targets.map((tg) => {
@@ -10416,13 +10694,13 @@ ${opts.tip}` : text;
   var detailBox = null;
   var detailUsesEl = null;
   function focusAfterDetail(id) {
-    var _a3, _b;
+    var _a3, _b, _c;
     const items = gridItems();
     const hit = items.find((x) => x.dataset.key === `v:${id}`);
-    const el = (_a3 = hit != null ? hit : items[0]) != null ? _a3 : $("varSearch");
+    const el = (_b = (_a3 = hit != null ? hit : foldAnchor(`v:${id}`, items)) != null ? _a3 : items[0]) != null ? _b : $("varSearch");
     items.forEach((x) => x.tabIndex = -1);
     el.tabIndex = 0;
-    focusKey = (_b = el.dataset.key) != null ? _b : null;
+    focusKey = (_c = el.dataset.key) != null ? _c : null;
     return { el, present: !!hit };
   }
   var detailVarId = null;
@@ -11295,6 +11573,10 @@ ${opts.tip}` : text;
     if (e.timer) clearTimeout(e.timer);
     e.timer = null;
     if (ed === e) ed = null;
+    if (varTableDropped) {
+      varTableDropped = false;
+      send({ type: "GET_VAR_TABLE" });
+    }
     detailUsesEl = null;
     detailBox = null;
   }
@@ -11500,8 +11782,7 @@ ${opts.tip}` : text;
     $("varSearch").value = "";
     sideSel = { kind: "col", id: v.collectionId };
     sideUserPick = v.collectionId;
-    const cut = v.name.lastIndexOf("/");
-    grpCollapsed.delete(`${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`);
+    for (const k of [`${v.collectionId}|`, ...varAncestorKeys(v)]) grpCollapsed.delete(k);
     focusKey = `v:${v.id}`;
     renderVarList();
     const item = gridItems().find((x) => x.dataset.key === focusKey);
@@ -11586,10 +11867,8 @@ ${opts.tip}` : text;
     if (activeTab !== "variables") showTab("variables");
     query = "";
     $("varSearch").value = "";
-    const cut = v.name.lastIndexOf("/");
-    const gk = `${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`;
     sideSel = { kind: "col", id: v.collectionId };
-    grpCollapsed.delete(gk);
+    for (const k of [`${v.collectionId}|`, ...varAncestorKeys(v)]) grpCollapsed.delete(k);
     focusKey = `v:${v.id}`;
     renderVarList();
   }
@@ -11819,7 +12098,8 @@ ${opts.tip}` : text;
   }
   function setAllGroups(open) {
     const sel = currentSel();
-    const keys = paletteGroups(vmCols, vmVars, sel.kind === "col" ? sel.id : null, query).map((g) => g.key);
+    const colId = sel.kind === "col" ? sel.id : null;
+    const keys = query.trim() ? paletteGroups(vmCols, vmVars, colId, query).map((g) => g.key) : flattenPaletteTree(paletteTree(vmCols, vmVars, colId)).filter((n) => n.depth > 0).map((n) => n.key);
     for (const k of keys) {
       if (open) grpCollapsed.delete(k);
       else grpCollapsed.add(k);
