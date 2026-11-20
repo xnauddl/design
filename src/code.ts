@@ -311,7 +311,7 @@ async function collectVarTable(): Promise<{ collections: VarCollection[]; vars: 
         const id = (raw as VariableAlias).id;
         if (nameById.has(id) || remoteName.has(id)) continue;
         const rv = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-        remoteName.set(id, rv ? rv.name : null);
+        remoteName.set(id, rv?.remote ? rv.name : null); // 로컬 목록에 없고 원격도 아니면 지운 로컬 변수(피그마가 지운 변수도 id로 돌려준다)
       }
     }
   }
@@ -445,7 +445,7 @@ async function deletedVarIds(roots: readonly SceneNode[]): Promise<Set<string>> 
   for (const id of usage.keys()) {
     if (local.has(id)) continue;
     const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-    if (!v) out.add(id);
+    if (!v?.remote) out.add(id); // 지운 로컬 변수도 id로 읽히므로 원격(라이브러리)만 살아 있다고 본다
   }
   return out;
 }
@@ -465,7 +465,7 @@ async function collectUsage(nodeIds: readonly string[] | undefined): Promise<Omi
   for (const [id, u] of usage) {
     if (local.has(id)) { out[id] = u; continue; }
     const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-    if (!v) { deletedIds.add(id); continue; }
+    if (!v?.remote) { deletedIds.add(id); continue; } // 지운 로컬 변수도 id로 읽힌다 — 원격만 라이브러리
     out[id] = u;
     const col = await figma.variables.getVariableCollectionByIdAsync(v.variableCollectionId).catch(() => null);
     const modeId = col?.defaultModeId ?? Object.keys(v.valuesByMode)[0];

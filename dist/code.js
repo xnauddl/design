@@ -2255,7 +2255,7 @@
     return isAlias(x) && liveVarIds.has(x.id);
   }
   async function collectLiveVarIds(selection2, local, deep = true) {
-    var _a, _b;
+    var _a, _b, _c;
     const seen = /* @__PURE__ */ new Set();
     const stack = selection2.slice();
     const take = (raw) => {
@@ -2278,7 +2278,7 @@
     for (const id of seen) {
       if (live.has(id)) continue;
       try {
-        if (await figma.variables.getVariableByIdAsync(id)) live.add(id);
+        if ((_c = await figma.variables.getVariableByIdAsync(id)) == null ? void 0 : _c.remote) live.add(id);
       } catch (e) {
       }
     }
@@ -11171,7 +11171,7 @@
           const id = raw.id;
           if (nameById.has(id) || remoteName.has(id)) continue;
           const rv = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-          remoteName.set(id, rv ? rv.name : null);
+          remoteName.set(id, (rv == null ? void 0 : rv.remote) ? rv.name : null);
         }
       }
     }
@@ -11289,7 +11289,7 @@
     for (const id of usage.keys()) {
       if (local.has(id)) continue;
       const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-      if (!v) out.add(id);
+      if (!(v == null ? void 0 : v.remote)) out.add(id);
     }
     return out;
   }
@@ -11307,7 +11307,7 @@
         continue;
       }
       const v = await figma.variables.getVariableByIdAsync(id).catch(() => null);
-      if (!v) {
+      if (!(v == null ? void 0 : v.remote)) {
         deletedIds.add(id);
         continue;
       }

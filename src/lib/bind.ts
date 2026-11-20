@@ -228,7 +228,7 @@ async function collectLiveVarIds(selection: readonly SceneNode[], local: Readonl
   for (const id of seen) {
     if (live.has(id)) continue;
     try {
-      if (await figma.variables.getVariableByIdAsync(id)) live.add(id); // 라이브러리(원격) 변수
+      if ((await figma.variables.getVariableByIdAsync(id))?.remote) live.add(id); // 라이브러리(원격) 변수만 — 지운 로컬 변수도 id로 읽힌다
     } catch {
       /* 없음 — 잔상 */
     }
