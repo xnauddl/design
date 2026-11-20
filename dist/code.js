@@ -3959,9 +3959,7 @@
     other: "Other"
   };
   var byName2 = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
-  function tierBlock(tokens, tier, opts) {
-    const mine = tokens.filter((t2) => t2.collection === tier);
-    if (!mine.length) return null;
+  function groupBody(mine, opts) {
     const body = [];
     for (const g of CSS_GROUP_ORDER) {
       const inGroup = mine.filter((t2) => {
@@ -3973,13 +3971,38 @@
       body.push(`  /* ${g} */`);
       for (const t2 of inGroup) body.push(...tokenCssLines(t2, opts));
     }
-    return [...cssBlockHead(CSS_HEAD[tier]), ":root {", ...body, "}"];
+    return body;
   }
-  function toCss(tokens, opts, textStyles) {
+  function tierBlock(tokens, tier, opts) {
+    const mine = tokens.filter((t2) => t2.collection === tier);
+    if (!mine.length) return null;
+    return [...cssBlockHead(CSS_HEAD[tier]), ":root {", ...groupBody(mine, opts), "}"];
+  }
+  var TIER_UPPER = { Global: "GLOBAL", Semantic: "SEMANTIC" };
+  var cssAttr = (v) => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  function modeBlock(base, mode, tier, opts) {
+    const byId = new Map(mode.tokens.filter((t2) => t2.id !== void 0).map((t2) => [t2.id, t2]));
+    const changed = [];
+    for (const b of base) {
+      if (b.collection !== tier || b.id === void 0) continue;
+      const m = byId.get(b.id);
+      if (!m) continue;
+      if (tokenCssLines(m, opts).join("\n") !== tokenCssLines(b, opts).join("\n")) changed.push(m);
+    }
+    if (!changed.length) return null;
+    const title = `${TIER_UPPER[tier]} \u2014 ${mode.titles[tier].replace(/\*\//g, "*\\/")} mode (only values that differ)`;
+    return [...cssBlockHead(title), `[data-theme="${cssAttr(mode.key)}"] {`, ...groupBody(changed, opts), "}"];
+  }
+  function toCss(tokens, opts, textStyles, modes) {
     const blocks = [];
     for (const tier of ["Global", "Semantic"]) {
       const b = tierBlock(tokens, tier, opts);
-      if (b) blocks.push(b);
+      if (!b) continue;
+      blocks.push(b);
+      for (const m of modes) {
+        const mb = modeBlock(tokens, m, tier, opts);
+        if (mb) blocks.push(mb);
+      }
     }
     if (textStyles.length) {
       const sorted = [...textStyles].sort(byName2);
@@ -4061,44 +4084,94 @@
   }
   var ALIAS_READ_LIMIT = 12;
   function resolveExportTokens(vars) {
+    return resolveWith(vars, (v) => v);
+  }
+  function exportModeKey(name) {
+    return name.trim().toLowerCase().replace(/\s+/g, "-");
+  }
+  function resolveExportModes(vars, cols) {
+    var _a;
+    const modeOfKey = /* @__PURE__ */ new Map();
+    const keys = [];
+    const titles = /* @__PURE__ */ new Map();
+    for (const c of cols) {
+      const def = c.modes.find((m) => m.modeId === c.defaultModeId);
+      const defKey = def ? exportModeKey(def.name) : "";
+      const mine = /* @__PURE__ */ new Map();
+      for (const m of c.modes) {
+        if (m.modeId === c.defaultModeId) continue;
+        const k = exportModeKey(m.name);
+        if (!k || k === defKey || mine.has(k)) continue;
+        mine.set(k, m.modeId);
+        if (!keys.includes(k)) keys.push(k);
+        const ti = (_a = titles.get(k)) != null ? _a : {};
+        if (ti.any === void 0) ti.any = m.name;
+        if (c.tier === 1 && ti.Global === void 0) ti.Global = m.name;
+        if (c.tier === 2 && ti.Semantic === void 0) ti.Semantic = m.name;
+        titles.set(k, ti);
+      }
+      modeOfKey.set(c.id, mine);
+    }
+    keys.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    return keys.map((k) => {
+      var _a2, _b, _c, _d, _e;
+      const ti = (_a2 = titles.get(k)) != null ? _a2 : {};
+      const tokens = resolveWith(vars, (v) => {
+        var _a3, _b2;
+        const mid = v.collectionId !== void 0 ? (_a3 = modeOfKey.get(v.collectionId)) == null ? void 0 : _a3.get(k) : void 0;
+        const mv = mid !== void 0 ? (_b2 = v.modeValues) == null ? void 0 : _b2[mid] : void 0;
+        return mv ? __spreadProps(__spreadValues({}, v), { alias: mv.alias, value: mv.value }) : v;
+      });
+      return { key: k, titles: { Global: (_c = (_b = ti.Global) != null ? _b : ti.any) != null ? _c : k, Semantic: (_e = (_d = ti.Semantic) != null ? _d : ti.any) != null ? _e : k }, tokens };
+    });
+  }
+  function resolveWith(vars, read) {
     const byId = new Map(vars.map((v) => [v.id, v]));
-    const reachesValue = (v) => {
-      const seen = /* @__PURE__ */ new Set([v.id]);
-      let cur = v;
+    const reaches = (start, rd) => {
+      const seen = /* @__PURE__ */ new Set([start.id]);
+      let cur = rd(start);
       for (let reads = 1; cur.alias !== void 0; reads++) {
         if (reads >= ALIAS_READ_LIMIT) return false;
         const next = byId.get(cur.alias);
         if (!next || seen.has(next.id)) return false;
         seen.add(next.id);
-        cur = next;
+        cur = rd(next);
       }
       return true;
     };
-    const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reachesValue(v));
+    const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x));
     const winner = /* @__PURE__ */ new Map();
     for (const v of ok) {
       const prev = winner.get(v.name);
       if (!prev || prev.tier === 2 && v.tier === 1) winner.set(v.name, v);
     }
     const survivors = new Set([...winner.values()].map((v) => v.id));
-    return ok.map((v) => {
-      const tok = { name: v.name, collection: v.tier === 1 ? "Global" : "Semantic", type: v.type, kind: v.kind };
-      let cur = v;
+    const out = [];
+    for (const v of ok) {
+      if (read !== void 0 && !reaches(v, read)) continue;
+      const tok = { id: v.id, name: v.name, collection: v.tier === 1 ? "Global" : "Semantic", type: v.type, kind: v.kind };
+      let cur = read(v);
+      let done = false;
       while (cur.alias !== void 0) {
         const next = byId.get(cur.alias);
         if (survivors.has(next.id)) {
           tok.aliasOf = next.name;
           if (v.description) tok.description = v.description;
-          return tok;
+          done = true;
+          break;
         }
-        cur = next;
+        cur = read(next);
       }
-      tok.value = cur.value;
-      if (cur.description) tok.description = cur.description;
-      return tok;
-    });
+      if (!done) {
+        tok.value = cur.value;
+        if (cur.description) tok.description = cur.description;
+      }
+      out.push(tok);
+    }
+    return out;
   }
-  function exportClashes(tokens) {
+  function exportClashes(tokens, modes = []) {
+    if (modes.length) return [...new Set([tokens, ...modes.map((m) => m.tokens)].flatMap((l) => exportClashes(l)))].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
     const globalOf = /* @__PURE__ */ new Map();
     for (const tk of tokens) if (tk.collection === "Global" && !globalOf.has(tk.name)) globalOf.set(tk.name, tk);
     const out = /* @__PURE__ */ new Set();
@@ -4153,9 +4226,9 @@
       node[segs[segs.length - 1]] = { $type: "typography", $value: value };
     }
   }
-  function exportTokens(tokens, opts, textStyles = []) {
+  function exportTokens(tokens, opts, textStyles = [], modes = []) {
     const list = dedupeByName(tokens);
-    if (opts.format === "css") return toCss(list, opts, textStyles);
+    if (opts.format === "css") return toCss(list, opts, textStyles, modes);
     const root = JSON.parse(toW3C(list, opts));
     textStylesToW3C(textStyles, opts, root);
     return JSON.stringify(root, null, 2);
@@ -12524,19 +12597,23 @@
           for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
             const col = colById.get(v.variableCollectionId);
             if (!col) continue;
-            const raw = v.valuesByMode[col.defaultModeId];
-            const inp = { id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v) };
+            const read = (raw) => {
+              if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") return { alias: raw.id };
+              if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) return { value: exportColorHex(raw) };
+              return { value: raw };
+            };
+            const inp = __spreadValues({ id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id }, read(v.valuesByMode[col.defaultModeId]));
             if (v.description) inp.description = v.description;
-            if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-              inp.alias = raw.id;
-            } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-              inp.value = exportColorHex(raw);
-            } else {
-              inp.value = raw;
-            }
+            const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
+            if (others.length) inp.modeValues = Object.fromEntries(others.map((m) => [m.modeId, read(v.valuesByMode[m.modeId])]));
             inputs.push(inp);
           }
           const tokens = resolveExportTokens(inputs);
+          const modeCols = [...cols].sort((a, b) => rank(a.id) - rank(b.id)).map((c) => {
+            var _a2;
+            return { id: c.id, tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0, defaultModeId: c.defaultModeId, modes: c.modes };
+          });
+          const modes = resolveExportModes(inputs, modeCols);
           tokens.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
           const styles = (await figma.getLocalTextStylesAsync()).map((st) => ({
             name: st.name,
@@ -12551,8 +12628,8 @@
             format: msg.format,
             fontSizeUnit: msg.fontSizeUnit,
             base: msg.base
-          }, styles);
-          post({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens) });
+          }, styles, modes);
+          post({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes) });
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {

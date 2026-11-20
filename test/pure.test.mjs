@@ -53,6 +53,8 @@ import {
   resolveExportTokens,
   exportClashes,
   exportClashNotice,
+  resolveExportModes,
+  exportModeKey,
   splitWeightStyle,
   parseVariantName,
   formatVariant,
@@ -806,6 +808,105 @@ test('exportClashNotice — 앞 3개 · 넘치면 "외 {n}개" · 없으면 빈 
   assert.equal(exportClashNotice(['color/primary', 'spacing/md']), 'Global과 이름이 같은 Semantic 2개는 Global 값만 냈어요: color/primary, spacing/md');
   assert.equal(exportClashNotice(['a', 'b', 'c', 'd']), 'Global과 이름이 같은 Semantic 4개는 Global 값만 냈어요: a, b, c 외 1개');
   assert.equal(exportClashNotice(['a', 'b', 'c', 'd', 'e']), 'Global과 이름이 같은 Semantic 5개는 Global 값만 냈어요: a, b, c 외 2개');
+});
+
+/* ---- 모드 블록 (ia-v3 §4.4 "모드 블록" · A.24) ---- */
+const MV = (id, name, tier, col, def, modes = {}, extra = {}) => ({ id, name, tier, type: 'COLOR', kind: 'color', collectionId: col, ...def, modeValues: modes, ...extra });
+const COL = (id, tier, modes, def = modes[0][0]) => ({ id, tier, defaultModeId: def, modes: modes.map(([modeId, name]) => ({ modeId, name })) });
+const modeCss = (vars, cols) => {
+  const toks = resolveExportTokens(vars);
+  const modes = resolveExportModes(vars, cols);
+  return { css: exportTokens(toks, OPTS, [], modes), toks, modes };
+};
+
+test('모드 블록 — D-T1: Global만 Dark → GLOBAL 뒤 [data-theme="dark"], SEMANTIC은 :root 한 블록', () => {
+  const R = '='.repeat(74);
+  const { css } = modeCss(
+    [
+      MV('g9', 'color/gray/900', 1, 'G', { value: '#101828' }, { gd: { value: '#f2f4f7' } }),
+      MV('g5', 'color/gray/50', 1, 'G', { value: '#f9fafb' }, { gd: { value: '#f9fafb' } }), // 값이 같으면 빠짐
+      MV('s1', 'color/text/default', 2, 'S', { alias: 'g9' }),
+    ],
+    [COL('G', 1, [['gl', 'Light'], ['gd', 'Dark']]), COL('S', 2, [['sm', 'Mode 1']])],
+  );
+  const expected = [
+    `/* ${R}`, '   GLOBAL (Primitive) — raw values. Do not use directly in components.', `   ${R} */`,
+    ':root {', '  /* Color */', '  --color-gray-50: #f9fafb;', '  --color-gray-900: #101828;', '}', '',
+    `/* ${R}`, '   GLOBAL — Dark mode (only values that differ)', `   ${R} */`,
+    '[data-theme="dark"] {', '  /* Color */', '  --color-gray-900: #f2f4f7;', '}', '',
+    `/* ${R}`, '   SEMANTIC — UI roles mapped to Global. Use these in components.', `   ${R} */`,
+    ':root {', '  /* Color */', '  --color-text-default: var(--color-gray-900);', '}',
+  ].join('\n');
+  assert.equal(css, expected);
+});
+
+test('모드 블록 — 옛 구조(Semantic Dark → dark/…)는 SEMANTIC 뒤 블록', () => {
+  const { css } = modeCss(
+    [
+      MV('g9', 'color/gray/900', 1, 'G', { value: '#101828' }),
+      MV('d9', 'dark/color/gray/900', 1, 'G', { value: '#f2f4f7' }),
+      MV('s1', 'color/text/default', 2, 'S', { alias: 'g9' }, { sd: { alias: 'd9' } }),
+    ],
+    [COL('G', 1, [['gm', 'Mode 1']]), COL('S', 2, [['sl', 'Light'], ['sd', 'Dark']])],
+  );
+  assert.doesNotMatch(css, /GLOBAL — Dark/);
+  assert.ok(css.includes('SEMANTIC — Dark mode (only values that differ)'));
+  assert.ok(css.includes('[data-theme="dark"] {\n  /* Color */\n  --color-text-default: var(--dark-color-gray-900);\n}'));
+  assert.ok(css.indexOf('SEMANTIC — UI roles') < css.indexOf('SEMANTIC — Dark mode'));
+});
+
+test('모드 블록 — 계층 밖 컬렉션의 모드로 값을 푼 Semantic도 바뀌면 들어감 · 모드별 거울 판정', () => {
+  const vars = [
+    MV('x', 'brand/ink', 0, 'X', { value: '#111111' }, { xd: { value: '#eeeeee' } }), // 계층 밖, Dark 있음
+    MV('s', 'color/text/brand', 2, 'S', { alias: 'x' }),
+    MV('g', 'color/p', 1, 'G', { value: '#000000' }),
+    MV('sp', 'color/p', 2, 'S', { value: '#000000' }, {}), // 기본 모드는 거울(같은 값)
+  ];
+  const cols = [COL('X', 0, [['xl', 'Light'], ['xd', 'Dark']]), COL('G', 1, [['gm', 'Mode 1']]), COL('S', 2, [['sm', 'Mode 1']])];
+  const { css, toks, modes } = modeCss(vars, cols);
+  assert.ok(css.includes('SEMANTIC — Dark mode'));
+  assert.ok(css.includes('--color-text-brand: #eeeeee;'));
+  assert.deepEqual(exportClashes(toks, modes), []); // 거울은 모드에서도 거울
+  // Semantic 쪽만 Dark가 다르면(모드에서 거울 아님) 겹침으로 셈
+  const vars2 = [MV('g', 'color/p', 1, 'G', { value: '#000000' }), MV('sp', 'color/p', 2, 'S', { value: '#000000' }, { sd: { value: '#ffffff' } })];
+  const cols2 = [COL('G', 1, [['gm', 'Mode 1']]), COL('S', 2, [['sl', 'Light'], ['sd', 'Dark']])];
+  const r2 = modeCss(vars2, cols2);
+  assert.deepEqual(exportClashes(r2.toks), []);
+  assert.deepEqual(exportClashes(r2.toks, r2.modes), ['color/p']);
+});
+
+test('모드 블록 — 키(대소문자 · 공백 · 한글 · 따옴표) · 같은 키 묶기 · 키 순 · 머리 이름은 그 계층 먼저 · 빈 키', () => {
+  assert.equal(exportModeKey('  High   Contrast '), 'high-contrast');
+  assert.equal(exportModeKey('다크'), '다크');
+  const vars = [
+    MV('a', 'color/a', 1, 'G1', { value: '#000000' }, { g1d: { value: '#111111' }, g1q: { value: '#222222' } }),
+    MV('b', 'color/b', 1, 'G2', { value: '#000000' }, { g2d: { value: '#333333' } }),
+    MV('c', 'color/c', 1, 'G1', { value: '#000000' }, { g1s: { value: '#444444' } }),
+  ];
+  const cols = [
+    COL('C', 3, [['cm', 'Mode 1'], ['cd', 'DARK']]), // Component — 머리 이름에 쓰지 않음(그 계층 먼저)
+    COL('G1', 1, [['g1l', 'Light'], ['g1d', 'Dark'], ['g1q', 'say "hi"'], ['g1s', '   ']]),
+    COL('G2', 1, [['g2l', 'Light'], ['g2d', 'dark ']]),
+  ];
+  const { css, modes } = modeCss(vars, cols);
+  assert.deepEqual(modes.map((m) => m.key), ['dark', 'say-"hi"']); // 빈 키(공백뿐)는 없음 · 키 순
+  assert.ok(css.includes('GLOBAL — Dark mode')); // Component의 "DARK"가 아니라 Global 첫 컬렉션의 이름
+  assert.ok(css.includes('[data-theme="dark"] {\n  /* Color */\n  --color-a: #111111;\n  --color-b: #333333;\n}')); // 두 컬렉션 묶음
+  assert.ok(css.includes('[data-theme="say-\\"hi\\""]'));
+  assert.ok(css.indexOf('[data-theme="dark"]') < css.indexOf('[data-theme="say'));
+});
+
+test('모드 블록 — 자기 기본 모드와 같은 키는 기본으로 읽음 · ③은 그 블록에서만 빠짐 · W3C는 그대로', () => {
+  const vars = [
+    MV('a', 'color/a', 1, 'G', { value: '#000000' }, { gx: { value: '#ffffff' } }),
+    MV('s', 'color/s', 2, 'S', { alias: 'a' }, { sd: { alias: 'nope' } }), // Dark에서는 끊김
+  ];
+  const cols = [COL('G', 1, [['gd', 'Dark'], ['gx', 'dark ']]), COL('S', 2, [['sl', 'Light'], ['sd', 'Dark']])];
+  const { css, toks, modes } = modeCss(vars, cols);
+  // G는 기본 모드가 Dark라 키 dark를 기본으로 읽음 → GLOBAL Dark 블록 없음, S의 Dark는 끊겨 빠짐 → SEMANTIC 블록 없음
+  assert.doesNotMatch(css, /\[data-theme/);
+  assert.ok(css.includes('--color-s: var(--color-a);')); // 기본 :root에는 그대로
+  assert.equal(exportTokens(toks, { ...OPTS, format: 'w3c' }, [], modes), exportTokens(toks, { ...OPTS, format: 'w3c' }));
 });
 
 test('exportHasTokens — 껍데기만 있는 결과는 저장 대상이 아님(#8)', () => {
