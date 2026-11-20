@@ -102,6 +102,7 @@
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
+    "export.clash": "Global\uACFC \uC774\uB984\uC774 \uAC19\uC740 Semantic {n}\uAC1C\uB294 Global \uAC12\uB9CC \uB0C8\uC5B4\uC694: {names}",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -3959,9 +3960,7 @@
     other: "Other"
   };
   var byName2 = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
-  function tierBlock(tokens, tier, opts) {
-    const mine = tokens.filter((t2) => t2.collection === tier);
-    if (!mine.length) return null;
+  function groupBody(mine, opts) {
     const body = [];
     for (const g of CSS_GROUP_ORDER) {
       const inGroup = mine.filter((t2) => {
@@ -3973,13 +3972,38 @@
       body.push(`  /* ${g} */`);
       for (const t2 of inGroup) body.push(...tokenCssLines(t2, opts));
     }
-    return [...cssBlockHead(CSS_HEAD[tier]), ":root {", ...body, "}"];
+    return body;
   }
-  function toCss(tokens, opts, textStyles) {
+  function tierBlock(tokens, tier, opts) {
+    const mine = tokens.filter((t2) => t2.collection === tier);
+    if (!mine.length) return null;
+    return [...cssBlockHead(CSS_HEAD[tier]), ":root {", ...groupBody(mine, opts), "}"];
+  }
+  var TIER_UPPER = { Global: "GLOBAL", Semantic: "SEMANTIC" };
+  var cssAttr = (v) => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  function modeBlock(base, mode, tier, opts) {
+    const byId = new Map(mode.tokens.filter((t2) => t2.id !== void 0).map((t2) => [t2.id, t2]));
+    const changed = [];
+    for (const b of base) {
+      if (b.collection !== tier || b.id === void 0) continue;
+      const m = byId.get(b.id);
+      if (!m) continue;
+      if (tokenCssLines(m, opts).join("\n") !== tokenCssLines(b, opts).join("\n")) changed.push(m);
+    }
+    if (!changed.length) return null;
+    const title = `${TIER_UPPER[tier]} \u2014 ${mode.titles[tier].replace(/\*\//g, "*\\/")} mode (only values that differ)`;
+    return [...cssBlockHead(title), `[data-theme="${cssAttr(mode.key)}"] {`, ...groupBody(changed, opts), "}"];
+  }
+  function toCss(tokens, opts, textStyles, modes) {
     const blocks = [];
     for (const tier of ["Global", "Semantic"]) {
       const b = tierBlock(tokens, tier, opts);
-      if (b) blocks.push(b);
+      if (!b) continue;
+      blocks.push(b);
+      for (const m of modes) {
+        const mb = modeBlock(tokens, m, tier, opts);
+        if (mb) blocks.push(mb);
+      }
     }
     if (textStyles.length) {
       const sorted = [...textStyles].sort(byName2);
@@ -4059,6 +4083,108 @@
     }
     return [...seen.values()];
   }
+  var ALIAS_READ_LIMIT = 12;
+  function resolveExportTokens(vars) {
+    return resolveWith(vars, (v) => v);
+  }
+  function exportModeKey(name) {
+    return name.trim().toLowerCase().replace(/\s+/g, "-");
+  }
+  function resolveExportModes(vars, cols) {
+    var _a;
+    const modeOfKey = /* @__PURE__ */ new Map();
+    const keys = [];
+    const titles = /* @__PURE__ */ new Map();
+    for (const c of cols) {
+      const def = c.modes.find((m) => m.modeId === c.defaultModeId);
+      const defKey = def ? exportModeKey(def.name) : "";
+      const mine = /* @__PURE__ */ new Map();
+      for (const m of c.modes) {
+        if (m.modeId === c.defaultModeId) continue;
+        const k = exportModeKey(m.name);
+        if (!k || k === defKey || mine.has(k)) continue;
+        mine.set(k, m.modeId);
+        if (!keys.includes(k)) keys.push(k);
+        const ti = (_a = titles.get(k)) != null ? _a : {};
+        if (ti.any === void 0) ti.any = m.name;
+        if (c.tier === 1 && ti.Global === void 0) ti.Global = m.name;
+        if (c.tier === 2 && ti.Semantic === void 0) ti.Semantic = m.name;
+        titles.set(k, ti);
+      }
+      modeOfKey.set(c.id, mine);
+    }
+    keys.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    return keys.map((k) => {
+      var _a2, _b, _c, _d, _e;
+      const ti = (_a2 = titles.get(k)) != null ? _a2 : {};
+      const tokens = resolveWith(vars, (v) => {
+        var _a3, _b2;
+        const mid = v.collectionId !== void 0 ? (_a3 = modeOfKey.get(v.collectionId)) == null ? void 0 : _a3.get(k) : void 0;
+        const mv = mid !== void 0 ? (_b2 = v.modeValues) == null ? void 0 : _b2[mid] : void 0;
+        return mv ? __spreadProps(__spreadValues({}, v), { alias: mv.alias, value: mv.value }) : v;
+      });
+      return { key: k, titles: { Global: (_c = (_b = ti.Global) != null ? _b : ti.any) != null ? _c : k, Semantic: (_e = (_d = ti.Semantic) != null ? _d : ti.any) != null ? _e : k }, tokens };
+    });
+  }
+  function resolveWith(vars, read) {
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const reaches = (start, rd) => {
+      const seen = /* @__PURE__ */ new Set([start.id]);
+      let cur = rd(start);
+      for (let reads = 1; cur.alias !== void 0; reads++) {
+        if (reads >= ALIAS_READ_LIMIT) return false;
+        const next = byId.get(cur.alias);
+        if (!next || seen.has(next.id)) return false;
+        seen.add(next.id);
+        cur = rd(next);
+      }
+      return true;
+    };
+    const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x));
+    const winner = /* @__PURE__ */ new Map();
+    for (const v of ok) {
+      const prev = winner.get(v.name);
+      if (!prev || prev.tier === 2 && v.tier === 1) winner.set(v.name, v);
+    }
+    const survivors = new Set([...winner.values()].map((v) => v.id));
+    const out = [];
+    for (const v of ok) {
+      if (read !== void 0 && !reaches(v, read)) continue;
+      const tok = { id: v.id, name: v.name, collection: v.tier === 1 ? "Global" : "Semantic", type: v.type, kind: v.kind };
+      let cur = read(v);
+      let done = false;
+      while (cur.alias !== void 0) {
+        const next = byId.get(cur.alias);
+        if (survivors.has(next.id)) {
+          tok.aliasOf = next.name;
+          if (v.description) tok.description = v.description;
+          done = true;
+          break;
+        }
+        cur = read(next);
+      }
+      if (!done) {
+        tok.value = cur.value;
+        if (cur.description) tok.description = cur.description;
+      }
+      out.push(tok);
+    }
+    return out;
+  }
+  function exportClashes(tokens, modes = []) {
+    if (modes.length) return [...new Set([tokens, ...modes.map((m) => m.tokens)].flatMap((l) => exportClashes(l)))].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    const globalOf = /* @__PURE__ */ new Map();
+    for (const tk of tokens) if (tk.collection === "Global" && !globalOf.has(tk.name)) globalOf.set(tk.name, tk);
+    const out = /* @__PURE__ */ new Set();
+    for (const s of tokens) {
+      if (s.collection !== "Semantic") continue;
+      const g = globalOf.get(s.name);
+      if (!g) continue;
+      const mirror = s.aliasOf === s.name || (s.aliasOf !== void 0 && g.aliasOf !== void 0 ? s.aliasOf === g.aliasOf : s.aliasOf === void 0 && g.aliasOf === void 0 && s.value === g.value && s.description === g.description && s.kind === g.kind);
+      if (!mirror) out.add(s.name);
+    }
+    return [...out].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+  }
   var TYPO_PREFIX = "typography";
   var pct = (n) => `${Number(n.toFixed(2))}%`;
   var lineHeightStr = (lh) => lh.unit === "auto" ? "normal" : lh.unit === "percent" ? pct(lh.value) : `${Number(lh.value.toFixed(2))}px`;
@@ -4101,9 +4227,9 @@
       node[segs[segs.length - 1]] = { $type: "typography", $value: value };
     }
   }
-  function exportTokens(tokens, opts, textStyles = []) {
+  function exportTokens(tokens, opts, textStyles = [], modes = []) {
     const list = dedupeByName(tokens);
-    if (opts.format === "css") return toCss(list, opts, textStyles);
+    if (opts.format === "css") return toCss(list, opts, textStyles, modes);
     const root = JSON.parse(toW3C(list, opts));
     textStylesToW3C(textStyles, opts, root);
     return JSON.stringify(root, null, 2);
@@ -12077,7 +12203,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -12462,39 +12588,34 @@
           const colById = new Map(cols.map((c) => [c.id, c]));
           const vars = await figma.variables.getLocalVariablesAsync();
           const tiers = collectionTiers(cols, vars);
-          const nameById = new Map(vars.map((v) => [v.id, v.name]));
-          const tokens = [];
           const owned = ownedIds(cols);
           const colIdx = new Map(cols.map((c, i) => [c.id, i]));
           const rank = (id) => {
             var _a2;
             return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
           };
+          const inputs = [];
           for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
             const col = colById.get(v.variableCollectionId);
-            const tier = col ? tiers.get(col.id) : 0;
-            if (!col || tier !== 1 && tier !== 2) continue;
-            const raw = v.valuesByMode[col.defaultModeId];
-            const t2 = {
-              name: v.name,
-              collection: tier === 1 ? "Global" : "Semantic",
-              // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
-              type: v.resolvedType,
-              kind: kindOf(v)
+            if (!col) continue;
+            const read = (raw) => {
+              if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") return { alias: raw.id };
+              if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) return { value: exportColorHex(raw) };
+              return { value: raw };
             };
-            if (v.description) t2.description = v.description;
-            if (raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS") {
-              const target = nameById.get(raw.id);
-              if (!target) continue;
-              t2.aliasOf = target;
-            } else if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) {
-              t2.value = exportColorHex(raw);
-            } else {
-              t2.value = raw;
-            }
-            tokens.push(t2);
+            const inp = __spreadValues({ id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id }, read(v.valuesByMode[col.defaultModeId]));
+            if (v.description) inp.description = v.description;
+            const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
+            if (others.length) inp.modeValues = Object.fromEntries(others.map((m) => [m.modeId, read(v.valuesByMode[m.modeId])]));
+            inputs.push(inp);
           }
-          tokens.sort((a, b) => a.name.localeCompare(b.name));
+          const tokens = resolveExportTokens(inputs);
+          const modeCols = [...cols].sort((a, b) => rank(a.id) - rank(b.id)).map((c) => {
+            var _a2;
+            return { id: c.id, tier: (_a2 = tiers.get(c.id)) != null ? _a2 : 0, defaultModeId: c.defaultModeId, modes: c.modes };
+          });
+          const modes = resolveExportModes(inputs, modeCols);
+          tokens.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
           const styles = (await figma.getLocalTextStylesAsync()).map((st) => ({
             name: st.name,
             fontFamily: st.fontName.family,
@@ -12503,13 +12624,13 @@
             lineHeight: st.lineHeight.unit === "AUTO" ? { unit: "auto", value: 0 } : { unit: st.lineHeight.unit === "PERCENT" ? "percent" : "px", value: st.lineHeight.value },
             letterSpacing: { unit: st.letterSpacing.unit === "PERCENT" ? "percent" : "px", value: st.letterSpacing.value }
           }));
-          styles.sort((a, b) => a.name.localeCompare(b.name));
+          styles.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
           const content = exportTokens(tokens, {
             format: msg.format,
             fontSizeUnit: msg.fontSizeUnit,
             base: msg.base
-          }, styles);
-          post({ type: "EXPORT_RESULT", format: msg.format, content });
+          }, styles, modes);
+          post({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes) });
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {
@@ -12779,7 +12900,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_c = msg.names) != null ? _c : {};
+          const shownNames = (_d = msg.names) != null ? _d : {};
           const groupNames = groups.map((g, gi) => {
             if (g.tab) return resolved[gi];
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
@@ -13078,7 +13199,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_d = r.why) != null ? _d : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_e = r.why) != null ? _e : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -13158,7 +13279,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_e = snaps[preferLive]) != null ? _e : snaps[0];
+                  const masterSnap = (_f = snaps[preferLive]) != null ? _f : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -13179,7 +13300,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_g = (_f = structs[preferLive]) == null ? void 0 : _f.type) != null ? _g : "");
+                  const prefix = shapePrefix(master, (_h = (_g = structs[preferLive]) == null ? void 0 : _g.type) != null ? _h : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -13285,7 +13406,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_h = r.why) != null ? _h : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_i = r.why) != null ? _i : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -13302,7 +13423,7 @@
               const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_i = sf.members[sf.master]) != null ? _i : sf.members[0];
+                const head = (_j = sf.members[sf.master]) != null ? _j : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
                 const icons = vectorPlans.map((p) => {
@@ -13352,7 +13473,7 @@
               }
               let set;
               try {
-                const home = (_j = pageOf2(made[0].comp)) != null ? _j : figma.currentPage;
+                const home = (_k = pageOf2(made[0].comp)) != null ? _k : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -13441,7 +13562,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_k = nodes[0].parent) != null ? _k : figma.currentPage;
+              const parent = (_l = nodes[0].parent) != null ? _l : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {

@@ -17,7 +17,7 @@ import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './l
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor } from './lib/naming';
-import { ExportToken, ExportTextStyle, TokenKind, exportTokens } from './lib/exporters';
+import { ExportCollectionInput, ExportModeValue, ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportTokens, resolveExportModes, resolveExportTokens } from './lib/exporters';
 import { tabInfo } from './lib/componentLike';
 import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
@@ -1742,36 +1742,36 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const colById = new Map(cols.map((c) => [c.id, c]));
         const vars = await figma.variables.getLocalVariablesAsync();
         const tiers = collectionTiers(cols, vars);
-        const nameById = new Map(vars.map((v) => [v.id, v.name]));
-        const tokens: ExportToken[] = [];
         // 같은 이름은 내보내기에서 앞의 것 하나만 남는다(dedupeByName) — 같은 계층 안에서는 사용자 컬렉션 먼저 · 목록 순(§2.13 13.5).
         const owned = ownedIds(cols);
         const colIdx = new Map(cols.map((c, i) => [c.id, i]));
         const rank = (id: string): number => (owned.has(id) ? 1e6 : 0) + (colIdx.get(id) ?? 0);
+        // 로컬 변수 전부(내보내지 않는 것도 — 별칭 사슬을 따라가려고), 값은 그 컬렉션의 기본 모드(ia-v3 §4.4 "별칭 대상이 내보내지 않는 변수일 때").
+        const inputs: ExportVarInput[] = [];
         for (const v of [...vars].sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
           const col = colById.get(v.variableCollectionId);
-          const tier = col ? tiers.get(col.id) : 0;
-          if (!col || (tier !== 1 && tier !== 2)) continue; // 내보내기는 Global·Semantic 계층(이름 무관)
-          const raw = v.valuesByMode[col.defaultModeId];
-          const t: ExportToken = {
-            name: v.name,
-            collection: tier === 1 ? 'Global' : 'Semantic', // 출력 그룹은 계층 이름(컬렉션 실제 이름과 무관)
-            type: v.resolvedType,
-            kind: kindOf(v),
+          if (!col) continue;
+          // 한 모드 값 → 별칭 대상 id 또는 값(색은 투명도가 있으면 #rrggbbaa — 변수 탭과 같은 기준, ia-v3 §2.11)
+          const read = (raw: VariableValue | undefined): ExportModeValue => {
+            if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') return { alias: (raw as VariableAlias).id };
+            if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) return { value: exportColorHex(raw as RGBA) };
+            return { value: raw as string | number | boolean };
           };
-          if (v.description) t.description = v.description; // #16: 원본 단위("160%") 내보내기 우선
-          if (raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS') {
-            const target = nameById.get((raw as VariableAlias).id);
-            if (!target) continue; // 대상 불명 → 스킵
-            t.aliasOf = target;
-          } else if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) {
-            t.value = exportColorHex(raw as RGBA); // 투명도가 있으면 #rrggbbaa — 변수 탭과 같은 기준(ia-v3 §2.11)
-          } else {
-            t.value = raw as string | number;
-          }
-          tokens.push(t);
+          const inp: ExportVarInput = { id: v.id, name: v.name, tier: tiers.get(col.id) ?? 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, ...read(v.valuesByMode[col.defaultModeId]) };
+          if (v.description) inp.description = v.description; // #16: 원본 단위("160%") 내보내기 우선
+          // 기본이 아닌 모드 값 — 모드 블록(ia-v3 §4.4 "모드 블록")
+          const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
+          if (others.length) inp.modeValues = Object.fromEntries(others.map((m) => [m.modeId, read(v.valuesByMode[m.modeId])]));
+          inputs.push(inp);
         }
-        tokens.sort((a, b) => a.name.localeCompare(b.name));
+        const tokens = resolveExportTokens(inputs); // 내보내는 계층(1 · 2)만, 별칭은 남는 변수를 가리키거나 값으로 풂
+        const modeCols: ExportCollectionInput[] = [...cols]
+          .sort((a, b) => rank(a.id) - rank(b.id)) // 13.5 순서 — 모드 블록 머리 이름의 "첫 컬렉션"
+          .map((c) => ({ id: c.id, tier: tiers.get(c.id) ?? 0, defaultModeId: c.defaultModeId, modes: c.modes }));
+        const modes = resolveExportModes(inputs, modeCols);
+        // 이름순은 코드 단위 비교(언어 설정 무관 — exporters.ts와 같은 기준). W3C 키 순서를 정하고, CSS는 exporters가 묶음마다 다시 정렬한다.
+        // 같은 이름끼리는 안정 정렬이라 13.5 순서(위 rank)가 남는다 — dedupe가 그 첫 것을 쓴다.
+        tokens.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
         // 텍스트 스타일도 함께 — 행간·자간 %는 변수가 아니라 스타일에 있다(A안). %는 그대로 낸다.
         const styles: ExportTextStyle[] = (await figma.getLocalTextStylesAsync()).map((st) => ({
           name: st.name,
@@ -1784,13 +1784,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               : { unit: st.lineHeight.unit === 'PERCENT' ? 'percent' : 'px', value: st.lineHeight.value },
           letterSpacing: { unit: st.letterSpacing.unit === 'PERCENT' ? 'percent' : 'px', value: st.letterSpacing.value },
         }));
-        styles.sort((a, b) => a.name.localeCompare(b.name));
+        styles.sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)); // 코드 단위 비교(위와 같은 기준)
         const content = exportTokens(tokens, {
           format: msg.format,
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
-        }, styles);
-        post({ type: 'EXPORT_RESULT', format: msg.format, content });
+        }, styles, modes);
+        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes) });
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {

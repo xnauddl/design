@@ -14,7 +14,7 @@ import { type Tier } from './lib/entitlements';
 import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/license';
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
-import { exportHasTokens, cssVarName, type ExportFormat } from './lib/exporters';
+import { exportHasTokens, exportClashNotice, cssVarName, type ExportFormat } from './lib/exporters';
 import { leafName, lastTwo, varValueText, varTypeMark, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, paletteTree, flattenPaletteTree, varAncestorKeys, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteNode } from './lib/varTable';
 import { varKind, APPLY_TARGETS, targetAllowed, scopeFits, scopesForNew, type ApplyTarget } from './lib/varKind';
 import { createReentryScheduler } from './lib/reread';
@@ -2718,7 +2718,10 @@ window.onmessage = (event: MessageEvent) => {
         break;
       }
       saveExportFile(msg.content, msg.format);
-      setStatus('exportStatus', t('export.saved', { format: label, file: msg.format === 'css' ? 'tokens.css' : 'tokens.json' }), 'ok');
+      const saved = t('export.saved', { format: label, file: msg.format === 'css' ? 'tokens.css' : 'tokens.json' });
+      // 같은 이름 Semantic을 Global 값만 냈으면 꼬리를 붙이고 경고색(ia-v3 §4.4 "같은 이름 Global · Semantic")
+      const clash = exportClashNotice(msg.clashes ?? []);
+      setStatus('exportStatus', clash ? `${saved} ${clash}` : saved, clash ? 'warn' : 'ok');
       break;
     }
     case 'COMPONENT_CANDIDATES': {

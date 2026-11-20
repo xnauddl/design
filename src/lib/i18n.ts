@@ -85,6 +85,7 @@ export const STRINGS: Record<string, string> = {
   // 내보내기
   'export.saved': '{format} — {file}로 저장했어요.',
   'export.empty': '내보낼 변수가 없어요. 먼저 토큰을 만드세요.',
+  'export.clash': 'Global과 이름이 같은 Semantic {n}개는 Global 값만 냈어요: {names}',
 
   // 라이선스
   'license.needKey': '라이선스 키를 입력하세요.',
