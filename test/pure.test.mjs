@@ -611,6 +611,114 @@ test('exportTokens — 빈 입력', () => {
   assert.equal(exportTokens([], { ...OPTS, format: 'w3c' }), '{}');
 });
 
+test('exportTokens CSS — 계층 블록 · 종류 묶음 · 머리 주석(ia-v3 §4.4 "CSS 파일 모양")', () => {
+  const R = '='.repeat(74);
+  // 섞인 순서로 넣는다 — 묶음 안 이름순은 exporters가 정한다
+  const tokens = [
+    { name: 'spacing/card-gap', collection: 'Semantic', type: 'FLOAT', kind: 'spacing', aliasOf: 'spacing/16' },
+    { name: 'spacing/16', collection: 'Global', type: 'FLOAT', kind: 'spacing', value: 16 },
+    { name: 'color/gray/50', collection: 'Global', type: 'COLOR', kind: 'color', value: '#f9fafb' },
+    { name: 'font-size/16', collection: 'Global', type: 'FLOAT', kind: 'fontSize', value: 16 },
+    { name: 'color/background/brand', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/blue/500' },
+    { name: 'color/blue/500', collection: 'Global', type: 'COLOR', kind: 'color', value: '#2e90fa' },
+  ];
+  const styles = [
+    { name: 'body/medium', fontFamily: 'Pretendard', fontStyle: 'Regular', fontSize: 16, lineHeight: { unit: 'percent', value: 150 }, letterSpacing: { unit: 'px', value: 0 } },
+  ];
+  const expected = [
+    `/* ${R}`,
+    '   GLOBAL (Primitive) — raw values. Do not use directly in components.',
+    `   ${R} */`,
+    ':root {',
+    '  /* Color */',
+    '  --color-blue-500: #2e90fa;',
+    '  --color-gray-50: #f9fafb;',
+    '',
+    '  /* Typography */',
+    '  --font-size-16: 16px;',
+    '',
+    '  /* Spacing */',
+    '  --spacing-16: 16px;',
+    '}',
+    '',
+    `/* ${R}`,
+    '   SEMANTIC — UI roles mapped to Global. Use these in components.',
+    `   ${R} */`,
+    ':root {',
+    '  /* Color */',
+    '  --color-background-brand: var(--color-blue-500);',
+    '',
+    '  /* Spacing */',
+    '  --spacing-card-gap: var(--spacing-16);',
+    '}',
+    '',
+    `/* ${R}`,
+    '   TEXT STYLES',
+    `   ${R} */`,
+    ':root {',
+    '  --typography-body-medium-font-family: Pretendard;',
+    '  --typography-body-medium-font-size: 16px;',
+    '  --typography-body-medium-font-weight: 400;',
+    '  --typography-body-medium-line-height: 150%;',
+    '  --typography-body-medium-letter-spacing: 0px;',
+    '}',
+  ].join('\n');
+  assert.equal(exportTokens(tokens, OPTS, styles), expected); // 시안과 같은 모양 · 파일 끝 줄바꿈 없음
+  // 받은 순서와 무관
+  assert.equal(exportTokens([...tokens].reverse(), OPTS, styles), expected);
+});
+
+test('exportTokens CSS — 빈 블록 · 빈 묶음 생략, 묶음 하나여도 종류 주석', () => {
+  const g = [{ name: 'radius/8', collection: 'Global', type: 'FLOAT', kind: 'radius', value: 8 }];
+  const css = exportTokens(g, OPTS);
+  assert.match(css, /GLOBAL \(Primitive\)/);
+  assert.doesNotMatch(css, /SEMANTIC|TEXT STYLES|\/\* Color \*\//);
+  assert.ok(css.includes(':root {\n  /* Radius */\n  --radius-8: 8px;\n}'));
+  assert.ok(!css.endsWith('\n'));
+
+  const sem = [{ name: 'radius/default', collection: 'Semantic', type: 'FLOAT', kind: 'radius', aliasOf: 'radius/8' }];
+  const sc = exportTokens(sem, OPTS);
+  assert.doesNotMatch(sc, /GLOBAL/);
+  assert.match(sc, /SEMANTIC — UI roles/);
+
+  const st = [{ name: 'a', fontFamily: 'Inter', fontStyle: 'Regular', fontSize: 14, lineHeight: { unit: 'auto', value: 0 }, letterSpacing: { unit: 'px', value: 0 } }];
+  const tc = exportTokens([], OPTS, st);
+  assert.doesNotMatch(tc, /GLOBAL|SEMANTIC/);
+  assert.match(tc, /TEXT STYLES/);
+  assert.equal(exportHasTokens(tc, 'css'), true);
+});
+
+test('exportTokens CSS — 종류 묶음 순서 · Other · italic 짝 줄 · 같은 이름은 GLOBAL에만', () => {
+  const tokens = [
+    { name: 'opacity/0_5', collection: 'Global', type: 'FLOAT', kind: 'opacity', value: 0.5 },
+    { name: 'shadow-blur/4', collection: 'Global', type: 'FLOAT', kind: 'effectFloat', value: 4 },
+    { name: 'misc/x', collection: 'Global', type: 'FLOAT', kind: 'other', value: 3 },
+    { name: 'stroke-width/1', collection: 'Global', type: 'FLOAT', kind: 'strokeWidth', value: 1 },
+    { name: 'size/24', collection: 'Global', type: 'FLOAT', kind: 'size', value: 24 },
+    { name: 'font-weight/heading', collection: 'Global', type: 'STRING', kind: 'fontWeight', value: 'Bold Italic' },
+    { name: 'color/x', collection: 'Semantic', type: 'COLOR', kind: 'color', aliasOf: 'color/x' },
+    { name: 'color/x', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000000' },
+  ];
+  const css = exportTokens(tokens, OPTS);
+  const heads = [...css.matchAll(/\/\* (\w+) \*\//g)].map((m) => m[1]);
+  assert.deepEqual(heads, ['Color', 'Typography', 'Size', 'Stroke', 'Opacity', 'Other']);
+  assert.ok(css.includes('  --font-weight-heading: 700;\n  --font-weight-heading-style: italic;'));
+  assert.ok(css.includes('  /* Other */\n  --misc-x: 3;\n  --shadow-blur-4: 4px;'));
+  assert.doesNotMatch(css, /SEMANTIC/); // 같은 이름 Semantic 미러는 dedupe로 빠져 블록이 없다
+});
+
+test('exportTokens CSS — 묶음 안 이름순은 코드 단위 비교(언어 설정과 무관 · #162 리뷰)', () => {
+  // 정렬은 CSS 이름이 아니라 Figma 이름 기준 — 순서는 값으로 확인한다
+  const tokens = [
+    { name: 'color/b', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000003' },
+    { name: 'color/Z', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000001' },
+    { name: 'color/a-2', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000002' },
+  ];
+  const values = [...exportTokens(tokens, OPTS).matchAll(/: (#0000\d\d);/g)].map((m) => m[1]);
+  // 대문자 Z(0x5A) < 소문자 a(0x61) < b — localeCompare라면 언어 설정에 따라 Z가 뒤로 갈 수 있다
+  assert.deepEqual(values, ['#000001', '#000002', '#000003']);
+});
+
 test('exportHasTokens — 껍데기만 있는 결과는 저장 대상이 아님(#8)', () => {
   // 변수 0개 → 형식별 껍데기. 파일로 떨어뜨리면 안 된다.
   assert.equal(exportHasTokens(exportTokens([], OPTS), 'css'), false);

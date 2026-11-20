@@ -3926,20 +3926,66 @@
     }
   }
   var cssVar = (name) => `--${kebab(name)}`;
-  function toCss(tokens, opts) {
-    const lines = [":root {"];
-    for (const t2 of tokens) {
-      if (t2.aliasOf) {
-        lines.push(`  ${cssVar(t2.name)}: var(${cssVar(t2.aliasOf)});`);
-      } else {
-        lines.push(`  ${cssVar(t2.name)}: ${cssLiteral(t2, opts)};`);
-        if (t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
-          lines.push(`  ${cssVar(t2.name)}-style: italic;`);
-        }
-      }
+  function tokenCssLines(t2, opts) {
+    if (t2.aliasOf) return [`  ${cssVar(t2.name)}: var(${cssVar(t2.aliasOf)});`];
+    const out = [`  ${cssVar(t2.name)}: ${cssLiteral(t2, opts)};`];
+    if (t2.kind === "fontWeight" && splitWeightStyle(t2.value).italic) {
+      out.push(`  ${cssVar(t2.name)}-style: italic;`);
     }
-    lines.push("}");
-    return lines.join("\n");
+    return out;
+  }
+  var CSS_RULE = "=".repeat(74);
+  var cssBlockHead = (title) => [`/* ${CSS_RULE}`, `   ${title}`, `   ${CSS_RULE} */`];
+  var CSS_HEAD = {
+    Global: "GLOBAL (Primitive) \u2014 raw values. Do not use directly in components.",
+    Semantic: "SEMANTIC \u2014 UI roles mapped to Global. Use these in components.",
+    textStyles: "TEXT STYLES"
+  };
+  var CSS_GROUP_ORDER = ["Color", "Typography", "Spacing", "Radius", "Size", "Stroke", "Opacity", "Other"];
+  var CSS_GROUP_OF = {
+    color: "Color",
+    fontSize: "Typography",
+    lineHeight: "Typography",
+    letterSpacing: "Typography",
+    fontFamily: "Typography",
+    fontWeight: "Typography",
+    spacing: "Spacing",
+    radius: "Radius",
+    size: "Size",
+    strokeWidth: "Stroke",
+    opacity: "Opacity",
+    effectFloat: "Other",
+    other: "Other"
+  };
+  var byName2 = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+  function tierBlock(tokens, tier, opts) {
+    const mine = tokens.filter((t2) => t2.collection === tier);
+    if (!mine.length) return null;
+    const body = [];
+    for (const g of CSS_GROUP_ORDER) {
+      const inGroup = mine.filter((t2) => {
+        var _a;
+        return ((_a = CSS_GROUP_OF[t2.kind]) != null ? _a : "Other") === g;
+      }).sort(byName2);
+      if (!inGroup.length) continue;
+      if (body.length) body.push("");
+      body.push(`  /* ${g} */`);
+      for (const t2 of inGroup) body.push(...tokenCssLines(t2, opts));
+    }
+    return [...cssBlockHead(CSS_HEAD[tier]), ":root {", ...body, "}"];
+  }
+  function toCss(tokens, opts, textStyles) {
+    const blocks = [];
+    for (const tier of ["Global", "Semantic"]) {
+      const b = tierBlock(tokens, tier, opts);
+      if (b) blocks.push(b);
+    }
+    if (textStyles.length) {
+      const sorted = [...textStyles].sort(byName2);
+      blocks.push([...cssBlockHead(CSS_HEAD.textStyles), ":root {", ...textStylesToCss(sorted, opts), "}"]);
+    }
+    if (!blocks.length) return ":root {\n}";
+    return blocks.map((b) => b.join("\n")).join("\n\n");
   }
   var W3C_TYPE = {
     color: "color",
@@ -4056,13 +4102,7 @@
   }
   function exportTokens(tokens, opts, textStyles = []) {
     const list = dedupeByName(tokens);
-    if (opts.format === "css") {
-      const css = toCss(list, opts);
-      if (!textStyles.length) return css;
-      const body = css.slice(0, css.lastIndexOf("}"));
-      return `${body}${textStylesToCss(textStyles, opts).join("\n")}
-}`;
-    }
+    if (opts.format === "css") return toCss(list, opts, textStyles);
     const root = JSON.parse(toW3C(list, opts));
     textStylesToW3C(textStyles, opts, root);
     return JSON.stringify(root, null, 2);
@@ -5035,14 +5075,14 @@
       var _a2, _b2;
       return Number(b.variableCollectionId === pluginGlobalId) - Number(a.variableCollectionId === pluginGlobalId) || ((_a2 = colIdx.get(a.variableCollectionId)) != null ? _a2 : 0) - ((_b2 = colIdx.get(b.variableCollectionId)) != null ? _b2 : 0);
     });
-    const byName2 = /* @__PURE__ */ new Map();
-    for (const v of globals) if (!byName2.has(v.name)) byName2.set(v.name, v);
+    const byName3 = /* @__PURE__ */ new Map();
+    for (const v of globals) if (!byName3.has(v.name)) byName3.set(v.name, v);
     const okIds = new Map(globals.map((v) => [v.id, v]));
     const reuseMap = readReuseMap();
     let semanticCol;
     let idx;
     for (const [semName, globalName] of Object.entries(map)) {
-      const g = (_c = byName2.get(globalName)) != null ? _c : okIds.get((_b = reuseMap[globalName]) != null ? _b : "");
+      const g = (_c = byName3.get(globalName)) != null ? _c : okIds.get((_b = reuseMap[globalName]) != null ? _b : "");
       if (!g) {
         summary.missing.push(globalName);
         continue;
@@ -5346,17 +5386,17 @@
       return (owned.has(id) ? 1e6 : 0) + ((_a2 = colIdx.get(id)) != null ? _a2 : 0);
     };
     const existing = /* @__PURE__ */ new Map();
-    const byName2 = /* @__PURE__ */ new Map();
+    const byName3 = /* @__PURE__ */ new Map();
     for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
       const val = resolve(v);
       const k = typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
       const arr = existing.get(v.name);
       if (!arr) existing.set(v.name, k ? [k] : []);
       else if (k && !arr.includes(k)) arr.push(k);
-      byName2.set(v.name, [...(_a = byName2.get(v.name)) != null ? _a : [], { key: k, v }]);
+      byName3.set(v.name, [...(_a = byName3.get(v.name)) != null ? _a : [], { key: k, v }]);
     }
     const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
-    return { cols, existing, byName: byName2, globalNames };
+    return { cols, existing, byName: byName3, globalNames };
   }
   async function placeTextRoleVars(reqs, globalOf) {
     if (!reqs.length) return [];
@@ -5752,14 +5792,14 @@
     const semId = (_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id;
     if (!semId) return res;
     const vars = (await figma.variables.getLocalVariablesAsync()).filter((v) => v.variableCollectionId === semId);
-    const byName2 = /* @__PURE__ */ new Map();
-    for (const v of vars) if (!byName2.has(v.name)) byName2.set(v.name, v);
+    const byName3 = /* @__PURE__ */ new Map();
+    for (const v of vars) if (!byName3.has(v.name)) byName3.set(v.name, v);
     const cands = [];
     const picked = /* @__PURE__ */ new Set();
     pairs.forEach((p, pair) => {
       if (p.from === p.to) return;
       for (const cat of ROLE_VAR_CATS) {
-        const v = byName2.get(`${cat}/${p.from}`);
+        const v = byName3.get(`${cat}/${p.from}`);
         if (!v || picked.has(v.id) || isManualVar(v) || textStepOf(v) || opts.onlyIds && !opts.onlyIds.has(v.id)) continue;
         picked.add(v.id);
         cands.push({ key: v.id, from: v.name, to: `${cat}/${p.to}`, v, pair });
@@ -6449,8 +6489,8 @@
   }
   function textFieldOf(name, scopes) {
     const segs = name.split("/").map((s) => s.trim().toLowerCase());
-    const byName2 = { "font-size": "fontSize", "line-height": "lineHeight", "letter-spacing": "letterSpacing", "font-family": "fontFamily" };
-    for (const s of [segs[segs.length - 1], segs[0]]) if (s && byName2[s]) return byName2[s];
+    const byName3 = { "font-size": "fontSize", "line-height": "lineHeight", "letter-spacing": "letterSpacing", "font-family": "fontFamily" };
+    for (const s of [segs[segs.length - 1], segs[0]]) if (s && byName3[s]) return byName3[s];
     const byScope = { FONT_SIZE: "fontSize", LINE_HEIGHT: "lineHeight", LETTER_SPACING: "letterSpacing", FONT_FAMILY: "fontFamily" };
     for (const s of scopes) if (byScope[s]) return byScope[s];
     return null;

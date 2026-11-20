@@ -2790,6 +2790,7 @@
   function cssVarName(name) {
     return cssVar(name);
   }
+  var CSS_RULE = "=".repeat(74);
   function exportHasTokens(content, format) {
     if (format === "css") return /--[\w-]+\s*:/.test(content);
     try {
