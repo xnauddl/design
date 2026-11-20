@@ -1345,6 +1345,49 @@
 
 - **계층 팝업(없앰, 2026-11-06 §2.13 13.3):** 사용자 컬렉션의 계층은 내용으로 판단하므로 지정할 곳이 필요 없다. 설정 · 레이어 어디서도 열지 않는다.
 - **내보내기 팝업:** 형식(W3C/CSS), 폰트 단위(px/rem), [내보내기].
+- **CSS 파일 모양(2026-11-20 사용자 결정 — 계층 먼저 · 영어 주석 · A.22):** 변수 이름 · 값 · 별칭(`var(…)`) 쓰는 법은 그대로이고, 줄의 **순서와 묶음**만 정한다. 지금 코드는 모든 변수를 이름순 한 `:root`에 늘어놓고(`code.ts` EXPORT의 `localeCompare` 정렬) 텍스트 스타일을 같은 `:root` 끝에 붙인다(`exporters.ts` `exportTokens`).
+  - **블록(계층 먼저):** ① GLOBAL ② SEMANTIC ③ TEXT STYLES 순서로, 블록마다 따로 `:root { … }`를 낸다. 블록 사이는 빈 줄 하나. 변수(또는 텍스트 스타일)가 하나도 없는 블록은 머리 주석까지 통째로 내지 않는다. 계층은 내보낼 때 정한 `collection`(13.4 계층 번호 — 1 = Global, 2 = Semantic. 컬렉션 실제 이름과 무관)을 따른다.
+  - **블록 머리 주석(영어 — 종류 이름을 영어로 쓰는 것과 같은 까닭, ia-v4 §2.7):** 블록 앞에 `/* ===…=== */` 테두리 줄 사이로 두 줄. GLOBAL은 `GLOBAL (Primitive) — raw values. Do not use directly in components.`, SEMANTIC은 `SEMANTIC — UI roles mapped to Global. Use these in components.`, TEXT STYLES는 `TEXT STYLES`. 번역 키를 쓰지 않는다(코드 상수 — 내보낸 파일은 코드라서 화면 언어를 따르지 않는다).
+  - **블록 안의 묶음(종류별):** GLOBAL · SEMANTIC 블록 안은 종류마다 작은 주석 `/* Color */` 한 줄로 묶는다. 순서는 Color → Typography → Spacing → Radius → Size → Stroke → Opacity → Other. 종류는 내보낼 때 정한 `kind`(`code.ts` `kindOf`)로 나눈다 — `color` → Color, `fontSize` · `lineHeight` · `letterSpacing` · `fontFamily` · `fontWeight` → Typography, `spacing` → Spacing, `radius` → Radius, `size` → Size, `strokeWidth` → Stroke, `opacity` → Opacity, `effectFloat` · `other` → Other. 빈 종류는 주석도 내지 않는다. 묶음 사이는 빈 줄 하나. 묶음 안은 이름순(지금 정렬 그대로). TEXT STYLES 블록은 종류 주석 없이 스타일 이름순(지금 그대로).
+  - **그대로인 것:** 같은 이름이 Global과 Semantic에 다 있으면 Global 하나만 남기는 규칙(`dedupeByName` — 묶기 전에 한다), 굵기 italic의 짝 줄(`…-style: italic`)이 바로 아래에 붙는 것, 폰트 단위(rem)의 값, 텍스트 스타일 줄 이름(`--typography-…`). 변수도 텍스트 스타일도 없으면 지금처럼 `:root {\n}` 하나를 내고 저장 전에 거른다(`exportHasTokens`).
+  - **W3C 토큰 JSON은 바꾸지 않는다** — JSON에는 주석을 넣을 수 없고, 이미 이름 경로로 묶여 있다.
+  - **이번에 하지 않는 것(다음 PR — A.22 끝):** Dark 등 기본이 아닌 모드 값 내보내기(지금은 기본 모드 값만 낸다 — `valuesByMode[defaultModeId]`), 텍스트 스타일을 변수 참조(`var(…)`)로 내기, 변수 이름 앞 `global-` 같은 접두사(내보내기는 Figma 변수 이름을 그대로 옮긴다 — 붙이지 않는다).
+
+```
+/* ==========================================================================
+   GLOBAL (Primitive) — raw values. Do not use directly in components.
+   ========================================================================== */
+:root {
+  /* Color */
+  --color-blue-500: #2e90fa;
+  --color-gray-50: #f9fafb;
+
+  /* Typography */
+  --font-size-16: 16px;
+
+  /* Spacing */
+  --spacing-16: 16px;
+}
+
+/* ==========================================================================
+   SEMANTIC — UI roles mapped to Global. Use these in components.
+   ========================================================================== */
+:root {
+  /* Color */
+  --color-background-brand: var(--color-blue-500);
+
+  /* Spacing */
+  --spacing-card-gap: var(--spacing-16);
+}
+
+/* ==========================================================================
+   TEXT STYLES
+   ========================================================================== */
+:root {
+  --typography-body-medium-font-family: Pretendard;
+  --typography-body-medium-font-size: 16px;
+}
+```
 
 ### 4.5 변수 탭 — 만들기
 
@@ -3177,3 +3220,21 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - 알약 연결: 후보(`BindCandidate`)와 연결 항목(`APPLY_SELECTED` items)에 `pillFrom`(찾을 때 읽은 원래 값)을 실어 연결 직전 다시 확인에 쓴다. 붙일 때 레이어 값을 9999로 먼저 쓴 뒤 연결한다.
 - 주인 계산 제거: `code.ts` `bindOwnerOf`, `BindOptions.ownerOf`, 찾기 `ctx.owner`, 추출 `acc.owner` · `extractFromSelection`의 주인 인자를 뺐다. `pickOwner` · `dsRoleOwner`(`inUiRole`) · `structIndex`(다른 곳이 씀)는 그대로.
 - 구현 메모(main #153 합침): 6-1b의 figma 테스트 ⑥("쓰임 이름 주인은 엄격한 구조만 tab")은 N-D1로 주인이 이름에서 빠져 뜻이 없어졌다 — "쓰임 이름에 tab · nav 주인이 새지 않음 · `spacing/gap`"으로 바꿨다(A.19 6번 ⑥의 쓰임 이름 부분은 이 PR부터 해당 없음).
+
+## A.22 내보내기 CSS 파일 모양 PR (2026-11-20 사용자 결정 — §4.4 "CSS 파일 모양")
+
+결정: 계층 먼저(GLOBAL → SEMANTIC → TEXT STYLES) · 블록 안은 종류별 묶음 · 영어 주석 · 이름 · 값은 그대로. 참고 자료: uxkm "SCSS 변수 네이밍 규칙 · 실무 변수 구성"(이름 규칙은 가져오지 않음 — 지금 규칙이 이미 같거나 Figma 변수에 더 맞음), 사용자가 준 CSS 예시(계층 블록 · 설명 주석 · Dark 덮어쓰기 블록).
+
+- [ ] `exporters.ts` CSS: `dedupeByName` 뒤 계층(`collection`)으로 나눠 블록마다 `:root`, 블록 머리 주석(코드 상수), 블록 안은 종류 묶음(`kind` → 묶음 표 — §4.4) · 묶음 주석 `/* {종류} */` · 빈 묶음 · 빈 블록 생략 · 블록 · 묶음 사이 빈 줄
+- [ ] 텍스트 스타일은 따로 TEXT STYLES 블록(지금 같은 `:root` 끝에 붙이던 것 — `exportTokens`)
+- [ ] 변수 · 스타일이 모두 없으면 `:root {\n}` 그대로(`exportHasTokens` · 테스트 "빈 입력" 그대로)
+- [ ] W3C JSON · 이름 · 값 · rem · italic 짝 줄 · dedupe 규칙은 바뀌지 않음을 테스트로 고정
+- [ ] 단위 테스트: 블록 순서 · 종류 묶음 순서 · 빈 묶음 생략 · Global만 / Semantic만 / 텍스트 스타일만 · 묶음 안 이름순 · Global과 Semantic 같은 이름은 GLOBAL에만
+- [ ] 기존 테스트(`test/pure.test.mjs` exportTokens 묶음) 기대값 — 바뀌는 것은 사유와 함께
+- [ ] 4검사 · `dist/` 다시 빌드
+- [ ] 실기 확인(사용자, 피그마): 변수 탭 ⋯ › 코드로 내보내기 › CSS → 블록 · 묶음 모양
+
+**다음 PR(이번에 하지 않음 — 2026-11-20 사용자 결정)**
+- Dark 등 기본이 아닌 모드 값 내보내기: 계층 블록 뒤 `[data-theme="{모드 이름 소문자}"] { … }`에 기본 모드와 값이 다른 변수만(선택자 `[data-theme]` — 결정).
+- 굵기 변수(Global `font-weight/{숫자}` — 예 `font-weight/700`)를 만들고 텍스트 스타일 등록 때 연결한다. 레이어에 직접 붙이지는 않는다. 2026-11-12 결정 Q3-1의 "굵기 만들기 없앰(연결할 속성이 없다)"을 굵기만 뒤집는다(Figma는 `fontWeight`에 변수를 붙일 수 있다 — `bind.ts` `RANGE_FIELDS`에도 있음). 명세 · 검토는 따로.
+- 나중 후보: 텍스트 스타일을 변수 참조(`var(--font-size-…)`)로 내보내기(굵기 변수 뒤).
