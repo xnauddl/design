@@ -1541,7 +1541,7 @@
 | 만드는 중 | 상태 줄 `dark.running`, 버튼 대기 잠금(위 "도구 화면 공통") |
 | 실행에 `PREMIUM_REQUIRED`(UI는 유료, 플러그인은 무료로 봄 — `code.ts` 2397 `requirePaid('tokens')`) | "만드는 중"을 끝내고(작업 끝남 · 쓰기 잠금 풀림 — `opReceived`의 `PREMIUM_REQUIRED` 처리) 무료 잠금 안내로 바꾼다(T-P23과 같은 모습 · 포커스 규칙). 공통 상태 줄에 유료 사유 `status.paid` + [라이선스 →](`showPaidReason` — 지금 처리 그대로) |
 | 다 됨 · 일부만 · 대상 없음 | 상태 줄 — 지금 `DARK_MODE_RESULT` 처리 글 그대로(`dark.done` ok · `dark.fillFailed` warn). 그 화면에 없으면 공통 상태 줄에도(T-P7) |
-| 거절(`DARK_MODE_RESULT.error` — D-T1 뒤에는 모드 추가 실패(`dark.errAddMode`)뿐 — 플러그인 Global이 없을 때는 `noTarget`(위 "플러그인 Global 없음" 줄) `dark.err*`) | 상태 줄 warn(지금 그대로 — `ui.ts` 2429–2431 `setStatus('darkStatus', msg.error, 'warn')`) |
+| 거절(`DARK_MODE_RESULT.error` — D-T1 뒤에는 모드 추가 실패(`dark.errAddMode`)뿐 — 플러그인 Global이 없을 때는 `noTarget`(위 "플러그인 Global 없음" 줄)) | 상태 줄 warn(지금 그대로 — `ui.ts` 2429–2431 `setStatus('darkStatus', msg.error, 'warn')`) |
 | 오류(`ERROR{op: 'GENERATE_DARK_MODE'}` — 예외) | 상태 줄 빨강 띠(§2.8 — `OP_STATUS`가 이 화면 상태 줄로) |
 | 컬렉션 목록 다시 읽기 실패(`ERROR{op: 'GET_VARIABLES'}`) | 고르개 · 고른 값은 예전 목록 그대로, 상태 줄 warn "컬렉션 목록을 다시 읽지 못했어요"(새 키 `tools.darkRefreshFail`) — 다음 다시 읽기 때(T-P10) 다시 보낸다(T-P21) |
 
