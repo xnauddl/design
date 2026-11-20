@@ -10029,10 +10029,14 @@ ${opts.tip}` : text;
     }
     doLibRedraw();
   }
+  var varTableDropped = false;
   function onVarTable(msg) {
     var _a3, _b;
     const openId = ed && !ed.create && !((_a3 = ed.saving) == null ? void 0 : _a3.awaitingTable) ? ed.v.id : null;
-    if (openId && !msg.vars.some((v) => v.id === openId)) return;
+    if (openId && !msg.vars.some((v) => v.id === openId)) {
+      varTableDropped = true;
+      return;
+    }
     const sig = JSON.stringify([msg.collections, msg.vars]);
     const edRebase = !!((_b = ed == null ? void 0 : ed.saving) == null ? void 0 : _b.awaitingTable);
     const first = !vmTableKnown;
@@ -11568,6 +11572,10 @@ ${opts.tip}` : text;
     if (e.timer) clearTimeout(e.timer);
     e.timer = null;
     if (ed === e) ed = null;
+    if (varTableDropped) {
+      varTableDropped = false;
+      send({ type: "GET_VAR_TABLE" });
+    }
     detailUsesEl = null;
     detailBox = null;
   }

@@ -327,8 +327,10 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...VARS, { id: 'sp8c', name: 'spacing/8-copy', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: '8' } }, scopes: ['GAP'], description: '' }] });
   check('9 복제 뒤 상세 열림 · 이름 칸 포커스', (await p.$('.modal')) !== null && (await p.evaluate(() => document.activeElement?.value)) === 'spacing/8-copy');
   // 복제 전에 읽기 시작한 표가 복사본 없이 늦게 온다. 줄을 지우면 닫을 때 포커스가 첫 그룹 머리로 떨어진다.
+  const gvtBefore = (await sent(p, 'GET_VAR_TABLE')).length;
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.keyboard.press('Escape');
+  check('9 상세가 열린 동안 버린 표가 있으면 닫을 때 새 표 요청(GET_VAR_TABLE 한 번)', (await sent(p, 'GET_VAR_TABLE')).length === gvtBefore + 1);
   check('9 복제 상세를 닫으면 복사본 줄(늦은 표가 복사본을 빼도 첫 머리가 아님)', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'sp8c', await p.evaluate(() => `${document.activeElement?.dataset?.key ?? ''} ${document.activeElement?.textContent ?? ''}`));
   // 삭제 — 확인 팝업(처음 포커스 [취소]) · m(가리키는 변수 수)
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
