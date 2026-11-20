@@ -260,7 +260,7 @@
         - **투명도 0:** 소수 둘째 자리로 반올림한 투명도가 0이면(0 < a < 0.005 포함) 추출 · 찾기 모두 건너뛴다(사유 없음 — 보이지 않는 칠).
         - **이름:** 색 이름 짓기(`huefyTokenColors` → `nameColorsByHue`)에 넣는 목록은 불투명 · 반투명 토큰의 **고유 hex**(불투명 토큰의 hex 먼저 — 그래서 불투명 색 이름이 반투명 때문에 `-2`로 밀리지 않는다)이고, 이름을 정한 뒤 `alpha`가 있는 토큰은 `-a{round(alpha × 100)}`를 붙인다(8% 검정 → `color/gray/1000-a8`, 12.5% → 0.13 → `-a13`). 추출 단계 이름(이름 짓기 전)도 `colorTokenName(hex)` + `-a{%}`.
         - **만들기:** Global 변수 값은 RGBA(`a` = 투명도). Semantic 쓰임 역할은 위 값 키로 나뉘고, 별칭은 그 반투명 Global을 가리킨다.
-        - **다크 짝**(`themeApply.ts` — `dark/…`)은 밝기만 바꾸고 투명도는 그대로 둔다(RGBA로 `setValueForMode`).
+        - **Dark 값**(`themeApply.ts` — 다크 구조 PR 뒤에는 플러그인 Global의 Dark 칸, 그 전에는 `dark/…` 짝 — 13.7)은 밝기만 바꾸고 투명도는 그대로 둔다(RGBA로 `setValueForMode`).
         - **코드 내보내기**(EXPORT)는 투명도가 있는 색을 `#rrggbbaa`로 낸다(투명도 없으면 지금처럼 `#rrggbb`). 투명도가 있는지는 변수 탭 값 칸과 같은 기준(`varTable.ts` `colorText` — 투명도를 0–255로 반올림해 255 미만)으로 본다 — 변수 탭에 `#RRGGBBFE`로 보이는 색이 내보내기에서 `#rrggbb`로 투명도를 잃지 않게. 쓰는 함수는 `tokens.ts` `exportColorHex(rgba)`: 앞 6자리는 `rgbToHex`(소문자), 꼬리 2자리는 `Math.round(a × 255)`의 소문자 16진(255이면 꼬리 없음). **기준이 둘인 것은 일부러다:** 파일에 적는 값(내보내기 · 변수 탭)은 1/255 단위로 정확히, 값 비교 · 합치기 · 칩의 % 표시(위 값 키 · `currentAlpha` · `variableAlpha`)는 소수 둘째 자리(1/100)로 본다 — 그래서 a = 0.996인 색은 칩에 %가 없지만 내보내기는 `#rrggbbfe`다.
         - **보이는 곳:** 값 칩은 "#000000 8%"(hex 뒤 회색 % — `valueChip(value, alpha?)`) — 만들기 화면 줄 · 연결 화면 줄(`BindCandidate`에 새 필드 `currentAlpha?` · `variableAlpha?`, 1이면 없음) · 값을 직접 고르기의 색 표(`renderColorTable` · `renderPaletteRow`). 변수 탭(목록 값 칸 · 상세 값 칸 `#RRGGBBAA`)은 이번에 바꾸지 않는다.
         - **% 꼬리 반올림(V PR — ia-v4 B.17):** 값 칩의 % 꼬리(`alphaTail`)는 반올림한 %가 100이면 붙이지 않는다(지금은 투명도 < 1이면 늘 붙어 1/255 단위 값 0.996이 "100%"로 보인다). 쓰는 곳 넷(`renderColorTable` · `renderPaletteRow` · `valueChip` · 만들기 카드)이 함께 바뀌고 글이 실제로 바뀌는 곳은 `valueChip`이다(나머지는 소수 둘째 자리 값).
@@ -583,18 +583,42 @@
       - 결과 수: `create.sumGlobals` "Global {n}개 (생성 {c} / 갱신 {u})"의 {n} · {c} · {u}는 플러그인 Global에 만들거나 갱신한 수다. 재사용한 사용자 Global은 어디에도 세지 않고 문구도 더하지 않는다. [미리보기](`previewCreateTokens`)도 같은 판단으로 센다.
     - **13.7 다른 쓰기 기능 (사용자 결정 — 전부 플러그인 컬렉션 안에서만).**
       - 역할 매핑 표(`createSemanticAliases`): 플러그인 Semantic에 만든다. Global 이름은 Global 계층 전부의 **직접 값 변수**에서 찾는다(별칭 변수는 이름이 같아도 쓰지 않는다 — 13.3, 플러그인 Global 먼저, 같은 이름이면 그것). 이름으로 못 찾으면 `dsl.reuseMap`에서 그 이름이 재사용한 Global을 쓴다(13.6). 그래도 없으면 지금처럼 `missing`.
-      - 다크(`themeApply`): Dark 모드는 플러그인 Semantic에만 더하고, 다시 거는 별칭과 새 어두운 Global은 플러그인 컬렉션에만 만든다. 사용자 Semantic의 모드 · 별칭은 건드리지 않는다.
-        - 라이트 값은 역할이 가리키는 Global이 **속한 컬렉션의 기본 모드**로 읽는다(그 값이 별칭이면 지금처럼 건너뛴다. 사용자 Global일 수 있다 — 지금은 플러그인 Global의 기본 모드로 읽어 사용자 Global이면 값이 비어 건너뛴다). 어두운 짝 `dark/{원래 이름}`은 플러그인 Global에 만들고, 같은 이름이 이미 있으면 지금처럼 그것을 쓴다.
-        - 대상 컬렉션: 다크 카드의 대상 목록(`refreshDarkOptions`) · 마법사의 대상(`pickDarkTarget`)은 플러그인 Semantic 하나뿐이다. 플러그인 Semantic이 없으면 다크 카드는 "토큰 만들기로 →"(§4.5)를 보인다. `GENERATE_DARK_MODE`에 플러그인 Semantic이 아닌 컬렉션 id가 오면 바꾸지 않고 오류로 답한다.
-        - 준비 현황의 다크 완료(`hasDarkMode`)는 플러그인 Semantic의 모드가 둘 이상일 때다.
-        - **결정 D-T1(2026-11-20 사용자 결정 "Global이 테마별로 바뀌는 방식" — 다크 구조 PR에서 바꿈, A.25. 위 다크 항목 전체는 그 전까지의 지금 코드):**
-          - **구조:** Dark 모드는 **플러그인 Global**에 더한다. 같은 Global 변수가 모드마다 다른 값을 가진다(`color/gray/900` — Light `#101828`, Dark 밝은 색). Semantic은 모드 하나이고 테마와 상관없이 늘 같은 Global을 가리킨다. `dark/…` Global 복사본은 만들지 않는다.
-          - **Dark 값:** 플러그인 Global의 색 변수(직접 값)마다 Dark 칸 = `darkValueForLight(Light 칸)`(밝기만 바꾸고 투명도 그대로 — 지금 규칙). 직접 만든 변수(§4.9 `isManual`)와 별칭 변수는 건너뛴다. 사용자 Global은 건드리지 않는다(13.7 원칙) — 사용자 Global을 가리키는 Semantic은 Dark에서 바뀌지 않는다(받아들임).
-          - **대상:** 다크 화면 · 마법사의 대상은 플러그인 Global 하나(`refreshDarkOptions` · `pickDarkTarget`). 플러그인 Global이 없으면 지금처럼 변수 만들기로 안내한다. `GENERATE_DARK_MODE`에 다른 컬렉션 id가 오면 오류.
-          - **준비 현황:** 다크 완료(`hasDarkMode`)는 플러그인 Global의 모드가 둘 이상일 때.
-          - **나중에 만든 Global의 Dark 칸(2026-11-20 사용자 결정 "다크를 다시 만들 때만"):** Dark 모드가 있는 뒤에 만들기 · 팔레트 · 추출이 새로 만든 플러그인 Global 색은 Dark 칸을 채우지 않는다 — [다크 만들기]를 다시 누를 때 채운다. 그 사이 Dark 칸이 Light와 같은 값인(또는 빈) 플러그인 Global 색 수를 다크 화면 · 준비 현황 다크 줄에 알린다(문구 · 자리 · 판정은 다크 구조 PR 명세에서 — 직접 만든 변수는 세지 않고, 밝기를 뒤집어도 값이 같은 중간 밝기 색을 어떻게 셀지 · Figma가 새 변수의 다른 모드 칸을 무엇으로 채우는지 구현 때 확인).
-          - **옛 파일 옮기기(2026-11-20 사용자 결정 "다시 만들 때 옮기기"):** 플러그인 Semantic에 Dark 모드가 있는 파일에서 [다크 만들기]를 누르면 확인 팝업 뒤 옮긴다 — Semantic Dark가 가리키던 `dark/X`의 값을 플러그인 Global `X`의 Dark 칸에 넣고, 플러그인 Semantic의 Dark 모드를 지우고, 이제 아무것도 가리키지 않는 `dark/…` 플러그인 Global을 지운다(다른 곳이 가리키면 남김). 한 번의 되돌리기 묶음(⌘Z 한 번). 자동으로 옮기지 않는다(사용자가 누를 때만). A.25에서 정할 것: Semantic Dark가 `dark/X`가 아닌 변수를 가리킬 때 · Light가 같은 X인 Semantic 여럿이 Dark에서 서로 다른 `dark/…`를 가리킬 때 · Light의 X가 사용자 Global일 때 · 옮기기와 Dark 칸 다시 계산의 순서와 어느 값이 이기는지.
-          - **지금과 달라지는 것:** ① 모드가 Semantic → Global ② `dark/…` 복사본 없음 ③ Semantic 모드 2개 → 1개 ④ `hasDarkMode` 판정 컬렉션 ⑤ 무료(F6 — 레이어를 Global에 바로 연결)도 Dark에서 색이 바뀜 ⑥ 테마마다 다른 Global을 고를 수 없음(예: Dark에서만 `text/brand`를 다른 단계로) — 그런 색은 Global Dark 값을 직접 고친다(받아들임. 다시 [다크 만들기]를 누를 때 직접 고친 Dark 칸 · 옮긴 값을 지킬지는 A.25 0단계에서 정한다) ⑦ 내보낸 CSS는 Global 값만 모드 블록에 나오고 SEMANTIC은 `:root` 한 블록(§4.4 "모드 블록").
+      - **다크(`themeApply`) — 결정 D-T1(2026-11-20 사용자 결정 "Global이 테마별로 바뀌는 방식", 다크 구조 PR에서 구현 — A.25).** 이력: 그 PR 전까지 코드는 Dark 모드를 플러그인 Semantic에 더하고 `dark/{이름}` Global 복사본을 만들어 Semantic Dark가 그것을 가리켰다(A.12 "다크" 줄). 아래가 그 PR 뒤의 규칙이다. 사용자 컬렉션의 모드 · 값은 건드리지 않는다(13.7 원칙).
+        - **구조:** Dark 모드는 **플러그인 Global**에 더한다. 같은 Global 변수가 모드마다 다른 값을 가진다(`color/gray/900` — Light `#101828`, Dark 밝은 색). Semantic은 모드 하나이고 테마와 상관없이 늘 같은 Global을 가리킨다. `dark/…` Global 복사본은 만들지 않는다.
+        - **모드 고르기:** 대상 컬렉션 = 플러그인 Global(`ownedCollection(cols, 'global')`). 다크 모드(to) = 고른 모드, 고르지 않았으면(플레이스홀더) 이름이 `Dark`인 모드(대소문자 무시), 없으면 `addMode('Dark')`(`ensureDarkMode` 그대로). 라이트 모드(from) = 고른 모드, 없으면 Global 기본 모드 — 기본 모드가 to면 to가 아닌 첫 모드. from = to면 `dark.errSameMode`로 거절(지금 규칙 그대로).
+        - **채우는 칸:** 플러그인 Global의 색 변수 중 from 칸이 **직접 값**인 것만(별칭 변수 · 직접 만든 변수 §4.9 `isManual`은 건너뛴다. 색이 아닌 변수의 Dark 칸은 건드리지 않는다). 쓰는 값 = `darkValueForLight(from 칸)`(밝기만 바꾸고 투명도 그대로 — 지금 규칙). 사용자 Global을 가리키는 Semantic은 Dark에서 바뀌지 않는다(받아들임).
+        - **채운 기록(2026-11-20 사용자 결정 "다시 만들 때 직접 고친 Dark 칸은 지킨다"):** Dark 칸을 쓸 때 그 변수에 플러그인 데이터 `dsl.darkFill`을 남긴다 — JSON `{ "{to 모드 id}": { "l": from 칸, "d": 쓴 Dark 값, "by": "calc" | "user" } }`(모드 id마다 한 칸 — 다른 모드에 쓴 기록은 서로 섞이지 않는다). 값은 `#RRGGBBAA`(채널마다 0–255 반올림, 대문자)로 적고 견줄 때도 같은 꼴로 바꿔 견준다(Figma 소수 오차 무시). `by: "calc"` = 플러그인이 계산해 쓴 칸, `by: "user"` = 사용자 것으로 보는 칸(직접 고친 칸 · 옮긴 칸 · 기록 없이 이미 다른 값이 있던 칸).
+        - **칸마다 판정(위에서부터 처음 맞는 것, to 모드 기준):**
+
+          | Dark 칸 · 기록 | 하는 일 | 세는 곳 |
+          |---|---|---|
+          | 기록 `by: "user"` | 그대로 둔다(Light가 바뀌어도) | 그대로 둔 색 k |
+          | 기록 `by: "calc"`, 지금 Dark 칸 ≠ 기록 `d`(별칭이 된 칸 포함) | 그대로 두고 기록을 `by: "user"`(`d` = 지금 Dark 칸, `l` = 지금 from 칸)로 바꾼다 — 사용자가 고쳤다고 본다 | k |
+          | 기록 `by: "calc"`, Dark 칸 = `d`, 지금 from 칸 ≠ 기록 `l` | 다시 계산해 쓰고 기록을 새로 | 채운 색 n |
+          | 기록 `by: "calc"`, Dark 칸 = `d`, from 칸 = `l` | 쓰지 않는다(이미 채움) | 세지 않음 |
+          | 기록 없음, Dark 칸 = from 칸(같은 값 — 모드를 막 더했거나 Dark를 만든 뒤 새로 생긴 변수) | 계산해 쓰고 기록 `by: "calc"` | n |
+          | 기록 없음, Dark 칸 ≠ from 칸(다른 색 · 별칭) | 그대로 두고 기록 `by: "user"` | k |
+
+        - **나중에 만든 Global(2026-11-20 사용자 결정 "다크를 다시 만들 때만"):** Dark 모드가 있는 뒤에 만들기 · 팔레트 · 추출(모두 `createTokens` `setGlobalLiteral`)이 플러그인 Global에 새 색 변수를 만들면 Dark 칸을 계산하지 않는다 — [다크 만들기]를 다시 누를 때 위 표 "기록 없음, Dark 칸 = from 칸"으로 채운다. 이 판정이 맞게, 새 색 변수는 **모든 모드에 같은 값**을 넣는다(Figma가 새 변수의 다른 모드 칸을 기본 모드 값으로 채우는지 구현 때 확인하되, 채우더라도 명시해 넣는다). 이미 있는 색 변수의 값을 바꿀 때는 지금처럼 기본 모드만 쓴다(Dark 칸은 다시 누를 때 위 표 "from 칸 ≠ `l`"로 새로). **색이 아닌 변수**(간격 · 크기 · 글꼴 등)는 새로 만들 때도 값을 바꿀 때도 모든 모드에 같은 값을 쓴다 — 테마로 바뀌는 값이 아니고, 안 그러면 Dark 칸에 옛 값이 남아 내보낸 CSS의 Dark 블록(§4.4 "모드 블록")에 나온다.
+        - **Dark 값이 없는 색 수(2026-11-20 사용자 결정 "기록으로 센다"):** 플러그인 Global의 모드가 둘 이상일 때만 센다. 셀 모드 = 이름이 `Dark`인 모드, 없으면 기본이 아닌 첫 모드. 대상 = 채우는 칸과 같은 변수(색 · 기본 모드 칸이 직접 값 · `isManual` 아님) 중 ① 그 모드의 기록이 없거나 ② 기록이 `by: "calc"`인데 지금 기본 모드 칸 ≠ 기록 `l`인 것. `by: "user"` 기록은 세지 않는다 — 다시 눌러도 채우지 않으므로 세면 수가 줄지 않는다(명세에서 정함). `code.ts` `postPrereq`가 세어 `PREREQ_STATE`에 새 필드 `darkUnfilled`(수, 모드가 하나면 0)로 보낸다. 보이는 곳: 다크 화면 띠 · 준비 현황 다크 줄(ia-v4 §4.11 ② · §4.6).
+        - **준비 현황:** 다크 완료(`hasDarkMode`) = 플러그인 Global의 모드가 둘 이상 **또는 옛 구조**(아래 — 옮기기 전에는 지금처럼 ✓). Global에 Dark 모드가 있고 `darkUnfilled` > 0이면 완료가 아니다(ia-v4 §4.6 "다크 모드 줄").
+        - **대상:** 다크 화면 고르개(`refreshDarkOptions`) · 만들기 화면 다크 단계(`wizard.ts` `pickDarkTarget`)의 대상은 플러그인 Global 하나(`owned === 'global'`). 플러그인 Global이 없으면 다크 화면은 지금처럼 "토큰 만들기로 →"(`dark.prereqNoVars`)를 보이고, 다크 단계는 `wizard.seq.darkNoTarget`으로 건너뛴다. `GENERATE_DARK_MODE`에 플러그인 Global이 아닌 컬렉션 id가 오면 바꾸지 않고 `dark.errNoCol`로 거절(지금 `dark.errNotOwned`를 합침).
+        - **옛 구조 옮기기(2026-11-20 사용자 결정 "다시 만들 때 옮기기" · "예외는 풀고 수를 알린다"):** 옛 구조 = 플러그인 Semantic의 모드가 둘 이상. [다크 만들기]를 누르면 플러그인이 아무것도 바꾸지 않고 `DARK_MODE_RESULT{needMigrate: {removeDark, mode}}`(지울 `dark/…` 수 — 아래 ⑤를 미리 셈 · 옮길 Semantic 모드 이름)로 답하고, UI가 확인 팝업(ia-v4 §4.11 ②)을 띄운다. [옮기고 다크 만들기]면 `GENERATE_DARK_MODE{…, migrate: true}`로 다시 보낸다. 자동으로 옮기지 않는다. 만들기 화면 다크 단계는 팝업을 띄우지 않고 ⚠ `wizard.seq.darkMigrate`로 멈춘다(결과 화면에 남음 — 옮기기는 사용자가 다크 화면에서 누를 때만, 명세에서 정함).
+          - 옛 구조인지는 `postPrereq`가 `PREREQ_STATE`의 새 필드 `darkOld`로도 보낸다 — 다크 화면이 [다크 만들기] 전에 띠로 알린다(ia-v4 §4.11 ② — 명세에서 정함).
+          - **옮길 모드:** Semantic에서 이름이 `Dark`인 기본이 아닌 모드, 없으면 기본이 아닌 첫 모드. Semantic 모드가 셋 이상이면 옮기지 않고 `dark.errMigrateModes`로 거절(옛 코드는 둘만 만든다 — 셋은 사용자가 더한 것이라 무엇을 지울지 정할 수 없다. 명세에서 정함).
+          - **① 값 모으기(아무것도 쓰기 전에):** 플러그인 Semantic의 색 변수 S마다(직접 만든 변수 포함 — 모드를 지우면 그 칸도 사라지므로) Light 칸(기본 모드)과 Dark 칸(옮길 모드)을 본다.
+            - Light와 Dark가 같은 별칭 · 같은 값이면 옮길 것이 없다(세지 않음).
+            - Light가 별칭이 아니거나(값을 직접 넣은 Semantic), Light가 가리키는 X가 플러그인 Global의 직접 값 색 변수가 아니면(사용자 Global · 다른 컬렉션 · 별칭 변수 · `isManual`) **옮기지 못한 역할 c**(Dark에서 바뀌지 않게 된다).
+            - 그 밖에는 X의 Dark 후보 = Dark 칸을 **색 값으로 푼 것**: `dark/X`든 다른 변수든 별칭이면 대상 변수를 그 컬렉션 기본 모드로 따라가 푼 색(최대 8단계 — 변수 탭 따라가기와 같은 한도), 값을 직접 넣은 Dark 칸이면 그 색. 풀지 못하면(없는 대상 · 순환 · 8단계 넘음) c.
+          - **② 갈린 값:** 같은 X에 후보가 여럿이고 색이 다르면 가장 많은 S가 쓴 색을 고른다. 수가 같으면 **Semantic 이름 순(코드 단위 비교)으로 첫 S의 색**. 이런 X 수 = **값이 갈린 색 b**.
+          - **③ 쓰기:** 플러그인 Global에 Dark 모드를 ensure(위 "모드 고르기"), 후보가 있는 X마다 Dark 칸 = 고른 색, 기록 `by: "user"`(`l` = X의 from 칸) — 그래서 뒤 채우기 · 다시 누를 때 다시 계산하지 않는다. 쓴 X 수 = **옮긴 색 a**(b 포함).
+          - **④ Semantic 모드 지우기:** 옮길 모드를 `removeMode`.
+          - **⑤ `dark/…` 지우기:** 플러그인 Global에서 이름이 `dark/`로 시작하고 `isManual`이 아닌 변수 중, ④ 뒤 **어떤 로컬 변수의 어느 모드 값도** 별칭으로 가리키지 않는 것을 지운다. 레이어 · 스타일 연결은 보지 않는다(파일 전체를 읽어야 해서 — 명세에서 정함. `dark/…`는 게시 숨김이라 레이어에 바로 쓸 일이 드물고, 지우면 그 레이어는 "삭제된 변수"가 된다 — ⌘Z로 되돌린다).
+          - **⑥ 채우기:** 이어서 위 "칸마다 판정"으로 나머지 칸을 채운다(③에서 쓴 칸은 `by: "user"`라 건드리지 않고 k에도 넣지 않는다 — 결과는 옮기기 줄이 말한다).
+          - 결과 `DARK_MODE_RESULT.migrated = {moved: a, split: b, failed: c, splitNames, failedNames, removedDark}` — 이름 목록은 상태 줄 툴팁(ia-v4 §4.11 ②). 같은 X의 Dark 칸에 옛 구조가 이미 Global Dark 값을 갖고 있어도(사용자가 Global에도 모드를 더한 파일) ③이 덮어쓴다.
+        - **되돌리기 · 실패:** 옮기기 + 채우기 전체가 `commitUndo` 한 번(⌘Z 한 번). 순서는 위 ①(읽기만) → 모드 ensure → ③ → ④ → ⑤ → ⑥이라, 모드 추가가 실패하면 아무것도 바뀌지 않는다(`dark.errAddMode` 그대로). 중간에 예외가 나면 그때까지 바꾼 것을 `commitUndo`로 묶은 뒤 `ERROR`로 답한다(한 묶음이라 ⌘Z 한 번으로 되돌린다). ④ 전에 멈췄으면 다음에 누를 때 다시 옛 구조로 보여 처음부터 옮긴다(③은 같은 값을 다시 쓰므로 괜찮다). 이번에 Dark 모드를 새로 만들었는데 쓴 칸이 하나도 없으면(n = 0 · a = 0) 그 모드를 지운다(지금 규칙 그대로 — 준비 현황이 ✓로 뒤집히지 않게).
+        - **함께 바뀌는 곳:** `createUsageRoles`의 "모든 모드에 같은 별칭"(`for (const m of col.modes)`)은 그대로 둔다 — Semantic 모드가 하나라 기본 모드 하나에 쓰는 것과 같고, 옛 구조 파일에서는 새 역할의 Dark 칸이 Light와 같은 별칭이 되어 ① "옮길 것이 없다"로 넘어간다. `prunePaletteColors`는 고치지 않는다 — `dark/…` 이름은 네 마디라 지금도 지우지 않고(`isPaletteColorName`), D-T1에서는 Dark 값이 같은 변수에 있어 그 변수와 함께 지워진다. 남은 `dark/…`는 옮기기 ⑤만 지운다. 내보내기(§4.4 "모드 블록" · A.24)는 고치지 않는다 — Global 모드 블록만 생기는 경우를 이미 다룬다. 무료(F6)는 [다크 만들기]가 지금처럼 유료(`requirePaid('tokens')`)이고, Global에 Dark 모드가 있는 파일이면 무료가 Global에 바로 연결한 레이어도 Dark에서 바뀐다.
+        - **지금과 달라지는 것(요약):** ① 모드가 Semantic → Global ② `dark/…` 복사본 없음 ③ Semantic 모드 2개 → 1개 ④ `hasDarkMode` 판정 컬렉션 ⑤ 무료(F6)도 Dark에서 색이 바뀜 ⑥ 테마마다 다른 Global을 고를 수 없음(예: Dark에서만 `text/brand`를 다른 단계로) — 그런 색은 Global Dark 값을 직접 고친다(다시 눌러도 지킨다 — 위 기록) ⑦ 내보낸 CSS는 Global 값만 모드 블록에 나오고 SEMANTIC은 `:root` 한 블록(§4.4 "모드 블록").
       - 텍스트 스타일 역할(`font-size/…` 등 Semantic 이동 · 생성): 플러그인 Semantic에서만.
       - 팔레트 다시 적용의 이전 색 지우기(`prunePaletteColors`): 플러그인 Global · Semantic 안에서만 지운다. 사용자 컬렉션의 색은 지우지 않는다. 지우는 이름은 마지막 마디가 팔레트 단계(`STEPS`)와 같은 정수인 것만이다 — 추출 경로의 `-n` · 반 단계 · `-a` · gray 0 · 1000 이름은 지우지 않는다(2026-11-11, 12.11).
       - 내보내기: Global · Semantic 계층 전부(플러그인 + 13.3으로 판단한 사용자 컬렉션). 내보내지 않는 변수(계층 1 · 2가 아님, 또는 같은 이름 정리에서 진 변수)를 가리키는 별칭은 값으로 풀어 낸다(§4.4 "별칭 대상이 내보내지 않는 변수일 때").
@@ -3301,12 +3325,34 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [x] 4검사 · `dist/` 다시 빌드
 - [x] 실기 확인(사용자, 피그마 — 2026-11-20 확인)
 
-## A.25 다크 구조 PR — D-T1 (2026-11-20 사용자 결정 — 13.7 "결정 D-T1", ia-v4 §4.11 ②. 도구 탭(§0 8) 앞, 별도 PR)
+## A.25 다크 구조 PR — D-T1 (2026-11-20 사용자 결정 — 13.7 "다크", ia-v4 §4.11 ② · §4.6. 도구 탭(§0 8) 앞, 별도 PR)
 
-명세 · 검토는 이 PR을 시작할 때 따로 한다(0단계 질문은 2026-11-20에 받음: 이름 그대로 · 뜻은 대비 / 다시 만들 때 옮기기 / 새 Global의 Dark 칸은 다시 만들 때만).
-- [ ] `themeApply.ts` `generateDarkMode`: 플러그인 Global에 Dark 모드 · 색마다 Dark 칸, `dark/` 복사본 없음
-- [ ] 옛 구조 옮기기(확인 팝업 · 한 번의 되돌리기)
-- [ ] `hasDarkMode` · `refreshDarkOptions` · `pickDarkTarget` · 문구(`dark.hintTip` · `dark.done` 등)
-- [ ] Dark 칸이 비거나 Light와 같은 Global 색 수 알림(다크 화면 · 준비 현황)
-- [ ] `createUsageRoles`의 "모든 모드에 같은 별칭"(Semantic 모드 하나라 단순해짐) · `prunePaletteColors`의 `dark/` 규칙
-- [ ] 4검사 · 실기 확인
+명세 작성 중(2026-11-20). 0단계 질문: 이름 그대로 · 뜻은 대비 / 다시 만들 때 옮기기 / 새 Global의 Dark 칸은 다시 만들 때만(첫 묶음), 직접 고친 칸 지키기 · 옮기기 예외는 풀고 수를 알림 · 없는 색 수는 기록으로 · 보이는 곳 띠와 준비 현황(둘째 묶음 — 13.7에 "2026-11-20 사용자 결정"으로 적음). 범위: 지금 다크 카드(값을 직접 고르기 › 테마 `#darkCard`)의 배치는 그대로 두고 글 · 띠 · 팝업 · 대상만 바꾼다(화면을 새로 짜는 것은 도구 탭 PR — ia-v4 §4.11 ②). 새 글은 모두 **임시 문구**(UX 라이팅 단계에서 확정).
+
+**메시지(`src/shared/messages.ts`)**
+- `GENERATE_DARK_MODE`에 `migrate?: boolean`(옮기기 확인을 받았을 때만 참).
+- `DARK_MODE_RESULT` = `{ filled, kept, targets, modeCreated?, migrated?, needMigrate?, error? }` — `filled` = 채운 색 n, `kept` = 그대로 둔 색 k(이번에 옮긴 칸 제외), `targets` = 채우는 칸 대상 수(0이면 "채울 색 없음"), `migrated` = `{ moved, split, failed, splitNames, failedNames, removedDark }`, `needMigrate` = `{ removeDark, mode }`(옮길 Semantic 모드 이름 — 팝업 글). 지금의 `created` · `realiased` · `skipped`는 없앤다.
+- `PREREQ_STATE`에 `darkUnfilled: number`(13.7 "Dark 값이 없는 색 수") · `darkOld: boolean`(옛 구조 — 다크 화면 띠).
+
+**i18n 키**(`src/lib/i18n.ts` · 같은 글의 `ui.html` 기본 글 — `verify:i18n`)
+
+| 구분 | 키 · 글 |
+|---|---|
+| 글 바꿈 | `dark.hint` "Global 색의 밝기를 뒤집어 Dark 칸에 채워요" · `dark.hintTip` "색상 · 채도는 그대로 두고 밝기만 뒤집어요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요. 고르개 이름은 피그마 변수 컬렉션 · 모드 이름이에요." · `dark.collection` "Global 컬렉션" · `wizard.seq.dark` "다크 값 {filled}개 채움"(자리 표시자 `realiased` → `filled`) · `wizard.seq.darkNoTarget` "플러그인 Global이 없어 건너뜀 — 먼저 토큰을 만드세요" · `wizard.seq.darkNothing` "채울 색이 없음 — 플러그인 Global에 값을 넣은 색 변수가 필요해요" |
+| 새 키 | `dark.doneFill` "{modePart}Global 색 {n}개의 Dark 칸을 채웠어요{keptPart}" · `dark.keptPart` " · 직접 고친 색 {k}개는 그대로 뒀어요" · `dark.upToDate` "Dark 칸이 모두 채워져 있어요{keptPart}" · `dark.nothing` "채울 색이 없어요 — 플러그인 Global에 값을 넣은 색 변수가 필요해요" · `dark.unfilled` "Dark 값이 없는 색 {n}개 — [다크 만들기]로 채워요" · `dark.needMigrate` "다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요" · `dark.migrateTitle` "다크 구조를 옮길까요?" · `dark.migrateBody` "지금 다크는 Semantic 모드에 있어요. Global 색의 Dark 칸으로 옮기고, Semantic의 {mode} 모드와 쓰지 않게 된 dark/ 색 {n}개를 지워요. ⌘Z 한 번으로 되돌릴 수 있어요." · `dark.migrateBodyNoDel` "지금 다크는 Semantic 모드에 있어요. Global 색의 Dark 칸으로 옮기고, Semantic의 {mode} 모드를 지워요. ⌘Z 한 번으로 되돌릴 수 있어요." · `dark.migrateGo` "옮기고 다크 만들기" · `dark.migrated` "다크 구조를 옮겼어요(옮긴 색 {a}개{splitPart}{failPart}) · " · `dark.migratedSplit` " · 값이 갈린 색 {b}개" · `dark.migratedFail` " · 옮기지 못한 역할 {c}개" · `dark.migratedSplitTip` "값이 갈린 색 — 가장 많이 쓴 값으로 옮겼어요:" · `dark.migratedFailTip` "옮기지 못한 역할 — Dark에서 바뀌지 않아요:" · `dark.migratedDelTip` "지운 dark/ 색 {n}개" · `dark.errMigrateModes` "Semantic에 모드가 3개 이상이라 옮기지 못했어요 — 피그마에서 모드를 2개로 줄인 뒤 다시 눌러 주세요" · `pipeline.hint.darkUnfilled` "Dark 값이 없는 색 {n}개" · `wizard.seq.darkKept` " · 직접 고친 색 {n}개는 그대로" · `wizard.seq.darkUpToDate` "Dark 칸이 모두 채워져 있음" · `wizard.seq.darkMigrate` "다크 구조를 옮겨야 해요 — 테마 화면에서 [다크 만들기]를 눌러 주세요" |
+| 없앰 | `dark.done` · `dark.skippedDirect` · `dark.whyNoGlobal` · `dark.whyNone` · `dark.fillFailed` · `dark.modeAdded`(채운 칸 0이면 만든 모드를 지우므로 "모드는 추가했어요"가 없다) · `dark.errNotOwned`(`dark.errNoCol`로 합침) · `dark.prereqNoModes`(플러그인 Global은 늘 모드가 하나 이상이라 닿지 않는다 — 그 갈래는 `dark.prereqPick`으로) · `wizard.seq.darkSkip`(→ `darkKept`) |
+| 그대로 | `dark.title` · `dark.fromMode` · `dark.toMode` · `dark.genBtn` · `dark.toPlaceholder` · `dark.prereqLoading` · `dark.prereqNoVars` · `dark.prereqPick` · `dark.running` · `dark.modeAddedShort` · `dark.errNoCol` · `dark.errAddMode` · `dark.errAddModePlan` · `dark.errSameMode` · `wizard.seq.darkModeCreated` · `make.optDark` · `make.run.dark` · `make.done.dark`({k} = `filled`) · `op.dark` · `list.addDark` · `pipeline.step.dark` |
+
+- ia-v4 B.20 PR 1(문구만)의 다크 줄 중 위에서 바뀌거나 없어지는 키(`dark.hint` · `dark.hintTip` · `dark.done` · `dark.prereqNoModes` · `dark.modeAdded` · `wizard.seq.dark` · `wizard.seq.darkSkip`)는 이 PR이 정한 글이 이긴다 — B.20 PR 1이 먼저 병합되면 이 PR에서 덮어쓰고, 뒤에 오면 그 키를 빼고 간다.
+
+**체크**
+- [ ] `themeApply.ts` `generateDarkMode`: 대상 플러그인 Global · 모드 고르기 · 칸마다 판정 표 · `dsl.darkFill` 기록(모드 id별 · `#RRGGBBAA` 견주기) · 만든 모드 0칸이면 지움 · `dark/` 복사본 없음. `themeGen.ts`의 `darkGlobalName` · `isDarkGlobalName` · `DARK_PREFIX`는 옮기기 ⑤의 이름 판정에만 남긴다(`darkValueForLight`는 그대로)
+- [ ] 옛 구조 옮기기(13.7 ①–⑥): `needMigrate` 미리 셈(쓰기 없음) · 모드 셋 이상 거절 · ①–③ 값 모으기 · 갈린 값(많은 쪽 → Semantic 이름 순) · 옮긴 칸 `by: "user"` · ④ 모드 지우기 · ⑤ 가리키는 변수가 없는 `dark/…`만 지우기 · ⑥ 채우기
+- [ ] `code.ts` `GENERATE_DARK_MODE`: `migrate` 넘기기 · 바꾼 것이 있으면 `commitUndo` 한 번(예외여도 바꾼 것이 있으면 묶고 `ERROR`) · `postPrereq` 다시. `postPrereq`: `hasDarkMode`(Global 모드 ≥ 2 또는 옛 구조) · `darkUnfilled` · `darkOld`
+- [ ] `createTokens` `setGlobalLiteral`: 새 색 변수 · 색 아닌 변수는 모든 모드에 같은 값(13.7 "나중에 만든 Global"), 이미 있는 색 변수 값 바꾸기는 기본 모드만
+- [ ] `ui.ts`: `refreshDarkOptions`(`owned === 'global'`) · `refreshDarkModes`(`dark.prereqNoModes` 갈래 없앰) · 띠(`dark.unfilled` · `dark.needMigrate`) · `DARK_MODE_RESULT` 글(위 표, 옮기기 툴팁) · 옮기기 팝업(ia-v4 §4.11 ②) · `renderPipeline`(`hintParams`). `pipeline.ts` 다크 줄(ia-v4 §4.6 "다크 모드 줄"). `wizard.ts` `pickDarkTarget`(`owned === 'global'`) · `runMake` 다크 단계(`needMigrate` → ⚠ `darkMigrate` · `targets` 0 → `darkNothing` · 채울 것 없음 → `darkUpToDate`(다 됨 줄의 다크 부분 뺌))
+- [ ] `createUsageRoles` · `prunePaletteColors` · 내보내기는 고치지 않음 — 13.7 "함께 바뀌는 곳"을 테스트로 고정(옛 구조 파일에서 새 역할의 Dark 칸 = Light 별칭 → 옮기기에서 안 셈 · 팔레트 다시 적용이 `dark/…`를 지우지 않음)
+- [ ] 단위 테스트(`test/figma.test.mjs` 목): 처음 채우기(모드 추가 · 별칭 · `isManual` · 색 아닌 변수 건너뜀 · 기록) · 다시 눌러 바뀐 것 없음(n = 0 → `upToDate`) · Light만 바뀜(n = 1) · Dark 직접 고침(k = 1, 기록 → user) · user 기록은 Light가 바뀌어도 그대로 · 기록 없이 다른 Dark 값(k) · 다른 모드 id의 기록은 없는 것으로 · 값 오차(소수)는 같은 값 · 고른 to 모드(`Night`) · from = to 거절 · 기본 모드가 Dark일 때 from · 플러그인 Global 아닌 id → `errNoCol` · 만든 모드 0칸이면 지움 · 모드 추가 실패면 아무것도 안 바뀜 · 옮기기 ① `dark/X` · ① 다른 변수 · ① 값을 직접 넣은 Dark · ① 풀 수 없음(c) · ② 많은 쪽 · ② 같은 수면 Semantic 이름 순 · ③ 사용자 Global(c) · Light가 값인 Semantic(Dark가 다르면 c, 같으면 안 셈) · 모드 셋 → 거절 · `needMigrate.removeDark` = 실제 지운 수 · 다른 변수가 가리키는 `dark/…`는 남김 · `isManual` `dark/…`는 남김 · 옮긴 칸은 ⑥에서 다시 계산 안 함 · 예외 때 `commitUndo` 한 번 · `darkUnfilled`(기록 없음 · calc인데 Light 바뀜 · user 안 셈 · 모드 하나면 0). 순수(`test/pure.test.mjs` · `test/wizard.test.mjs`): `pipelineSteps` 다크 줄 세 모습 · `pickDarkTarget`(Global만) · 결과 글 만들기(옮기기 · 0 생략 · 툴팁 줄)
+- [ ] `verify-bind-flow` 블록: 테마 카드 — 라벨 "Global 컬렉션" · 고르개에 플러그인 Global만 · 안내 글 · `PREREQ_STATE{darkUnfilled: 3}` → 띠 `dark.unfilled` · `darkOld` → 띠 `dark.needMigrate` · 둘 다 아니면 띠 없음. 준비 현황 다크 줄 — `darkUnfilled` 3이면 ✓ 아님 · 상태 글 "Dark 값이 없는 색 3개" · 완료 수 {rd}에 안 셈. `DARK_MODE_RESULT{needMigrate}` → 팝업 제목 · 본문(지울 수 0이면 `migrateBodyNoDel`) · 버튼 · 처음 포커스 [취소] · Esc = 취소 → [다크 만들기] 포커스 · 상태 줄 비움, [옮기고 다크 만들기] → `GENERATE_DARK_MODE{migrate: true}` 보냄. 결과 글 — 채움 + 그대로 둠 · 옮기기 줄(0 부분 생략 · 툴팁 이름 · c > 0이면 warn) · `upToDate` · `nothing`
+- [ ] 4검사 · `dist/` 다시 빌드
+- [ ] 실기 확인(사용자, 피그마): 새 파일에서 [다크 만들기] → Global에 Dark 모드 · Semantic 모드 하나 · `dark/` 없음 · 레이어가 Dark에서 바뀜 / Dark 칸 하나를 직접 고치고 다시 누름 → 그대로 · "직접 고친 색 1개" / 팔레트를 다시 적용해 새 색 → 띠 · 준비 현황 수 → 다시 누르면 0 / 옛 파일(Semantic Dark) → 팝업 → 옮김 · 수 · 툴팁 → ⌘Z 한 번에 처음 상태 / CSS 내보내기에 GLOBAL Dark 블록만
