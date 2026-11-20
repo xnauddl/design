@@ -3941,26 +3941,35 @@
     Semantic: "SEMANTIC \u2014 UI roles mapped to Global. Use these in components.",
     textStyles: "TEXT STYLES"
   };
-  var CSS_GROUPS = [
-    { head: "Color", kinds: ["color"] },
-    { head: "Typography", kinds: ["fontSize", "lineHeight", "letterSpacing", "fontFamily", "fontWeight"] },
-    { head: "Spacing", kinds: ["spacing"] },
-    { head: "Radius", kinds: ["radius"] },
-    { head: "Size", kinds: ["size"] },
-    { head: "Stroke", kinds: ["strokeWidth"] },
-    { head: "Opacity", kinds: ["opacity"] },
-    { head: "Other", kinds: ["effectFloat", "other"] }
-  ];
-  var byName2 = (a, b) => a.name.localeCompare(b.name);
+  var CSS_GROUP_ORDER = ["Color", "Typography", "Spacing", "Radius", "Size", "Stroke", "Opacity", "Other"];
+  var CSS_GROUP_OF = {
+    color: "Color",
+    fontSize: "Typography",
+    lineHeight: "Typography",
+    letterSpacing: "Typography",
+    fontFamily: "Typography",
+    fontWeight: "Typography",
+    spacing: "Spacing",
+    radius: "Radius",
+    size: "Size",
+    strokeWidth: "Stroke",
+    opacity: "Opacity",
+    effectFloat: "Other",
+    other: "Other"
+  };
+  var byName2 = (a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
   function tierBlock(tokens, tier, opts) {
     const mine = tokens.filter((t2) => t2.collection === tier);
     if (!mine.length) return null;
     const body = [];
-    for (const g of CSS_GROUPS) {
-      const inGroup = mine.filter((t2) => g.kinds.includes(t2.kind)).sort(byName2);
+    for (const g of CSS_GROUP_ORDER) {
+      const inGroup = mine.filter((t2) => {
+        var _a;
+        return ((_a = CSS_GROUP_OF[t2.kind]) != null ? _a : "Other") === g;
+      }).sort(byName2);
       if (!inGroup.length) continue;
       if (body.length) body.push("");
-      body.push(`  /* ${g.head} */`);
+      body.push(`  /* ${g} */`);
       for (const t2 of inGroup) body.push(...tokenCssLines(t2, opts));
     }
     return [...cssBlockHead(CSS_HEAD[tier]), ":root {", ...body, "}"];

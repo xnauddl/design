@@ -707,6 +707,18 @@ test('exportTokens CSS — 종류 묶음 순서 · Other · italic 짝 줄 · �
   assert.doesNotMatch(css, /SEMANTIC/); // 같은 이름 Semantic 미러는 dedupe로 빠져 블록이 없다
 });
 
+test('exportTokens CSS — 묶음 안 이름순은 코드 단위 비교(언어 설정과 무관 · #162 리뷰)', () => {
+  // 정렬은 CSS 이름이 아니라 Figma 이름 기준 — 순서는 값으로 확인한다
+  const tokens = [
+    { name: 'color/b', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000003' },
+    { name: 'color/Z', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000001' },
+    { name: 'color/a-2', collection: 'Global', type: 'COLOR', kind: 'color', value: '#000002' },
+  ];
+  const values = [...exportTokens(tokens, OPTS).matchAll(/: (#0000\d\d);/g)].map((m) => m[1]);
+  // 대문자 Z(0x5A) < 소문자 a(0x61) < b — localeCompare라면 언어 설정에 따라 Z가 뒤로 갈 수 있다
+  assert.deepEqual(values, ['#000001', '#000002', '#000003']);
+});
+
 test('exportHasTokens — 껍데기만 있는 결과는 저장 대상이 아님(#8)', () => {
   // 변수 0개 → 형식별 껍데기. 파일로 떨어뜨리면 안 된다.
   assert.equal(exportHasTokens(exportTokens([], OPTS), 'css'), false);

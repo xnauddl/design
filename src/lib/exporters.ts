@@ -159,29 +159,39 @@ const CSS_HEAD = {
 } as const;
 
 /** 종류 묶음 순서(사용자 예시 · 시안 순서 — 화면 종류 순서와 일부러 다름, ia-v4 §2.7). */
-const CSS_GROUPS: readonly { head: string; kinds: readonly TokenKind[] }[] = [
-  { head: 'Color', kinds: ['color'] },
-  { head: 'Typography', kinds: ['fontSize', 'lineHeight', 'letterSpacing', 'fontFamily', 'fontWeight'] },
-  { head: 'Spacing', kinds: ['spacing'] },
-  { head: 'Radius', kinds: ['radius'] },
-  { head: 'Size', kinds: ['size'] },
-  { head: 'Stroke', kinds: ['strokeWidth'] },
-  { head: 'Opacity', kinds: ['opacity'] },
-  { head: 'Other', kinds: ['effectFloat', 'other'] },
-];
+const CSS_GROUP_ORDER = ['Color', 'Typography', 'Spacing', 'Radius', 'Size', 'Stroke', 'Opacity', 'Other'] as const;
+type CssGroup = (typeof CSS_GROUP_ORDER)[number];
 
-const byName = <T extends { name: string }>(a: T, b: T): number => a.name.localeCompare(b.name);
+/** 종류 → 묶음. `Record`라서 종류가 늘면 여기를 채우지 않는 한 타입 검사가 실패한다(CSS에서 조용히 빠지지 않게). */
+const CSS_GROUP_OF: Record<TokenKind, CssGroup> = {
+  color: 'Color',
+  fontSize: 'Typography',
+  lineHeight: 'Typography',
+  letterSpacing: 'Typography',
+  fontFamily: 'Typography',
+  fontWeight: 'Typography',
+  spacing: 'Spacing',
+  radius: 'Radius',
+  size: 'Size',
+  strokeWidth: 'Stroke',
+  opacity: 'Opacity',
+  effectFloat: 'Other',
+  other: 'Other',
+};
+
+/** 이름순 — 코드 단위 비교(실행 환경의 언어 설정과 무관하게 늘 같은 순서). */
+const byName = <T extends { name: string }>(a: T, b: T): number => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
 
 /** 한 계층의 블록 — 변수가 없으면 null. */
 function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', opts: ExportOptions): string[] | null {
   const mine = tokens.filter((t) => t.collection === tier);
   if (!mine.length) return null;
   const body: string[] = [];
-  for (const g of CSS_GROUPS) {
-    const inGroup = mine.filter((t) => g.kinds.includes(t.kind)).sort(byName);
+  for (const g of CSS_GROUP_ORDER) {
+    const inGroup = mine.filter((t) => (CSS_GROUP_OF[t.kind] ?? 'Other') === g).sort(byName);
     if (!inGroup.length) continue;
     if (body.length) body.push('');
-    body.push(`  /* ${g.head} */`);
+    body.push(`  /* ${g} */`);
     for (const t of inGroup) body.push(...tokenCssLines(t, opts));
   }
   return [...cssBlockHead(CSS_HEAD[tier]), ':root {', ...body, '}'];
