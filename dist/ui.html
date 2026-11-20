@@ -1484,6 +1484,7 @@
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
+    "export.clash": "Global\uACFC \uC774\uB984\uC774 \uAC19\uC740 Semantic {n}\uAC1C\uB294 Global \uAC12\uB9CC \uB0C8\uC5B4\uC694: {names}",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -2800,6 +2801,13 @@
     return cssVar(name);
   }
   var CSS_RULE = "=".repeat(74);
+  function exportClashNotice(clashes) {
+    if (!clashes.length) return "";
+    const shown = clashes.slice(0, 3).join(", ");
+    const rest = clashes.length - 3;
+    const names = rest > 0 ? `${shown} ${t("list.usesMore", { n: rest })}` : shown;
+    return t("export.clash", { n: clashes.length, names });
+  }
   function exportHasTokens(content, format) {
     if (format === "css") return /--[\w-]+\s*:/.test(content);
     try {
@@ -6376,7 +6384,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6682,7 +6690,9 @@
           break;
         }
         saveExportFile(msg.content, msg.format);
-        setStatus("exportStatus", t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" }), "ok");
+        const saved = t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" });
+        const clash = exportClashNotice((_p = msg.clashes) != null ? _p : []);
+        setStatus("exportStatus", clash ? `${saved} ${clash}` : saved, clash ? "warn" : "ok");
         break;
       }
       case "COMPONENT_CANDIDATES": {
@@ -6691,7 +6701,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_p = msg.autoNamed) != null ? _p : 0);
+        setCompAutoNamed((_q = msg.autoNamed) != null ? _q : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6706,12 +6716,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_q = msg.placeFailed) != null ? _q : [];
-        const cloned = (_r = msg.placeCloned) != null ? _r : [];
-        const propFailed = (_s = msg.propFailed) != null ? _s : [];
-        const fillKept = (_t = msg.fillKept) != null ? _t : [];
-        const reused = (_u = msg.reused) != null ? _u : [];
-        const reuseKept = (_v = msg.reuseKept) != null ? _v : [];
+        const misplaced = (_r = msg.placeFailed) != null ? _r : [];
+        const cloned = (_s = msg.placeCloned) != null ? _s : [];
+        const propFailed = (_t = msg.propFailed) != null ? _t : [];
+        const fillKept = (_u = msg.fillKept) != null ? _u : [];
+        const reused = (_v = msg.reused) != null ? _v : [];
+        const reuseKept = (_w = msg.reuseKept) != null ? _w : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures, reused));

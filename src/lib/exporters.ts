@@ -5,6 +5,7 @@
    ============================================================ */
 import { ResolvedType } from './tokens';
 import { kebab } from './naming';
+import { t } from './i18n';
 
 export type ExportFormat = 'w3c' | 'css';
 
@@ -188,6 +189,7 @@ function tierBlock(tokens: readonly ExportToken[], tier: 'Global' | 'Semantic', 
   if (!mine.length) return null;
   const body: string[] = [];
   for (const g of CSS_GROUP_ORDER) {
+    // `?? 'Other'`는 타입 밖 값(검사를 거치지 않은 메시지 등)에 대한 런타임 안전망 — 타입 안에서는 위 Record가 빠짐없음을 보장한다.
     const inGroup = mine.filter((t) => (CSS_GROUP_OF[t.kind] ?? 'Other') === g).sort(byName);
     if (!inGroup.length) continue;
     if (body.length) body.push('');
@@ -296,6 +298,104 @@ function dedupeByName(tokens: ExportToken[]): ExportToken[] {
     if (!prev || (prev.collection === 'Semantic' && t.collection === 'Global')) seen.set(t.name, t);
   }
   return [...seen.values()];
+}
+
+/* ---------- 별칭 풀기 · 같은 이름 알림 (ia-v3 §4.4 · A.23) ---------- */
+
+/** 내보내기 입력 — 로컬 변수 하나(내보내지 않는 것도 — 별칭 사슬을 따라가려고). 값은 그 변수 컬렉션의 기본 모드. */
+export interface ExportVarInput {
+  id: string;
+  name: string;
+  /** 13.4 계층 번호 — 1 Global · 2 Semantic만 내보낸다(0 · 3은 남지 않는 변수). */
+  tier: number;
+  type: ResolvedType;
+  kind: TokenKind;
+  description?: string;
+  /** 기본 모드 값이 별칭이면 대상 변수 id. */
+  alias?: string;
+  /** 별칭이 아니면 값(색은 이미 `#rrggbb[aa]`). */
+  value?: string | number | boolean;
+}
+
+/** 원래 변수를 포함해 읽는 상한(연결 쪽 `bind.ts` `resolveValue`와 같다). */
+const ALIAS_READ_LIMIT = 12;
+
+/**
+ * 변수 목록(13.5 순서 — 사용자 컬렉션 먼저 · 목록 순) → 내보낼 토큰(dedupe 전).
+ * ⓪ 사슬이 실제 값에 닿지 않는 변수(없는 대상 · 순환 · 12번 초과)를 빼고 → 남는 변수를 정하고 →
+ * ① 남는 변수를 만나면 그 이름을 가리키고 ② 아니면 값까지 따라가 값을 낸다.
+ * 이름 · 계층 · 종류는 원래 변수, 설명은 ①이면 원래 · ②면 값을 준 변수.
+ */
+export function resolveExportTokens(vars: readonly ExportVarInput[]): ExportToken[] {
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const reachesValue = (v: ExportVarInput): boolean => {
+    const seen = new Set([v.id]);
+    let cur = v;
+    for (let reads = 1; cur.alias !== undefined; reads++) {
+      if (reads >= ALIAS_READ_LIMIT) return false;
+      const next = byId.get(cur.alias);
+      if (!next || seen.has(next.id)) return false;
+      seen.add(next.id);
+      cur = next;
+    }
+    return true;
+  };
+  const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reachesValue(v));
+  // 남는 변수 — dedupeByName과 같은 규칙(같은 이름이면 Global, 같은 계층이면 앞의 것)
+  const winner = new Map<string, ExportVarInput>();
+  for (const v of ok) {
+    const prev = winner.get(v.name);
+    if (!prev || (prev.tier === 2 && v.tier === 1)) winner.set(v.name, v);
+  }
+  const survivors = new Set([...winner.values()].map((v) => v.id));
+  return ok.map((v) => {
+    const tok: ExportToken = { name: v.name, collection: v.tier === 1 ? 'Global' : 'Semantic', type: v.type, kind: v.kind };
+    let cur = v;
+    while (cur.alias !== undefined) {
+      const next = byId.get(cur.alias) as ExportVarInput; // ⓪에서 닿는 것을 확인함
+      if (survivors.has(next.id)) {
+        tok.aliasOf = next.name; // ①
+        if (v.description) tok.description = v.description;
+        return tok;
+      }
+      cur = next;
+    }
+    tok.value = cur.value as string | number; // ② (참거짓도 그대로)
+    if (cur.description) tok.description = cur.description;
+    return tok;
+  });
+}
+
+/**
+ * Global과 이름이 같은데 거울이 아닌 Semantic이 있는 이름(중복 없음 · 코드 단위 이름순).
+ * 거울: ⓐ 자기 이름을 가리키는 별칭 ⓑ 둘 다 별칭이면 같은 대상, 둘 다 값이면 값 · 설명 · 종류가 같음.
+ * 견줄 Global은 남는 것(앞의 것). 같은 계층 안 겹침은 세지 않는다.
+ */
+export function exportClashes(tokens: readonly ExportToken[]): string[] {
+  const globalOf = new Map<string, ExportToken>();
+  for (const tk of tokens) if (tk.collection === 'Global' && !globalOf.has(tk.name)) globalOf.set(tk.name, tk);
+  const out = new Set<string>();
+  for (const s of tokens) {
+    if (s.collection !== 'Semantic') continue;
+    const g = globalOf.get(s.name);
+    if (!g) continue;
+    const mirror =
+      s.aliasOf === s.name ||
+      (s.aliasOf !== undefined && g.aliasOf !== undefined
+        ? s.aliasOf === g.aliasOf
+        : s.aliasOf === undefined && g.aliasOf === undefined && s.value === g.value && s.description === g.description && s.kind === g.kind);
+    if (!mirror) out.add(s.name);
+  }
+  return [...out].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+}
+
+/** 내보내기 팝업 상태 줄의 겹침 꼬리(`export.clash`) — 이름은 앞 3개, 넘치면 `list.usesMore`. 겹침이 없으면 ''. */
+export function exportClashNotice(clashes: readonly string[]): string {
+  if (!clashes.length) return '';
+  const shown = clashes.slice(0, 3).join(', ');
+  const rest = clashes.length - 3;
+  const names = rest > 0 ? `${shown} ${t('list.usesMore', { n: rest })}` : shown;
+  return t('export.clash', { n: clashes.length, names });
 }
 
 /* ---------- 텍스트 스타일(typography) ---------- */

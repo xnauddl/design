@@ -589,7 +589,7 @@
         - 준비 현황의 다크 완료(`hasDarkMode`)는 플러그인 Semantic의 모드가 둘 이상일 때다.
       - 텍스트 스타일 역할(`font-size/…` 등 Semantic 이동 · 생성): 플러그인 Semantic에서만.
       - 팔레트 다시 적용의 이전 색 지우기(`prunePaletteColors`): 플러그인 Global · Semantic 안에서만 지운다. 사용자 컬렉션의 색은 지우지 않는다. 지우는 이름은 마지막 마디가 팔레트 단계(`STEPS`)와 같은 정수인 것만이다 — 추출 경로의 `-n` · 반 단계 · `-a` · gray 0 · 1000 이름은 지우지 않는다(2026-11-11, 12.11).
-      - 내보내기: Global · Semantic 계층 전부(플러그인 + 13.3으로 판단한 사용자 컬렉션).
+      - 내보내기: Global · Semantic 계층 전부(플러그인 + 13.3으로 판단한 사용자 컬렉션). 내보내지 않는 변수(계층 1 · 2가 아님, 또는 같은 이름 정리에서 진 변수)를 가리키는 별칭은 값으로 풀어 낸다(§4.4 "별칭 대상이 내보내지 않는 변수일 때").
     - **13.8 깨진 플러그인 역할.** 플러그인 Semantic 변수가 가리키던 사용자 Global이 지워지면 그 역할은 값을 읽을 수 없어 연결 후보에서 빠진다(지금 색인 규칙). 변수 표의 값 칸은 지금처럼 "삭제된 변수"(`edit.deletedTarget`)로 보인다. 다음 연결 · 만들기는 같은 쓰임에 새 번호(`-n`)의 역할을 만든다. 따로 안내는 더하지 않는다(과한 안내 — 2026-11-06 사용자 원칙).
 
 ## 3. 전체 구조
@@ -1349,8 +1349,8 @@
 - **CSS 파일 모양(2026-11-20 사용자 결정 — 계층 먼저 · 영어 주석 · A.22):** 변수 이름 · 값 · 별칭(`var(…)`) 쓰는 법은 그대로이고, 줄의 **순서와 묶음**만 정한다. 전에는 모든 변수를 이름순 한 `:root`에 늘어놓고 텍스트 스타일을 같은 `:root` 끝에 붙였다(A.22에서 바꿈).
   - **블록(계층 먼저):** ① GLOBAL ② SEMANTIC ③ TEXT STYLES 순서로, 블록마다 따로 `:root { … }`를 낸다. 블록 사이는 빈 줄 하나. 변수(또는 텍스트 스타일)가 하나도 없는 블록은 머리 주석까지 통째로 내지 않는다. 계층은 내보낼 때 정한 `collection`(13.4 계층 번호 — 1 = Global, 2 = Semantic. 컬렉션 실제 이름과 무관)을 따른다.
   - **블록 머리 주석(영어 — 종류 이름을 영어로 쓰는 것과 같은 까닭, ia-v4 §2.7):** 블록 앞에 테두리 두 줄 사이로 제목 **한 줄**(모양은 아래 예시가 정확한 모양 — 여는 줄 `/* ` + `=` 74개, 제목 줄은 3칸 들여쓰기, 닫는 줄 3칸 + `=` 74개 + ` */`). GLOBAL은 `GLOBAL (Primitive) — raw values. Do not use directly in components.`, SEMANTIC은 `SEMANTIC — UI roles mapped to Global. Use these in components.`, TEXT STYLES는 `TEXT STYLES`. 번역 키를 쓰지 않는다(코드 상수 — 내보낸 파일은 코드라서 화면 언어를 따르지 않는다). 머리는 GLOBAL · SEMANTIC과 같은 꼴로 대문자 · 복수(`TEXT STYLES`)이고 화면 종류 이름 "Text Style"과는 별개다. 머리 문구는 안내이고 내용을 검사하지 않는다(13.3 판단으로 Semantic 계층에 직접 값이, Global 계층에 별칭이 있어도 문구는 그대로).
-  - **블록 안의 묶음(종류별):** GLOBAL · SEMANTIC 블록 안은 종류마다 작은 주석 `/* Color */` 한 줄로 묶는다. 종류 → 묶음 표는 모든 종류를 빠짐없이 가진다(`exporters.ts` `CSS_GROUP_OF` — `Record<TokenKind, …>`라 종류가 늘면 표를 채우기 전까지 타입 검사가 실패한다. 표에 없는 값이 오면 Other). 순서는 Color → Typography → Spacing → Radius → Size → Stroke → Opacity → Other(사용자가 준 CSS 예시 · 시안 순서 — 화면 종류 순서 ia-v4 §2.7은 Typography가 Opacity 뒤 — 여기서는 Color 바로 뒤로 일부러 옮김). 종류는 내보낼 때 정한 `kind`(`code.ts` `kindOf`)로 나눈다 — `color` → Color, `fontSize` · `lineHeight` · `letterSpacing` · `fontFamily` · `fontWeight` → Typography, `spacing` → Spacing, `radius` → Radius, `size` → Size, `strokeWidth` → Stroke, `opacity` → Opacity, `effectFloat` · `other` → Other. 빈 종류는 주석도 내지 않는다. 블록에 묶음이 하나뿐이어도 종류 주석을 낸다. 묶음 사이는 빈 줄 하나. **묶음 안은 이름순** — `exporters.ts`가 묶음마다 Figma 이름(슬래시 이름 — CSS 이름이 아님)을 **코드 단위 비교**(`<` — 실행 환경의 언어 설정과 무관하게 늘 같은 순서. `localeCompare`는 언어마다 순서가 달라 쓰지 않는다 — #162 리뷰)로 다시 정렬한다(안정 정렬 — 변수는 dedupe 뒤라 이름이 모두 달라 받은 순서와 무관, 같은 이름 텍스트 스타일은 받은 순서대로 — 지금 그대로. `code.ts`의 `localeCompare` 정렬은 그 앞 단계라 결과에 영향 없음). TEXT STYLES 블록은 종류 주석 없이 스타일 이름순(같은 방식으로 `exporters.ts`가 정렬). 들여쓰기 · 빈 줄은 예시 그대로(`:root {` 바로 뒤 · `}` 바로 앞에는 빈 줄 없음), 파일 끝 줄바꿈은 없다(지금 그대로).
-  - **그대로인 것:** 같은 이름이 Global과 Semantic에 다 있으면 Global 하나만 남기고 같은 계층 안에서 겹치면 13.5 순서(사용자 컬렉션 먼저 · 목록 순)의 첫 것을 남기는 규칙(`dedupeByName` · `code.ts` `rank` 정렬 — 묶기 전에 한다), 굵기 italic의 짝 줄(`…-style: italic`)이 바로 아래에 붙는 것, 폰트 단위(rem)의 값, 텍스트 스타일 줄 이름(`--typography-…`). 변수도 텍스트 스타일도 없으면 지금처럼 `:root {\n}` 하나를 내고 저장 전에 거른다(`exportHasTokens`).
+  - **블록 안의 묶음(종류별):** GLOBAL · SEMANTIC 블록 안은 종류마다 작은 주석 `/* Color */` 한 줄로 묶는다. 종류 → 묶음 표는 모든 종류를 빠짐없이 가진다(`exporters.ts` `CSS_GROUP_OF` — `Record<TokenKind, …>`라 종류가 늘면 표를 채우기 전까지 타입 검사가 실패한다. 표에 없는 값이 오면 Other). 순서는 Color → Typography → Spacing → Radius → Size → Stroke → Opacity → Other(사용자가 준 CSS 예시 · 시안 순서 — 화면 종류 순서 ia-v4 §2.7은 Typography가 Opacity 뒤 — 여기서는 Color 바로 뒤로 일부러 옮김). 종류는 내보낼 때 정한 `kind`(`code.ts` `kindOf`)로 나눈다 — `color` → Color, `fontSize` · `lineHeight` · `letterSpacing` · `fontFamily` · `fontWeight` → Typography, `spacing` → Spacing, `radius` → Radius, `size` → Size, `strokeWidth` → Stroke, `opacity` → Opacity, `effectFloat` · `other` → Other. 빈 종류는 주석도 내지 않는다. 블록에 묶음이 하나뿐이어도 종류 주석을 낸다. 묶음 사이는 빈 줄 하나. **묶음 안은 이름순** — `exporters.ts`가 묶음마다 Figma 이름(슬래시 이름 — CSS 이름이 아님)을 **코드 단위 비교**(`<` — 실행 환경의 언어 설정과 무관하게 늘 같은 순서. `localeCompare`는 언어마다 순서가 달라 쓰지 않는다 — #162 리뷰)로 다시 정렬한다(안정 정렬 — 변수는 dedupe 뒤라 이름이 모두 달라 받은 순서와 무관, 같은 이름 텍스트 스타일은 받은 순서대로 — 지금 그대로. `code.ts`의 정렬도 같은 코드 단위 비교 — W3C 키 순서를 정하고, CSS는 이 정렬이 다시 정함). TEXT STYLES 블록은 종류 주석 없이 스타일 이름순(같은 방식으로 `exporters.ts`가 정렬). 들여쓰기 · 빈 줄은 예시 그대로(`:root {` 바로 뒤 · `}` 바로 앞에는 빈 줄 없음), 파일 끝 줄바꿈은 없다(지금 그대로).
+  - **그대로인 것:** 같은 이름이 Global과 Semantic에 다 있으면 Global 하나만 남기고(거울이 아닌 겹침은 알림 — 아래 "같은 이름 Global · Semantic") 같은 계층 안에서 겹치면 13.5 순서(사용자 컬렉션 먼저 · 목록 순)의 첫 것을 남기는 규칙(`dedupeByName` · `code.ts` `rank` 정렬 — 묶기 전에 한다), 굵기 italic의 짝 줄(`…-style: italic`)이 바로 아래에 붙는 것, 폰트 단위(rem)의 값, 텍스트 스타일 줄 이름(`--typography-…`). 변수도 텍스트 스타일도 없으면 지금처럼 `:root {\n}` 하나를 내고 저장 전에 거른다(`exportHasTokens`).
   - **W3C 토큰 JSON은 바꾸지 않는다** — JSON에는 주석을 넣을 수 없고, 이미 이름 경로로 묶여 있다.
   - **다음 PR(A.22 끝):** Dark 등 기본이 아닌 모드 값 내보내기(지금은 기본 모드 값만 낸다 — `valuesByMode[defaultModeId]`) · 굵기 변수. **나중 후보:** 텍스트 스타일을 변수 참조(`var(…)`)로 내기. **하지 않음:** 변수 이름 앞 `global-` 같은 접두사(내보내기는 Figma 변수 이름을 그대로 옮긴다).
 
@@ -1392,6 +1392,22 @@
   --typography-body-medium-letter-spacing: 0px;
 }
 ```
+
+- **별칭 대상이 내보내지 않는 변수일 때(2026-11-20 사용자 결정 — #162 리뷰 4 · A.23):** 내보내는 변수(Global · Semantic 계층)의 기본 모드 값이 별칭이면 대상 변수를 본다. 지금 코드는 대상이 로컬 변수이기만 하면 그 이름을 가리킨다(`code.ts` EXPORT — `nameById`). 그래서 대상이 내보내지 않는 변수면 정의되지 않은 `var(--…)`(W3C는 없는 `{…}` 참조)가 나오고, 대상과 같은 이름의 다른 변수가 남으면 그 변수의 값으로 잘못 풀린다.
+  - **남는 변수** = 내보내는 변수 가운데 아래 dedupe 뒤에 실제로 출력되는 그 변수 자신(같은 이름이면 Global, 같은 계층 안이면 13.5 순서의 첫 것). 계층 번호(13.4 — `TIER_NUM`)가 1 · 2가 아닌 변수(0 = 계층 아님, 3 = Component)와 dedupe에서 진 변수는 **남지 않는 변수**다.
+  - **정하는 순서:** ⓪ 먼저 내보내는 변수마다 기본 모드 값의 사슬을 실제 값까지 따라가 ③에 걸리는 변수를 뺀다(그 변수는 내보내지 않고, 남는 변수 판정에도 들지 않는다) → 남은 것으로 dedupe를 해 **남는 변수**를 정한다 → 그다음 각 변수에 ① · ②를 한다. (예: Global `A`가 끊긴 별칭이고 Semantic `A`는 값, Semantic `B`가 Global `A`를 가리키면 — Global `A`는 ⓪에서 빠지고 Semantic `A`가 남는 변수가 되며, `B`도 ⓪에서 사슬(`B` → Global `A` → 끊김)이 끊겨 빠진다. `B`가 Semantic `A`의 값으로 잘못 풀리지 않는다.)
+  - ① 대상이 **남는 변수**면 지금처럼 그 이름을 가리킨다(CSS `var(--…)`, W3C `{a.b}`).
+  - ② 대상이 **남지 않는 변수**면 대상이 속한 컬렉션의 **기본 모드** 값을 읽어 다시 ① · ②를 따른다. 남는 변수를 만나면 그것을 가리키고, 실제 값을 만나면 그 값을 직접 낸다 — 색은 지금 규칙 그대로 `#rrggbb`(투명도가 있으면 `#rrggbbaa`), 숫자 · 문자 · 참거짓은 지금처럼 그대로.
+  - ③ 대상을 찾을 수 없거나(로컬 변수가 아님 — 지운 변수 · 라이브러리 변수), 따라가다 같은 변수를 다시 만나거나(순환), 12번을 읽어도 실제 값에 닿지 않으면(원래 변수를 포함해 12번 읽기 — 연결 쪽 `bind.ts` `resolveValue`와 같은 상한) 지금처럼 그 변수를 내보내지 않는다.
+  - 이름 · 계층 · 종류(`kind`)는 **원래 변수의 것**을 쓴다 — 그래서 CSS 블록 · 묶음 자리와 px · rem 규칙은 원래 변수 그대로다. 설명(`description` — #16 원본 단위, 행간 · 자간에서 값보다 먼저 쓰임)은 ①이면 원래 변수의 것(지금 그대로 — 별칭 줄이라 출력에 쓰이지 않음), ②로 값을 냈으면 **값을 준 변수**의 것을 쓴다(원래 변수의 설명은 쓰지 않는다 — 안내 글이 값 자리에 나오거나 원본 단위를 잃지 않게). CSS · W3C 둘 다 같다.
+  - 값으로 푼 줄은 기본 모드 값으로 굳는다. 다음 PR(모드 내보내기 — A.22 끝)에서는 모드마다 다시 푼다.
+- **같은 이름 Global · Semantic(2026-11-20 사용자 결정 — #162 리뷰 5 · A.23):** 같은 이름이 Global과 Semantic에 다 있으면 지금처럼 Global 하나만 낸다(CSS는 같은 이름을 두 번 가질 수 없다). 다만 Semantic 쪽이 **거울이 아니면** 내보내기 팝업 상태 줄에 알린다.
+  - **견줄 Global** = 그 이름의 Global 중 남는 것(13.5 순서의 첫 것). 판정은 위 ①–③으로 푼 뒤의 필드로 한다(형식 · 폰트 단위와 무관).
+  - **거울** = Semantic이 ⓐ 자기 이름을 가리키는 별칭(`aliasOf`가 자기 이름 — 예전 1:1 거울)이거나, ⓑ 풀린 뒤 출력을 정하는 필드가 견줄 Global과 같다 — 둘 다 별칭이면 `aliasOf`만 견주고(별칭 줄은 설명 · 종류가 출력에 쓰이지 않는다 — 둘 다 같은 대상을 가리키면 잃는 정보가 없다), 둘 다 값이면 `value` · `description` · `kind`를 모두 견준다. 한쪽만 별칭이면 거울이 아니다. 그 밖은 **겹침**이다.
+  - **세는 단위:** 이름 하나에 Semantic이 여럿이면 그중 하나라도 거울이 아니면 그 이름을 겹침으로 센다. n = 겹친 **이름** 수(같은 이름은 한 번). 같은 계층 안의 겹침(Global끼리 · Semantic끼리)은 지금처럼 13.5 순서의 첫 것만 내고 알리지 않는다(이번 범위 밖).
+  - **상태 줄:** 겹친 이름이 1개 이상이면 저장 성공 글(`export.saved`) 뒤에 한 칸 띄고 새 키 `export.clash` "Global과 이름이 같은 Semantic {n}개는 Global 값만 냈어요: {names}"를 붙이고 상태 종류를 `warn`(경고)으로 한다 — 지금 코드는 `ui.html`에서 `.status`의 회색이 `.warn` · `.ok` 색보다 뒤에 있어 모든 상태 줄이 회색으로 보인다(원래 있던 문제 — 2026-11-20 사용자 결정 "별도 PR로 전체 고침", ROADMAP). names = 겹친 이름(Figma 슬래시 이름)을 이름순(코드 단위 비교)으로 앞 3개까지 ", "로 잇고, 3개를 넘으면 뒤에 한 칸 + `list.usesMore`("외 {n}개", n = 나머지 수 — 있는 키를 다시 씀. 정확히 4개면 "a, b, c 외 1개"). 예: "CSS — tokens.css로 저장했어요. Global과 이름이 같은 Semantic 2개는 Global 값만 냈어요: color/primary, spacing/md". 겹침이 0이면 지금 그대로(`export.saved`, `ok`). 파일은 늘 저장한다(겹침 때문에 막지 않는다). 상태 줄은 `exportStatus` 한 줄 글이다(상자 아님 — ia-v4 §2.8 카드 안 카드 금지).
+  - **메시지:** `EXPORT_RESULT`에 새 필드 `clashes: string[]`(겹친 이름, 중복 없이 이름순). `exporters.ts`의 새 함수 `exportClashes(tokens)`가 위 판정으로 세고, `code.ts` EXPORT가 실어 보낸다. CSS · W3C 둘 다 같다.
+  - **이번에 하지 않음:** CSS 이름에서 한글 같은 글자가 지워지는 문제(`kebab` — `color/가`의 한글이 사라져 다른 이름과 겹칠 수 있음) — ROADMAP 나중 후보.
 
 ### 4.5 변수 탭 — 만들기
 
@@ -3243,3 +3259,17 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - Dark 등 기본이 아닌 모드 값 내보내기: 계층 블록 뒤 `[data-theme="{모드 이름 소문자}"] { … }`에 기본 모드와 값이 다른 변수만(선택자 `[data-theme]` — 결정).
 - 굵기 변수(Global `font-weight/{숫자}` — 예 `font-weight/700`)를 만들고 텍스트 스타일 등록 때 연결한다. 레이어에 직접 붙이지는 않는다. 2026-11-12 결정 Q3-1의 "굵기 만들기 없앰(연결할 속성이 없다)"을 굵기만 뒤집는다(Figma는 `fontWeight`에 변수를 붙일 수 있다 — `bind.ts` `RANGE_FIELDS`에도 있음). 명세 · 검토는 따로.
 - 나중 후보: 텍스트 스타일을 변수 참조(`var(--font-size-…)`)로 내보내기(굵기 변수 뒤).
+
+## A.23 내보내기 별칭 풀기 · 같은 이름 알림 PR (2026-11-20 사용자 결정 — #162 리뷰 4 · 5, §4.4)
+
+결정: ④ 남지 않는 변수(계층 1 · 2가 아님, 또는 dedupe에서 짐)를 가리키는 별칭은 값으로 풀기(남는 변수를 만나면 그것을 가리킴) · ⑤ 같은 이름 Global · Semantic은 Global을 남기고 거울이 아니면 팝업 상태 줄에 알림 · 한글 CSS 이름은 나중에.
+
+- [x] `code.ts` EXPORT: 별칭 따라가기(⓪ ③에 걸리는 변수 먼저 빼고 남는 변수 정함 → ① 남는 변수 → 가리킴 ② 남지 않는 변수 → 그 컬렉션 기본 모드 값으로 계속 ③ 없음 · 순환 · 12번 읽기 초과 → 내보내지 않음), 이름 · 계층 · 종류는 원래 변수, 설명은 ①이면 원래 · ②면 값을 준 변수
+- [x] `exporters.ts` `exportClashes(tokens)`: 거울 판정(ⓐ 자기 이름 별칭 · ⓑ 별칭 쌍은 `aliasOf`, 값 쌍은 `value` · `description` · `kind`) 밖의 Global · Semantic 같은 이름 → 이름 단위(중복 없음) 이름순 목록
+- [x] `messages.ts` `EXPORT_RESULT.clashes: string[]` · `code.ts`가 실어 보냄
+- [x] `ui.ts` EXPORT_RESULT: 겹침이 있으면 `export.saved` + " " + `export.clash`(names 앞 3개 · 넘치면 `list.usesMore`) · `warn`, 없으면 지금 그대로
+- [x] `i18n.ts` 새 키 `export.clash`
+- [x] 단위 테스트: 별칭 풀기 — 순수 함수로 빼서 시험(계층 0 대상 1단 · 2단 · Component 계층 대상 · dedupe에서 진 변수 대상 · 중간에 남는 변수 · 순환 · 12번 읽기 초과 · 없는 대상 · 설명은 값을 준 변수 것 · ⓪ 예(끊긴 Global `A` · 값 Semantic `A` · `B` → Global `A`는 빠짐)) · `exportClashes`(자기 이름 별칭 = 거울 · 같은 필드 = 거울 · 둘 다 같은 대상 별칭 = 거울 · 다른 값 · 다른 대상 · 값 쌍에서 설명만 다름 = 겹침 · 별칭 쌍에서 설명만 다름 = 거울 · 한쪽만 별칭 = 겹침 · Global이 별칭인 경우 · 같은 이름 Semantic 여럿(하나만 겹침이어도 이름 1개) · 같은 계층 겹침은 안 셈 · 이름순)
+- [x] `ui.ts` 상태 줄 글: `saved + " " + clash` 이어 붙임 · 3개 초과 `list.usesMore` — 단위 검사(`exportClashNotice`) + 실제 화면 확인(Playwright로 팝업에 `EXPORT_RESULT` 넣어 글 · `warn` 클래스 확인)
+- [x] 4검사 · `dist/` 다시 빌드
+- [x] 실기 확인(사용자, 피그마): 계층 밖 컬렉션을 가리키는 Semantic · 같은 이름 다른 값 Semantic이 있는 파일에서 CSS 내보내기 → 값으로 풀림 · 상태 줄 알림 — 2026-11-20 사용자 지시 "병합해"로 생략(병합 뒤 확인)
