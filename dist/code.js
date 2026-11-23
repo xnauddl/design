@@ -91,14 +91,21 @@
     // 마법사
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
-    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
-    "dark.collection": "Semantic \uCEEC\uB809\uC158",
-    "dark.fromMode": "\uB77C\uC774\uD2B8",
-    "dark.toMode": "\uB2E4\uD06C",
+    "dark.hint": "Global \uC0C9\uC758 \uBA85\uB3C4\uB97C \uB4A4\uC9D1\uC5B4 Dark \uBAA8\uB4DC\uC5D0 \uCC44\uC6CC\uC694",
+    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4 Global \uC0C9\uB9C8\uB2E4 Dark \uCE78\uC744 \uCC44\uC6CC\uC694. Semantic\uC740 \uADF8\uB300\uB85C Global\uC744 \uAC00\uB9AC\uCF1C\uC694. \uC9C1\uC811 \uACE0\uCE5C Dark \uCE78\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
-    // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
-    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
+    // 다시 채울 칸(ia-v3 13.7 D-T1) — 다크 카드 · 준비 현황
+    "dark.stale": "\uB2E4\uD06C\uB97C \uB2E4\uC2DC \uCC44\uC6B8 Global \uC0C9 {n}\uAC1C \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB204\uB974\uBA74 \uCC44\uC6CC\uC694",
+    "pipeline.stat.darkStale": "\uB2E4\uC2DC \uCC44\uC6B8 \uC0C9 {n}\uAC1C",
+    // 옛 구조 옮기기 확인 팝업(13.7)
+    "dark.migrateTitle": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uBC14\uAFC0\uAE4C\uC694?",
+    "dark.migrateBody": "Semantic\uC758 {modes} \uBAA8\uB4DC\uB97C Global\uB85C \uC62E\uACA8\uC694.",
+    "dark.migrateDarkVars": " dark/ \uBCC0\uC218 {d}\uAC1C \uAC00\uC6B4\uB370 \uC4F0\uC9C0 \uC54A\uB294 \uAC83\uC740 \uC9C0\uC6CC\uC694.",
+    "dark.migrateLost": "\uC9C1\uC811 \uACE0\uCE5C Dark\uAC00 \uC0AC\uB77C\uC9C0\uB294 Semantic {k}\uAC1C: {names}",
+    "dark.migrateUser": "\uC0AC\uC6A9\uC790 Global\uC744 \uC4F0\uB294 Semantic {u}\uAC1C\uB294 \uB2E4\uD06C\uAC00 \uC5C6\uC5B4\uC838\uC694",
+    "dark.migrateFrames": "\uD504\uB808\uC784\uC5D0 Semantic {modes} \uBAA8\uB4DC\uB97C \uACE8\uB77C \uB450\uC5C8\uB2E4\uBA74 Global \uCEEC\uB809\uC158\uC758 \uBAA8\uB4DC\uB85C \uB2E4\uC2DC \uACE8\uB77C \uC8FC\uC138\uC694",
+    "dark.migrateUndo": "\u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694",
+    "dark.migrateBtn": "\uC62E\uAE30\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -139,11 +146,13 @@
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
+    "wizard.seq.dark": "Global \uC0C9 {realiased}\uAC1C \uB2E4\uD06C \uCC44\uC6C0",
     "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
-    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
-    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
+    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uBCC4\uCE6D \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uC0C9 \xB7 \uC61B dark/)",
+    "wizard.seq.darkNoTarget": "\uD50C\uB7EC\uADF8\uC778 Global\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 \uC9C1\uC811 \uAC12\uC778 Global \uC0C9\uC774 \uD544\uC694\uD574\uC694",
+    "wizard.seq.darkNoChange": "\uBC14\uAFC0 \uB2E4\uD06C \uCE78 \uC5C6\uC74C",
+    "wizard.seq.darkLegacy": "\uC61B \uB2E4\uD06C \uAD6C\uC870\uC608\uC694 \u2014 \uB2E4\uD06C \uBAA8\uB4DC \uCE74\uB4DC\uC5D0\uC11C \uC62E\uACA8 \uC8FC\uC138\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesLinked": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uC5F0\uACB0",
     "wizard.seq.textStylesMissing": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -827,21 +836,21 @@
     "semantic.needGlobal": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "dark.prereqLoading": "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "dark.prereqNoVars": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
-    "dark.prereqNoModes": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.",
-    "dark.prereqPick": "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
     "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
-    "dark.whyNoGlobal": "Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 {n}\uAC1C)",
+    "dark.whyNoGlobal": "\uCC44\uC6B8 Global \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 {n}\uAC1C)",
     "dark.whyNone": "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694",
     "dark.modeAdded": "\uB2E4\uD06C \uBAA8\uB4DC\uB294 \uCD94\uAC00\uD588\uC5B4\uC694. ",
     "dark.fillFailed": "{modePart}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.modeAddedShort": "\uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00 \xB7 ",
-    "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "dark.done": "{modePart}\uB2E4\uD06C {n}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 {c}\uAC1C{skipPart}",
-    "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "dark.errNotOwned": "\uB2E4\uD06C\uB294 \uD50C\uB7EC\uADF8\uC778 Semantic\uC5D0\uB9CC \uB9CC\uB4E4\uC5B4\uC694",
+    "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uBCC4\uCE6D \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uC0C9 \xB7 \uC61B dark/)",
+    "dark.done": "{migratedPart}{modePart}Global \uC0C9 {n}\uAC1C \uB2E4\uD06C \uCC44\uC6C0{keptPart}{userPart}{skipPart}",
+    "dark.doneNoChange": "{migratedPart}{modePart}\uBC14\uAFC0 \uB2E4\uD06C \uCE78\uC774 \uC5C6\uC5B4\uC694{keptPart}{userPart}{skipPart}",
+    "dark.keptPart": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uCE78 {k}\uAC1C \uADF8\uB300\uB85C",
+    "dark.userPart": " \xB7 \uC0AC\uC6A9\uC790 Global\uC744 \uC4F0\uB294 Semantic {u}\uAC1C\uB294 \uB2E4\uD06C \uC5C6\uC74C",
+    "dark.migratedPart": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACBC\uC5B4\uC694(dark/ {d}\uAC1C \uC9C0\uC6C0{keptDarkPart}) \xB7 ",
+    "dark.keptDarkPart": " \xB7 {k}\uAC1C\uB294 \uB0A8\uAE40 \u2014 \uC4F0\uB294 \uACF3\uC774 \uC788\uAC70\uB098 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
     "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
-    "dark.errSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694 \u2014 \uB77C\uC774\uD2B8\uC5D0 \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
     // 만들기 › 타이포(텍스트 스타일)
     "textStyle.rowDelete": "\uC0AD\uC81C",
     "textStyle.scanSummary": "\uC2E0\uADDC {a} \xB7 \uB4F1\uB85D\uB428 {b}",
@@ -4925,6 +4934,7 @@
             summary.created++;
             summary.globals++;
             setGlobalLiteral(g2.variable, gMode, t2, type, base);
+            copyDefaultToOtherModes(g2.variable, globalCol);
             g2.variable.hiddenFromPublishing = true;
             const desc2 = unitDescription(t2);
             if (desc2) g2.variable.description = desc2;
@@ -4951,6 +4961,7 @@
         summary.globalOf.set(t2.name, g.variable.id);
         delete reuseMap[t2.name];
         setGlobalLiteral(g.variable, gMode, t2, type, base);
+        if (g.created) copyDefaultToOtherModes(g.variable, globalCol);
         const scopes = scopesForType(scopesForSources(t2.sources), type);
         const key = vkey(globalCol.id, t2.name);
         const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
@@ -5158,6 +5169,11 @@
       made++;
     }
     return made;
+  }
+  function copyDefaultToOtherModes(v, col) {
+    const val = v.valuesByMode[col.defaultModeId];
+    if (val === void 0) return;
+    for (const m of col.modes) if (m.modeId !== col.defaultModeId) v.setValueForMode(m.modeId, val);
   }
   function setGlobalLiteral(v, modeId, t2, type, base) {
     var _a, _b;
@@ -10922,117 +10938,249 @@
   function darkGlobalName(lightName) {
     return isDarkGlobalName(lightName) ? lightName : `${DARK_PREFIX}${lightName}`;
   }
+  function darkCellHex(c) {
+    const h = (x) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, "0");
+    return `#${h(c.r)}${h(c.g)}${h(c.b)}${h(typeof c.a === "number" ? c.a : 1)}`;
+  }
+  var DARK_CALC_KEY = "dsl.darkCalc";
+  function classifyDarkCell(light, calc, dark, record) {
+    if (dark === void 0) return "fill";
+    if (dark === null) return "kept";
+    if (dark === light || record !== "" && dark === record) return dark === calc ? "same" : "fill";
+    return "kept";
+  }
 
   // src/lib/themeApply.ts
   var DARK_MODE_NAME = "Dark";
   function isVariableAlias(raw) {
     return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
   }
+  function isColor(raw) {
+    return !!raw && typeof raw === "object" && "r" in raw && "g" in raw && "b" in raw;
+  }
   function findModeByName(modes, name) {
     const key = name.toLowerCase();
     return modes.find((m) => m.name.toLowerCase() === key);
   }
+  function findDarkMode(collection) {
+    return findModeByName(collection.modes.filter((m) => m.modeId !== collection.defaultModeId), DARK_MODE_NAME);
+  }
   function ensureDarkMode(collection) {
-    const existing = findModeByName(collection.modes, DARK_MODE_NAME);
+    const existing = findDarkMode(collection);
     if (existing) return { modeId: existing.modeId, created: false };
     const modeId = collection.addMode(DARK_MODE_NAME);
     return { modeId, created: true };
   }
-  async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a, _b, _c, _d;
-    let created = 0;
-    let realiased = 0;
-    let skipped = 0;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semanticCol = cols.find((c) => c.id === collectionId);
-    if (!semanticCol) return { created, realiased, skipped, error: t("dark.errNoCol") };
-    if (((_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id) !== semanticCol.id) return { created, realiased, skipped, error: t("dark.errNotOwned") };
-    let modeCreated = false;
-    let to = toModeId;
-    if (!to) {
-      try {
-        const ensured = ensureDarkMode(semanticCol);
-        to = ensured.modeId;
-        modeCreated = ensured.created;
-      } catch (e) {
-        const why = e instanceof Error ? e.message : String(e);
-        return {
-          created: 0,
-          realiased: 0,
-          skipped: 0,
-          error: t("dark.errAddMode", { why: why || t("dark.errAddModePlan") })
-        };
-      }
+  function readRecord(v) {
+    try {
+      const fn = v.getPluginData;
+      return typeof fn === "function" ? fn.call(v, DARK_CALC_KEY) || "" : "";
+    } catch (e) {
+      return "";
     }
-    let from = fromModeId;
-    if (!from) {
-      const def = semanticCol.defaultModeId;
-      from = def === to ? (_c = (_b = semanticCol.modes.find((m) => m.modeId !== to)) == null ? void 0 : _b.modeId) != null ? _c : def : def;
+  }
+  function writeRecord(v, val) {
+    var _a;
+    if (readRecord(v) === val) return false;
+    try {
+      (_a = v.setPluginData) == null ? void 0 : _a.call(v, DARK_CALC_KEY, val);
+      return true;
+    } catch (e) {
+      return false;
     }
-    if (from === to) {
-      return __spreadProps(__spreadValues({
-        created: 0,
-        realiased: 0,
-        skipped: 0
-      }, modeCreated ? { modeCreated: true } : {}), {
-        error: t("dark.errSameMode")
+  }
+  function cellPlan(v, lightModeId) {
+    if (v.resolvedType !== "COLOR" || isDarkGlobalName(v.name) || isManualVar(v)) return null;
+    const raw = v.valuesByMode[lightModeId];
+    if (!isColor(raw)) return null;
+    const a = typeof raw.a === "number" ? raw.a : 1;
+    const calc = __spreadProps(__spreadValues({}, hexToRgb(darkValueForLight(rgbToHex(raw)))), { a });
+    return { v, light: __spreadProps(__spreadValues({}, raw), { a }), calc, lightHex: darkCellHex(__spreadProps(__spreadValues({}, raw), { a })), calcHex: darkCellHex(calc) };
+  }
+  function cellAction(p, darkModeId) {
+    const d = p.v.valuesByMode[darkModeId];
+    const dark = d === void 0 ? void 0 : isColor(d) ? darkCellHex(d) : null;
+    return classifyDarkCell(p.lightHex, p.calcHex, dark, readRecord(p.v));
+  }
+  function countDarkStale(cols, vars) {
+    const g = ownedCollection(cols, "global");
+    const dark = g ? findDarkMode(g) : void 0;
+    if (!g || !dark) return { count: 0, names: [] };
+    const names = [];
+    for (const v of vars) {
+      if (v.variableCollectionId !== g.id) continue;
+      const p = cellPlan(v, g.defaultModeId);
+      if (p && cellAction(p, dark.modeId) === "fill") names.push(v.name);
+    }
+    names.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    return { count: names.length, names: names.slice(0, 10) };
+  }
+  function sameValue(a, b) {
+    if (isVariableAlias(a) || isVariableAlias(b)) return isVariableAlias(a) && isVariableAlias(b) && a.id === b.id;
+    if (isColor(a) && isColor(b)) return darkCellHex(a) === darkCellHex(b);
+    return a === b;
+  }
+  function legacyDarkModes(sem, semVars, byId) {
+    return sem.modes.filter((m) => {
+      if (m.modeId === sem.defaultModeId) return false;
+      if (m.name.toLowerCase() === DARK_MODE_NAME.toLowerCase()) return true;
+      return semVars.some((v) => {
+        var _a, _b;
+        const raw = v.valuesByMode[m.modeId];
+        return isVariableAlias(raw) && isDarkGlobalName((_b = (_a = byId.get(raw.id)) == null ? void 0 : _a.name) != null ? _b : "");
       });
+    });
+  }
+  function userGlobalRoles(g) {
+    if (!g.semantic) return [];
+    const def = g.semantic.defaultModeId;
+    return g.semVars.filter((v) => {
+      const raw = v.valuesByMode[def];
+      return v.resolvedType === "COLOR" && isVariableAlias(raw) && g.isUserGlobal(g.byId.get(raw.id));
+    });
+  }
+  function movedPair(g, v, legacy) {
+    const sem = g.semantic;
+    const def = v.valuesByMode[sem.defaultModeId];
+    if (!isVariableAlias(def)) return null;
+    const x = g.byId.get(def.id);
+    if (!x || x.variableCollectionId !== g.global.id || isDarkGlobalName(x.name)) return null;
+    const want = darkGlobalName(x.name);
+    let dark;
+    for (const m of legacy) {
+      const raw = v.valuesByMode[m.modeId];
+      if (raw === void 0 || sameValue(raw, def)) continue;
+      const t2 = isVariableAlias(raw) ? g.byId.get(raw.id) : void 0;
+      if (!t2 || t2.name !== want || t2.variableCollectionId !== g.global.id) return null;
+      dark = t2;
     }
-    let globalCol = ownedCollection(cols, "global");
-    const allVars = await figma.variables.getLocalVariablesAsync();
-    const byId = new Map(allVars.map((v) => [v.id, v]));
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const globalByName = new Map(globalCol ? allVars.filter((v) => v.variableCollectionId === (globalCol == null ? void 0 : globalCol.id)).map((v) => [v.name, v]) : []);
-    for (const v of allVars) {
-      if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
-      if (isManualVar(v)) {
-        skipped++;
-        continue;
-      }
-      const fromRaw = v.valuesByMode[from];
-      if (!isVariableAlias(fromRaw)) {
-        skipped++;
-        continue;
-      }
-      const lightGlobal = byId.get(fromRaw.id);
-      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[(_d = modeOf.get(lightGlobal.variableCollectionId)) != null ? _d : ""];
-      if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
-        skipped++;
-        continue;
-      }
-      if (isDarkGlobalName(lightGlobal.name)) {
-        skipped++;
-        continue;
-      }
-      const darkHex = darkValueForLight(rgbToHex(lightRaw));
-      const dname = darkGlobalName(lightGlobal.name);
-      let dark = globalByName.get(dname);
-      if (dark && isManualVar(dark)) {
-        skipped++;
-        continue;
-      }
-      if (!dark || !globalCol) globalCol = ensureOwnedCollection(cols, "global");
-      const gMode = globalCol.defaultModeId;
-      if (!dark) {
-        dark = figma.variables.createVariable(dname, globalCol, "COLOR");
-        dark.scopes = lightGlobal.scopes;
-        dark.hiddenFromPublishing = true;
-        globalByName.set(dname, dark);
-        created++;
-      }
-      const la = lightRaw.a;
-      dark.setValueForMode(gMode, __spreadProps(__spreadValues({}, hexToRgb(darkHex)), { a: typeof la === "number" ? la : 1 }));
-      v.setValueForMode(to, figma.variables.createVariableAlias(dark));
-      realiased++;
+    return { x, dark };
+  }
+  function planMigration(g, legacy) {
+    const sem = g.semantic;
+    const userRoleIds = new Set(userGlobalRoles(g).map((v) => v.id));
+    const differs = (v) => legacy.some((m) => {
+      const raw = v.valuesByMode[m.modeId];
+      return raw !== void 0 && !sameValue(raw, v.valuesByMode[sem.defaultModeId]);
+    });
+    const lost = [];
+    let userRoles = 0;
+    for (const v of g.semVars) {
+      if (v.resolvedType !== "COLOR" || !differs(v)) continue;
+      if (userRoleIds.has(v.id)) userRoles++;
+      else if (!movedPair(g, v, legacy)) lost.push(v.name);
     }
-    if (modeCreated && realiased === 0) {
+    lost.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
+    return {
+      modes: legacy.map((m) => m.name),
+      darkVars: g.vars.filter((v) => v.variableCollectionId === g.global.id && isDarkGlobalName(v.name)).length,
+      lost,
+      userRoles
+    };
+  }
+  async function generateDarkMode(opts = {}) {
+    var _a;
+    const out = { filled: 0, kept: 0, same: 0, skipped: 0, userRoles: 0 };
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    if (!ownedCollection(cols, "global")) return __spreadProps(__spreadValues({}, out), { noTarget: true });
+    let vars = await figma.variables.getLocalVariablesAsync();
+    const tiers = collectionTiers(cols, vars);
+    const global = ownedCollection(cols, "global");
+    const semantic = ownedCollection(cols, "semantic");
+    const graph = {
+      cols,
+      vars,
+      byId: new Map(vars.map((v) => [v.id, v])),
+      global,
+      semantic,
+      semVars: semantic ? vars.filter((v) => v.variableCollectionId === semantic.id) : [],
+      isUserGlobal: (v) => !!v && v.variableCollectionId !== global.id && tiers.get(v.variableCollectionId) === 1
+    };
+    out.userRoles = userGlobalRoles(graph).length;
+    const legacy = semantic ? legacyDarkModes(semantic, graph.semVars, graph.byId) : [];
+    if (legacy.length && !opts.migrate) return __spreadProps(__spreadValues({}, out), { needsMigration: planMigration(graph, legacy) });
+    ensureOwnedCollection(cols, "global");
+    let darkModeId;
+    let modeCreated = false;
+    try {
+      const ensured = ensureDarkMode(global);
+      darkModeId = ensured.modeId;
+      modeCreated = ensured.created;
+    } catch (e) {
+      const why = e instanceof Error ? e.message : String(e);
+      return __spreadProps(__spreadValues({}, out), { error: t("dark.errAddMode", { why: why || t("dark.errAddModePlan") }) });
+    }
+    const lightModeId = global.defaultModeId;
+    let recordChanged = false;
+    if (legacy.length) {
+      const done = /* @__PURE__ */ new Set();
+      for (const v of graph.semVars) {
+        if (v.resolvedType !== "COLOR") continue;
+        const pair = movedPair(graph, v, legacy);
+        if (!(pair == null ? void 0 : pair.dark) || done.has(pair.x.id)) continue;
+        done.add(pair.x.id);
+        const raw = pair.dark.valuesByMode[lightModeId];
+        if (!isColor(raw)) continue;
+        const p = cellPlan(pair.x, lightModeId);
+        if (!p || cellAction(p, darkModeId) === "kept") continue;
+        const val = __spreadProps(__spreadValues({}, raw), { a: typeof raw.a === "number" ? raw.a : 1 });
+        pair.x.setValueForMode(darkModeId, val);
+        recordChanged = writeRecord(pair.x, darkCellHex(val) === p.calcHex ? p.calcHex : "") || recordChanged;
+      }
+      for (const m of legacy) {
+        try {
+          semantic == null ? void 0 : semantic.removeMode(m.modeId);
+        } catch (e) {
+        }
+      }
+      const scan = await ((_a = opts.scanUnused) != null ? _a : scanUnusedVariables)();
+      const none = new Set(scan.items.filter((i) => i.kind === "none").map((i) => i.id));
+      vars = await figma.variables.getLocalVariablesAsync();
+      let deleted = 0;
+      let keptDark = 0;
+      for (const v of vars) {
+        if (v.variableCollectionId !== global.id || !isDarkGlobalName(v.name)) continue;
+        if (!none.has(v.id) || isManualVar(v)) {
+          keptDark++;
+          continue;
+        }
+        try {
+          v.remove();
+          deleted++;
+        } catch (e) {
+          keptDark++;
+        }
+      }
+      out.migrated = { deleted, keptDark };
+      vars = await figma.variables.getLocalVariablesAsync();
+    }
+    for (const v of vars) {
+      if (v.variableCollectionId !== global.id || v.resolvedType !== "COLOR") continue;
+      const p = cellPlan(v, lightModeId);
+      if (!p) {
+        out.skipped++;
+        continue;
+      }
+      const act = cellAction(p, darkModeId);
+      if (act === "kept") out.kept++;
+      else if (act === "same") {
+        out.same++;
+        recordChanged = writeRecord(v, p.calcHex) || recordChanged;
+      } else {
+        v.setValueForMode(darkModeId, p.calc);
+        writeRecord(v, p.calcHex);
+        recordChanged = true;
+        out.filled++;
+      }
+    }
+    if (modeCreated && !legacy.length && out.filled + out.kept + out.same === 0) {
       try {
-        semanticCol.removeMode(to);
+        global.removeMode(darkModeId);
         modeCreated = false;
       } catch (e) {
       }
     }
-    return __spreadValues({ created, realiased, skipped }, modeCreated ? { modeCreated: true } : {});
+    return __spreadValues(__spreadValues(__spreadValues({}, out), modeCreated ? { modeCreated: true } : {}), recordChanged ? { recordChanged: true } : {});
   }
 
   // src/lib/entitlements.ts
@@ -11237,15 +11385,14 @@
     }
   }
   async function postPrereq() {
-    var _a, _b;
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
       const vars = await figma.variables.getLocalVariablesAsync();
       const tiers = collectionTiers(cols, vars);
       const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
       const bindableIds = new Set(cols.filter((c) => {
-        var _a2;
-        return ((_a2 = tiers.get(c.id)) != null ? _a2 : 0) > 0;
+        var _a;
+        return ((_a = tiers.get(c.id)) != null ? _a : 0) > 0;
       }).map((c) => c.id));
       const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
       const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
@@ -11253,17 +11400,20 @@
       const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
       const semanticIds = new Set(cols.filter((c) => {
-        var _a2;
-        return ((_a2 = tiers.get(c.id)) != null ? _a2 : 0) >= 2;
+        var _a;
+        return ((_a = tiers.get(c.id)) != null ? _a : 0) >= 2;
       }).map((c) => c.id));
-      const hasDarkMode = ((_b = (_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.modes.length) != null ? _b : 0) > 1;
+      const ownedGlobal = ownedCollection(cols, "global");
+      const hasOwnedGlobal = !!ownedGlobal;
+      const hasDarkMode = !!ownedGlobal && !!findDarkMode(ownedGlobal);
+      const stale = countDarkStale(cols, vars);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
       const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasOwnedGlobal, darkStale: stale.count, darkStaleNames: stale.names, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
     } catch (e) {
     }
   }
@@ -13688,9 +13838,9 @@
         }
         case "GENERATE_DARK_MODE": {
           if (!requirePaid("tokens")) break;
-          const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+          const r = await generateDarkMode({ migrate: !!msg.migrate });
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
-          if (r.created || r.realiased || r.modeCreated) {
+          if (r.filled > 0 || r.modeCreated || r.migrated || r.recordChanged) {
             commitUndo(figma);
             await postPrereq();
           }

@@ -3724,3 +3724,27 @@ test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 �
   assert.equal(lastTwo('(삭제된 변수)'), '(삭제된 변수)');
   assert.deepEqual(['FLOAT', 'STRING', 'BOOLEAN', 'COLOR'].map(varTypeMark), ['#', 'Aa', '✓', '']);
 });
+
+test('darkCellHex · classifyDarkCell — D-T1 Dark 칸 판정(ia-v3 13.7 ①②③)', async () => {
+  const { darkCellHex, classifyDarkCell } = await import('../dist/pure.mjs');
+  assert.equal(darkCellHex({ r: 1, g: 1, b: 1 }), '#ffffffff');
+  assert.equal(darkCellHex({ r: 0, g: 0, b: 0, a: 0.08 }), '#00000014');
+  const L = '#ffffffff', C = '#121212ff';
+  assert.equal(classifyDarkCell(L, C, undefined, ''), 'fill', '① 칸 없음');
+  assert.equal(classifyDarkCell(L, C, L, ''), 'fill', '② Light와 같음');
+  assert.equal(classifyDarkCell(L, C, '#222222ff', '#222222ff'), 'fill', '③ 기록과 같음');
+  assert.equal(classifyDarkCell(L, C, C, C), 'same');
+  assert.equal(classifyDarkCell(L, C, '#abcdefff', C), 'kept', '사용자가 고친 칸');
+  assert.equal(classifyDarkCell(L, C, '#abcdefff', ''), 'kept', '기록 없이 Light와 다름');
+  assert.equal(classifyDarkCell(L, C, null, ''), 'kept', '별칭 칸');
+  assert.equal(classifyDarkCell(L, L, L, ''), 'same', '중간 밝기(C = Light)');
+});
+
+test('pipelineSteps — 다크 완료 + 다시 채울 칸이 있으면 stale(상태 글 pipeline.stat.darkStale)', async () => {
+  const { pipelineSteps } = await import('../dist/pure.mjs');
+  const base = { hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasTextStyles: false };
+  const dark = (s) => pipelineSteps({ ...base, ...s }).find((x) => x.id === 'dark');
+  assert.deepEqual(dark({ hasDarkMode: true, darkStale: 3 }), { id: 'dark', status: 'done', stale: 3 });
+  assert.deepEqual(dark({ hasDarkMode: true, darkStale: 0 }), { id: 'dark', status: 'done' });
+  assert.deepEqual(dark({ hasDarkMode: false, darkStale: 3 }), { id: 'dark', status: 'todo' });
+});

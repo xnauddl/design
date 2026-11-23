@@ -252,6 +252,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
           summary.created++;
           summary.globals++;
           setGlobalLiteral(g.variable, gMode, t, type, base);
+          copyDefaultToOtherModes(g.variable, globalCol);
           g.variable.hiddenFromPublishing = true;
           const desc = unitDescription(t);
           if (desc) g.variable.description = desc;
@@ -280,6 +281,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
       delete reuseMap[t.name];
       // Global 값 = 리터럴(#16: 비-px lineHeight/letterSpacing은 px FLOAT + 원본 단위는 description)
       setGlobalLiteral(g.variable, gMode, t, type, base);
+      if (g.created) copyDefaultToOtherModes(g.variable, globalCol);
       const scopes = scopesForType(scopesForSources(t.sources), type);
       const key = vkey(globalCol.id, t.name);
       const merged = touched.has(key) ? scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type) : scopes;
@@ -497,6 +499,17 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     made++;
   }
   return made;
+}
+
+/**
+ * 새로 만든 플러그인 Global 변수의 기본이 아닌 모드 칸(예 Dark)에 기본 모드와 같은 값을 넣는다(ia-v3 13.7 D-T1
+ * "새로 만든 Global 칸") — Figma가 새 변수의 다른 모드 칸을 무엇으로 채우든, 다크 판정 ②(Light와 같음)에 걸려
+ * "손댄 칸"으로 잘못 남지 않게. 이미 있는 변수의 값을 바꿀 때는 부르지 않는다(Dark 칸은 다시 채울 칸이 된다).
+ */
+function copyDefaultToOtherModes(v: Variable, col: VariableCollection): void {
+  const val = v.valuesByMode[col.defaultModeId];
+  if (val === undefined) return;
+  for (const m of col.modes) if (m.modeId !== col.defaultModeId) v.setValueForMode(m.modeId, val);
 }
 
 function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {

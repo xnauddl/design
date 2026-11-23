@@ -35,27 +35,6 @@ export function planMake(i: MakePlanInput): MakeStepId[] {
   return out;
 }
 
-/** 다크 단계가 보낼 대상(컬렉션·출처 모드·대상 모드). */
-export interface DarkTarget {
-  collectionId: string;
-  fromModeId: string;
-  /** 이미 있는 Dark 모드. 없으면 생략 — 플러그인이 `addMode('Dark')`로 만든다. */
-  toModeId?: string;
-}
-
-/**
- * 변수 목록에서 다크 채움 대상을 고른다(순수). 대상은 플러그인 Semantic 하나뿐(§2.13 13.7) →
- * 출처는 Dark가 아닌 첫 모드 → 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
- */
-export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; tier?: number; owned?: string; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
-  const target = vars.find((v) => v.owned === 'semantic' && v.modes.length >= 1);
-  if (!target) return null;
-  const dark = target.modes.find((m) => m.name.toLowerCase() === 'dark');
-  const from = target.modes.find((m) => m.modeId !== dark?.modeId);
-  if (!from) return null; // 모드가 Dark 하나뿐 — 다크에서 다크를 채울 일은 없다
-  return { collectionId: target.collectionId, fromModeId: from.modeId, ...(dark ? { toModeId: dark.modeId } : {}) };
-}
-
 /** 실행이 단계 결과로 모은 수(다 됨 문구용). 단계가 돌지 않았으면 그 필드는 없다. */
 export interface MakeTotals {
   /** 만들기: g = created + updated, r = Semantic 수, m = 직접 만든 변수라 건너뜀. */

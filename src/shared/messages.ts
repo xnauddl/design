@@ -275,7 +275,7 @@ export type UiToCode =
   | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
-  | { type: 'GENERATE_DARK_MODE'; collectionId: string; fromModeId?: string; toModeId?: string }; // 라이트→Dark(없으면 추가) 자동 채움
+  | { type: 'GENERATE_DARK_MODE'; migrate?: boolean }; // 플러그인 Global 기본 모드 → Dark(없으면 추가) 채움, migrate = 옛 구조 옮기기(ia-v3 13.7 D-T1)
 
 /** code → UI 응답. */
 export type CodeToUi =
@@ -321,7 +321,13 @@ export type CodeToUi =
       hasScaleVars: boolean;
       hasGlobal: boolean;
       hasBindable: boolean;
+      /** 플러그인 Global에 Dark 모드(기본이 아닌, 이름 dark)가 있음(ia-v3 13.7 D-T1). */
       hasDarkMode: boolean;
+      /** 플러그인 Global 컬렉션이 있음(변수 0개여도) — 다크 카드 전제. */
+      hasOwnedGlobal: boolean;
+      /** [다크 만들기]를 누르면 바뀔 Global 색 수 · 이름(이름 순 앞 10개). */
+      darkStale: number;
+      darkStaleNames: string[];
       hasTextStyles: boolean;
       /** Semantic에 역할 별칭이 있음(역할 매핑 완료). */
       hasSemanticRoles: boolean;
@@ -360,7 +366,7 @@ export type CodeToUi =
   | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
-  | { type: 'DARK_MODE_RESULT'; created: number; realiased: number; skipped: number; modeCreated?: boolean; error?: string }
+  | { type: 'DARK_MODE_RESULT'; filled: number; kept: number; same: number; skipped: number; userRoles: number; modeCreated?: boolean; migrated?: { deleted: number; keptDark: number }; needsMigration?: { modes: string[]; darkVars: number; lost: string[]; userRoles: number }; noTarget?: boolean; recordChanged?: boolean; error?: string }
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }
   | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'paid' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 유료(무료의 플러그인 Semantic 컬렉션 — §4.9 F2) · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
 

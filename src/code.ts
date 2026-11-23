@@ -23,7 +23,7 @@ import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type Ke
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
-import { generateDarkMode } from './lib/themeApply';
+import { generateDarkMode, findDarkMode, countDarkStale } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache, isVerifyErrCode } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
@@ -206,9 +206,12 @@ async function postPrereq(): Promise<void> {
     const hasScaleVars = globals.some((v) => v.resolvedType !== 'COLOR'); // 간격·크기·폰트
     const hasGlobal = globals.length > 0;
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    // 다크는 플러그인 Semantic의 모드가 둘 이상일 때 완료(§2.13 13.7 — 다크는 플러그인 Semantic에만 만든다).
     const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
-    const hasDarkMode = (ownedCollection(cols, 'semantic')?.modes.length ?? 0) > 1;
+    // 다크는 플러그인 Global에 Dark 모드(기본이 아닌, 이름 dark)가 있을 때 완료(ia-v3 13.7 D-T1 — 모드 수로 보지 않는다).
+    const ownedGlobal = ownedCollection(cols, 'global');
+    const hasOwnedGlobal = !!ownedGlobal;
+    const hasDarkMode = !!ownedGlobal && !!findDarkMode(ownedGlobal);
+    const stale = countDarkStale(cols, vars);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
     // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
@@ -216,7 +219,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasOwnedGlobal, darkStale: stale.count, darkStaleNames: stale.names, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -2884,10 +2887,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'GENERATE_DARK_MODE': {
         // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
         if (!requirePaid('tokens')) break;
-        // toModeId 생략 시 themeApply가 Dark 모드를 ensure(없으면 addMode('Dark')).
-        const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+        // 대상은 늘 플러그인 Global(ia-v3 13.7 D-T1). 옮기기는 ④에서 파일을 훑는다 (진행 글은 dark.running, 취소 없음).
+        const r = await generateDarkMode({ migrate: !!msg.migrate });
         post({ type: 'DARK_MODE_RESULT', ...r });
-        if (r.created || r.realiased || r.modeCreated) {
+        if (r.filled > 0 || r.modeCreated || r.migrated || r.recordChanged) {
           commitUndo(figma); // UX2: 모드 추가+채움 전체를 단일 Undo로
           await postPrereq();
         }

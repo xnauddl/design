@@ -594,7 +594,7 @@
           - **새로 만든 Global 칸:** 플러그인 Global에 모드가 둘 이상일 때 만들기 · 팔레트 · 추출(`createTokens` 등 플러그인 Global에 `createVariable` 하는 곳)이 새 변수를 만들면 기본이 아닌 모드 칸에도 기본 모드와 같은 값을 넣는다 — Figma가 새 변수의 다른 모드 칸을 무엇으로 채우든 ②에 걸리게 해서 "손댄 칸"으로 잘못 남지 않게. 이미 있는 변수의 Light 값을 바꿀 때는 Dark 칸을 건드리지 않는다(③으로 다시 채울 칸이 된다).
           - **사용자 Global을 쓰는 역할:** 플러그인 Semantic의 색 변수 중 기본 모드 값이 사용자 Global(13.3 계층 1, 플러그인 것이 아님)을 가리키는 별칭인 것의 수(`userRoles`). 이 역할은 Dark에서 바뀌지 않는다(2026-11-20 사용자 결정 "다크 제외 + 알림" — 13.7 원칙).
         - **결과** `DARK_MODE_RESULT{filled, kept, same, skipped, userRoles, modeCreated?, migrated?, needsMigration?, noTarget?, error?}`(지금 `created` · `realiased`는 없앤다). 상태 줄:
-          - filled > 0: ok `dark.done` "{migratedPart}{modePart}Global 색 {n}개 다크 채움{keptPart}{userPart}{skipPart}"(n = filled — 이번에 실제로 바꾼 칸 수). filled = 0이고 kept + same > 0: ok `dark.doneNoChange` "{migratedPart}{modePart}바꿀 다크 칸이 없어요{keptPart}{userPart}{skipPart}"(이미 맞거나 직접 고친 칸뿐) — `keptPart` `dark.keptPart` " · 직접 고친 칸 {k}개 그대로", `userPart` `dark.userPart` " · 사용자 Global을 쓰는 역할 {u}개는 다크 없음", `skipPart` `dark.skippedDirect` " · 건너뜀 {n}개(별칭 · 직접 만든 색 · 옛 dark/)", `modePart` `dark.modeAddedShort` 그대로, `migratedPart`는 아래 옮기기. 0인 부분은 뺀다.
+          - filled > 0: ok `dark.done` "{migratedPart}{modePart}Global 색 {n}개 다크 채움{keptPart}{userPart}{skipPart}"(n = filled — 이번에 실제로 바꾼 칸 수). filled = 0이고 kept + same > 0: ok `dark.doneNoChange` "{migratedPart}{modePart}바꿀 다크 칸이 없어요{keptPart}{userPart}{skipPart}"(이미 맞거나 직접 고친 칸뿐) — `keptPart` `dark.keptPart` " · 직접 고친 칸 {k}개 그대로", `userPart` `dark.userPart` " · 사용자 Global을 쓰는 Semantic {u}개는 다크 없음", `skipPart` `dark.skippedDirect` " · 건너뜀 {n}개(별칭 · 직접 만든 색 · 옛 dark/)", `modePart` `dark.modeAddedShort` 그대로, `migratedPart`는 아래 옮기기. 0인 부분은 뺀다.
           - filled + kept + same = 0: warn `dark.fillFailed`(그대로) — 사유 `dark.whyNoGlobal` "채울 Global 색이 없어요(건너뜀 {n}개)" · `dark.whyNone` 그대로.
           - 결과에는 안에서만 쓰는 `recordChanged`(기록 pluginData를 하나라도 새로 쓰거나 바꿨는지 — 화면에는 쓰지 않음)를 더한다. `code.ts`는 filled > 0 · modeCreated · migrated · recordChanged 가운데 하나면 `commitUndo` 한 번 + `postPrereq`(기록만 바꾼 것도 파일 변경이라 같은 되돌리기 묶음에 넣는다). `VARIABLES`는 지금처럼 늘 다시 보낸다.
         - **다시 채울 칸 알림(2026-11-20 사용자 결정 "다크를 다시 만들 때만"):** 만들기 · 팔레트 · 추출이 플러그인 Global의 Light 값을 바꿔도 Dark 칸은 채우지 않는다. 대신 "지금 [다크 만들기]를 누르면 값이 바뀔 칸"의 수 s를 센다 — 플러그인 Global에 위 Dark 모드(기본이 아닌, 이름이 `dark`)가 있을 때, 위 "칸 채우기" 대상 중 ①②③에 들어맞고 D ≠ C인 색(= 실행하면 `filled`가 될 칸). 중간 밝기라 C가 Light와 같은 색 · 직접 만든 변수 · 손댄 칸은 세지 않는다. `postPrereq`가 부를 때마다 색 변수 수만큼 계산한다(OKLCH 변환 · pluginData 읽기 — 수백 개 수준이라 받아들임).
@@ -605,7 +605,7 @@
           - 다크 카드 [다크 만들기]: 옛 구조면 `generateDarkMode`는 아무것도 바꾸지 않고 `needsMigration{modes: string[], darkVars: number, lost: string[], userRoles: number}`로 답한다. UI는 그 작업을 표시 없이 끝내고(✓ · 작업 직후 다시 읽기 없음, 상태 줄 비움) 확인 팝업(`.modal` — §4.6 삭제 확인 창과 같은 모양)을 연다:
             - 제목 `dark.migrateTitle` "다크 구조를 바꿀까요?"
             - 본문 `dark.migrateBody` "Semantic의 {modes} 모드를 Global로 옮겨요." + d > 0이면 `dark.migrateDarkVars` " dark/ 변수 {d}개 가운데 쓰지 않는 것은 지워요."
-            - 있을 때만: `dark.migrateLost` "직접 고친 Dark가 사라지는 역할 {k}개: {names}"(앞 3개 + `list.usesMore`, 툴팁 전체) · `dark.migrateUser` "사용자 Global을 쓰는 역할 {u}개는 다크가 없어져요"
+            - 있을 때만: `dark.migrateLost` "직접 고친 Dark가 사라지는 Semantic {k}개: {names}"(앞 3개 + `list.usesMore`, 툴팁 전체) · `dark.migrateUser` "사용자 Global을 쓰는 Semantic {u}개는 다크가 없어져요"
             - 늘: `dark.migrateFrames` "프레임에 Semantic {modes} 모드를 골라 두었다면 Global 컬렉션의 모드로 다시 골라 주세요" · `dark.migrateUndo` "⌘Z 한 번으로 되돌릴 수 있어요"
             - [취소] [옮기기]. [옮기기]는 `--danger`(모드 · 변수를 지우므로 §4.6 삭제와 같게). 처음 포커스 [취소], Esc = 취소. [취소] → 팝업 닫고 상태 줄 비운 채 포커스 [다크 만들기]. [옮기기] → 같은 메시지에 `migrate: true`를 더해 새 작업으로 보낸다(진행 글 `dark.running`, 취소 없음).
           - 마법사(만들기 화면 실행의 다크 단계 · "만든 뒤 · 다크 모드"): 옛 구조면 팝업 없이 바꾸지 않고 warn `wizard.seq.darkLegacy` "옛 다크 구조예요 — 다크 모드 카드에서 옮겨 주세요"(stay).
@@ -3332,10 +3332,11 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 ## A.25 다크 구조 PR — D-T1 (2026-11-20 사용자 결정 — 13.7 "다크", ia-v4 §4.11 ②. 도구 탭(§0 8) 앞, 별도 PR)
 
 0단계 질문(2026-11-20): 이름 그대로 · 뜻은 대비 / 다시 만들 때 옮기기 / 새 Global의 Dark 칸은 다시 만들 때만 / 손댄 칸은 둠 / `dark/X`가 아닌 Dark는 계산값 + 알림 / 사용자 Global 역할은 다크 제외 + 알림 / 옮긴 뒤 Semantic 모드 · 안 쓰는 `dark/` 둘 다 지움.
-- [ ] `themeApply.ts` `generateDarkMode`: 플러그인 Global에 Dark 모드 · 색마다 Dark 칸(`dsl.darkCalc` 기록 · 손댄 칸 둠, 대상은 스스로 정함), `dark/` 복사본 없음, 결과 `filled · kept · skipped · userRoles`
-- [ ] 옛 구조 옮기기: `needsMigration` 답 → 확인 팝업 → `migrate: true`(① 모드 ② `dark/X` 값 옮김 ③ Semantic 모드 지움 ④ 안 쓰는 `dark/` 지움 ⑤ 칸 채우기 — 한 번의 되돌리기). 마법사는 `wizard.seq.darkLegacy`
-- [ ] `hasDarkMode`(Global의 기본이 아닌 dark 모드 — Brand 모드만이면 false) · `PREREQ_STATE.hasOwnedGlobal` · `PREREQ_STATE.darkStale` · `darkStaleNames` · 다크 카드 `dark.stale` · 준비 현황 `pipeline.stat.darkStale`
-- [ ] 고르개 세 개 · `refreshDarkOptions` · `refreshDarkModes` · `pickDarkTarget` 지움(2026-11-20 사용자 결정 — `test/wizard.test.mjs`의 `pickDarkTarget` 테스트 · import, `ui.ts` import도) · `renderDarkGate` · `ensureDarkMode` 기본 모드 건너뜀(`figma.test.mjs`에 그 경우) · `noTarget` · 전제 띠 둘 · 문구(13.7 "문구 바뀜" · 결과 글 · 팝업 글)
-- [ ] 새 변수의 기본이 아닌 모드 칸 = 기본 모드 값(플러그인 Global에 `createVariable` 하는 곳) · `needsMigration` 작업 추적(표시 없이 끝냄) · `messages.ts` 타입
-- [ ] 단위 테스트: 칸 채우기 ①②③ · `same` · 손댄 칸 · 중간 밝기(C = Light) · `dark/…` 건너뜀 · 옛 다크 모드 판정(브랜드 모드는 아님) · 옮겨지는 역할 / `lost` / 팝업 `userRoles` 판정 · `dark/X`가 별칭 · 손댄 X 칸 · 옮긴 값 기록(C와 같을 때만 — 다르면 kept로 지킴) · 옮긴 뒤 모드 안 지움 · Dark 모드 찾기(이름 dark · 없으면 만듦) · 준비 현황 상태 글
-- [ ] 4검사 · `dist/` 다시 빌드 · 실기 확인(새 파일 · 옛 구조 파일 · 새 변수의 Dark 칸을 Figma가 무엇으로 채우는지 · 기본 모드 이름이 Dark인 파일 — 같은 이름 모드를 Figma가 허용하는지, 막히면 `dark.errAddMode`)
+- [x] `themeApply.ts` `generateDarkMode`: 플러그인 Global에 Dark 모드 · 색마다 Dark 칸(`dsl.darkCalc` 기록 · 손댄 칸 둠, 대상은 스스로 정함), `dark/` 복사본 없음, 결과 `filled · kept · skipped · userRoles`
+- [x] 옛 구조 옮기기: `needsMigration` 답 → 확인 팝업 → `migrate: true`(① 모드 ② `dark/X` 값 옮김 ③ Semantic 모드 지움 ④ 안 쓰는 `dark/` 지움 ⑤ 칸 채우기 — 한 번의 되돌리기). 마법사는 `wizard.seq.darkLegacy`
+- [x] `hasDarkMode`(Global의 기본이 아닌 dark 모드 — Brand 모드만이면 false) · `PREREQ_STATE.hasOwnedGlobal` · `PREREQ_STATE.darkStale` · `darkStaleNames` · 다크 카드 `dark.stale` · 준비 현황 `pipeline.stat.darkStale`
+- [x] 고르개 세 개 · `refreshDarkOptions` · `refreshDarkModes` · `pickDarkTarget` 지움(2026-11-20 사용자 결정 — `test/wizard.test.mjs`의 `pickDarkTarget` 테스트 · import, `ui.ts` import도) · `renderDarkGate` · `ensureDarkMode` 기본 모드 건너뜀(`figma.test.mjs`에 그 경우) · `noTarget` · 전제 띠 둘 · 문구(13.7 "문구 바뀜" · 결과 글 · 팝업 글)
+- [x] 새 변수의 기본이 아닌 모드 칸 = 기본 모드 값(플러그인 Global에 `createVariable` 하는 곳) · `needsMigration` 작업 추적(표시 없이 끝냄) · `messages.ts` 타입
+- [x] 단위 테스트: 칸 채우기 ①②③ · `same` · 손댄 칸 · 중간 밝기(C = Light) · `dark/…` 건너뜀 · 옛 다크 모드 판정(브랜드 모드는 아님) · 옮겨지는 역할 / `lost` / 팝업 `userRoles` 판정 · `dark/X`가 별칭 · 손댄 X 칸 · 옮긴 값 기록(C와 같을 때만 — 다르면 kept로 지킴) · 옮긴 뒤 모드 안 지움 · Dark 모드 찾기(이름 dark · 없으면 만듦) · 준비 현황 상태 글
+- [x] 4검사 · `dist/` 다시 빌드 · 실제 화면 스크린샷(다크 카드 상태 · 옮기기 팝업 · 준비 현황) — 시안 v2와 맞음
+- [ ] 실기 확인(새 파일 · 옛 구조 파일 · 새 변수의 Dark 칸을 Figma가 무엇으로 채우는지 · 기본 모드 이름이 Dark인 파일 — 같은 이름 모드를 Figma가 허용하는지, 막히면 `dark.errAddMode`)

@@ -58,6 +58,8 @@ import {
   pickOwner,
   generateDarkMode,
   ensureDarkMode,
+  findDarkMode,
+  countDarkStale,
   DARK_MODE_NAME,
   createIconRegistry,
   cleanupAfterRegister,
@@ -4111,122 +4113,203 @@ test('createSemanticTextStyles — 같은 px 자간 이름에 원본이 갈리�
   assert.deepEqual(figma._state.textStyles.find((s) => s.name === 'label').letterSpacing, { value: 1, unit: 'PIXELS' });
 });
 
-/* ================= themeApply.ts ================= */
+/* ================= themeApply.ts (D-T1 — ia-v3 13.7 "다크") ================= */
 function darkFixture() {
   const figma = installFigma();
-  const global = figma.variables.createVariableCollection('Global');
+  const global = figma.variables.createVariableCollection('Global'); // 이름이 Global — 플러그인 것으로 이어받음(13.2-2)
   const semantic = figma.variables.createVariableCollection('Semantic');
-  const mkGlobal = (name, hex) => {
-    const v = figma.variables.createVariable(name, global, 'COLOR');
+  const LIGHT = global.defaultModeId;
+  const mkGlobal = (name, hex, col = global) => {
+    const v = figma.variables.createVariable(name, col, 'COLOR');
     v.scopes = ['FRAME_FILL'];
-    v.setValueForMode(global.defaultModeId, hexToRgb(hex));
+    v.setValueForMode(col.defaultModeId, hexToRgb(hex));
     return v;
   };
-  const mkSemantic = (name) => figma.variables.createVariable(name, semantic, 'COLOR');
-  const gVal = (v) => rgbToHex(v.valuesByMode[global.defaultModeId]);
-  return { figma, global, semantic, LIGHT: 'mode:light', DARK: 'mode:dark', mkGlobal, mkSemantic, gVal };
+  const mkSemantic = (name, target) => {
+    const v = figma.variables.createVariable(name, semantic, 'COLOR');
+    if (target) v.setValueForMode(semantic.defaultModeId, figma.variables.createVariableAlias(target));
+    return v;
+  };
+  const darkId = () => findDarkMode(global)?.modeId;
+  const dVal = (v) => rgbToHex(v.valuesByMode[darkId()]);
+  return { figma, global, semantic, LIGHT, mkGlobal, mkSemantic, darkId, dVal };
 }
+const noScan = async () => ({ items: [], cancelled: false });
 
-test('generateDarkMode — Global 별칭 Semantic만 dark/ 짝을 만들어 재별칭', async () => {
+test('generateDarkMode — 플러그인 Global에 Dark 모드 · 색마다 Dark 칸(dark/ 복사본 없음, Semantic은 그대로)', async () => {
   const f = darkFixture();
   const white = f.mkGlobal('color/gray/0', '#ffffff');
-  const surface = f.mkSemantic('surface');
-  surface.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(white));
-  // 리터럴 Semantic(별칭 아님)은 3계층 규칙상 대상이 아님
-  const brand = f.mkSemantic('brand');
-  brand.setValueForMode(f.LIGHT, { r: 1, g: 0, b: 0 });
+  const alias = f.figma.variables.createVariable('color/alias', f.global, 'COLOR');
+  alias.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(white));
+  const mine = f.mkGlobal('color/mine', '#ff0000');
+  mine.setPluginData('dsl.manual', '1');
+  const surface = f.mkSemantic('surface', white);
 
-  const r = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
-  assert.deepEqual(r, { created: 1, realiased: 1, skipped: 1 });
-
-  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0');
-  assert.ok(dark, 'dark/ 짝 생성');
-  // 흰 표면이 순수 검정이 아니라 다크 표면 대역으로 간다(붕괴 방지).
-  assert.equal(f.gVal(dark), '#121212');
-  assert.equal(dark.hiddenFromPublishing, true, '직접 사용 방지');
-  assert.deepEqual(dark.scopes, white.scopes, '스코프 승계');
-  assert.deepEqual(surface.valuesByMode[f.DARK], { type: 'VARIABLE_ALIAS', id: dark.id });
-  assert.equal(f.gVal(white), '#ffffff', '원본 라이트 값 불변');
-  assert.equal(brand.valuesByMode[f.DARK], undefined, '리터럴은 손대지 않음');
+  const r = await generateDarkMode();
+  assert.equal(r.modeCreated, true);
+  assert.equal(r.filled, 1);
+  assert.equal(r.skipped, 2, '별칭 · 직접 만든 변수');
+  assert.equal(f.dVal(white), '#121212');
+  assert.equal(rgbToHex(white.valuesByMode[f.LIGHT]), '#ffffff', 'Light 칸 그대로');
+  assert.equal(white.getPluginData('dsl.darkCalc'), '#121212ff');
+  assert.equal(mine.valuesByMode[f.darkId()], undefined);
+  assert.equal(f.figma._state.variables.some((v) => v.name.startsWith('dark/')), false);
+  assert.equal(f.semantic.modes.length, 1, 'Semantic 모드는 하나');
+  assert.deepEqual(surface.valuesByMode[f.semantic.defaultModeId], { type: 'VARIABLE_ALIAS', id: white.id });
 });
 
-test('generateDarkMode — 출처가 이미 dark/면 원본을 덮어쓰지 않고 건너뛴다', async () => {
+test('generateDarkMode — 다시 실행: 맞는 칸은 same · 손댄 칸은 kept · Light가 바뀐 칸은 다시 채움', async () => {
   const f = darkFixture();
-  // 모드를 자유롭게 고를 수 있어 from=Dark가 가능하다. 이때 대상 이름이 출처 자신이라
-  // 가드가 없으면 dark/ 프리미티브의 값을 밝은 값으로 덮어쓰고 자기 자신을 별칭한다.
-  const darkGlobal = f.mkGlobal('dark/color/gray/0', '#121212');
-  const surface = f.mkSemantic('surface');
-  surface.setValueForMode(f.DARK, f.figma.variables.createVariableAlias(darkGlobal));
-
-  const r = await generateDarkMode(f.semantic.id, f.DARK, f.LIGHT);
-  assert.deepEqual(r, { created: 0, realiased: 0, skipped: 1 });
-  assert.equal(findVar(f.figma, 'Global', 'dark/dark/color/gray/0'), undefined, 'dark/dark/ 미생성');
-  assert.equal(f.gVal(darkGlobal), '#121212', '원본 값 불변');
-  assert.equal(surface.valuesByMode[f.LIGHT], undefined, '자기 참조 별칭 미생성');
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const black = f.mkGlobal('color/gray/1000', '#000000');
+  const blue = f.mkGlobal('color/blue/500', '#3366ff');
+  await generateDarkMode();
+  const r2 = await generateDarkMode();
+  assert.deepEqual([r2.filled, r2.same, r2.kept], [0, 3, 0]);
+  assert.equal(r2.recordChanged, undefined, '기록도 그대로면 되돌리기 묶음 없음');
+  // 사용자가 Figma에서 black의 Dark 칸을 고침 → kept
+  black.setValueForMode(f.darkId(), hexToRgb('#abcdef'));
+  // white의 Light가 바뀜 → 기록과 같은 Dark 칸 → 다시 채울 칸
+  white.setValueForMode(f.LIGHT, hexToRgb('#f0f0f0'));
+  const cols = f.figma._state.collections;
+  const stale = countDarkStale(cols, f.figma._state.variables);
+  assert.deepEqual(stale, { count: 1, names: ['color/gray/0'] });
+  const r3 = await generateDarkMode();
+  assert.deepEqual([r3.filled, r3.same, r3.kept], [1, 1, 1]);
+  assert.equal(f.dVal(black), '#abcdef', '손댄 칸 그대로');
+  assert.notEqual(f.dVal(white), '#121212');
+  assert.equal(countDarkStale(cols, f.figma._state.variables).count, 0);
+  void blue;
 });
 
-test('ensureDarkMode — 모드 1개면 Dark를 추가하고, 이미 있으면 재사용', () => {
+test('generateDarkMode — Dark 칸이 Light와 같으면(새로 만든 변수) 채우고, 기록 없이 다르면 손댄 칸', async () => {
+  const f = darkFixture();
+  const a = f.mkGlobal('color/a', '#ffffff');
+  const b = f.mkGlobal('color/b', '#ffffff');
+  const dark = f.global.addMode('Dark');
+  a.setValueForMode(dark, hexToRgb('#ffffff')); // Light와 같음 → ②
+  b.setValueForMode(dark, hexToRgb('#222222')); // 기록 없이 다름 → kept
+  const r = await generateDarkMode();
+  assert.equal(r.modeCreated, undefined);
+  assert.deepEqual([r.filled, r.kept], [1, 1]);
+  assert.equal(rgbToHex(b.valuesByMode[dark]), '#222222');
+});
+
+test('generateDarkMode — 플러그인 Global이 없으면 noTarget(바꾸지 않음)', async () => {
   const figma = installFigma();
-  const col = figma.variables.createVariableCollection('Semantic');
-  assert.equal(col.modes.length, 1);
+  const prim = figma.variables.createVariableCollection('Primitives');
+  figma.variables.createVariable('gray/0', prim, 'COLOR').setValueForMode(prim.defaultModeId, rgbOf('#ffffff'));
+  const r = await generateDarkMode();
+  assert.equal(r.noTarget, true);
+  assert.equal(prim.modes.length, 1);
+});
+
+test('ensureDarkMode — 없으면 Dark 추가 · 있으면 재사용 · 기본 모드 이름이 Dark여도 잡지 않음', () => {
+  const figma = installFigma();
+  const col = figma.variables.createVariableCollection('Global');
   const first = ensureDarkMode(col);
   assert.equal(first.created, true);
   assert.equal(DARK_MODE_NAME, 'Dark');
-  assert.equal(col.modes.length, 2);
   assert.equal(col.modes[1].name, 'Dark');
-  assert.equal(first.modeId, col.modes[1].modeId);
-
   const again = ensureDarkMode(col);
   assert.equal(again.created, false);
   assert.equal(again.modeId, first.modeId);
-  assert.equal(col.modes.length, 2, '중복 Dark 미추가');
-
-  // 대소문자만 다른 기존 모드도 재사용
   const col2 = figma.variables.createVariableCollection('Other');
   const id = col2.addMode('dark');
-  const reused = ensureDarkMode(col2);
-  assert.equal(reused.created, false);
-  assert.equal(reused.modeId, id);
+  assert.equal(ensureDarkMode(col2).modeId, id, '대소문자만 다른 모드 재사용');
+  // 기본 모드 이름이 Dark인 컬렉션 — Light 칸을 덮어쓰지 않게 새 Dark를 더한다
+  const col3 = figma.variables.createVariableCollection('Third');
+  col3.modes[0].name = 'Dark';
+  const r3 = ensureDarkMode(col3);
+  assert.equal(r3.created, true);
+  assert.notEqual(r3.modeId, col3.defaultModeId);
+  assert.equal(findDarkMode(col3)?.modeId, r3.modeId);
 });
 
-test('generateDarkMode — toModeId 생략 시 Dark 모드를 만든 뒤 채운다', async () => {
+test('generateDarkMode — 한 칸도 못 채우면 만든 Dark 모드를 도로 걷는다', async () => {
   const f = darkFixture();
-  const lightId = f.semantic.defaultModeId;
-  const white = f.mkGlobal('color/gray/0', '#ffffff');
-  const surface = f.mkSemantic('surface');
-  surface.setValueForMode(lightId, f.figma.variables.createVariableAlias(white));
-
-  assert.equal(f.semantic.modes.length, 1);
-  const r = await generateDarkMode(f.semantic.id, lightId);
-  assert.equal(r.modeCreated, true);
-  assert.equal(r.created, 1);
-  assert.equal(r.realiased, 1);
-  assert.equal(f.semantic.modes.length, 2);
-  const darkMode = f.semantic.modes.find((m) => m.name === 'Dark');
-  assert.ok(darkMode);
-  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0');
-  assert.deepEqual(surface.valuesByMode[darkMode.modeId], { type: 'VARIABLE_ALIAS', id: dark.id });
-
-  // 두 번째 실행은 모드를 다시 만들지 않는다
-  const r2 = await generateDarkMode(f.semantic.id, lightId);
-  assert.equal(r2.modeCreated, undefined);
-  assert.equal(f.semantic.modes.length, 2);
-});
-
-test('generateDarkMode — 한 값도 못 채우면 만든 Dark 모드를 도로 걷는다', async () => {
-  const f = darkFixture();
-  const lightId = f.semantic.defaultModeId;
-  // Global 별칭이 아니라 리터럴 색인 Semantic — generateDarkMode가 통째로 건너뛰는 경우.
-  const surface = f.mkSemantic('surface');
-  surface.setValueForMode(lightId, { r: 1, g: 1, b: 1 });
-
-  assert.equal(f.semantic.modes.length, 1);
-  const r = await generateDarkMode(f.semantic.id, lightId);
-  assert.equal(r.realiased, 0);
-  assert.equal(r.skipped, 1);
-  // 빈 모드를 남기면 postPrereq가 '모드 2개 = 다크 있음'으로 읽어 준비 현황을 완료로 뒤집는다.
-  assert.equal(f.semantic.modes.length, 1);
+  const mine = f.mkGlobal('color/mine', '#ffffff');
+  mine.setPluginData('dsl.manual', '1');
+  const r = await generateDarkMode();
+  assert.deepEqual([r.filled, r.kept, r.same, r.skipped], [0, 0, 0, 1]);
+  assert.equal(f.global.modes.length, 1);
   assert.equal(r.modeCreated, undefined);
+});
+
+test('generateDarkMode — 사용자 Global을 가리키는 역할 수(userRoles) · 투명도는 그대로', async () => {
+  const f = darkFixture();
+  const prim = f.figma.variables.createVariableCollection('Primitives');
+  const up = f.mkGlobal('gray/0', '#ffffff', prim);
+  f.mkSemantic('bg', up);
+  const g = f.figma.variables.createVariable('color/gray/0-a8', f.global, 'COLOR');
+  g.setValueForMode(f.LIGHT, { r: 1, g: 1, b: 1, a: 0.08 });
+  const r = await generateDarkMode();
+  assert.equal(r.userRoles, 1);
+  assert.equal(prim.modes.length, 1, '사용자 컬렉션은 건드리지 않음');
+  const val = g.valuesByMode[f.darkId()];
+  assert.equal(val.a, 0.08);
+  assert.equal(rgbToHex(val), '#121212');
+});
+
+test('generateDarkMode — 옛 구조면 needsMigration(바꾸지 않음) · 브랜드 모드만은 옛 구조 아님', async () => {
+  const f = darkFixture();
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const brand = f.semantic.addMode('Brand');
+  const s = f.mkSemantic('surface', white);
+  s.setValueForMode(brand, f.figma.variables.createVariableAlias(white));
+  const r0 = await generateDarkMode();
+  assert.equal(r0.needsMigration, undefined, 'Brand 모드만 있으면 옛 구조 아님');
+  assert.equal(f.semantic.modes.length, 2);
+});
+
+test('generateDarkMode — 옛 구조 옮기기: 계획(lost · userRoles · darkVars) → dark/X 값 옮김 · Semantic 옛 모드 지움 · 안 쓰는 dark/ 지움', async () => {
+  const f = darkFixture();
+  const SEM = f.semantic.defaultModeId;
+  const DK = f.semantic.addMode('Dark');
+  const brand = f.semantic.addMode('Brand');
+  const alias = (v) => f.figma.variables.createVariableAlias(v);
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const blue = f.mkGlobal('color/blue/500', '#3366ff');
+  const gray9 = f.mkGlobal('color/gray/900', '#333333');
+  const dWhite = f.mkGlobal('dark/color/gray/0', '#121212'); // 계산값과 같음
+  const dBlue = f.mkGlobal('dark/color/blue/500', '#010203'); // 사용자가 다듬은 값(C와 다름)
+  const dUsed = f.mkGlobal('dark/color/gray/900', '#eeeeee'); // 레이어가 씀 → 남김
+  const prim = f.figma.variables.createVariableCollection('Primitives');
+  const up = f.mkGlobal('gray/0', '#ffffff', prim);
+  const surface = f.mkSemantic('surface', white);
+  surface.setValueForMode(DK, alias(dWhite));
+  const link = f.mkSemantic('link', blue);
+  link.setValueForMode(DK, alias(dBlue));
+  const text = f.mkSemantic('text', gray9);
+  text.setValueForMode(DK, alias(gray9)); // Dark = 기본과 같음 → 잃는 것 없음
+  const custom = f.mkSemantic('custom', gray9);
+  custom.setValueForMode(DK, alias(white)); // dark/X가 아닌 Dark → lost
+  const ub = f.mkSemantic('userBg', up);
+  ub.setValueForMode(DK, alias(dWhite)); // 사용자 Global 역할 · Dark 다름
+  for (const v of [surface, link, text, custom, ub]) v.setValueForMode(brand, v.valuesByMode[SEM]);
+
+  const plan = await generateDarkMode();
+  assert.deepEqual(plan.needsMigration, { modes: ['Dark'], darkVars: 3, lost: ['custom'], userRoles: 1 });
+  assert.equal(f.global.modes.length, 1, '옮기기 전에는 바꾸지 않음');
+  assert.equal(f.semantic.modes.length, 3);
+
+  const scan = async () => ({ items: [{ id: dWhite.id, kind: 'none' }, { id: dBlue.id, kind: 'none' }, { id: dUsed.id, kind: 'chain' }], cancelled: false });
+  const r = await generateDarkMode({ migrate: true, scanUnused: scan });
+  assert.deepEqual(r.migrated, { deleted: 2, keptDark: 1 });
+  assert.equal(r.modeCreated, true);
+  assert.deepEqual(f.semantic.modes.map((m) => m.name), ['Mode 1', 'Brand'], 'Dark만 지우고 Brand는 둔다');
+  assert.equal(f.dVal(white), '#121212');
+  assert.equal(white.getPluginData('dsl.darkCalc'), '#121212ff', 'C와 같은 옮긴 값은 기록');
+  assert.equal(f.dVal(blue), '#010203', '다듬은 dark/X 값은 지킨다');
+  assert.equal(blue.getPluginData('dsl.darkCalc'), '');
+  assert.ok(r.kept >= 1);
+  assert.equal(f.figma._state.variables.includes(dUsed), true);
+  assert.equal(f.figma._state.variables.includes(dWhite), false);
+  assert.ok(r.skipped >= 1, '남은 dark/…는 건너뜀');
+  // 다시 실행해도 다듬은 값은 그대로
+  const again = await generateDarkMode({ scanUnused: noScan });
+  assert.equal(again.needsMigration, undefined);
+  assert.equal(f.dVal(blue), '#010203');
 });
 
 /* ================= artwork.ts (그림 슬롯 이식) ================= */
@@ -4556,29 +4639,6 @@ test('연결 — 새 역할은 플러그인 Semantic에, 별칭 대상은 사용
   up.remove();
   const dry2 = await bindSelection([node], false);
   assert.equal(dry2.candidates[0].newRole.globalId, pg.id);
-});
-
-test('다크 — 플러그인 Semantic이 아니면 오류(바꾸지 않음) · 라이트 값은 사용자 Global의 기본 모드에서 읽고 dark/는 플러그인 Global에', async () => {
-  const figma = installFigma();
-  withRoot(figma);
-  const prim = figma.variables.createVariableCollection('Primitives');
-  const white = figma.variables.createVariable('gray/0', prim, 'COLOR');
-  white.setValueForMode(prim.defaultModeId, rgbOf('#ffffff'));
-  const tokens = figma.variables.createVariableCollection('Tokens'); // 사용자 Semantic
-  const ut = figma.variables.createVariable('bg', tokens, 'COLOR');
-  ut.setValueForMode(tokens.defaultModeId, { type: 'VARIABLE_ALIAS', id: white.id });
-  const bad = await generateDarkMode(tokens.id);
-  assert.ok(bad.error);
-  assert.equal(tokens.modes.length, 1);
-  const sem = figma.variables.createVariableCollection('Semantic'); // 이어받을 플러그인 Semantic
-  const s1 = figma.variables.createVariable('color/background/default', sem, 'COLOR');
-  s1.setValueForMode(sem.defaultModeId, { type: 'VARIABLE_ALIAS', id: white.id });
-  const r = await generateDarkMode(sem.id);
-  assert.equal(r.realiased, 1);
-  const dark = figma._state.variables.find((v) => v.name === 'dark/gray/0');
-  const dcol = figma._state.collections.find((c) => c.id === dark.variableCollectionId);
-  assert.equal(dcol._pd['dsl.owned'], 'global');
-  assert.notEqual(dcol.id, prim.id);
 });
 
 test('팔레트 정리 — 플러그인 컬렉션 안에서만 지운다(사용자 컬렉션의 같은 패밀리 색은 보존)', async () => {
@@ -6566,32 +6626,29 @@ test('직접 만든 변수 지키기 — prunePaletteColors는 지우지 않고,
   assert.equal(rgbToHex(role.valuesByMode[scol.defaultModeId]), '#000000');
 });
 
-test('직접 만든 변수 지키기 — 다크: manual Semantic은 다시 걸지 않고, manual dark/ Global은 덮어쓰거나 새로 만들지 않는다 · 두 번 돌려도 변수 수 같음', async () => {
+test('직접 만든 변수 지키기 — 다크: manual Global 색은 건너뛰고 Dark 칸을 넣지 않는다 · 두 번 돌려도 변수 수 같음', async () => {
   const f = darkFixture();
-  f.global.setPluginData('dsl.owned', 'global');
-  f.semantic.setPluginData('dsl.owned', 'semantic');
   const white = f.mkGlobal('color/gray/0', '#ffffff');
-  const black = f.mkGlobal('color/gray/1000', '#000000');
-  const myDark = f.mkGlobal('dark/color/gray/0', '#ff00ff');
-  myDark.setPluginData('dsl.manual', '1');
-  const surface = f.mkSemantic('surface');
-  surface.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(white));
-  const fg = f.mkSemantic('fg');
-  fg.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(black));
-  const mine = f.mkSemantic('mine');
-  mine.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(black));
+  const mine = f.mkGlobal('color/mine', '#000000');
   mine.setPluginData('dsl.manual', '1');
-
-  const r1 = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
-  assert.deepEqual(r1, { created: 1, realiased: 1, skipped: 2 });
+  const r1 = await generateDarkMode();
+  assert.deepEqual([r1.filled, r1.skipped], [1, 1]);
   const count = f.figma._state.variables.length;
-  assert.equal(f.gVal(myDark), '#ff00ff', 'manual dark/ 값 그대로');
-  assert.equal(surface.valuesByMode[f.DARK], undefined, '그 역할의 Dark 값은 지금대로');
-  assert.equal(mine.valuesByMode[f.DARK], undefined);
-  assert.equal(f.figma._state.variables.filter((v) => v.name.startsWith('dark/color/gray/0')).length, 1);
-  const r2 = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
-  assert.deepEqual(r2, { created: 0, realiased: 1, skipped: 2 });
+  assert.equal(mine.valuesByMode[f.darkId()], undefined);
+  const r2 = await generateDarkMode();
+  assert.deepEqual([r2.filled, r2.same, r2.skipped], [0, 1, 1]);
   assert.equal(f.figma._state.variables.length, count);
+  void white;
+});
+
+test('createTokens — Dark 모드가 있는 플러그인 Global에 새 변수를 만들면 Dark 칸 = Light(다시 채울 칸으로 잡힘)', async () => {
+  const figma = installFigma();
+  const g = figma.variables.createVariableCollection('Global');
+  const dark = g.addMode('Dark');
+  await createTokens([{ name: 'color/new', category: 'color', sources: ['fill'], value: '#ffffff' }]);
+  const v = findVar(figma, 'Global', 'color/new');
+  assert.equal(rgbToHex(v.valuesByMode[dark]), '#ffffff');
+  assert.deepEqual(countDarkStale(figma._state.collections, figma._state.variables), { count: 1, names: ['color/new'] });
 });
 
 /* ================= B.4 — 텍스트 스타일 A+C · 바로 연결 · 만들기 미리보기 · reqId (IA v4 §2.3-6 · §4.3) ================= */
@@ -7044,21 +7101,6 @@ test('colorSlotKey · colorRoleBases — 키는 투명도까지, 밝기는 hex�
   assert.equal(b.get('#000000@0.08'), 'default');
   assert.equal(b.get('#777777@0.5'), 'subtle');
   assert.equal(colorRoleBases([{ hex: '#ffffff', count: 1 }], '#000000@0.08', 'border').get('#ffffff'), 'subtle', '기준이 색 값 키여도 hex만 본다');
-});
-
-test('generateDarkMode — 다크 짝은 밝기만 바꾸고 투명도는 그대로', async () => {
-  const f = darkFixture();
-  const g = f.figma.variables.createVariable('color/gray/0-a8', f.global, 'COLOR');
-  g.scopes = ['FRAME_FILL'];
-  g.setValueForMode(f.global.defaultModeId, { r: 1, g: 1, b: 1, a: 0.08 });
-  const s = f.mkSemantic('overlay');
-  s.setValueForMode(f.LIGHT, f.figma.variables.createVariableAlias(g));
-  const r = await generateDarkMode(f.semantic.id, f.LIGHT, f.DARK);
-  assert.equal(r.realiased, 1);
-  const dark = findVar(f.figma, 'Global', 'dark/color/gray/0-a8');
-  const val = dark.valuesByMode[f.global.defaultModeId];
-  assert.equal(val.a, 0.08);
-  assert.equal(rgbToHex(val), '#121212');
 });
 
 test('code.ts — EXPORT: 투명도가 1이 아닌 색은 #rrggbbaa, 1이면 #rrggbb', async () => {

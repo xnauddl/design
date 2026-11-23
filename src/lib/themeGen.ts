@@ -44,3 +44,28 @@ export function isDarkGlobalName(name: string): boolean {
 export function darkGlobalName(lightName: string): string {
   return isDarkGlobalName(lightName) ? lightName : `${DARK_PREFIX}${lightName}`;
 }
+
+/* ---------- D-T1 Dark 칸 판정 (ia-v3 13.7 "칸 채우기") ---------- */
+
+/** Dark 칸 비교 값 — 늘 `#rrggbbaa`(채널마다 8비트 반올림, 투명도 ff도 붙임). */
+export function darkCellHex(c: { r: number; g: number; b: number; a?: number }): string {
+  const h = (x: number) => Math.round(Math.max(0, Math.min(1, x)) * 255).toString(16).padStart(2, '0');
+  return `#${h(c.r)}${h(c.g)}${h(c.b)}${h(typeof c.a === 'number' ? c.a : 1)}`;
+}
+
+/** 변수 pluginData — 플러그인이 마지막으로 Dark 칸에 넣은 값(`darkCellHex`). */
+export const DARK_CALC_KEY = 'dsl.darkCalc';
+
+export type DarkCellAction = 'fill' | 'same' | 'kept';
+
+/**
+ * 한 Global 색의 Dark 칸을 어떻게 할지(13.7 ①②③).
+ * light · calc는 `darkCellHex`, dark는 지금 Dark 칸 값(없으면 undefined, 색이 아니면 null), record는 기록(없으면 '').
+ * ① 칸 없음 ② Light와 같음 ③ 기록과 같음 → 다시 계산(이미 계산값이면 same) · 그 밖 → kept(손댄 칸).
+ */
+export function classifyDarkCell(light: string, calc: string, dark: string | null | undefined, record: string): DarkCellAction {
+  if (dark === undefined) return 'fill';
+  if (dark === null) return 'kept';
+  if (dark === light || (record !== '' && dark === record)) return dark === calc ? 'same' : 'fill';
+  return 'kept';
+}

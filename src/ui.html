@@ -1276,24 +1276,15 @@
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted lock" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뛰어요. 다크용 원시색은 dark/…로 따로 만들어요.">라이트 색을 뒤집어 다크에 채워요. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
+      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집어 Global 색마다 Dark 칸을 채워요. Semantic은 그대로 Global을 가리켜요. 직접 고친 Dark 칸은 그대로 둬요.">Global 색의 명도를 뒤집어 Dark 모드에 채워요</div>
       <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
       <div class="toolbar">
         <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="type" data-i18n="rail.next">다음 →</button>
       </div>
-      <div class="row">
-        <label class="inline"><span data-i18n="dark.collection">Semantic 컬렉션</span>
-          <select id="darkCollection"></select>
-        </label>
-        <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
-          <select id="darkFromMode"></select>
-        </label>
-        <label class="inline"><span data-i18n="dark.toMode">다크</span>
-          <select id="darkToMode"></select>
-        </label>
-      </div>
+      <!-- D-T1: 고르개 없음 — 대상은 늘 플러그인 Global(기본 모드 → Dark). 다시 채울 칸이 있으면 주황 한 줄(ia-v3 13.7). -->
+      <div class="warn" id="darkStale" style="display:none;margin:6px 0"></div>
       <!-- 바로가기는 '토큰이 없다'일 때만 뜬다 — 컬렉션·모드를 고르라는 안내에는 갈 곳이 없다. -->
       <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <div class="status" id="darkStatus"></div>

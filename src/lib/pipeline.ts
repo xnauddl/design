@@ -17,8 +17,10 @@ export interface PrereqState {
   hasGlobal: boolean;
   /** 바인딩 가능 변수(Semantic/Component) 존재(변수 연결 전제). */
   hasBindable: boolean;
-  /** 모드가 둘 이상인 컬렉션 존재(다크 모드를 이미 만든 상태). */
+  /** 플러그인 Global에 Dark 모드(기본이 아닌, 이름 dark)가 있음(ia-v3 13.7 D-T1). */
   hasDarkMode: boolean;
+  /** [다크 만들기]를 누르면 값이 바뀔 Global 색 수(13.7 "다시 채울 칸"). */
+  darkStale?: number;
   /** 등록된 텍스트 스타일 존재. */
   hasTextStyles: boolean;
   /** Semantic에 역할 별칭이 하나라도 있음(역할 매핑 완료). 없으면 false(이전 파일 호환). */
@@ -34,6 +36,8 @@ export interface PipelineStep {
   status: StepStatus;
   /** blocked일 때 다음 행동 안내(i18n 키, UI가 t()로 해석). 표시 라벨은 `pipeline.step.<id>`. */
   hint?: string;
+  /** 다크 단계가 done이고 다시 채울 칸이 있으면 그 수 — 상태 글 `pipeline.stat.darkStale`. */
+  stale?: number;
 }
 
 /**
@@ -54,7 +58,7 @@ export function pipelineSteps(s: PrereqState): PipelineStep[] {
       status: s.hasSemanticRoles ? 'done' : s.hasGlobal ? 'ready' : 'blocked',
       hint: s.hasGlobal || s.hasSemanticRoles ? undefined : 'pipeline.hint.needTokens',
     },
-    { id: 'dark', status: s.hasDarkMode ? 'done' : 'todo' },
+    { id: 'dark', status: s.hasDarkMode ? 'done' : 'todo', ...(s.hasDarkMode && (s.darkStale ?? 0) > 0 ? { stale: s.darkStale } : {}) },
     { id: 'textStyles', status: s.hasTextStyles ? 'done' : 'todo' },
     {
       id: 'bind',
