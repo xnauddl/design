@@ -3305,7 +3305,7 @@ const mkOn = new Map<string, boolean>();
  * 남은 값이 아닌 토큰 이름. mkOn에 적지 않고 들어갈 때 · 추출할 때마다 다시 정한다.
  */
 const mkOffByLib = new Set<string>();
-/** 사용자가 직접 바꾼 줄(줄 스위치 · 종류 머리 스위치 · 모두 켜기 · 끄기). 잠금 풀림 자동 켬은 표시하지 않는다. */
+/** 사용자가 직접 바꾼 줄(줄 스위치 · 종류 머리 스위치 · 모두 켜기 · 끄기). 잠금 풀림은 mkOn을 쓰지 않으므로 표시할 일도 없다(B.32). */
 const mkTouched = new Set<string>();
 const mkCollapsed = new Set<string>();
 let mkTreeFresh = true;
@@ -3328,7 +3328,8 @@ let mkTsExisting: ExistingStyleSig[] = [];
 let mkTsFor: string | null = null;
 let mkScanReq = 0;
 let mkTsReading = false;
-const mkTsOff = new Set<string>(); // sig
+/** 켠 텍스트 스타일 줄(sig — 포함 모음). 처음 보는 후보는 끔(ia-v4 §4.3 텍스트 스타일 탭 "기본 끔" · B.32). */
+const mkTsOn = new Set<string>(); // sig
 const mkTsNames = new Map<string, string>(); // sig → 고친 이름
 let mkEditSig: string | null = null;
 let mkTsPending: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }> | null = null;
@@ -3348,9 +3349,11 @@ const mkNextReq = (): number => { const id = ++bindReqSeq; mkOwned.add(id); retu
 const mkKind = (tk: DraftToken): MakeKind | undefined => MAKE_KIND_OF[tk.category];
 const mkLocked = (tk: DraftToken): boolean => mkStates[tk.name]?.state === 'manual';
 /** 기본 끔을 뺀 켬 — 새 줄 규칙("그 종류가 지금 모두 꺼져 있으면 새 줄 끔")의 판정에 쓴다. */
-const mkOnNoLib = (tk: DraftToken): boolean => !mkLocked(tk) && (mkOn.get(tk.name) ?? true);
+/** mkOn에 이름이 없을 때의 값 — 글자 종류는 끔(§4.3 "글자 기본 꺼짐 — 켜는 길은 사용자 조작뿐"). */
+const mkOnDefault = (tk: DraftToken): boolean => mkKind(tk) !== 'text';
+const mkOnNoLib = (tk: DraftToken): boolean => !mkLocked(tk) && (mkOn.get(tk.name) ?? mkOnDefault(tk));
 /** 줄이 켜졌는가 — 사용자가 바꾼 값 > 기본 끔(mkOffByLib) > 지금 기본(mkOn에 적힌 기본 · 새 줄 규칙). */
-const mkIsOn = (tk: DraftToken): boolean => !mkLocked(tk) && (mkTouched.has(tk.name) || !mkOffByLib.has(tk.name)) && (mkOn.get(tk.name) ?? true);
+const mkIsOn = (tk: DraftToken): boolean => !mkLocked(tk) && (mkTouched.has(tk.name) || !mkOffByLib.has(tk.name)) && (mkOn.get(tk.name) ?? mkOnDefault(tk));
 /** 사용자가 줄 켬을 바꿈 — mkOn에 적고 바꾼 줄로 표시한다. */
 function mkSetOn(name: string, on: boolean): void {
   mkOn.set(name, on);
@@ -3374,12 +3377,12 @@ function mkRecalcOffByLib(): void {
 const mkGlobalsOn = (): DraftToken[] => mkTokens.filter(mkIsOn);
 const mkSendTokens = (): DraftToken[] => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
 const mkTsName = (s: TextStyleSpec): string => mkTsNames.get(tsSig(s)) ?? s.name;
-const mkTsOnList = (): TextStyleSpec[] => (isPaid ? mkTs.filter((s) => !mkTsOff.has(tsSig(s))) : []);
+const mkTsOnList = (): TextStyleSpec[] => (isPaid ? mkTs.filter((s) => mkTsOn.has(tsSig(s))) : []);
 const mkReady = (): boolean => !!baseline && mkFor === baseKey() && !mkReading && (!isPaid || (mkTsFor === baseKey() && !mkTsReading));
 
 /** 이름 겹침(§4.3 텍스트 스타일 묶음) — 'dup' 켠 줄끼리 · 'exists' 값이 다른 기존 스타일 이름. */
 function mkTsConflict(s: TextStyleSpec): 'dup' | 'exists' | null {
-  if (mkTsOff.has(tsSig(s))) return null;
+  if (!mkTsOn.has(tsSig(s))) return null;
   const name = mkTsName(s);
   const sig = tsSig(s);
   if (mkTsOnList().some((o) => o !== s && mkTsName(o) === name)) return 'dup';
@@ -3462,10 +3465,8 @@ function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void
   mkSendPreview();
 }
 function onMakePreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
-  const prev = mkStates;
   mkStates = { ...mkStates, ...(msg.tokenStates ?? {}) };
-  // 잠금이 풀렸으면(manual이 아니게 됨) 켠다.
-  for (const [name, st] of Object.entries(msg.tokenStates ?? {})) if (prev[name]?.state === 'manual' && st.state !== 'manual') mkOn.set(name, true);
+  // 잠금이 풀려도(manual이 아니게 됨) mkOn은 쓰지 않는다 — 잠기기 전 켬 값 그대로(§4.3 "직접 만든 변수" · B.32).
   if (mkPreviewTagsOnly) { mkPreview = null; mkRoleRows = []; }
   else {
     mkPreview = { g: msg.created + msg.updated, r: msg.roles ?? 0, m: msg.skippedManual ?? 0 };
@@ -3480,7 +3481,8 @@ function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): 
   mkTsDecimal = msg.decimalRows ?? [];
   mkTsExisting = msg.existing ?? [];
   const sigs = new Set(mkTs.map(tsSig));
-  for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
+  // 지금 후보에 없는 sig만 지운다 — 남은 sig는 켠 채 이어받고 새 sig는 끔(B.32).
+  for (const k of Array.from(mkTsOn)) if (!sigs.has(k)) mkTsOn.delete(k);
   mkTsFor = baseKey();
   renderMakeScreen();
 }
@@ -3579,7 +3581,7 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       }
       const s = x;
       const sig = tsSig(s);
-      const on = !mkTsOff.has(sig);
+      const on = mkTsOn.has(sig);
       // [Aa] "Layer {n}" … [→ 스타일 이름 | 값 요약] ["있음"] … 스위치(TR-D14) — 이름 고치기 칸은 옅은 칸 자리
       const cells: HTMLElement[] = [trLeadAa(), mkLayers(s.count)];
       if (mkEditSig === sig) cells.push(mkEditInput(s));
@@ -3593,7 +3595,7 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
       if (s.boundStyleId) cells.push(mkTag(t('make.tagHas'), t('make.tsHasTip')));
       items.push({
         key: `t:${sig}`, indent: 8, off: !on, cells, onEdit: () => mkStartEdit(sig),
-        sw: { state: on, label: t('make.rowAria', { name: mkTsName(s) }), onToggle: () => { on ? mkTsOff.add(sig) : mkTsOff.delete(sig); renderMakeScreen(); } },
+        sw: { state: on, label: t('make.rowAria', { name: mkTsName(s) }), onToggle: () => { on ? mkTsOn.delete(sig) : mkTsOn.add(sig); renderMakeScreen(); } },
       });
     }
   }
@@ -4003,7 +4005,7 @@ $('makeLicense').addEventListener('click', () => goToLicense());
 $('makeSemLic').addEventListener('click', () => goToLicense());
 /** 모두 켜기 · 끄기 — 고른 탭의 줄만(잠긴 줄은 그대로, §4.3 도구 줄). */
 function mkSetAll(on: boolean): void {
-  if (mkTab === 'ts') { if (on) mkTsOff.clear(); else for (const s of mkTs) mkTsOff.add(tsSig(s)); }
+  if (mkTab === 'ts') { if (on) for (const s of mkTs) mkTsOn.add(tsSig(s)); else mkTsOn.clear(); }
   else { for (const tk of mkTokens) if (!mkLocked(tk)) mkSetOn(tk.name, on); mkPreviewSoon(); }
   renderMakeScreen();
 }
