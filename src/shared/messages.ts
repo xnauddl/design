@@ -104,6 +104,8 @@ export interface BindCandidate {
   mainId?: string;
   /** 9999로 붙이는 알약 반경 자리면 찾을 때 읽은 원래 값(ia-v3 §2.12 12.12 N-D5) — 연결 직전 다시 확인에 쓴다. */
   pillFrom?: number;
+  /** 무료 용도 더함(ia-v4 §2.3-7) — 붙이기 바로 전에 이 용도를 그 플러그인 Global에 더한다(용도 다시 확인은 건너뜀). */
+  scopeAdd?: string;
 }
 
 /** 함께 연결하는 선택 밖 메인 컴포넌트 단위(세트는 하나 — ia-v3 §2.11 11번). */
@@ -184,6 +186,8 @@ export type TextStyleApplySkipReason = 'hasStyle' | 'instance' | 'ambiguous';
 export interface TokenState {
   state: 'new' | 'update' | 'reuse' | 'manual';
   varName?: string;
+  /** reuse 가운데 실행 때 그 Global에 용도를 더하는 것(ia-v4 §4.3 "있는 변수 · 용도 더함"). */
+  scopeAdd?: boolean;
 }
 
 /** 만들기 미리보기의 Semantic 줄(IA v4 §4.3) — 역할 이름 · 가리킬 Global 이름 · 그 역할을 만든 토큰 이름. */
@@ -218,7 +222,7 @@ export type UiToCode =
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
   | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'PREVIEW_TEXT_STYLES'; reqId: number; nodeIds?: string[] } // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다
-  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string; pillFrom?: number }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string; pillFrom?: number; scopeAdd?: string }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
   // 변수 고치기(§4.4 고치기, PR 3.5) — 고친 것만. base = 팝업을 열 때(또는 마지막 저장 응답 뒤)의 이름과 고친 모드의 칸(값 없음은 null).

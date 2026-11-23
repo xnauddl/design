@@ -29,7 +29,7 @@ import { AUTO_ROLE_KEY, TEXT_STEP_KEY, assignNames, colorRoleBases, colorRoleRef
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig, isIntegerSize } from './textStyles';
 import { nameKrdsStyles, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
-import { dsRoleOwner } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
+import { dsRoleOwner, mergeScopes } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
 import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow, TsRenameRow, TsRenameItem } from '../shared/messages';
@@ -244,7 +244,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
         delete reuseMap[t.name];
         if (nm.reuse) {
           // 값은 바꾸지 않고 용도는 합친다(12.11)
-          g.variable.scopes = scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type);
+          g.variable.scopes = mergeScopes(g.variable.scopes as string[], scopes, type);
           touched.add(key);
           continue;
         }
@@ -344,7 +344,12 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
       if (nm.reuse) {
         const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
         if (v) summary.globalOf.set(t.name, v.id);
-        setState(t.name, { state: 'reuse', varName: nm.name });
+        // 실행 때 용도를 더하는가(ia-v4 §4.3 "있는 변수 · 용도 더함") — 지금 용도가 토큰 용도를 다 담지 못하면.
+        const type = resolvedTypeForToken(t);
+        const need = scopesForType(scopesForSources(t.sources), type) as string[];
+        const cur = (v?.scopes ?? []) as string[];
+        const scopeAdd = !!v && !cur.includes('ALL_SCOPES') && need.some((x) => !cur.includes(x) && !(cur.includes('ALL_FILLS') && ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'].includes(x)));
+        setState(t.name, scopeAdd ? { state: 'reuse', varName: nm.name, scopeAdd: true } : { state: 'reuse', varName: nm.name });
         continue;
       }
       setState(t.name, nm.name !== t.name ? { state: 'new', varName: nm.name } : { state: 'new' });

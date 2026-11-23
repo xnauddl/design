@@ -375,6 +375,8 @@
     "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
+    "v4.scopePlaces": "\uC6A9\uB3C4 \uB9DE\uCD9C \uAC12 {u}\uACF3",
+    "v4.scopePlacesTip": "\uAC19\uC740 \uAC12\uC758 \uBCC0\uC218\uAC00 \uC788\uC9C0\uB9CC \uC774 \uC790\uB9AC \uC6A9\uB3C4\uAC00 \uAEBC\uC838 \uC788\uC5B4\uC694 \u2014 [\uBCC0\uC218 \uB9CC\uB4E4\uAE30]\uAC00 \uC6A9\uB3C4\uB97C \uB354\uD574 \uC5F0\uACB0\uD574\uC694",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
@@ -440,7 +442,7 @@
     // 변수 만들기 화면(IA v4 §4.3)
     "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.subRight": "\uC5D0\uC11C \uCC3E\uC740 \uAC12",
-    "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
+    "make.top": "\uCF20 \uAC12\uB9CC \uB9CC\uB4E4\uAC70\uB098 \uC788\uB294 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uD574\uC694",
     "make.freeBox": "\uBB34\uB8CC: Global \uBCC0\uC218\uB9CC",
     "make.freeBoxPaid": "Semantic \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
     "make.freeSemTop": "\u{1F512} Semantic\uC740 \uC720\uB8CC\uC608\uC694",
@@ -496,6 +498,8 @@
     "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
     "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
     "make.tagReuseTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uADF8\uAC83\uC744 \uC368\uC694",
+    "make.tagReuseScope": "\uC788\uB294 \uBCC0\uC218 \xB7 \uC6A9\uB3C4 \uB354\uD568",
+    "make.tagReuseScopeTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0, \uC774 \uC790\uB9AC \uC6A9\uB3C4\uB97C \uB354\uD574 \uC368\uC694",
     "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
     "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
     "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
@@ -2198,6 +2202,103 @@
     return known.length ? known[known.length - 1] : segs[segs.length - 1];
   }
 
+  // src/lib/varKind.ts
+  var FIRST_FLOAT = {
+    spacing: "gap",
+    radius: "radius",
+    size: "size",
+    "stroke-width": "stroke",
+    opacity: "opacity",
+    "font-size": "text",
+    "line-height": "text",
+    "letter-spacing": "text"
+  };
+  var DIRS = ["top", "right", "bottom", "left"];
+  var CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
+  function lastFloatKind(seg) {
+    if (["gap", "row-gap", "column-gap", "spacing", "padding", "padding-x", "padding-y"].includes(seg)) return "gap";
+    if (DIRS.some((d) => seg === `padding-${d}`)) return "gap";
+    if (seg === "radius" || CORNERS.some((c) => seg === `radius-${c}`)) return "radius";
+    if (["size", "width", "height"].includes(seg)) return "size";
+    if (seg === "stroke-width" || DIRS.some((d) => seg === `stroke-width-${d}`)) return "stroke";
+    if (seg === "opacity") return "opacity";
+    if (["font-size", "line-height", "letter-spacing"].includes(seg)) return "text";
+    return null;
+  }
+  var SCOPE_KIND = {
+    GAP: "gap",
+    CORNER_RADIUS: "radius",
+    WIDTH_HEIGHT: "size",
+    STROKE_FLOAT: "stroke",
+    OPACITY: "opacity",
+    FONT_SIZE: "text",
+    LINE_HEIGHT: "text",
+    LETTER_SPACING: "text",
+    FONT_FAMILY: "text"
+  };
+  function varKind(v) {
+    var _a, _b, _c;
+    if (v.type === "COLOR") return "color";
+    if (v.type === "BOOLEAN") return "other";
+    const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
+    const first = (_a = segs[0]) != null ? _a : "";
+    const last = (_b = segs[segs.length - 1]) != null ? _b : "";
+    if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
+    if (v.type === "STRING" && first === "font-family") return "text";
+    if (v.type === "FLOAT") {
+      const k = lastFloatKind(last);
+      if (k) return k;
+    }
+    if (v.type === "STRING" && last === "font-family") return "text";
+    if (v.type === "FLOAT" || v.type === "STRING") {
+      const kinds = new Set(((_c = v.scopes) != null ? _c : []).map((s) => SCOPE_KIND[s]).filter(Boolean));
+      if (kinds.size === 1) return [...kinds][0];
+    }
+    return "other";
+  }
+  var FILL_SUB = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  function expand(scopes) {
+    const out = /* @__PURE__ */ new Set();
+    for (const s of scopes) {
+      if (s === "ALL_FILLS") FILL_SUB.forEach((x) => out.add(x));
+      else out.add(s);
+    }
+    return out;
+  }
+  var APPLY_TARGETS = {
+    color: ["fill", "stroke", "text", "shadow"],
+    gap: ["gap", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right"],
+    radius: ["radius", "radius-tl", "radius-tr", "radius-bl", "radius-br"]
+  };
+  var TARGET_SCOPES = {
+    fill: ["FRAME_FILL", "SHAPE_FILL"],
+    text: ["TEXT_FILL"],
+    stroke: ["STROKE_COLOR"],
+    shadow: ["EFFECT_COLOR"],
+    gap: ["GAP"],
+    padding: ["GAP"],
+    "padding-top": ["GAP"],
+    "padding-right": ["GAP"],
+    "padding-bottom": ["GAP"],
+    "padding-left": ["GAP"],
+    radius: ["CORNER_RADIUS"],
+    "radius-tl": ["CORNER_RADIUS"],
+    "radius-tr": ["CORNER_RADIUS"],
+    "radius-bl": ["CORNER_RADIUS"],
+    "radius-br": ["CORNER_RADIUS"]
+  };
+  function targetAllowed(scopes, target) {
+    if (scopes.includes("ALL_SCOPES")) return true;
+    const ex = expand(scopes);
+    return TARGET_SCOPES[target].some((s) => ex.has(s));
+  }
+  var MANUAL_KEY = "dsl.manual";
+  function duplicateName(name, taken) {
+    const base = `${name}-copy`;
+    if (!taken.has(base)) return base;
+    for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
+  }
+
   // src/lib/selCards.ts
   var PADDING = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
   var RADIUS = /* @__PURE__ */ new Set(["cornerRadius", "topLeftRadius", "topRightRadius", "bottomLeftRadius", "bottomRightRadius"]);
@@ -2530,7 +2631,7 @@
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => __spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {})),
+        preview.candidates.map((c) => __spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), c.scopeAdd ? { scopeAdd: c.scopeAdd } : {})),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
@@ -2592,6 +2693,7 @@
       };
       if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
       if (tier === 2 && readAutoRole(v)) e.auto = true;
+      if (tier === 1 && readFlag(v, MANUAL_KEY)) e.manual = true;
       if (v.resolvedType === "COLOR" && isRGB(val)) {
         e.colorHex = rgbToHex(val);
         e.colorAlpha = roundAlpha(val.a);
@@ -2603,6 +2705,14 @@
     }
     entries.sort((a, b) => b.tier - a.tier);
     return { entries, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])) };
+  }
+  function readFlag(v, key) {
+    const fn = v.getPluginData;
+    try {
+      return typeof fn === "function" && fn.call(v, key) === "1";
+    } catch (e) {
+      return false;
+    }
   }
   function readAutoRole(v) {
     const fn = v.getPluginData;
@@ -2641,12 +2751,25 @@
   function scopeOk(scopes, allowed) {
     return scopes.includes("ALL_SCOPES") || allowed.some((s) => scopes.includes(s));
   }
+  var PART_FILLS = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
+  function mergeScopes(current, add2, type) {
+    if (current.includes("ALL_SCOPES")) return [...current];
+    const set = /* @__PURE__ */ new Set([...current, ...add2]);
+    if (set.has("ALL_FILLS")) for (const p of PART_FILLS) set.delete(p);
+    return scopesForType([...set], type);
+  }
+  function addVariableScope(v, scope) {
+    var _a;
+    const cur = (_a = v.scopes) != null ? _a : ["ALL_SCOPES"];
+    if (cur.includes("ALL_SCOPES") || cur.includes(scope)) return;
+    v.scopes = mergeScopes(cur, [scope], v.resolvedType);
+  }
   var DROP = "drop";
   var isFrac = (v) => Math.abs(v - Math.round(v)) >= 5e-3;
   var numReason = (v, dropAtOrBelowZero = true) => dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? "fraction" : "no-match";
-  function sameValueEntries(ctx, s, value = s.value) {
+  function sameValueEntries(ctx, s, value = s.value, anyScope = false) {
     return ctx.index.entries.filter((e) => {
-      if (!scopeOk(e.scopes, s.allowed)) return false;
+      if (!anyScope && !scopeOk(e.scopes, s.allowed)) return false;
       if (s.kind === "color") return e.colorKey === value;
       if (typeof value === "number") return e.num != null && sameNumber(e.num, value);
       return e.str != null && e.str === value;
@@ -2670,9 +2793,11 @@
     const { res, preview } = ctx;
     const pending = [];
     const colorLeft = [];
-    const emit = (s, e, viaPill = false) => {
+    const emit = (s, e, viaPill = false, scopeAdd) => {
       res.bound++;
-      preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type));
+      const c = candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type);
+      if (scopeAdd) c.scopeAdd = scopeAdd;
+      preview.candidates.push(c);
     };
     const globalFor = (cands) => {
       var _a2;
@@ -2727,13 +2852,26 @@
         pending.push({ slot: x.slot, base, global: globalFor(x.cands), refHex });
       }
     }
+    const ownedSame = (s) => s.kind === "color" && s.noMatchReason === "no-match" ? sameValueEntries(ctx, s, s.value, true).filter((e) => e.tier === 1 && e.direct && !e.user).sort(byUserThenName) : [];
+    const addScope = /* @__PURE__ */ new Map();
     const live = pending.filter((p) => {
       if (p.global) return true;
+      const own = ownedSame(p.slot);
+      if (own.length) {
+        const pick = ctx.noNewRoles ? own.find((e) => !e.manual) : void 0;
+        if (pick) {
+          p.global = pick;
+          addScope.set(p, p.slot.allowed[0]);
+          return true;
+        }
+        skip(res, "scope-add", p.slot.node, preview, p.slot.field);
+        return false;
+      }
       if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
       return false;
     });
     if (ctx.noNewRoles) {
-      for (const p of live) emit(p.slot, p.global, p.slot.pill != null);
+      for (const p of live) emit(p.slot, p.global, p.slot.pill != null, addScope.get(p));
       return;
     }
     const names = assignNames(
@@ -3157,10 +3295,12 @@
             const hex = rgbToHex(x.color);
             const alpha = itemAlpha(x);
             const allowed = key === "fills" ? fillScopesFor(node.type) : key === "strokes" ? STROKE_SCOPES : EFFECT_SCOPES;
-            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha(value.a) !== alpha || !scopeOk(scopesOf(), allowed)) {
+            const scopeAdd = !it.newRole && it.scopeAdd ? it.scopeAdd : void 0;
+            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha(value.a) !== alpha || !scopeAdd && !scopeOk(scopesOf(), allowed)) {
               fail("changed", node, key);
               continue;
             }
+            if (scopeAdd) addVariableScope(vv.variable, scopeAdd);
             const variable = await target();
             const arr = list.slice();
             arr[i] = key === "effects" ? figma.variables.setBoundVariableForEffect(x, "color", variable) : figma.variables.setBoundVariableForPaint(x, "color", variable);
@@ -4739,103 +4879,6 @@
     return { styles, decimalRows, labeled, fallback };
   }
 
-  // src/lib/varKind.ts
-  var FIRST_FLOAT = {
-    spacing: "gap",
-    radius: "radius",
-    size: "size",
-    "stroke-width": "stroke",
-    opacity: "opacity",
-    "font-size": "text",
-    "line-height": "text",
-    "letter-spacing": "text"
-  };
-  var DIRS = ["top", "right", "bottom", "left"];
-  var CORNERS = ["top-left", "top-right", "bottom-left", "bottom-right"];
-  function lastFloatKind(seg) {
-    if (["gap", "row-gap", "column-gap", "spacing", "padding", "padding-x", "padding-y"].includes(seg)) return "gap";
-    if (DIRS.some((d) => seg === `padding-${d}`)) return "gap";
-    if (seg === "radius" || CORNERS.some((c) => seg === `radius-${c}`)) return "radius";
-    if (["size", "width", "height"].includes(seg)) return "size";
-    if (seg === "stroke-width" || DIRS.some((d) => seg === `stroke-width-${d}`)) return "stroke";
-    if (seg === "opacity") return "opacity";
-    if (["font-size", "line-height", "letter-spacing"].includes(seg)) return "text";
-    return null;
-  }
-  var SCOPE_KIND = {
-    GAP: "gap",
-    CORNER_RADIUS: "radius",
-    WIDTH_HEIGHT: "size",
-    STROKE_FLOAT: "stroke",
-    OPACITY: "opacity",
-    FONT_SIZE: "text",
-    LINE_HEIGHT: "text",
-    LETTER_SPACING: "text",
-    FONT_FAMILY: "text"
-  };
-  function varKind(v) {
-    var _a, _b, _c;
-    if (v.type === "COLOR") return "color";
-    if (v.type === "BOOLEAN") return "other";
-    const segs = v.name.split("/").map((s) => s.trim().toLowerCase());
-    const first = (_a = segs[0]) != null ? _a : "";
-    const last = (_b = segs[segs.length - 1]) != null ? _b : "";
-    if (v.type === "FLOAT" && FIRST_FLOAT[first]) return FIRST_FLOAT[first];
-    if (v.type === "STRING" && first === "font-family") return "text";
-    if (v.type === "FLOAT") {
-      const k = lastFloatKind(last);
-      if (k) return k;
-    }
-    if (v.type === "STRING" && last === "font-family") return "text";
-    if (v.type === "FLOAT" || v.type === "STRING") {
-      const kinds = new Set(((_c = v.scopes) != null ? _c : []).map((s) => SCOPE_KIND[s]).filter(Boolean));
-      if (kinds.size === 1) return [...kinds][0];
-    }
-    return "other";
-  }
-  var FILL_SUB = ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"];
-  function expand(scopes) {
-    const out = /* @__PURE__ */ new Set();
-    for (const s of scopes) {
-      if (s === "ALL_FILLS") FILL_SUB.forEach((x) => out.add(x));
-      else out.add(s);
-    }
-    return out;
-  }
-  var APPLY_TARGETS = {
-    color: ["fill", "stroke", "text", "shadow"],
-    gap: ["gap", "padding", "padding-top", "padding-bottom", "padding-left", "padding-right"],
-    radius: ["radius", "radius-tl", "radius-tr", "radius-bl", "radius-br"]
-  };
-  var TARGET_SCOPES = {
-    fill: ["FRAME_FILL", "SHAPE_FILL"],
-    text: ["TEXT_FILL"],
-    stroke: ["STROKE_COLOR"],
-    shadow: ["EFFECT_COLOR"],
-    gap: ["GAP"],
-    padding: ["GAP"],
-    "padding-top": ["GAP"],
-    "padding-right": ["GAP"],
-    "padding-bottom": ["GAP"],
-    "padding-left": ["GAP"],
-    radius: ["CORNER_RADIUS"],
-    "radius-tl": ["CORNER_RADIUS"],
-    "radius-tr": ["CORNER_RADIUS"],
-    "radius-bl": ["CORNER_RADIUS"],
-    "radius-br": ["CORNER_RADIUS"]
-  };
-  function targetAllowed(scopes, target) {
-    if (scopes.includes("ALL_SCOPES")) return true;
-    const ex = expand(scopes);
-    return TARGET_SCOPES[target].some((s) => ex.has(s));
-  }
-  var MANUAL_KEY = "dsl.manual";
-  function duplicateName(name, taken) {
-    const base = `${name}-copy`;
-    if (!taken.has(base)) return base;
-    for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
-  }
-
   // src/lib/variables.ts
   function isManualVar(v) {
     try {
@@ -4988,7 +5031,7 @@
           summary.globalOf.set(t2.name, g2.variable.id);
           delete reuseMap[t2.name];
           if (nm.reuse) {
-            g2.variable.scopes = scopesForType([.../* @__PURE__ */ new Set([...g2.variable.scopes, ...scopes2])], type);
+            g2.variable.scopes = mergeScopes(g2.variable.scopes, scopes2, type);
             touched.add(key2);
             continue;
           }
@@ -5036,7 +5079,7 @@
     return summary;
   }
   async function previewCreateTokens(tokens, base) {
-    var _a, _b;
+    var _a, _b, _c;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const gId = (_b = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
     const reuse = await pickReusable(tokens, base);
@@ -5078,7 +5121,11 @@
         if (nm.reuse) {
           const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
           if (v) summary.globalOf.set(t2.name, v.id);
-          setState(t2.name, { state: "reuse", varName: nm.name });
+          const type = resolvedTypeForToken(t2);
+          const need = scopesForType(scopesForSources(t2.sources), type);
+          const cur = (_c = v == null ? void 0 : v.scopes) != null ? _c : [];
+          const scopeAdd = !!v && !cur.includes("ALL_SCOPES") && need.some((x) => !cur.includes(x) && !(cur.includes("ALL_FILLS") && ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"].includes(x)));
+          setState(t2.name, scopeAdd ? { state: "reuse", varName: nm.name, scopeAdd: true } : { state: "reuse", varName: nm.name });
           continue;
         }
         setState(t2.name, nm.name !== t2.name ? { state: "new", varName: nm.name } : { state: "new" });

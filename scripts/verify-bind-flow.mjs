@@ -1291,7 +1291,7 @@ async function saveAndGet(p) {
   check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', 'Text Style1']), JSON.stringify(await tabsOf(p)));
   const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
   check('17 Global 탭 — 종류 머리만(묶음 머리 없음) · 글자(꺼져 접힘)', JSON.stringify(heads) === JSON.stringify(['Spacing 2개', 'Typography 1개']) && (await p.getAttribute('#makeTree [data-tkey="gk:text"]', 'aria-expanded')) === 'false', JSON.stringify(heads));
-  check('17 Global 탭 도구 줄 — "켠 값만 변수로 만들어요" · ⓘ 없음 · 모두 켜기 · 끄기', (await p.textContent('#makeTopText')) === '켠 값만 변수로 만들어요' && !(await visible(p, '#makeInfo')) && (await visible(p, '#makeAllOn')));
+  check('17 Global 탭 도구 줄 — "켠 값만 만들거나 있는 변수에 연결해요" · ⓘ 없음 · 모두 켜기 · 끄기', (await p.textContent('#makeTopText')) === '켠 값만 만들거나 있는 변수에 연결해요' && !(await visible(p, '#makeInfo')) && (await visible(p, '#makeAllOn')));
   check('17 상태 태그 "있음"(update — 칩 뒤, TR-D9) · "Layer 2" · 옅은 칸에 종류 표시 없음', (await p.textContent('#makeTree [data-tkey="g:spacing/8"]')).includes('있음') && (await p.$eval('#makeTree [data-tkey="g:spacing/8"] .tr-tag', (e) => e.previousElementSibling?.classList.contains('vchip'))) && (await p.textContent('#makeTree [data-tkey="g:spacing/8"] .tr-lt')) === 'Layer 2' && (await p.$$eval('#makeTree [data-tkey^="g:"] .vchip .bv-mark', (e) => e.length)) === 0 && (await p.textContent('#makeTree [data-tkey="g:spacing/8"] .vchip .al')) === '→ spacing/8');
   // 탭 키보드 — → 로 Semantic(바로 고름)
   await p.focus('#makeTab-global');
@@ -1440,7 +1440,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 2, updated: 0, summary: '', roles: 1, skippedManual: 0, tokenStates: {}, roleRows: [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }] });
   await p.waitForTimeout(30);
   check('17 무료 — 두 줄 라벨 상자 "무료: Global 변수만" / "🔒 Semantic · 텍스트 스타일 · 다크 모드 · 라이선스 →"', (await visible(p, '#makeFree')) && (await p.$eval('#makeFree', (e) => e.innerText.replace(/\s+/g, ' ').trim())) === '무료: Global 변수만 🔒 Semantic · 텍스트 스타일 · 다크 모드 · 라이선스 →', await p.$eval('#makeFree', (e) => e.innerText));
-  check('17 무료 — Global 탭 스위치 · 모두 켜기 · 끄기 · 도구 줄 "켠 값만 변수로 만들어요"', (await p.$$eval('#makeTree .bv-switch', (e) => e.length)) > 0 && (await visible(p, '#makeAllOn')) && (await p.textContent('#makeTopText')) === '켠 값만 변수로 만들어요');
+  check('17 무료 — Global 탭 스위치 · 모두 켜기 · 끄기 · 도구 줄 "켠 값만 만들거나 있는 변수에 연결해요"', (await p.$$eval('#makeTree .bv-switch', (e) => e.length)) > 0 && (await visible(p, '#makeAllOn')) && (await p.textContent('#makeTopText')) === '켠 값만 만들거나 있는 변수에 연결해요');
   check('17 무료 — 만들 수 "Global 2개" · [변수 2개 만들기] · 다크 잠금', (await p.textContent('#makeCount')) === 'Global 2개' && (await p.textContent('#btnMakeRun')) === '변수 2개 만들기' && !(await locked(p, '#btnMakeRun')) && (await locked(p, '#makeOptDark')), await p.textContent('#makeCount'));
   await p.click('#makeTab-semantic');
   await p.waitForTimeout(20);
@@ -4343,6 +4343,67 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
     c[0] === 'CSS — tokens.css로 저장했어요. Global끼리 이름이 같은 5개는 앞 컬렉션 것만 냈어요: a, b, c 외 2개' && c[1] === 'status warn' &&
     d[0] === 'CSS — tokens.css로 저장했어요. Global과 이름이 같은 Semantic 1개는 Global 값만 냈어요: color/primary Global끼리 이름이 같은 1개는 "G" 것만 냈어요: a' && d[1] === 'status warn',
     JSON.stringify([a, b, c, d]));
+  await p.close();
+}
+
+// B.33 — 용도 어긋남: 카드 1 u · 연결 화면 후보 0 · 만들기 태그 "있는 변수 · 용도 더함"
+{
+  const p = await open(560, 'select');
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['1:2'] });
+  await p.waitForTimeout(450);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  const first = '#selCards .sel-card >> nth=0';
+  const sub = async (counts, cands = []) => {
+    await recv(p, { ...preview(ap.reqId), candidates: cands, bound: cands.length, counts });
+    await recv(p, tsPrev(ap.reqId));
+    await p.waitForTimeout(80);
+    return p.textContent(first);
+  };
+  const a = await sub({ 'scope-add': { color: 65 } });
+  if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/b33-card.png` });
+  const tip = await p.getAttribute('#selCards [data-k="scope"]', 'title');
+  check('B.33 카드 1 (가) u만 — "변수 없는 값 65곳 · 용도 맞출 값 65곳" · 툴팁 · 카드 안 버튼 0 · 할 일 [변수 만들기] 주 버튼',
+    a.includes('변수 없는 값 65곳') && a.includes('용도 맞출 값 65곳') && !a.includes('새로 만들 값') && tip === '같은 값의 변수가 있지만 이 자리 용도가 꺼져 있어요 — [변수 만들기]가 용도를 더해 연결해요' && (await p.locator(first).locator('button').count()) === 0 && (await makeHot(p)), `${a} | ${tip}`);
+  const b = await sub({ 'no-match': { color: 12 }, 'scope-add': { color: 53 } });
+  check('B.33 카드 1 (나) k + u — "새로 만들 값 12곳 · 용도 맞출 값 53곳"', b.includes('변수 없는 값 65곳') && b.includes('새로 만들 값 12곳 · 용도 맞출 값 53곳'), b);
+  const c3 = await sub({ 'no-match': { color: 2 }, 'scope-add': { color: 4 } }, [c('itemSpacing'), c('paddingLeft'), c('paddingRight')]);
+  check('B.33 카드 1 (다) m + k + u — "변수 없는 값 9곳" · "Spacing 3 · 새로 만들 값 2곳 · 용도 맞출 값 4곳" · [3곳 연결]',
+    c3.includes('변수 없는 값 9곳') && c3.includes('Spacing 3 · 새로 만들 값 2곳 · 용도 맞출 값 4곳') && (await p.textContent('[data-k="link"]')) === '3곳 연결', c3);
+  // 연결 화면 — u만이면 후보 0: "연결할 수 있는 값이 없어요" + [변수 만들기 →] (✓ 모두 연결 아님)
+  await sub({ 'scope-add': { color: 65 } });
+  await goSub(p, 'bind');
+  await p.waitForTimeout(80);
+  const be = await p.textContent('#bindEmpty');
+  if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/b33-bind.png` });
+  check('B.33 연결 화면 u만 — "연결할 수 있는 값이 없어요" + [변수 만들기 →] · ✓ 글 아님', be.includes('연결할 수 있는 값이 없어요') && be.includes('변수 만들기 →') && !be.includes('✓'), be);
+  await p.close();
+}
+{
+  const p = await open(560, 'layer');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card' });
+  await goSub(p, 'make');
+  await p.waitForTimeout(50);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
+    { name: 'color/gray/1000', category: 'color', value: '#000000', sources: ['fill'], count: 4, uses: [{ name: 'color/background', count: 4 }] },
+    { name: 'color/gray/400', category: 'color', value: '#888888', sources: ['fill'], count: 2, uses: [{ name: 'color/background', count: 2 }] },
+  ] });
+  await p.waitForTimeout(50);
+  const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 0, updated: 0, summary: '', roles: 0, skippedManual: 0,
+    tokenStates: { 'color/gray/1000': { state: 'reuse', varName: 'color/gray/1000', scopeAdd: true }, 'color/gray/400': { state: 'reuse', varName: 'color/gray/400' } }, roleRows: [] });
+  await p.waitForTimeout(50);
+  const t1 = await p.$eval('#makeTree [data-tkey="g:color/gray/1000"] .tr-tag', (e) => [e.textContent, e.getAttribute('title') ?? e.dataset.tip ?? '']);
+  const t2 = await p.textContent('#makeTree [data-tkey="g:color/gray/400"] .tr-tag');
+  if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/b33-make.png` });
+  check('B.33 만들기 Global 탭 — "있는 변수 · 용도 더함"(툴팁) · "있는 변수" · 안내 글 · [변수 0개 만들기] 그대로',
+    t1[0] === '있는 변수 · 용도 더함' && t1[1].includes('이 자리 용도를 더해 써요') && t2 === '있는 변수' && (await p.textContent('#makeTopText')) === '켠 값만 만들거나 있는 변수에 연결해요' && (await p.textContent('#btnMakeRun')) === '변수 0개 만들기',
+    JSON.stringify([t1, t2, await p.textContent('#btnMakeRun')]));
   await p.close();
 }
 

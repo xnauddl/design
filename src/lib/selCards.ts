@@ -30,6 +30,8 @@ export function fieldKind(field: string | undefined): SelKind {
 
 /** k = 변수가 없는 값(§4.1). */
 export const NO_VAR_REASONS: readonly string[] = ['no-match'];
+/** u = 용도 맞출 값(§4.1 — 같은 값 플러그인 Global의 용도만 꺼진 색 자리, 만들기가 용도를 더해 연결). 건너뛴 곳 목록에는 줄이 없다. */
+export const SCOPE_ADD_REASONS: readonly string[] = ['scope-add'];
 /** s = 손볼 곳(§4.1) — 디자인을 고치면 연결할 수 있게 되는 자리 단위 사유만. */
 export const FIX_SKIP_REASONS: readonly string[] = ['fraction', 'size-fraction', 'deleted-var'];
 /** 그대로 둬도 되는 자리 단위 사유(§4.2) — s에 넣지 않고 건너뛴 곳 목록에만. 이 순서가 목록 줄 순서. */
@@ -85,9 +87,11 @@ export interface CardCounts {
   m: number;
   /** 변수가 없는 값. */
   k: number;
+  /** 용도 맞출 값(§4.1 u). */
+  u: number;
   /** 자리 단위 건너뜀. */
   s: number;
-  /** m + k. */
+  /** m + k + u. */
   n: number;
   /** 종류별 연결할 곳 수(m만 — 합 = m, 연결 화면 종류 머리 수와 같다. SEL_KINDS 순서, 0은 뺌). k는 noVarByKind. */
   byKind: { kind: SelKind; n: number }[];
@@ -111,12 +115,14 @@ export function cardCounts(candidateFields: readonly string[], counts: ReasonCou
       add(noVar, kind as SelKind, n);
     }
   }
+  let u = 0;
+  for (const r of SCOPE_ADD_REASONS) u += sumKinds(counts?.[r]);
   let s = 0;
   for (const r of FIX_SKIP_REASONS) s += sumKinds(counts?.[r]);
   const order = (map: Map<SelKind, number>): { kind: SelKind; n: number }[] =>
     [...SEL_KINDS, 'other' as const].map((kind) => ({ kind, n: map.get(kind) ?? 0 })).filter((x) => x.n > 0);
   const m = candidateFields.length;
-  return { m, k, s, n: m + k, byKind: order(byKind), noVarByKind: order(noVar) };
+  return { m, k, u, s, n: m + k + u, byKind: order(byKind), noVarByKind: order(noVar) };
 }
 
 /* ---------- 상태 5 만들기 카드 — 라이브러리와 같은 값(IA v4 §4.1 "만들기 카드 — 상태 5") ---------- */

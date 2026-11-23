@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, makeCreatedText, hasDarkTarget, darkResultText, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, libSameSplit, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, libSameSplit, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, SCOPE_ADD_REASONS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -1694,7 +1694,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
   const eff = bindTsOnly() ? [] : effCandidates();
   const items = eff
     .filter((c) => bindChecked.has(candKey(c)))
-    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}) }));
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), ...(c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}) }));
   const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds, ...(r.mainIds?.some(Boolean) ? { mainIds: r.mainIds } : {}) }));
   if (!items.length && !textStyles.length) return;
   startLink({ items, textStyles });
@@ -3537,7 +3537,7 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
         // [동그라미 · 종류 표시] "Layer {n}" … [→ 이름 | 값] [태그 — 칩 뒤, TR-D9] … 스위치(ia-v4 §4.3 TR 뒤)
         const cells: HTMLElement[] = [mkLead(tk), mkLayers(tk.count), trChip(name, mkValueText(tk))];
         if (st?.state === 'update') cells.push(mkTag(t('make.tagHas'), t('make.tagHasTip')));
-        else if (st?.state === 'reuse') cells.push(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
+        else if (st?.state === 'reuse') cells.push(st.scopeAdd ? mkTag(t('make.tagReuseScope'), t('make.tagReuseScopeTip')) : mkTag(t('make.tagReuse'), t('make.tagReuseTip'))); // B.33 — 실행 때 용도를 더하면 꼬리
         else if (st?.state === 'manual') cells.push(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
         return {
           key: `g:${tk.name}`, indent: 16, off: !on, cells,
@@ -3943,7 +3943,7 @@ async function runMake(): Promise<void> {
         const reasons = r.reasons ?? {};
         if (r.bound) results.push({ id, mark: 'ok', text: t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') });
         else {
-          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !(reasons['no-match'] ?? 0) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
+          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !((reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0)) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
           // 이미 모두 연결됨이면 할 일이 없었던 것 — 실패가 아니라 ✓, 결과도 "다 됨"(2026-11-19 사용자 결정, ia-v4 §4.3 "연결 0곳 사유")
           if (zero === 'wizard.seq.bindAllBound') results.push({ id, mark: 'ok', text: t(zero) });
           else {
@@ -4146,19 +4146,22 @@ function countBindCards(): CardCounts & { t: number } {
   const c = cardCounts(fields, bindCounts);
   // 스타일 후보 레이어의 글자 종류 자리는 k · s에서도 뺀다(§4.1) — 사유 목록(bindSkips, 레이어 × 사유)으로 센다.
   let dk = 0;
+  let du = 0;
   let ds = 0;
   for (const s of bindSkips) {
     if (!ts.has(s.nodeId) || fieldKind(s.field) !== 'text') continue;
     if (NO_VAR_REASONS.includes(s.reason)) dk++;
+    else if (SCOPE_ADD_REASONS.includes(s.reason)) du++;
     else if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
   }
   const t = ts.size;
   const m = c.m + t;
   const k = Math.max(0, c.k - dk);
+  const u = Math.max(0, c.u - du);
   const byKind = [...c.byKind];
   const noVarByKind = c.noVarByKind.map((x) => (x.kind === 'text' ? { ...x, n: x.n - dk } : x)).filter((x) => x.n > 0);
   if (t) byKind.push({ kind: 'textStyle' as SelKind, n: t });
-  return { ...c, m, k, s: Math.max(0, c.s - ds), n: m + k, byKind, noVarByKind, t };
+  return { ...c, m, k, u, s: Math.max(0, c.s - ds), n: m + k + u, byKind, noVarByKind, t };
 }
 
 /** 타입 표시 — ● 색 · # 숫자 · T 글자. */
@@ -4280,7 +4283,7 @@ function renderBindEmpty(): void {
   else if (zero) text = bindSkipMode() && bindCardCounts().s > 0 ? t('v4.allLinked') : t('v4.allBound');
   else if (!hasBindPreview() || (bindTsOnly() && !bindTsRows.length)) {
     text = t('v4.nothingToLink');
-    if (bindCardCounts().k > 0) action = [t('v4.makeArrow'), () => showMakeScreen()];
+    if (bindCardCounts().k + bindCardCounts().u > 0) action = [t('v4.makeArrow'), () => showMakeScreen()]; // 용도 맞출 값도 만들기가 용도를 더해 연결(B.33)
   }
   box.hidden = !text;
   if (!text) return;
@@ -4298,9 +4301,9 @@ function renderBindEmpty(): void {
   }
 }
 
-/** 찾기를 마쳤고 연결할 곳(m)과 새로 만들 값(k)이 모두 0(텍스트 스타일만 모습 제외) — 건너뛴 곳 모습 · 모두 연결된 모습(§4.2). */
+/** 찾기를 마쳤고 연결할 곳(m) · 새로 만들 값(k) · 용도 맞출 값(u)이 모두 0(텍스트 스타일만 모습 제외) — 건너뛴 곳 모습 · 모두 연결된 모습(§4.2). */
 function bindZero(): boolean {
-  return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+  return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k + bindCardCounts().u === 0;
 }
 /** 건너뛴 곳 목록의 줄(§4.2) — 변수 사유(스타일 후보 글자 자리를 뺀 셈, `skipRowCounts`) + 보이는 텍스트 스타일 사유. 칩 · 목록 · 모습이 함께 쓴다. */
 function skipListRows(): ReturnType<typeof skipRowCounts> & { ts: string[] } {
@@ -8849,7 +8852,7 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
     put(selCard({ title: t('v4.find0'), subs: [t('v4.reading')] }));
     return;
   }
-  const { m, k, s, n } = counts;
+  const { m, k, u, s, n } = counts;
   // 연결 뒤 메인 줄(§4.1 결정 B) — ✓ 모습이고 기억의 목록 기준이 지금과 같을 때만. ✓가 아니면 기억을 지운다.
   const boundMains = (): HTMLElement[] => {
     if (lastMainsBound && lastMainsBound.base !== baseKey()) lastMainsBound = null; // 목록 기준이 바뀜 — 지운다
@@ -8882,12 +8885,21 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: CardCounts | nul
   if (k > 0) parts.push(t('v4.noVarPlaces', { k }));
   const sub = document.createElement('span');
   sub.textContent = parts.join(' · ');
+  // 용도 맞출 값(§4.1 u — B.33): k 자리 바로 뒤, 그 조각만 툴팁
+  if (u > 0) {
+    if (parts.length) sub.append(' · ');
+    const us = document.createElement('span');
+    us.dataset.k = 'scope';
+    us.textContent = t('v4.scopePlaces', { u });
+    us.title = t('v4.scopePlacesTip');
+    sub.appendChild(us);
+  }
   const actions: HTMLElement[] = [];
   if (m > 0) {
     const go = selBtn(t('v4.linkN', { n: m }), (el) => { showSelSub('bind', el); }, true);
     go.dataset.k = 'link';
     actions.push(go);
-  } else if (k > 0) selMakeHot = true; // m = 0 · k > 0 — 버튼 없음, 할 일 [변수 만들기]가 주 버튼(§4.1, 2026-11-11 사용자 결정)
+  } else if (k + u > 0) selMakeHot = true; // m = 0 · k + u > 0(B.33 — 용도 맞출 값도 만들기가 연결) — 버튼 없음, 할 일 [변수 만들기]가 주 버튼(§4.1, 2026-11-11 사용자 결정)
   // 메인 컴포넌트 줄(§4.1) — m > 0 · c > 0이면 둘째 줄 아래 회색 줄 + 툴팁(메인 단위 이름 — 페이지).
   const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
   const subs: (string | Node)[] = [sub];

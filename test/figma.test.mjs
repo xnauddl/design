@@ -6582,7 +6582,7 @@ test('createUsageRoles · previewCreateTokens — tokenStates(쓰임 있는 토�
   const s = await previewCreateTokens(toks, 16);
   assert.deepEqual(Object.fromEntries(s.tokenStates), {
     'color/0066ff': { state: 'reuse', varName: 'blue/500' },
-    'color/ff0000': { state: 'reuse', varName: 'color/ff0000' },
+    'color/ff0000': { state: 'reuse', varName: 'color/ff0000', scopeAdd: true }, // 목 변수 용도 [] — 실행 때 칠 용도를 더함(ia-v4 §4.3 B.33)
     'color/00ff00': { state: 'new', varName: 'color/00ff00-2' },
     'spacing/8': { state: 'reuse', varName: 'spacing/8' },
     'spacing/12': { state: 'new' },
@@ -9389,4 +9389,80 @@ test('다크 D-T1 옮기기 ③ — Global Dark 칸에 이미 사용자 기록(b
   assert.deepEqual(r.migrated, { moved: 1, split: 0, failed: 0, splitNames: [], failedNames: [], removedDark: 0 }, '덮지 않은 X는 옮긴 색 · 갈린 색에 안 셈');
   assert.equal(r.kept, 1, '⑥에서 그대로 둔 색으로 셈');
   assert.equal(r.filled, 0);
+});
+
+/* ---- 7-5 용도 어긋남(ia-v4 §2.3-7 "무료 · 용도 더함" · §4.1 u · B.33) ---- */
+const blackFrame = (id = 'bf') => ({
+  type: 'FRAME', id, name: id,
+  fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }],
+  strokes: [], effects: [],
+  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
+});
+const strokeOnlyBlack = async () => {
+  await createTokens([{ name: 'color/000000', category: 'color', sources: ['stroke'], value: '#000000', uses: [{ name: 'color/border', count: 1 }] }], 16);
+  return globalThis.figma._state.variables.find((v) => v.name === 'color/000000');
+};
+
+test('B.33 ① 유료 — 선 용도만 있는 플러그인 Global + 같은 색 칠 → scope-add(u), no-match 아님 · 변수 그대로', async () => {
+  installFigma();
+  const g = await strokeOnlyBlack();
+  assert.deepEqual(g.scopes, ['STROKE_COLOR']);
+  const res = await bindSelection([blackFrame()], false);
+  assert.equal(res.reasons['scope-add'], 1);
+  assert.equal(res.reasons['no-match'] ?? 0, 0);
+  assert.equal(res.bound, 0);
+  assert.deepEqual(g.scopes, ['STROKE_COLOR']);
+});
+
+test('B.33 ② 사용자 컬렉션 Global은 용도를 존중 — no-match 그대로', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'black', 'COLOR', ['STROKE_COLOR'], { r: 0, g: 0, b: 0, a: 1 });
+  const res = await bindSelection([blackFrame()], false);
+  assert.equal(res.reasons['no-match'], 1);
+  assert.equal(res.reasons['scope-add'] ?? 0, 0);
+});
+
+test('B.33 ②′ · ②″ 플러그인 Global 컬렉션의 직접 만든 변수 — 유료 · 무료 모두 scope-add(무료도 붙이지 않음 · 용도 그대로)', async () => {
+  installFigma();
+  const g = await strokeOnlyBlack();
+  g.setPluginData('dsl.manual', '1');
+  const paid = await bindSelection([blackFrame()], false);
+  assert.equal(paid.reasons['scope-add'], 1);
+  const node = blackFrame('bf2');
+  const free = await bindSelection([node], true, {}, { noNewRoles: true });
+  assert.equal(free.reasons['scope-add'], 1);
+  assert.equal(free.bound, 0);
+  assert.equal(node.fills[0].boundVariables, undefined);
+  assert.deepEqual(g.scopes, ['STROKE_COLOR']);
+});
+
+test('B.33 ③ 숫자 자리는 하지 않음 — 플러그인 spacing/16(GAP) + 반경 16 → no-match', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
+  const node = { ...blackFrame('r16'), fills: [], cornerRadius: 16, topLeftRadius: 16, topRightRadius: 16, bottomLeftRadius: 16, bottomRightRadius: 16 };
+  const res = await bindSelection([node], false);
+  assert.equal(res.reasons['scope-add'] ?? 0, 0);
+  assert.ok((res.reasons['no-match'] ?? 0) >= 1);
+});
+
+test('B.33 ④ 무료 — 미리보기 후보 scopeAdd(ALL_FILLS) · 변수 그대로 → 실제 연결 뒤 용도 더함 · 붙음', async () => {
+  installFigma();
+  const g = await strokeOnlyBlack();
+  const dry = await bindSelection([blackFrame()], false, {}, { noNewRoles: true });
+  assert.equal(dry.bound, 1);
+  assert.equal(dry.candidates[0].scopeAdd, 'ALL_FILLS');
+  assert.equal(dry.candidates[0].variableId, g.id);
+  assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+  const node = blackFrame('bf3');
+  const res = await bindSelection([node], true, {}, { noNewRoles: true });
+  assert.equal(res.bound, 1);
+  assert.equal(node.fills[0].boundVariables.color.id, g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('B.33 mergeScopes — ALL_FILLS가 들어가면 개별 칠 용도를 빼고, ALL_SCOPES면 그대로', async () => {
+  const { mergeScopes } = await import('../dist/figma-lib.mjs');
+  assert.deepEqual(mergeScopes(['FRAME_FILL', 'STROKE_COLOR'], ['ALL_FILLS'], 'COLOR').sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+  assert.deepEqual(mergeScopes(['ALL_SCOPES'], ['ALL_FILLS'], 'COLOR'), ['ALL_SCOPES']);
+  assert.deepEqual(mergeScopes(['GAP'], ['CORNER_RADIUS'], 'FLOAT').sort(), ['CORNER_RADIUS', 'GAP']);
 });

@@ -10,6 +10,7 @@ import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scop
 import type { BindCandidate, BindNode, BindSkip, MainUnitInfo, NewRoleRef } from '../shared/messages';
 import { backgroundOf, gapSkip, isIconOrAvatar, inAutoLayoutFlow, iconOrAvatarKind, isInsideIconFrame } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타 · 오토레이아웃 흐름) — 만들기와 같은 기준
 import { ROLE_KEY, isKnownRole } from './naming';
+import { MANUAL_KEY } from './varKind'; // 직접 만든 변수 표시(§4.9) — variables.ts를 가져오면 순환 참조라 키를 직접 읽는다
 import { fieldKind, type ReasonCounts } from './selCards'; // 카드 숫자 — 속성 → 종류(IA v4 §4.1)
 import {
   AUTO_ROLE_KEY,
@@ -61,6 +62,8 @@ interface VarEntry {
   colorKey?: string;
   num?: number;
   str?: string;
+  /** 직접 만든 변수(`dsl.manual` — §4.9). 무료 용도 더함 대체에서 뺀다(ia-v4 §2.3-7). */
+  manual?: boolean;
 }
 
 /**
@@ -578,7 +581,7 @@ export async function bindSelection(
     const known = new Map<string, SceneNode>();
     for (const s of ctx.slots) known.set(s.node.id, s.node);
     const r = await bindSelectedItems(
-      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}) })),
+      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), ...(c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}) })),
       {},
       known, // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
     );
@@ -651,6 +654,7 @@ async function buildIndex(): Promise<VarIndexAll> {
     };
     if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
     if (tier === 2 && readAutoRole(v)) e.auto = true;
+    if (tier === 1 && readFlag(v, MANUAL_KEY)) e.manual = true;
     // 색 변수는 투명도도 함께 색인한다(§2.11 "색") — 투명도까지 같은 칠하기 · 그림자에만 붙인다.
     if (v.resolvedType === 'COLOR' && isRGB(val)) {
       e.colorHex = rgbToHex(val);
@@ -664,6 +668,16 @@ async function buildIndex(): Promise<VarIndexAll> {
   // 높은 tier 우선(Component의 "지금 순서"는 이 정렬 안의 피그마 순서).
   entries.sort((a, b) => b.tier - a.tier);
   return { entries, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])) };
+}
+
+/** 변수의 플러그인 표시(값 '1')를 읽는다 — 목 변수는 API가 없을 수 있다. */
+function readFlag(v: Variable, key: string): boolean {
+  const fn = (v as unknown as { getPluginData?: (k: string) => string }).getPluginData;
+  try {
+    return typeof fn === 'function' && fn.call(v, key) === '1';
+  } catch {
+    return false;
+  }
 }
 
 /** 변수에 플러그인 표시(`dsl.autoRole`)가 있나 — 목 변수는 API가 없을 수 있다. */
@@ -712,6 +726,27 @@ function isRGB(v: VariableValue): v is RGB | RGBA {
 
 function scopeOk(scopes: readonly VariableScope[], allowed: readonly VariableScope[]): boolean {
   return scopes.includes('ALL_SCOPES') || allowed.some((s) => scopes.includes(s));
+}
+
+/** 개별 칠 용도 — `ALL_FILLS`가 모두 담는다. */
+const PART_FILLS: readonly string[] = ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'];
+
+/**
+ * 용도 합치기(ia-v4 §2.3-7 · ia-v3 12.11) — 이미 있거나 `ALL_SCOPES`면 그대로, `ALL_FILLS`가 들어가면 개별 칠 용도는 뺀다.
+ * 타입에 맞지 않는 용도는 버린다(`scopesForType`).
+ */
+export function mergeScopes(current: readonly string[], add: readonly string[], type: ResolvedType): ScopeName[] {
+  if (current.includes('ALL_SCOPES')) return [...current] as ScopeName[];
+  const set = new Set<string>([...current, ...add]);
+  if (set.has('ALL_FILLS')) for (const p of PART_FILLS) set.delete(p);
+  return scopesForType([...set] as ScopeName[], type);
+}
+
+/** 변수에 용도 하나를 더한다(바뀔 때만 쓴다). */
+function addVariableScope(v: Variable, scope: VariableScope): void {
+  const cur = (v.scopes ?? ['ALL_SCOPES']) as string[];
+  if (cur.includes('ALL_SCOPES') || cur.includes(scope)) return;
+  v.scopes = mergeScopes(cur, [scope], v.resolvedType as ResolvedType) as VariableScope[];
 }
 
 /* ---------- 찾기: 자리 모으기 → 역할 고르기 (§2.12) ---------- */
@@ -767,9 +802,9 @@ interface Ctx {
 }
 
 /** 값 · 용도가 맞는 변수들(12.2 전제). `value`를 주면 그 값으로(알약 자리의 9999 — 12.12 N-D5). */
-function sameValueEntries(ctx: Ctx, s: Slot, value: number | string = s.value): VarEntry[] {
+function sameValueEntries(ctx: Ctx, s: Slot, value: number | string = s.value, anyScope = false): VarEntry[] {
   return ctx.index.entries.filter((e) => {
-    if (!scopeOk(e.scopes, s.allowed)) return false;
+    if (!anyScope && !scopeOk(e.scopes, s.allowed)) return false;
     if (s.kind === 'color') return e.colorKey === value; // hex · 투명도 모두
     if (typeof value === 'number') return e.num != null && sameNumber(e.num, value);
     return e.str != null && e.str === value;
@@ -811,9 +846,11 @@ function resolveSlots(ctx: Ctx): void {
   const { res, preview } = ctx;
   const pending: Pending[] = [];
   const colorLeft: { slot: Slot; cands: VarEntry[] }[] = [];
-  const emit = (s: Slot, e: VarEntry, viaPill = false): void => {
+  const emit = (s: Slot, e: VarEntry, viaPill = false, scopeAdd?: VariableScope): void => {
     res.bound++;
-    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type));
+    const c = candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type);
+    if (scopeAdd) c.scopeAdd = scopeAdd;
+    preview.candidates.push(c);
   };
   const globalFor = (cands: VarEntry[]): VarEntry | null => {
     // 직접 값 Global만(별칭 변수는 사슬을 만든다 — 13.3), 사용자 컬렉션 먼저.
@@ -878,14 +915,32 @@ function resolveSlots(ctx: Ctx): void {
   }
 
   // 순서 4 — 새 역할. 이름 번호는 한꺼번에(곳 수 순).
+  // 용도만 맞지 않는 같은 값 플러그인 Global(ia-v4 §2.3-7 "무료 · 용도 더함" · §4.1 u — 색 자리 · no-match만).
+  const ownedSame = (s: Slot): VarEntry[] =>
+    s.kind === 'color' && s.noMatchReason === 'no-match'
+      ? sameValueEntries(ctx, s, s.value, true).filter((e) => e.tier === 1 && e.direct && !e.user).sort(byUserThenName)
+      : [];
+  const addScope = new Map<Pending, VariableScope>();
   const live = pending.filter((p) => {
     if (p.global) return true;
+    const own = ownedSame(p.slot);
+    if (own.length) {
+      // 무료: 직접 만든 변수가 아닌 것에 붙이고 연결 때 용도를 더한다. 유료 · 직접 만든 변수뿐이면 만들기가 용도를 더한다(u).
+      const pick = ctx.noNewRoles ? own.find((e) => !e.manual) : undefined;
+      if (pick) {
+        p.global = pick;
+        addScope.set(p, p.slot.allowed[0]);
+        return true;
+      }
+      skip(res, 'scope-add', p.slot.node, preview, p.slot.field);
+      return false;
+    }
     if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
     return false;
   });
   // 무료(F6 — §2.3-7): 새 역할을 만들지 않고 그 Global에 바로 붙인다.
   if (ctx.noNewRoles) {
-    for (const p of live) emit(p.slot, p.global as VarEntry, p.slot.pill != null);
+    for (const p of live) emit(p.slot, p.global as VarEntry, p.slot.pill != null, addScope.get(p));
     return;
   }
   // 재사용은 순서 2가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
@@ -1306,6 +1361,8 @@ export interface SelectedBindItem {
   mainId?: string;
   /** 9999로 붙일 알약 자리의 찾을 때 읽은 원래 값(12.12 N-D5). */
   pillFrom?: number;
+  /** 무료 용도 더함(ia-v4 §2.3-7) — 다른 다시 확인을 통과한 뒤 붙이기 바로 전에 이 용도를 변수에 더한다. */
+  scopeAdd?: string;
 }
 
 /** 연결 진행률 · 양보 훅(§4.6 "찾기 · 연결의 수"). 묶음이 끝날 때마다 부른다. */
@@ -1459,10 +1516,13 @@ export async function bindSelectedItems(
           const alpha = itemAlpha(x);
           const allowed = key === 'fills' ? fillScopesFor(node.type) : key === 'strokes' ? STROKE_SCOPES : EFFECT_SCOPES;
           // hex · 투명도(소수 둘째 자리)가 같아야 — 투명도 0(보이지 않게 바뀜)도 그 사이 바뀜
-          if (alpha === 0 || vv.variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha((value as RGBA).a) !== alpha || !scopeOk(scopesOf(), allowed)) {
+          // 무료 용도 더함(ia-v4 §2.3-7)이면 용도 다시 확인은 건너뛴다 — 값 · 투명도 · 타입 확인은 그대로.
+          const scopeAdd = !it.newRole && it.scopeAdd ? (it.scopeAdd as VariableScope) : undefined;
+          if (alpha === 0 || vv.variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha((value as RGBA).a) !== alpha || (!scopeAdd && !scopeOk(scopesOf(), allowed))) {
             fail('changed', node, key); // 값 · 용도가 그 사이 달라짐(칠하기 용도는 레이어 종류 — §2.11)
             continue;
           }
+          if (scopeAdd) addVariableScope(vv.variable, scopeAdd);
           const variable = await target();
           const arr = list.slice();
           arr[i] =
