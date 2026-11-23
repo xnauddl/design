@@ -17,7 +17,7 @@ import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './l
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor } from './lib/naming';
-import { ExportCollectionInput, ExportModeValue, ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportTokens, resolveExportModes, resolveExportTokens } from './lib/exporters';
+import { ExportCollectionInput, ExportModeValue, ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportGlobalDupes, exportTokens, resolveExportModes, resolveExportTokens } from './lib/exporters';
 import { tabInfo } from './lib/componentLike';
 import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
@@ -1757,7 +1757,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             if (v.resolvedType === 'COLOR' && raw && typeof raw === 'object' && 'r' in raw) return { value: exportColorHex(raw as RGBA) };
             return { value: raw as string | number | boolean };
           };
-          const inp: ExportVarInput = { id: v.id, name: v.name, tier: tiers.get(col.id) ?? 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, ...read(v.valuesByMode[col.defaultModeId]) };
+          const inp: ExportVarInput = { id: v.id, name: v.name, tier: tiers.get(col.id) ?? 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, collectionName: col.name, ...read(v.valuesByMode[col.defaultModeId]) };
           if (v.description) inp.description = v.description; // #16: 원본 단위("160%") 내보내기 우선
           // 기본이 아닌 모드 값 — 모드 블록(ia-v3 §4.4 "모드 블록")
           const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
@@ -1790,7 +1790,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
         }, styles, modes);
-        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes) });
+        // 같은 이름 Global끼리 — 앞의 것만 냈음을 알린다(ia-v3 §4.4 "같은 이름 Global끼리")
+        const dupes = exportGlobalDupes(inputs);
+        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes), globalDupes: dupes.names, ...(dupes.from !== undefined ? { globalDupesFrom: dupes.from } : {}) });
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {

@@ -4328,6 +4328,24 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   }
 }
 
+// A.26 — 내보내기 상태 줄: 같은 이름 Global끼리 알림(ia-v3 §4.4 "같은 이름 Global끼리")
+{
+  const p = await open(560, 'variables');
+  const css = ':root {\n  --color-gray-0: #ffffff;\n}\n';
+  const st = async (m) => { await recv(p, { type: 'EXPORT_RESULT', format: 'css', content: css, clashes: [], globalDupes: [], ...m }); await p.waitForTimeout(20); return p.$eval('#exportStatus', (e) => [e.textContent, e.className]); };
+  const a = await st({});
+  const b = await st({ globalDupes: ['color/blue/500', 'color/gray/0'], globalDupesFrom: 'DSL UI 재확인' });
+  const c = await st({ globalDupes: ['a', 'b', 'c', 'd', 'e'] });
+  const d = await st({ clashes: ['color/primary'], globalDupes: ['a'], globalDupesFrom: 'G' });
+  check('A.26 내보내기 상태 줄 — 없음 ok · 한 컬렉션 · 섞임 · 겹침 + Global끼리(warn)',
+    a[0] === 'CSS — tokens.css로 저장했어요.' && a[1] === 'status ok' &&
+    b[0] === 'CSS — tokens.css로 저장했어요. Global끼리 이름이 같은 2개는 "DSL UI 재확인" 것만 냈어요: color/blue/500, color/gray/0' && b[1] === 'status warn' &&
+    c[0] === 'CSS — tokens.css로 저장했어요. Global끼리 이름이 같은 5개는 앞 컬렉션 것만 냈어요: a, b, c 외 2개' && c[1] === 'status warn' &&
+    d[0] === 'CSS — tokens.css로 저장했어요. Global과 이름이 같은 Semantic 1개는 Global 값만 냈어요: color/primary Global끼리 이름이 같은 1개는 "G" 것만 냈어요: a' && d[1] === 'status warn',
+    JSON.stringify([a, b, c, d]));
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);
