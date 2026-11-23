@@ -2,7 +2,7 @@
    만들기 화면 실행(IA v4 §4.3)의 단계 계획(planMake) · 다크 대상 · 다 됨 문구(makeDoneText). */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { MAKE_STEP_ORDER, planMake, makeDoneText, makeCreatedText, pickDarkTarget } from '../dist/pure.mjs';
+import { MAKE_STEP_ORDER, planMake, makeDoneText, makeCreatedText, hasDarkTarget, darkResultText } from '../dist/pure.mjs';
 
 const BASE = { isPaid: true, globalsOn: 5, stylesOn: 2, link: true, rename: false, dark: false };
 
@@ -28,27 +28,42 @@ test('planMake — 무료도 만들기(Global만) · 다크 · 텍스트 스타�
   assert.deepEqual(planMake({ ...BASE, isPaid: false, globalsOn: 0, link: false }), []);
 });
 
-test('pickDarkTarget — 플러그인 Semantic만(§2.13 13.7) · 출처는 Dark가 아닌 모드 · Dark 있으면 대상으로', () => {
+test('hasDarkTarget — 플러그인 Global이 있으면 참(모드는 고르지 않음 — ia-v3 13.7 D-T1)', () => {
   const light = { modeId: 'm1', name: 'Light' };
   const dark = { modeId: 'm2', name: 'Dark' };
-  const vars = [
-    { collectionId: 'g', collection: 'Global', owned: 'global', modes: [{ modeId: 'g1', name: 'Mode 1' }] },
-    { collectionId: 'u', collection: 'Tokens', tier: 2, modes: [light, dark] }, // 사용자 Semantic — 대상 아님
+  assert.equal(hasDarkTarget([{ collectionId: 'g', collection: 'Global', owned: 'global', modes: [{ modeId: 'g1', name: 'Mode 1' }] }]), true);
+  // 플러그인 Semantic · 사용자 컬렉션만 있으면 거짓(모드가 있어도)
+  assert.equal(hasDarkTarget([
     { collectionId: 's', collection: 'Semantic', owned: 'semantic', modes: [light, dark] },
-  ];
-  assert.deepEqual(pickDarkTarget(vars), { collectionId: 's', fromModeId: 'm1', toModeId: 'm2' });
-  // 플러그인 Semantic이 없으면 건너뛴다(사용자 Semantic이 있어도)
-  assert.equal(pickDarkTarget([vars[1]]), null);
+    { collectionId: 'u', collection: 'Primitives', tier: 1, modes: [light] },
+  ]), false);
+  assert.equal(hasDarkTarget([]), false);
+});
 
-  // Dark가 없으면 대상 모드를 생략한다 — 플러그인이 addMode('Dark')로 만든다.
-  const noDark = [{ collectionId: 's', collection: 'Semantic', owned: 'semantic', modes: [light] }];
-  assert.deepEqual(pickDarkTarget(noDark), { collectionId: 's', fromModeId: 'm1' });
+test('darkResultText — 채움 · 그대로 둠 · 이미 채움 · 대상 없음', () => {
+  assert.deepEqual(darkResultText({ filled: 32, kept: 3, targets: 40 }), { text: 'Global 색 32개의 Dark 칸을 채웠어요 · 직접 고친 색 3개는 그대로 뒀어요', cls: 'ok' });
+  assert.deepEqual(darkResultText({ filled: 5, kept: 0, targets: 5, modeCreated: true }), { text: '다크 모드 추가 · Global 색 5개의 Dark 칸을 채웠어요', cls: 'ok' });
+  assert.deepEqual(darkResultText({ filled: 0, kept: 0, targets: 5 }), { text: 'Dark 칸이 모두 채워져 있어요', cls: 'ok' });
+  assert.deepEqual(darkResultText({ filled: 0, kept: 2, targets: 5 }), { text: 'Dark 칸이 모두 채워져 있어요 · 직접 고친 색 2개는 그대로 뒀어요', cls: 'ok' });
+  assert.deepEqual(darkResultText({ filled: 0, kept: 0, targets: 0 }), { text: '채울 색이 없어요 — 플러그인 Global에 값을 넣은 색 변수가 필요해요', cls: 'warn' });
+});
 
-  // 모드가 Dark 하나뿐이면 채울 출처가 없다.
-  assert.equal(pickDarkTarget([{ collectionId: 's', collection: 'Semantic', owned: 'semantic', modes: [dark] }]), null);
-  // 모드가 있는 컬렉션이 아예 없으면 null.
-  assert.equal(pickDarkTarget([{ collectionId: 'g', collection: 'Global', modes: [] }]), null);
-  assert.equal(pickDarkTarget([]), null);
+test('darkResultText — 옮기기 줄(0 부분 생략) · 툴팁 묶음 · c > 0이면 warn · 대상 0이어도 옮기기 줄', () => {
+  const m = (o) => ({ moved: 0, split: 0, failed: 0, splitNames: [], failedNames: [], removedDark: 0, ...o });
+  const r = darkResultText({ filled: 14, kept: 0, targets: 32, modeCreated: true, migrated: m({ moved: 18, split: 2, failed: 2, splitNames: ['color/gray/100', 'color/blue/500'], failedNames: ['text/brand', 'border/focus'], removedDark: 24 }) });
+  assert.equal(r.text, '다크 구조를 옮겼어요(옮긴 색 18개 · 값이 갈린 색 2개 · 옮기지 못한 역할 2개) · 다크 모드 추가 · Global 색 14개의 Dark 칸을 채웠어요');
+  assert.equal(r.cls, 'warn');
+  assert.equal(r.tip, '값이 갈린 색 — 가장 많이 쓴 값으로 옮겼어요:\ncolor/gray/100\ncolor/blue/500\n\n옮기지 못한 역할 — Dark에서 바뀌지 않아요:\ntext/brand\nborder/focus\n\n지운 dark/ 색 24개');
+  // b · c 0 → 그 부분 생략 · 툴팁은 있는 묶음만 · ok
+  const r2 = darkResultText({ filled: 0, kept: 0, targets: 4, migrated: m({ moved: 4, removedDark: 3 }) });
+  assert.deepEqual(r2, { text: '다크 구조를 옮겼어요(옮긴 색 4개) · Dark 칸이 모두 채워져 있어요', cls: 'ok', tip: '지운 dark/ 색 3개' });
+  // 옮긴 색 0 · 모두 실패 · 대상 0 → 옮기기 줄이 붙은 nothing, warn
+  const r3 = darkResultText({ filled: 0, kept: 0, targets: 0, migrated: m({ failed: 1, failedNames: ['bg'] }) });
+  assert.equal(r3.text, '다크 구조를 옮겼어요(옮긴 색 0개 · 옮기지 못한 역할 1개) · 채울 색이 없어요 — 플러그인 Global에 값을 넣은 색 변수가 필요해요');
+  assert.equal(r3.cls, 'warn');
+  assert.equal(r3.tip, '옮기지 못한 역할 — Dark에서 바뀌지 않아요:\nbg');
+  // 툴팁 없음이면 tip 필드 없음
+  assert.equal('tip' in darkResultText({ filled: 1, kept: 0, targets: 1, migrated: m({ moved: 1 }) }), false);
 });
 
 test('makeDoneText — 한 단계씩 이어 붙이고, 하지 않은 부분은 뺀다', () => {

@@ -317,6 +317,9 @@
 
     /* ── 전제 미충족 안내 ── */
     .prereq { margin: 6px 0; font-size: var(--fs); color: var(--warn); display: flex; align-items: center; gap: 6px; }
+    /* 다크 알림 띠 — .prereq와 같은 글 · 여백에 옅은 주황 배경만(테두리 · 둥근 모서리 없음, ia-v4 §4.11 ②). */
+    .dark-notice { margin: 6px 0; font-size: var(--fs); color: var(--warn); background: var(--warn-subtle); }
+    .dark-notice[hidden] { display: none; }
 
     /* ── 진행 안내 파이프라인 ── */
     #pipelineSteps { margin: 6px 0; }
@@ -1276,25 +1279,15 @@
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted lock" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상·채도는 그대로 두고 명도만 뒤집어요. Semantic이 Global을 가리키는 것만 대상이고 값을 직접 넣은 건 건너뛰어요. 다크용 원시색은 dark/…로 따로 만들어요.">라이트 색을 뒤집어 다크에 채워요. 목록 이름은 Figma 변수 컬렉션·모드예요</div>
-      <!-- 다른 카드와 같은 규칙: 결론 버튼은 툴바에, 입력은 그 아래 한 줄(와이어 uxTheme). -->
+      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상 · 채도는 그대로 두고 밝기만 뒤집어요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.">Global 색의 밝기를 뒤집어 Dark 칸에 채워요</div>
+      <!-- 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7 D-T1) — 고르개 없음. -->
       <div class="toolbar">
         <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
         <span class="grow"></span>
         <button class="btn-next" data-next-make="type" data-i18n="rail.next">다음 →</button>
       </div>
-      <div class="row">
-        <label class="inline"><span data-i18n="dark.collection">Semantic 컬렉션</span>
-          <select id="darkCollection"></select>
-        </label>
-        <label class="inline"><span data-i18n="dark.fromMode">라이트</span>
-          <select id="darkFromMode"></select>
-        </label>
-        <label class="inline"><span data-i18n="dark.toMode">다크</span>
-          <select id="darkToMode"></select>
-        </label>
-      </div>
-      <!-- 바로가기는 '토큰이 없다'일 때만 뜬다 — 컬렉션·모드를 고르라는 안내에는 갈 곳이 없다. -->
+      <!-- 알림 띠(ia-v4 §4.11 ②) — 옛 구조 · Dark 값이 없는 색. 테두리 없는 옅은 주황 띠(카드 안 카드 아님 — §2.8). -->
+      <div id="darkNotice" class="dark-notice" hidden></div>
       <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
@@ -1507,14 +1500,9 @@
     // 마법사
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
-    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
-    "dark.collection": "Semantic \uCEEC\uB809\uC158",
-    "dark.fromMode": "\uB77C\uC774\uD2B8",
-    "dark.toMode": "\uB2E4\uD06C",
+    "dark.hint": "Global \uC0C9\uC758 \uBC1D\uAE30\uB97C \uB4A4\uC9D1\uC5B4 Dark \uCE78\uC5D0 \uCC44\uC6CC\uC694",
+    "dark.hintTip": "\uC0C9\uC0C1 \xB7 \uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBC1D\uAE30\uB9CC \uB4A4\uC9D1\uC5B4\uC694. \uD50C\uB7EC\uADF8\uC778 Global\uC758 \uC0C9\uB9CC \uCC44\uC6B0\uACE0, \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218 \xB7 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 \xB7 \uC9C1\uC811 \uACE0\uCE5C Dark \uCE78\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
-    // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
-    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -1555,11 +1543,13 @@
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
+    "wizard.seq.dark": "\uB2E4\uD06C \uAC12 {filled}\uAC1C \uCC44\uC6C0",
     "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
-    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
-    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
+    "wizard.seq.darkKept": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uC0C9 {n}\uAC1C\uB294 \uADF8\uB300\uB85C",
+    "wizard.seq.darkUpToDate": "Dark \uCE78\uC774 \uBAA8\uB450 \uCC44\uC6CC\uC838 \uC788\uC74C",
+    "wizard.seq.darkMigrate": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACA8\uC57C \uD574\uC694 \u2014 \uD14C\uB9C8 \uD654\uBA74\uC5D0\uC11C [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "wizard.seq.darkNoTarget": "\uD50C\uB7EC\uADF8\uC778 Global\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC5D0 \uAC12\uC744 \uB123\uC740 \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesLinked": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uC5F0\uACB0",
     "wizard.seq.textStylesMissing": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -1580,6 +1570,7 @@
     "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
+    "pipeline.hint.darkUnfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
     "v4.colEmpty": "\uC774 \uCEEC\uB809\uC158\uC5D4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -2243,21 +2234,31 @@
     "semantic.needGlobal": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "dark.prereqLoading": "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "dark.prereqNoVars": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
-    "dark.prereqNoModes": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.",
-    "dark.prereqPick": "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
     "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
-    "dark.whyNoGlobal": "Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 {n}\uAC1C)",
-    "dark.whyNone": "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694",
-    "dark.modeAdded": "\uB2E4\uD06C \uBAA8\uB4DC\uB294 \uCD94\uAC00\uD588\uC5B4\uC694. ",
-    "dark.fillFailed": "{modePart}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.modeAddedShort": "\uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00 \xB7 ",
-    "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "dark.done": "{modePart}\uB2E4\uD06C {n}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 {c}\uAC1C{skipPart}",
+    // 다크 결과 · 띠 · 옮기기(ia-v3 13.7 D-T1 · A.25 — 임시 문구, UX 라이팅 단계에서 확정)
+    "dark.doneFill": "{modePart}Global \uC0C9 {n}\uAC1C\uC758 Dark \uCE78\uC744 \uCC44\uC6E0\uC5B4\uC694{keptPart}",
+    "dark.keptPart": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uC0C9 {k}\uAC1C\uB294 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "dark.upToDate": "Dark \uCE78\uC774 \uBAA8\uB450 \uCC44\uC6CC\uC838 \uC788\uC5B4\uC694{keptPart}",
+    "dark.nothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC5B4\uC694 \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC5D0 \uAC12\uC744 \uB123\uC740 \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
+    "dark.unfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB85C \uCC44\uC6CC\uC694",
+    "dark.needMigrate": "\uB2E4\uD06C\uAC00 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB204\uB974\uBA74 Global\uB85C \uC62E\uACA8\uC694",
+    "dark.needMigrateManual": "\uB2E4\uD06C\uAC00 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 Semantic \uBAA8\uB4DC\uAC00 3\uAC1C \uC774\uC0C1\uC774\uB77C \uC62E\uAE38 \uC218 \uC5C6\uC5B4\uC694. \uD53C\uADF8\uB9C8\uC5D0\uC11C \uBAA8\uB4DC\uB97C 2\uAC1C\uB85C \uC904\uC5EC \uC8FC\uC138\uC694",
+    "dark.migrateTitle": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uAE38\uAE4C\uC694?",
+    "dark.migrateBody": "\uC9C0\uAE08 \uB2E4\uD06C\uB294 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694. Global \uC0C9\uC758 Dark \uCE78\uC73C\uB85C \uC62E\uAE30\uACE0, Semantic\uC758 {mode} \uBAA8\uB4DC\uC640 \uC4F0\uC9C0 \uC54A\uAC8C \uB41C dark/ \uC0C9 {n}\uAC1C\uB97C \uC9C0\uC6CC\uC694. \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
+    "dark.migrateBodyNoDel": "\uC9C0\uAE08 \uB2E4\uD06C\uB294 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694. Global \uC0C9\uC758 Dark \uCE78\uC73C\uB85C \uC62E\uAE30\uACE0, Semantic\uC758 {mode} \uBAA8\uB4DC\uB97C \uC9C0\uC6CC\uC694. \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
+    "dark.migrateGo": "\uC62E\uAE30\uACE0 \uB2E4\uD06C \uB9CC\uB4E4\uAE30",
+    "dark.migrated": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACBC\uC5B4\uC694(\uC62E\uAE34 \uC0C9 {a}\uAC1C{splitPart}{failPart}) \xB7 ",
+    "dark.migratedSplit": " \xB7 \uAC12\uC774 \uAC08\uB9B0 \uC0C9 {b}\uAC1C",
+    "dark.migratedFail": " \xB7 \uC62E\uAE30\uC9C0 \uBABB\uD55C \uC5ED\uD560 {c}\uAC1C",
+    "dark.migratedSplitTip": "\uAC12\uC774 \uAC08\uB9B0 \uC0C9 \u2014 \uAC00\uC7A5 \uB9CE\uC774 \uC4F4 \uAC12\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694:",
+    "dark.migratedFailTip": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC5ED\uD560 \u2014 Dark\uC5D0\uC11C \uBC14\uB00C\uC9C0 \uC54A\uC544\uC694:",
+    "dark.migratedDelTip": "\uC9C0\uC6B4 dark/ \uC0C9 {n}\uAC1C",
+    "dark.errMigrateModes": "Semantic\uC5D0 \uBAA8\uB4DC\uAC00 3\uAC1C \uC774\uC0C1\uC774\uB77C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uBAA8\uB4DC\uB97C 2\uAC1C\uB85C \uC904\uC778 \uB4A4 \uB2E4\uC2DC \uB20C\uB7EC \uC8FC\uC138\uC694",
     "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "dark.errNotOwned": "\uB2E4\uD06C\uB294 \uD50C\uB7EC\uADF8\uC778 Semantic\uC5D0\uB9CC \uB9CC\uB4E4\uC5B4\uC694",
     "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
-    "dark.errSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694 \u2014 \uB77C\uC774\uD2B8\uC5D0 \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    "dark.errSameMode": "Global \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC774 Dark\uC608\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC744 Light \uB4F1\uC73C\uB85C \uBC14\uAFD4 \uC8FC\uC138\uC694",
     // 만들기 › 타이포(텍스트 스타일)
     "textStyle.rowDelete": "\uC0AD\uC81C",
     "textStyle.scanSummary": "\uC2E0\uADDC {a} \xB7 \uB4F1\uB85D\uB428 {b}",
@@ -4469,6 +4470,7 @@
 
   // src/lib/pipeline.ts
   function pipelineSteps(s) {
+    var _a3, _b;
     return [
       { id: "colors", status: s.hasColorVars ? "done" : "ready" },
       { id: "tokens", status: s.hasScaleVars ? "done" : "ready" },
@@ -4477,7 +4479,8 @@
         status: s.hasSemanticRoles ? "done" : s.hasGlobal ? "ready" : "blocked",
         hint: s.hasGlobal || s.hasSemanticRoles ? void 0 : "pipeline.hint.needTokens"
       },
-      { id: "dark", status: s.hasDarkMode ? "done" : "todo" },
+      // 다크: Dark 값이 없는 색이 있으면 완료가 아니다(ia-v4 §4.6 "다크 모드 줄").
+      ((_a3 = s.darkUnfilled) != null ? _a3 : 0) > 0 ? { id: "dark", status: "todo", hint: "pipeline.hint.darkUnfilled", hintParams: { n: (_b = s.darkUnfilled) != null ? _b : 0 } } : { id: "dark", status: s.hasDarkMode ? "done" : "todo" },
       { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" },
       {
         id: "bind",
@@ -4536,13 +4539,8 @@
     if (i.rename) out.push("rename");
     return out;
   }
-  function pickDarkTarget(vars) {
-    const target = vars.find((v) => v.owned === "semantic" && v.modes.length >= 1);
-    if (!target) return null;
-    const dark = target.modes.find((m) => m.name.toLowerCase() === "dark");
-    const from = target.modes.find((m) => m.modeId !== (dark == null ? void 0 : dark.modeId));
-    if (!from) return null;
-    return __spreadValues({ collectionId: target.collectionId, fromModeId: from.modeId }, dark ? { toModeId: dark.modeId } : {});
+  function hasDarkTarget(vars) {
+    return vars.some((v) => v.owned === "global");
   }
   function makeDoneText(totals, opts) {
     var _a3, _b;
@@ -4559,6 +4557,29 @@
   }
   function makeCreatedText(c, isPaid2) {
     return isPaid2 ? t("make.done.create", { g: c.g, r: c.r }) : t("make.globalN", { g: c.g });
+  }
+  function darkResultText(r) {
+    const keptPart = r.kept > 0 ? t("dark.keptPart", { k: r.kept }) : "";
+    let cls = "ok";
+    let body;
+    if (r.targets === 0) {
+      body = t("dark.nothing");
+      cls = "warn";
+    } else if (r.filled === 0) body = t("dark.upToDate", { keptPart });
+    else body = t("dark.doneFill", { modePart: r.modeCreated ? t("dark.modeAddedShort") : "", n: r.filled, keptPart });
+    const m = r.migrated;
+    if (!m) return { text: body, cls };
+    const head = t("dark.migrated", {
+      a: m.moved,
+      splitPart: m.split > 0 ? t("dark.migratedSplit", { b: m.split }) : "",
+      failPart: m.failed > 0 ? t("dark.migratedFail", { c: m.failed }) : ""
+    });
+    if (m.failed > 0) cls = "warn";
+    const groups = [];
+    if (m.splitNames.length) groups.push([t("dark.migratedSplitTip"), ...m.splitNames].join("\n"));
+    if (m.failedNames.length) groups.push([t("dark.migratedFailTip"), ...m.failedNames].join("\n"));
+    if (m.removedDark > 0) groups.push(t("dark.migratedDelTip", { n: m.removedDark }));
+    return __spreadValues({ text: head + body, cls }, groups.length ? { tip: groups.join("\n\n") } : {});
   }
 
   // src/ui.ts
@@ -4596,6 +4617,8 @@
     }, 3e3);
   }
   var hasDarkMode = false;
+  var darkUnfilled = 0;
+  var darkOld = false;
   var hasTextStyles = false;
   var hasSemanticRoles = false;
   var hasBoundNodes = false;
@@ -6148,7 +6171,7 @@
       $(id).textContent = isPaid ? "" : PAID_LOCK;
     }
     for (const id of ["paletteLock", "colorVarsLock", "createLock", "paletteBtnLock"]) $(id).textContent = "";
-    refreshDarkModes();
+    refreshDarkPrereq();
     setPrereq("btnSemantics", "semPrereq", hasGlobal, t("semantic.needGlobal"));
     if (!isPaid) setLock($("btnSemantics"), "paid");
     renderBindPrereq();
@@ -6264,7 +6287,7 @@
   function renderPipeline() {
     const box = $("pipelineSteps");
     box.innerHTML = "";
-    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
+    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
     steps.forEach((s, i) => {
       const row = document.createElement("div");
       row.className = `pstep ${s.status}`;
@@ -6279,7 +6302,7 @@
       label.textContent = t("pipeline.step." + s.id);
       const stat = document.createElement("span");
       stat.className = "pstat";
-      stat.textContent = s.hint ? t(s.hint) : t("pipeline.stat." + s.status);
+      stat.textContent = s.hint ? t(s.hint, s.hintParams) : t("pipeline.stat." + s.status);
       row.append(dot, label, stat);
       const go = () => gotoStep(s.id);
       row.addEventListener("click", go);
@@ -6307,51 +6330,10 @@
   $("btnScanComp").addEventListener("click", startCompScan);
   var allVars = [];
   var varsLoaded = false;
-  function refreshDarkOptions() {
-    var _a3, _b, _c, _d;
-    const cols = /* @__PURE__ */ new Map();
-    for (const v of allVars) if (v.owned === "semantic" && !cols.has(v.collectionId)) cols.set(v.collectionId, v);
-    const sel = $("darkCollection");
-    const prev = sel.value;
-    sel.innerHTML = "";
-    for (const [id, v] of cols) {
-      const o = document.createElement("option");
-      o.value = id;
-      o.textContent = v.collection;
-      sel.appendChild(o);
-    }
-    if (prev && cols.has(prev)) sel.value = prev;
-    const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-    const usable = (_a3 = withModes.find((v) => v.tier === 2)) != null ? _a3 : withModes[0];
-    if (usable && ((_c = (_b = cols.get(sel.value)) == null ? void 0 : _b.modes.length) != null ? _c : 0) < 1) sel.value = usable.collectionId;
-    if (usable && (!sel.value || ((_d = cols.get(sel.value)) == null ? void 0 : _d.tier) === 1) && usable.tier === 2) {
-      sel.value = usable.collectionId;
-    } else if (usable && !sel.value) {
-      sel.value = usable.collectionId;
-    }
-    refreshDarkModes();
-  }
-  function refreshDarkModes() {
+  function refreshDarkPrereq() {
     var _a3;
-    const colId = $("darkCollection").value;
-    const v = allVars.find((x) => x.collectionId === colId);
-    const modes = v ? v.modes : [];
-    const restored = {};
-    for (const id of ["darkFromMode", "darkToMode"]) {
-      const sel = $(id);
-      const prev = sel.value;
-      sel.innerHTML = "";
-      for (const m of modes) {
-        const o = document.createElement("option");
-        o.value = m.modeId;
-        o.textContent = m.name;
-        sel.appendChild(o);
-      }
-      restored[id] = !!prev && modes.some((m) => m.modeId === prev);
-      if (restored[id]) sel.value = prev;
-    }
-    const hasCollection = !!colId && modes.length >= 1;
-    const ok = hasCollection && varsLoaded && allVars.length > 0;
+    const hasGlobalCol = allVars.some((v) => v.owned === "global");
+    const ok = varsLoaded && hasGlobalCol;
     const notice = $("darkPrereq");
     const gotoCreate = $("darkPrereqGotoCreate");
     notice.style.display = ok ? "none" : "";
@@ -6360,50 +6342,56 @@
       if (!varsLoaded) {
         text.textContent = t("dark.prereqLoading");
         gotoCreate.style.display = "none";
-      } else if (allVars.length === 0 || !allVars.some((v2) => v2.owned === "semantic")) {
+      } else {
         text.textContent = t("dark.prereqNoVars");
         gotoCreate.style.display = "";
-      } else if (!colId || modes.length === 0) {
-        text.textContent = t("dark.prereqNoModes");
-        gotoCreate.style.display = "none";
-      } else {
-        text.textContent = t("dark.prereqPick");
-        gotoCreate.style.display = "none";
       }
     }
-    const darkBtn = $("btnGenDark");
-    setLock(darkBtn, !isPaid ? "paid" : ok ? null : "prereq", ((_a3 = text == null ? void 0 : text.textContent) != null ? _a3 : "") || t("status.noSelection"));
-    const toSel = $("darkToMode");
-    const darkMode = modes.find((m) => m.name.toLowerCase() === "dark");
-    if (!restored["darkToMode"]) {
-      if (darkMode) {
-        toSel.value = darkMode.modeId;
-      } else if (modes.length >= 1) {
-        const o = document.createElement("option");
-        o.value = "";
-        o.textContent = t("dark.toPlaceholder");
-        toSel.insertBefore(o, toSel.firstChild);
-        toSel.value = "";
-      }
-    }
-    const fromSel = $("darkFromMode");
-    if (modes.length >= 2 && darkMode && fromSel.value === darkMode.modeId) {
-      const other = modes.find((m) => m.modeId !== darkMode.modeId);
-      if (other) fromSel.value = other.modeId;
-    }
+    setLock($("btnGenDark"), !isPaid ? "paid" : ok ? null : "prereq", ((_a3 = text == null ? void 0 : text.textContent) != null ? _a3 : "") || t("status.noSelection"));
+    renderDarkNotice();
   }
-  $("darkCollection").addEventListener("change", refreshDarkModes);
-  $("btnGenDark").addEventListener("click", () => {
-    const collectionId = $("darkCollection").value;
-    const fromModeId = $("darkFromMode").value;
-    if (!collectionId || !fromModeId) {
-      setStatus("darkStatus", t("dark.prereqPick"), "warn");
-      return;
+  function semanticModeCount() {
+    var _a3, _b;
+    return (_b = (_a3 = allVars.find((v) => v.owned === "semantic")) == null ? void 0 : _a3.modes.length) != null ? _b : 0;
+  }
+  function renderDarkNotice() {
+    const el = $("darkNotice");
+    const prereqShown = $("darkPrereq").style.display !== "none";
+    let text = "";
+    if (!prereqShown) {
+      if (darkOld) text = semanticModeCount() >= 3 ? t("dark.needMigrateManual") : t("dark.needMigrate");
+      else if (darkUnfilled > 0) text = t("dark.unfilled", { n: darkUnfilled });
     }
+    el.textContent = text;
+    el.hidden = !text;
+  }
+  $("btnGenDark").addEventListener("click", () => {
     setStatus("darkStatus", t("dark.running"), "");
-    const toModeId = $("darkToMode").value;
-    send(__spreadValues({ type: "GENERATE_DARK_MODE", collectionId, fromModeId }, toModeId ? { toModeId } : {}));
+    send({ type: "GENERATE_DARK_MODE" });
   });
+  var darkMigrateLater = null;
+  function openDarkMigrate(need) {
+    const body = document.createElement("div");
+    const para = document.createElement("p");
+    para.textContent = need.removeDark > 0 ? t("dark.migrateBody", { mode: need.mode, n: need.removeDark }) : t("dark.migrateBodyNoDel", { mode: need.mode });
+    body.appendChild(para);
+    const btn = $("btnGenDark");
+    let going = false;
+    const cancel = modalButton(t("common.cancel"), () => closeModal());
+    const go = modalButton(
+      t("dark.migrateGo"),
+      () => {
+        going = true;
+        closeModal();
+        setStatus("darkStatus", t("dark.running"), "");
+        send({ type: "GENERATE_DARK_MODE", migrate: true });
+      },
+      true
+    );
+    openModal(t("dark.migrateTitle"), body, [cancel, go], () => btn, () => {
+      if (!going) setStatus("darkStatus", "", "");
+    }, { focus: cancel });
+  }
   $("btnRegisterComp").addEventListener("click", () => {
     var _a3;
     const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
@@ -6479,7 +6467,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6758,6 +6746,8 @@
         prereqLocalVars = ((_m = msg.tierVars) != null ? _m : 0) + ((_n = msg.otherVars) != null ? _n : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         hasDarkMode = msg.hasDarkMode;
+        darkUnfilled = (_o = msg.darkUnfilled) != null ? _o : 0;
+        darkOld = (_p = msg.darkOld) != null ? _p : false;
         hasTextStyles = msg.hasTextStyles;
         hasSemanticRoles = msg.hasSemanticRoles;
         updateGates();
@@ -6770,7 +6760,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_o = msg.noteKind) != null ? _o : "ok");
+          setStatus("licenseStatus", msg.note, (_q = msg.noteKind) != null ? _q : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -6786,7 +6776,7 @@
         }
         saveExportFile(msg.content, msg.format);
         const saved = t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" });
-        const clash = exportClashNotice((_p = msg.clashes) != null ? _p : []);
+        const clash = exportClashNotice((_r = msg.clashes) != null ? _r : []);
         setStatus("exportStatus", clash ? `${saved} ${clash}` : saved, clash ? "warn" : "ok");
         break;
       }
@@ -6796,7 +6786,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_q = msg.autoNamed) != null ? _q : 0);
+        setCompAutoNamed((_s = msg.autoNamed) != null ? _s : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6811,12 +6801,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_r = msg.placeFailed) != null ? _r : [];
-        const cloned = (_s = msg.placeCloned) != null ? _s : [];
-        const propFailed = (_t = msg.propFailed) != null ? _t : [];
-        const fillKept = (_u = msg.fillKept) != null ? _u : [];
-        const reused = (_v = msg.reused) != null ? _v : [];
-        const reuseKept = (_w = msg.reuseKept) != null ? _w : [];
+        const misplaced = (_t = msg.placeFailed) != null ? _t : [];
+        const cloned = (_u = msg.placeCloned) != null ? _u : [];
+        const propFailed = (_v = msg.propFailed) != null ? _v : [];
+        const fillKept = (_w = msg.fillKept) != null ? _w : [];
+        const reused = (_x = msg.reused) != null ? _x : [];
+        const reuseKept = (_y = msg.reuseKept) != null ? _y : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures, reused));
@@ -6846,7 +6836,7 @@
       case "VARIABLES": {
         varsLoaded = true;
         allVars = msg.vars;
-        refreshDarkOptions();
+        refreshDarkPrereq();
         if (!tokens.length) {
           const globals = allVars.filter((v) => v.tier === 1);
           const colors = globals.filter((v) => v.name.startsWith("color/")).length;
@@ -6864,15 +6854,15 @@
           setStatus("darkStatus", msg.error, "warn");
           break;
         }
-        if (!msg.realiased) {
-          const why = msg.skipped ? t("dark.whyNoGlobal", { n: msg.skipped }) : t("dark.whyNone");
-          const modePart2 = msg.modeCreated ? t("dark.modeAdded") : "";
-          setStatus("darkStatus", t("dark.fillFailed", { modePart: modePart2, why }), "warn");
+        if (msg.needMigrate) {
+          if (!wizardRunning) {
+            if (isMini) darkMigrateLater = msg.needMigrate;
+            else openDarkMigrate(msg.needMigrate);
+          }
           break;
         }
-        const modePart = msg.modeCreated ? t("dark.modeAddedShort") : "";
-        const skipPart = msg.skipped ? t("dark.skippedDirect", { n: msg.skipped }) : "";
-        setStatus("darkStatus", t("dark.done", { modePart, n: msg.realiased, c: msg.created, skipPart }), "ok");
+        const res = darkResultText(msg);
+        setStatus("darkStatus", res.text, res.cls, res.tip);
         break;
       }
       case "PREMIUM_REQUIRED": {
@@ -8042,19 +8032,23 @@
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
           const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
-          const target = pickDarkTarget(vars.vars);
-          if (!target) results.push({ id, mark: "ok", text: t("wizard.seq.darkNoTarget") });
+          if (!hasDarkTarget(vars.vars)) results.push({ id, mark: "ok", text: t("wizard.seq.darkNoTarget") });
           else {
-            const r = await wizardRequest(__spreadValues({ type: "GENERATE_DARK_MODE", collectionId: target.collectionId, fromModeId: target.fromModeId }, target.toModeId ? { toModeId: target.toModeId } : {}), ["DARK_MODE_RESULT"]);
+            const r = await wizardRequest({ type: "GENERATE_DARK_MODE" }, ["DARK_MODE_RESULT"]);
+            const keptPart = r.kept ? t("wizard.seq.darkKept", { n: r.kept }) : "";
             if (r.error) {
               results.push({ id, mark: "warn", text: r.error });
               stay = true;
-            } else if (!r.realiased) {
+            } else if (r.needMigrate) {
+              results.push({ id, mark: "warn", text: t("wizard.seq.darkMigrate") });
+              stay = true;
+            } else if (!r.targets) {
               results.push({ id, mark: "warn", text: t("wizard.seq.darkNothing") });
               stay = true;
-            } else {
-              totals.darkFilled = r.realiased;
-              results.push({ id, mark: "ok", text: t("wizard.seq.dark", { realiased: r.realiased }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + (r.skipped ? t("wizard.seq.darkSkip", { n: r.skipped }) : "") });
+            } else if (!r.filled) results.push({ id, mark: "ok", text: t("wizard.seq.darkUpToDate") + keptPart });
+            else {
+              totals.darkFilled = r.filled;
+              results.push({ id, mark: "ok", text: t("wizard.seq.dark", { filled: r.filled }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + keptPart });
             }
           }
         } else if (id === "textStyles") {
@@ -9134,6 +9128,11 @@ ${opts.tip}` : text;
     syncStickyOffsets();
     $("btnMinimize").focus();
     readScreen("expand");
+    if (darkMigrateLater) {
+      const need = darkMigrateLater;
+      darkMigrateLater = null;
+      openDarkMigrate(need);
+    }
   }
   function renderMiniMark() {
     const mark = $("btnExpand");
@@ -9312,6 +9311,10 @@ ${opts.tip}` : text;
       if ((m.type === "COMPONENTS_RESULT" || m.type === "VARIANTS_RESULT") && ((_b = (_a3 = m.failures) == null ? void 0 : _a3.length) != null ? _b : 0) > 0) failed = true;
       if (m.type === "COMPONENTS_RESULT" && ((_d = (_c = m.propFailed) == null ? void 0 : _c.length) != null ? _d : 0) + ((_f = (_e = m.fillKept) == null ? void 0 : _e.length) != null ? _f : 0) + ((_h = (_g = m.reuseKept) == null ? void 0 : _g.length) != null ? _h : 0) + ((_j = (_i = m.placeCloned) == null ? void 0 : _i.length) != null ? _j : 0) + ((_l = (_k = m.placeFailed) == null ? void 0 : _k.length) != null ? _l : 0) > 0) failed = true;
       if (m.type === "APPLY_RESULT" && m.cancelled) cancelled = true;
+      if (m.type === "DARK_MODE_RESULT" && m.needMigrate) {
+        if (isMini) renderMiniMark();
+        return;
+      }
       if (m.type === "VARIABLES_DELETED") {
         if (m.cancelled) cancelled = true;
         if (m.failed > 0) failed = true;
@@ -9422,7 +9425,7 @@ ${opts.tip}` : text;
   send({ type: "GET_LICENSE" });
   send({ type: "GET_VARIABLES" });
   send({ type: "GET_SETTINGS" });
-  refreshDarkModes();
+  refreshDarkPrereq();
   document.querySelectorAll('[data-goto="create"]').forEach((b) => b.addEventListener("click", goToCreate));
   var TABS = ["select", "variables"];
   var activeTab = "select";
@@ -12201,7 +12204,11 @@ ${opts.tip}` : text;
       { label: t("list.addNew"), onSelect: () => openNewVar(btn), focusElsewhere: true },
       // 메뉴 줄은 잠그지 않는다(§4.9 F2)
       { label: t("list.addFromSel"), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => showMakeScreen(), focusElsewhere: true },
-      { label: t("list.addDark"), onSelect: () => showPick("theme", "vars"), focusElsewhere: true },
+      // 들어오면 포커스 [다크 만들기](ia-v4 §4.11 ② "포커스" — 시안 1).
+      { label: t("list.addDark"), onSelect: () => {
+        showPick("theme", "vars");
+        $("btnGenDark").focus();
+      }, focusElsewhere: true },
       { label: t("list.addTextStyles"), onSelect: () => showPick("type", "vars"), focusElsewhere: true }
     ], btn);
   }
@@ -12233,7 +12240,7 @@ ${opts.tip}` : text;
     renderVarList();
   });
   function readinessDone() {
-    return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === "done").length;
+    return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === "done").length;
   }
   var readinessReturn = null;
   function openReadiness(btn) {

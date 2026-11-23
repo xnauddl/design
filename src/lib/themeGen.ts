@@ -28,19 +28,10 @@ export function darkValueForLight(hex: string): string {
   return oklchToHex(clampToGamut({ l, c: lch.c, h: lch.h }));
 }
 
-/** Global 프리미티브의 다크 짝을 담는 그룹 접두. */
+/** 옛 구조(D-T1 전)의 Global 다크 복사본 그룹 접두 — 옮기기 ⑤와 채우기 · 수의 건너뛰기에만 쓴다(ia-v3 13.7). */
 export const DARK_PREFIX = 'dark/';
 
-/** 이미 다크 짝인 Global 이름인지 — 다크 모드를 출처로 재실행할 때의 자기 참조 방지용. */
+/** 옛 `dark/…` 복사본 이름인지 — 채우기 · 수에서 건너뛰어 "다크의 다크"를 막는다. */
 export function isDarkGlobalName(name: string): boolean {
   return name.startsWith(DARK_PREFIX);
-}
-
-/**
- * 다크용 Global 프리미티브 이름 — 라이트 Global 이름을 `dark/` 그룹 아래로.
- * 예: 'color/blue/500' → 'dark/color/blue/500'. (Semantic 다크 모드가 이 변수를 재-별칭)
- * 이미 `dark/`면 그대로 둔다 — 다크 모드를 출처로 골라도 `dark/dark/…`가 생기지 않는다.
- */
-export function darkGlobalName(lightName: string): string {
-  return isDarkGlobalName(lightName) ? lightName : `${DARK_PREFIX}${lightName}`;
 }

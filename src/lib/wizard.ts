@@ -1,6 +1,7 @@
 /* ============================================================
    wizard.ts — 만들기 화면 실행(IA v4 §4.3)의 순수 로직: 단계 계획 · 다크 대상 · 다 됨 문구.
    figma/DOM 의존 없음. 실제 메시지 시퀀싱은 ui.ts가 이 계획을 따라 수행한다.
+   다크 결과 글(darkResultText)도 여기 — 다크 카드 상태 줄이 쓴다(ia-v4 §4.11 ② 상태표).
    ============================================================ */
 import { t } from './i18n';
 
@@ -35,25 +36,12 @@ export function planMake(i: MakePlanInput): MakeStepId[] {
   return out;
 }
 
-/** 다크 단계가 보낼 대상(컬렉션·출처 모드·대상 모드). */
-export interface DarkTarget {
-  collectionId: string;
-  fromModeId: string;
-  /** 이미 있는 Dark 모드. 없으면 생략 — 플러그인이 `addMode('Dark')`로 만든다. */
-  toModeId?: string;
-}
-
 /**
- * 변수 목록에서 다크 채움 대상을 고른다(순수). 대상은 플러그인 Semantic 하나뿐(§2.13 13.7) →
- * 출처는 Dark가 아닌 첫 모드 → 대상은 이미 있는 `Dark`(없으면 생략). 고를 게 없으면 null(단계는 건너뛴다).
+ * 다크 단계를 돌릴 수 있나(순수) — 플러그인 Global이 있으면 참(ia-v3 13.7 D-T1). 모드는 고르지 않는다 —
+ * 플러그인이 기본 모드 → `Dark`(없으면 만듦)로 정한다(`GENERATE_DARK_MODE{}`). 없으면 단계는 건너뛴다.
  */
-export function pickDarkTarget(vars: readonly { collectionId: string; collection: string; tier?: number; owned?: string; modes: readonly { modeId: string; name: string }[] }[]): DarkTarget | null {
-  const target = vars.find((v) => v.owned === 'semantic' && v.modes.length >= 1);
-  if (!target) return null;
-  const dark = target.modes.find((m) => m.name.toLowerCase() === 'dark');
-  const from = target.modes.find((m) => m.modeId !== dark?.modeId);
-  if (!from) return null; // 모드가 Dark 하나뿐 — 다크에서 다크를 채울 일은 없다
-  return { collectionId: target.collectionId, fromModeId: from.modeId, ...(dark ? { toModeId: dark.modeId } : {}) };
+export function hasDarkTarget(vars: readonly { owned?: string }[]): boolean {
+  return vars.some((v) => v.owned === 'global');
 }
 
 /** 실행이 단계 결과로 모은 수(다 됨 문구용). 단계가 돌지 않았으면 그 필드는 없다. */
@@ -87,4 +75,41 @@ export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOf
 /** 만들기 부분 글 — 유료 "Global {g}개 · Semantic {r}개", 무료 "Global {g}개"(다 됨 · 취소됨 괄호 공통 — §4.3). */
 export function makeCreatedText(c: { g: number; r: number }, isPaid: boolean): string {
   return isPaid ? t('make.done.create', { g: c.g, r: c.r }) : t('make.globalN', { g: c.g });
+}
+
+/** 다크 결과(`DARK_MODE_RESULT`에서 거절 · needMigrate를 뺀 것) — 결과 글을 만드는 데 쓰는 필드만. */
+export interface DarkResultLike {
+  filled: number;
+  kept: number;
+  targets: number;
+  modeCreated?: boolean;
+  migrated?: { moved: number; split: number; failed: number; splitNames: string[]; failedNames: string[]; removedDark: number };
+}
+
+/**
+ * 다크 카드 상태 줄 글(ia-v4 §4.11 ② 상태표 "다 됨" · "대상 없음" · "옮기기를 한 결과").
+ * 옮기기를 했으면 어느 결과든 앞에 옮기기 줄 · 툴팁(있는 묶음만 빈 줄로 나눔), c > 0이면 warn.
+ */
+export function darkResultText(r: DarkResultLike): { text: string; cls: 'ok' | 'warn'; tip?: string } {
+  const keptPart = r.kept > 0 ? t('dark.keptPart', { k: r.kept }) : '';
+  let cls: 'ok' | 'warn' = 'ok';
+  let body: string;
+  if (r.targets === 0) {
+    body = t('dark.nothing');
+    cls = 'warn';
+  } else if (r.filled === 0) body = t('dark.upToDate', { keptPart });
+  else body = t('dark.doneFill', { modePart: r.modeCreated ? t('dark.modeAddedShort') : '', n: r.filled, keptPart });
+  const m = r.migrated;
+  if (!m) return { text: body, cls };
+  const head = t('dark.migrated', {
+    a: m.moved,
+    splitPart: m.split > 0 ? t('dark.migratedSplit', { b: m.split }) : '',
+    failPart: m.failed > 0 ? t('dark.migratedFail', { c: m.failed }) : '',
+  });
+  if (m.failed > 0) cls = 'warn';
+  const groups: string[] = [];
+  if (m.splitNames.length) groups.push([t('dark.migratedSplitTip'), ...m.splitNames].join('\n'));
+  if (m.failedNames.length) groups.push([t('dark.migratedFailTip'), ...m.failedNames].join('\n'));
+  if (m.removedDark > 0) groups.push(t('dark.migratedDelTip', { n: m.removedDark }));
+  return { text: head + body, cls, ...(groups.length ? { tip: groups.join('\n\n') } : {}) };
 }

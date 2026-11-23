@@ -3989,6 +3989,106 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await p.close();
 }
 
+
+/* ---------- 40 다크 구조 D-T1(ia-v3 13.7 "다크" · A.25 · ia-v4 §4.11 ② · §4.6) — 고르개 없음 · 알림 띠 · 옮기기 팝업 · 결과 글 · 준비 현황 다크 줄 ---------- */
+{
+  const p = await open(560, null);
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, PREREQ);
+  await goSub(p, 'pick');
+  await p.click('#makeRail [data-make-step="theme"]');
+  check('40 다크 카드 — 고르개 없음(#darkCollection · #darkFromMode · #darkToMode 0개)', (await p.$$('#darkCollection, #darkFromMode, #darkToMode')).length === 0 && (await visible(p, '#darkCard')));
+  check('40 안내 글 · 툴팁(dark.hint · dark.hintTip)', (await p.textContent('#darkCard .hint')) === 'Global 색의 밝기를 뒤집어 Dark 칸에 채워요' && (await p.getAttribute('#darkCard .hint', 'title')) === '색상 · 채도는 그대로 두고 밝기만 뒤집어요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.');
+  const vi = (id, colId, col, owned, tier, modes) => ({ id, name: `color/${id}`, collectionId: colId, collection: col, tier, owned, modes });
+  const SEMV = vi('s1', 's', 'Semantic', 'semantic', 2, [{ modeId: 'l', name: 'Light' }]);
+  const SEMV3 = vi('s1', 's', 'Semantic', 'semantic', 2, [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }, { modeId: 'b', name: 'Brand' }]);
+  const GLOBV = vi('g1', 'g', 'Global', 'global', 1, [{ modeId: 'm', name: 'Mode 1' }]);
+  // 플러그인 Global 없음 → 전제 띠 · 잠금 · 알림 띠 숨김
+  await recv(p, { ...PREREQ, darkUnfilled: 3 });
+  await recv(p, { type: 'VARIABLES', vars: [SEMV] });
+  check('40 플러그인 Global 없음 → 띠 dark.prereqNoVars · [다크 만들기] 잠금 · 알림 띠 숨김', (await visible(p, '#darkPrereq')) && (await p.textContent('#darkPrereq .prereq-text')) === '먼저 토큰 만들기에서 변수를 만드세요.' && (await locked(p, '#btnGenDark')) && (await p.$eval('#darkNotice', (e) => e.hidden)));
+  await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV] });
+  check('40 PREREQ_STATE{darkUnfilled: 3} → #darkNotice dark.unfilled · 잠금 없음 · 전제 띠 숨김', (await p.textContent('#darkNotice')) === 'Dark 값이 없는 색 3개 — [다크 만들기]로 채워요' && (await visible(p, '#darkNotice')) && !(await locked(p, '#btnGenDark')) && !(await visible(p, '#darkPrereq')));
+  const look = await p.$eval('#darkNotice', (e) => { const c = getComputedStyle(e); const q = getComputedStyle(document.querySelector('.prereq')); return { color: c.color, pc: q.color, bg: c.backgroundColor, border: c.borderTopWidth, radius: c.borderTopLeftRadius, m: c.margin, pm: q.margin, pad: c.padding, ppad: q.padding }; });
+  check('40 알림 띠 모양 — .prereq와 같은 주황 글 · 여백 · 옅은 주황 배경 · 테두리 · 둥근 모서리 없음', look.color === look.pc && look.m === look.pm && look.pad === look.ppad && look.bg === 'rgb(251, 241, 223)' && look.border === '0px' && look.radius === '0px', JSON.stringify(look));
+  check('40 카드 안 카드 0 — 다크 카드', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
+  await recv(p, { ...PREREQ, hasDarkMode: true, darkOld: true });
+  check('40 darkOld → dark.needMigrate', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요');
+  await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV3] });
+  check('40 darkOld + Semantic 모드 셋 → dark.needMigrateManual', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — Semantic 모드가 3개 이상이라 옮길 수 없어요. 피그마에서 모드를 2개로 줄여 주세요' && !(await locked(p, '#btnGenDark')));
+  await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV] });
+  await recv(p, PREREQ);
+  check('40 필드 없음 → 띠 없음', await p.$eval('#darkNotice', (e) => e.hidden));
+  await recv(p, { ...PREREQ, darkUnfilled: 0, darkOld: false });
+  check('40 0 · 거짓 → 띠 없음', await p.$eval('#darkNotice', (e) => e.hidden));
+  // [다크 만들기] → GENERATE_DARK_MODE{}(id 없음)
+  await p.click('#btnGenDark');
+  const g1 = (await sent(p, 'GENERATE_DARK_MODE')).at(-1);
+  check('40 [다크 만들기] → GENERATE_DARK_MODE{}(컬렉션 · 모드 id · migrate 없음) · "만드는 중"', !!g1 && !('collectionId' in g1) && !('fromModeId' in g1) && !('toModeId' in g1) && !('migrate' in g1) && (await p.textContent('#darkStatus')) === '다크 모드를 만들고 값을 채우는 중…', JSON.stringify(g1));
+  const pre0 = await count(p, 'GET_PREREQ');
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 0, needMigrate: { removeDark: 0, mode: 'Dark' } });
+  const modalBtns = await p.$$eval('.modal .m-foot button', (e) => e.map((x) => x.textContent));
+  check('40 needMigrate → 팝업 제목 · 본문(지울 수 0 → migrateBodyNoDel) · [취소] [옮기고 다크 만들기] · 처음 포커스 [취소]', (await p.textContent('.modal h3')) === '다크 구조를 옮길까요?' && (await p.textContent('.modal .m-scroll p')) === '지금 다크는 Semantic 모드에 있어요. Global 색의 Dark 칸으로 옮기고, Semantic의 Dark 모드를 지워요. ⌘Z 한 번으로 되돌릴 수 있어요.' && JSON.stringify(modalBtns) === JSON.stringify(['취소', '옮기고 다크 만들기']) && (await activeText(p)) === '취소', JSON.stringify(modalBtns));
+  check('40 needMigrate는 결과로 치지 않음 — 다시 읽기 없음', (await count(p, 'GET_PREREQ')) === pre0);
+  await p.keyboard.press('Escape');
+  check('40 Esc = 취소 → 팝업 닫힘 · [다크 만들기] 포커스 · 상태 줄 비움', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.id)) === 'btnGenDark' && (await p.textContent('#darkStatus')) === '');
+  // 작은 창 — needMigrate에 ✓ · ⚠ 없음
+  await p.click('#btnGenDark');
+  await p.click('#btnMinimize');
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 0, needMigrate: { removeDark: 4, mode: 'Dark' } });
+  check('40 작은 창 — needMigrate에 ✓ · ⚠ 없음 · 진행 테두리 끝', !(await visible(p, '#miniBadge')) && !(await p.$eval('#btnExpand', (e) => e.classList.contains('busy'))));
+  check('40 작은 창 — 팝업은 펼칠 때까지 띄우지 않음', (await p.$('.modal')) === null);
+  await p.click('#btnExpand');
+  check('40 펼치면 팝업 · 처음 포커스 [취소]', (await p.$('.modal')) !== null && (await activeText(p)) === '취소');
+  check('40 본문 — 지울 dark/ 수', (await p.textContent('.modal .m-scroll p')) === '지금 다크는 Semantic 모드에 있어요. Global 색의 Dark 칸으로 옮기고, Semantic의 Dark 모드와 쓰지 않게 된 dark/ 색 4개를 지워요. ⌘Z 한 번으로 되돌릴 수 있어요.');
+  await p.click('.modal button.primary');
+  const g2 = (await sent(p, 'GENERATE_DARK_MODE')).at(-1);
+  check('40 [옮기고 다크 만들기] → GENERATE_DARK_MODE{migrate: true} · 팝업 닫힘 · "만드는 중"', g2?.migrate === true && (await p.$('.modal')) === null && (await p.textContent('#darkStatus')) === '다크 모드를 만들고 값을 채우는 중…', JSON.stringify(g2));
+  // 결과 글
+  const st = () => p.$eval('#darkStatus', (e) => ({ text: e.textContent, cls: e.className, title: e.getAttribute('title') }));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 32, kept: 3, targets: 40 });
+  let s0 = await st();
+  check('40 결과 — 채움 + 그대로 둠(ok)', s0.text === 'Global 색 32개의 Dark 칸을 채웠어요 · 직접 고친 색 3개는 그대로 뒀어요' && s0.cls === 'status ok' && s0.title === null, JSON.stringify(s0));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 14, kept: 0, targets: 32, modeCreated: true, migrated: { moved: 18, split: 2, failed: 2, splitNames: ['color/gray/100', 'color/blue/500'], failedNames: ['text/brand', 'border/focus'], removedDark: 24 } });
+  s0 = await st();
+  check('40 결과 — 옮기기 줄 · c > 0 warn · 툴팁 이름(빈 줄로 나눔)', s0.text === '다크 구조를 옮겼어요(옮긴 색 18개 · 값이 갈린 색 2개 · 옮기지 못한 역할 2개) · 다크 모드 추가 · Global 색 14개의 Dark 칸을 채웠어요' && s0.cls === 'status warn' && s0.title === '값이 갈린 색 — 가장 많이 쓴 값으로 옮겼어요:\ncolor/gray/100\ncolor/blue/500\n\n옮기지 못한 역할 — Dark에서 바뀌지 않아요:\ntext/brand\nborder/focus\n\n지운 dark/ 색 24개', JSON.stringify(s0));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 4, migrated: { moved: 4, split: 0, failed: 0, splitNames: [], failedNames: [], removedDark: 0 } });
+  s0 = await st();
+  check('40 결과 — 옮기기 줄 0 부분 생략 · upToDate · 툴팁 없음', s0.text === '다크 구조를 옮겼어요(옮긴 색 4개) · Dark 칸이 모두 채워져 있어요' && s0.cls === 'status ok' && s0.title === null, JSON.stringify(s0));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 1, targets: 4 });
+  s0 = await st();
+  check('40 결과 — upToDate + 그대로 둠', s0.text === 'Dark 칸이 모두 채워져 있어요 · 직접 고친 색 1개는 그대로 뒀어요' && s0.cls === 'status ok', JSON.stringify(s0));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 0 });
+  s0 = await st();
+  check('40 결과 — nothing(warn)', s0.text === '채울 색이 없어요 — 플러그인 Global에 값을 넣은 색 변수가 필요해요' && s0.cls === 'status warn', JSON.stringify(s0));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 0, migrated: { moved: 0, split: 0, failed: 1, splitNames: [], failedNames: ['bg'], removedDark: 0 } });
+  s0 = await st();
+  check('40 결과 — 옮기기 + nothing(옮기기 줄이 붙음)', s0.text === '다크 구조를 옮겼어요(옮긴 색 0개 · 옮기지 못한 역할 1개) · 채울 색이 없어요 — 플러그인 Global에 값을 넣은 색 변수가 필요해요' && s0.cls === 'status warn' && s0.title === '옮기지 못한 역할 — Dark에서 바뀌지 않아요:\nbg', JSON.stringify(s0));
+  await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 0, error: 'Semantic에 모드가 3개 이상이라 옮기지 못했어요 — 피그마에서 모드를 2개로 줄인 뒤 다시 눌러 주세요' });
+  s0 = await st();
+  check('40 결과 — 거절은 warn 그대로(팝업 없음)', s0.text.startsWith('Semantic에 모드가 3개 이상이라') && s0.cls === 'status warn' && (await p.$('.modal')) === null);
+  // 준비 현황 다크 줄
+  await p.click('#tabbtn-variables');
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...PREREQ, hasDarkMode: true, darkUnfilled: 0 });
+  await p.click('#btnVarMore');
+  const rd0 = Number((await p.$eval('.ctx-menu button', (e) => e.textContent)).match(/(\d)\/7/)[1]);
+  await p.keyboard.press('Escape');
+  await recv(p, { ...PREREQ, hasDarkMode: true, darkUnfilled: 3 });
+  await p.click('#btnVarMore');
+  const m1 = await p.$eval('.ctx-menu button', (e) => e.textContent);
+  const rd1 = Number(m1.match(/(\d)\/7/)[1]);
+  await p.click('.ctx-menu button >> nth=0');
+  const row = await p.$eval('#readinessPop .pstep[data-step="dark"]', (e) => ({ cls: e.className, dot: e.querySelector('.pdot').textContent, stat: e.querySelector('.pstat').textContent }));
+  check('40 준비 현황 — darkUnfilled 3이면 ✓ 아님 · "Dark 값이 없는 색 3개" · 완료 수에 안 셈', row.dot !== '✓' && row.cls.includes('todo') && row.stat === 'Dark 값이 없는 색 3개' && rd1 === rd0 - 1, JSON.stringify({ row, rd0, rd1 }));
+  await p.keyboard.press('Escape');
+  await p.click('#btnAddVar');
+  await p.click('.ctx-menu button >> text=다크 모드 만들기…');
+  await p.waitForTimeout(50);
+  check('40 변수 탭 ＋ "다크 모드 만들기…" → 다크 카드 · 포커스 [다크 만들기]', (await visible(p, '#darkCard')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnGenDark', await p.evaluate(() => document.activeElement?.id));
+  await p.close();
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);

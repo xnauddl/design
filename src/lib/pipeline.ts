@@ -17,8 +17,10 @@ export interface PrereqState {
   hasGlobal: boolean;
   /** 바인딩 가능 변수(Semantic/Component) 존재(변수 연결 전제). */
   hasBindable: boolean;
-  /** 모드가 둘 이상인 컬렉션 존재(다크 모드를 이미 만든 상태). */
+  /** 플러그인 Global의 모드가 둘 이상 또는 옛 구조(다크 모드를 이미 만든 상태 — ia-v3 13.7). */
   hasDarkMode: boolean;
+  /** Dark 값이 없는 색 수(플러그인 Global 모드가 하나면 0). > 0이면 다크 줄은 완료가 아니다. 없으면 0. */
+  darkUnfilled?: number;
   /** 등록된 텍스트 스타일 존재. */
   hasTextStyles: boolean;
   /** Semantic에 역할 별칭이 하나라도 있음(역할 매핑 완료). 없으면 false(이전 파일 호환). */
@@ -34,6 +36,8 @@ export interface PipelineStep {
   status: StepStatus;
   /** blocked일 때 다음 행동 안내(i18n 키, UI가 t()로 해석). 표시 라벨은 `pipeline.step.<id>`. */
   hint?: string;
+  /** hint 키의 매개(예: 다크 줄 `{ n }`). */
+  hintParams?: Record<string, number>;
 }
 
 /**
@@ -54,7 +58,10 @@ export function pipelineSteps(s: PrereqState): PipelineStep[] {
       status: s.hasSemanticRoles ? 'done' : s.hasGlobal ? 'ready' : 'blocked',
       hint: s.hasGlobal || s.hasSemanticRoles ? undefined : 'pipeline.hint.needTokens',
     },
-    { id: 'dark', status: s.hasDarkMode ? 'done' : 'todo' },
+    // 다크: Dark 값이 없는 색이 있으면 완료가 아니다(ia-v4 §4.6 "다크 모드 줄").
+    (s.darkUnfilled ?? 0) > 0
+      ? { id: 'dark', status: 'todo', hint: 'pipeline.hint.darkUnfilled', hintParams: { n: s.darkUnfilled ?? 0 } }
+      : { id: 'dark', status: s.hasDarkMode ? 'done' : 'todo' },
     { id: 'textStyles', status: s.hasTextStyles ? 'done' : 'todo' },
     {
       id: 'bind',

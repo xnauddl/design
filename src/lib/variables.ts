@@ -251,7 +251,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
         if (g.created) {
           summary.created++;
           summary.globals++;
-          setGlobalLiteral(g.variable, gMode, t, type, base);
+          setGlobalLiteral(g.variable, globalCol, true, t, type, base);
           g.variable.hiddenFromPublishing = true;
           const desc = unitDescription(t);
           if (desc) g.variable.description = desc;
@@ -279,7 +279,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
       summary.globalOf.set(t.name, g.variable.id);
       delete reuseMap[t.name];
       // Global 값 = 리터럴(#16: 비-px lineHeight/letterSpacing은 px FLOAT + 원본 단위는 description)
-      setGlobalLiteral(g.variable, gMode, t, type, base);
+      setGlobalLiteral(g.variable, globalCol, g.created, t, type, base);
       const scopes = scopesForType(scopesForSources(t.sources), type);
       const key = vkey(globalCol.id, t.name);
       const merged = touched.has(key) ? scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type) : scopes;
@@ -499,7 +499,15 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
   return made;
 }
 
-function setGlobalLiteral(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {
+/**
+ * Global 리터럴 쓰기 — 모드 규칙(ia-v3 13.7 "나중에 만든 Global"): 새 색 변수와 색이 아닌 변수는 **모든 모드**에 같은 값
+ * (Dark 칸은 [다크 만들기]를 다시 누를 때 채운다 · 색 아닌 값은 테마로 바뀌지 않는다), 이미 있는 색 변수의 값 바꾸기는 기본 모드만.
+ */
+function setGlobalLiteral(v: Variable, col: VariableCollection, created: boolean, t: DraftToken, type: ResolvedType, base: number): void {
+  const modeIds = type === 'COLOR' && !created ? [col.defaultModeId] : col.modes.map((m) => m.modeId);
+  for (const modeId of modeIds) setGlobalLiteralFor(v, modeId, t, type, base);
+}
+function setGlobalLiteralFor(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {
   if (type === 'COLOR') {
     const { r, g, b } = hexToRgb(String(t.value));
     v.setValueForMode(modeId, { r, g, b, a: t.alpha ?? 1 }); // 반투명 색은 투명도를 담은 Global

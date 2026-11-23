@@ -25,7 +25,7 @@ import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMa
 import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
-import { planMake, makeDoneText, makeCreatedText, pickDarkTarget, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
+import { planMake, makeDoneText, makeCreatedText, hasDarkTarget, darkResultText, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
 import { cardCounts, fieldKind, libSameSplit, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
@@ -75,6 +75,9 @@ function requestPrereq(): void {
   setTimeout(() => { prereqInFlight = false; }, 3000);
 }
 let hasDarkMode = false;
+/** Dark 값이 없는 색 수 · 옛 구조(PREREQ_STATE — ia-v3 13.7 D-T1). 필드가 없으면 0 · 거짓. */
+let darkUnfilled = 0;
+let darkOld = false;
 let hasTextStyles = false;
 let hasSemanticRoles = false; // 역할 별칭 존재(역할 매핑 완료)
 let hasBoundNodes = false; // 현재 선택에 변수 붙은 레이어 존재(변수 연결 완료)
@@ -1931,10 +1934,9 @@ function updateGates(): void {
   }
   // 색 변수화 · 토큰 만들기 · 브랜드 팔레트는 무료(F8 · ia-v4 §4.3a) — 🔒 없음(색 카드 제목의 🔒도 — F-D9).
   for (const id of ['paletteLock', 'colorVarsLock', 'createLock', 'paletteBtnLock']) $(id).textContent = '';
-  // 다크 채우기는 Paid에 더해 컬렉션·모드(라이트 출처)가 있어야 한다. PAID_FIELDS 루프가
+  // 다크 채우기는 Paid에 더해 플러그인 Global이 있어야 한다. PAID_FIELDS 루프가
   // 방금 disabled를 티어만 보고 덮었으니, 전제를 여기서 다시 적용해야 한다(순서 의존).
-  // Dark 모드는 없으면 생성하므로 모드 2개 전제는 더 이상 없다.
-  refreshDarkModes();
+  refreshDarkPrereq();
 
   // 전제 미충족 가드(#11) — Global 없으면 시맨틱 매핑, 바인딩 변수 없으면 바인딩을 잠근다.
   setPrereq('btnSemantics', 'semPrereq', hasGlobal, t('semantic.needGlobal'));
@@ -2080,7 +2082,7 @@ function gotoStep(id: PipelineStep['id']): void {
 function renderPipeline(): void {
   const box = $('pipelineSteps');
   box.innerHTML = '';
-  const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
+  const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
   steps.forEach((s, i) => {
     const row = document.createElement('div');
     row.className = `pstep ${s.status}`;
@@ -2096,7 +2098,7 @@ function renderPipeline(): void {
     label.textContent = t('pipeline.step.' + s.id);
     const stat = document.createElement('span');
     stat.className = 'pstat';
-    stat.textContent = s.hint ? t(s.hint) : t('pipeline.stat.' + s.status);
+    stat.textContent = s.hint ? t(s.hint, s.hintParams) : t('pipeline.stat.' + s.status);
 
     row.append(dot, label, stat);
     const go = (): void => gotoStep(s.id);
@@ -2135,61 +2137,12 @@ let allVars: VarInfo[] = [];
 /** GET_VARIABLES 응답을 한 번이라도 받았는지 — 다크 카드가 ‘목록 미로드’와 ‘토큰 없음’을 구분한다. */
 let varsLoaded = false;
 
-// 밝은 모드 → 고른 어두운 모드로 채운다. 셀렉트가 플레이스홀더(모드가 아직 없음)일 때만
-// to를 생략하고, 그때 플러그인이 addMode('Dark')로 만든다.
-// 목록은 시작할 때 한 번 받아 둔다 — 안 받으면 토큰이 있어도 modes=[]로 보여
-// ‘토큰 생성으로’라는 엉뚱한 안내가 뜬다.
-function refreshDarkOptions(): void {
-  // 대상은 플러그인 Semantic 하나뿐(§2.13 13.7) — 사용자 Semantic의 모드는 건드리지 않는다.
-  const cols = new Map<string, VarInfo>();
-  for (const v of allVars) if (v.owned === 'semantic' && !cols.has(v.collectionId)) cols.set(v.collectionId, v);
-  const sel = $('darkCollection') as HTMLSelectElement;
-  const prev = sel.value;
-  sel.innerHTML = '';
-  for (const [id, v] of cols) {
-    const o = document.createElement('option');
-    o.value = id;
-    o.textContent = v.collection;
-    sel.appendChild(o);
-  }
-  if (prev && cols.has(prev)) sel.value = prev;
-  // Semantic을 우선(다크 채움 대상). 모드 1개여도 Dark를 만들 수 있으므로 ≥1이면 충분.
-  const withModes = [...cols.values()].filter((v) => v.modes.length >= 1);
-  const usable = withModes.find((v) => v.tier === 2) ?? withModes[0];
-  if (usable && (cols.get(sel.value)?.modes.length ?? 0) < 1) sel.value = usable.collectionId;
-  // 선택이 비었거나 Global만 잡힌 경우 Semantic으로 끌어올린다.
-  if (usable && (!sel.value || cols.get(sel.value)?.tier === 1) && usable.tier === 2) {
-    sel.value = usable.collectionId;
-  } else if (usable && !sel.value) {
-    sel.value = usable.collectionId;
-  }
-  refreshDarkModes();
-}
-
-function refreshDarkModes(): void {
-  const colId = ($('darkCollection') as HTMLSelectElement).value;
-  const v = allVars.find((x) => x.collectionId === colId);
-  const modes = v ? v.modes : [];
-  // 이전 선택이 아직 유효하면 복원한다. 복원 여부를 기억해 둬야 아래 기본값이
-  // 사용자의 선택을 덮어쓰지 않는다 — 옵션을 새로 넣으면 sel.value는 첫 항목으로
-  // 잡히므로, value만 봐서는 ‘사용자가 고른 것’과 ‘브라우저 기본’을 구분 못 한다.
-  const restored: Record<string, boolean> = {};
-  for (const id of ['darkFromMode', 'darkToMode']) {
-    const sel = $(id) as HTMLSelectElement;
-    const prev = sel.value;
-    sel.innerHTML = '';
-    for (const m of modes) {
-      const o = document.createElement('option');
-      o.value = m.modeId;
-      o.textContent = m.name;
-      sel.appendChild(o);
-    }
-    restored[id] = !!prev && modes.some((m) => m.modeId === prev);
-    if (restored[id]) sel.value = prev;
-  }
-  // 모드 ≥1 + Paid면 생성 가능(Dark 없으면 플러그인이 추가). 목록 미로드·토큰 없음만 막는다.
-  const hasCollection = !!colId && modes.length >= 1;
-  const ok = hasCollection && varsLoaded && allVars.length > 0;
+// 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7 D-T1, 2026-11-20 "고르개 완전히 없앰").
+// 카드는 전제(목록을 받았나 · 플러그인 Global이 있나)만 보고, 알림 띠는 PREREQ_STATE의 수 · 옛 구조로 그린다.
+/** 전제 판정 — "읽는 중" · "플러그인 Global 없음" 두 갈래와 버튼 잠금(ia-v4 §4.11 ② 상태표). 그 밖이면 띠 숨김 · 잠금 없음. */
+function refreshDarkPrereq(): void {
+  const hasGlobalCol = allVars.some((v) => v.owned === 'global');
+  const ok = varsLoaded && hasGlobalCol;
   // 유료 잠금이 전제보다 먼저(§2.3). 전제 사유는 아래 안내 문구와 같다.
   const notice = $('darkPrereq');
   const gotoCreate = $('darkPrereqGotoCreate') as HTMLButtonElement;
@@ -2200,62 +2153,62 @@ function refreshDarkModes(): void {
     if (!varsLoaded) {
       text.textContent = t('dark.prereqLoading');
       gotoCreate.style.display = 'none';
-    } else if (allVars.length === 0 || !allVars.some((v) => v.owned === 'semantic')) {
-      // 플러그인 Semantic이 없으면 만들기부터(§4.5 "토큰 만들기로 →").
+    } else {
       text.textContent = t('dark.prereqNoVars');
       gotoCreate.style.display = '';
-    } else if (!colId || modes.length === 0) {
-      text.textContent = t('dark.prereqNoModes');
-      gotoCreate.style.display = 'none';
-    } else {
-      text.textContent = t('dark.prereqPick');
-      gotoCreate.style.display = 'none';
     }
   }
-  const darkBtn = $('btnGenDark');
-  setLock(darkBtn, !isPaid ? 'paid' : ok ? null : 'prereq', (text?.textContent ?? '') || t('status.noSelection'));
-  // to 셀렉트 기본값: 이미 Dark가 있으면 그걸, 없으면 안내 옵션(실제 생성은 플러그인).
-  // 단 사용자가 이미 대상 모드를 골라 뒀으면 건드리지 않는다 — 탭을 오갈 때마다
-  // (showTab → PREREQ_STATE·VARIABLES → 이 함수) 선택이 Dark나 빈 값으로 되돌아가면
-  // 「다크 생성」이 toModeId 없이 나가 사용자의 모드 대신 빈 ‘Dark’를 새로 만든다.
-  const toSel = $('darkToMode') as HTMLSelectElement;
-  const darkMode = modes.find((m) => m.name.toLowerCase() === 'dark');
-  if (!restored['darkToMode']) {
-    if (darkMode) {
-      toSel.value = darkMode.modeId;
-    } else if (modes.length >= 1) {
-      // 플레이스홀더 — 값이 실제 modeId가 아니므로 전송하지 않는다(버튼은 from만 보냄).
-      const o = document.createElement('option');
-      o.value = '';
-      o.textContent = t('dark.toPlaceholder');
-      toSel.insertBefore(o, toSel.firstChild);
-      toSel.value = '';
-    }
-  }
-  // from: Dark가 기본으로 잡히면 다른 모드로.
-  const fromSel = $('darkFromMode') as HTMLSelectElement;
-  if (modes.length >= 2 && darkMode && fromSel.value === darkMode.modeId) {
-    const other = modes.find((m) => m.modeId !== darkMode.modeId);
-    if (other) fromSel.value = other.modeId;
-  }
+  setLock($('btnGenDark'), !isPaid ? 'paid' : ok ? null : 'prereq', (text?.textContent ?? '') || t('status.noSelection'));
+  renderDarkNotice();
 }
 
-$('darkCollection').addEventListener('change', refreshDarkModes);
+/** 플러그인 Semantic 모드 수(VARIABLES에서) — 옛 구조를 옮길 수 있나(셋 이상이면 못 옮김). */
+function semanticModeCount(): number {
+  return allVars.find((v) => v.owned === 'semantic')?.modes.length ?? 0;
+}
+
+/** 알림 띠 `#darkNotice`(ia-v4 §4.11 ②) — 옛 구조 · Dark 값이 없는 색. 전제 안내 띠가 보이는 동안은 숨긴다. */
+function renderDarkNotice(): void {
+  const el = $('darkNotice');
+  const prereqShown = $('darkPrereq').style.display !== 'none';
+  let text = '';
+  if (!prereqShown) {
+    if (darkOld) text = semanticModeCount() >= 3 ? t('dark.needMigrateManual') : t('dark.needMigrate');
+    else if (darkUnfilled > 0) text = t('dark.unfilled', { n: darkUnfilled });
+  }
+  el.textContent = text;
+  el.hidden = !text;
+}
 
 $('btnGenDark').addEventListener('click', () => {
-  const collectionId = ($('darkCollection') as HTMLSelectElement).value;
-  const fromModeId = ($('darkFromMode') as HTMLSelectElement).value;
-  if (!collectionId || !fromModeId) {
-    setStatus('darkStatus', t('dark.prereqPick'), 'warn');
-    return;
-  }
   setStatus('darkStatus', t('dark.running'), '');
-  // 고른 대상 모드를 그대로 보낸다 — 플레이스홀더(값 '')일 때만 생략해 themeApply가 Dark를 ensure.
-  // 안 보내면 사용자가 고른 `Night` 대신 새 `Dark` 모드가 생기고, 모드 상한에 걸린 파일에선
-  // addMode가 실패해 생성 자체가 막힌다.
-  const toModeId = ($('darkToMode') as HTMLSelectElement).value;
-  send({ type: 'GENERATE_DARK_MODE', collectionId, fromModeId, ...(toModeId ? { toModeId } : {}) });
+  send({ type: 'GENERATE_DARK_MODE' });
 });
+
+/** 작은 창에서 받은 옮기기 확인 — 펼칠 때 띄운다. */
+let darkMigrateLater: { removeDark: number; mode: string } | null = null;
+/** 옛 구조 옮기기 확인 팝업(ia-v4 §4.11 ②) — 처음 포커스 [취소], Esc = 취소. */
+function openDarkMigrate(need: { removeDark: number; mode: string }): void {
+  const body = document.createElement('div');
+  const para = document.createElement('p');
+  para.textContent = need.removeDark > 0 ? t('dark.migrateBody', { mode: need.mode, n: need.removeDark }) : t('dark.migrateBodyNoDel', { mode: need.mode });
+  body.appendChild(para);
+  const btn = $('btnGenDark');
+  let going = false;
+  const cancel = modalButton(t('common.cancel'), () => closeModal());
+  const go = modalButton(
+    t('dark.migrateGo'),
+    () => {
+      going = true;
+      closeModal();
+      setStatus('darkStatus', t('dark.running'), '');
+      send({ type: 'GENERATE_DARK_MODE', migrate: true });
+    },
+    true,
+  );
+  // [취소] · Esc · 바깥 누름 — "만드는 중"을 지운다. 포커스는 [다크 만들기](returnFocus).
+  openModal(t('dark.migrateTitle'), body, [cancel, go], () => btn, () => { if (!going) setStatus('darkStatus', '', ''); }, { focus: cancel });
+}
 
 $('btnRegisterComp').addEventListener('click', () => {
   // #1: 늘 후보를 보고 체크한 노드만 보낸다 — 후보 없이 선택 전체를 등록하던 길은 닫았다(ia-v4 §4.3a-2).
@@ -2684,6 +2637,8 @@ window.onmessage = (event: MessageEvent) => {
       prereqLocalVars = (msg.tierVars ?? 0) + (msg.otherVars ?? 0);
       if (activeTab === 'select') queueMicrotask(readLayerLibUse); // 로컬 변수 0개가 확인되면 ② 판정용으로 읽는다
       hasDarkMode = msg.hasDarkMode;
+      darkUnfilled = msg.darkUnfilled ?? 0;
+      darkOld = msg.darkOld ?? false;
       hasTextStyles = msg.hasTextStyles;
       hasSemanticRoles = msg.hasSemanticRoles;
       updateGates();
@@ -2800,7 +2755,7 @@ window.onmessage = (event: MessageEvent) => {
     case 'VARIABLES': {
       varsLoaded = true;
       allVars = msg.vars;
-      refreshDarkOptions();
+      refreshDarkPrereq();
       // 만들기 탭이 비어 보이지 않게 — 파일에 이미 있는 변수 수를 카드 상태 줄에(목록은 다음 버전).
       if (!tokens.length) {
         const globals = allVars.filter((v) => v.tier === 1);
@@ -2819,15 +2774,17 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('darkStatus', msg.error, 'warn');
         break;
       }
-      if (!msg.realiased) {
-        const why = msg.skipped ? t('dark.whyNoGlobal', { n: msg.skipped }) : t('dark.whyNone');
-        const modePart = msg.modeCreated ? t('dark.modeAdded') : '';
-        setStatus('darkStatus', t('dark.fillFailed', { modePart, why }), 'warn');
+      if (msg.needMigrate) {
+        // 만들기 화면 실행의 다크 단계는 팝업을 띄우지 않는다(⚠ wizard.seq.darkMigrate — 그 단계가 그린다).
+        // 작은 창이면 펼칠 때 띄운다(작은 창에서는 팝업을 볼 수도 닫을 수도 없다 — A.25 구현 메모).
+        if (!wizardRunning) {
+          if (isMini) darkMigrateLater = msg.needMigrate;
+          else openDarkMigrate(msg.needMigrate);
+        }
         break;
       }
-      const modePart = msg.modeCreated ? t('dark.modeAddedShort') : '';
-      const skipPart = msg.skipped ? t('dark.skippedDirect', { n: msg.skipped }) : '';
-      setStatus('darkStatus', t('dark.done', { modePart, n: msg.realiased, c: msg.created, skipPart }), 'ok');
+      const res = darkResultText(msg);
+      setStatus('darkStatus', res.text, res.cls, res.tip);
       break;
     }
     case 'PREMIUM_REQUIRED': {
@@ -3958,15 +3915,18 @@ async function runMake(): Promise<void> {
         results.push({ id, mark: 'ok', text: t('wizard.seq.createDone', { created: r.created, updated: r.updated }) });
       } else if (id === 'dark') {
         const vars = await wizardRequest({ type: 'GET_VARIABLES' }, ['VARIABLES']);
-        const target = pickDarkTarget(vars.vars);
-        if (!target) results.push({ id, mark: 'ok', text: t('wizard.seq.darkNoTarget') });
+        if (!hasDarkTarget(vars.vars)) results.push({ id, mark: 'ok', text: t('wizard.seq.darkNoTarget') });
         else {
-          const r = await wizardRequest({ type: 'GENERATE_DARK_MODE', collectionId: target.collectionId, fromModeId: target.fromModeId, ...(target.toModeId ? { toModeId: target.toModeId } : {}) }, ['DARK_MODE_RESULT']);
+          // 대상 · 모드는 플러그인이 정한다(ia-v3 13.7). 옛 구조면 옮기지 않고 ⚠로 멈춘다(옮기기는 다크 화면에서만).
+          const r = await wizardRequest({ type: 'GENERATE_DARK_MODE' }, ['DARK_MODE_RESULT']);
+          const keptPart = r.kept ? t('wizard.seq.darkKept', { n: r.kept }) : '';
           if (r.error) { results.push({ id, mark: 'warn', text: r.error }); stay = true; }
-          else if (!r.realiased) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkNothing') }); stay = true; }
+          else if (r.needMigrate) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkMigrate') }); stay = true; }
+          else if (!r.targets) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkNothing') }); stay = true; }
+          else if (!r.filled) results.push({ id, mark: 'ok', text: t('wizard.seq.darkUpToDate') + keptPart }); // 다 됨 줄의 다크 부분은 뺀다
           else {
-            totals.darkFilled = r.realiased;
-            results.push({ id, mark: 'ok', text: t('wizard.seq.dark', { realiased: r.realiased }) + (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') + (r.skipped ? t('wizard.seq.darkSkip', { n: r.skipped }) : '') });
+            totals.darkFilled = r.filled;
+            results.push({ id, mark: 'ok', text: t('wizard.seq.dark', { filled: r.filled }) + (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') + keptPart });
           }
         }
       } else if (id === 'textStyles') {
@@ -5183,6 +5143,11 @@ function setMini(on: boolean, notify = true): void {
   syncStickyOffsets();
   ($('btnMinimize') as HTMLButtonElement).focus();
   readScreen('expand');
+  if (darkMigrateLater) {
+    const need = darkMigrateLater;
+    darkMigrateLater = null;
+    openDarkMigrate(need);
+  }
 }
 
 function renderMiniMark(): void {
@@ -5357,6 +5322,8 @@ function opReceived(m: CodeToUi): void {
     // 속성 값 실패 · 복사본 · 빈 자리도 실패로(§4.7 5·6번) — failures에도 실리지만 꼬리와 같은 기준으로 한 번 더 본다.
     if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.fillKept?.length ?? 0) + (m.reuseKept?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
     if (m.type === 'APPLY_RESULT' && m.cancelled) cancelled = true;
+    // 옮기기 확인 전 응답 — 작업은 끝내되 결과로 치지 않는다(✓ · ⚠ 없음 · 다시 읽기 없음 — 바뀐 것이 없다, ia-v4 §4.11 ②).
+    if (m.type === 'DARK_MODE_RESULT' && m.needMigrate) { if (isMini) renderMiniMark(); return; }
     if (m.type === 'VARIABLES_DELETED') { if (m.cancelled) cancelled = true; if (m.failed > 0) failed = true; }
     if (cancelled) { if (isMini) renderMiniMark(); }
     else opFinished(!failed, def);
@@ -5473,7 +5440,7 @@ requestPrereq(); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
 send({ type: 'GET_VARIABLES' }); // 다크 카드의 컬렉션·모드 선택지
 send({ type: 'GET_SETTINGS' }); // #19: 기준 크기·맥락 깊이는 파일에 기억된 값으로 시작
-refreshDarkModes(); // 응답 전 ‘불러오는 중…’ 안내(오안내 ‘토큰 생성으로’ 방지)
+refreshDarkPrereq(); // 응답 전 ‘불러오는 중…’ 안내(오안내 ‘토큰 생성으로’ 방지)
 
 // #11: 전제 안내의 ‘토큰 생성으로’ 바로가기.
 document.querySelectorAll<HTMLButtonElement>('[data-goto="create"]').forEach((b) => b.addEventListener('click', goToCreate));
@@ -8151,7 +8118,8 @@ function openAddMenu(): void {
   openMenu(r.left, r.bottom + 2, [
     { label: t('list.addNew'), onSelect: () => openNewVar(btn), focusElsewhere: true }, // 메뉴 줄은 잠그지 않는다(§4.9 F2)
     { label: t('list.addFromSel'), separatorBefore: true, disabled: !curSel.count, note: curSel.count ? undefined : t('status.noSelection'), onSelect: () => showMakeScreen(), focusElsewhere: true },
-    { label: t('list.addDark'), onSelect: () => showPick('theme', 'vars'), focusElsewhere: true },
+    // 들어오면 포커스 [다크 만들기](ia-v4 §4.11 ② "포커스" — 시안 1).
+    { label: t('list.addDark'), onSelect: () => { showPick('theme', 'vars'); ($('btnGenDark') as HTMLButtonElement).focus(); }, focusElsewhere: true },
     { label: t('list.addTextStyles'), onSelect: () => showPick('type', 'vars'), focusElsewhere: true },
   ], btn);
 }
@@ -8181,7 +8149,7 @@ $('modeSelect').addEventListener('change', () => { modeName = ($('modeSelect') a
    ===================================================================== */
 /* ---------- 준비 현황 팝오버 ---------- */
 function readinessDone(): number {
-  return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === 'done').length;
+  return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === 'done').length;
 }
 let readinessReturn: HTMLElement | null = null;
 function openReadiness(btn: HTMLElement): void {
