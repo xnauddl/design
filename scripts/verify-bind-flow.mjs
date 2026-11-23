@@ -22,6 +22,8 @@
     25 라이선스 구매 버튼(IA v4 §4.10 · B.21): 늘 보임 · 자리표시자면 잠금 · 티어별 글 · 툴팁 꼬리
     30 상태 5 만들기 카드(IA v4 §4.1 · B.30): 남은 값 · 같은 값 줄 · 추출 전 · 실패 · 미리보기 다시 보냄 · 만들기 화면 기본 끔
     31 큰 선택 [읽기] — 찾기 중 미룬 만들기 카드 읽기를 찾기가 끝난 뒤 보냄("선택을 읽는 중…" 멈춤 수정)
+  B.32 만들기 화면 글자 기본 꺼짐(IA v4 §4.3 · §2.7 키보드): Text Style 기본 끔 · 다시 읽기 이어받기 · 잠금 풀림이 글자를 켜지 않음 ·
+       마우스로 누른 뒤 Space · 되풀이 Space는 스위치를 바꾸지 않음(트리 넷 — 연결 · 만들기 · 이름 정리 · 안 쓰는 변수 팝업)
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
    ============================================================ */
 import { chromium } from 'playwright';
@@ -156,6 +158,7 @@ async function cardAnswer(p, tokens = MC_TOKENS, states = null, roles = 4) {
   return pv;
 }
 /** 카드 안 카드 찾기(ia-v4 §2.8 · B.12) — 보이는 카드(.step · .sel-card · .modal) 안에서 테두리나 그림자 + 둥근 모서리 + 배경을 모두 가진 요소. */
+const swStates = (p, tree) => p.$$eval(`${tree} .bv-switch`, (e) => e.map((x) => x.getAttribute('aria-checked')).join(''));
 const nestedCards = (p) => p.evaluate(() => {
   const EX = 'button,input,select,textarea,.tabs,.tag,.r-swatch,.swatch,.mk-row .sw,.palette-row i,.bv-chip,.bv-sw,.bv-track,.bar,.tr-skel,.alias-pill,.vp-item,.tier-chip,.chip,.ed-field,.bf-swatch,.ed-picker,.vr-sw';
   document.activeElement?.blur?.();
@@ -735,6 +738,23 @@ const reenter = (p) => p.evaluate(() => {
   await p.keyboard.press('Space');
   check('B2 ↓×3 → 반경 줄 · Space → 끔', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]));
   await p.keyboard.press('Space');
+  // B.32 ⑪ 연결 화면 — 마우스로 줄을 누른 뒤 Space는 바뀌지 않고, ↓로 간 뒤 Space는 바뀜 · 되풀이 Space는 바뀌지 않음
+  {
+    const s0 = await swStates(p, '#bindTree');
+    await p.click('#bindTree .tr-row >> nth=1', { position: { x: 4, y: 8 } });
+    await p.keyboard.press('Space');
+    const s1 = await swStates(p, '#bindTree');
+    await p.keyboard.press('ArrowDown');
+    await p.keyboard.press('ArrowUp');
+    await p.evaluate(() => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true, cancelable: true })));
+    const s2 = await swStates(p, '#bindTree');
+    await p.keyboard.press('Space');
+    const s3 = await swStates(p, '#bindTree');
+    await p.keyboard.press('Space');
+    check('B.32 ⑪ 연결 트리 — 마우스 클릭 뒤 Space 그대로 · 되풀이 Space 그대로 · ↓↑ 뒤 Space 바뀜', s1 === s0 && s2 === s0 && s3 !== s0 && (await swStates(p, '#bindTree')) === s0, JSON.stringify([s0, s1, s2, s3]));
+    await p.focus('#bindTree [data-tkey]');
+    for (let i = 0; i < 3; i++) await p.keyboard.press('ArrowDown');
+  }
   await p.keyboard.press('ArrowUp'); // 반경 머리
   await p.keyboard.press('ArrowLeft');
   check('B2 머리에서 ← → 접힘(줄 숨김) · → 펼침', (await p.getAttribute('#bindTree [data-tkey="kind:radius"]', 'aria-expanded')) === 'false' && (await bindList(p)).filter(Array.isArray).length === 4);
@@ -1265,6 +1285,8 @@ async function saveAndGet(p) {
   await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [{ name: 'body/medium', sig: '99|0|0|Inter|Regular' }],
     styles: [{ name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] }] });
   await p.waitForTimeout(50);
+  check('B.32 ① Text Style 후보는 처음 끔 — 만들 수에 " · 스타일" 없음', (await p.textContent('#makeCount')) === 'Global 1개 · Semantic 1개', await p.textContent('#makeCount'));
+  check('B.32 ⑥ 처음엔 겹침 점 없음(켠 줄이 없어 겹침 판정 없음) · 실행 잠그지 않음', !(await p.$('#makeTab-ts .mk-dot:not([hidden])')) && !(await locked(p, '#btnMakeRun')), JSON.stringify([await p.$$eval('#makeTab-ts .mk-dot', (e) => e.map((x) => x.outerHTML)), await locked(p, '#btnMakeRun')]));
   check('17 Text Style 탭 줄에 .ts-off 없음 · 요약은 tsSummary 글 그대로(KRDS 크기 표시 없음 — text-style-krds §4)', await p.evaluate(() => { const m = [...document.querySelectorAll('#makeTabs [role="tab"]')].find((x) => x.textContent.startsWith('Text Style')); m?.click(); const sub = document.querySelector('#makeTree .vchip .vl'); const ok = !!sub && document.querySelectorAll('#makeTree .ts-off').length === 0 && sub.children.length === 0 && sub.textContent.startsWith('Inter') && !/[○⚠]/.test(sub.textContent); document.getElementById('makeTab-global')?.click(); return ok; }));
   check('17 탭 — Global*(고름) · Semantic · 텍스트 스타일, 개수 = 총 줄 수', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global3*', 'Semantic1', 'Text Style1']), JSON.stringify(await tabsOf(p)));
   const heads = await p.$$eval('#makeTree .tr-head', (e) => e.map((x) => `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}`));
@@ -1287,6 +1309,10 @@ async function saveAndGet(p) {
   await p.click('#makeTab-ts');
   await p.waitForTimeout(20);
   check('17 텍스트 스타일 탭 — 머리 없이 줄 · "켠 스타일만 등록해요" · 모두 켜기 · 끄기', (await p.$$eval('#makeTree .tr-head', (e) => e.length)) === 0 && (await p.$$eval('#makeTree [data-tkey^="t:"]', (e) => e.length)) === 1 && (await p.textContent('#makeTopText')) === '켠 스타일만 등록해요' && (await visible(p, '#makeAllOff')));
+  check('B.32 ① Text Style 줄 처음 끔(스위치 · 끈 줄 모양)', (await p.getAttribute('#makeTree [data-tkey^="t:"] .bv-switch', 'aria-checked')) === 'false' && (await p.$eval('#makeTree [data-tkey^="t:"]', (e) => e.classList.contains('off'))));
+  await p.click('#makeTree [data-tkey^="t:"] .bv-switch'); // 사용자가 켬(B.32 ②)
+  await p.waitForTimeout(20);
+  check('B.32 ② 줄 하나 켬 → 켬 · 만들 수 " · 스타일 1개"', (await p.getAttribute('#makeTree [data-tkey^="t:"] .bv-switch', 'aria-checked')) === 'true' && (await p.textContent('#makeCount')).endsWith(' · 스타일 1개'), await p.textContent('#makeCount'));
   await p.click('#makeTab-global');
   await p.waitForTimeout(20);
   check('17 겹침 잠금 중 다른 탭이면 텍스트 스타일 탭에 주황 점(aria-label = 사유)', (await visible(p, '#makeTab-ts .mk-dot')) && (await p.getAttribute('#makeTab-ts .mk-dot', 'aria-label')) === '이미 있는 스타일 이름이에요');
@@ -2633,6 +2659,21 @@ async function fillBoth(p) {
   await p.click('.modal .unused-tree .tr-row .bv-switch');
   await p.waitForTimeout(30);
   check('27 하나 켜면 [선택한 1개 지우기] 풀림', (await p.textContent('.modal [data-unused="delete"]')) === '선택한 1개 지우기' && (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) !== 'true');
+  {
+    // B.32 ⑪ 안 쓰는 변수 팝업 트리 — 마우스로 줄을 누른 뒤 Space 그대로 · ↓↑ 뒤 Space 바뀜(되돌림)
+    const s0 = await swStates(p, '.modal .unused-tree');
+    await p.click('.modal .unused-tree .tr-row >> nth=1', { position: { x: 4, y: 8 } });
+    await p.keyboard.press('Space');
+    const s1 = await swStates(p, '.modal .unused-tree');
+    await p.keyboard.press('ArrowUp');
+    await p.keyboard.press('ArrowDown');
+    await p.evaluate(() => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true, cancelable: true })));
+    const s2 = await swStates(p, '.modal .unused-tree');
+    await p.keyboard.press('Space');
+    const s3 = await swStates(p, '.modal .unused-tree');
+    await p.click('.modal .unused-tree .tr-row >> nth=1 >> .bv-switch'); // 되돌림
+    check('B.32 ⑪ 안 쓰는 변수 팝업 트리 — 마우스 클릭 뒤 Space 그대로 · 되풀이 그대로 · ↑↓ 뒤 Space 바뀜', s1 === s0 && s2 === s0 && s3 !== s0 && (await swStates(p, '.modal .unused-tree')) === s0, JSON.stringify([s0, s1, s2, s3]));
+  }
   const badU = await nestedCards(p);
   check('27 카드 안 카드 0 — 안 쓰는 변수 팝업', badU.length === 0, badU.join(' · '));
   await p.click('.modal [data-unused="delete"]');
@@ -2701,7 +2742,10 @@ async function fillBoth(p) {
     check('28f Text Style 탭 줄 2개 — 26.67 흐린 줄이 크기 순서 제자리(먼저) · 스위치 없음 · 오른쪽 글',
       rows.length === 2 && rows[0].dec && !rows[0].sw && rows[0].txt.includes('글자 크기가 소수라 만들지 않아요') && rows[0].txt.includes('26.67') && rows[0].txt.includes('Layer 4') && !rows[1].dec && rows[1].sw, JSON.stringify(rows));
     check('28f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(146, 152, 161)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
-    check('28f 아래 줄 · 실행 수는 스타일 1개', (await p.textContent('#makeCount')).includes('스타일 1개'), await p.textContent('#makeCount'));
+    check('28f 처음엔 스타일 꺼짐 — 만들 수에 스타일 없음(B.32)', !(await p.textContent('#makeCount')).includes('스타일'), await p.textContent('#makeCount'));
+    await p.click('#makeAllOn');
+    await p.waitForTimeout(20);
+    check('28f 모두 켜기 → 실행 수는 스타일 1개(흐린 줄은 켜지 않음)', (await p.textContent('#makeCount')).includes('스타일 1개') && (await p.$$eval('#makeTree .tr-row.ts-decimal .bv-switch', (e) => e.length)) === 0, await p.textContent('#makeCount'));
     // 키보드 — 화살표가 흐린 줄에도 멈추고 Enter · Space는 아무 일 없음
     await p.focus('#makeTree .tr-row[data-tkey^="t:"]');
     await p.keyboard.press('ArrowUp');
@@ -2934,6 +2978,9 @@ async function fillBoth(p) {
   await p.waitForTimeout(30);
   await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
   await p.waitForTimeout(30);
+  await p.click('#makeTab-ts'); // 텍스트 스타일은 기본 끔 — 켜고 실행(B.32)
+  await p.click('#makeAllOn');
+  await p.waitForTimeout(20);
   await p.click('#btnMakeRun');
   await p.waitForTimeout(30);
   await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
@@ -3965,6 +4012,19 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   check('32 이름 정리 키보드 — ↓↓ Space → 단 3 줄 끔', (await p.getAttribute('#renameTree [data-tkey="a1"] > .bv-switch', 'aria-checked')) === 'false');
   await p.keyboard.press('ArrowLeft');
   check('32 이름 정리 키보드 — ← 부모 줄', (await p.evaluate(() => document.activeElement?.dataset.tkey)) === 'a');
+  {
+    // B.32 ⑪ 이름 정리 트리 — 마우스로 줄을 누른 뒤 Space 그대로 · 되풀이 그대로 · ↓↑ 뒤 Space 바뀜
+    const s0 = await swStates(p, '#renameTree');
+    await p.click('#renameTree [data-tkey="a2"] > .tr-lt');
+    await p.keyboard.press('Space');
+    const s1 = await swStates(p, '#renameTree');
+    await p.keyboard.press('ArrowUp');
+    await p.keyboard.press('ArrowDown');
+    await p.evaluate(() => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', repeat: true, bubbles: true, cancelable: true })));
+    const s2 = await swStates(p, '#renameTree');
+    await p.keyboard.press('Space');
+    check('B.32 ⑪ 이름 정리 트리 — 마우스 클릭 뒤 Space 그대로 · 되풀이 그대로 · ↑↓ 뒤 Space → a2 끔', s1 === s0 && s2 === s0 && (await p.getAttribute('#renameTree [data-tkey="a2"] > .bv-switch', 'aria-checked')) === 'false', JSON.stringify([s0, s1, s2, await swStates(p, '#renameTree')]));
+  }
   check('32 카드 안 카드 0 — 이름 정리', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
   await p.close();
   p = await renameWith([
@@ -4089,6 +4149,183 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await p.waitForTimeout(50);
   check('40 변수 탭 ＋ "다크 모드 만들기…" → 다크 카드 · 포커스 [다크 만들기]', (await visible(p, '#darkCard')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnGenDark', await p.evaluate(() => document.activeElement?.id));
   await p.close();
+}
+
+/* ---------- B.32 만들기 화면 글자 기본 꺼짐(ia-v4 §4.3 "글자 기본 꺼짐" · 텍스트 스타일 탭 "기본 끔" · §2.7 키보드 "Space는 마지막 포커스가 키보드로 왔을 때만") ---------- */
+{
+  const T32 = [
+    ...['111111', '222222', '333333', '444444', '555555', '666666'].map((h, i) => ({ name: `color/${h}`, category: 'color', value: `#${h}`, sources: ['fills'], count: 6 - i })),
+    ...[2, 4, 6, 8, 10, 12].map((v) => ({ name: `spacing/${v}`, category: 'gap', value: v, sources: ['itemSpacing'], count: 3 })),
+    ...[12, 14, 16, 18].map((v) => ({ name: `font-size/${v}`, category: 'fontSize', value: v, sources: ['fontSize'], count: 2 })),
+  ];
+  /** 아직 답하지 않은 미리보기에 답한다(만들 수 = 보낸 토큰 수, states로 상태를 덮어씀). */
+  const answered32 = new WeakMap();
+  const answerPv32 = async (p, states = {}, again = false) => {
+    const done = answered32.get(p) ?? new Set();
+    answered32.set(p, done);
+    const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+    if (!pv || (done.has(pv.reqId) && !again)) return pv;
+    done.add(pv.reqId);
+    const st = { ...Object.fromEntries(pv.tokens.map((tk) => [tk.name, { state: 'new' }])), ...states };
+    const g = pv.tokens.filter((tk) => st[tk.name]?.state !== 'manual').length;
+    await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: g, updated: 0, summary: '', roles: 0, skippedManual: pv.tokens.length - g, tokenStates: st, roleRows: [] });
+    await p.waitForTimeout(30);
+    return pv;
+  };
+  /** 첫 화면에서 [변수 만들기]를 실제 마우스로 눌러 들어온다(무료 · 상태 6 — 로컬 변수 0개). */
+  const enter32 = async (tokens, tier = 'free', ts = null) => {
+    const p = await open(560, 'select');
+    await recv(p, { type: 'LICENSE_STATUS', tier, unlimited: tier === 'paid', source: 'dev' });
+    await recv(p, { ...PREREQ, hasBindable: false, tierVars: 0, otherVars: 0 });
+    await recv(p, { type: 'VAR_TABLE', collections: [], vars: [] });
+    await recv(p, { ...sel(1, 0), ids: ['b32'], firstName: 'Card' });
+    await p.waitForTimeout(30);
+    await p.click('#btnGoMake');
+    await p.waitForTimeout(40);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens });
+    await p.waitForTimeout(40);
+    await answerPv32(p);
+    if (ts) await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], ...ts });
+    await p.waitForTimeout(40);
+    return p;
+  };
+  const head = (p, k) => p.$eval(`#makeTree [data-tkey="${k}"]`, (r) => ({ on: r.querySelector(':scope > .bv-switch')?.getAttribute('aria-checked'), open: r.getAttribute('aria-expanded') }));
+  const rowOn = (p, k) => p.getAttribute(`#makeTree [data-tkey="${k}"] > .bv-switch`, 'aria-checked');
+  const foot = async (p) => `${await p.textContent('#makeCount')} · ${await p.textContent('#btnMakeRun')}`;
+  const nPv = async (p) => (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).length;
+  const active = (p) => p.evaluate(() => document.activeElement?.closest?.('[data-tkey]')?.dataset.tkey ?? null);
+  const spaceRepeat = (p) => p.evaluate(() => document.activeElement.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', repeat: true, bubbles: true, cancelable: true })));
+
+  // ⑦ 버그 재현 — 무료 · 상태 6 · 색 6 · 간격 6 · 글자 4
+  const p = await enter32(T32);
+  check('B.32 ⑦ 들어온 뒤 — Typography 머리 끔 · 접힘 · "Global 12개 · 변수 12개 만들기"', JSON.stringify(await head(p, 'gk:text')) === JSON.stringify({ on: 'false', open: 'false' }) && (await foot(p)) === 'Global 12개 · 변수 12개 만들기', `${JSON.stringify(await head(p, 'gk:text'))} ${await foot(p)}`);
+  const n0 = await nPv(p);
+  await p.click('#makeTree [data-tkey="gk:text"] .tr-name');
+  const y0 = await p.evaluate(() => [window.scrollY, document.scrollingElement.scrollTop, document.getElementById('makeTree').closest('.sub-body, .screen, main')?.scrollTop ?? 0].join(','));
+  const focusedByMouse = (await active(p)) === 'gk:text';
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(350);
+  const y1 = await p.evaluate(() => [window.scrollY, document.scrollingElement.scrollTop, document.getElementById('makeTree').closest('.sub-body, .screen, main')?.scrollTop ?? 0].join(','));
+  check('B.32 ⑦ 머리 줄 이름을 마우스로 누른 뒤 Space → 머리 끔 그대로 · 접힘 · 만들 수 그대로 · 미리보기 안 보냄 · 스크롤 없음', focusedByMouse && JSON.stringify(await head(p, 'gk:text')) === JSON.stringify({ on: 'false', open: 'false' }) && (await foot(p)) === 'Global 12개 · 변수 12개 만들기' && (await nPv(p)) === n0 && y0 === y1, `${focusedByMouse} ${JSON.stringify(await head(p, 'gk:text'))} ${await foot(p)} ${n0}/${await nPv(p)} ${y0}/${y1}`);
+  await p.keyboard.press('ArrowUp');
+  await p.keyboard.press('ArrowDown');
+  const back = await active(p);
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(300);
+  await answerPv32(p);
+  check('B.32 ⑦ 이어서 ↑ ↓로 돌아온 뒤 Space → 머리 켬 · "Global 16개 · 변수 16개 만들기"', back === 'gk:text' && (await head(p, 'gk:text')).on === 'true' && (await foot(p)) === 'Global 16개 · 변수 16개 만들기', `${back} ${JSON.stringify(await head(p, 'gk:text'))} ${await foot(p)}`);
+  // ⑨ 되풀이 Space — 키보드로 왔어도 바꾸지 않음
+  await spaceRepeat(p);
+  await p.waitForTimeout(20);
+  check('B.32 ⑨ 되풀이 Space(repeat) → 바뀌지 않음', (await head(p, 'gk:text')).on === 'true');
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(300);
+  await answerPv32(p);
+  check('B.32 ⑦ 다시 Space → 끔 · "Global 12개"', (await head(p, 'gk:text')).on === 'false' && (await foot(p)) === 'Global 12개 · 변수 12개 만들기', await foot(p));
+  // ⑧ ↓로 Typography 머리에 간 뒤 Space → 켬
+  await p.keyboard.press('Home');
+  for (let i = 0; i < 30 && (await active(p)) !== 'gk:text'; i++) await p.keyboard.press('ArrowDown');
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(300);
+  await answerPv32(p);
+  check('B.32 ⑧ Home · ↓로 Typography 머리 → Space → 켬(키보드는 그대로)', (await active(p)) === 'gk:text' && (await head(p, 'gk:text')).on === 'true' && (await foot(p)) === 'Global 16개 · 변수 16개 만들기', await foot(p));
+  // ⑬ 마우스로 줄을 누른 뒤 Tab으로 나갔다 Shift+Tab으로 돌아와 Space → 바뀜
+  await p.click('#makeTree [data-tkey="g:spacing/2"] .tr-lt');
+  await p.keyboard.press(' ');
+  const keep = await rowOn(p, 'g:spacing/2');
+  await p.keyboard.press('Tab');
+  const out = await active(p);
+  await p.keyboard.press('Shift+Tab');
+  const back2 = await active(p);
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(20);
+  check('B.32 ⑬ 줄을 마우스로 누른 뒤 Space는 그대로 → Tab으로 나갔다 Shift+Tab으로 돌아와 Space → 끔', keep === 'true' && out === null && back2 === 'g:spacing/2' && (await rowOn(p, 'g:spacing/2')) === 'false', `${keep} ${out} ${back2} ${await rowOn(p, 'g:spacing/2')}`);
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(300);
+  await answerPv32(p);
+  // ⑩ 잠금 풀림 응답(manual → new) — 글자 줄은 켜지지 않음 · 켠 뒤 잠겼다 풀린 줄은 켬 그대로
+  await p.keyboard.press('Home');
+  for (let i = 0; i < 30 && (await active(p)) !== 'gk:text'; i++) await p.keyboard.press('ArrowDown');
+  await p.keyboard.press(' '); // 글자 끔
+  await p.waitForTimeout(300);
+  await answerPv32(p, { 'spacing/4': { state: 'manual' }, 'font-size/12': { state: 'manual' } });
+  const lockedNow = await p.getAttribute('#makeTree [data-tkey="g:spacing/4"] > .bv-switch', 'aria-disabled');
+  // ⑨ 마우스로 잠긴 스위치를 누른 뒤 Space → 아무 일 없음
+  const n1 = await nPv(p);
+  const f1 = await foot(p);
+  await p.$eval('#makeTree [data-tkey="g:spacing/4"]', (e) => e.scrollIntoView({ block: 'center' })); // 아래 고정 줄에 가리지 않게
+  await p.click('#makeTree [data-tkey="g:spacing/4"] > .bv-switch', { force: true });
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(300);
+  check('B.32 ⑨ 마우스로 잠긴 스위치(직접 만든 변수)를 누른 뒤 Space → 아무 일 없음', lockedNow === 'true' && (await rowOn(p, 'g:spacing/4')) === 'false' && (await nPv(p)) === n1 && (await foot(p)) === f1 && (await head(p, 'gk:text')).on === 'false', `${lockedNow} ${await rowOn(p, 'g:spacing/4')} ${f1}/${await foot(p)}`);
+  await answerPv32(p, { 'spacing/4': { state: 'new' }, 'font-size/12': { state: 'new' } }, true);
+  await p.click('#makeTree [data-tkey="gk:text"] > .tr-car');
+  await p.waitForTimeout(20);
+  check('B.32 ⑩ 잠금 풀림 응답 — 글자 줄은 끈 채 · 켠 뒤 잠겼다 풀린 줄(spacing/4)은 켬 · 만들 수 그대로 12', (await rowOn(p, 'g:spacing/4')) === 'true' && (await rowOn(p, 'g:font-size/12')) === 'false' && (await head(p, 'gk:text')).on === 'false' && (await foot(p)) === 'Global 12개 · 변수 12개 만들기', `${await rowOn(p, 'g:spacing/4')} ${await rowOn(p, 'g:font-size/12')} ${await foot(p)}`);
+  // 키보드로 줄을 옮긴 뒤 마우스가 창 밖으로 나감 → Space → 그대로(창 다시 들어옴 읽기를 부르지 않게 끝에서)
+  await p.keyboard.press('Home');
+  for (let i = 0; i < 30 && (await active(p)) !== 'gk:text'; i++) await p.keyboard.press('ArrowDown');
+  await p.evaluate(() => document.documentElement.dispatchEvent(new PointerEvent('pointerleave', { pointerType: 'mouse' })));
+  await p.keyboard.press(' ');
+  await p.waitForTimeout(20);
+  check('B.32 키보드로 줄을 옮긴 뒤 마우스가 창을 떠남(documentElement pointerleave) → Space → 그대로', (await active(p)) === 'gk:text' && (await head(p, 'gk:text')).on === 'false');
+  await p.close();
+
+  // ⑫ 마우스로 [변수 만들기]를 눌러 들어온 직후(스크립트가 첫 줄에 포커스) Space → 첫 줄 그대로(글자만 — 첫 줄 = Typography 머리)
+  {
+    const q = await enter32(T32.filter((tk) => tk.category === 'fontSize'));
+    const first = await active(q);
+    await q.keyboard.press(' ');
+    await q.waitForTimeout(300);
+    check('B.32 ⑫ 마우스로 들어온 직후(첫 줄 = Typography 머리 포커스) Space → 끔 그대로 · 미리보기 없음', first === 'gk:text' && (await head(q, 'gk:text')).on === 'false' && (await locked(q, '#btnMakeRun')), `${first} ${JSON.stringify(await head(q, 'gk:text'))}`);
+    await q.close();
+  }
+
+  // ①–⑥ 유료 Text Style 탭 — 후보 2
+  const S1 = { name: 'body/medium', fontSize: 14, lineHeight: 20, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 3, nodeIds: ['t1'] };
+  const S2 = { name: 'heading/small', fontSize: 20, lineHeight: 28, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 2, nodeIds: ['t2'] };
+  const S3 = { name: 'heading/large', fontSize: 32, lineHeight: 40, letterSpacing: 0, family: 'Inter', style: 'Bold', count: 1, nodeIds: ['t3'] };
+  {
+    const q = await enter32(T32.slice(6, 8), 'paid', { styles: [S1, S2] });
+    const scReq = (await sent(q, 'SCAN_TEXT_STYLES')).at(-1).reqId;
+    const tsOn = () => q.$$eval('#makeTree [data-tkey^="t:"] > .bv-switch', (e) => e.map((x) => x.getAttribute('aria-checked') === 'true'));
+    await q.click('#makeTab-ts');
+    await q.waitForTimeout(20);
+    check('B.32 ① 유료 · 후보 2 → 처음 모두 끔 · 만들 수에 " · 스타일" 없음 · 탭 수 2', JSON.stringify(await tsOn()) === '[false,false]' && !(await q.textContent('#makeCount')).includes('스타일') && (await tabsOf(q)).includes('Text Style2*'), `${JSON.stringify(await tsOn())} ${await q.textContent('#makeCount')} ${JSON.stringify(await tabsOf(q))}`);
+    await q.click('#makeTree [data-tkey^="t:"] > .bv-switch');
+    await q.waitForTimeout(20);
+    check('B.32 ② 줄 하나 켬 → " · 스타일 1개"', JSON.stringify(await tsOn()) === '[true,false]' && (await q.textContent('#makeCount')).endsWith(' · 스타일 1개'), await q.textContent('#makeCount'));
+    await q.click('#makeAllOn');
+    await q.waitForTimeout(20);
+    const allOn = (await q.textContent('#makeCount')).endsWith(' · 스타일 2개') && JSON.stringify(await tsOn()) === '[true,true]';
+    await q.click('#makeAllOff');
+    await q.waitForTimeout(20);
+    check('B.32 ③ 모두 켜기 → 스타일 2개 · 모두 끄기 → 0(꼬리 없음)', allOn && JSON.stringify(await tsOn()) === '[false,false]' && !(await q.textContent('#makeCount')).includes('스타일'), await q.textContent('#makeCount'));
+    // ④ 같은 기준 다시 읽기 — S1만 켠 채, 새 후보 S3 · 사라진 S2
+    await q.click('#makeTree [data-tkey^="t:"] > .bv-switch');
+    await recv(q, { type: 'TEXT_STYLE_CANDIDATES', reqId: scReq, warnings: [], existing: [], styles: [S1, S3] });
+    await q.waitForTimeout(30);
+    const names = await q.$$eval('#makeTree [data-tkey^="t:"]', (e) => e.map((r) => [r.querySelector('.vchip .al')?.textContent, r.querySelector(':scope > .bv-switch').getAttribute('aria-checked')]));
+    check('B.32 ④ 같은 기준 다시 읽기 → 켠 줄(body/medium) 이어받음 · 새 후보(heading/large)는 끔', JSON.stringify(names) === JSON.stringify([['→ body/medium', 'true'], ['→ heading/large', 'false']]) && (await q.textContent('#makeCount')).endsWith(' · 스타일 1개'), JSON.stringify(names));
+    // 사라진 S2가 다시 와도 끔(지운 sig)
+    await recv(q, { type: 'TEXT_STYLE_CANDIDATES', reqId: scReq, warnings: [], existing: [], styles: [S1, S2] });
+    await q.waitForTimeout(30);
+    check('B.32 ④ 사라졌던 후보가 다시 와도 끔(지운 sig는 켬을 잃음)', JSON.stringify(await tsOn()) === '[true,false]', JSON.stringify(await tsOn()));
+    await q.close();
+  }
+  {
+    // ⑤ n = 0 · 스타일만 → 주 버튼 잠금 "만들 값을 켜 주세요"(글은 [변수 만들기]) → 켜면 [스타일 1개 만들기]
+    const q = await enter32([], 'paid', { styles: [S1] });
+    const tabs = await tabsOf(q);
+    if (!tabs.some((x) => x.endsWith('*') && x.startsWith('Text Style'))) await q.click('#makeTab-ts');
+    await q.waitForTimeout(20);
+    const lk = (await locked(q, '#btnMakeRun')) && (await q.textContent('#btnMakeRun')) === '변수 만들기' && (await lockMsg(q, '#btnMakeRun')) === '만들 값을 켜 주세요';
+    await q.click('#makeTree [data-tkey^="t:"] > .bv-switch');
+    await q.waitForTimeout(20);
+    check('B.32 ⑤ n = 0 · 스타일만 → 처음 잠금 "만들 값을 켜 주세요"([변수 만들기]) → 켜면 [스타일 1개 만들기] 풀림', lk && !(await locked(q, '#btnMakeRun')) && (await q.textContent('#btnMakeRun')) === '스타일 1개 만들기' && (await q.textContent('#makeCount')) === '스타일 1개', `${lk} ${JSON.stringify(tabs)} ${await q.textContent('#btnMakeRun')} ${await q.textContent('#makeCount')}`);
+    await q.close();
+  }
 }
 
 await browser.close();
