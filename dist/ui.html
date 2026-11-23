@@ -1643,6 +1643,8 @@
     "op.createVar": "\uC0C8 \uBCC0\uC218",
     "op.dupVar": "\uBCF5\uC81C",
     "op.delVar": "\uC0AD\uC81C",
+    "op.updateVar": "\uACE0\uCE58\uAE30",
+    // 상세 [저장] 쓰기 잠금 사유의 작업 이름(ia-v4 §4.11 T-P26)
     "op.tsRename": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uBC14\uAFB8\uAE30",
     "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
@@ -4650,6 +4652,9 @@
   var semStatusTarget = "colorStatus";
   var semStatusPrefix = "";
   var bindLinking = 0;
+  var edSaveReq = 0;
+  var edSaveTimer = null;
+  var mkFootClose = false;
   var bindSelChangedDuringLink = false;
   var lastLinkItems = null;
   var selectStatusTarget = "applyStatus";
@@ -5869,6 +5874,24 @@
     }
     if (hadFocus) (_d = body.querySelector(`[data-id="${CSS.escape(hadFocus)}"], [data-all="${CSS.escape(hadFocus)}"]`)) == null ? void 0 : _d.focus();
   }
+  function releaseOwnBusy(msg) {
+    var _a3;
+    const rid = msg.reqId;
+    if (msg.type === "PREMIUM_REQUIRED" && rid != null && rid === tsrApplyReq && tsrBusy) {
+      tsrBusy = false;
+      if (tsrBody) closeModal();
+      else tsrRender();
+    }
+    if (rid != null && rid === tsrReq && tsrBody && !tsrRows) {
+      tsrRows = [];
+      tsrRender();
+    }
+    if (msg.type === "PREMIUM_REQUIRED" && msg.feature === "components") {
+      if (rid != null && rid === compScanReq) compScanReq = 0;
+      const busyTexts = ["component.scanning", "component.registering", "component.classifying", "component.generating"].map((k) => t(k));
+      if (busyTexts.includes((_a3 = $("structureStatus").textContent) != null ? _a3 : "")) setStatus("structureStatus", "", "");
+    }
+  }
   function onTsRenamePlan(msg) {
     var _a3;
     if (msg.reqId !== tsrReq || !tsrBody) return;
@@ -6067,23 +6090,27 @@
     if (!m) return;
     if (!wizardWaiter) return;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
+      if (m.reqId !== wizardWaiter.reqId) return;
       const w = wizardWaiter;
       wizardWaiter = null;
       if (m.type === "ERROR") wizardErrorMsg = m;
       w.reject(m.type === "PREMIUM_REQUIRED" ? new PaidRequiredError() : new Error(m.message));
       return;
     }
-    if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === void 0 || m.reqId === wizardWaiter.reqId)) {
+    if (wizardWaiter.types.includes(m.type) && m.reqId === wizardWaiter.reqId) {
       const w = wizardWaiter;
       wizardWaiter = null;
       setTimeout(() => w.resolve(m), 0);
     }
   });
   function wizardRequest(msg, expect, reqId) {
+    var _a3;
+    const rid = (_a3 = reqId != null ? reqId : msg.reqId) != null ? _a3 : mkNextReq();
+    msg.reqId = rid;
     return new Promise((resolve, reject) => {
       wizardWaiter = {
         types: [...expect],
-        reqId,
+        reqId: rid,
         resolve: (m) => resolve(m),
         reject
       };
@@ -6488,7 +6515,7 @@
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
     const msg = event.data.pluginMessage;
     if (!msg) return;
-    opReceived(msg);
+    if (msg.reqId == null || !opQuiet.has(msg.reqId)) opReceived(msg);
     if (makeTakes(msg)) return;
     if (mcTakes(msg)) return;
     switch (msg.type) {
@@ -6885,6 +6912,7 @@
         break;
       }
       case "PREMIUM_REQUIRED": {
+        releaseOwnBusy(msg);
         showPaidReason();
         break;
       }
@@ -6895,8 +6923,12 @@
         void deactivateInstance(msg.key, msg.instanceId);
         break;
       case "ERROR": {
-        if (msg.op === "UPDATE_VARIABLE" || msg.op === "GET_VAR_TABLE") edMaybeSaved();
-        if (msg.op === "UPDATE_VARIABLE") break;
+        if (msg.op === "UPDATE_VARIABLE") {
+          edMaybeSaved(msg.reqId);
+          edSaveEnd(msg.reqId);
+          break;
+        }
+        if (msg.op === "GET_VAR_TABLE") edMaybeSaved();
         if (msg.op === "SCAN_USAGE" && msg.reqId != null) {
           if (msg.reqId === vmUsageReq) {
             vmUsageInFlight = false;
@@ -6910,6 +6942,7 @@
         }
         if (onUnusedError(msg)) break;
         if (onVarOpError(msg)) break;
+        if (msg.op === "SCAN_TS_RENAME") releaseOwnBusy(msg);
         if (msg.op === "PREVIEW_TEXT_STYLES") {
           if (bindTsPending) {
             bindTsPending = false;
@@ -7083,13 +7116,31 @@
         setStatus(id, t("bind.waitLink"), "warn");
         return;
       }
-      send(retry);
+      resendRetry(retry);
     } : null;
     const { box, retry: retryBtn } = errorBox(f, onRetry);
     el.appendChild(box);
     const card = cardOf(el);
     if (retryBtn && card) holdPrimaries(card, retryBtn);
     if (id === "structureStatus") structStatusFind = true;
+  }
+  function resendRetry(m) {
+    const rid = m.reqId;
+    if (rid == null || opAutoReq.has(rid)) {
+      const copy = __spreadValues({}, m);
+      delete copy.reqId;
+      send(copy);
+      return;
+    }
+    if (m.type === "APPLY" && m.preview) {
+      runBindPreview();
+      return;
+    }
+    if (m.type === "RENAME" && !m.apply) {
+      readRename(true);
+      return;
+    }
+    send(__spreadValues({}, m));
   }
   function baseDepth(rows) {
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
@@ -7471,14 +7522,18 @@
     if (opBusy() || wizardRunning) return;
     mkExtractReq = mkNextReq();
     mkReading = true;
-    opSilent = true;
+    opSilent = !user;
+    opMakeRead = user;
+    if (user) mkUserReqs.add(mkExtractReq);
     send({ type: "EXTRACT", nodeIds: baseline.ids, reqId: mkExtractReq });
     if (isPaid) {
       mkScanReq = mkNextReq();
       mkTsReading = true;
-      send({ type: "SCAN_TEXT_STYLES", nodeIds: baseline.ids, reqId: mkScanReq });
+      if (user) mkUserReqs.add(mkScanReq);
+      send({ type: "SCAN_TEXT_STYLES", nodeIds: baseline.ids, reqId: mkScanReq, make: true });
     }
     opSilent = false;
+    opMakeRead = false;
     renderMakeScreen();
   }
   function scheduleMake() {
@@ -7513,13 +7568,45 @@
     opSilent = false;
     renderMakeScreen();
   }
+  var mkUserReqs = /* @__PURE__ */ new Set();
   function makeTakes(msg) {
     const rid = msg.reqId;
     if (rid == null || !mkOwned.has(rid)) return false;
+    if (msg.type === "VARIABLES" || msg.type === "DARK_MODE_RESULT") return false;
+    if ((msg.type === "ERROR" || msg.type === "PREMIUM_REQUIRED") && (rid === mkExtractReq || rid === mkScanReq)) {
+      onMakeReadFail(msg, rid === mkScanReq);
+      return true;
+    }
     if (msg.type === "EXTRACT_RESULT" && rid === mkExtractReq) onMakeExtract(msg);
     else if (msg.type === "CREATE_RESULT" && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
     else if (msg.type === "TEXT_STYLE_CANDIDATES" && rid === mkScanReq) onMakeScan(msg);
+    mkUserReqs.delete(rid);
     return true;
+  }
+  function onMakeReadFail(msg, scan) {
+    const user = msg.reqId != null && mkUserReqs.delete(msg.reqId);
+    if (scan) {
+      mkScanReq = 0;
+      mkTsReading = false;
+      mkTsPending = null;
+      mkTs = [];
+      mkTsDecimal = [];
+      mkTsFor = baseKey();
+    } else {
+      mkExtractReq = 0;
+      mkReading = false;
+      if (mkFor !== baseKey()) {
+        mkTokens = [];
+        mkFor = baseKey();
+      }
+    }
+    renderMakeScreen();
+    if (!user) {
+      console.warn("[make] quiet read failed", msg);
+      return;
+    }
+    if (msg.type === "PREMIUM_REQUIRED") showPaidReason();
+    else showStatusLine(explainError(msg.message).message, { cls: "warn", tip: msg.message });
   }
   function onMakeExtract(msg) {
     var _a3;
@@ -7962,6 +8049,10 @@
   function renderMakeFoot(showResults) {
     var _a3;
     const run = $("btnMakeRun");
+    if (mkFootClose !== showResults) {
+      mkFootClose = showResults;
+      renderWaitLocks();
+    }
     const opts = $("makeOpts");
     opts.hidden = showResults;
     const dark = $("makeOptDark");
@@ -8049,10 +8140,10 @@
           totals.created = { g: r.created + r.updated, r: (_a3 = r.roles) != null ? _a3 : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
-          const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"]);
+          const vars = await wizardRequest({ type: "GET_VARIABLES" }, ["VARIABLES"], mkNextReq());
           if (!hasDarkTarget(vars.vars)) results.push({ id, mark: "ok", text: t("wizard.seq.darkNoTarget") });
           else {
-            const r = await wizardRequest({ type: "GENERATE_DARK_MODE" }, ["DARK_MODE_RESULT"]);
+            const r = await wizardRequest({ type: "GENERATE_DARK_MODE" }, ["DARK_MODE_RESULT"], mkNextReq());
             const keptPart = r.kept ? t("wizard.seq.darkKept", { n: r.kept }) : "";
             if (r.error) {
               results.push({ id, mark: "warn", text: r.error });
@@ -9223,6 +9314,8 @@ ${opts.tip}` : text;
     }, write: true }
   };
   var opPending = /* @__PURE__ */ new Map();
+  var opQuiet = /* @__PURE__ */ new Set();
+  var opAutoReq = /* @__PURE__ */ new Set();
   var opWizard = false;
   var WAIT_LINK_IDS = [
     "btnCreate",
@@ -9249,17 +9342,18 @@ ${opts.tip}` : text;
     // 만들기 화면 실행(§4.3)
   ];
   var WAIT_CARD_IDS = ["btnApplyConfirm"];
-  function otherWriteOp() {
+  function otherWriteOp(opts) {
     if (opWizard || wizardRunning) return t("op.wizard");
-    for (const [type, def] of opPending) if (type !== "APPLY_SELECTED" && def.write) return t(def.label);
+    for (const [type, p] of opPending) if (type !== "APPLY_SELECTED" && p.def.write) return t(p.def.label);
+    if (edSaveReq && !(opts == null ? void 0 : opts.exceptSave)) return t("op.updateVar");
     return null;
   }
-  var VAR_WRITE_OPS = ["APPLY_VARIABLE", "CREATE_VARIABLE", "DUPLICATE_VARIABLE", "DELETE_VARIABLE", "DELETE_VARIABLES"];
   function renderWaitLocks() {
     const link = bindLinking ? t("bind.waitLink") : null;
-    const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
-    const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
-    for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
+    const op = link ? null : otherWriteOp();
+    const opLock = op ? t("bind.waitOp", { op }) : null;
+    for (const id of WAIT_LINK_IDS) setWait($(id), id === "btnMakeRun" && mkFootClose ? null : link != null ? link : opLock);
+    if (ed) edChrome();
     if (activeTab === "select" && selSub === "home" && (mcKeep() || mcNeed())) renderSelHome();
     tsrRender();
     const other = link ? null : otherWriteOp();
@@ -9283,11 +9377,27 @@ ${opts.tip}` : text;
     showTab("select");
     showSelSub("home");
   }, write: true };
+  var opMakeRead = false;
+  var goMake = () => {
+    showTab("select");
+    showSelSub("make");
+  };
+  var OP_MAKE_EXTRACT = { results: ["EXTRACT_RESULT"], label: "op.extract", go: goMake, write: false };
+  var OP_MAKE_SCAN = { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: goMake, write: false };
+  var OP_CREATE_PREVIEW = __spreadProps(__spreadValues({}, OPS.CREATE_TOKENS), { write: false });
   function opSent(msg) {
-    if (wizardRunning || opSilent) return;
-    const def = opCardCreate && msg.type === "CREATE_TOKENS" ? OP_MAKE_CARD : OPS[msg.type];
+    if (msg.reqId == null) {
+      msg.reqId = ++bindReqSeq;
+      opAutoReq.add(msg.reqId);
+    }
+    if (wizardRunning || opSilent) {
+      opQuiet.add(msg.reqId);
+      return;
+    }
+    opQuiet.delete(msg.reqId);
+    const def = opCardCreate && msg.type === "CREATE_TOKENS" ? OP_MAKE_CARD : opMakeRead && msg.type === "EXTRACT" ? OP_MAKE_EXTRACT : opMakeRead && msg.type === "SCAN_TEXT_STYLES" ? OP_MAKE_SCAN : msg.type === "CREATE_TOKENS" && msg.preview ? OP_CREATE_PREVIEW : OPS[msg.type];
     if (!def) return;
-    opPending.set(msg.type, def);
+    opPending.set(msg.type, { def, reqId: msg.reqId });
     if (msg.type === "APPLY_SELECTED" || msg.type === "APPLY") opProg = null;
     if (isMini) renderMiniMark();
     if (def.write) renderWaitLocks();
@@ -9303,22 +9413,29 @@ ${opts.tip}` : text;
     if (wizardRunning) return;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
       const op = m.type === "ERROR" ? m.op : void 0;
-      let def;
+      let key;
       if (op) {
-        def = opPending.get(op);
-        if (!def) return;
-        opPending.delete(op);
+        const p = opPending.get(op);
+        if (!p || m.reqId != null && m.reqId !== p.reqId) return;
+        key = op;
+      } else if (m.reqId != null) {
+        for (const [type, p] of opPending) if (p.reqId === m.reqId) {
+          key = type;
+          break;
+        }
+        if (!key) return;
       } else {
-        def = [...opPending.values()][0];
-        if (!def) return;
-        opPending.clear();
+        if (opPending.size) console.warn("[ops] reply without op/reqId \u2014 no op ended", m);
+        return;
       }
+      const def = opPending.get(key).def;
+      opPending.delete(key);
       opProg = null;
       renderWaitLocks();
       opFinished(false, def);
       return;
     }
-    for (const [type, def] of opPending) {
+    for (const [type, { def }] of opPending) {
       if (!def.results.includes(m.type)) continue;
       opPending.delete(type);
       opProg = null;
@@ -9611,8 +9728,7 @@ ${opts.tip}` : text;
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || menuEl || modalEl || e.defaultPrevented) return;
-    const tg = e.target;
-    if (tg.closest("input, textarea, select, [contenteditable]")) return;
+    if (isTextEntry(e.target)) return;
     if (activeTab === "settings") {
       e.preventDefault();
       showTab(settingsReturn);
@@ -9622,6 +9738,12 @@ ${opts.tip}` : text;
       subBack();
     }
   });
+  var TEXT_INPUT_TYPES = /* @__PURE__ */ new Set(["text", "search", "number", "password", "email", "url", "tel"]);
+  function isTextEntry(el) {
+    if (!el) return false;
+    if (el instanceof HTMLInputElement) return TEXT_INPUT_TYPES.has(el.type);
+    return !!el.closest('textarea, [contenteditable]:not([contenteditable="false"])');
+  }
   var pickFrom = "make";
   function showPick(step, from = "vars") {
     const opener = document.activeElement;
@@ -11063,7 +11185,8 @@ ${opts.tip}` : text;
       e.btnSave.title = t("paid.semantic");
       return;
     }
-    const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
+    const other = e.create ? null : otherWriteOp({ exceptSave: true });
+    const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0 || !!other;
     if (locked) {
       e.btnSave.setAttribute("aria-disabled", "true");
       e.btnSave.dataset.lock = "edit";
@@ -11071,7 +11194,7 @@ ${opts.tip}` : text;
       e.btnSave.removeAttribute("aria-disabled");
       delete e.btnSave.dataset.lock;
     }
-    e.btnSave.title = bindLinking ? t("bind.waitLink") : "";
+    e.btnSave.title = bindLinking ? t("bind.waitLink") : other ? t("bind.waitOp", { op: other }) : "";
   }
   function edPaidPing(e) {
     const a = e.paidAlert;
@@ -11097,7 +11220,9 @@ ${opts.tip}` : text;
     }
     if (!e || e.saving || e.sticky) return;
     const st = edState(e);
+    const other = otherWriteOp({ exceptSave: true });
     if (bindLinking) e.event = { text: t("bind.waitLink"), err: false };
+    else if (other && !e.create) e.event = { text: t("bind.waitOp", { op: other }), err: false };
     else if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
     else if (st.hasErr) {
       e.event = { text: t("edit.checkInput"), err: true };
@@ -11734,7 +11859,7 @@ ${opts.tip}` : text;
       return;
     }
     const st = edState(e);
-    if (bindLinking || !st.changed || st.hasErr) {
+    if (bindLinking || otherWriteOp({ exceptSave: true }) || !st.changed || st.hasErr) {
       edLockedSave();
       return;
     }
@@ -11757,7 +11882,23 @@ ${opts.tip}` : text;
     if (n.changed) msg.name = n.name;
     if (Object.keys(values).length) msg.values = values;
     send(msg);
+    edSaveBegin(reqId);
     edChrome();
+  }
+  function edSaveBegin(reqId) {
+    edSaveReq = reqId;
+    if (edSaveTimer) clearTimeout(edSaveTimer);
+    edSaveTimer = setTimeout(() => edSaveEnd(reqId), EDIT_TIMEOUT);
+    renderWaitLocks();
+  }
+  function edSaveEnd(reqId) {
+    if (!edSaveReq || reqId != null && reqId !== edSaveReq) return;
+    edSaveReq = 0;
+    if (edSaveTimer) {
+      clearTimeout(edSaveTimer);
+      edSaveTimer = null;
+    }
+    renderWaitLocks();
   }
   function edEndSaving(e) {
     e.saving = null;
@@ -11785,6 +11926,7 @@ ${opts.tip}` : text;
   }
   function onVariableUpdated(msg) {
     var _a3, _b;
+    edSaveEnd(msg.reqId);
     const e = ed;
     if (edDeadReqs.has(msg.reqId)) {
       edDeadReqs.delete(msg.reqId);
@@ -12534,6 +12676,11 @@ ${opts.tip}` : text;
         } } });
         renderSelHome();
       }
+    } else if (msg.type === "PREMIUM_REQUIRED" && rid === mcCreateReq) {
+      mcCreateReq = 0;
+      mcCreating = null;
+      showPaidReason();
+      renderSelHome();
     }
     return true;
   }

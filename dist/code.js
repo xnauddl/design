@@ -234,6 +234,8 @@
     "op.createVar": "\uC0C8 \uBCC0\uC218",
     "op.dupVar": "\uBCF5\uC81C",
     "op.delVar": "\uC0AD\uC81C",
+    "op.updateVar": "\uACE0\uCE58\uAE30",
+    // 상세 [저장] 쓰기 잠금 사유의 작업 이름(ia-v4 §4.11 T-P26)
     "op.tsRename": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uBC14\uAFB8\uAE30",
     "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
@@ -11387,14 +11389,15 @@
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     return ((_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id) === collectionId;
   }
-  function requirePaid(feature) {
+  function requirePaid(feature, reqId) {
     if (isPaid()) return true;
-    post({ type: "PREMIUM_REQUIRED", feature });
+    post(__spreadValues({ type: "PREMIUM_REQUIRED", feature }, reqId != null ? { reqId } : {}));
     return false;
   }
-  function postLicense(note2) {
+  function postLicense(note2, reqId) {
     const e = effective();
-    post({
+    post(__spreadProps(__spreadValues({}, reqId != null ? { reqId } : {}), {
+      // GET_LICENSE · SET_LICENSE에 답할 때만(T-P29 ②)
       type: "LICENSE_STATUS",
       tier: e.tier,
       unlimited: e.tier === "paid",
@@ -11405,7 +11408,7 @@
       note: note2 == null ? void 0 : note2.text,
       noteKind: note2 == null ? void 0 : note2.kind,
       noteTip: note2 == null ? void 0 : note2.tip
-    });
+    }));
   }
   async function loadLicense() {
     try {
@@ -11426,7 +11429,7 @@
     } catch (e) {
     }
   }
-  async function postPrereq() {
+  async function postPrereq(reqId) {
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
       const vars = await figma.variables.getLocalVariablesAsync();
@@ -11452,7 +11455,7 @@
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+      post(__spreadProps(__spreadValues({}, reqId != null ? { reqId } : {}), { type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual }));
     } catch (e) {
     }
   }
@@ -11696,11 +11699,11 @@
     while (n && n.type !== "PAGE") n = n.parent;
     return n && n.type === "PAGE" ? n : null;
   }
-  function requireComponents() {
-    return requirePaid("components");
+  function requireComponents(reqId) {
+    return requirePaid("components", reqId);
   }
-  function requireTextStyles() {
-    return requirePaid("textStyles");
+  function requireTextStyles(reqId) {
+    return requirePaid("textStyles", reqId);
   }
   function kindOf(v) {
     if (v.resolvedType === "COLOR") return "color";
@@ -12391,19 +12394,22 @@
     }
     return out;
   }
+  var NOTICE_TYPES = /* @__PURE__ */ new Set(["PROGRESS", "SELECTION_STATE", "REQUEST_VERIFY", "REQUEST_DEACTIVATE"]);
   figma.ui.onmessage = async (msg) => {
     var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    const rid = msg.reqId;
+    const reply = (m) => post(rid != null && m.reqId == null && !NOTICE_TYPES.has(m.type) ? __spreadProps(__spreadValues({}, m), { reqId: rid }) : m);
     try {
       switch (msg.type) {
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
           const wm = await withLocalMains(sel);
           const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys()));
-          post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
+          reply(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
         case "CREATE_TOKENS": {
-          if (!msg.preview && !msg.globalOnly && !requirePaid("tokens")) break;
+          if (!msg.preview && !msg.globalOnly && !requirePaid("tokens", msg.reqId)) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
@@ -12420,7 +12426,7 @@
           }
           if (s.skippedManual) summary += t("create.sumManual", { n: s.skippedManual });
           const tokenStates = msg.preview && s.tokenStates ? Object.fromEntries(s.tokenStates) : void 0;
-          post(__spreadValues(__spreadValues(__spreadValues({
+          reply(__spreadValues(__spreadValues(__spreadValues({
             type: "CREATE_RESULT",
             created: s.created,
             updated: s.updated,
@@ -12450,13 +12456,13 @@
               sel,
               !msg.preview,
               {
-                onProgress: (done, total) => post({ type: "PROGRESS", op: "bind", done, total }),
+                onProgress: (done, total) => reply({ type: "PROGRESS", op: "bind", done, total }),
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
               __spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
             );
-            post(__spreadValues(__spreadValues({
+            reply(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",
               bound: r.bound,
               skipped: r.skipped,
@@ -12492,17 +12498,17 @@
           const deletedIds = await deletedVarIds(roots);
           const r = await unbindDeleted(roots, deletedIds);
           if (r.unbound) commitUndo(figma);
-          post(__spreadValues({ type: "DELETED_UNBOUND", reqId: msg.reqId }, r));
+          reply(__spreadValues({ type: "DELETED_UNBOUND", reqId: msg.reqId }, r));
           if (r.unbound) await postPrereq();
           break;
         }
         case "SCAN_USAGE": {
-          post(__spreadValues({ type: "USAGE_RESULT", reqId: msg.reqId }, await collectUsage(msg.nodeIds)));
+          reply(__spreadValues({ type: "USAGE_RESULT", reqId: msg.reqId }, await collectUsage(msg.nodeIds)));
           break;
         }
         case "FIND_VAR_USERS": {
           const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
-          post({ type: "VAR_USERS", reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
+          reply({ type: "VAR_USERS", reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
           break;
         }
         case "SELECT_VAR_USERS": {
@@ -12514,7 +12520,7 @@
             figma.currentPage.selection = pick;
             figma.viewport.scrollAndZoomIntoView(pick);
           }
-          post({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
+          reply({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
           break;
         }
         case "CANCEL": {
@@ -12543,7 +12549,7 @@
             figma.currentPage.selection = onPage;
             figma.viewport.scrollAndZoomIntoView(onPage);
           }
-          post({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
+          reply({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
           break;
         }
         case "APPLY_SELECTED": {
@@ -12558,7 +12564,7 @@
             const ts = ((_a = msg.textStyles) == null ? void 0 : _a.length) ? await applyTextStyleRows(msg.textStyles) : null;
             if (ts == null ? void 0 : ts.applied) written += ts.applied;
             const r = await bindSelectedItems(msg.items, {
-              onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
+              onProgress: (done, total) => reply({ type: "PROGRESS", op: "link", done, total }),
               yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0)),
               onBound: (n) => {
                 var _a2;
@@ -12581,7 +12587,7 @@
                 if (m && !mainsBound.includes(m)) mainsBound.push(m);
               }
             }
-            post(__spreadValues(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), mainsBound.length ? { mainsBound } : {}));
+            reply(__spreadValues(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), mainsBound.length ? { mainsBound } : {}));
             if (r.bound || r.newRoles || (ts == null ? void 0 : ts.applied)) {
               commitUndo(figma);
               committed = true;
@@ -12597,7 +12603,7 @@
         }
         case "RENAME": {
           const r = await renameSelection(await resolveRoots(msg.nodeIds), { apply: msg.apply, maxDepth: msg.maxDepth });
-          post(__spreadValues({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied }, msg.reqId != null ? { reqId: msg.reqId } : {}));
+          reply(__spreadValues({ type: "RENAME_RESULT", changes: r.changes, nodes: r.nodes, applied: r.applied }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           if (r.applied && r.changes.length) {
             commitUndo(figma);
           }
@@ -12623,7 +12629,7 @@
             if (before === after) continue;
             changes.push({ id, before, after });
           }
-          post(__spreadValues({ type: "RENAME_RESULT", changes, nodes: [], applied: true }, msg.reqId != null ? { reqId: msg.reqId } : {}));
+          reply(__spreadValues({ type: "RENAME_RESULT", changes, nodes: [], applied: true }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           selfSelect = true;
           postSelection();
           if (changes.length || roleWrites) {
@@ -12632,57 +12638,55 @@
           break;
         }
         case "CREATE_SEMANTICS": {
-          if (!requirePaid("semantics")) break;
+          if (!requirePaid("semantics", msg.reqId)) break;
           const s = await createSemanticAliases(msg.map);
-          post(__spreadValues({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing }, s.skippedManual ? { skippedManual: s.skippedManual } : {}));
+          reply(__spreadValues({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing }, s.skippedManual ? { skippedManual: s.skippedManual } : {}));
           commitUndo(figma);
           await postPrereq();
           break;
         }
         case "SCAN_TEXT_STYLES": {
-          if (!requirePaid("textStyles")) break;
+          if (!requirePaid("textStyles", msg.reqId)) break;
           const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
-          if (msg.reqId == null) lastTextSamples = samples;
+          if (!msg.make) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
           const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
           const styles = nameTextStyles(rest, existing);
           const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
-          if (msg.reqId != null) {
-            post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
-          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, existing: existingSigs });
+          reply({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, existing: existingSigs });
           break;
         }
         case "SCAN_TS_RENAME": {
-          if (!requireTextStyles()) break;
-          post({ type: "TS_RENAME_PLAN", reqId: msg.reqId, rows: await planTsRename() });
+          if (!requireTextStyles(msg.reqId)) break;
+          reply({ type: "TS_RENAME_PLAN", reqId: msg.reqId, rows: await planTsRename() });
           break;
         }
         case "APPLY_TS_RENAME": {
-          if (!requireTextStyles()) break;
+          if (!requireTextStyles(msg.reqId)) break;
           const r = await applyTsRename(msg.items);
-          post(__spreadValues({ type: "TS_RENAMED", reqId: msg.reqId }, r));
+          reply(__spreadValues({ type: "TS_RENAMED", reqId: msg.reqId }, r));
           commitUndo(figma);
           await postPrereq();
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {
-          if (!requirePaid("textStyles")) break;
+          if (!requirePaid("textStyles", msg.reqId)) break;
           if (!lastTextSamples.length) {
-            post({ type: "ERROR", message: t("textStyle.needScan"), op: "NAME_TEXT_STYLES_BY_ROW" });
+            reply({ type: "ERROR", message: t("textStyle.needScan"), op: "NAME_TEXT_STYLES_BY_ROW" });
             break;
           }
           const existing = await scanExistingTextStyles();
           const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-          post({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
+          reply({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
           break;
         }
         case "CREATE_TEXT_STYLES": {
-          if (!requireTextStyles()) break;
+          if (!requireTextStyles(msg.reqId)) break;
           const r = await createSemanticTextStyles(msg.styles);
           const wm = msg.applyTo ? await withLocalMains(await resolveRoots(msg.applyTo)) : null;
           const ap = wm ? await applyRegisteredTextStyles(wm.roots, r.styleIds) : null;
           const mainsApplied = wm && ap ? unitsOfIds(ap.appliedIds, wm.unitOf) : [];
-          post(__spreadValues(__spreadValues(__spreadValues({
+          reply(__spreadValues(__spreadValues(__spreadValues({
             type: "TEXT_STYLES_RESULT",
             created: r.created,
             updated: r.updated,
@@ -12701,21 +12705,21 @@
             var _a2;
             return (_a2 = wm.unitOf.get(id)) != null ? _a2 : null;
           }) })) : r.rows;
-          post({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows, skipReasons: r.skipReasons });
+          reply({ type: "TEXT_STYLES_PREVIEW", reqId: msg.reqId, rows, skipReasons: r.skipReasons });
           break;
         }
         case "GET_COLLECTIONS": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
-          post({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
+          reply({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
           postSelection();
           break;
         }
         case "GET_PREREQ": {
-          await postPrereq();
+          await postPrereq(msg.reqId);
           break;
         }
         case "GET_LICENSE": {
-          postLicense();
+          postLicense(void 0, msg.reqId);
           break;
         }
         case "SET_LICENSE": {
@@ -12725,7 +12729,7 @@
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
           } catch (e) {
           }
-          postLicense();
+          postLicense(void 0, msg.reqId);
           break;
         }
         case "LICENSE_VERIFIED": {
@@ -12735,7 +12739,7 @@
               const keyChanged = prev.key !== msg.key;
               const instChanged = !!msg.result.instanceId && prev.instanceId !== msg.result.instanceId;
               if (keyChanged || instChanged) {
-                post({ type: "REQUEST_DEACTIVATE", key: prev.key, instanceId: prev.instanceId });
+                reply({ type: "REQUEST_DEACTIVATE", key: prev.key, instanceId: prev.instanceId });
               }
             }
             cache = cacheFromVerify(msg.key, msg.result, Date.now());
@@ -12758,7 +12762,7 @@
         }
         case "CLEAR_LICENSE": {
           if ((cache == null ? void 0 : cache.key) && cache.instanceId) {
-            post({ type: "REQUEST_DEACTIVATE", key: cache.key, instanceId: cache.instanceId });
+            reply({ type: "REQUEST_DEACTIVATE", key: cache.key, instanceId: cache.instanceId });
           }
           cache = null;
           try {
@@ -12819,11 +12823,11 @@
             fontSizeUnit: msg.fontSizeUnit,
             base: msg.base
           }, styles, modes);
-          post({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes) });
+          reply({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes) });
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {
-          if (!requireComponents()) break;
+          if (!requireComponents(msg.reqId)) break;
           const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible3);
           const scanMains = await instanceMainsAsync(roots);
           const rootStructs = roots.map((n) => toStructNode(n, true, scanMains));
@@ -12902,11 +12906,11 @@
           } catch (e) {
             console.warn("component preview label failed", e);
           }
-          post({ type: "COMPONENT_CANDIDATES", nodes, autoNamed, reqId: msg.reqId });
+          reply({ type: "COMPONENT_CANDIDATES", nodes, autoNamed, reqId: msg.reqId });
           break;
         }
         case "REGISTER_COMPONENTS": {
-          if (!requireComponents()) break;
+          if (!requireComponents(msg.reqId)) break;
           await figma.loadAllPagesAsync();
           let registered = 0;
           let skipped = 0;
@@ -12954,7 +12958,7 @@
           const nameByGroup = /* @__PURE__ */ new Map();
           resolvePlanNames(groups, existingNames).forEach((nm, i) => nameByGroup.set(groups[i], nm));
           if (!groups.length) {
-            post({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
+            reply({ type: "COMPONENTS_RESULT", registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
             break;
           }
           groups = orderInnerFirst(groups, byId);
@@ -13720,12 +13724,12 @@
           const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
           tallyRestoreFailures(keepRoots, keepFailed, propFailed, (name, prop) => failures.push(t("component.fail.propValue", { name, prop })));
           await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
+          reply({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
           if (registered || sets || reused.length) commitUndo(figma);
           break;
         }
         case "CLASSIFY_VARIANTS": {
-          if (!requireComponents()) break;
+          if (!requireComponents(msg.reqId)) break;
           const comps = selection().filter(
             (n) => {
               var _a2;
@@ -13772,12 +13776,12 @@
               failures.push(t("component.fail.combine", { set: groupNames[gi], error: errText(e) }));
             }
           }
-          post({ type: "VARIANTS_RESULT", sets, missing, singles, failures });
+          reply({ type: "VARIANTS_RESULT", sets, missing, singles, failures });
           if (sets) commitUndo(figma);
           break;
         }
         case "GENERATE_MISSING_VARIANTS": {
-          if (!requireComponents()) break;
+          if (!requireComponents(msg.reqId)) break;
           const sets = selection().filter((n) => n.type === "COMPONENT_SET");
           let generated = 0;
           const combos = [];
@@ -13798,12 +13802,12 @@
             }
             if (missing.length) arrangeSet(set);
           }
-          post({ type: "GENERATE_RESULT", generated, sets: sets.length, combos });
+          reply({ type: "GENERATE_RESULT", generated, sets: sets.length, combos });
           if (generated) commitUndo(figma);
           break;
         }
         case "GET_VAR_TABLE": {
-          post(__spreadValues({ type: "VAR_TABLE" }, await collectVarTable()));
+          reply(__spreadValues({ type: "VAR_TABLE" }, await collectVarTable()));
           break;
         }
         case "UPDATE_VARIABLE": {
@@ -13813,12 +13817,12 @@
         case "APPLY_VARIABLE": {
           const v = await figma.variables.getVariableByIdAsync(msg.id).catch(() => null);
           if (!v) {
-            post({ type: "ERROR", message: "variable not found", op: msg.type, reqId: msg.reqId, code: "deleted" });
+            reply({ type: "ERROR", message: "variable not found", op: msg.type, reqId: msg.reqId, code: "deleted" });
             break;
           }
           const r = await applyVariableToNodes(selection().slice(), v, msg.target);
           if (r.applied) commitUndo(figma);
-          post({ type: "VARIABLE_APPLIED", reqId: msg.reqId, applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, name: v.name });
+          reply({ type: "VARIABLE_APPLIED", reqId: msg.reqId, applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, name: v.name });
           break;
         }
         case "CREATE_VARIABLE":
@@ -13829,22 +13833,22 @@
         }
         case "SCAN_UNUSED_VARS": {
           unusedCancel = false;
-          const r = await scanUnusedVariables({ onProgress: (done, total) => post({ type: "PROGRESS", op: "unused", done, total }), cancelled: () => unusedCancel });
-          post(__spreadValues({ type: "UNUSED_VARS", reqId: msg.reqId, items: r.items, pages: r.pages, layers: r.layers }, r.cancelled ? { cancelled: true } : {}));
+          const r = await scanUnusedVariables({ onProgress: (done, total) => reply({ type: "PROGRESS", op: "unused", done, total }), cancelled: () => unusedCancel });
+          reply(__spreadValues({ type: "UNUSED_VARS", reqId: msg.reqId, items: r.items, pages: r.pages, layers: r.layers }, r.cancelled ? { cancelled: true } : {}));
           break;
         }
         case "DELETE_VARIABLES": {
           unusedCancel = false;
-          const r = await deleteUnusedVariables(msg.ids, { onProgress: (done, total) => post({ type: "PROGRESS", op: "unused-delete", done, total }), cancelled: () => unusedCancel });
+          const r = await deleteUnusedVariables(msg.ids, { onProgress: (done, total) => reply({ type: "PROGRESS", op: "unused-delete", done, total }), cancelled: () => unusedCancel });
           if (r.deleted > 0) commitUndo(figma);
-          post(__spreadValues({ type: "VARIABLES_DELETED", reqId: msg.reqId, deleted: r.deleted, skipped: r.skipped, failed: r.failed }, r.cancelled ? { cancelled: true } : {}));
+          reply(__spreadValues({ type: "VARIABLES_DELETED", reqId: msg.reqId, deleted: r.deleted, skipped: r.skipped, failed: r.failed }, r.cancelled ? { cancelled: true } : {}));
           if (r.deleted > 0) await postPrereq();
           break;
         }
         case "SET_UI_SIZE": {
           const mode = normalizeUiSize(msg.mode);
           figma.ui.resize(uiWidth(mode), uiHeight(mode));
-          post({ type: "UI_SIZE", mode });
+          reply({ type: "UI_SIZE", mode });
           break;
         }
         case "GET_SETTINGS": {
@@ -13861,7 +13865,7 @@
             }
           } catch (e) {
           }
-          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, grid: s.grid });
+          reply({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, grid: s.grid });
           break;
         }
         case "SET_SETTINGS": {
@@ -13872,11 +13876,11 @@
           break;
         }
         case "GET_VARIABLES": {
-          post({ type: "VARIABLES", vars: await collectVars() });
+          reply({ type: "VARIABLES", vars: await collectVars() });
           break;
         }
         case "GENERATE_DARK_MODE": {
-          if (!requirePaid("tokens")) break;
+          if (!requirePaid("tokens", msg.reqId)) break;
           let res;
           try {
             res = await generateDarkMode(msg.migrate === true);
@@ -13889,7 +13893,7 @@
             throw e;
           }
           const _m = res, { changed } = _m, r = __objRest(_m, ["changed"]);
-          post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
+          reply(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
           if (changed) {
             commitUndo(figma);
             await postPrereq();
@@ -13899,7 +13903,7 @@
         }
       }
     } catch (err) {
-      post({ type: "ERROR", message: err instanceof Error ? err.message : String(err), op: msg == null ? void 0 : msg.type, reqId: msg == null ? void 0 : msg.reqId });
+      reply({ type: "ERROR", message: err instanceof Error ? err.message : String(err), op: msg == null ? void 0 : msg.type, reqId: msg == null ? void 0 : msg.reqId });
     }
   };
 })();

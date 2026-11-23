@@ -22,6 +22,7 @@
     25 라이선스 구매 버튼(IA v4 §4.10 · B.21): 늘 보임 · 자리표시자면 잠금 · 티어별 글 · 툴팁 꼬리
     30 상태 5 만들기 카드(IA v4 §4.1 · B.30): 남은 값 · 같은 값 줄 · 추출 전 · 실패 · 미리보기 다시 보냄 · 만들기 화면 기본 끔
     31 큰 선택 [읽기] — 찾기 중 미룬 만들기 카드 읽기를 찾기가 끝난 뒤 보냄("선택을 읽는 중…" 멈춤 수정)
+    8a 도구 탭 기반(IA v4 B.19a): reqId · 조용한 응답 · 거절은 그 작업만 · 쓰기 잠금 양쪽 · 상세 [저장] 잠금 · [읽기] OPS · [다시 시도] 새 reqId · Esc
   B.32 만들기 화면 글자 기본 꺼짐(IA v4 §4.3 · §2.7 키보드): Text Style 기본 끔 · 다시 읽기 이어받기 · 잠금 풀림이 글자를 켜지 않음 ·
        마우스로 누른 뒤 Space · 되풀이 Space는 스위치를 바꾸지 않음(트리 넷 — 연결 · 만들기 · 이름 정리 · 안 쓰는 변수 팝업)
    사용: npm run verify:bind  (Chromium 경로가 다르면 CHROMIUM_PATH로 지정)
@@ -4325,6 +4326,242 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
     await q.waitForTimeout(20);
     check('B.32 ⑤ n = 0 · 스타일만 → 처음 잠금 "만들 값을 켜 주세요"([변수 만들기]) → 켜면 [스타일 1개 만들기] 풀림', lk && !(await locked(q, '#btnMakeRun')) && (await q.textContent('#btnMakeRun')) === '스타일 1개 만들기' && (await q.textContent('#makeCount')) === '스타일 1개', `${lk} ${JSON.stringify(tabs)} ${await q.textContent('#btnMakeRun')} ${await q.textContent('#makeCount')}`);
     await q.close();
+  }
+}
+
+/* 8a — 도구 탭 기반(ia-v4 B.19a): reqId 전부 · 조용한 응답 분리 · 거절은 그 작업만 · 쓰기 잠금 양쪽 · 상세 [저장] 잠금 · [읽기] OPS · Esc */
+{
+  const waitOf = (p, s) => p.getAttribute(s, 'data-wait');
+  const isBusy = (p) => p.$eval('#btnExpand', (e) => e.classList.contains('busy'));
+  // A — 만들기 화면 실행(마법사): 다른 쓰기 버튼 잠금 · 남의 거절 · 오류 무시 · 다크 단계 reqId · 결과 [닫기] 예외
+  {
+    const p = await open(560, 'select');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS });
+    await recv(p, { ...sel(1, 0), ids: ['w8a'] });
+    await goSub(p, 'make');
+    await p.waitForTimeout(30);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(30);
+    await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+    await p.waitForTimeout(30);
+    check('8a 자동 읽기 SCAN_TEXT_STYLES는 make 표시(lastTextSamples를 덮지 않게) · reqId', (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).make === true);
+    const free0 = !(await waitOf(p, '#btnRename')) && !(await waitOf(p, '#btnRegisterComp'));
+    await p.click('#makeOptDark');
+    await p.click('#btnMakeRun');
+    await p.waitForTimeout(40);
+    const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+    check('8a T-D8 만들기 화면 실행 중 — btnRename · btnRegisterComp · btnTsRename 대기 잠금(실행 전엔 없음)', free0 && !!(await waitOf(p, '#btnRename')) && !!(await waitOf(p, '#btnRegisterComp')) && !!(await waitOf(p, '#btnTsRename')), String(await waitOf(p, '#btnRename')));
+    // 실행 직전에 보낸 다른 화면 요청의 거절 · 오류(마법사 reqId가 아님) — 돌던 단계를 실패시키지 않는다(T-P24 ④)
+    await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'components', reqId: 99901 });
+    await recv(p, { type: 'ERROR', message: 'x', op: 'SCAN_COMPONENT_CANDIDATES', reqId: 99902 });
+    await p.waitForTimeout(40);
+    check('8a T-P24 ④ 실행 중 남의 PREMIUM_REQUIRED{reqId} · ERROR{reqId} → 단계 그대로(실행 중 · 결과 없음)', (await visible(p, '#btnMakeCancel')) && !(await visible(p, '#makeResults')));
+    await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+    await p.waitForTimeout(60);
+    const gv = (await sent(p, 'GET_VARIABLES')).at(-1);
+    check('8a T-P29 ① 마법사 다크 단계 GET_VARIABLES에 reqId', typeof gv?.reqId === 'number', JSON.stringify(gv));
+    await recv(p, { type: 'VARIABLES', reqId: gv.reqId, vars: [{ id: 'g1', name: 'color/blue/500', tier: 1, owned: 'global', type: 'COLOR', collectionId: 'g', collectionName: 'Global', modes: [] }] });
+    await p.waitForTimeout(60);
+    const gd = (await sent(p, 'GENERATE_DARK_MODE')).at(-1);
+    check('8a GENERATE_DARK_MODE에 reqId · 마법사 다크 단계 뒤 allVars · 다크 전제 판정 갱신(띠 숨음)', typeof gd?.reqId === 'number' && (await p.$eval('#darkPrereq', (e) => e.style.display)) === 'none', JSON.stringify(gd));
+    await recv(p, { type: 'DARK_MODE_RESULT', reqId: gd.reqId, filled: 2, kept: 0, targets: 2 });
+    await p.waitForTimeout(80);
+    const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+    check('8a 만들기 화면 실행의 다크 단계가 DARK_MODE_RESULT{reqId}로 끝남 → 연결 단계 · darkStatus 갱신', !!ap && (await p.textContent('#darkStatus')) !== '', JSON.stringify(ap));
+    await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'no-match': 2 }, preview: false, reqId: ap.reqId });
+    await p.waitForTimeout(80);
+    check('8a 실행 끝 → 대기 잠금 풀림 · 결과 화면 [닫기]', !(await waitOf(p, '#btnRename')) && (await p.textContent('#btnMakeRun')) === '닫기', String(await waitOf(p, '#btnRename')));
+    // 결과 [닫기]는 다른 쓰기(상세 [저장]) 중에도 잠기지 않음
+    await p.click('#tabbtn-variables');
+    await p.waitForTimeout(500);
+    const u0 = (await sent(p, 'SCAN_USAGE')).at(-1);
+    if (u0) await recv(p, usageResult(u0.reqId, {}));
+    await p.waitForTimeout(40);
+    await menuEdit(p, 'tx');
+    await p.fill(NAME, 'color/text/main');
+    const u = await saveAndGet(p);
+    check('8a T-D8 예외 — 상세 [저장] 중에도 만들기 결과 화면 [닫기]는 잠기지 않음 · 이름 정리 버튼은 잠김', !!u && !(await waitOf(p, '#btnMakeRun')) && (await waitOf(p, '#btnRename'))?.includes('고치기'), `${await waitOf(p, '#btnMakeRun')} / ${await waitOf(p, '#btnRename')}`);
+    await p.close();
+  }
+  // B — 상세 [저장] 쓰기 잠금(T-P26): 저장 중 btnMakeRun 잠김 · 다른 reqId의 ERROR는 그대로 · VARIABLE_UPDATED 뒤(표 다시 읽기 중) 풀림
+  {
+    const p = await openEditList();
+    await menuEdit(p, 'tx');
+    await p.fill(NAME, 'color/text/main');
+    const u = await saveAndGet(p);
+    const w1 = await waitOf(p, '#btnMakeRun');
+    check('8a T-P26 상세 [저장] 중 btnMakeRun · btnApplyConfirm 대기 잠금(사유 "고치기")', !!w1 && w1.includes('고치기') && !!(await waitOf(p, '#btnApplyConfirm')), String(w1));
+    await recv(p, { type: 'ERROR', message: 'x', op: 'UPDATE_VARIABLE', reqId: u.reqId + 1000 });
+    await p.waitForTimeout(20);
+    check('8a ERROR{op: UPDATE_VARIABLE}의 reqId가 다르면 잠금 그대로', !!(await waitOf(p, '#btnMakeRun')));
+    await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name'] });
+    await p.waitForTimeout(30);
+    check('8a VARIABLE_UPDATED 뒤(표 다시 읽기 중) 다른 쓰기 잠금 풀림', !(await waitOf(p, '#btnMakeRun')) && !(await waitOf(p, '#btnApplyConfirm')));
+    await p.close();
+  }
+  // C — 다른 쓰기(컴포넌트 등록) 중: btnMakeRun 잠김 · 남의 거절 · 옛 reqId 오류는 그 쓰기를 끝내지 않음 · 상세 [저장] 잠김 → ERROR로 풀림
+  {
+    const p = await compScreen();
+    await fillBoth(p);
+    await p.click('#btnRegisterComp');
+    const reg = (await sent(p, 'REGISTER_COMPONENTS')).at(-1);
+    check('8a T-D8 컴포넌트 등록 중 btnMakeRun · btnRename 잠김 · REGISTER_COMPONENTS에 reqId', typeof reg?.reqId === 'number' && !!(await waitOf(p, '#btnMakeRun')) && !!(await waitOf(p, '#btnRename')));
+    await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'components', reqId: 424242 });
+    await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'components' });
+    await recv(p, { type: 'ERROR', message: 'old', op: 'REGISTER_COMPONENTS', reqId: reg.reqId - 1 });
+    await p.waitForTimeout(30);
+    check('8a T-P29 ③ 다른 쓰기 중 남의 PREMIUM_REQUIRED{reqId} · reqId 없는 거절 · ERROR{op, 옛 reqId} → 그 쓰기 그대로(clear 없음)', !!(await waitOf(p, '#btnMakeRun')));
+    await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS });
+    await p.click('#tabbtn-variables');
+    await p.waitForTimeout(500);
+    const u0 = (await sent(p, 'SCAN_USAGE')).at(-1);
+    if (u0) await recv(p, usageResult(u0.reqId, {}));
+    await p.waitForTimeout(40);
+    await menuEdit(p, 'tx');
+    await p.fill(NAME, 'color/text/main');
+    await p.waitForTimeout(20);
+    const lockedSave = await edSaveLocked(p);
+    await p.click('.modal .m-foot button.primary', { force: true });
+    const alert = await edAlert(p);
+    check('8a T-P26 다른 쓰기 중 상세 [저장] 잠김 · 누르면 팝업 알림 줄 사유 · UPDATE_VARIABLE 0', lockedSave && alert.includes('컴포넌트') && (await sent(p, 'UPDATE_VARIABLE')).length === 0, alert);
+    await recv(p, { type: 'ERROR', message: '등록 실패', op: 'REGISTER_COMPONENTS' });
+    await p.waitForTimeout(30);
+    check('8a 다른 쓰기(컴포넌트 등록)가 ERROR{op}(reqId 없음)로 끝나면 열린 상세 [저장] 잠금 풀림', !(await edSaveLocked(p)) && !(await waitOf(p, '#btnMakeRun')));
+    await p.close();
+  }
+  // D — 만들기 화면 큰 선택 [읽기] → OPS 작업(진행 테두리) · 스캔 거절은 그 작업만 끝냄 · 다음 자동 읽기 막히지 않음
+  const big = async () => {
+    const p = await open(560, 'select');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await recv(p, { ...sel(10, 0), ids: ['big8a'] });
+    await goSub(p, 'make');
+    await p.waitForTimeout(40);
+    return p;
+  };
+  {
+    const p = await big();
+    const ex0 = (await sent(p, 'EXTRACT')).length;
+    await p.click('#makeEmpty button');
+    await p.waitForTimeout(20);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await p.click('#btnMinimize');
+    await p.waitForTimeout(30);
+    check('8a T-P14 큰 선택 [읽기] → EXTRACT · SCAN_TEXT_STYLES(make) 보냄 · 진행 테두리(OPS 작업)', (await sent(p, 'EXTRACT')).length === ex0 + 1 && sc?.make === true && (await isBusy(p)));
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 10, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+    await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'textStyles', reqId: sc.reqId });
+    await p.waitForTimeout(40);
+    check('8a T-P28 [읽기]의 SCAN_TEXT_STYLES 거절(PREMIUM_REQUIRED{reqId}) → 그 작업 끝(진행 테두리 끝)', !(await isBusy(p)));
+    await p.click('#btnExpand');
+    await p.waitForTimeout(60);
+    check('8a 스캔 거절 → Text Style 탭 숨김 · 공통 상태 줄 유료 사유', !(await tabsOf(p)).some((x) => x.startsWith('Text Style')) && (await p.textContent('#statusText')).length > 0, `${JSON.stringify(await tabsOf(p))} ${await p.textContent('#statusText')}`);
+    const n0 = (await sent(p, 'EXTRACT')).length;
+    await recv(p, { ...sel(1, 0), ids: ['small8a'] });
+    await p.waitForTimeout(500);
+    check('8a T-P27 [읽기]가 끝난 뒤 opPending이 비어 다음 자동 읽기(readMake)가 막히지 않음', (await sent(p, 'EXTRACT')).length > n0);
+    await p.close();
+  }
+  {
+    const p = await big();
+    await p.click('#makeEmpty button');
+    await p.waitForTimeout(20);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
+    await p.click('#btnMinimize');
+    await p.waitForTimeout(30);
+    await recv(p, { type: 'ERROR', message: 'read failed', op: 'EXTRACT', reqId: ex.reqId });
+    await p.waitForTimeout(40);
+    const badge = await p.$eval('#miniBadge', (e) => !e.hidden && e.classList.contains('fail'));
+    await p.click('#btnExpand');
+    await p.waitForTimeout(60);
+    const status = await p.textContent('#statusText');
+    const action = (await p.getAttribute('#statusAction', 'hidden')) === null ? await p.textContent('#statusAction') : '';
+    check('8a 사용자 [읽기] ERROR{reqId} → 작업 실패 ⚠ · 읽는 중 풀림(빈 값 줄) · 공통 상태 줄 "추출 실패 · [보기]"', badge && !(await p.textContent('#makeEmpty')).includes('읽는 중') && status === '추출 실패' && action === '보기', `${badge} ${status} ${action}`);
+    await p.click('#statusAction');
+    await p.waitForTimeout(40);
+    check('8a [보기] → 만들기 화면', await visible(p, '#makeScreen'));
+    await p.close();
+  }
+  // E — 만들기 카드 만들기 중 조용한 응답(카드 미리보기 · 추출)이 와도 그 작업 그대로(T-P27)
+  {
+    const p = await openZero('free');
+    const pv = await cardAnswer(p, MC_TOKENS, null, 0);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    await p.click('[data-k="mkAll"]');
+    const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+    const w0 = !!(await waitOf(p, '#btnMakeRun'));
+    await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 5, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: {}, roleRows: [] });
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: MC_TOKENS });
+    await p.waitForTimeout(30);
+    check('8a T-P27 만들기 카드 만들기 중 조용한 미리보기 CREATE_RESULT{reqId} · 추출 응답 → 작업(쓰기 잠금) 그대로', w0 && !!(await waitOf(p, '#btnMakeRun')));
+    await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 5, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+    await p.waitForTimeout(30);
+    check('8a 진짜 결과가 오면 잠금 풀림', !(await waitOf(p, '#btnMakeRun')));
+    await p.close();
+  }
+  // F — 이름 다시 짓기 바꾸기 거절 → 그 작업 끝 · 팝업 닫힘 · 유료 사유 · 포커스 ⋯
+  {
+    const p = await open(560, 'variables');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasTextStyles: true });
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await p.waitForTimeout(200);
+    await p.click('#btnVarMore');
+    await p.click('.ctx-menu button >> text=텍스트 스타일 이름 다시 짓기…');
+    await p.waitForTimeout(30);
+    const sr = (await sent(p, 'SCAN_TS_RENAME')).at(-1);
+    await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows: [{ id: 's1', from: 'body', to: 'body/large', sig: 'a' }] });
+    await p.waitForTimeout(30);
+    await p.locator('.modal button', { hasText: '이름 바꾸기' }).click();
+    const a1 = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
+    const w0 = !!(await waitOf(p, '#btnMakeRun'));
+    await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'textStyles', reqId: a1.reqId });
+    await p.waitForTimeout(40);
+    check('8a T-P29 ④ APPLY_TS_RENAME 거절 → 그 작업 끝(T-D8 잠금 풂) · 팝업 닫힘 · 유료 사유 · 포커스 ⋯', w0 && !(await waitOf(p, '#btnMakeRun')) && (await p.$('.modal')) === null && (await p.textContent('#statusText')).length > 0 && (await activeId(p)) === 'btnVarMore', `${w0} ${await activeId(p)} ${await p.textContent('#statusText')}`);
+    // 오류 상자 [다시 시도]는 새 reqId로(내보내기 — opSent가 붙인 reqId를 빼고 다시 보냄)
+    await p.click('#btnVarMore');
+    await p.click('.ctx-menu button >> text=코드로 내보내기…');
+    await p.waitForTimeout(40);
+    await p.click('#btnExport');
+    const e1 = (await sent(p, 'EXPORT')).at(-1);
+    await recv(p, { type: 'ERROR', message: '내보내기 실패', op: 'EXPORT', reqId: e1.reqId });
+    await p.waitForTimeout(30);
+    await p.click('.modal .retry-btn');
+    const e2 = (await sent(p, 'EXPORT')).at(-1);
+    check('8a 오류 상자 [다시 시도] → 새 reqId로 다시 보냄', typeof e1.reqId === 'number' && typeof e2?.reqId === 'number' && e2.reqId !== e1.reqId && e2.format === e1.format, `${e1.reqId} → ${e2?.reqId}`);
+    await p.close();
+  }
+  // G — Esc는 글자 칸에서만 막는다(T-D7)
+  {
+    const p = await open(560, 'select');
+    await recv(p, PREREQ);
+    await recv(p, { ...sel(1, 0), ids: ['esc8a'] });
+    await goSub(p, 'make');
+    await p.waitForTimeout(40);
+    await p.focus('#makeOptLink');
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(30);
+    check('8a T-D7 만들기 화면 "만든 뒤" 체크박스에서 Esc → 뒤로(선택 탭 첫 화면)', await visible(p, '#selHome'));
+    await p.click('#btnSettings');
+    await p.focus('#base');
+    await p.keyboard.press('Escape');
+    const stayNum = await visible(p, '#tab-settings');
+    await p.focus('#licenseKey');
+    await p.keyboard.press('Escape');
+    const stayText = await visible(p, '#tab-settings');
+    await p.evaluate(() => { document.getElementById('devTierRow').style.display = ''; }); // 개발용 줄(평소 숨김)을 잠깐 보여 고르개에 포커스
+    await p.focus('#tier');
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(30);
+    check('8a T-D7 설정 숫자 · 글 칸에서는 그대로, 닫힌 고르개(select)에서 Esc → 뒤로', stayNum && stayText && !(await visible(p, '#tab-settings')), JSON.stringify([stayNum, stayText]));
+    await p.close();
   }
 }
 

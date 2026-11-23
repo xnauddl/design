@@ -6680,6 +6680,43 @@ test('code.ts — reqId를 돌려준다: EXTRACT · CREATE_TOKENS(미리보기 �
   assert.equal(rr.applied, true);
 });
 
+test('code.ts — 8a reqId 전부(ia-v4 B.19a · T-P28 · T-P29): 결과 · ERROR · PREMIUM_REQUIRED에 요청의 reqId, 알림 · 밀어 보내는 PREREQ_STATE에는 없음', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  // 결과 — GET_VARIABLES · GET_PREREQ(답할 때만) · GET_LICENSE
+  let out = await p.send({ type: 'GET_VARIABLES', reqId: 21 });
+  assert.equal(ofType(out, 'VARIABLES')[0].reqId, 21);
+  out = await p.send({ type: 'GET_PREREQ', reqId: 22 });
+  assert.equal(ofType(out, 'PREREQ_STATE')[0].reqId, 22);
+  out = await p.send({ type: 'GET_PREREQ' });
+  assert.equal('reqId' in ofType(out, 'PREREQ_STATE')[0], false, 'reqId 없는 요청에는 싣지 않는다');
+  out = await p.send({ type: 'GET_LICENSE', reqId: 23 });
+  assert.equal(ofType(out, 'LICENSE_STATUS')[0].reqId, 23);
+  // 다크 — 유료: DARK_MODE_RESULT에 reqId(마법사 다크 단계가 reqId로 기다린다), 밀어 보내는 VARIABLES · PREREQ_STATE는 알림
+  const gcol = figma.variables.createVariableCollection('Global');
+  const v = figma.variables.createVariable('color/blue/500', gcol, 'COLOR');
+  v.setValueForMode(gcol.defaultModeId, { r: 0, g: 0, b: 1, a: 1 });
+  out = await p.send({ type: 'GENERATE_DARK_MODE', reqId: 24 });
+  const dark = ofType(out, 'DARK_MODE_RESULT')[0] ?? ofType(out, 'ERROR')[0];
+  assert.equal(dark.reqId, 24);
+  for (const m of ofType(out, 'PREREQ_STATE')) assert.equal('reqId' in m, false, '작업 뒤 밀어 보내는 PREREQ_STATE는 알림');
+  // ERROR — NAME_TEXT_STYLES_BY_ROW(스캔 전)도 reqId를 싣는다
+  out = await p.send({ type: 'NAME_TEXT_STYLES_BY_ROW', reqId: 25 });
+  assert.deepEqual(ofType(out, 'ERROR').map((m) => [m.op, m.reqId]), [['NAME_TEXT_STYLES_BY_ROW', 25]]);
+  // 무료 거절 — PREMIUM_REQUIRED{feature, reqId}
+  await p.send({ type: 'SET_LICENSE', tier: 'free' });
+  out = await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: [], reqId: 26 });
+  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'components', reqId: 26 }]);
+  out = await p.send({ type: 'GENERATE_DARK_MODE', reqId: 27 });
+  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'tokens', reqId: 27 }]);
+  out = await p.send({ type: 'SCAN_TEXT_STYLES', reqId: 28, make: true });
+  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'textStyles', reqId: 28 }]);
+  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 29, items: [] });
+  assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0].reqId, 29);
+  out = await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: [] });
+  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'components' }], 'reqId 없는 요청의 거절에는 싣지 않는다');
+});
+
 test('code.ts — CREATE_TOKENS 미리보기: 쓰임 있는 토큰은 값 다른 직접 만든 변수를 피해 다음 이름(new + varName) · roleRows도 최종 이름', async () => {
   const figma = installFigma();
   const p = await loadPlugin(figma);
@@ -6695,7 +6732,7 @@ test('code.ts — CREATE_TOKENS 미리보기: 쓰임 있는 토큰은 값 다른
   assert.equal(cr.roleRows.find((r) => r.token === 'color/00ff00').global, 'color/00ff00-2');
 });
 
-test('code.ts — SCAN_TEXT_STYLES: reqId 스캔은 기준 nodeIds를 읽고 lastTextSamples를 덮어쓰지 않는다 · existing은 두 스캔 모두', async () => {
+test('code.ts — SCAN_TEXT_STYLES: make 스캔(만들기 화면)은 기준 nodeIds를 읽고 lastTextSamples를 덮어쓰지 않는다 · reqId는 둘 다 돌려줌 · existing은 두 스캔 모두', async () => {
   const figma = installFigma();
   const p = await loadPlugin(figma);
   await createSemanticTextStyles([TITLE]);
@@ -6708,12 +6745,12 @@ test('code.ts — SCAN_TEXT_STYLES: reqId 스캔은 기준 nodeIds를 읽고 las
   assert.deepEqual(c.styles.map((s) => s.fontSize), [16]);
   assert.equal(c.reqId, undefined);
   assert.deepEqual(c.existing, [{ name: 'title', sig: '24|36|0|Inter|Regular' }], 'reqId 없는 스캔도 existing을 싣는다(기본 램프 예약 — docs/text-style-krds.md §6)');
-  out = await p.send({ type: 'SCAN_TEXT_STYLES', nodeIds: ['big'], reqId: 3 });
+  out = await p.send({ type: 'SCAN_TEXT_STYLES', nodeIds: ['big'], reqId: 3, make: true });
   c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
   assert.equal(c.reqId, 3);
   assert.deepEqual(c.styles.map((s) => s.fontSize), [40]);
   assert.deepEqual(c.existing, [{ name: 'title', sig: '24|36|0|Inter|Regular' }]);
-  // 「왼쪽 글자로 이름 채우기」는 reqId 없는 마지막 스캔(16px)을 쓴다
+  // 「왼쪽 글자로 이름 채우기」는 make가 아닌 마지막 스캔(16px)을 쓴다 — 8a 뒤 reqId는 모든 요청에 실린다(B.19a)
   out = await p.send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
   c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
   assert.deepEqual(c.styles.map((s) => s.fontSize), [16]);

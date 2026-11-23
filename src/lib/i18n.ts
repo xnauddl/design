@@ -226,6 +226,7 @@ export const STRINGS: Record<string, string> = {
   'op.createVar': '새 변수',
   'op.dupVar': '복제',
   'op.delVar': '삭제',
+  'op.updateVar': '고치기', // 상세 [저장] 쓰기 잠금 사유의 작업 이름(ia-v4 §4.11 T-P26)
   'op.tsRename': '텍스트 스타일 이름 바꾸기',
   'create.sumManual': ' · 직접 만든 변수라 건너뜀 {n}',
   'common.close': '닫기',

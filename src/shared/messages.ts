@@ -209,8 +209,12 @@ export interface VarUpdateError {
   message?: string;
 }
 
-/** UI → code 요청. */
-export type UiToCode =
+/**
+ * UI → code 요청. 모든 요청은 선택 필드 `reqId`를 실을 수 있다 — UI의 `opSent`가 없으면 붙이고, 플러그인은
+ * 그 요청에 답하는 모든 메시지(결과 · `ERROR` · `PREMIUM_REQUIRED`)에 돌려준다(ia-v4 §4.11 T-P29 ① · ②).
+ */
+export type UiToCode = UiToCodeBase & { reqId?: number };
+type UiToCodeBase =
   | { type: 'EXTRACT'; nodeIds?: string[]; reqId?: number } // reqId: 만들기 화면 요청 번호(결과에 그대로 돌려줌, IA v4 §4.3) · nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number; globalOnly?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리 · globalOnly: Global만(Semantic을 만들지 않음 — 무료도 됨, IA v4 §4.3 무료 규칙)
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
@@ -245,7 +249,8 @@ export type UiToCode =
   | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
-  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
+  // make: 만들기 화면의 후보 읽기 — 응답에 reqId만 돌려주고 lastTextSamples를 덮어쓰지 않는다(8a 뒤 reqId는 모든 요청에 실리므로 따로 표시 — ia-v4 B.19a).
+  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number; make?: boolean } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
   // [이름 다시 짓기](docs/text-style-krds.md §5): 미리보기(파일의 로컬 텍스트 스타일 전부 — 선택 무관) · 바꾸기(이름만, 역할 변수 함께)
   | { type: 'SCAN_TS_RENAME'; reqId: number }
   | { type: 'APPLY_TS_RENAME'; reqId: number; items: TsRenameItem[] }
@@ -278,8 +283,12 @@ export type UiToCode =
   // 다크 만들기 — 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7). migrate: 옛 구조 옮기기 확인을 받았을 때만 참.
   | { type: 'GENERATE_DARK_MODE'; migrate?: boolean };
 
-/** code → UI 응답. */
-export type CodeToUi =
+/**
+ * code → UI 응답. 요청에 답하는 메시지는 그 요청의 `reqId`를 싣는다(ia-v4 §4.11 T-P29 ②) — 알림
+ * (`SELECTION_STATE` · `PROGRESS` · `REQUEST_VERIFY` · `REQUEST_DEACTIVATE` · 작업 뒤 밀어 보내는 `PREREQ_STATE` · `VARIABLES`)은 싣지 않는다.
+ */
+export type CodeToUi = CodeToUiBase & { reqId?: number };
+type CodeToUiBase =
   | { type: 'UI_SIZE'; mode: 'default' | 'mini' } // 지금 창 크기(최소화 여부)
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number; reqId?: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
@@ -355,7 +364,7 @@ export type CodeToUi =
       /** 원문 사유(서버 error · 기술 사유) — #licenseStatus의 title(툴팁). 없으면 title을 비운다. */
       noteTip?: string;
     }
-  | { type: 'PREMIUM_REQUIRED'; feature: Feature } // 사유 문구는 보내지 않는다 — UI가 status.paid를 띄운다(PR 4)
+  | { type: 'PREMIUM_REQUIRED'; feature: Feature; reqId?: number } // reqId: 거절된 요청의 reqId(T-P28) · 사유 문구는 보내지 않는다 — UI가 status.paid를 띄운다(PR 4)
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string; clashes: string[] } // 토큰 코드 내보내기 결과 · clashes = Global과 같은 이름의 거울 아닌 Semantic(ia-v3 §4.4)

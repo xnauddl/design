@@ -101,6 +101,14 @@ let semStatusPrefix = '';
  * 초기화 중 setLock이 읽으므로 맨 위에 둔다.
  */
 let bindLinking = 0;
+/**
+ * 상세 [저장]이 쓰기 응답을 기다리는 동안 그 `UPDATE_VARIABLE`의 reqId, 아니면 0(ia-v4 §4.11 T-P26 · B.19a).
+ * 팝업의 `e.saving`(팝업 모습용)과 따로 산다 — 팝업이 닫혀도 응답 · 10초 시간 초과까지 남는다. `otherWriteOp()`가 본다.
+ */
+let edSaveReq = 0;
+let edSaveTimer: ReturnType<typeof setTimeout> | null = null;
+/** 만들기 화면 아래 버튼이 결과 화면 [닫기] 모습 — 쓰기 중 잠금에서 뺀다(T-D8 예외). `renderMakeFoot`이 바꾼다. */
+let mkFootClose = false;
 /** 연결 중에 사용자가 선택을 바꿨다 — 결과 지우기를 미뤄 뒀다(연결이 성공하면 결과 카드, 아니면 그때 지운다). */
 let bindSelChangedDuringLink = false;
 /** 마지막으로 보낸 연결 자리 — 연결 오류의 [다시 시도]가 쓴다(lastSentMsg는 그 뒤 다른 요청으로 바뀔 수 있다). */
@@ -1532,6 +1540,23 @@ function tsrRender(): void {
   }
   if (hadFocus) body.querySelector<HTMLElement>(`[data-id="${CSS.escape(hadFocus)}"], [data-all="${CSS.escape(hadFocus)}"]`)?.focus();
 }
+/**
+ * 자기 바쁨 표시 풀기(T-P29 ④) — 그 reqId의 거절 · 오류. 이름 다시 짓기: 바꾸기 거절 → 바쁨 풂 · 팝업 닫음(포커스는 연 ⋯ 단추) ·
+ * 유료 사유(메인 처리기), 읽기 거절 · 오류 → "읽는 중" 끝냄(줄 0). 컴포넌트 작업 거절 → structureStatus의 "…하는 중" 글 지움.
+ */
+function releaseOwnBusy(msg: Extract<CodeToUi, { type: 'ERROR' | 'PREMIUM_REQUIRED' }>): void {
+  const rid = msg.reqId;
+  if (msg.type === 'PREMIUM_REQUIRED' && rid != null && rid === tsrApplyReq && tsrBusy) {
+    tsrBusy = false;
+    if (tsrBody) closeModal(); else tsrRender();
+  }
+  if (rid != null && rid === tsrReq && tsrBody && !tsrRows) { tsrRows = []; tsrRender(); }
+  if (msg.type === 'PREMIUM_REQUIRED' && msg.feature === 'components') {
+    if (rid != null && rid === compScanReq) compScanReq = 0;
+    const busyTexts = ['component.scanning', 'component.registering', 'component.classifying', 'component.generating'].map((k) => t(k));
+    if (busyTexts.includes($('structureStatus').textContent ?? '')) setStatus('structureStatus', '', '');
+  }
+}
 function onTsRenamePlan(msg: Extract<CodeToUi, { type: 'TS_RENAME_PLAN' }>): void {
   if (msg.reqId !== tsrReq || !tsrBody) return;
   const stayed = document.activeElement === tsrCloseBtn; // 열 때 포커스는 [닫기]
@@ -1743,7 +1768,7 @@ let wizardRunning = false;
 /** 마법사 단계가 유료 잠금에 걸림 — 실패 줄은 공통 잠금 문구(status.paid)를 쓴다(§2.3). */
 class PaidRequiredError extends Error {}
 
-let wizardWaiter: { types: string[]; reqId?: number; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
+let wizardWaiter: { types: string[]; reqId: number; resolve: (m: CodeToUi) => void; reject: (e: Error) => void } | null = null;
 /** 마법사 단계가 받아 실패로 끝낸 ERROR — 메인 처리기는 이것을 카드 상태 자리에 띄우지 않는다(ia-v4 §2.8). */
 let wizardErrorMsg: CodeToUi | null = null;
 /** 마법사 연결 요청의 reqId — 메인 처리기는 이 결과로 연결 화면을 다시 그리지 않는다(§4.3). */
@@ -1756,15 +1781,17 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (!m) return;
   // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시(‘적용’ 탭 진행바는 안 보임).
   if (!wizardWaiter) return;
-  // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
+  // 오류/유료요구는 대기 중인 단계의 reqId일 때만 그 단계 실패로 처리(무한 대기 방지). 다른 reqId(없는 것 포함)는
+  // 무시한다 — 실행 직전에 보낸 다른 화면 요청의 오류 · 거절이 돌던 단계를 실패시키지 않게(T-P24 ④ · T-P29 ①).
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
+    if (m.reqId !== wizardWaiter.reqId) return;
     const w = wizardWaiter;
     wizardWaiter = null;
     if (m.type === 'ERROR') wizardErrorMsg = m; // 메인 처리기가 같은 ERROR를 카드에 그리지 않게
     w.reject(m.type === 'PREMIUM_REQUIRED' ? new PaidRequiredError() : new Error(m.message));
     return;
   }
-  if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === undefined || (m as { reqId?: number }).reqId === wizardWaiter.reqId)) {
+  if (wizardWaiter.types.includes(m.type) && m.reqId === wizardWaiter.reqId) {
     const w = wizardWaiter;
     wizardWaiter = null;
     // 메인 핸들러(window.onmessage)가 같은 메시지를 **다 처리한 뒤** 깨운다. 이 리스너가 먼저
@@ -1777,10 +1804,13 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 /** 메시지를 보내고 기대 응답(또는 오류)까지 기다린다. 결과 타입은 expect로 좁혀진다. */
 function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[], reqId?: number): Promise<Extract<CodeToUi, { type: T }>> {
+  // 모든 단계가 reqId를 싣는다(T-P29 ①) — 대기는 그 reqId의 답 · 오류 · 거절만 받는다.
+  const rid = reqId ?? msg.reqId ?? mkNextReq();
+  msg.reqId = rid;
   return new Promise<Extract<CodeToUi, { type: T }>>((resolve, reject) => {
     wizardWaiter = {
       types: [...expect],
-      reqId,
+      reqId: rid,
       resolve: (m) => resolve(m as Extract<CodeToUi, { type: T }>),
       reject,
     };
@@ -2313,7 +2343,9 @@ if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
 window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
   if (!msg) return;
-  opReceived(msg); // 진행 테두리·✓/⚠·작업 직후 다시 읽기
+  // 조용한 reqId 묶음(opSilent · 마법사 단계)의 응답은 opReceived를 건너뛴다 — 진행 중인 쓰기 · 사용자 [읽기] 작업을
+  // 일찍 끝내지 않게(T-P24 ③ · T-P27 — opReceived는 results 종류만 본다). 그 밖은 opReceived가 먼저 작업을 끝낸 뒤 화면이 받는다.
+  if (msg.reqId == null || !opQuiet.has(msg.reqId)) opReceived(msg); // 진행 테두리·✓/⚠·작업 직후 다시 읽기
   if (makeTakes(msg)) return; // 만들기 화면의 reqId 응답(§4.3) — 값을 직접 고르기 처리기를 건드리지 않는다
   if (mcTakes(msg)) return; // 선택 탭 만들기 카드의 reqId 응답(§4.1) — 메인 처리기를 타지 않는다
   switch (msg.type) {
@@ -2785,6 +2817,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     }
     case 'PREMIUM_REQUIRED': {
+      releaseOwnBusy(msg);
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
       // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
       // IA v3: 잠금 사유는 공통 상태 줄로(§2.3). 카드 상태 영역은 그 카드 작업의 결과 요약만 남긴다.
@@ -2801,8 +2834,8 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'ERROR': {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
-      if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
-      if (msg.op === 'UPDATE_VARIABLE') break;
+      if (msg.op === 'UPDATE_VARIABLE') { edMaybeSaved(msg.reqId); edSaveEnd(msg.reqId); break; }
+      if (msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       // 사용 수 읽기 실패 — 진행 중 표시를 풀어 다음 읽기 · 창 다시 들어옴 다시 읽기가 막히지 않게(#110 검토 ②). 알림은 아래 공통 상태 줄 그대로.
       if (msg.op === 'SCAN_USAGE' && msg.reqId != null) {
         // 같은 기준에서는 저절로 다시 보내지 않는다 — 실패가 이어지면 창에 들어올 때마다 같은 경고가 뜬다. [읽기] · 작업 직후 · 기준이 바뀌면 다시.
@@ -2811,6 +2844,7 @@ window.onmessage = (event: MessageEvent) => {
       }
       if (onUnusedError(msg)) break;
       if (onVarOpError(msg)) break;
+      if (msg.op === 'SCAN_TS_RENAME') releaseOwnBusy(msg);
       if (msg.op === 'PREVIEW_TEXT_STYLES') {
         // 텍스트 스타일 미리보기 실패 — 변수 연결은 막지 않는다(스타일 줄 없이 그린다).
         if (bindTsPending) { bindTsPending = false; bindTsRows = []; bindTsSkips = {}; bindFindSettle(); }
@@ -2991,7 +3025,7 @@ function showError(id: string, f: FriendlyError, op?: string): void {
     if (!retry) return;
     // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
     if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
-    send(retry);
+    resendRetry(retry);
   } : null;
   const { box, retry: retryBtn } = errorBox(f, onRetry);
   el.appendChild(box);
@@ -2999,6 +3033,24 @@ function showError(id: string, f: FriendlyError, op?: string): void {
   const card = cardOf(el);
   if (retryBtn && card) holdPrimaries(card, retryBtn);
   if (id === 'structureStatus') structStatusFind = true; // 목록을 비울 때 함께 지운다(§4.5 "비우는 것")
+}
+
+/**
+ * 오류 상자 [다시 시도]의 다시 보내기(B.19a) — opSent가 붙인 reqId는 빼고 보내 새 reqId를 받게 한다(옛 응답과 섞이거나
+ * 조용한 묶음에 걸려 opPending이 남지 않게). 화면이 정한 reqId로 응답을 기다리는 요청은 그 화면의 다시 보내기 함수로
+ * (연결 찾기 → runBindPreview · 이름 정리 미리보기 → readRename), 그런 함수가 없으면 그 reqId 그대로(opSent가 조용한 묶음에서 뺀다).
+ */
+function resendRetry(m: UiToCode): void {
+  const rid = m.reqId;
+  if (rid == null || opAutoReq.has(rid)) {
+    const copy = { ...m };
+    delete copy.reqId;
+    send(copy);
+    return;
+  }
+  if (m.type === 'APPLY' && m.preview) { runBindPreview(); return; }
+  if (m.type === 'RENAME' && !m.apply) { readRename(true); return; }
+  send({ ...m });
 }
 
 /* ============================================================
@@ -3398,14 +3450,19 @@ function readMake(user = false): void {
   if (opBusy() || wizardRunning) return;
   mkExtractReq = mkNextReq();
   mkReading = true;
-  opSilent = true;
+  // 사용자가 누른 [읽기]만 OPS 작업(진행 테두리 · ✓ / ⚠ · 실패 [보기] — §2.6 · T-P14), 자동 읽기는 조용히.
+  opSilent = !user;
+  opMakeRead = user;
+  if (user) mkUserReqs.add(mkExtractReq);
   send({ type: 'EXTRACT', nodeIds: baseline.ids, reqId: mkExtractReq });
   if (isPaid) {
     mkScanReq = mkNextReq();
     mkTsReading = true;
-    send({ type: 'SCAN_TEXT_STYLES', nodeIds: baseline.ids, reqId: mkScanReq });
+    if (user) mkUserReqs.add(mkScanReq);
+    send({ type: 'SCAN_TEXT_STYLES', nodeIds: baseline.ids, reqId: mkScanReq, make: true });
   }
   opSilent = false;
+  opMakeRead = false;
   renderMakeScreen();
 }
 function scheduleMake(): void {
@@ -3432,16 +3489,45 @@ function mkSendPreview(): void {
   renderMakeScreen();
 }
 
+/** 사용자가 누른 [읽기]의 reqId — 실패 · 거절을 공통 상태 줄에 알린다(자동 읽기는 콘솔만 — B.19a). */
+const mkUserReqs = new Set<number>();
 /** 이 화면의 응답이면 받고 true(메인 처리기는 건드리지 않는다). */
 function makeTakes(msg: CodeToUi): boolean {
-  const rid = (msg as { reqId?: number }).reqId;
+  const rid = msg.reqId;
   if (rid == null || !mkOwned.has(rid)) return false;
+  // 마법사 다크 단계의 답 — 메인 처리기가 지금처럼 받는다(allVars · 다크 전제 판정 · darkStatus — B.19a). 마법사는 자기 리스너로 받는다.
+  if (msg.type === 'VARIABLES' || msg.type === 'DARK_MODE_RESULT') return false;
+  if ((msg.type === 'ERROR' || msg.type === 'PREMIUM_REQUIRED') && (rid === mkExtractReq || rid === mkScanReq)) { onMakeReadFail(msg, rid === mkScanReq); return true; }
   if (msg.type === 'EXTRACT_RESULT' && rid === mkExtractReq) onMakeExtract(msg);
   else if (msg.type === 'CREATE_RESULT' && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
   else if (msg.type === 'TEXT_STYLE_CANDIDATES' && rid === mkScanReq) onMakeScan(msg);
+  mkUserReqs.delete(rid);
   return true; // 실행 단계 응답은 wizardRequest가 받는다
 }
 
+/**
+ * 만들기 화면 읽기의 오류 · 거절 — 읽는 중을 끄고 다시 그린다. 추출 실패 = 마지막으로 읽은 값 그대로(다른 기준이면 값 줄 0),
+ * 스캔 실패 · 거절 = 후보 0개(Text Style 탭 숨김). 사용자 [읽기]면 공통 상태 줄에 warn · 유료 사유, 자동 읽기는 콘솔만.
+ */
+function onMakeReadFail(msg: Extract<CodeToUi, { type: 'ERROR' | 'PREMIUM_REQUIRED' }>, scan: boolean): void {
+  const user = msg.reqId != null && mkUserReqs.delete(msg.reqId);
+  if (scan) {
+    mkScanReq = 0;
+    mkTsReading = false;
+    mkTsPending = null;
+    mkTs = [];
+    mkTsDecimal = [];
+    mkTsFor = baseKey();
+  } else {
+    mkExtractReq = 0;
+    mkReading = false;
+    if (mkFor !== baseKey()) { mkTokens = []; mkFor = baseKey(); }
+  }
+  renderMakeScreen();
+  if (!user) { console.warn('[make] quiet read failed', msg); return; }
+  if (msg.type === 'PREMIUM_REQUIRED') showPaidReason();
+  else showStatusLine(explainError(msg.message).message, { cls: 'warn', tip: msg.message });
+}
 function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
   mkReading = false;
   const sameBase = mkFor === baseKey();
@@ -3829,6 +3915,8 @@ function renderMakeResults(): void {
 
 function renderMakeFoot(showResults: boolean): void {
   const run = $('btnMakeRun');
+  // [닫기] ↔ 실행 버튼이 바뀌면 쓰기 중 잠금을 다시 맞춘다([닫기]는 잠그지 않음 — T-D8 예외).
+  if (mkFootClose !== showResults) { mkFootClose = showResults; renderWaitLocks(); }
   const opts = $('makeOpts');
   opts.hidden = showResults;
   const dark = $('makeOptDark') as HTMLInputElement;
@@ -3913,11 +4001,11 @@ async function runMake(): Promise<void> {
         totals.created = { g: r.created + r.updated, r: r.roles ?? 0, m: r.skippedManual ?? 0 };
         results.push({ id, mark: 'ok', text: t('wizard.seq.createDone', { created: r.created, updated: r.updated }) });
       } else if (id === 'dark') {
-        const vars = await wizardRequest({ type: 'GET_VARIABLES' }, ['VARIABLES']);
+        const vars = await wizardRequest({ type: 'GET_VARIABLES' }, ['VARIABLES'], mkNextReq());
         if (!hasDarkTarget(vars.vars)) results.push({ id, mark: 'ok', text: t('wizard.seq.darkNoTarget') });
         else {
           // 대상 · 모드는 플러그인이 정한다(ia-v3 13.7). 옛 구조면 옮기지 않고 ⚠로 멈춘다(옮기기는 다크 화면에서만).
-          const r = await wizardRequest({ type: 'GENERATE_DARK_MODE' }, ['DARK_MODE_RESULT']);
+          const r = await wizardRequest({ type: 'GENERATE_DARK_MODE' }, ['DARK_MODE_RESULT'], mkNextReq());
           const keptPart = r.kept ? t('wizard.seq.darkKept', { n: r.kept }) : '';
           if (r.error) { results.push({ id, mark: 'warn', text: r.error }); stay = true; }
           else if (r.needMigrate) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkMigrate') }); stay = true; }
@@ -5212,8 +5300,14 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   EXPORT: { results: ['EXPORT_RESULT'], label: 'op.export', go: () => showTab('variables'), write: false },
   UNBIND_DELETED: { results: ['DELETED_UNBOUND'], label: 'op.unbind', go: () => { showTab('select'); showSelSub('home'); }, write: true },
 };
-/** 결과를 기다리는 작업(요청 종류별). 마법사는 단계 요청을 따로 세지 않고 한 작업으로 본다. */
-const opPending = new Map<UiToCode['type'], OpDef>();
+/** 결과를 기다리는 작업(요청 종류별) — 정의와 보낸 요청의 reqId(거절 · 오류가 그 작업만 끝내게 — ia-v4 §4.11 T-P29 ③).
+ *  마법사는 단계 요청을 따로 세지 않고 한 작업으로 본다. */
+const opPending = new Map<UiToCode['type'], { def: OpDef; reqId: number }>();
+/** 조용한 reqId 묶음(T-P24 ③ · T-P27) — `opSilent`로 보낸 요청과 마법사 단계(`wizardRunning` 중 보낸 요청)의 reqId.
+ *  응답의 reqId가 여기 있으면 메인 처리기가 `opReceived`를 건너뛴다(진행 중인 작업을 일찍 끝내지 않게). */
+const opQuiet = new Set<number>();
+/** `opSent`가 붙인 reqId(화면이 정하지 않은 것) — 오류 상자의 [다시 시도]는 이것을 빼고 다시 보낸다(새 reqId). */
+const opAutoReq = new Set<number>();
 let opWizard = false;
 
 /* ---------- 연결 중 잠금(§4.6 "연결 중의 다른 일") ----------
@@ -5235,18 +5329,23 @@ const WAIT_LINK_IDS = [
 /** 연결 화면의 [n곳 연결] — 사유는 화면 상태 줄(#applyStatus). */
 const WAIT_CARD_IDS = ['btnApplyConfirm'];
 /** 지금 진행 중인 다른 쓰기 작업의 이름(op.* 라벨) — 없으면 null. 연결 자신은 빼고 본다. */
-function otherWriteOp(): string | null {
+function otherWriteOp(opts?: { exceptSave?: boolean }): string | null {
   if (opWizard || wizardRunning) return t('op.wizard');
-  for (const [type, def] of opPending) if (type !== 'APPLY_SELECTED' && def.write) return t(def.label);
+  for (const [type, p] of opPending) if (type !== 'APPLY_SELECTED' && p.def.write) return t(p.def.label);
+  // 상세 [저장](T-P26) — OPS 표에는 없다(진행 테두리 · [보기] 없음). 열린 상세의 [저장] 자신은 빼고 본다.
+  if (edSaveReq && !opts?.exceptSave) return t('op.updateVar');
   return null;
 }
-/** 변수 탭 쓰기 작업(§4.6 쓰기 잠금) — 진행 중이면 다른 쓰기 버튼을 잠근다. */
-const VAR_WRITE_OPS: readonly UiToCode['type'][] = ['APPLY_VARIABLE', 'CREATE_VARIABLE', 'DUPLICATE_VARIABLE', 'DELETE_VARIABLE', 'DELETE_VARIABLES'];
+/**
+ * 쓰기 중 잠금 — 양쪽(T-D8): 연결 중이면 bind.waitLink, 아니면 진행 중인 쓰기(마법사 · OPS write 전부 · 상세 [저장] —
+ * 자기 작업 포함)가 있으면 bind.waitOp. 만들기 결과 화면 [닫기](`btnMakeRun`의 [닫기] 모습)는 잠그지 않는다.
+ */
 function renderWaitLocks(): void {
   const link = bindLinking ? t('bind.waitLink') : null;
-  const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
-  const varLock = varOp ? t('bind.waitOp', { op: t(opPending.get(varOp)!.label) }) : null;
-  for (const id of WAIT_LINK_IDS) setWait($(id), link ?? varLock);
+  const op = link ? null : otherWriteOp();
+  const opLock = op ? t('bind.waitOp', { op }) : null;
+  for (const id of WAIT_LINK_IDS) setWait($(id), id === 'btnMakeRun' && mkFootClose ? null : link ?? opLock);
+  if (ed) edChrome(); // 열린 상세의 [저장] 잠금(T-P26)
   if (activeTab === 'select' && selSub === 'home' && (mcKeep() || mcNeed())) renderSelHome(); // 만들기 카드의 쓰기 잠금(§4.1)
   tsrRender(); // 이름 다시 짓기 팝업의 [k개 이름 바꾸기] 잠금(§5.1)
   const other = link ? null : otherWriteOp();
@@ -5272,11 +5371,25 @@ let opSilent = false;
 /** 선택 탭 만들기 카드의 만들기(`CREATE_TOKENS`) — 작업 이름 "변수 만들기", [보기]는 선택 탭 첫 화면(§4.1 · §2.6). */
 let opCardCreate = false;
 const OP_MAKE_CARD: OpDef = { results: ['CREATE_RESULT'], label: 'op.makeCard', go: () => { showTab('select'); showSelSub('home'); }, write: true };
+/** 만들기 화면 큰 선택의 [읽기](`readMake(true)`) — 보낸 곳별 작업 정의(§2.6 · T-P14 · T-P27). [보기]는 만들기 화면(목록 기준 가드 없음). */
+let opMakeRead = false;
+const goMake: OpGo = () => { showTab('select'); showSelSub('make'); };
+const OP_MAKE_EXTRACT: OpDef = { results: ['EXTRACT_RESULT'], label: 'op.extract', go: goMake, write: false };
+const OP_MAKE_SCAN: OpDef = { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: goMake, write: false };
+/** 값을 직접 고르기의 미리보기 CREATE_TOKENS{preview} — 쓰지 않으므로 쓰기 중 잠금(T-D8)을 걸지 않는다. */
+const OP_CREATE_PREVIEW: OpDef = { ...OPS.CREATE_TOKENS!, write: false };
 function opSent(msg: UiToCode): void {
-  if (wizardRunning || opSilent) return; // 마법사 단계 요청은 마법사 한 작업으로 센다
-  const def = opCardCreate && msg.type === 'CREATE_TOKENS' ? OP_MAKE_CARD : OPS[msg.type];
+  // 모든 요청에 reqId(T-P29 ①) — 화면이 정한 것은 그대로, 없으면 같은 순번(bindReqSeq)으로 붙인다(조용한 묶음 id와 겹치지 않게).
+  if (msg.reqId == null) { msg.reqId = ++bindReqSeq; opAutoReq.add(msg.reqId); }
+  if (wizardRunning || opSilent) { opQuiet.add(msg.reqId); return; } // 마법사 단계 요청은 마법사 한 작업으로 센다
+  opQuiet.delete(msg.reqId); // [다시 시도]가 화면의 reqId로 다시 보냄 — 이제 OPS가 추적한다
+  const def = opCardCreate && msg.type === 'CREATE_TOKENS' ? OP_MAKE_CARD
+    : opMakeRead && msg.type === 'EXTRACT' ? OP_MAKE_EXTRACT
+      : opMakeRead && msg.type === 'SCAN_TEXT_STYLES' ? OP_MAKE_SCAN
+        : msg.type === 'CREATE_TOKENS' && msg.preview ? OP_CREATE_PREVIEW
+          : OPS[msg.type];
   if (!def) return;
-  opPending.set(msg.type, def);
+  opPending.set(msg.type, { def, reqId: msg.reqId });
   if (msg.type === 'APPLY_SELECTED' || msg.type === 'APPLY') opProg = null;
   if (isMini) renderMiniMark();
   if (def.write) renderWaitLocks(); // 다른 쓰기 작업 중 [🔗 연결] 잠금(§4.6 "반대 방향")
@@ -5292,24 +5405,29 @@ function opReceived(m: CodeToUi): void {
   }
   if (wizardRunning) return;
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
-    // 오류의 op가 있으면 그 작업만 끝낸다 — 다른 작업(예: 연결)이 기다리는 결과는 그대로 기다린다.
+    // 거절 · 오류는 그 작업만 끝낸다(T-P29 ③) — ① op가 있으면 그 종류(다른 reqId를 실었으면 늦게 온 옛 요청 — 무시)
+    // ② op가 없으면 reqId가 같은 항목 ③ 둘 다 없으면 아무것도 끝내지 않는다.
     const op = m.type === 'ERROR' ? (m.op as UiToCode['type'] | undefined) : undefined;
-    let def: OpDef | undefined;
+    let key: UiToCode['type'] | undefined;
     if (op) {
-      def = opPending.get(op);
-      if (!def) return;
-      opPending.delete(op);
+      const p = opPending.get(op);
+      if (!p || (m.reqId != null && m.reqId !== p.reqId)) return;
+      key = op;
+    } else if (m.reqId != null) {
+      for (const [type, p] of opPending) if (p.reqId === m.reqId) { key = type; break; }
+      if (!key) return;
     } else {
-      def = [...opPending.values()][0];
-      if (!def) return;
-      opPending.clear();
+      if (opPending.size) console.warn('[ops] reply without op/reqId — no op ended', m);
+      return;
     }
+    const def = opPending.get(key)!.def;
+    opPending.delete(key);
     opProg = null;
     renderWaitLocks();
     opFinished(false, def);
     return;
   }
-  for (const [type, def] of opPending) {
+  for (const [type, { def }] of opPending) {
     if (!def.results.includes(m.type)) continue;
     opPending.delete(type);
     opProg = null;
@@ -5600,12 +5718,20 @@ $('btnSettings').addEventListener('click', () => { showTab('settings'); $('btnSe
 $('btnSettingsBack').addEventListener('click', () => { showTab(settingsReturn); $('btnSettings').focus(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || menuEl || modalEl || e.defaultPrevented) return;
-  const tg = e.target as HTMLElement;
-  if (tg.closest('input, textarea, select, [contenteditable]')) return;
+  // 글자 칸(글자를 치는 input · textarea · contenteditable — 열린 이름 칸 포함)에서만 막는다(T-D7 · §2.1).
+  // 체크박스 · 라디오 · 색 피커 · 닫힌 select에서는 뒤로.
+  if (isTextEntry(e.target as HTMLElement)) return;
   if (activeTab === 'settings') { e.preventDefault(); showTab(settingsReturn); $('btnSettings').focus(); }
   else if (activeTab === 'select' && selSub !== 'home') { e.preventDefault(); subBack(); }
 });
 
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'number', 'password', 'email', 'url', 'tel']);
+/** 글자를 치는 칸인가 — Esc를 그 칸에 맡긴다(T-D7). */
+function isTextEntry(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  if (el instanceof HTMLInputElement) return TEXT_INPUT_TYPES.has(el.type);
+  return !!el.closest('textarea, [contenteditable]:not([contenteditable="false"])');
+}
 /** 값을 직접 고르기(v3 만들기 4단계)로 — from: 돌아갈 곳(만들기 화면 · 변수 탭). */
 let pickFrom: 'make' | 'vars' = 'make';
 function showPick(step?: MakeStep, from: 'make' | 'vars' = 'vars'): void {
@@ -7066,10 +7192,12 @@ function edChrome(): void {
     return;
   }
   // 연결 중에도 잠근다(§4.6 "연결 중의 다른 일") — 툴팁 꼬리 · 누르면 팝업 안 알림 줄에 bind.waitLink.
-  const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
+  // 다른 쓰기 중에도 잠근다(T-P26 · T-D8) — 자기 저장(edSaveReq)은 빼고 본다([저장] 중 모습은 e.saving 그대로).
+  const other = e.create ? null : otherWriteOp({ exceptSave: true });
+  const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0 || !!other;
   if (locked) { e.btnSave.setAttribute('aria-disabled', 'true'); e.btnSave.dataset.lock = 'edit'; }
   else { e.btnSave.removeAttribute('aria-disabled'); delete e.btnSave.dataset.lock; }
-  e.btnSave.title = bindLinking ? t('bind.waitLink') : '';
+  e.btnSave.title = bindLinking ? t('bind.waitLink') : other ? t('bind.waitOp', { op: other }) : '';
 }
 /** 잠긴 [만들기 🔒]를 눌렀다 — 늘 보이는 사유 줄을 그대로 둔 채 화면 읽기 프로그램에 다시 알린다(줄을 더 띄우지 않음 — F-D11). */
 function edPaidPing(e: Editor): void {
@@ -7092,7 +7220,9 @@ function edLockedSave(): void {
   if (e?.create?.paidLocked) { edPaidPing(e); return; } // 유료 잠금 — 공통 상태 줄이 아니라 팝업 안 사유 줄(§4.9 F2)
   if (!e || e.saving || e.sticky) return; // 저장 중 · 남는 상태 문구는 그대로
   const st = edState(e);
+  const other = otherWriteOp({ exceptSave: true });
   if (bindLinking) e.event = { text: t('bind.waitLink'), err: false }; // 연결 중(§4.6 "연결 중의 다른 일")
+  else if (other && !e.create) e.event = { text: t('bind.waitOp', { op: other }), err: false }; // 다른 쓰기 중(T-P26 · §4.6)
   else if (!st.changed) e.event = { text: t('edit.noChange'), err: false };
   else if (st.hasErr) { e.event = { text: t('edit.checkInput'), err: true }; st.firstErr?.focus(); }
   edChrome();
@@ -7661,7 +7791,7 @@ function edSave(): void {
   if (e.create?.paidLocked) { edPaidPing(e); return; }
   if (e.create) { edCreate(e); return; }
   const st = edState(e);
-  if (bindLinking || !st.changed || st.hasErr) { edLockedSave(); return; }
+  if (bindLinking || otherWriteOp({ exceptSave: true }) || !st.changed || st.hasErr) { edLockedSave(); return; }
   const n = edNameState(e);
   const values: Record<string, EditValue> = {};
   const baseValues: Record<string, VarCell | null> = {};
@@ -7681,7 +7811,22 @@ function edSave(): void {
   if (n.changed) msg.name = n.name;
   if (Object.keys(values).length) msg.values = values;
   send(msg);
+  edSaveBegin(reqId);
   edChrome();
+}
+/** 상세 [저장] 쓰기 잠금 세움(T-P26) — 다른 자리 쓰기 버튼이 잠긴다. */
+function edSaveBegin(reqId: number): void {
+  edSaveReq = reqId;
+  if (edSaveTimer) clearTimeout(edSaveTimer);
+  edSaveTimer = setTimeout(() => edSaveEnd(reqId), EDIT_TIMEOUT);
+  renderWaitLocks();
+}
+/** 상세 [저장] 쓰기가 끝남(VARIABLE_UPDATED · ERROR{UPDATE_VARIABLE} · 10초) — reqId가 다르면 그대로(없으면 끝냄). */
+function edSaveEnd(reqId?: number): void {
+  if (!edSaveReq || (reqId != null && reqId !== edSaveReq)) return;
+  edSaveReq = 0;
+  if (edSaveTimer) { clearTimeout(edSaveTimer); edSaveTimer = null; }
+  renderWaitLocks();
 }
 /** 저장 중 끝. */
 function edEndSaving(e: Editor): void {
@@ -7711,6 +7856,7 @@ function edReasonText(err: VarUpdateError | undefined): { text: string; tip?: st
 }
 /** 저장 응답(VARIABLE_UPDATED). */
 function onVariableUpdated(msg: Extract<CodeToUi, { type: 'VARIABLE_UPDATED' }>): void {
+  edSaveEnd(msg.reqId); // 쓰기는 끝났다 — 표 다시 읽기(awaitingTable) 동안은 잠그지 않는다(T-P26)
   const e = ed;
   if (edDeadReqs.has(msg.reqId)) {
     // 시간 초과 뒤 늦은 응답 — 팝업은 다시 그리지 않는다. 바뀌었으면 목록을 실제와 맞추고 닫을 때 판정에 넣는다.
@@ -8429,6 +8575,12 @@ function mcTakes(msg: CodeToUi): boolean {
       showStatusLine(t('status.failed', { op: t('op.makeCard') }), { cls: 'warn', tip: msg.message, action: { label: t('common.view'), run: () => { showTab('select'); showSelSub('home'); } } });
       renderSelHome();
     }
+  } else if (msg.type === 'PREMIUM_REQUIRED' && rid === mcCreateReq) {
+    // 만들기 거절(8a 뒤 PREMIUM_REQUIRED도 reqId를 실어 여기로 온다 — T-P28) — 만드는 중을 풀고 유료 사유.
+    mcCreateReq = 0;
+    mcCreating = null;
+    showPaidReason();
+    renderSelHome();
   }
   return true;
 }

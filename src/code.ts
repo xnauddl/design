@@ -139,18 +139,20 @@ async function paidSemanticTarget(collectionId: string | undefined): Promise<boo
   return ownedCollection(cols, 'semantic')?.id === collectionId;
 }
 
-/** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
-function requirePaid(feature: Feature): boolean {
+/** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용)
+ *  reqId: 거절된 요청의 reqId — 답에 그대로 싣는다(ia-v4 §4.11 T-P28 — UI가 그 작업만 끝낸다). */
+function requirePaid(feature: Feature, reqId?: number): boolean {
   if (isPaid()) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature });
+  post({ type: 'PREMIUM_REQUIRED', feature, ...(reqId != null ? { reqId } : {}) });
   return false;
 }
 
 interface LicenseNote { text: string; kind: 'ok' | 'warn'; tip?: string }
 
-function postLicense(note?: LicenseNote): void {
+function postLicense(note?: LicenseNote, reqId?: number): void {
   const e = effective();
   post({
+    ...(reqId != null ? { reqId } : {}), // GET_LICENSE · SET_LICENSE에 답할 때만(T-P29 ②)
     type: 'LICENSE_STATUS',
     tier: e.tier,
     unlimited: e.tier === 'paid', // Free/Paid 2티어 — 유료면 모든 기능 해금
@@ -192,7 +194,7 @@ async function loadLicense(): Promise<void> {
  * 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능). 전제 미충족 카드는
  * UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
  */
-async function postPrereq(): Promise<void> {
+async function postPrereq(reqId?: number): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const vars = await figma.variables.getLocalVariablesAsync();
@@ -216,7 +218,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+    post({ ...(reqId != null ? { reqId } : {}), type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -499,13 +501,13 @@ function pageOf(node: BaseNode): PageNode | null {
 }
 
 /** Paid 게이트(컴포넌트/베리언트): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireComponents(): boolean {
-  return requirePaid('components');
+function requireComponents(reqId?: number): boolean {
+  return requirePaid('components', reqId);
 }
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireTextStyles(): boolean {
-  return requirePaid('textStyles');
+function requireTextStyles(reqId?: number): boolean {
+  return requirePaid('textStyles', reqId);
 }
 
 /** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
@@ -1291,7 +1293,13 @@ async function decideReuse(groups: readonly PlanGroup[], exclude: ReadonlySet<st
   return out;
 }
 
+/** 요청에 답하는 메시지가 아닌 알림 — reqId를 싣지 않는다(ia-v4 B.19a). 작업 뒤 밀어 보내는 PREREQ_STATE · VARIABLES는 모듈 post로 보낸다. */
+const NOTICE_TYPES: ReadonlySet<CodeToUi['type']> = new Set<CodeToUi['type']>(['PROGRESS', 'SELECTION_STATE', 'REQUEST_VERIFY', 'REQUEST_DEACTIVATE']);
+
 figma.ui.onmessage = async (msg: UiToCode) => {
+  // 이 요청에 답하는 메시지는 그 reqId를 싣는다(ia-v4 §4.11 T-P29 ②) — 알림(진행률 · 선택 · 검증 요청)은 빼고.
+  const rid = msg.reqId;
+  const reply = (m: CodeToUi): void => post(rid != null && m.reqId == null && !NOTICE_TYPES.has(m.type) ? ({ ...m, reqId: rid } as CodeToUi) : m);
   try {
     switch (msg.type) {
       case 'EXTRACT': {
@@ -1299,13 +1307,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 인스턴스의 메인 컴포넌트 안 값도 뽑는다(ia-v3 §2.11 11번) — 메인을 더한 인스턴스는 "인스턴스 안쪽" 건너뜀을 남기지 않는다.
         const wm = await withLocalMains(sel);
         const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys())); // 쓰임 이름은 주인을 쓰지 않는다(§2.12 12.12 N-D1)
-        post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
+        reply({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         break;
       }
       case 'CREATE_TOKENS': {
         // 실제 변수 생성 중 Semantic까지 만드는 것만 Paid(미리보기는 비파괴 읽기라 허용). globalOnly(무료 규칙 — Global만,
         // `createUsageRoles`를 돌리지 않음)는 무료도 통과한다(IA v4 §4.3 "무료 — 무료 규칙 PR 뒤" · F1 · F4 · F8).
-        if (!msg.preview && !msg.globalOnly && !requirePaid('tokens')) break;
+        if (!msg.preview && !msg.globalOnly && !requirePaid('tokens', msg.reqId)) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
@@ -1329,7 +1337,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (s.skippedManual) summary += t('create.sumManual', { n: s.skippedManual });
         // 미리보기는 토큰별 상태 · Semantic 줄을 함께 싣는다(IA v4 §4.3 — 만들기 화면의 상태 태그 · Semantic 묶음).
         const tokenStates: Record<string, TokenState> | undefined = msg.preview && s.tokenStates ? Object.fromEntries(s.tokenStates) : undefined;
-        post({
+        reply({
           type: 'CREATE_RESULT',
           created: s.created,
           updated: s.updated,
@@ -1364,7 +1372,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           sel,
           !msg.preview,
           {
-            onProgress: (done, total) => post({ type: 'PROGRESS', op: 'bind', done, total }),
+            onProgress: (done, total) => reply({ type: 'PROGRESS', op: 'bind', done, total }),
             shouldCancel: () => bindCancel,
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
           },
@@ -1375,7 +1383,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             ...(isPaid() ? {} : { noNewRoles: true }),
           },
         );
-        post({
+        reply({
           type: 'APPLY_RESULT',
           bound: r.bound,
           skipped: r.skipped,
@@ -1409,18 +1417,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const deletedIds = await deletedVarIds(roots);
         const r = await unbindDeleted(roots, deletedIds);
         if (r.unbound) commitUndo(figma);
-        post({ type: 'DELETED_UNBOUND', reqId: msg.reqId, ...r });
+        reply({ type: 'DELETED_UNBOUND', reqId: msg.reqId, ...r });
         if (r.unbound) await postPrereq();
         break;
       }
       case 'SCAN_USAGE': {
         // 변수 목록의 사용 수(보기 전용) — 연결 카드의 미리보기·결과와 무관하다.
-        post({ type: 'USAGE_RESULT', reqId: msg.reqId, ...(await collectUsage(msg.nodeIds)) });
+        reply({ type: 'USAGE_RESULT', reqId: msg.reqId, ...(await collectUsage(msg.nodeIds)) });
         break;
       }
       case 'FIND_VAR_USERS': {
         const r = findUsers(await resolveRoots(msg.nodeIds), new Set(msg.varIds));
-        post({ type: 'VAR_USERS', reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
+        reply({ type: 'VAR_USERS', reqId: msg.reqId, layers: r.nodes.slice(0, msg.limit).map((n) => ({ id: n.id, name: n.name })), totalLayers: r.nodes.length, places: r.places });
         break;
       }
       case 'SELECT_VAR_USERS': {
@@ -1433,7 +1441,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           figma.currentPage.selection = pick;
           figma.viewport.scrollAndZoomIntoView(pick);
         }
-        post({ type: 'SELECT_RESULT', found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
+        reply({ type: 'SELECT_RESULT', found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
         break;
       }
       case 'CANCEL': {
@@ -1468,7 +1476,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           figma.currentPage.selection = onPage;
           figma.viewport.scrollAndZoomIntoView(onPage);
         }
-        post({ type: 'SELECT_RESULT', found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
+        reply({ type: 'SELECT_RESULT', found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
         break;
       }
       case 'APPLY_SELECTED': {
@@ -1489,7 +1497,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           const ts = msg.textStyles?.length ? await applyTextStyleRows(msg.textStyles) : null;
           if (ts?.applied) written += ts.applied;
           const r = await bindSelectedItems(msg.items, {
-            onProgress: (done, total) => post({ type: 'PROGRESS', op: 'link', done, total }),
+            onProgress: (done, total) => reply({ type: 'PROGRESS', op: 'link', done, total }),
             yieldToEvents: () => new Promise<void>((resolve) => setTimeout(resolve, 0)),
             onBound: (n) => { written = (ts?.applied ?? 0) + n; },
             onCreated: (n) => { made = n; },
@@ -1501,7 +1509,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             for (const row of msg.textStyles) row.nodeIds.forEach((id, i) => { const m = row.mainIds?.[i]; if (m) mainOfText.set(id, m); });
             for (const id of ts.appliedIds) { const m = mainOfText.get(id); if (m && !mainsBound.includes(m)) mainsBound.push(m); }
           }
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), ...(mainsBound.length ? { mainsBound } : {}) });
+          reply({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), ...(mainsBound.length ? { mainsBound } : {}) });
           // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
           if (r.bound || r.newRoles || ts?.applied) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로
@@ -1518,7 +1526,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'RENAME': {
         const r = await renameSelection(await resolveRoots(msg.nodeIds), { apply: msg.apply, maxDepth: msg.maxDepth });
-        post({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
+        reply({ type: 'RENAME_RESULT', changes: r.changes, nodes: r.nodes, applied: r.applied, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         if (r.applied && r.changes.length) {
           commitUndo(figma); // UX2: 리네임 전체를 단일 Undo로
         }
@@ -1558,7 +1566,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (before === after) continue;
           changes.push({ id, before, after });
         }
-        post({ type: 'RENAME_RESULT', changes, nodes: [], applied: true, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
+        reply({ type: 'RENAME_RESULT', changes, nodes: [], applied: true, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         selfSelect = true;
         postSelection();
         // 이름이 하나도 안 바뀌어도 역할을 새로 기록했으면 커밋한다. 안 하면 그 pluginData
@@ -1570,9 +1578,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
-        if (!requirePaid('semantics')) break;
+        if (!requirePaid('semantics', msg.reqId)) break;
         const s = await createSemanticAliases(msg.map);
-        post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
+        reply({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
         await postPrereq(); // #11: 시맨틱 별칭(바인딩 가능 변수) 생성 → 전제 갱신
         break;
@@ -1580,62 +1588,60 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
-        if (!requirePaid('textStyles')) break;
+        if (!requirePaid('textStyles', msg.reqId)) break;
         // 이름은 언제나 KRDS 규칙(heading/large… — docs/text-style-krds.md) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
-        // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
-        // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
+        // nodeIds: 목록 기준(없으면 지금 선택). make 스캔은 만들기 화면의 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
+        // 쓸 표본(lastTextSamples)을 덮어쓰지 않는다(IA v4 §4.3 — 8a 뒤 reqId는 모든 요청에 실려 make로 가린다, B.19a). existing은 모든 스캔에.
         // ① 후보 읽기 — 인스턴스의 메인 컴포넌트 안 글자도 표본으로(ia-v3 §2.11 11번)
         const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
-        if (msg.reqId == null) lastTextSamples = samples;
+        if (!msg.make) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
         // 앵커 없는 소수 크기 군집은 이름 짓기에서 빼 흐린 줄로(§2.11 11번 "글자 크기도 정수만")
         const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
         const styles = nameTextStyles(rest, existing);
-        // existing은 reqId 없는 스캔에도 싣는다 — 기본 램프(rampToSpecs)의 예약 이름(docs/text-style-krds.md §6).
+        // existing은 모든 스캔에 싣는다 — 이름 겹침 잠금 · 기본 램프(rampToSpecs)의 예약 이름(docs/text-style-krds.md §6).
         const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
-        if (msg.reqId != null) {
-          post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
-        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, existing: existingSigs });
+        reply({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, existing: existingSigs });
         break;
       }
       case 'SCAN_TS_RENAME': {
         // [이름 다시 짓기] 미리보기(docs/text-style-krds.md §5.2) — 읽기만. 텍스트 스타일 기능과 같은 유료 잠금.
-        if (!requireTextStyles()) break;
-        post({ type: 'TS_RENAME_PLAN', reqId: msg.reqId, rows: await planTsRename() });
+        if (!requireTextStyles(msg.reqId)) break;
+        reply({ type: 'TS_RENAME_PLAN', reqId: msg.reqId, rows: await planTsRename() });
         break;
       }
       case 'APPLY_TS_RENAME': {
         // [이름 다시 짓기] 바꾸기(§5.3) — 이름만 쓴다(글꼴 · 값 없음). 스타일 · 역할 변수 이름을 ⌘Z 한 번으로.
-        if (!requireTextStyles()) break;
+        if (!requireTextStyles(msg.reqId)) break;
         const r = await applyTsRename(msg.items);
-        post({ type: 'TS_RENAMED', reqId: msg.reqId, ...r });
+        reply({ type: 'TS_RENAMED', reqId: msg.reqId, ...r });
         commitUndo(figma);
         await postPrereq();
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
-        if (!requirePaid('textStyles')) break; // 스캔 후속 — 스캔과 같은 등급
+        if (!requirePaid('textStyles', msg.reqId)) break; // 스캔 후속 — 스캔과 같은 등급
         // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
         if (!lastTextSamples.length) {
-          post({ type: 'ERROR', message: t('textStyle.needScan'), op: 'NAME_TEXT_STYLES_BY_ROW' });
+          reply({ type: 'ERROR', message: t('textStyle.needScan'), op: 'NAME_TEXT_STYLES_BY_ROW' });
           break;
         }
         const existing = await scanExistingTextStyles();
         const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
+        reply({ type: 'TEXT_STYLE_CANDIDATES', styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
         break;
       }
       case 'CREATE_TEXT_STYLES': {
-        if (!requireTextStyles()) break;
+        if (!requireTextStyles(msg.reqId)) break;
         const r = await createSemanticTextStyles(msg.styles);
         // 바로 연결(IA v4 §4.3 "타이포 등록") — 방금 등록 · 갱신한 스타일만 그 루트들의 글자에 붙인다. 같은 메시지라 ⌘Z 한 번.
         // ② 바로 연결 — 메인 안 글자에도 붙이고, 붙인 글자의 메인 단위를 mainsApplied로(ia-v3 §2.11 11번)
         const wm = msg.applyTo ? await withLocalMains(await resolveRoots(msg.applyTo)) : null;
         const ap = wm ? await applyRegisteredTextStyles(wm.roots, r.styleIds) : null;
         const mainsApplied = wm && ap ? unitsOfIds(ap.appliedIds, wm.unitOf) : [];
-        post({
+        reply({
           type: 'TEXT_STYLES_RESULT',
           created: r.created,
           updated: r.updated,
@@ -1656,21 +1662,21 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const wm = await withLocalMains(await resolveRoots(msg.nodeIds));
         const r = await planExistingTextStyles(wm.roots);
         const rows = wm.unitOf.size ? r.rows.map((row) => ({ ...row, mainIds: row.nodeIds.map((id) => wm.unitOf.get(id) ?? null) })) : r.rows;
-        post({ type: 'TEXT_STYLES_PREVIEW', reqId: msg.reqId, rows, skipReasons: r.skipReasons });
+        reply({ type: 'TEXT_STYLES_PREVIEW', reqId: msg.reqId, rows, skipReasons: r.skipReasons });
         break;
       }
       case 'GET_COLLECTIONS': {
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
-        post({ type: 'COLLECTIONS', collections: cols.map((c) => ({ id: c.id, name: c.name })) });
+        reply({ type: 'COLLECTIONS', collections: cols.map((c) => ({ id: c.id, name: c.name })) });
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
         break;
       }
       case 'GET_PREREQ': {
-        await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
+        await postPrereq(msg.reqId); // #11: 단계 전제 상태(시작·탭 전환 시) — GET_PREREQ에 답하므로 reqId
         break;
       }
       case 'GET_LICENSE': {
-        postLicense();
+        postLicense(undefined, msg.reqId);
         break;
       }
       case 'SET_LICENSE': {
@@ -1681,7 +1687,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 저장 실패해도 세션 동안은 적용 */
         }
-        postLicense();
+        postLicense(undefined, msg.reqId);
         break;
       }
       case 'LICENSE_VERIFIED': {
@@ -1693,7 +1699,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             const keyChanged = prev.key !== msg.key;
             const instChanged = !!msg.result.instanceId && prev.instanceId !== msg.result.instanceId;
             if (keyChanged || instChanged) {
-              post({ type: 'REQUEST_DEACTIVATE', key: prev.key, instanceId: prev.instanceId });
+              reply({ type: 'REQUEST_DEACTIVATE', key: prev.key, instanceId: prev.instanceId });
             }
           }
           cache = cacheFromVerify(msg.key, msg.result, Date.now());
@@ -1720,7 +1726,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CLEAR_LICENSE': {
         // 이 기기의 LS 활성화 슬롯 반납(best-effort) — 캐시를 지우기 전에 키+instanceId를 UI로 넘긴다.
         if (cache?.key && cache.instanceId) {
-          post({ type: 'REQUEST_DEACTIVATE', key: cache.key, instanceId: cache.instanceId });
+          reply({ type: 'REQUEST_DEACTIVATE', key: cache.key, instanceId: cache.instanceId });
         }
         cache = null;
         try {
@@ -1790,11 +1796,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           fontSizeUnit: msg.fontSizeUnit,
           base: msg.base,
         }, styles, modes);
-        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes) });
+        reply({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes) });
         break;
       }
       case 'SCAN_COMPONENT_CANDIDATES': {
-        if (!requireComponents()) break;
+        if (!requireComponents(msg.reqId)) break;
         // 목록 기준의 nodeIds(ia-v4 §2.5) — 없으면 지금 선택. 숨긴 조상 아래 노드는 선택 루트여도 제외(실효 비가시).
         const roots = (await resolveRoots(msg.nodeIds)).filter(isEffectivelyVisible);
         // StructNode로 매핑해 넘긴다 — 말단 등록 자격이 `dsRole`에 달려 있다.
@@ -1889,11 +1895,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // 미리보기 라벨 실패해도 후보는 반환(스캔 중 고정 방지).
           console.warn('component preview label failed', e);
         }
-        post({ type: 'COMPONENT_CANDIDATES', nodes, autoNamed, reqId: msg.reqId });
+        reply({ type: 'COMPONENT_CANDIDATES', nodes, autoNamed, reqId: msg.reqId });
         break;
       }
       case 'REGISTER_COMPONENTS': {
-        if (!requireComponents()) break;
+        if (!requireComponents(msg.reqId)) break;
         await figma.loadAllPagesAsync(); // dynamic-page: 컴포넌트 페이지 이동 전 로드
         let registered = 0;
         let skipped = 0;
@@ -1956,7 +1962,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const nameByGroup = new Map<PlanGroup, string>();
         resolvePlanNames(groups, existingNames).forEach((nm, i) => nameByGroup.set(groups[i], nm));
         if (!groups.length) {
-          post({ type: 'COMPONENTS_RESULT', registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
+          reply({ type: 'COMPONENTS_RESULT', registered: 0, skipped, sets: 0, singles: [], missing: [], failures: [] });
           break;
         }
         // **내부(자손) 그룹 먼저** — 내부 반복이 먼저 세트/인스턴스가 된 뒤 바깥을 컴포넌트화해야
@@ -2725,12 +2731,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 끝 정리(§4.7 "인스턴스 자리" 7번 — C-D4): 이번에 만들었는데 쓰이지 않게 된 아이콘, 이번에 만든 빈 Components 페이지.
         await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
+        reply({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
         if (registered || sets || reused.length) commitUndo(figma); // UX2 — 재사용만이어도 ⌘Z 한 번(§4.7 "재사용" 6번)
         break;
       }
       case 'CLASSIFY_VARIANTS': {
-        if (!requireComponents()) break;
+        if (!requireComponents(msg.reqId)) break;
         // 「컴포넌트 등록」과 동일한 **정확한 이름 기준**으로 기존 컴포넌트를 다시 묶는다.
         // 선택의 COMPONENT 중 아직 세트에 안 속한 것만(멱등). 같은 이름 2개+ → 세트, 1개 → 단독.
         const comps = selection().filter(
@@ -2773,12 +2779,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             failures.push(t('component.fail.combine', { set: groupNames[gi], error: errText(e) }));
           }
         }
-        post({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });
+        reply({ type: 'VARIANTS_RESULT', sets, missing, singles, failures });
         if (sets) commitUndo(figma); // UX2
         break;
       }
       case 'GENERATE_MISSING_VARIANTS': {
-        if (!requireComponents()) break;
+        if (!requireComponents(msg.reqId)) break;
         const sets = selection().filter((n): n is ComponentSetNode => n.type === 'COMPONENT_SET');
         let generated = 0;
         const combos: string[] = [];
@@ -2800,12 +2806,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
           if (missing.length) arrangeSet(set); // 추가 후 그리드 정렬 + 리사이즈
         }
-        post({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
+        reply({ type: 'GENERATE_RESULT', generated, sets: sets.length, combos });
         if (generated) commitUndo(figma); // UX2
         break;
       }
       case 'GET_VAR_TABLE': {
-        post({ type: 'VAR_TABLE', ...(await collectVarTable()) });
+        reply({ type: 'VAR_TABLE', ...(await collectVarTable()) });
         break;
       }
       case 'UPDATE_VARIABLE': {
@@ -2816,12 +2822,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 클릭 연결(IA v4 §4.7) — 지금 선택의 레이어만, ⌘Z 한 번.
         const v = await figma.variables.getVariableByIdAsync(msg.id).catch(() => null);
         if (!v) {
-          post({ type: 'ERROR', message: 'variable not found', op: msg.type, reqId: msg.reqId, code: 'deleted' });
+          reply({ type: 'ERROR', message: 'variable not found', op: msg.type, reqId: msg.reqId, code: 'deleted' });
           break;
         }
         const r = await applyVariableToNodes(selection().slice(), v, msg.target);
         if (r.applied) commitUndo(figma);
-        post({ type: 'VARIABLE_APPLIED', reqId: msg.reqId, applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, name: v.name });
+        reply({ type: 'VARIABLE_APPLIED', reqId: msg.reqId, applied: r.applied, skipped: r.skipped, skipReasons: r.skipReasons, name: v.name });
         break;
       }
       case 'CREATE_VARIABLE':
@@ -2832,15 +2838,15 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'SCAN_UNUSED_VARS': {
         unusedCancel = false; // 남은 플래그가 이 요청을 멈추지 않게
-        const r = await scanUnusedVariables({ onProgress: (done, total) => post({ type: 'PROGRESS', op: 'unused', done, total }), cancelled: () => unusedCancel });
-        post({ type: 'UNUSED_VARS', reqId: msg.reqId, items: r.items, pages: r.pages, layers: r.layers, ...(r.cancelled ? { cancelled: true as const } : {}) });
+        const r = await scanUnusedVariables({ onProgress: (done, total) => reply({ type: 'PROGRESS', op: 'unused', done, total }), cancelled: () => unusedCancel });
+        reply({ type: 'UNUSED_VARS', reqId: msg.reqId, items: r.items, pages: r.pages, layers: r.layers, ...(r.cancelled ? { cancelled: true as const } : {}) });
         break;
       }
       case 'DELETE_VARIABLES': {
         unusedCancel = false;
-        const r = await deleteUnusedVariables(msg.ids, { onProgress: (done, total) => post({ type: 'PROGRESS', op: 'unused-delete', done, total }), cancelled: () => unusedCancel });
+        const r = await deleteUnusedVariables(msg.ids, { onProgress: (done, total) => reply({ type: 'PROGRESS', op: 'unused-delete', done, total }), cancelled: () => unusedCancel });
         if (r.deleted > 0) commitUndo(figma); // 지운 것이 있을 때만 ⌘Z 한 번
-        post({ type: 'VARIABLES_DELETED', reqId: msg.reqId, deleted: r.deleted, skipped: r.skipped, failed: r.failed, ...(r.cancelled ? { cancelled: true as const } : {}) });
+        reply({ type: 'VARIABLES_DELETED', reqId: msg.reqId, deleted: r.deleted, skipped: r.skipped, failed: r.failed, ...(r.cancelled ? { cancelled: true as const } : {}) });
         if (r.deleted > 0) await postPrereq();
         break;
       }
@@ -2848,7 +2854,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 최소화/펼치기만 — 저장하지 않는다.
         const mode = normalizeUiSize(msg.mode);
         figma.ui.resize(uiWidth(mode), uiHeight(mode));
-        post({ type: 'UI_SIZE', mode });
+        reply({ type: 'UI_SIZE', mode });
         break;
       }
       case 'GET_SETTINGS': {
@@ -2866,7 +2872,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 저장소 접근 실패 → 기본값 */
         }
-        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid });
+        reply({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid });
         break;
       }
       case 'SET_SETTINGS': {
@@ -2878,12 +2884,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GET_VARIABLES': {
-        post({ type: 'VARIABLES', vars: await collectVars() });
+        reply({ type: 'VARIABLES', vars: await collectVars() });
         break;
       }
       case 'GENERATE_DARK_MODE': {
         // 다크 값을 새로 쓰는 작업이라 토큰 생성과 같은 등급으로 잠근다.
-        if (!requirePaid('tokens')) break;
+        if (!requirePaid('tokens', msg.reqId)) break;
         // 대상 · 모드는 플러그인이 정한다(플러그인 Global · 기본 모드 → Dark — ia-v3 13.7).
         let res;
         try {
@@ -2898,7 +2904,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           throw e;
         }
         const { changed, ...r } = res;
-        post({ type: 'DARK_MODE_RESULT', ...r });
+        reply({ type: 'DARK_MODE_RESULT', ...r });
         if (changed) {
           commitUndo(figma); // UX2: 옮기기 + 모드 추가 + 채움 전체를 단일 Undo로
           await postPrereq();
@@ -2909,6 +2915,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
     }
   } catch (err) {
     // UX7: 실패한 작업 종류(op)도 함께 보내 UI가 해당 영역에 친절한 메시지를 띄운다.
-    post({ type: 'ERROR', message: err instanceof Error ? err.message : String(err), op: msg?.type, reqId: (msg as { reqId?: number } | undefined)?.reqId });
+    reply({ type: 'ERROR', message: err instanceof Error ? err.message : String(err), op: msg?.type, reqId: (msg as { reqId?: number } | undefined)?.reqId });
   }
 };
