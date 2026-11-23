@@ -42,7 +42,8 @@ export { createIconRegistry, cleanupAfterRegister, swapVectorSlots, transplantIm
 export type { IconRegistry, VectorSlot, MemberResult, CopyDeps, KeepLookDeps } from './artwork';
 export { captureOrigin, placeAtOrigin, releaseOrigin, fillOrigin, tallyFill } from './placement';
 export type { Origin, FillResult, FillTally, Sizing } from './placement';
-export { generateDarkMode, ensureDarkMode, findModeByName, DARK_MODE_NAME } from './themeApply';
+export { generateDarkMode, ensureDarkMode, findModeByName, oldDarkMode, countDarkUnfilled, darkPrereq, readDarkFill, hex8, darkChangedBeforeError, DARK_MODE_NAME, DARK_FILL_KEY } from './themeApply';
+export type { DarkMigrated, DarkFillEntry, DarkFillRecord } from './themeApply';
 export type { DarkModeResult } from './themeApply';
 export { applyVariableToNodes, SKIP_REASONS } from './applyVar';
 export type { ApplyVarResult, SkipReason } from './applyVar';

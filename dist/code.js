@@ -91,14 +91,9 @@
     // 마법사
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.hint": "\uB77C\uC774\uD2B8 \uC0C9\uC744 \uB4A4\uC9D1\uC5B4 \uB2E4\uD06C\uC5D0 \uCC44\uC6CC\uC694. \uBAA9\uB85D \uC774\uB984\uC740 Figma \uBCC0\uC218 \uCEEC\uB809\uC158\xB7\uBAA8\uB4DC\uC608\uC694",
-    "dark.hintTip": "\uC0C9\uC0C1\xB7\uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBA85\uB3C4\uB9CC \uB4A4\uC9D1\uC5B4\uC694. Semantic\uC774 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uAC83\uB9CC \uB300\uC0C1\uC774\uACE0 \uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uAC74 \uAC74\uB108\uB6F0\uC5B4\uC694. \uB2E4\uD06C\uC6A9 \uC6D0\uC2DC\uC0C9\uC740 dark/\u2026\uB85C \uB530\uB85C \uB9CC\uB4E4\uC5B4\uC694.",
-    "dark.collection": "Semantic \uCEEC\uB809\uC158",
-    "dark.fromMode": "\uB77C\uC774\uD2B8",
-    "dark.toMode": "\uB2E4\uD06C",
+    "dark.hint": "Global \uC0C9\uC758 \uBC1D\uAE30\uB97C \uB4A4\uC9D1\uC5B4 Dark \uCE78\uC5D0 \uCC44\uC6CC\uC694",
+    "dark.hintTip": "\uC0C9\uC0C1 \xB7 \uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBC1D\uAE30\uB9CC \uB4A4\uC9D1\uC5B4\uC694. \uD50C\uB7EC\uADF8\uC778 Global\uC758 \uC0C9\uB9CC \uCC44\uC6B0\uACE0, \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218 \xB7 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 \xB7 \uC9C1\uC811 \uACE0\uCE5C Dark \uCE78\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
-    // 아직 Dark 모드가 없을 때 '어두운 모드' 셀렉트에 끼우는 안내 옵션(값이 없어 전송되지 않는다).
-    "dark.toPlaceholder": "Dark (\uC5C6\uC73C\uBA74 \uB9CC\uB4E4\uC5B4\uC694)",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
@@ -139,11 +134,13 @@
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.dark": "\uB2E4\uD06C {realiased}\uAC1C \uC5F0\uACB0",
+    "wizard.seq.dark": "\uB2E4\uD06C \uAC12 {filled}\uAC1C \uCC44\uC6C0",
     "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
-    "wizard.seq.darkSkip": " \xB7 \uAC74\uB108\uB700 {n}(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "wizard.seq.darkNoTarget": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
-    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC2DC\uB9E8\uD2F1 \uC0C9\uC774 \uD544\uC694\uD574\uC694",
+    "wizard.seq.darkKept": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uC0C9 {n}\uAC1C\uB294 \uADF8\uB300\uB85C",
+    "wizard.seq.darkUpToDate": "Dark \uCE78\uC774 \uBAA8\uB450 \uCC44\uC6CC\uC838 \uC788\uC74C",
+    "wizard.seq.darkMigrate": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACA8\uC57C \uD574\uC694 \u2014 \uD14C\uB9C8 \uD654\uBA74\uC5D0\uC11C [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "wizard.seq.darkNoTarget": "\uD50C\uB7EC\uADF8\uC778 Global\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
+    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC5D0 \uAC12\uC744 \uB123\uC740 \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesLinked": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uC5F0\uACB0",
     "wizard.seq.textStylesMissing": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -164,6 +161,7 @@
     "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
     "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
     "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
+    "pipeline.hint.darkUnfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
     "v4.colEmpty": "\uC774 \uCEEC\uB809\uC158\uC5D4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -827,21 +825,31 @@
     "semantic.needGlobal": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "dark.prereqLoading": "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "dark.prereqNoVars": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
-    "dark.prereqNoModes": "\uBAA8\uB4DC\uAC00 \uC788\uB294 \uCEEC\uB809\uC158(\uBCF4\uD1B5 Semantic)\uC744 \uACE0\uB974\uC138\uC694.",
-    "dark.prereqPick": "\uCEEC\uB809\uC158\uACFC \uB77C\uC774\uD2B8 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
     "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
-    "dark.whyNoGlobal": "Global\uC744 \uAC00\uB9AC\uD0A4\uB294 \uC0C9\uC774 \uC5C6\uC5B4\uC694(\uAC74\uB108\uB700 {n}\uAC1C)",
-    "dark.whyNone": "\uB300\uC0C1 \uC0C9\uC774 \uC5C6\uC5B4\uC694",
-    "dark.modeAdded": "\uB2E4\uD06C \uBAA8\uB4DC\uB294 \uCD94\uAC00\uD588\uC5B4\uC694. ",
-    "dark.fillFailed": "{modePart}\uB2E4\uD06C \uAC12\uC744 \uCC44\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.modeAddedShort": "\uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00 \xB7 ",
-    "dark.skippedDirect": " \xB7 \uAC74\uB108\uB700 {n}\uAC1C(\uAC12\uC744 \uC9C1\uC811 \uB123\uC740 \uC0C9)",
-    "dark.done": "{modePart}\uB2E4\uD06C {n}\uAC1C \uC5F0\uACB0 \xB7 \uC0C8 dark/ \uC6D0\uC2DC\uC0C9 {c}\uAC1C{skipPart}",
+    // 다크 결과 · 띠 · 옮기기(ia-v3 13.7 D-T1 · A.25 — 임시 문구, UX 라이팅 단계에서 확정)
+    "dark.doneFill": "{modePart}Global \uC0C9 {n}\uAC1C\uC758 Dark \uCE78\uC744 \uCC44\uC6E0\uC5B4\uC694{keptPart}",
+    "dark.keptPart": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uC0C9 {k}\uAC1C\uB294 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "dark.upToDate": "Dark \uCE78\uC774 \uBAA8\uB450 \uCC44\uC6CC\uC838 \uC788\uC5B4\uC694{keptPart}",
+    "dark.nothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC5B4\uC694 \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC5D0 \uAC12\uC744 \uB123\uC740 \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
+    "dark.unfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB85C \uCC44\uC6CC\uC694",
+    "dark.needMigrate": "\uB2E4\uD06C\uAC00 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB204\uB974\uBA74 Global\uB85C \uC62E\uACA8\uC694",
+    "dark.needMigrateManual": "\uB2E4\uD06C\uAC00 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 Semantic \uBAA8\uB4DC\uAC00 3\uAC1C \uC774\uC0C1\uC774\uB77C \uC62E\uAE38 \uC218 \uC5C6\uC5B4\uC694. \uD53C\uADF8\uB9C8\uC5D0\uC11C \uBAA8\uB4DC\uB97C 2\uAC1C\uB85C \uC904\uC5EC \uC8FC\uC138\uC694",
+    "dark.migrateTitle": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uAE38\uAE4C\uC694?",
+    "dark.migrateBody": "\uC9C0\uAE08 \uB2E4\uD06C\uB294 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694. Global \uC0C9\uC758 Dark \uCE78\uC73C\uB85C \uC62E\uAE30\uACE0, Semantic\uC758 {mode} \uBAA8\uB4DC\uC640 \uC4F0\uC9C0 \uC54A\uAC8C \uB41C dark/ \uC0C9 {n}\uAC1C\uB97C \uC9C0\uC6CC\uC694. \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
+    "dark.migrateBodyNoDel": "\uC9C0\uAE08 \uB2E4\uD06C\uB294 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694. Global \uC0C9\uC758 Dark \uCE78\uC73C\uB85C \uC62E\uAE30\uACE0, Semantic\uC758 {mode} \uBAA8\uB4DC\uB97C \uC9C0\uC6CC\uC694. \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
+    "dark.migrateGo": "\uC62E\uAE30\uACE0 \uB2E4\uD06C \uB9CC\uB4E4\uAE30",
+    "dark.migrated": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACBC\uC5B4\uC694(\uC62E\uAE34 \uC0C9 {a}\uAC1C{splitPart}{failPart}) \xB7 ",
+    "dark.migratedSplit": " \xB7 \uAC12\uC774 \uAC08\uB9B0 \uC0C9 {b}\uAC1C",
+    "dark.migratedFail": " \xB7 \uC62E\uAE30\uC9C0 \uBABB\uD55C \uC5ED\uD560 {c}\uAC1C",
+    "dark.migratedSplitTip": "\uAC12\uC774 \uAC08\uB9B0 \uC0C9 \u2014 \uAC00\uC7A5 \uB9CE\uC774 \uC4F4 \uAC12\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694:",
+    "dark.migratedFailTip": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC5ED\uD560 \u2014 Dark\uC5D0\uC11C \uBC14\uB00C\uC9C0 \uC54A\uC544\uC694:",
+    "dark.migratedDelTip": "\uC9C0\uC6B4 dark/ \uC0C9 {n}\uAC1C",
+    "dark.errMigrateModes": "Semantic\uC5D0 \uBAA8\uB4DC\uAC00 3\uAC1C \uC774\uC0C1\uC774\uB77C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uBAA8\uB4DC\uB97C 2\uAC1C\uB85C \uC904\uC778 \uB4A4 \uB2E4\uC2DC \uB20C\uB7EC \uC8FC\uC138\uC694",
     "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
-    "dark.errNotOwned": "\uB2E4\uD06C\uB294 \uD50C\uB7EC\uADF8\uC778 Semantic\uC5D0\uB9CC \uB9CC\uB4E4\uC5B4\uC694",
     "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
-    "dark.errSameMode": "\uB77C\uC774\uD2B8\uC640 \uB2E4\uD06C\uAC00 \uAC19\uC740 \uBAA8\uB4DC\uC608\uC694 \u2014 \uB77C\uC774\uD2B8\uC5D0 \uB2E4\uB978 \uBAA8\uB4DC\uB97C \uACE0\uB974\uC138\uC694.",
+    "dark.errSameMode": "Global \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC774 Dark\uC608\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC744 Light \uB4F1\uC73C\uB85C \uBC14\uAFD4 \uC8FC\uC138\uC694",
     // 만들기 › 타이포(텍스트 스타일)
     "textStyle.rowDelete": "\uC0AD\uC81C",
     "textStyle.scanSummary": "\uC2E0\uADDC {a} \xB7 \uB4F1\uB85D\uB428 {b}",
@@ -4924,7 +4932,7 @@
           if (g2.created) {
             summary.created++;
             summary.globals++;
-            setGlobalLiteral(g2.variable, gMode, t2, type, base);
+            setGlobalLiteral(g2.variable, globalCol, true, t2, type, base);
             g2.variable.hiddenFromPublishing = true;
             const desc2 = unitDescription(t2);
             if (desc2) g2.variable.description = desc2;
@@ -4950,7 +4958,7 @@
         summary.globals++;
         summary.globalOf.set(t2.name, g.variable.id);
         delete reuseMap[t2.name];
-        setGlobalLiteral(g.variable, gMode, t2, type, base);
+        setGlobalLiteral(g.variable, globalCol, g.created, t2, type, base);
         const scopes = scopesForType(scopesForSources(t2.sources), type);
         const key = vkey(globalCol.id, t2.name);
         const merged = touched.has(key) ? scopesForType([.../* @__PURE__ */ new Set([...g.variable.scopes, ...scopes])], type) : scopes;
@@ -5159,7 +5167,11 @@
     }
     return made;
   }
-  function setGlobalLiteral(v, modeId, t2, type, base) {
+  function setGlobalLiteral(v, col, created, t2, type, base) {
+    const modeIds = created ? col.modes.map((m) => m.modeId) : [col.defaultModeId];
+    for (const modeId of modeIds) setGlobalLiteralFor(v, modeId, t2, type, base);
+  }
+  function setGlobalLiteralFor(v, modeId, t2, type, base) {
     var _a, _b;
     if (type === "COLOR") {
       const { r, g, b } = hexToRgb(String(t2.value));
@@ -10919,120 +10931,298 @@
   function isDarkGlobalName(name) {
     return name.startsWith(DARK_PREFIX);
   }
-  function darkGlobalName(lightName) {
-    return isDarkGlobalName(lightName) ? lightName : `${DARK_PREFIX}${lightName}`;
-  }
 
   // src/lib/themeApply.ts
   var DARK_MODE_NAME = "Dark";
+  var DARK_FILL_KEY = "dsl.darkFill";
+  var MAX_ALIAS_HOPS = 8;
   function isVariableAlias(raw) {
     return !!raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS";
   }
-  function findModeByName(modes, name) {
-    const key = name.toLowerCase();
-    return modes.find((m) => m.name.toLowerCase() === key);
+  function isColor(raw) {
+    return !!raw && typeof raw === "object" && "r" in raw && "g" in raw && "b" in raw;
+  }
+  function hex8(raw) {
+    if (!isColor(raw)) return null;
+    const h = (c) => Math.round(Math.min(1, Math.max(0, c)) * 255).toString(16).padStart(2, "0");
+    const a = typeof raw.a === "number" ? raw.a : 1;
+    return `#${h(raw.r)}${h(raw.g)}${h(raw.b)}${h(a)}`.toUpperCase();
+  }
+  function cellKey(raw) {
+    if (isVariableAlias(raw)) return `alias:${raw.id}`;
+    return hex8(raw);
+  }
+  function rgbaOfHex8(h) {
+    const n = parseInt(h.slice(1, 7), 16);
+    const a = parseInt(h.slice(7, 9), 16);
+    return { r: (n >> 16 & 255) / 255, g: (n >> 8 & 255) / 255, b: (n & 255) / 255, a: a / 255 };
+  }
+  function findModeByName(modes, name, exceptModeId) {
+    const key = name.trim().toLowerCase();
+    return modes.find((m) => m.modeId !== exceptModeId && m.name.trim().toLowerCase() === key);
   }
   function ensureDarkMode(collection) {
-    const existing = findModeByName(collection.modes, DARK_MODE_NAME);
+    const existing = findModeByName(collection.modes, DARK_MODE_NAME, collection.defaultModeId);
     if (existing) return { modeId: existing.modeId, created: false };
     const modeId = collection.addMode(DARK_MODE_NAME);
     return { modeId, created: true };
   }
-  async function generateDarkMode(collectionId, fromModeId, toModeId) {
-    var _a, _b, _c, _d;
-    let created = 0;
-    let realiased = 0;
-    let skipped = 0;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const semanticCol = cols.find((c) => c.id === collectionId);
-    if (!semanticCol) return { created, realiased, skipped, error: t("dark.errNoCol") };
-    if (((_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id) !== semanticCol.id) return { created, realiased, skipped, error: t("dark.errNotOwned") };
-    let modeCreated = false;
-    let to = toModeId;
-    if (!to) {
-      try {
-        const ensured = ensureDarkMode(semanticCol);
-        to = ensured.modeId;
-        modeCreated = ensured.created;
-      } catch (e) {
-        const why = e instanceof Error ? e.message : String(e);
-        return {
-          created: 0,
-          realiased: 0,
-          skipped: 0,
-          error: t("dark.errAddMode", { why: why || t("dark.errAddModePlan") })
-        };
-      }
+  function oldDarkMode(semantic) {
+    return semantic ? findModeByName(semantic.modes, DARK_MODE_NAME, semantic.defaultModeId) : void 0;
+  }
+  function readDarkFill(v) {
+    try {
+      const fn = v.getPluginData;
+      const raw = typeof fn === "function" ? fn.call(v, DARK_FILL_KEY) : "";
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+    } catch (e) {
+      return {};
     }
-    let from = fromModeId;
-    if (!from) {
-      const def = semanticCol.defaultModeId;
-      from = def === to ? (_c = (_b = semanticCol.modes.find((m) => m.modeId !== to)) == null ? void 0 : _b.modeId) != null ? _c : def : def;
-    }
-    if (from === to) {
-      return __spreadProps(__spreadValues({
-        created: 0,
-        realiased: 0,
-        skipped: 0
-      }, modeCreated ? { modeCreated: true } : {}), {
-        error: t("dark.errSameMode")
+  }
+  function writeDarkFill(v, rec) {
+    var _a;
+    (_a = v.setPluginData) == null ? void 0 : _a.call(v, DARK_FILL_KEY, JSON.stringify(rec));
+  }
+  function darkTargets(global, vars, fromModeId) {
+    return vars.filter(
+      (v) => v.variableCollectionId === global.id && v.resolvedType === "COLOR" && !isManualVar(v) && !isDarkGlobalName(v.name) && isColor(v.valuesByMode[fromModeId])
+    );
+  }
+  function countDarkUnfilled(cols, vars) {
+    const global = ownedCollection(cols, "global");
+    if (!global || global.modes.length < 2) return 0;
+    const modeIds = new Set(global.modes.map((m) => m.modeId));
+    let n = 0;
+    for (const v of darkTargets(global, vars, global.defaultModeId)) {
+      const rec = readDarkFill(v);
+      const filled = Object.entries(rec).some(([to, e]) => {
+        if (!modeIds.has(to) || !e) return false;
+        if (e.by === "user") return true;
+        return e.by === "calc" && e.f === global.defaultModeId && hex8(v.valuesByMode[e.f]) === e.l;
       });
+      if (!filled) n++;
     }
-    let globalCol = ownedCollection(cols, "global");
-    const allVars = await figma.variables.getLocalVariablesAsync();
-    const byId = new Map(allVars.map((v) => [v.id, v]));
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const globalByName = new Map(globalCol ? allVars.filter((v) => v.variableCollectionId === (globalCol == null ? void 0 : globalCol.id)).map((v) => [v.name, v]) : []);
-    for (const v of allVars) {
-      if (v.variableCollectionId !== semanticCol.id || v.resolvedType !== "COLOR") continue;
-      if (isManualVar(v)) {
-        skipped++;
-        continue;
-      }
-      const fromRaw = v.valuesByMode[from];
-      if (!isVariableAlias(fromRaw)) {
-        skipped++;
-        continue;
-      }
-      const lightGlobal = byId.get(fromRaw.id);
-      const lightRaw = lightGlobal == null ? void 0 : lightGlobal.valuesByMode[(_d = modeOf.get(lightGlobal.variableCollectionId)) != null ? _d : ""];
-      if (!lightGlobal || !(lightRaw && typeof lightRaw === "object" && "r" in lightRaw)) {
-        skipped++;
-        continue;
-      }
-      if (isDarkGlobalName(lightGlobal.name)) {
-        skipped++;
-        continue;
-      }
-      const darkHex = darkValueForLight(rgbToHex(lightRaw));
-      const dname = darkGlobalName(lightGlobal.name);
-      let dark = globalByName.get(dname);
-      if (dark && isManualVar(dark)) {
-        skipped++;
-        continue;
-      }
-      if (!dark || !globalCol) globalCol = ensureOwnedCollection(cols, "global");
-      const gMode = globalCol.defaultModeId;
-      if (!dark) {
-        dark = figma.variables.createVariable(dname, globalCol, "COLOR");
-        dark.scopes = lightGlobal.scopes;
-        dark.hiddenFromPublishing = true;
-        globalByName.set(dname, dark);
-        created++;
-      }
-      const la = lightRaw.a;
-      dark.setValueForMode(gMode, __spreadProps(__spreadValues({}, hexToRgb(darkHex)), { a: typeof la === "number" ? la : 1 }));
-      v.setValueForMode(to, figma.variables.createVariableAlias(dark));
-      realiased++;
+    return n;
+  }
+  function darkPrereq(cols, vars) {
+    var _a, _b;
+    const global = ownedCollection(cols, "global");
+    const semantic = ownedCollection(cols, "semantic");
+    const darkOld = !!oldDarkMode(semantic);
+    return {
+      hasDarkMode: ((_a = global == null ? void 0 : global.modes.length) != null ? _a : 0) > 1 || darkOld,
+      darkUnfilled: countDarkUnfilled(cols, vars),
+      darkOld,
+      // 옛 구조인데 Semantic 모드가 셋 이상 — 옮기기를 거절하는 경우(띠 dark.needMigrateManual).
+      darkOldManual: darkOld && ((_b = semantic == null ? void 0 : semantic.modes.length) != null ? _b : 0) >= 3
+    };
+  }
+  function resolveColor(raw, byId, defOf) {
+    var _a;
+    let cur = raw;
+    const seen = /* @__PURE__ */ new Set();
+    for (let hop = 0; hop <= MAX_ALIAS_HOPS; hop++) {
+      if (isColor(cur)) return { r: cur.r, g: cur.g, b: cur.b, a: typeof cur.a === "number" ? cur.a : 1 };
+      if (!isVariableAlias(cur) || hop === MAX_ALIAS_HOPS || seen.has(cur.id)) return null;
+      seen.add(cur.id);
+      const tv = byId.get(cur.id);
+      if (!tv) return null;
+      cur = tv.valuesByMode[(_a = defOf.get(tv.variableCollectionId)) != null ? _a : ""];
     }
-    if (modeCreated && realiased === 0) {
-      try {
-        semanticCol.removeMode(to);
-        modeCreated = false;
-      } catch (e) {
+    return null;
+  }
+  function unusedDarkCopies(global, cols, vars, skip2) {
+    var _a;
+    const modesOf = new Map(cols.map((c) => [c.id, c.modes.map((m) => m.modeId)]));
+    const referenced = /* @__PURE__ */ new Set();
+    for (const v of vars) {
+      for (const m of (_a = modesOf.get(v.variableCollectionId)) != null ? _a : []) {
+        if (skip2 && v.variableCollectionId === skip2.collectionId && m === skip2.modeId) continue;
+        const raw = v.valuesByMode[m];
+        if (isVariableAlias(raw)) referenced.add(raw.id);
       }
     }
-    return __spreadValues({ created, realiased, skipped }, modeCreated ? { modeCreated: true } : {});
+    return vars.filter((v) => v.variableCollectionId === global.id && isDarkGlobalName(v.name) && !isManualVar(v) && !referenced.has(v.id));
+  }
+  var CHANGED_FLAG = "__darkChanged";
+  function darkChangedBeforeError(e) {
+    return !!e && typeof e === "object" && e[CHANGED_FLAG] === true;
+  }
+  async function generateDarkMode(migrate) {
+    var _a, _b, _c, _d;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const global = ownedCollection(cols, "global");
+    if (!global) return { filled: 0, kept: 0, targets: 0, error: t("dark.errNoCol") };
+    const semantic = ownedCollection(cols, "semantic");
+    const oldMode = oldDarkMode(semantic);
+    if (oldMode && semantic && semantic.modes.length >= 3) return { filled: 0, kept: 0, targets: 0, error: t("dark.errMigrateModes") };
+    const from = global.defaultModeId;
+    const defMode = global.modes.find((m) => m.modeId === from);
+    if (defMode && findModeByName([defMode], DARK_MODE_NAME) && !findModeByName(global.modes, DARK_MODE_NAME, from)) {
+      return { filled: 0, kept: 0, targets: 0, error: t("dark.errSameMode") };
+    }
+    let vars = await figma.variables.getLocalVariablesAsync();
+    if (oldMode && semantic && !migrate) {
+      const removeDark = unusedDarkCopies(global, cols, vars, { collectionId: semantic.id, modeId: oldMode.modeId }).length;
+      return { filled: 0, kept: 0, targets: 0, needMigrate: { removeDark, mode: oldMode.name } };
+    }
+    const doMigrate = !!(oldMode && semantic);
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const defOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+    const cand = /* @__PURE__ */ new Map();
+    const failedNames = [];
+    if (doMigrate && semantic && oldMode) {
+      for (const s of vars) {
+        if (s.variableCollectionId !== semantic.id || s.resolvedType !== "COLOR") continue;
+        const L = s.valuesByMode[semantic.defaultModeId];
+        const D = s.valuesByMode[oldMode.modeId];
+        if (D === void 0 || D === null) continue;
+        if (isVariableAlias(L) && isVariableAlias(D) && L.id === D.id) continue;
+        if (!isVariableAlias(L) && !isVariableAlias(D) && hex8(L) !== null && hex8(L) === hex8(D)) continue;
+        if (!isVariableAlias(L)) {
+          const dh = hex8(resolveColor(D, byId, defOf));
+          if (dh !== null && hex8(L) !== null && dh === hex8(L)) continue;
+          failedNames.push(s.name);
+          continue;
+        }
+        const x = byId.get(L.id);
+        if (!x || x.variableCollectionId !== global.id || x.resolvedType !== "COLOR" || isManualVar(x) || !isColor(x.valuesByMode[from])) {
+          failedNames.push(s.name);
+          continue;
+        }
+        const col = resolveColor(D, byId, defOf);
+        const h = col ? hex8(col) : null;
+        if (!h) {
+          failedNames.push(s.name);
+          continue;
+        }
+        const arr = (_a = cand.get(x.id)) != null ? _a : [];
+        arr.push({ hex: h, sem: s.name });
+        cand.set(x.id, arr);
+      }
+    }
+    const pick = /* @__PURE__ */ new Map();
+    const splitNames = [];
+    for (const [xid, arr] of cand) {
+      const counts = /* @__PURE__ */ new Map();
+      for (const c of arr) counts.set(c.hex, ((_b = counts.get(c.hex)) != null ? _b : 0) + 1);
+      const max = Math.max(...counts.values());
+      const sorted = arr.slice().sort((a, b) => a.sem < b.sem ? -1 : a.sem > b.sem ? 1 : 0);
+      const chosen = sorted.find((c) => counts.get(c.hex) === max).hex;
+      pick.set(xid, chosen);
+      if (counts.size > 1) splitNames.push(byId.get(xid).name);
+    }
+    let to;
+    let modeCreated = false;
+    try {
+      ensureOwnedCollection(cols, "global");
+      const ensured = ensureDarkMode(global);
+      to = ensured.modeId;
+      modeCreated = ensured.created;
+    } catch (e) {
+      const why = e instanceof Error ? e.message : String(e);
+      return { filled: 0, kept: 0, targets: 0, error: t("dark.errAddMode", { why: why || t("dark.errAddModePlan") }) };
+    }
+    let changed = modeCreated;
+    try {
+      vars = await figma.variables.getLocalVariablesAsync();
+      const modeIds = new Set(global.modes.map((m) => m.modeId));
+      const written = /* @__PURE__ */ new Set();
+      for (const [xid, h] of pick) {
+        const x = byId.get(xid);
+        const prev = readDarkFill(x)[to];
+        if ((prev == null ? void 0 : prev.by) === "user" && prev.d !== h) continue;
+        x.setValueForMode(to, rgbaOfHex8(h));
+        const rec = pruneRecord(readDarkFill(x), modeIds);
+        rec[to] = { f: from, l: (_c = hex8(x.valuesByMode[from])) != null ? _c : "", d: (_d = hex8(x.valuesByMode[to])) != null ? _d : h, by: "user" };
+        writeDarkFill(x, rec);
+        written.add(xid);
+        changed = true;
+      }
+      let removedDark = 0;
+      if (doMigrate && semantic && oldMode) {
+        semantic.removeMode(oldMode.modeId);
+        changed = true;
+        const colsNow = await figma.variables.getLocalVariableCollectionsAsync();
+        const varsNow = await figma.variables.getLocalVariablesAsync();
+        for (const d of unusedDarkCopies(global, colsNow, varsNow)) {
+          d.remove();
+          removedDark++;
+        }
+        vars = await figma.variables.getLocalVariablesAsync();
+      }
+      let filled = 0;
+      let kept = 0;
+      const targets = darkTargets(global, vars, from);
+      const fromHexOf = (v) => hex8(v.valuesByMode[from]);
+      const writeCalc = (v, rec) => {
+        var _a2;
+        const light = v.valuesByMode[from];
+        const la = typeof light.a === "number" ? light.a : 1;
+        v.setValueForMode(to, __spreadProps(__spreadValues({}, hexToRgb(darkValueForLight(rgbToHex(light)))), { a: la }));
+        rec[to] = { f: from, l: fromHexOf(v), d: (_a2 = hex8(v.valuesByMode[to])) != null ? _a2 : "", by: "calc" };
+        writeDarkFill(v, rec);
+        filled++;
+        changed = true;
+      };
+      for (const v of targets) {
+        if (written.has(v.id)) continue;
+        const rec = pruneRecord(readDarkFill(v), modeIds);
+        const darkRaw = v.valuesByMode[to];
+        const entry = rec[to];
+        if (modeCreated || darkRaw === void 0 || darkRaw === null) {
+          writeCalc(v, rec);
+          continue;
+        }
+        const darkNow = cellKey(darkRaw);
+        if (entry && entry.by === "user") {
+          kept++;
+          continue;
+        }
+        if (entry && entry.by === "calc") {
+          if (darkNow !== entry.d) {
+            rec[to] = { f: from, l: fromHexOf(v), d: darkNow != null ? darkNow : "", by: "user" };
+            writeDarkFill(v, rec);
+            changed = true;
+            kept++;
+            continue;
+          }
+          const fStale = !modeIds.has(entry.f) || hex8(v.valuesByMode[entry.f]) !== entry.l || from !== entry.f;
+          if (fStale) writeCalc(v, rec);
+          continue;
+        }
+        if (darkNow === fromHexOf(v)) writeCalc(v, rec);
+        else {
+          rec[to] = { f: from, l: fromHexOf(v), d: darkNow != null ? darkNow : "", by: "user" };
+          writeDarkFill(v, rec);
+          changed = true;
+          kept++;
+        }
+      }
+      const moved = written.size;
+      const splitWritten = splitNames.filter((n) => vars.some((v) => written.has(v.id) && v.name === n));
+      if (modeCreated && filled === 0 && moved === 0) {
+        try {
+          global.removeMode(to);
+          modeCreated = false;
+        } catch (e) {
+        }
+      }
+      const out = { filled, kept, targets: targets.length, changed };
+      if (modeCreated) out.modeCreated = true;
+      if (doMigrate) out.migrated = { moved, split: splitWritten.length, failed: failedNames.length, splitNames: splitWritten, failedNames, removedDark };
+      return out;
+    } catch (e) {
+      if (changed && e && typeof e === "object") e[CHANGED_FLAG] = true;
+      throw e;
+    }
+  }
+  function pruneRecord(rec, modeIds) {
+    const out = {};
+    for (const [k, e] of Object.entries(rec)) if (modeIds.has(k) && e && typeof e === "object") out[k] = e;
+    return out;
   }
 
   // src/lib/entitlements.ts
@@ -11100,7 +11290,7 @@
 
   // src/lib/varTable.ts
   var NO_GROUP = t("list.noGroup");
-  function cellKey(c) {
+  function cellKey2(c) {
     var _a;
     if (!c) return "";
     switch (c.kind) {
@@ -11116,7 +11306,7 @@
         return `a:${"targetId" in c ? c.targetId : c.aliasId}`;
     }
   }
-  var sameCell = (a, b) => cellKey(a) === cellKey(b);
+  var sameCell = (a, b) => cellKey2(a) === cellKey2(b);
 
   // src/code.ts
   figma.showUI(__html__, { width: UI_WIDTH, height: uiHeight("default"), themeColors: true });
@@ -11237,15 +11427,14 @@
     }
   }
   async function postPrereq() {
-    var _a, _b;
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
       const vars = await figma.variables.getLocalVariablesAsync();
       const tiers = collectionTiers(cols, vars);
       const globalIds = new Set(cols.filter((c) => tiers.get(c.id) === 1).map((c) => c.id));
       const bindableIds = new Set(cols.filter((c) => {
-        var _a2;
-        return ((_a2 = tiers.get(c.id)) != null ? _a2 : 0) > 0;
+        var _a;
+        return ((_a = tiers.get(c.id)) != null ? _a : 0) > 0;
       }).map((c) => c.id));
       const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
       const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
@@ -11253,17 +11442,17 @@
       const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
       const semanticIds = new Set(cols.filter((c) => {
-        var _a2;
-        return ((_a2 = tiers.get(c.id)) != null ? _a2 : 0) >= 2;
+        var _a;
+        return ((_a = tiers.get(c.id)) != null ? _a : 0) >= 2;
       }).map((c) => c.id));
-      const hasDarkMode = ((_b = (_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.modes.length) != null ? _b : 0) > 1;
+      const { hasDarkMode, darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
       const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
     } catch (e) {
     }
   }
@@ -13688,13 +13877,24 @@
         }
         case "GENERATE_DARK_MODE": {
           if (!requirePaid("tokens")) break;
-          const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+          let res;
+          try {
+            res = await generateDarkMode(msg.migrate === true);
+          } catch (e) {
+            if (darkChangedBeforeError(e)) {
+              commitUndo(figma);
+              await postPrereq();
+              post({ type: "VARIABLES", vars: await collectVars() });
+            }
+            throw e;
+          }
+          const _m = res, { changed } = _m, r = __objRest(_m, ["changed"]);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
-          if (r.created || r.realiased || r.modeCreated) {
+          if (changed) {
             commitUndo(figma);
             await postPrereq();
           }
-          post({ type: "VARIABLES", vars: await collectVars() });
+          if (!r.needMigrate) post({ type: "VARIABLES", vars: await collectVars() });
           break;
         }
       }

@@ -113,7 +113,6 @@ import {
   scopesForTypeList,
   hexToOklch,
   darkValueForLight,
-  darkGlobalName,
   isDarkGlobalName,
   DARK_L_MIN,
   DARK_L_MAX,
@@ -2130,6 +2129,20 @@ test('pipelineSteps — 전제에 따른 단계 상태', () => {
   assert.deepEqual(ran.map((s) => s.status), ['done', 'done', 'done', 'todo', 'done', 'done', 'done']);
 });
 
+test('pipelineSteps — 다크 줄 세 모습(ia-v4 §4.6 "다크 모드 줄" · ia-v3 A.25)', () => {
+  const none = { hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasDarkMode: false, hasTextStyles: false };
+  const dark = (s) => pipelineSteps({ ...none, ...s })[3];
+  // 없음 → todo(상태 글은 "만들기" — hint 없음)
+  assert.deepEqual(dark({}), { id: 'dark', status: 'todo' });
+  // 있음 · 없는 색 0(필드 없음 포함) → done
+  assert.deepEqual(dark({ hasDarkMode: true }), { id: 'dark', status: 'done' });
+  assert.deepEqual(dark({ hasDarkMode: true, darkUnfilled: 0 }), { id: 'dark', status: 'done' });
+  // 있음 · Dark 값이 없는 색 3 → todo + 상태 글 매개
+  const d = dark({ hasDarkMode: true, darkUnfilled: 3 });
+  assert.deepEqual(d, { id: 'dark', status: 'todo', hint: 'pipeline.hint.darkUnfilled', hintParams: { n: 3 } });
+  assert.equal(t(d.hint, d.hintParams), 'Dark 값이 없는 색 3개');
+});
+
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */
 test('t — 키 조회·보간·폴백', () => {
   assert.equal(t('rename.none'), '바꿀 이름이 없어요');
@@ -2731,11 +2744,7 @@ test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 �
   for (const l of ls) assert.ok(l >= DARK_L_MIN - eps && l <= DARK_L_MAX + eps, `대역 이탈 L=${l}`);
 });
 
-test('darkGlobalName — dark/ 그룹 접두 · 멱등', () => {
-  assert.equal(darkGlobalName('color/blue/500'), 'dark/color/blue/500');
-  // 다크 모드를 출처로 재실행해도 dark/dark/…가 생기지 않는다.
-  assert.equal(darkGlobalName('dark/color/blue/500'), 'dark/color/blue/500');
-  assert.equal(darkGlobalName(darkGlobalName('color/blue/500')), 'dark/color/blue/500');
+test('isDarkGlobalName — 옛 dark/ 복사본 이름(채우기 · 수에서 건너뜀 — ia-v3 13.7)', () => {
   assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
   assert.equal(isDarkGlobalName('color/blue/500'), false);
 });

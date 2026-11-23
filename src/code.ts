@@ -23,7 +23,7 @@ import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type Ke
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
-import { generateDarkMode } from './lib/themeApply';
+import { generateDarkMode, darkPrereq, darkChangedBeforeError } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
 import { LicenseCache, LicenseStatus, evaluateLicense, cacheFromVerify, normalizeLicenseCache, isVerifyErrCode } from './lib/license';
 import { PURCHASE_URL, PORTAL_URL } from './lib/licenseConfig';
@@ -206,9 +206,9 @@ async function postPrereq(): Promise<void> {
     const hasScaleVars = globals.some((v) => v.resolvedType !== 'COLOR'); // 간격·크기·폰트
     const hasGlobal = globals.length > 0;
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    // 다크는 플러그인 Semantic의 모드가 둘 이상일 때 완료(§2.13 13.7 — 다크는 플러그인 Semantic에만 만든다).
+    // 다크는 플러그인 Global의 모드가 둘 이상 또는 옛 구조(Semantic에 Dark 모드)면 완료 · Dark 값이 없는 색 수(ia-v3 13.7 D-T1).
     const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
-    const hasDarkMode = (ownedCollection(cols, 'semantic')?.modes.length ?? 0) > 1;
+    const { hasDarkMode, darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
     // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
@@ -216,7 +216,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars });
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -2882,16 +2882,28 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GENERATE_DARK_MODE': {
-        // 다크 Global을 새로 만드는 작업이라 토큰 생성과 같은 등급으로 잠근다.
+        // 다크 값을 새로 쓰는 작업이라 토큰 생성과 같은 등급으로 잠근다.
         if (!requirePaid('tokens')) break;
-        // toModeId 생략 시 themeApply가 Dark 모드를 ensure(없으면 addMode('Dark')).
-        const r = await generateDarkMode(msg.collectionId, msg.fromModeId, msg.toModeId);
+        // 대상 · 모드는 플러그인이 정한다(플러그인 Global · 기본 모드 → Dark — ia-v3 13.7).
+        let res;
+        try {
+          res = await generateDarkMode(msg.migrate === true);
+        } catch (e) {
+          // 옮기기 + 채우기 중간에 예외 — 바꾼 것이 있으면 한 묶음으로(⌘Z 한 번) 커밋한 뒤 ERROR.
+          if (darkChangedBeforeError(e)) {
+            commitUndo(figma);
+            await postPrereq();
+            post({ type: 'VARIABLES', vars: await collectVars() }); // 성공 때처럼 목록 갱신(모드가 바뀌었을 수 있다)
+          }
+          throw e;
+        }
+        const { changed, ...r } = res;
         post({ type: 'DARK_MODE_RESULT', ...r });
-        if (r.created || r.realiased || r.modeCreated) {
-          commitUndo(figma); // UX2: 모드 추가+채움 전체를 단일 Undo로
+        if (changed) {
+          commitUndo(figma); // UX2: 옮기기 + 모드 추가 + 채움 전체를 단일 Undo로
           await postPrereq();
         }
-        post({ type: 'VARIABLES', vars: await collectVars() }); // 모드가 늘었을 수 있으니 목록 갱신
+        if (!r.needMigrate) post({ type: 'VARIABLES', vars: await collectVars() }); // 모드가 바뀌었을 수 있으니 목록 갱신
         break;
       }
     }

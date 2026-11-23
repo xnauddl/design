@@ -13,6 +13,7 @@
         dist/ 밖에 고친 파일이 있으면 멈춘다(사용자 작업을 지우지 않는다).
      3. 브랜치를 바꾸고(인자가 있을 때) 원격 최신으로 앞으로만 옮긴다(--ff-only).
         앞으로만 옮길 수 없어도, 로컬에만 있는 커밋이 모두 이미 main에 들어간 것이면(병합 뒤 브랜치를 다시 맞춘 경우) 원격으로 맞춘다.
+        합쳐서 병합(squash)해 커밋 번호가 다른 경우도 내용이 main에 다 있으면 같다고 본다. 맞추기 전 위치는 backup/<브랜치>에 남긴다.
         원격이 새로 들이는 파일과 이름이 같은 '추적 안 하는' 로컬 파일은 같은 내용이면 지우고, 다르면 .local로 옮긴다.
      4. 받아 온 커밋 · 창 크기(dist/code.js의 UI_WIDTH)를 보여 준다.
    ============================================================ */
@@ -22,7 +23,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024 }).trim();
 const fail = (msg) => {
   console.error(`✗ ${msg}`);
   process.exit(1);
@@ -86,12 +87,42 @@ try {
   const merged = (c) => {
     try { git('merge-base', '--is-ancestor', c, 'origin/main'); return true; } catch { return false; }
   };
+  // 합쳐서 병합(squash)한 PR은 커밋 번호가 main과 달라 위 검사로는 '안 들어감'으로 보인다.
+  // 그래서 로컬 HEAD를 main에 병합해 봐서(파일은 건드리지 않는 merge-tree) main과 내용이 똑같으면
+  // 로컬 커밋의 변경이 모두 main에 이미 있는 것으로 본다. 충돌하거나 git이 오래돼 못 하면 들어가지 않은 것으로 본다(안전한 쪽).
+  // ① 로컬 커밋들을 합친 변경(갈라진 곳 → HEAD)과 똑같은 변경의 커밋이 main에 있으면(squash 병합 커밋) 들어간 것.
+  // ② 아니면 로컬 HEAD를 main에 병합해 봐서(파일은 건드리지 않는 merge-tree) 결과가 main과 같으면 들어간 것.
+  // 둘 다 아니거나(충돌 포함) git이 오래돼 못 하면 들어가지 않은 것으로 본다(안전한 쪽).
+  const patchId = (diff) => {
+    const out = execFileSync('git', ['patch-id', '--stable'], { cwd: root, input: diff, encoding: 'utf8' }).trim();
+    return out.split(/\s+/)[0] || '';
+  };
+  const contentInMain = () => {
+    try {
+      const base = git('merge-base', 'origin/main', 'HEAD');
+      const mine = patchId(git('diff', '--full-index', '--binary', base, 'HEAD'));
+      if (mine) {
+        for (const c of git('rev-list', '--no-merges', `${base}..origin/main`).split('\n').filter(Boolean)) {
+          if (patchId(git('diff', '--full-index', '--binary', `${c}^`, c)) === mine) return true;
+        }
+      }
+    } catch { /* ②로 */ }
+    try {
+      const tree = git('merge-tree', '--write-tree', 'origin/main', 'HEAD').split('\n')[0];
+      return tree === git('rev-parse', 'origin/main^{tree}');
+    } catch {
+      return false;
+    }
+  };
   const unmerged = localOnly.filter((c) => !merged(c));
-  if (unmerged.length) {
+  if (unmerged.length && !contentInMain()) {
     fail(`앞으로만 옮길 수 없어요(main에 없는 로컬 커밋 ${unmerged.length}개). Claude에게 이 메시지를 알려 주세요:\n  ${String(e.stderr || e.message).trim()}`);
   }
+  // 되돌릴 수 있게 맞추기 전 위치를 백업 브랜치로 남긴다(같은 이름이 있으면 덮어씀).
+  const backup = `backup/${branch}`;
+  git('branch', '-f', backup, 'HEAD');
   git('reset', '--hard', `origin/${branch}`);
-  console.log(`· 이미 main에 들어간 로컬 커밋 ${localOnly.length}개를 두고 원격 ${branch}로 맞춤`);
+  console.log(`· 이미 main에 들어간 로컬 커밋 ${localOnly.length}개를 두고 원격 ${branch}로 맞춤(맞추기 전 위치: ${backup})`);
 }
 
 const after = git('log', '-1', '--oneline');
