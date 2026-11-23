@@ -3209,11 +3209,28 @@
     });
     return b;
   }
+  var pointerMode = false;
+  var pointerWatch = false;
+  var KEYBOARD_NAV = /* @__PURE__ */ new Set(["Tab", "ArrowUp", "ArrowDown", "Home", "End", "ArrowLeft", "ArrowRight", "Enter"]);
+  function watchPointer() {
+    if (pointerWatch) return;
+    pointerWatch = true;
+    document.addEventListener("pointerdown", () => {
+      pointerMode = true;
+    }, true);
+    document.documentElement.addEventListener("pointerleave", () => {
+      pointerMode = true;
+    });
+    document.addEventListener("keydown", (e) => {
+      if (KEYBOARD_NAV.has(e.key)) pointerMode = false;
+    }, true);
+  }
   function renderTree(mount, items, opts) {
     var _a3, _b, _c;
     const active = document.activeElement;
     const hadFocus = !!active && mount.contains(active) && !active.matches("input, textarea");
     const focusKey2 = hadFocus ? (_b = (_a3 = active.closest("[data-tkey]")) == null ? void 0 : _a3.dataset.tkey) != null ? _b : null : (_c = mount.dataset.focusKey) != null ? _c : null;
+    watchPointer();
     mount.replaceChildren();
     mount.setAttribute("role", "treegrid");
     const flat = [];
@@ -3410,6 +3427,10 @@
         break;
       case " ":
       case "Spacebar": {
+        if (e.repeat || pointerMode) {
+          e.preventDefault();
+          return;
+        }
         const sw = cur.querySelector(":scope > .bv-switch");
         if (!sw || sw.getAttribute("aria-disabled") === "true") {
           e.preventDefault();
@@ -7371,7 +7392,7 @@
   var mkTsFor = null;
   var mkScanReq = 0;
   var mkTsReading = false;
-  var mkTsOff = /* @__PURE__ */ new Set();
+  var mkTsOn = /* @__PURE__ */ new Set();
   var mkTsNames = /* @__PURE__ */ new Map();
   var mkEditSig = null;
   var mkTsPending = null;
@@ -7394,13 +7415,14 @@
     var _a3;
     return ((_a3 = mkStates[tk.name]) == null ? void 0 : _a3.state) === "manual";
   };
+  var mkOnDefault = (tk) => mkKind(tk) !== "text";
   var mkOnNoLib = (tk) => {
     var _a3;
-    return !mkLocked(tk) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : true);
+    return !mkLocked(tk) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : mkOnDefault(tk));
   };
   var mkIsOn = (tk) => {
     var _a3;
-    return !mkLocked(tk) && (mkTouched.has(tk.name) || !mkOffByLib.has(tk.name)) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : true);
+    return !mkLocked(tk) && (mkTouched.has(tk.name) || !mkOffByLib.has(tk.name)) && ((_a3 = mkOn.get(tk.name)) != null ? _a3 : mkOnDefault(tk));
   };
   function mkSetOn(name, on) {
     mkOn.set(name, on);
@@ -7423,10 +7445,10 @@
     var _a3;
     return (_a3 = mkTsNames.get(tsSig(s))) != null ? _a3 : s.name;
   };
-  var mkTsOnList = () => isPaid ? mkTs.filter((s) => !mkTsOff.has(tsSig(s))) : [];
+  var mkTsOnList = () => isPaid ? mkTs.filter((s) => mkTsOn.has(tsSig(s))) : [];
   var mkReady = () => !!baseline && mkFor === baseKey() && !mkReading && (!isPaid || mkTsFor === baseKey() && !mkTsReading);
   function mkTsConflict(s) {
-    if (mkTsOff.has(tsSig(s))) return null;
+    if (!mkTsOn.has(tsSig(s))) return null;
     const name = mkTsName(s);
     const sig = tsSig(s);
     if (mkTsOnList().some((o) => o !== s && mkTsName(o) === name)) return "dup";
@@ -7524,16 +7546,14 @@
     mkSendPreview();
   }
   function onMakePreview(msg) {
-    var _a3, _b, _c, _d, _e, _f;
-    const prev = mkStates;
+    var _a3, _b, _c, _d;
     mkStates = __spreadValues(__spreadValues({}, mkStates), (_a3 = msg.tokenStates) != null ? _a3 : {});
-    for (const [name, st] of Object.entries((_b = msg.tokenStates) != null ? _b : {})) if (((_c = prev[name]) == null ? void 0 : _c.state) === "manual" && st.state !== "manual") mkOn.set(name, true);
     if (mkPreviewTagsOnly) {
       mkPreview = null;
       mkRoleRows = [];
     } else {
-      mkPreview = { g: msg.created + msg.updated, r: (_d = msg.roles) != null ? _d : 0, m: (_e = msg.skippedManual) != null ? _e : 0 };
-      mkRoleRows = (_f = msg.roleRows) != null ? _f : [];
+      mkPreview = { g: msg.created + msg.updated, r: (_b = msg.roles) != null ? _b : 0, m: (_c = msg.skippedManual) != null ? _c : 0 };
+      mkRoleRows = (_d = msg.roleRows) != null ? _d : [];
     }
     renderMakeScreen();
   }
@@ -7548,7 +7568,7 @@
     mkTsDecimal = (_a3 = msg.decimalRows) != null ? _a3 : [];
     mkTsExisting = (_b = msg.existing) != null ? _b : [];
     const sigs = new Set(mkTs.map(tsSig));
-    for (const k of Array.from(mkTsOff)) if (!sigs.has(k)) mkTsOff.delete(k);
+    for (const k of Array.from(mkTsOn)) if (!sigs.has(k)) mkTsOn.delete(k);
     mkTsFor = baseKey();
     renderMakeScreen();
   }
@@ -7658,7 +7678,7 @@
         }
         const s = x;
         const sig = tsSig(s);
-        const on = !mkTsOff.has(sig);
+        const on = mkTsOn.has(sig);
         const cells = [trLeadAa(), mkLayers(s.count)];
         if (mkEditSig === sig) cells.push(mkEditInput(s));
         else {
@@ -7681,7 +7701,7 @@
           cells,
           onEdit: () => mkStartEdit(sig),
           sw: { state: on, label: t("make.rowAria", { name: mkTsName(s) }), onToggle: () => {
-            on ? mkTsOff.add(sig) : mkTsOff.delete(sig);
+            on ? mkTsOn.delete(sig) : mkTsOn.add(sig);
             renderMakeScreen();
           } }
         });
@@ -8135,8 +8155,8 @@
   $("makeSemLic").addEventListener("click", () => goToLicense());
   function mkSetAll(on) {
     if (mkTab === "ts") {
-      if (on) mkTsOff.clear();
-      else for (const s of mkTs) mkTsOff.add(tsSig(s));
+      if (on) for (const s of mkTs) mkTsOn.add(tsSig(s));
+      else mkTsOn.clear();
     } else {
       for (const tk of mkTokens) if (!mkLocked(tk)) mkSetOn(tk.name, on);
       mkPreviewSoon();

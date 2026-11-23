@@ -96,11 +96,29 @@ function swEl(sw: TreeSwitch, locked: boolean): HTMLButtonElement {
   return b;
 }
 
+/**
+ * 포인터 표시(ia-v4 §2.7 키보드 "B.32 PR 뒤 — Space는 마지막 포커스가 키보드로 왔을 때만") — 문서 전체에 하나.
+ * 켬 = 캡처 단계 pointerdown(어디든) · 마우스가 창을 떠남(documentElement pointerleave — 피그마 캔버스 손 도구 Space).
+ * 끔 = 캡처 단계 keydown Tab(Shift+Tab) · ↑↓ · Home/End · ← → · Enter. 처리기는 표시만 바꾼다(preventDefault · stopPropagation 없음).
+ * 다시 그리기 · 스크립트 포커스 · focusin은 표시를 바꾸지 않는다. :focus-visible은 키를 누르는 순간 참이 되어 쓰지 않는다.
+ */
+let pointerMode = false;
+let pointerWatch = false;
+const KEYBOARD_NAV = new Set(['Tab', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'ArrowLeft', 'ArrowRight', 'Enter']);
+function watchPointer(): void {
+  if (pointerWatch) return;
+  pointerWatch = true;
+  document.addEventListener('pointerdown', () => { pointerMode = true; }, true);
+  document.documentElement.addEventListener('pointerleave', () => { pointerMode = true; });
+  document.addEventListener('keydown', (e) => { if (KEYBOARD_NAV.has(e.key)) pointerMode = false; }, true);
+}
+
 /** 트리를 그린다. 포커스가 트리 안에 있었으면 같은 key 줄로 되돌린다. */
 export function renderTree(mount: HTMLElement, items: readonly TreeItem[], opts: TreeOptions): void {
   const active = document.activeElement as HTMLElement | null;
   const hadFocus = !!active && mount.contains(active) && !active.matches('input, textarea');
   const focusKey = hadFocus ? active!.closest<HTMLElement>('[data-tkey]')?.dataset.tkey ?? null : mount.dataset.focusKey ?? null;
+  watchPointer();
   mount.replaceChildren();
   mount.setAttribute('role', 'treegrid');
   const flat: Flat[] = [];
@@ -292,6 +310,8 @@ function onKey(mount: HTMLElement, e: KeyboardEvent): void {
       break;
     case ' ':
     case 'Spacebar': {
+      // 되풀이(누르고 있음 — 피그마 손 도구) · 마지막 포커스가 마우스로 왔을 때는 바꾸지 않는다(B.32).
+      if (e.repeat || pointerMode) { e.preventDefault(); return; }
       const sw = cur.querySelector<HTMLButtonElement>(':scope > .bv-switch');
       if (!sw || sw.getAttribute('aria-disabled') === 'true') { e.preventDefault(); return; }
       it.sw?.onToggle();
