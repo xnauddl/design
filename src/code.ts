@@ -208,7 +208,7 @@ async function postPrereq(): Promise<void> {
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
     // 다크는 플러그인 Global의 모드가 둘 이상 또는 옛 구조(Semantic에 Dark 모드)면 완료 · Dark 값이 없는 색 수(ia-v3 13.7 D-T1).
     const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
-    const { hasDarkMode, darkUnfilled, darkOld } = darkPrereq(cols, vars);
+    const { hasDarkMode, darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
     const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
     const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
     // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
@@ -216,7 +216,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld });
+    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -2893,6 +2893,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (darkChangedBeforeError(e)) {
             commitUndo(figma);
             await postPrereq();
+            post({ type: 'VARIABLES', vars: await collectVars() }); // 성공 때처럼 목록 갱신(모드가 바뀌었을 수 있다)
           }
           throw e;
         }

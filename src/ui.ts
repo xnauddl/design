@@ -78,6 +78,7 @@ let hasDarkMode = false;
 /** Dark 값이 없는 색 수 · 옛 구조(PREREQ_STATE — ia-v3 13.7 D-T1). 필드가 없으면 0 · 거짓. */
 let darkUnfilled = 0;
 let darkOld = false;
+let darkOldManual = false;
 let hasTextStyles = false;
 let hasSemanticRoles = false; // 역할 별칭 존재(역할 매핑 완료)
 let hasBoundNodes = false; // 현재 선택에 변수 붙은 레이어 존재(변수 연결 완료)
@@ -2162,18 +2163,13 @@ function refreshDarkPrereq(): void {
   renderDarkNotice();
 }
 
-/** 플러그인 Semantic 모드 수(VARIABLES에서) — 옛 구조를 옮길 수 있나(셋 이상이면 못 옮김). */
-function semanticModeCount(): number {
-  return allVars.find((v) => v.owned === 'semantic')?.modes.length ?? 0;
-}
-
-/** 알림 띠 `#darkNotice`(ia-v4 §4.11 ②) — 옛 구조 · Dark 값이 없는 색. 전제 안내 띠가 보이는 동안은 숨긴다. */
+/** 알림 띠 `#darkNotice`(ia-v4 §4.11 ②) — 옛 구조(모드 셋 이상이면 PREREQ_STATE.darkOldManual) · Dark 값이 없는 색. 전제 안내 띠가 보이는 동안은 숨긴다. */
 function renderDarkNotice(): void {
   const el = $('darkNotice');
   const prereqShown = $('darkPrereq').style.display !== 'none';
   let text = '';
   if (!prereqShown) {
-    if (darkOld) text = semanticModeCount() >= 3 ? t('dark.needMigrateManual') : t('dark.needMigrate');
+    if (darkOld) text = darkOldManual ? t('dark.needMigrateManual') : t('dark.needMigrate');
     else if (darkUnfilled > 0) text = t('dark.unfilled', { n: darkUnfilled });
   }
   el.textContent = text;
@@ -2639,6 +2635,7 @@ window.onmessage = (event: MessageEvent) => {
       hasDarkMode = msg.hasDarkMode;
       darkUnfilled = msg.darkUnfilled ?? 0;
       darkOld = msg.darkOld ?? false;
+      darkOldManual = msg.darkOldManual ?? false;
       hasTextStyles = msg.hasTextStyles;
       hasSemanticRoles = msg.hasSemanticRoles;
       updateGates();

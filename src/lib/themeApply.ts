@@ -160,7 +160,8 @@ export function countDarkUnfilled(cols: readonly VariableCollection[], vars: rea
     const filled = Object.entries(rec).some(([to, e]) => {
       if (!modeIds.has(to) || !e) return false;
       if (e.by === 'user') return true;
-      return e.by === 'calc' && modeIds.has(e.f) && hex8(v.valuesByMode[e.f]) === e.l;
+      // 다시 누를 때 다시 계산하는 calc(f 모드 없음 · f 칸 ≠ l · 기본 모드가 바뀜 — generate의 fStale)는 채우지 않은 색으로 센다.
+      return e.by === 'calc' && e.f === global.defaultModeId && hex8(v.valuesByMode[e.f]) === e.l;
     });
     if (!filled) n++;
   }
@@ -168,13 +169,16 @@ export function countDarkUnfilled(cols: readonly VariableCollection[], vars: rea
 }
 
 /** 준비 현황 · 다크 화면 띠에 쓰는 다크 상태(code.ts `postPrereq`). */
-export function darkPrereq(cols: readonly VariableCollection[], vars: readonly Variable[]): { hasDarkMode: boolean; darkUnfilled: number; darkOld: boolean } {
+export function darkPrereq(cols: readonly VariableCollection[], vars: readonly Variable[]): { hasDarkMode: boolean; darkUnfilled: number; darkOld: boolean; darkOldManual: boolean } {
   const global = ownedCollection(cols, 'global');
-  const darkOld = !!oldDarkMode(ownedCollection(cols, 'semantic'));
+  const semantic = ownedCollection(cols, 'semantic');
+  const darkOld = !!oldDarkMode(semantic);
   return {
     hasDarkMode: (global?.modes.length ?? 0) > 1 || darkOld,
     darkUnfilled: countDarkUnfilled(cols, vars),
     darkOld,
+    // 옛 구조인데 Semantic 모드가 셋 이상 — 옮기기를 거절하는 경우(띠 dark.needMigrateManual).
+    darkOldManual: darkOld && (semantic?.modes.length ?? 0) >= 3,
   };
 }
 
@@ -255,7 +259,13 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
       if (D === undefined || D === null) continue; // 옮길 것 없음
       if (isVariableAlias(L) && isVariableAlias(D) && L.id === D.id) continue;
       if (!isVariableAlias(L) && !isVariableAlias(D) && hex8(L) !== null && hex8(L) === hex8(D)) continue;
-      if (!isVariableAlias(L)) { failedNames.push(s.name); continue; }
+      if (!isVariableAlias(L)) {
+        // 값을 직접 넣은 Light — Dark를 색으로 푼 값과 같으면 옮길 것 없음, 다르면(또는 못 풀면) c.
+        const dh = hex8(resolveColor(D, byId, defOf));
+        if (dh !== null && hex8(L) !== null && dh === hex8(L)) continue;
+        failedNames.push(s.name);
+        continue;
+      }
       const x = byId.get(L.id);
       if (!x || x.variableCollectionId !== global.id || x.resolvedType !== 'COLOR' || isManual(x) || !isColor(x.valuesByMode[from])) {
         failedNames.push(s.name);
@@ -303,6 +313,10 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
     const written = new Set<string>();
     for (const [xid, h] of pick) {
       const x = byId.get(xid)!;
+      // Global Dark 칸에 이미 사용자 기록(by: user)이 있고 그 값이 고른 색과 다르면 덮지 않는다 — 옮긴 색에 세지 않고
+      // ⑥에서 k로 센다(A.25 구현 메모). 같은 값이면(④ 전에 멈춘 옮기기를 다시 할 때 등) 그대로 옮긴 색으로 센다.
+      const prev = readDarkFill(x)[to];
+      if (prev?.by === 'user' && prev.d !== h) continue;
       x.setValueForMode(to, rgbaOfHex8(h));
       const rec = pruneRecord(readDarkFill(x), modeIds);
       rec[to] = { f: from, l: hex8(x.valuesByMode[from]) ?? '', d: hex8(x.valuesByMode[to]) ?? h, by: 'user' };
@@ -375,7 +389,8 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
         kept++;
       }
     }
-    const moved = pick.size;
+    const moved = written.size;
+    const splitWritten = splitNames.filter((n) => vars.some((v) => written.has(v.id) && v.name === n));
     // 새로 만든 모드에 쓴 칸이 하나도 없으면 지운다(준비 현황이 ✓로 뒤집히지 않게).
     if (modeCreated && filled === 0 && moved === 0) {
       try {
@@ -387,7 +402,7 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
     }
     const out: DarkModeResult = { filled, kept, targets: targets.length, changed };
     if (modeCreated) out.modeCreated = true;
-    if (doMigrate) out.migrated = { moved, split: splitNames.length, failed: failedNames.length, splitNames, failedNames, removedDark };
+    if (doMigrate) out.migrated = { moved, split: splitWritten.length, failed: failedNames.length, splitNames: splitWritten, failedNames, removedDark };
     return out;
   } catch (e) {
     if (changed && e && typeof e === 'object') (e as Record<string, unknown>)[CHANGED_FLAG] = true;

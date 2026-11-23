@@ -4619,6 +4619,7 @@
   var hasDarkMode = false;
   var darkUnfilled = 0;
   var darkOld = false;
+  var darkOldManual = false;
   var hasTextStyles = false;
   var hasSemanticRoles = false;
   var hasBoundNodes = false;
@@ -6350,16 +6351,12 @@
     setLock($("btnGenDark"), !isPaid ? "paid" : ok ? null : "prereq", ((_a3 = text == null ? void 0 : text.textContent) != null ? _a3 : "") || t("status.noSelection"));
     renderDarkNotice();
   }
-  function semanticModeCount() {
-    var _a3, _b;
-    return (_b = (_a3 = allVars.find((v) => v.owned === "semantic")) == null ? void 0 : _a3.modes.length) != null ? _b : 0;
-  }
   function renderDarkNotice() {
     const el = $("darkNotice");
     const prereqShown = $("darkPrereq").style.display !== "none";
     let text = "";
     if (!prereqShown) {
-      if (darkOld) text = semanticModeCount() >= 3 ? t("dark.needMigrateManual") : t("dark.needMigrate");
+      if (darkOld) text = darkOldManual ? t("dark.needMigrateManual") : t("dark.needMigrate");
       else if (darkUnfilled > 0) text = t("dark.unfilled", { n: darkUnfilled });
     }
     el.textContent = text;
@@ -6467,7 +6464,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6748,6 +6745,7 @@
         hasDarkMode = msg.hasDarkMode;
         darkUnfilled = (_o = msg.darkUnfilled) != null ? _o : 0;
         darkOld = (_p = msg.darkOld) != null ? _p : false;
+        darkOldManual = (_q = msg.darkOldManual) != null ? _q : false;
         hasTextStyles = msg.hasTextStyles;
         hasSemanticRoles = msg.hasSemanticRoles;
         updateGates();
@@ -6760,7 +6758,7 @@
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_q = msg.noteKind) != null ? _q : "ok");
+          setStatus("licenseStatus", msg.note, (_r = msg.noteKind) != null ? _r : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -6776,7 +6774,7 @@
         }
         saveExportFile(msg.content, msg.format);
         const saved = t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" });
-        const clash = exportClashNotice((_r = msg.clashes) != null ? _r : []);
+        const clash = exportClashNotice((_s = msg.clashes) != null ? _s : []);
         setStatus("exportStatus", clash ? `${saved} ${clash}` : saved, clash ? "warn" : "ok");
         break;
       }
@@ -6786,7 +6784,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_s = msg.autoNamed) != null ? _s : 0);
+        setCompAutoNamed((_t = msg.autoNamed) != null ? _t : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6801,12 +6799,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_t = msg.placeFailed) != null ? _t : [];
-        const cloned = (_u = msg.placeCloned) != null ? _u : [];
-        const propFailed = (_v = msg.propFailed) != null ? _v : [];
-        const fillKept = (_w = msg.fillKept) != null ? _w : [];
-        const reused = (_x = msg.reused) != null ? _x : [];
-        const reuseKept = (_y = msg.reuseKept) != null ? _y : [];
+        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
+        const cloned = (_v = msg.placeCloned) != null ? _v : [];
+        const propFailed = (_w = msg.propFailed) != null ? _w : [];
+        const fillKept = (_x = msg.fillKept) != null ? _x : [];
+        const reused = (_y = msg.reused) != null ? _y : [];
+        const reuseKept = (_z = msg.reuseKept) != null ? _z : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures, reused));

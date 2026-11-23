@@ -335,6 +335,8 @@ export type CodeToUi =
       darkUnfilled?: number;
       /** 옛 구조(플러그인 Semantic에 Dark 모드) — 다크 화면 띠. 없으면 거짓. */
       darkOld?: boolean;
+      /** 옛 구조인데 플러그인 Semantic 모드가 셋 이상(옮기기 거절 — 띠 dark.needMigrateManual). 없으면 거짓. */
+      darkOldManual?: boolean;
     }
   | {
       type: 'LICENSE_STATUS';

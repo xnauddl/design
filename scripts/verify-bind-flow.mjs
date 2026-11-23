@@ -4015,8 +4015,10 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await recv(p, { ...PREREQ, hasDarkMode: true, darkOld: true });
   check('40 darkOld → dark.needMigrate', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요');
   await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV3] });
-  check('40 darkOld + Semantic 모드 셋 → dark.needMigrateManual', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — Semantic 모드가 3개 이상이라 옮길 수 없어요. 피그마에서 모드를 2개로 줄여 주세요' && !(await locked(p, '#btnGenDark')));
+  check('40 띠는 VARIABLES의 모드 수가 아니라 PREREQ_STATE.darkOldManual로 가른다(옛 목록이어도 그대로)', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요');
   await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV] });
+  await recv(p, { ...PREREQ, hasDarkMode: true, darkOld: true, darkOldManual: true });
+  check('40 darkOld + darkOldManual(Semantic 모드 셋 이상) → dark.needMigrateManual · 잠금 없음', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — Semantic 모드가 3개 이상이라 옮길 수 없어요. 피그마에서 모드를 2개로 줄여 주세요' && !(await locked(p, '#btnGenDark')));
   await recv(p, PREREQ);
   check('40 필드 없음 → 띠 없음', await p.$eval('#darkNotice', (e) => e.hidden));
   await recv(p, { ...PREREQ, darkUnfilled: 0, darkOld: false });

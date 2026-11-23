@@ -5168,7 +5168,7 @@
     return made;
   }
   function setGlobalLiteral(v, col, created, t2, type, base) {
-    const modeIds = type === "COLOR" && !created ? [col.defaultModeId] : col.modes.map((m) => m.modeId);
+    const modeIds = created ? col.modes.map((m) => m.modeId) : [col.defaultModeId];
     for (const modeId of modeIds) setGlobalLiteralFor(v, modeId, t2, type, base);
   }
   function setGlobalLiteralFor(v, modeId, t2, type, base) {
@@ -11000,20 +11000,23 @@
       const filled = Object.entries(rec).some(([to, e]) => {
         if (!modeIds.has(to) || !e) return false;
         if (e.by === "user") return true;
-        return e.by === "calc" && modeIds.has(e.f) && hex8(v.valuesByMode[e.f]) === e.l;
+        return e.by === "calc" && e.f === global.defaultModeId && hex8(v.valuesByMode[e.f]) === e.l;
       });
       if (!filled) n++;
     }
     return n;
   }
   function darkPrereq(cols, vars) {
-    var _a;
+    var _a, _b;
     const global = ownedCollection(cols, "global");
-    const darkOld = !!oldDarkMode(ownedCollection(cols, "semantic"));
+    const semantic = ownedCollection(cols, "semantic");
+    const darkOld = !!oldDarkMode(semantic);
     return {
       hasDarkMode: ((_a = global == null ? void 0 : global.modes.length) != null ? _a : 0) > 1 || darkOld,
       darkUnfilled: countDarkUnfilled(cols, vars),
-      darkOld
+      darkOld,
+      // 옛 구조인데 Semantic 모드가 셋 이상 — 옮기기를 거절하는 경우(띠 dark.needMigrateManual).
+      darkOldManual: darkOld && ((_b = semantic == null ? void 0 : semantic.modes.length) != null ? _b : 0) >= 3
     };
   }
   function resolveColor(raw, byId, defOf) {
@@ -11079,6 +11082,8 @@
         if (isVariableAlias(L) && isVariableAlias(D) && L.id === D.id) continue;
         if (!isVariableAlias(L) && !isVariableAlias(D) && hex8(L) !== null && hex8(L) === hex8(D)) continue;
         if (!isVariableAlias(L)) {
+          const dh = hex8(resolveColor(D, byId, defOf));
+          if (dh !== null && hex8(L) !== null && dh === hex8(L)) continue;
           failedNames.push(s.name);
           continue;
         }
@@ -11127,6 +11132,8 @@
       const written = /* @__PURE__ */ new Set();
       for (const [xid, h] of pick) {
         const x = byId.get(xid);
+        const prev = readDarkFill(x)[to];
+        if ((prev == null ? void 0 : prev.by) === "user" && prev.d !== h) continue;
         x.setValueForMode(to, rgbaOfHex8(h));
         const rec = pruneRecord(readDarkFill(x), modeIds);
         rec[to] = { f: from, l: (_c = hex8(x.valuesByMode[from])) != null ? _c : "", d: (_d = hex8(x.valuesByMode[to])) != null ? _d : h, by: "user" };
@@ -11194,7 +11201,8 @@
           kept++;
         }
       }
-      const moved = pick.size;
+      const moved = written.size;
+      const splitWritten = splitNames.filter((n) => vars.some((v) => written.has(v.id) && v.name === n));
       if (modeCreated && filled === 0 && moved === 0) {
         try {
           global.removeMode(to);
@@ -11204,7 +11212,7 @@
       }
       const out = { filled, kept, targets: targets.length, changed };
       if (modeCreated) out.modeCreated = true;
-      if (doMigrate) out.migrated = { moved, split: splitNames.length, failed: failedNames.length, splitNames, failedNames, removedDark };
+      if (doMigrate) out.migrated = { moved, split: splitWritten.length, failed: failedNames.length, splitNames: splitWritten, failedNames, removedDark };
       return out;
     } catch (e) {
       if (changed && e && typeof e === "object") e[CHANGED_FLAG] = true;
@@ -11437,14 +11445,14 @@
         var _a;
         return ((_a = tiers.get(c.id)) != null ? _a : 0) >= 2;
       }).map((c) => c.id));
-      const { hasDarkMode, darkUnfilled, darkOld } = darkPrereq(cols, vars);
+      const { hasDarkMode, darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
       const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
       const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
       const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld });
+      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
     } catch (e) {
     }
   }
@@ -13876,6 +13884,7 @@
             if (darkChangedBeforeError(e)) {
               commitUndo(figma);
               await postPrereq();
+              post({ type: "VARIABLES", vars: await collectVars() });
             }
             throw e;
           }

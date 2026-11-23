@@ -500,11 +500,12 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
 }
 
 /**
- * Global 리터럴 쓰기 — 모드 규칙(ia-v3 13.7 "나중에 만든 Global"): 새 색 변수와 색이 아닌 변수는 **모든 모드**에 같은 값
- * (Dark 칸은 [다크 만들기]를 다시 누를 때 채운다 · 색 아닌 값은 테마로 바뀌지 않는다), 이미 있는 색 변수의 값 바꾸기는 기본 모드만.
+ * Global 리터럴 쓰기 — 모드 규칙(ia-v3 13.7 "나중에 만든 Global"): **새로 만든 변수**는 색이든 아니든 모든 모드에 같은 값
+ * (Dark 칸은 [다크 만들기]를 다시 누를 때 채운다), **이미 있는 변수**의 값 바꾸기는 색이든 아니든 기본 모드만
+ * (사용자가 다른 모드에 직접 넣은 값을 덮지 않는다).
  */
 function setGlobalLiteral(v: Variable, col: VariableCollection, created: boolean, t: DraftToken, type: ResolvedType, base: number): void {
-  const modeIds = type === 'COLOR' && !created ? [col.defaultModeId] : col.modes.map((m) => m.modeId);
+  const modeIds = created ? col.modes.map((m) => m.modeId) : [col.defaultModeId];
   for (const modeId of modeIds) setGlobalLiteralFor(v, modeId, t, type, base);
 }
 function setGlobalLiteralFor(v: Variable, modeId: string, t: DraftToken, type: ResolvedType, base: number): void {
