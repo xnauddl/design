@@ -3377,4 +3377,4 @@ v1.0에서 레이어 › 컴포넌트 하위 탭은 **베타**다. 숨기지 않
 - [x] `exporters.ts`: ②′(같은 이름 Global에 진 대상 — ②′ 없이 푼 T · S를 견줘 같을 때만 ①) · `reaches` 꺼내기 · `exportGlobalDupes` · `exportDupNotice` · `exportStatusTail` · `ExportVarInput.collectionName`
 - [x] `code.ts` EXPORT: `collectionName` 넘김 · `globalDupes` · `globalDupesFrom`, `messages.ts` · `ui.ts`(`exportStatusTail`) · i18n `export.dupGlobal` · `export.dupGlobalMixed`
 - [x] 단위 테스트: ②′ 값 같음 → `var` · 값 다름 → 값 · 별칭끼리 · 설명 다름 · T가 Semantic이면 ②′ 아님 · 서로 엇갈린 두 쌍(순환 없음) · 모드 블록에서 모드마다 · S가 그 모드에서만 ③ → 값 · `exportGlobalDupes`(값 같아도 셈 · 컬렉션 하나 / 섞임 / 이름 없음) · `exportStatusTail`(clash만 · dup만 · 둘 다)
-- [ ] 4검사 · `dist/` 다시 빌드 · 실기 확인(실기 파일 — "DSL UI 재확인" 컬렉션이 있는 파일에서 CSS 내보내기)
+- [x] 4검사 · `dist/` 다시 빌드 · 실기 확인(실기 파일 — "DSL UI 재확인" 컬렉션이 있는 파일에서 CSS 내보내기)
