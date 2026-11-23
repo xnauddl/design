@@ -1507,6 +1507,8 @@
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
     "export.clash": "Global\uACFC \uC774\uB984\uC774 \uAC19\uC740 Semantic {n}\uAC1C\uB294 Global \uAC12\uB9CC \uB0C8\uC5B4\uC694: {names}",
+    "export.dupGlobal": 'Global\uB07C\uB9AC \uC774\uB984\uC774 \uAC19\uC740 {n}\uAC1C\uB294 "{col}" \uAC83\uB9CC \uB0C8\uC5B4\uC694: {names}',
+    "export.dupGlobalMixed": "Global\uB07C\uB9AC \uC774\uB984\uC774 \uAC19\uC740 {n}\uAC1C\uB294 \uC55E \uCEEC\uB809\uC158 \uAC83\uB9CC \uB0C8\uC5B4\uC694: {names}",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -2837,12 +2839,22 @@
     return cssVar(name);
   }
   var CSS_RULE = "=".repeat(74);
+  function shortNames(names) {
+    const shown = names.slice(0, 3).join(", ");
+    const rest = names.length - 3;
+    return rest > 0 ? `${shown} ${t("list.usesMore", { n: rest })}` : shown;
+  }
+  function exportDupNotice(dupes, from) {
+    if (!dupes.length) return "";
+    const names = shortNames(dupes);
+    return from ? t("export.dupGlobal", { n: dupes.length, col: from, names }) : t("export.dupGlobalMixed", { n: dupes.length, names });
+  }
+  function exportStatusTail(clashes, dupes, from) {
+    return [exportClashNotice(clashes), exportDupNotice(dupes, from)].filter(Boolean).join(" ");
+  }
   function exportClashNotice(clashes) {
     if (!clashes.length) return "";
-    const shown = clashes.slice(0, 3).join(", ");
-    const rest = clashes.length - 3;
-    const names = rest > 0 ? `${shown} ${t("list.usesMore", { n: rest })}` : shown;
-    return t("export.clash", { n: clashes.length, names });
+    return t("export.clash", { n: clashes.length, names: shortNames(clashes) });
   }
   function exportHasTokens(content, format) {
     if (format === "css") return /--[\w-]+\s*:/.test(content);
@@ -6485,7 +6497,7 @@
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _A;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6795,8 +6807,8 @@
         }
         saveExportFile(msg.content, msg.format);
         const saved = t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" });
-        const clash = exportClashNotice((_s = msg.clashes) != null ? _s : []);
-        setStatus("exportStatus", clash ? `${saved} ${clash}` : saved, clash ? "warn" : "ok");
+        const tail = exportStatusTail((_s = msg.clashes) != null ? _s : [], (_t = msg.globalDupes) != null ? _t : [], msg.globalDupesFrom);
+        setStatus("exportStatus", tail ? `${saved} ${tail}` : saved, tail ? "warn" : "ok");
         break;
       }
       case "COMPONENT_CANDIDATES": {
@@ -6805,7 +6817,7 @@
         const hadFocus = compFocusInLists();
         compScanned = true;
         compCandidates = msg.nodes;
-        setCompAutoNamed((_t = msg.autoNamed) != null ? _t : 0);
+        setCompAutoNamed((_u = msg.autoNamed) != null ? _u : 0);
         compChecked.clear();
         for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
         renderCompTree();
@@ -6820,12 +6832,12 @@
         break;
       }
       case "COMPONENTS_RESULT": {
-        const misplaced = (_u = msg.placeFailed) != null ? _u : [];
-        const cloned = (_v = msg.placeCloned) != null ? _v : [];
-        const propFailed = (_w = msg.propFailed) != null ? _w : [];
-        const fillKept = (_x = msg.fillKept) != null ? _x : [];
-        const reused = (_y = msg.reused) != null ? _y : [];
-        const reuseKept = (_z = msg.reuseKept) != null ? _z : [];
+        const misplaced = (_v = msg.placeFailed) != null ? _v : [];
+        const cloned = (_w = msg.placeCloned) != null ? _w : [];
+        const propFailed = (_x = msg.propFailed) != null ? _x : [];
+        const fillKept = (_y = msg.fillKept) != null ? _y : [];
+        const reused = (_z = msg.reused) != null ? _z : [];
+        const reuseKept = (_A = msg.reuseKept) != null ? _A : [];
         const extraPart = (msg.skipped ? t("component.extraSkipped", { n: msg.skipped }) : "") + (msg.exposed ? t("component.extraProps", { n: msg.exposed }) : "") + (msg.icons ? t("component.extraIcons", { n: msg.icons }) : "") + placeTailText("component.propFailed", propFailed) + placeTailText("component.reuseKept", reuseKept) + placeTailText("component.placeCloned", cloned) + placeFailedText(misplaced);
         setStatus("structureStatus", t("component.registered", { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? "ok" : "warn");
         renderVariantReport(variantIssueSections(msg.missing, msg.failures, reused));

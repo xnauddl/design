@@ -352,6 +352,8 @@ export interface ExportVarInput {
   collectionId?: string;
   /** 기본이 아닌 모드 값(모드 id → 값). 모드 블록용. */
   modeValues?: Record<string, ExportModeValue>;
+  /** 속한 컬렉션 이름(같은 이름 Global끼리 알림용). */
+  collectionName?: string;
 }
 
 /** 원래 변수를 포함해 읽는 상한(연결 쪽 `bind.ts` `resolveValue`와 같다). */
@@ -438,49 +440,142 @@ export function resolveExportModes(vars: readonly ExportVarInput[], cols: readon
  */
 function resolveWith(vars: readonly ExportVarInput[], read: (v: ExportVarInput) => ExportVarInput): ExportToken[] {
   const byId = new Map(vars.map((v) => [v.id, v]));
-  const reaches = (start: ExportVarInput, rd: (v: ExportVarInput) => ExportVarInput): boolean => {
-    const seen = new Set([start.id]);
-    let cur = rd(start);
-    for (let reads = 1; cur.alias !== undefined; reads++) {
-      if (reads >= ALIAS_READ_LIMIT) return false;
-      const next = byId.get(cur.alias);
-      if (!next || seen.has(next.id)) return false;
-      seen.add(next.id);
-      cur = rd(next);
+  const ok = passing(vars, byId);
+  const winner = winnersOf(ok);
+  const survivors = new Set([...winner.values()].map((v) => v.id));
+  /** ①–② 규칙으로 하나를 푼다. `prime`이면 ②′(같은 이름 Global에 진 대상 — ia-v3 §4.4)도 본다. */
+  const resolveOne = (v: ExportVarInput, prime: boolean): ExportToken => {
+    const tok: ExportToken = { id: v.id, name: v.name, collection: v.tier === 1 ? 'Global' : 'Semantic', type: v.type, kind: v.kind };
+    let cur = read(v);
+    while (cur.alias !== undefined) {
+      const next = byId.get(cur.alias) as ExportVarInput; // 닿는 것을 확인함
+      let point = survivors.has(next.id); // ①
+      if (!point && prime && next.tier === 1) {
+        const s = winner.get(next.name);
+        // ②′ — 진 Global T와 남은 Global S를 ②′ 없이 풀어 견준다. S가 이 모드에서 ③이면 다름.
+        if (s && s.id !== next.id && s.tier === 1 && reaches(s, read, byId)) point = sameOutput(resolveOne(next, false), resolveOne(s, false));
+      }
+      if (point) {
+        tok.aliasOf = next.name;
+        if (v.description) tok.description = v.description;
+        return tok;
+      }
+      cur = read(next);
     }
-    return true;
+    tok.value = cur.value as string | number; // ② (참거짓도 그대로)
+    if (cur.description) tok.description = cur.description;
+    return tok;
   };
-  const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x));
-  // 남는 변수 — dedupeByName과 같은 규칙(같은 이름이면 Global, 같은 계층이면 앞의 것)
+  const out: ExportToken[] = [];
+  const primed = new Map<ExportToken, ExportVarInput>(); // ②′로 별칭이 된 토큰 → 원래 변수
+  for (const v of ok) {
+    if (!reaches(v, read, byId)) continue; // ③ (이 모드에서만)
+    const tok = resolveOne(v, true);
+    const plain = resolveOne(v, false);
+    if (tok.aliasOf !== undefined && plain.aliasOf !== tok.aliasOf) primed.set(tok, v);
+    out.push(tok);
+  }
+  // ②′ 별칭이 고리를 만들면(엇갈린 두 쌍 — CSS에서 둘 다 무효) 고리 안의 ②′ 줄은 ② 결과로 되돌린다.
+  const outOf = new Map<string, ExportToken>();
+  for (const tk of out) {
+    const w = winner.get(tk.name);
+    if (w && w.id === tk.id) outOf.set(tk.name, tk);
+  }
+  for (const start of out) {
+    const path: ExportToken[] = [];
+    let cur: ExportToken | undefined = start;
+    while (cur && cur.aliasOf !== undefined && !path.includes(cur)) {
+      path.push(cur);
+      cur = outOf.get(cur.aliasOf);
+    }
+    if (!cur || !path.includes(cur)) continue;
+    for (const tk of path.slice(path.indexOf(cur))) {
+      const v = primed.get(tk);
+      if (!v) continue;
+      const plain = resolveOne(v, false);
+      delete tk.aliasOf;
+      delete tk.description;
+      Object.assign(tk, plain);
+      primed.delete(tk);
+    }
+  }
+  return out;
+}
+
+/** 거울 ⓑ와 같은 견줌 — 둘 다 별칭이면 대상, 둘 다 값이면 값 · 설명 · 종류, 한쪽만 별칭이면 다름. */
+function sameOutput(a: ExportToken, b: ExportToken): boolean {
+  if (a.aliasOf !== undefined || b.aliasOf !== undefined) return a.aliasOf !== undefined && a.aliasOf === b.aliasOf;
+  return a.value === b.value && a.description === b.description && a.kind === b.kind;
+}
+
+/** 사슬이 실제 값에 닿는가(없는 대상 · 순환 · 12번 초과면 아니다). */
+function reaches(start: ExportVarInput, rd: (v: ExportVarInput) => ExportVarInput, byId: ReadonlyMap<string, ExportVarInput>): boolean {
+  const seen = new Set([start.id]);
+  let cur = rd(start);
+  for (let reads = 1; cur.alias !== undefined; reads++) {
+    if (reads >= ALIAS_READ_LIMIT) return false;
+    const next = byId.get(cur.alias);
+    if (!next || seen.has(next.id)) return false;
+    seen.add(next.id);
+    cur = rd(next);
+  }
+  return true;
+}
+
+/** ⓪ — 계층 1 · 2이고 기본 모드 사슬이 값에 닿는 변수(입력 순서 그대로). */
+function passing(vars: readonly ExportVarInput[], byId: ReadonlyMap<string, ExportVarInput>): ExportVarInput[] {
+  return vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x, byId));
+}
+
+/** 남는 변수 — dedupeByName과 같은 규칙(같은 이름이면 Global, 같은 계층이면 앞의 것). 이름 → 승자. */
+function winnersOf(ok: readonly ExportVarInput[]): Map<string, ExportVarInput> {
   const winner = new Map<string, ExportVarInput>();
   for (const v of ok) {
     const prev = winner.get(v.name);
     if (!prev || (prev.tier === 2 && v.tier === 1)) winner.set(v.name, v);
   }
-  const survivors = new Set([...winner.values()].map((v) => v.id));
-  const out: ExportToken[] = [];
-  for (const v of ok) {
-    if (read !== undefined && !reaches(v, read)) continue; // ③ (이 모드에서만)
-    const tok: ExportToken = { id: v.id, name: v.name, collection: v.tier === 1 ? 'Global' : 'Semantic', type: v.type, kind: v.kind };
-    let cur = read(v);
-    let done = false;
-    while (cur.alias !== undefined) {
-      const next = byId.get(cur.alias) as ExportVarInput; // 위에서 닿는 것을 확인함
-      if (survivors.has(next.id)) {
-        tok.aliasOf = next.name; // ①
-        if (v.description) tok.description = v.description;
-        done = true;
-        break;
-      }
-      cur = read(next);
-    }
-    if (!done) {
-      tok.value = cur.value as string | number; // ② (참거짓도 그대로)
-      if (cur.description) tok.description = cur.description;
-    }
-    out.push(tok);
+  return winner;
+}
+
+const byCode = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * 같은 이름 Global끼리(ia-v3 §4.4 "같은 이름 Global끼리") — ⓪을 통과한 Global 가운데 같은 이름이 둘 이상인 이름
+ * (값이 같아도 셈 · 이름순). `from` = 겹친 이름마다 남은 변수의 컬렉션 이름이 모두 있고 모두 같을 때 그 이름.
+ */
+export function exportGlobalDupes(vars: readonly ExportVarInput[]): { names: string[]; from?: string } {
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const first = new Map<string, ExportVarInput>();
+  const dup = new Set<string>();
+  for (const v of passing(vars, byId)) {
+    if (v.tier !== 1) continue;
+    const prev = first.get(v.name);
+    if (!prev) first.set(v.name, v);
+    else if (prev.id !== v.id) dup.add(v.name);
   }
-  return out;
+  const names = [...dup].sort(byCode);
+  const cols = new Set(names.map((n) => first.get(n)?.collectionName));
+  const only = cols.size === 1 ? [...cols][0] : undefined;
+  return only ? { names, from: only } : { names };
+}
+
+/** 이름 목록 — 이름순 앞 3개, 넘치면 `list.usesMore`. */
+function shortNames(names: readonly string[]): string {
+  const shown = names.slice(0, 3).join(', ');
+  const rest = names.length - 3;
+  return rest > 0 ? `${shown} ${t('list.usesMore', { n: rest })}` : shown;
+}
+
+/** 같은 이름 Global끼리의 알림 꼬리(`export.dupGlobal` · `export.dupGlobalMixed`). 없으면 ''. */
+export function exportDupNotice(dupes: readonly string[], from?: string): string {
+  if (!dupes.length) return '';
+  const names = shortNames(dupes);
+  return from ? t('export.dupGlobal', { n: dupes.length, col: from, names }) : t('export.dupGlobalMixed', { n: dupes.length, names });
+}
+
+/** 내보내기 상태 줄 꼬리 — 겹침 알림 + 한 칸 + Global끼리 알림(빈 쪽은 뺌). 둘 다 없으면 ''. */
+export function exportStatusTail(clashes: readonly string[], dupes: readonly string[], from?: string): string {
+  return [exportClashNotice(clashes), exportDupNotice(dupes, from)].filter(Boolean).join(' ');
 }
 
 /**
@@ -511,10 +606,7 @@ export function exportClashes(tokens: readonly ExportToken[], modes: readonly Ex
 /** 내보내기 팝업 상태 줄의 겹침 꼬리(`export.clash`) — 이름은 앞 3개, 넘치면 `list.usesMore`. 겹침이 없으면 ''. */
 export function exportClashNotice(clashes: readonly string[]): string {
   if (!clashes.length) return '';
-  const shown = clashes.slice(0, 3).join(', ');
-  const rest = clashes.length - 3;
-  const names = rest > 0 ? `${shown} ${t('list.usesMore', { n: rest })}` : shown;
-  return t('export.clash', { n: clashes.length, names });
+  return t('export.clash', { n: clashes.length, names: shortNames(clashes) });
 }
 
 /* ---------- 텍스트 스타일(typography) ---------- */

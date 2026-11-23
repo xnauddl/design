@@ -98,6 +98,8 @@
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
     "export.empty": "\uB0B4\uBCF4\uB0BC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694. \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694.",
     "export.clash": "Global\uACFC \uC774\uB984\uC774 \uAC19\uC740 Semantic {n}\uAC1C\uB294 Global \uAC12\uB9CC \uB0C8\uC5B4\uC694: {names}",
+    "export.dupGlobal": 'Global\uB07C\uB9AC \uC774\uB984\uC774 \uAC19\uC740 {n}\uAC1C\uB294 "{col}" \uAC83\uB9CC \uB0C8\uC5B4\uC694: {names}',
+    "export.dupGlobalMixed": "Global\uB07C\uB9AC \uC774\uB984\uC774 \uAC19\uC740 {n}\uAC1C\uB294 \uC55E \uCEEC\uB809\uC158 \uAC83\uB9CC \uB0C8\uC5B4\uC694: {names}",
     // 라이선스
     "license.needKey": "\uB77C\uC774\uC120\uC2A4 \uD0A4\uB97C \uC785\uB825\uD558\uC138\uC694.",
     // 유료 게이팅
@@ -4136,48 +4138,109 @@
   }
   function resolveWith(vars, read) {
     const byId = new Map(vars.map((v) => [v.id, v]));
-    const reaches = (start, rd) => {
-      const seen = /* @__PURE__ */ new Set([start.id]);
-      let cur = rd(start);
-      for (let reads = 1; cur.alias !== void 0; reads++) {
-        if (reads >= ALIAS_READ_LIMIT) return false;
+    const ok = passing(vars, byId);
+    const winner = winnersOf(ok);
+    const survivors = new Set([...winner.values()].map((v) => v.id));
+    const resolveOne = (v, prime) => {
+      const tok = { id: v.id, name: v.name, collection: v.tier === 1 ? "Global" : "Semantic", type: v.type, kind: v.kind };
+      let cur = read(v);
+      while (cur.alias !== void 0) {
         const next = byId.get(cur.alias);
-        if (!next || seen.has(next.id)) return false;
-        seen.add(next.id);
-        cur = rd(next);
+        let point = survivors.has(next.id);
+        if (!point && prime && next.tier === 1) {
+          const s = winner.get(next.name);
+          if (s && s.id !== next.id && s.tier === 1 && reaches(s, read, byId)) point = sameOutput(resolveOne(next, false), resolveOne(s, false));
+        }
+        if (point) {
+          tok.aliasOf = next.name;
+          if (v.description) tok.description = v.description;
+          return tok;
+        }
+        cur = read(next);
       }
-      return true;
+      tok.value = cur.value;
+      if (cur.description) tok.description = cur.description;
+      return tok;
     };
-    const ok = vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x));
+    const out = [];
+    const primed = /* @__PURE__ */ new Map();
+    for (const v of ok) {
+      if (!reaches(v, read, byId)) continue;
+      const tok = resolveOne(v, true);
+      const plain = resolveOne(v, false);
+      if (tok.aliasOf !== void 0 && plain.aliasOf !== tok.aliasOf) primed.set(tok, v);
+      out.push(tok);
+    }
+    const outOf = /* @__PURE__ */ new Map();
+    for (const tk of out) {
+      const w = winner.get(tk.name);
+      if (w && w.id === tk.id) outOf.set(tk.name, tk);
+    }
+    for (const start of out) {
+      const path = [];
+      let cur = start;
+      while (cur && cur.aliasOf !== void 0 && !path.includes(cur)) {
+        path.push(cur);
+        cur = outOf.get(cur.aliasOf);
+      }
+      if (!cur || !path.includes(cur)) continue;
+      for (const tk of path.slice(path.indexOf(cur))) {
+        const v = primed.get(tk);
+        if (!v) continue;
+        const plain = resolveOne(v, false);
+        delete tk.aliasOf;
+        delete tk.description;
+        Object.assign(tk, plain);
+        primed.delete(tk);
+      }
+    }
+    return out;
+  }
+  function sameOutput(a, b) {
+    if (a.aliasOf !== void 0 || b.aliasOf !== void 0) return a.aliasOf !== void 0 && a.aliasOf === b.aliasOf;
+    return a.value === b.value && a.description === b.description && a.kind === b.kind;
+  }
+  function reaches(start, rd, byId) {
+    const seen = /* @__PURE__ */ new Set([start.id]);
+    let cur = rd(start);
+    for (let reads = 1; cur.alias !== void 0; reads++) {
+      if (reads >= ALIAS_READ_LIMIT) return false;
+      const next = byId.get(cur.alias);
+      if (!next || seen.has(next.id)) return false;
+      seen.add(next.id);
+      cur = rd(next);
+    }
+    return true;
+  }
+  function passing(vars, byId) {
+    return vars.filter((v) => (v.tier === 1 || v.tier === 2) && reaches(v, (x) => x, byId));
+  }
+  function winnersOf(ok) {
     const winner = /* @__PURE__ */ new Map();
     for (const v of ok) {
       const prev = winner.get(v.name);
       if (!prev || prev.tier === 2 && v.tier === 1) winner.set(v.name, v);
     }
-    const survivors = new Set([...winner.values()].map((v) => v.id));
-    const out = [];
-    for (const v of ok) {
-      if (read !== void 0 && !reaches(v, read)) continue;
-      const tok = { id: v.id, name: v.name, collection: v.tier === 1 ? "Global" : "Semantic", type: v.type, kind: v.kind };
-      let cur = read(v);
-      let done = false;
-      while (cur.alias !== void 0) {
-        const next = byId.get(cur.alias);
-        if (survivors.has(next.id)) {
-          tok.aliasOf = next.name;
-          if (v.description) tok.description = v.description;
-          done = true;
-          break;
-        }
-        cur = read(next);
-      }
-      if (!done) {
-        tok.value = cur.value;
-        if (cur.description) tok.description = cur.description;
-      }
-      out.push(tok);
+    return winner;
+  }
+  var byCode = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function exportGlobalDupes(vars) {
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const first = /* @__PURE__ */ new Map();
+    const dup = /* @__PURE__ */ new Set();
+    for (const v of passing(vars, byId)) {
+      if (v.tier !== 1) continue;
+      const prev = first.get(v.name);
+      if (!prev) first.set(v.name, v);
+      else if (prev.id !== v.id) dup.add(v.name);
     }
-    return out;
+    const names = [...dup].sort(byCode);
+    const cols = new Set(names.map((n) => {
+      var _a;
+      return (_a = first.get(n)) == null ? void 0 : _a.collectionName;
+    }));
+    const only = cols.size === 1 ? [...cols][0] : void 0;
+    return only ? { names, from: only } : { names };
   }
   function exportClashes(tokens, modes = []) {
     if (modes.length) return [...new Set([tokens, ...modes.map((m) => m.tokens)].flatMap((l) => exportClashes(l)))].sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
@@ -12792,7 +12855,7 @@
               if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) return { value: exportColorHex(raw) };
               return { value: raw };
             };
-            const inp = __spreadValues({ id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id }, read(v.valuesByMode[col.defaultModeId]));
+            const inp = __spreadValues({ id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, collectionName: col.name }, read(v.valuesByMode[col.defaultModeId]));
             if (v.description) inp.description = v.description;
             const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
             if (others.length) inp.modeValues = Object.fromEntries(others.map((m) => [m.modeId, read(v.valuesByMode[m.modeId])]));
@@ -12819,7 +12882,8 @@
             fontSizeUnit: msg.fontSizeUnit,
             base: msg.base
           }, styles, modes);
-          post({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes) });
+          const dupes = exportGlobalDupes(inputs);
+          post(__spreadValues({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes), globalDupes: dupes.names }, dupes.from !== void 0 ? { globalDupesFrom: dupes.from } : {}));
           break;
         }
         case "SCAN_COMPONENT_CANDIDATES": {

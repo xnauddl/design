@@ -81,6 +81,8 @@ export const STRINGS: Record<string, string> = {
   'export.saved': '{format} — {file}로 저장했어요.',
   'export.empty': '내보낼 변수가 없어요. 먼저 토큰을 만드세요.',
   'export.clash': 'Global과 이름이 같은 Semantic {n}개는 Global 값만 냈어요: {names}',
+  'export.dupGlobal': 'Global끼리 이름이 같은 {n}개는 "{col}" 것만 냈어요: {names}',
+  'export.dupGlobalMixed': 'Global끼리 이름이 같은 {n}개는 앞 컬렉션 것만 냈어요: {names}',
 
   // 라이선스
   'license.needKey': '라이선스 키를 입력하세요.',

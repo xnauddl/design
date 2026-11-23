@@ -53,6 +53,9 @@ import {
   resolveExportTokens,
   exportClashes,
   exportClashNotice,
+  exportGlobalDupes,
+  exportDupNotice,
+  exportStatusTail,
   resolveExportModes,
   exportModeKey,
   splitWeightStyle,
@@ -807,6 +810,112 @@ test('exportClashNotice — 앞 3개 · 넘치면 "외 {n}개" · 없으면 빈 
   assert.equal(exportClashNotice(['color/primary', 'spacing/md']), 'Global과 이름이 같은 Semantic 2개는 Global 값만 냈어요: color/primary, spacing/md');
   assert.equal(exportClashNotice(['a', 'b', 'c', 'd']), 'Global과 이름이 같은 Semantic 4개는 Global 값만 냈어요: a, b, c 외 1개');
   assert.equal(exportClashNotice(['a', 'b', 'c', 'd', 'e']), 'Global과 이름이 같은 Semantic 5개는 Global 값만 냈어요: a, b, c 외 2개');
+});
+
+/* ---- 같은 이름 Global끼리 · ②′ (ia-v3 §4.4 · A.26) ---- */
+test('②′ — 진 Global의 값이 남은 Global과 같으면 var, 다르면 값', () => {
+  const toks = byN(resolveExportTokens([
+    EV('u1', 'color/gray/0', 1, { value: '#ffffff', collectionName: 'DSL UI 재확인' }), // 사용자 컬렉션(앞)
+    EV('u2', 'color/blue/500', 1, { value: '#0000ff', collectionName: 'DSL UI 재확인' }),
+    EV('p1', 'color/gray/0', 1, { value: '#ffffff', collectionName: 'Global' }), // 진 것 — 값 같음
+    EV('p2', 'color/blue/500', 1, { value: '#3366ff', collectionName: 'Global' }), // 진 것 — 값 다름
+    EV('s1', 'color/background/default', 2, { alias: 'p1', description: 'bg' }),
+    EV('s2', 'color/text/brand', 2, { alias: 'p2' }),
+  ]));
+  assert.equal(toks['Semantic:color/background/default'].aliasOf, 'color/gray/0');
+  assert.equal(toks['Semantic:color/background/default'].description, 'bg'); // ①의 설명 규칙
+  assert.equal(toks['Semantic:color/text/brand'].aliasOf, undefined);
+  assert.equal(toks['Semantic:color/text/brand'].value, '#3366ff');
+});
+
+test('②′ — 별칭끼리는 대상으로, 설명이 다르면 값, 한쪽만 별칭이면 값', () => {
+  const toks = byN(resolveExportTokens([
+    EV('base', 'color/base', 1, { value: '#111111' }),
+    EV('u1', 'color/a', 1, { alias: 'base' }),
+    EV('p1', 'color/a', 1, { alias: 'base' }), // 같은 대상 → var(--color-a)
+    EV('u2', 'color/b', 1, { value: '#222222', description: '메모' }),
+    EV('p2', 'color/b', 1, { value: '#222222' }), // 설명 다름 → 값
+    EV('u3', 'color/c', 1, { alias: 'base' }),
+    EV('p3', 'color/c', 1, { value: '#111111' }), // 한쪽만 별칭 → 값
+    EV('s1', 'sem/a', 2, { alias: 'p1' }),
+    EV('s2', 'sem/b', 2, { alias: 'p2' }),
+    EV('s3', 'sem/c', 2, { alias: 'p3' }),
+  ]));
+  assert.equal(toks['Semantic:sem/a'].aliasOf, 'color/a');
+  assert.equal(toks['Semantic:sem/b'].value, '#222222');
+  assert.equal(toks['Semantic:sem/c'].value, '#111111');
+});
+
+test('②′ — 대상이 Semantic이면 하지 않고, 서로 엇갈린 두 쌍도 끝난다', () => {
+  const all = resolveExportTokens([
+    EV('sa', 'sem/x', 2, { value: '#123456' }),
+    EV('sb', 'sem/x', 2, { value: '#123456' }), // 진 Semantic
+    EV('s1', 'sem/ref', 2, { alias: 'sb' }),
+    // 엇갈림: 사용자 a → 플러그인 b, 사용자 b → 플러그인 a (진 쪽끼리 가리킴)
+    EV('ua', 'g/a', 1, { alias: 'pb' }),
+    EV('ub', 'g/b', 1, { alias: 'pa' }),
+    EV('pa', 'g/a', 1, { alias: 'pb' }),
+    EV('pb', 'g/b', 1, { value: '#abcdef' }),
+    EV('s2', 'sem/cross', 2, { alias: 'pa' }),
+  ]);
+  const toks = byN(all);
+  const id = (x) => all.find((t) => t.id === x);
+  assert.equal(toks['Semantic:sem/ref'].value, '#123456'); // Semantic 대상은 ②′ 없음
+  // 남는 것: g/a = ua · g/b = ub. pa · ua를 ②′ 없이 풀면 둘 다 pb의 값 #abcdef → 같음 → var(--g-a)
+  assert.equal(toks['Semantic:sem/cross'].aliasOf, 'g/a');
+  // ua → pb(진 · S = ub)와 ub → pa(진 · S = ua)는 ②′로 서로 가리키는 고리가 된다 → 둘 다 값으로 되돌림
+  assert.equal(id('ua').value, '#abcdef');
+  assert.equal(id('ub').value, '#abcdef');
+  assert.equal(id('ua').aliasOf, undefined);
+});
+
+test('②′ — 모드 블록에서 모드마다 견주고, S가 그 모드에서만 ③이면 값', () => {
+  const vars = [
+    MV('u1', 'color/gray/0', 1, 'U', { value: '#ffffff' }, { ud: { value: '#000000' } }),
+    MV('p1', 'color/gray/0', 1, 'P', { value: '#ffffff' }, { pd: { value: '#111111' } }), // Dark에서 다름
+    MV('u2', 'color/gray/1', 1, 'U', { value: '#eeeeee' }, { ud: { alias: 'nope' } }), // Dark에서 ③
+    MV('p2', 'color/gray/1', 1, 'P', { value: '#eeeeee' }, { pd: { value: '#eeeeee' } }),
+    MV('s1', 'color/bg', 2, 'S', { alias: 'p1' }),
+    MV('s2', 'color/bg2', 2, 'S', { alias: 'p2' }),
+  ];
+  const cols = [COL('U', 1, [['ul', 'Light'], ['ud', 'Dark']]), COL('P', 1, [['pl', 'Light'], ['pd', 'Dark']]), COL('S', 2, [['sm', 'Mode 1']])];
+  const base = byN(resolveExportTokens(vars));
+  assert.equal(base['Semantic:color/bg'].aliasOf, 'color/gray/0');
+  assert.equal(base['Semantic:color/bg2'].aliasOf, 'color/gray/1');
+  const dark = byN(resolveExportModes(vars, cols).find((m) => m.key === 'dark').tokens);
+  assert.equal(dark['Semantic:color/bg'].value, '#111111');
+  assert.equal(dark['Semantic:color/bg2'].value, '#eeeeee');
+});
+
+test('exportGlobalDupes — 값이 같아도 세고, 컬렉션 이름이 하나일 때만 from', () => {
+  const one = exportGlobalDupes([
+    EV('u1', 'color/gray/0', 1, { value: '#fff', collectionName: 'DSL UI 재확인' }),
+    EV('u2', 'color/blue/500', 1, { value: '#00f', collectionName: 'DSL UI 재확인' }),
+    EV('p1', 'color/gray/0', 1, { value: '#fff', collectionName: 'Global' }),
+    EV('p2', 'color/blue/500', 1, { value: '#36f', collectionName: 'Global' }),
+    EV('s1', 'color/gray/0', 2, { value: '#fff', collectionName: 'Semantic' }), // Semantic은 세지 않음
+    EV('x1', 'color/x', 1, { alias: 'nope', collectionName: 'Global' }),
+    EV('x2', 'color/x', 1, { value: '#000', collectionName: 'Global' }), // ⓪에서 빠진 것과는 겹침 아님
+  ]);
+  assert.deepEqual(one, { names: ['color/blue/500', 'color/gray/0'], from: 'DSL UI 재확인' });
+  const mixed = exportGlobalDupes([
+    EV('a1', 'a', 1, { value: 1, collectionName: 'A' }),
+    EV('b1', 'b', 1, { value: 1, collectionName: 'B' }),
+    EV('a2', 'a', 1, { value: 1, collectionName: 'G' }),
+    EV('b2', 'b', 1, { value: 1, collectionName: 'G' }),
+  ]);
+  assert.deepEqual(mixed, { names: ['a', 'b'] });
+  const noName = exportGlobalDupes([EV('a1', 'a', 1, { value: 1 }), EV('a2', 'a', 1, { value: 1, collectionName: 'G' })]);
+  assert.deepEqual(noName, { names: ['a'] });
+  assert.deepEqual(exportGlobalDupes([EV('a1', 'a', 1, { value: 1 })]), { names: [] });
+});
+
+test('exportStatusTail — 겹침만 · Global끼리만 · 둘 다 · 없음', () => {
+  assert.equal(exportStatusTail([], []), '');
+  assert.equal(exportStatusTail(['color/primary'], []), 'Global과 이름이 같은 Semantic 1개는 Global 값만 냈어요: color/primary');
+  assert.equal(exportStatusTail([], ['color/blue/500', 'color/gray/0'], 'DSL UI 재확인'), 'Global끼리 이름이 같은 2개는 "DSL UI 재확인" 것만 냈어요: color/blue/500, color/gray/0');
+  assert.equal(exportDupNotice(['a', 'b', 'c', 'd', 'e']), 'Global끼리 이름이 같은 5개는 앞 컬렉션 것만 냈어요: a, b, c 외 2개');
+  assert.equal(exportStatusTail(['p'], ['a'], 'G'), 'Global과 이름이 같은 Semantic 1개는 Global 값만 냈어요: p Global끼리 이름이 같은 1개는 "G" 것만 냈어요: a');
 });
 
 /* ---- 모드 블록 (ia-v3 §4.4 "모드 블록" · A.24) ---- */
