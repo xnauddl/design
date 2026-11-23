@@ -3329,7 +3329,18 @@ test('cardCounts — m · k · s · n, 레이어 단위 사유와 already-bound�
   assert.equal(c.n, 6);
   assert.deepEqual(c.byKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]); // 연결할 곳만(k는 noVarByKind)
   assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]);
-  assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
+  assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, u: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
+  assert.equal(c.u, 0);
+});
+
+test('cardCounts — u(용도 맞출 값, B.33): scope-add는 k · s가 아니라 u, n = m + k + u', () => {
+  const c = cardCounts(['fills'], { 'no-match': { color: 2 }, 'scope-add': { color: 5 } });
+  assert.equal(c.m, 1);
+  assert.equal(c.k, 2);
+  assert.equal(c.u, 5);
+  assert.equal(c.s, 0);
+  assert.equal(c.n, 8);
+  assert.deepEqual(c.noVarByKind, [{ kind: 'color', n: 2 }]); // u는 종류별로 두지 않는다
 });
 
 test('groupByVarKind · carryRowChecks — (변수, 종류) 줄 · 종류 순서 · 줄 단위 스위치 이어받기(IA v4 §4.2)', async () => {

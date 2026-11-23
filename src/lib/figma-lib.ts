@@ -33,7 +33,7 @@ export {
 } from './variables';
 export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult, RoleVarRenameResult, TsRenameResult } from './variables';
 export { judgeUnused, collectAliasIds, scanUnusedVariables, deleteUnusedVariables } from './unusedVars';
-export { bindSelection, collectLocalMains, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted } from './bind';
+export { bindSelection, collectLocalMains, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted, mergeScopes } from './bind';
 export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName, pickOwner } from './usageRoles';
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName, stripRootPrefix, nameHintRole } from './rename';

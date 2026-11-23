@@ -1150,7 +1150,7 @@
         <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
       </div>
       <div id="makePanel">
-        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 변수로 만들어요</span><button class="link link-btn" id="makeSemLic" type="button" data-i18n="make.license" hidden>라이선스 →</button><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 만들거나 있는 변수에 연결해요</span><button class="link link-btn" id="makeSemLic" type="button" data-i18n="make.license" hidden>라이선스 →</button><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
         <div class="bind-empty" id="makeEmpty" hidden></div>
         <div class="make-tabnote" id="makeTabNote" hidden></div>
         <div id="makeTree" class="tree" role="treegrid" aria-label="Global"></div>
@@ -1784,6 +1784,8 @@
     "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
     "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
+    "v4.scopePlaces": "\uC6A9\uB3C4 \uB9DE\uCD9C \uAC12 {u}\uACF3",
+    "v4.scopePlacesTip": "\uAC19\uC740 \uAC12\uC758 \uBCC0\uC218\uAC00 \uC788\uC9C0\uB9CC \uC774 \uC790\uB9AC \uC6A9\uB3C4\uAC00 \uAEBC\uC838 \uC788\uC5B4\uC694 \u2014 [\uBCC0\uC218 \uB9CC\uB4E4\uAE30]\uAC00 \uC6A9\uB3C4\uB97C \uB354\uD574 \uC5F0\uACB0\uD574\uC694",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
@@ -1849,7 +1851,7 @@
     // 변수 만들기 화면(IA v4 §4.3)
     "make.title": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.subRight": "\uC5D0\uC11C \uCC3E\uC740 \uAC12",
-    "make.top": "\uCF20 \uAC12\uB9CC \uBCC0\uC218\uB85C \uB9CC\uB4E4\uC5B4\uC694",
+    "make.top": "\uCF20 \uAC12\uB9CC \uB9CC\uB4E4\uAC70\uB098 \uC788\uB294 \uBCC0\uC218\uC5D0 \uC5F0\uACB0\uD574\uC694",
     "make.freeBox": "\uBB34\uB8CC: Global \uBCC0\uC218\uB9CC",
     "make.freeBoxPaid": "Semantic \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
     "make.freeSemTop": "\u{1F512} Semantic\uC740 \uC720\uB8CC\uC608\uC694",
@@ -1905,6 +1907,8 @@
     "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
     "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
     "make.tagReuseTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uADF8\uAC83\uC744 \uC368\uC694",
+    "make.tagReuseScope": "\uC788\uB294 \uBCC0\uC218 \xB7 \uC6A9\uB3C4 \uB354\uD568",
+    "make.tagReuseScopeTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0, \uC774 \uC790\uB9AC \uC6A9\uB3C4\uB97C \uB354\uD574 \uC368\uC694",
     "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
     "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
     "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
@@ -2562,6 +2566,7 @@
     return "other";
   }
   var NO_VAR_REASONS = ["no-match"];
+  var SCOPE_ADD_REASONS = ["scope-add"];
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font", "library-main"];
@@ -2595,6 +2600,8 @@
         add(noVar, kind, n);
       }
     }
+    let u = 0;
+    for (const r of SCOPE_ADD_REASONS) u += sumKinds(counts == null ? void 0 : counts[r]);
     let s = 0;
     for (const r of FIX_SKIP_REASONS) s += sumKinds(counts == null ? void 0 : counts[r]);
     const order = (map) => [...SEL_KINDS, "other"].map((kind) => {
@@ -2602,7 +2609,7 @@
       return { kind, n: (_a4 = map.get(kind)) != null ? _a4 : 0 };
     }).filter((x) => x.n > 0);
     const m = candidateFields.length;
-    return { m, k, s, n: m + k, byKind: order(byKind), noVarByKind: order(noVar) };
+    return { m, k, u, s, n: m + k + u, byKind: order(byKind), noVarByKind: order(noVar) };
   }
   var COLOR_CATS = /* @__PURE__ */ new Set(["color", "effectColor"]);
   function libValueSame(tk, v) {
@@ -6026,7 +6033,7 @@
   }
   $("btnApplyConfirm").addEventListener("click", () => {
     const eff = bindTsOnly() ? [] : effCandidates();
-    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}));
+    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}));
     const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => {
       var _a3;
       return __spreadValues({ styleId: r.styleId, nodeIds: r.nodeIds }, ((_a3 = r.mainIds) == null ? void 0 : _a3.some(Boolean)) ? { mainIds: r.mainIds } : {});
@@ -7625,7 +7632,7 @@
           const name = (st == null ? void 0 : st.varName) ? st.varName : tk.name;
           const cells = [mkLead(tk), mkLayers(tk.count), trChip(name, mkValueText(tk))];
           if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
-          else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
+          else if ((st == null ? void 0 : st.state) === "reuse") cells.push(st.scopeAdd ? mkTag(t("make.tagReuseScope"), t("make.tagReuseScopeTip")) : mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
           else if ((st == null ? void 0 : st.state) === "manual") cells.push(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
           return {
             key: `g:${tk.name}`,
@@ -8010,7 +8017,7 @@
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -8098,7 +8105,7 @@
           const reasons = (_f = r.reasons) != null ? _f : {};
           if (r.bound) results.push({ id, mark: "ok", text: t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") });
           else {
-            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_g = reasons["already-bound"]) != null ? _g : 0) > 0 && !((_h = reasons["no-match"]) != null ? _h : 0) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_g = reasons["already-bound"]) != null ? _g : 0) > 0 && !(((_h = reasons["no-match"]) != null ? _h : 0) + ((_i = reasons["scope-add"]) != null ? _i : 0)) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
             if (zero === "wizard.seq.bindAllBound") results.push({ id, mark: "ok", text: t(zero) });
             else {
               results.push({ id, mark: "warn", text: t(zero) });
@@ -8121,7 +8128,7 @@
         break;
       }
     }
-    const finishedSteps = (_i = mkProg == null ? void 0 : mkProg.done) != null ? _i : [];
+    const finishedSteps = (_j = mkProg == null ? void 0 : mkProg.done) != null ? _j : [];
     rememberMainsBound(mkMainsDone, mkBase);
     mkRunning = false;
     mkProg = null;
@@ -8148,7 +8155,7 @@
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    const doneTip = (_k = (_j = totals.styles) == null ? void 0 : _j.missing) == null ? void 0 : _k.join("\n");
+    const doneTip = (_l = (_k = totals.styles) == null ? void 0 : _k.missing) == null ? void 0 : _l.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");
@@ -8288,19 +8295,22 @@
     const fields = bindCandidates.filter((c2) => !(fieldKind(c2.field) === "text" && ts.has(c2.nodeId))).map((c2) => c2.field);
     const c = cardCounts(fields, bindCounts);
     let dk = 0;
+    let du = 0;
     let ds = 0;
     for (const s of bindSkips) {
       if (!ts.has(s.nodeId) || fieldKind(s.field) !== "text") continue;
       if (NO_VAR_REASONS.includes(s.reason)) dk++;
+      else if (SCOPE_ADD_REASONS.includes(s.reason)) du++;
       else if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
     }
     const t2 = ts.size;
     const m = c.m + t2;
     const k = Math.max(0, c.k - dk);
+    const u = Math.max(0, c.u - du);
     const byKind = [...c.byKind];
     const noVarByKind = c.noVarByKind.map((x) => x.kind === "text" ? __spreadProps(__spreadValues({}, x), { n: x.n - dk }) : x).filter((x) => x.n > 0);
     if (t2) byKind.push({ kind: "textStyle", n: t2 });
-    return __spreadProps(__spreadValues({}, c), { m, k, s: Math.max(0, c.s - ds), n: m + k, byKind, noVarByKind, t: t2 });
+    return __spreadProps(__spreadValues({}, c), { m, k, u, s: Math.max(0, c.s - ds), n: m + k + u, byKind, noVarByKind, t: t2 });
   }
   function typeMark(value) {
     return isHexColor(value) ? "\u25CF" : /^-?\d/.test(value) ? "#" : "T";
@@ -8405,7 +8415,7 @@
     else if (zero) text = bindSkipMode() && bindCardCounts().s > 0 ? t("v4.allLinked") : t("v4.allBound");
     else if (!hasBindPreview() || bindTsOnly() && !bindTsRows.length) {
       text = t("v4.nothingToLink");
-      if (bindCardCounts().k > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
+      if (bindCardCounts().k + bindCardCounts().u > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
     }
     box.hidden = !text;
     if (!text) return;
@@ -8423,7 +8433,7 @@
     }
   }
   function bindZero() {
-    return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k === 0;
+    return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k + bindCardCounts().u === 0;
   }
   function skipListRows() {
     const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly(), bindSkipLayers);
@@ -13006,7 +13016,7 @@ ${opts.tip}` : text;
       put(selCard({ title: t("v4.find0"), subs: [t("v4.reading")] }));
       return;
     }
-    const { m, k, s, n } = counts;
+    const { m, k, u, s, n } = counts;
     const boundMains = () => {
       if (lastMainsBound && lastMainsBound.base !== baseKey()) lastMainsBound = null;
       if (!lastMainsBound) return [];
@@ -13043,6 +13053,14 @@ ${opts.tip}` : text;
     if (k > 0) parts.push(t("v4.noVarPlaces", { k }));
     const sub = document.createElement("span");
     sub.textContent = parts.join(" \xB7 ");
+    if (u > 0) {
+      if (parts.length) sub.append(" \xB7 ");
+      const us = document.createElement("span");
+      us.dataset.k = "scope";
+      us.textContent = t("v4.scopePlaces", { u });
+      us.title = t("v4.scopePlacesTip");
+      sub.appendChild(us);
+    }
     const actions = [];
     if (m > 0) {
       const go = selBtn(t("v4.linkN", { n: m }), (el) => {
@@ -13050,7 +13068,7 @@ ${opts.tip}` : text;
       }, true);
       go.dataset.k = "link";
       actions.push(go);
-    } else if (k > 0) selMakeHot = true;
+    } else if (k + u > 0) selMakeHot = true;
     const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
     const subs = [sub];
     if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
