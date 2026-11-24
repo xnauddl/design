@@ -3853,3 +3853,30 @@ test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 �
   assert.equal(lastTwo('(삭제된 변수)'), '(삭제된 변수)');
   assert.deepEqual(['FLOAT', 'STRING', 'BOOLEAN', 'COLOR'].map(varTypeMark), ['#', 'Aa', '✓', '']);
 });
+
+test('B.34 tokenGroups · libSameGroups · onlyItems — 묶음 · 라이브러리 같은 값 묶음 뺌 · 묶음 0개 토큰 뺌', async () => {
+  const { tokenGroups, libSameGroups, onlyItems } = await import('../dist/pure.mjs');
+  const fill = { name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { 'ALL_FILLS|FRAME_FILL': 10, 'ALL_FILLS|TEXT_FILL': 3 } };
+  const bound = { name: 'color/green/500', category: 'color', value: '#00AA00', freeBy: {} }; // 모두 붙음
+  const fs = { name: 'font-size/16', category: 'fontSize', value: 16 };
+  const fam = { name: 'font-family/Inter', category: 'fontFamily', value: 'Inter' };
+  const old = { name: 'spacing/8', category: 'gap', value: 8 }; // freeBy 없는 옛 토큰
+  assert.deepEqual(tokenGroups(fill), ['ALL_FILLS|FRAME_FILL', 'ALL_FILLS|TEXT_FILL']);
+  assert.deepEqual(tokenGroups(bound), []);
+  assert.deepEqual(tokenGroups(fs), ['FONT_SIZE']);
+  assert.deepEqual(tokenGroups(fam), ['FONT_FAMILY']);
+  assert.deepEqual(tokenGroups(old), ['GAP']);
+  // 라이브러리 #3B82F6 — FRAME_FILL만 받음 → 프레임 칠 묶음만 같은 값
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#3b82f6' }, scopes: ['FRAME_FILL'] }, { type: 'FLOAT', value: { kind: 'number', text: '16' }, scopes: ['GAP'] }];
+  assert.deepEqual(libSameGroups(fill, libs), ['ALL_FILLS|FRAME_FILL']);
+  assert.deepEqual(libSameGroups(fs, libs), [], '라이브러리 spacing 16(GAP)은 글자 크기 묶음과 무관');
+  const items = onlyItems([fill, bound, fs, fam, old], libs);
+  assert.deepEqual(items, [
+    { value: '#3B82F6', groups: ['ALL_FILLS|TEXT_FILL'] },
+    { value: 16, groups: ['FONT_SIZE'] },
+    { value: 'Inter', groups: ['FONT_FAMILY'] },
+    { value: 8, groups: ['GAP'] },
+  ]);
+  assert.deepEqual(onlyItems([{ ...fill, freeBy: { 'ALL_FILLS|FRAME_FILL': 10 } }], libs), [], '묶음이 모두 라이브러리 같은 값이면 토큰을 뺀다');
+  assert.deepEqual(onlyItems([{ name: 'x', category: 'color', value: '#000000', alpha: 0.1, freeBy: { EFFECT_COLOR: 1 } }], []), [{ value: '#000000', alpha: 0.1, groups: ['EFFECT_COLOR'] }]);
+});

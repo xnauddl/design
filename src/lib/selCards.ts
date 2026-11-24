@@ -172,6 +172,47 @@ function libScopeOk(v: LibSameVar, key: string): boolean {
   return v.scopes.includes('ALL_SCOPES') || key.split('|').some((s) => v.scopes!.includes(s));
 }
 
+/** 글자 토큰의 용도 묶음 키(freeBy가 없는 종류 — 연결 글자 자리의 `allowed`와 같다, §4.3 B.34 ①). */
+const TEXT_GROUP: Record<string, string> = { fontSize: 'FONT_SIZE', lineHeight: 'LINE_HEIGHT', letterSpacing: 'LETTER_SPACING', fontFamily: 'FONT_FAMILY' };
+
+/** freeBy가 없는 옛 토큰의 종류별 묶음(연결 자리의 `allowed.join('|')` — 칠은 레이어 종류마다 셋, `scopes.ts`). */
+const KIND_GROUPS: Record<string, string[]> = {
+  color: ['ALL_FILLS|TEXT_FILL', 'ALL_FILLS|FRAME_FILL', 'ALL_FILLS|SHAPE_FILL', 'STROKE_COLOR'],
+  effectColor: ['EFFECT_COLOR'],
+  gap: ['GAP'],
+  radius: ['CORNER_RADIUS'],
+  size: ['WIDTH_HEIGHT'],
+  strokeWidth: ['STROKE_FLOAT'],
+  opacity: ['OPACITY'],
+};
+
+/**
+ * 토큰의 용도 묶음 키 — freeBy가 있으면 남은 자리가 1곳 이상인 묶음, 글자는 종류 묶음 하나.
+ * freeBy가 없는 옛 토큰(추출이 자리를 싣기 전)은 종류에서 정한 묶음(KIND_GROUPS).
+ */
+export function tokenGroups(tk: LibSameToken): string[] {
+  if (tk.freeBy) return Object.entries(tk.freeBy).filter(([, n]) => n > 0).map(([k]) => k);
+  const g = TEXT_GROUP[tk.category];
+  return g ? [g] : [...(KIND_GROUPS[tk.category] ?? [])];
+}
+
+/** 같은 값 · 그 묶음 스코프를 받는 라이브러리 변수가 있는 묶음 키(§4.3 B.34 ② — libSameSplit과 같은 판정). */
+export function libSameGroups(tk: LibSameToken, libs: readonly LibSameVar[]): string[] {
+  return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
+}
+
+/** 만들기 연결 단계의 거름 항목(§4.3 B.34 ①②) — 묶음에서 라이브러리 같은 값 묶음을 빼고, 묶음이 0개인 토큰은 뺀다. */
+export function onlyItems(tokens: readonly LibSameToken[], libs: readonly LibSameVar[]): { value: string | number; alpha?: number; groups: string[] }[] {
+  const out: { value: string | number; alpha?: number; groups: string[] }[] = [];
+  for (const tk of tokens) {
+    const lib = new Set(libSameGroups(tk, libs));
+    const groups = tokenGroups(tk).filter((k) => !lib.has(k));
+    if (!groups.length) continue;
+    out.push({ value: tk.value, ...(tk.alpha != null && tk.alpha < 1 ? { alpha: tk.alpha } : {}), groups });
+  }
+  return out;
+}
+
 /**
  * 토큰마다 변수가 안 붙은 자리(freeBy)를 묶음별로 "같은 값 자리"(값이 같고 그 묶음의 스코프를 받는 라이브러리 변수가 있음)와
  * "남은 자리"로 가른다. 한 토큰이 둘을 함께 가질 수 있다. freeBy가 없으면 free = count, 묶음 하나(스코프 비교 없음).
