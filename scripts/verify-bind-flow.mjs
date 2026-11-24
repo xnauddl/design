@@ -389,6 +389,24 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.close();
 }
 {
+  // B.38 — Global 알약 숫자 순(VO-D1) · 사이드바 아래까지 경계선(VO-D2)
+  const p = await open(560, 'variables');
+  await recv(p, PREREQ);
+  const many = [14, 2, 100, 4, 10].map((n) => ({ id: `s${n}`, name: `spacing/${n}`, collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'number', text: String(n) } }, scopes: ['GAP'], description: '' }));
+  const colors = Array.from({ length: 30 }, (_, i) => ({ id: `c${i}`, name: `color/gray/${i}`, collectionId: 'g', type: 'COLOR', values: { m: { kind: 'color', hex: '#' + String(i).padStart(2, '0').repeat(3) } }, scopes: [], description: '' }));
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: [...many, { id: 'sa', name: 'spacing/alias', collectionId: 'g', type: 'FLOAT', values: { m: { kind: 'alias', aliasId: 's2', aliasName: 'spacing/2' } }, scopes: [], description: '' }, ...colors, ...VARS.filter((v) => v.collectionId === 's')] });
+  await p.click('#varSide [data-key="side:col:g"]');
+  await p.waitForTimeout(30);
+  const ids = await p.$$eval('.vp-line.vp-pill .vp-item', (e) => e.map((x) => x.dataset.id));
+  check('B.38 Global 알약 — 숫자 작은 순 · 별칭 끝(피그마 순서 14 · 2 · 100 · 4 · 10 → 2 · 4 · 10 · 14 · 100)', JSON.stringify(ids) === JSON.stringify(['s2', 's4', 's10', 's14', 's100', 'sa']), JSON.stringify(ids));
+  const line = await p.evaluate(() => {
+    const split = document.querySelector('.vl-split'); const side = document.querySelector('.vl-side');
+    return { bg: getComputedStyle(split).backgroundImage, sideBorder: getComputedStyle(side).borderRightWidth, splitH: Math.round(split.getBoundingClientRect().height), sideH: Math.round(side.getBoundingClientRect().height) };
+  });
+  check('B.38 경계선 — 사이드바 border-right 그대로 · 감싼 칸이 같은 x(127px)에 선 · 목록이 사이드바보다 길다', line.bg.includes('linear-gradient') && line.bg.includes('127px') && line.sideBorder === '1px' && line.splitH > line.sideH, JSON.stringify(line));
+  await p.close();
+}
+{
   // 선택 탭 카드(v4 §4.1) — 카드 1 숫자 · 카드 2 직접만 · 카드 3 [선택] · [연결 풀기]
   const p = await open(560, 'select');
   await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });

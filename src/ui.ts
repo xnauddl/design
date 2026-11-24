@@ -15,7 +15,7 @@ import { extractSignedToken, pickInstanceId, type VerifyResult } from './lib/lic
 import { base64UrlToString, verifyLicenseToken } from './lib/licenseToken';
 import { VERIFY_URL, PLUGIN_ID, LICENSE_ISS, LICENSE_AUD, LICENSE_ALG, LICENSE_PUBLIC_JWK, licenseLinksConfigured, licenseVerifyConfigured } from './lib/licenseConfig';
 import { exportHasTokens, exportStatusTail, cssVarName, type ExportFormat } from './lib/exporters';
-import { leafName, lastTwo, varValueText, varTypeMark, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, paletteTree, flattenPaletteTree, varAncestorKeys, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteNode } from './lib/varTable';
+import { pillOrder, leafName, lastTwo, varValueText, varTypeMark, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, paletteTree, flattenPaletteTree, varAncestorKeys, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteNode } from './lib/varTable';
 import { varKind, APPLY_TARGETS, targetAllowed, scopeFits, scopesForNew, type ApplyTarget } from './lib/varKind';
 import { createReentryScheduler } from './lib/reread';
 import type { VarInfo } from './shared/messages';
@@ -6426,7 +6426,8 @@ function renderVarList(): void {
     if (global) {
       const colors = rows.filter((v) => v.type === 'COLOR');
       const others = rows.filter((v) => v.type !== 'COLOR');
-      if (others.length) grp.appendChild(paletteLineEl(others, 'pill', level));
+      // 숫자 값 작은 순 → 숫자 아님 → 별칭(IA v4 §4.6 B.38 VO-D1 — 화면 순서만)
+      if (others.length) grp.appendChild(paletteLineEl(pillOrder(others, currentModeCell), 'pill', level));
       if (colors.length) {
         if (colorView === 'grid') grp.appendChild(paletteLineEl(colors, 'dot', level));
         else for (const v of colors) grp.appendChild(varRowEl(v, true, level));

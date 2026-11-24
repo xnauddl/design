@@ -635,3 +635,21 @@ export function varAncestorKeys(v: Pick<VarRow, 'collectionId' | 'name'>): strin
   const segs = v.name.slice(0, cut).split('/');
   return segs.map((_, i) => `${v.collectionId}|${segs.slice(0, i + 1).join('/')}`);
 }
+
+/**
+ * 변수 탭 Global 알약 순서(IA v4 §4.6 B.38 VO-D1) — 고른 모드의 숫자 값 작은 순 → 숫자 아님(글자 · 참거짓 · 값 없음) → 별칭.
+ * 각 묶음 안은 들어온(피그마) 순서 — 안정 정렬.
+ */
+export function pillOrder<T>(rows: readonly T[], cellOf: (r: T) => VarCell | undefined): T[] {
+  const num: { r: T; v: number; i: number }[] = [];
+  const other: T[] = [];
+  const alias: T[] = [];
+  rows.forEach((r, i) => {
+    const c = cellOf(r);
+    if (c?.kind === 'alias') alias.push(r);
+    else if (c?.kind === 'number' && Number.isFinite(Number(c.text))) num.push({ r, v: Number(c.text), i });
+    else other.push(r);
+  });
+  num.sort((a, b) => a.v - b.v || a.i - b.i);
+  return [...num.map((x) => x.r), ...other, ...alias];
+}

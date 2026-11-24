@@ -214,6 +214,31 @@ function resolveUsesNames(tokens: readonly DraftToken[], skip: ReadonlyMap<strin
  * 거울 계층을 두지 않는다. 역할 없는 값은 바인딩이 Global에 직접 붙는다(bind.ts).
  * Semantic 컬렉션은 역할 단계가 쓸 수 있게 미리 만들어 둔다(빈 컬렉션).
  */
+/**
+ * 새로 만드는 Global의 순서(IA v4 §4.3 B.38 VO-D3) — 그룹(이름 첫 마디)은 처음 나온 순서, 그룹 안에서 숫자 아닌 토큰이
+ * 있던 자리는 그대로 두고 FLOAT 토큰끼리만 만들 px 값(`literalOf`) 작은 순(안정)으로 채운다.
+ */
+export function creationOrder(tokens: readonly DraftToken[], base: number): DraftToken[] {
+  const groups = new Map<string, DraftToken[]>();
+  for (const t of tokens) {
+    const g = t.name.split('/')[0];
+    const arr = groups.get(g);
+    if (arr) arr.push(t);
+    else groups.set(g, [t]);
+  }
+  const out: DraftToken[] = [];
+  for (const arr of groups.values()) {
+    const isNum = arr.map((t) => resolvedTypeForToken(t) === 'FLOAT');
+    const nums = arr
+      .map((t, i) => ({ t, i, v: Number(literalOf(t, 'FLOAT', base)) }))
+      .filter((x) => isNum[x.i])
+      .sort((a, b) => (Number.isFinite(a.v) && Number.isFinite(b.v) ? a.v - b.v : 0) || a.i - b.i);
+    let k = 0;
+    arr.forEach((t, i) => out.push(isNum[i] ? nums[k++].t : t));
+  }
+  return out;
+}
+
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const reuse = await pickReusable(tokens, base);
   const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), finalName: new Map() };
@@ -232,7 +257,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
     const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
     // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
     const touched = new Set<string>();
-    for (const t of toCreate) {
+    for (const t of creationOrder(toCreate, base)) {
       const type = resolvedTypeForToken(t);
       const nm = named.get(t.name);
       if (nm) {

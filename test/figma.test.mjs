@@ -37,6 +37,7 @@ import {
   applyRegisteredTextStyles,
   textStyleCandidateTest,
   dropRemoteClusters,
+  creationOrder,
   bindSelection,
   collectLocalMains,
   createRole,
@@ -9874,4 +9875,15 @@ test('B.37 원격 스타일 — 만들기 후보에서 원격과 같은 묶음�
   clusters.push({ key: 'instance', nodeIds: ['a', 'ii'] });
   const kept = await dropRemoteClusters(clusters, nodeById, [], (c) => c.key === 'anchored');
   assert.deepEqual(kept.map((c) => c.key), ['mixUpper', 'amb', 'changed', 'anchored', 'instance']);
+});
+
+test('B.38 creationOrder · createTokens — 그룹 안 숫자 값 작은 순 · 그룹은 처음 나온 순서 · px 값으로', async () => {
+  const tk = (name, category, value, extra = {}) => ({ name, category, sources: [category], value, ...extra });
+  assert.deepEqual(creationOrder([tk('spacing/16', 'gap', 16), tk('spacing/4', 'gap', 4), tk('spacing/8', 'gap', 8)], 16).map((t) => t.name), ['spacing/4', 'spacing/8', 'spacing/16']);
+  assert.deepEqual(creationOrder([tk('radius/2', 'radius', 2), tk('spacing/4', 'gap', 4), tk('radius/1', 'radius', 1)], 16).map((t) => t.name), ['radius/1', 'radius/2', 'spacing/4']);
+  const figma = installFigma();
+  await createTokens([tk('spacing/16', 'gap', 16), tk('color/000000', 'color', '#000000', { sources: ['fill'] }), tk('spacing/4', 'gap', 4), tk('spacing/8', 'gap', 8)], 16);
+  const order = figma._state.variables.map((v) => v.name);
+  const sp = order.filter((n) => n.startsWith('spacing/'));
+  assert.deepEqual(sp, ['spacing/4', 'spacing/8', 'spacing/16'], '새 숫자 변수는 값 작은 순으로 만든다');
 });

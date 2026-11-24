@@ -5031,6 +5031,23 @@
     }
     return resolveGlobalNames(reqs, file);
   }
+  function creationOrder(tokens, base) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const t2 of tokens) {
+      const g = t2.name.split("/")[0];
+      const arr = groups.get(g);
+      if (arr) arr.push(t2);
+      else groups.set(g, [t2]);
+    }
+    const out = [];
+    for (const arr of groups.values()) {
+      const isNum = arr.map((t2) => resolvedTypeForToken(t2) === "FLOAT");
+      const nums = arr.map((t2, i) => ({ t: t2, i, v: Number(literalOf(t2, "FLOAT", base)) })).filter((x) => isNum[x.i]).sort((a, b) => (Number.isFinite(a.v) && Number.isFinite(b.v) ? a.v - b.v : 0) || a.i - b.i);
+      let k = 0;
+      arr.forEach((t2, i) => out.push(isNum[i] ? nums[k++].t : t2));
+    }
+    return out;
+  }
   async function createTokens(tokens, base) {
     const reuse = await pickReusable(tokens, base);
     const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), finalName: /* @__PURE__ */ new Map() };
@@ -5046,7 +5063,7 @@
       const idx = await buildVarIndex();
       const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
       const touched = /* @__PURE__ */ new Set();
-      for (const t2 of toCreate) {
+      for (const t2 of creationOrder(toCreate, base)) {
         const type = resolvedTypeForToken(t2);
         const nm = named.get(t2.name);
         if (nm) {
