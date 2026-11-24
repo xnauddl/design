@@ -26,7 +26,7 @@ import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, makeCreatedText, hasDarkTarget, darkResultText, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, libSameSplit, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, SCOPE_ADD_REASONS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, libSameSplit, onlyItems, skipRowCounts, SEL_KINDS, NO_VAR_REASONS, SCOPE_ADD_REASONS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -2811,7 +2811,7 @@ window.onmessage = (event: MessageEvent) => {
       }
       if (onUnusedError(msg)) break;
       if (onVarOpError(msg)) break;
-      if (msg.op === 'PREVIEW_TEXT_STYLES') {
+      if (msg.op === 'PREVIEW_TEXT_STYLES' && wizardErrorMsg !== msg) {
         // 텍스트 스타일 미리보기 실패 — 변수 연결은 막지 않는다(스타일 줄 없이 그린다).
         if (bindTsPending) { bindTsPending = false; bindTsRows = []; bindTsSkips = {}; bindFindSettle(); }
         break;
@@ -3365,11 +3365,9 @@ function mkSetOn(name: string, on: boolean): void {
  */
 function mkRecalcOffByLib(): void {
   mkOffByLib.clear();
-  if (!baseline || !usageMap) return; // 쓰는 변수 결과 전 · 기준이 바뀐 뒤 결과 전 — 거르지 않는다
-  const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
-  if (!vmTableKnown && !prereqKnown) return;
+  if (!baseline || !usageMap) return; // 쓰는 변수 결과 전 · 기준이 바뀐 뒤 결과 전 — 거르지 않는다(판정할 수 없음)
+  // B.35 뒤 — 첫 화면 상태와 상관없이 늘, 라이브러리 목록이 비어도 free = 0 토큰은 끔(ia-v4 §4.3 Global 탭 "B.30 PR 뒤")
   const libs = libDirectNow();
-  if (!libs.length || !(localZero || mcKeep())) return;
   const toks = mkTokens.filter((tk) => mkKind(tk) !== 'text');
   const left = new Set(libSameSplit(toks, libs).left.map((tk) => tk.name));
   for (const tk of toks) if (!left.has(tk.name)) mkOffByLib.add(tk.name);
@@ -3937,19 +3935,49 @@ async function runMake(): Promise<void> {
       } else if (id === 'bind') {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
-        const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
-        totals.bound = r.bound;
-        mkMainsDone.push(...(r.mainsBound ?? []));
-        const reasons = r.reasons ?? {};
-        if (r.bound) results.push({ id, mark: 'ok', text: t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') });
-        else {
-          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !((reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0)) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
-          // 이미 모두 연결됨이면 할 일이 없었던 것 — 실패가 아니라 ✓, 결과도 "다 됨"(2026-11-19 사용자 결정, ia-v4 §4.3 "연결 0곳 사유")
-          if (zero === 'wizard.seq.bindAllBound') results.push({ id, mark: 'ok', text: t(zero) });
-          else {
-            results.push({ id, mark: 'warn', text: t(zero) });
-            stay = true;
+        try {
+          // ① 켠 줄의 값만 · ② 라이브러리와 같은 값 묶음은 뺌(ia-v4 §4.3 "B.35 뒤 연결 단계")
+          const only = onlyItems(mkSendTokens(), libDirectNow());
+          const r = only.length
+            ? await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, ['APPLY_RESULT'], wizBindReq)
+            : null; // 켠 값이 없으면 변수 연결은 건너뛴다(④는 돈다)
+          const n = r?.bound ?? 0;
+          if (r) {
+            totals.bound = r.bound;
+            mkMainsDone.push(...(r.mainsBound ?? []));
           }
+          // ④ 기존 텍스트 스타일도 붙인다 — 실패해도 단계를 실패로 보지 않는다(변수 결과는 남김)
+          let ts = 0;
+          let tsFail = false;
+          try {
+            const pv = await wizardRequest({ type: 'PREVIEW_TEXT_STYLES', reqId: wizBindReq, nodeIds: ids }, ['TEXT_STYLES_PREVIEW'], wizBindReq);
+            if (pv.rows.length) {
+              const textStyles = pv.rows.map((row) => ({ styleId: row.styleId, nodeIds: row.nodeIds, ...(row.mainIds?.some(Boolean) ? { mainIds: row.mainIds } : {}) }));
+              const ar = await wizardRequest({ type: 'APPLY_SELECTED', items: [], textStyles, reqId: wizBindReq }, ['APPLY_RESULT'], wizBindReq);
+              ts = ar.textStylesApplied ?? 0;
+              mkMainsDone.push(...(ar.mainsBound ?? []));
+            }
+          } catch {
+            tsFail = true;
+          }
+          if (ts) totals.tsBound = ts;
+          const reasons = r?.reasons ?? {};
+          const tsTail = (ts ? t('wizard.seq.bindTs', { t: ts }) : '') + (tsFail ? t('wizard.seq.bindTsFail') : '');
+          if (n) results.push({ id, mark: tsFail ? 'warn' : 'ok', text: t('wizard.seq.bindDone', { n }) + (r?.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') + tsTail });
+          else if (ts) results.push({ id, mark: tsFail ? 'warn' : 'ok', text: t('wizard.seq.bindTsOnly', { t: ts }) + (tsFail ? t('wizard.seq.bindTsFail') : '') });
+          else if (!r) results.push({ id, mark: tsFail ? 'warn' : 'ok', text: t('wizard.seq.bindNoneOn') + (tsFail ? t('wizard.seq.bindTsFail') : '') });
+          else {
+            const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !((reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0)) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
+            // 이미 모두 연결됨이면 할 일이 없었던 것 — 실패가 아니라 ✓, 결과도 "다 됨"(2026-11-19 사용자 결정, ia-v4 §4.3 "연결 0곳 사유")
+            if (zero === 'wizard.seq.bindAllBound' && !tsFail) results.push({ id, mark: 'ok', text: t(zero) });
+            else {
+              results.push({ id, mark: 'warn', text: t(zero) + (tsFail ? t('wizard.seq.bindTsFail') : '') });
+              stay = true;
+            }
+          }
+          if (tsFail) stay = true;
+        } finally {
+          wizBindPending = false;
         }
       } else if (id === 'rename') {
         const rid = mkNextReq();

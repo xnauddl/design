@@ -149,6 +149,10 @@
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
     "wizard.seq.bindRoles": " \xB7 \uC0C8 Semantic {k}\uAC1C",
+    "wizard.seq.bindTs": " \xB7 Text Style {t}\uACF3",
+    "wizard.seq.bindTsOnly": "Text Style {t}\uACF3 \uC5F0\uACB0",
+    "wizard.seq.bindNoneOn": "\uC5F0\uACB0\uD560 \uCF20 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "wizard.seq.bindTsFail": " \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC5F0\uACB0 \uBABB \uD568",
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -2577,6 +2581,16 @@
     res.skipped++;
     note(res, key, node, preview, field);
   }
+  function onlyMatch(only, s) {
+    const key = s.allowed.join("|");
+    const v = slotValue(s);
+    return only.some((it) => {
+      if (!it.groups.includes(key)) return false;
+      if (s.kind === "color") return typeof it.value === "string" && colorKey(it.value, it.alpha) === v;
+      if (typeof v === "number") return typeof it.value === "number" && sameNumber(it.value, v);
+      return it.value === v;
+    });
+  }
   function dsRoleOwner(node) {
     const fn = node.getPluginData;
     let role;
@@ -2626,6 +2640,7 @@
     }
     ctx.mainId = void 0;
     if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
+    if (opts.only) ctx.slots = ctx.slots.filter((s) => onlyMatch(opts.only, s));
     resolveSlots(ctx);
     if (apply && preview.candidates.length) {
       const known = /* @__PURE__ */ new Map();
@@ -12724,7 +12739,7 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              __spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
+              __spreadValues(__spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true }), msg.only && !msg.preview ? { only: msg.only } : {})
             );
             post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",

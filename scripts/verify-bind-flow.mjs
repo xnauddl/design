@@ -63,6 +63,18 @@ async function goSub(p, sub) {
 }
 const recv = (p, m) => p.evaluate((m) => window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: m } })), m);
 const sent = (p, type) => p.evaluate((t) => window.__sent.filter((m) => m && m.type === t), type);
+/** 만들기 연결 단계의 기존 텍스트 스타일 미리보기(ia-v4 §4.3 B.35 ④)에 답한다 — rows가 있으면 APPLY_SELECTED에도 답한다. */
+async function wizTs(p, reqId, rows = [], applied = 0) {
+  await p.waitForTimeout(30);
+  const pv = (await sent(p, 'PREVIEW_TEXT_STYLES')).filter((m) => m.reqId === reqId).at(-1);
+  if (!pv) return null;
+  await recv(p, { type: 'TEXT_STYLES_PREVIEW', reqId, rows, skipReasons: {} });
+  if (!rows.length) return pv;
+  await p.waitForTimeout(30);
+  const as = (await sent(p, 'APPLY_SELECTED')).filter((m) => m.reqId === reqId).at(-1);
+  if (as) await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: {}, reqId, textStylesApplied: applied, textStylesSkipped: 0 });
+  return pv;
+}
 const lastReq = async (p, type) => (await sent(p, type)).at(-1)?.reqId;
 /** 컴포넌트 화면 찾기 — 버튼을 눌러 보낸 reqId로 응답한다(ia-v4 §4.5 — 비운 뒤 늦게 온 응답은 버림). 잠겨 있으면 유료 · 목록 기준을 먼저 준다. */
 async function compFound(p, nodes) {
@@ -1354,6 +1366,7 @@ async function saveAndGet(p) {
   check('17 연결 — APPLY(preview 아님) · skipTextStyleNodes · 시작 때 기준 · reqId', !!ap && ap.skipTextStyleNodes === true && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
   check('17 실행 중 [연결] 잠금', await locked(p, '#btnApplyConfirm'));
   await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
+  await wizTs(p, ap.reqId);
   await p.waitForTimeout(120);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-make-done-missing.png` : '/dev/null' }).catch(() => {});
   check('17 다 됨 → 첫 화면 · 상태 줄 "… 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결"(글꼴 알림이 있어도 연결까지 돈다) · 툴팁에 알림 글', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결' && (await p.getAttribute('#statusText', 'title')).includes("title: 글꼴 'Gone Bold'"), await p.textContent('#statusText'));
@@ -1386,6 +1399,7 @@ async function saveAndGet(p) {
   await p.waitForTimeout(60);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'no-match': 2 }, preview: false, reqId: ap.reqId });
+  await wizTs(p, ap.reqId);
   await p.waitForTimeout(80);
   const res = await p.$$eval('#makeResults .tr-head', (e) => e.map((x) => x.textContent));
   check('17 일부 실패 — 화면에 남고 단계별 결과 · 끈 단계는 "껐음" · [닫기] 하나', (await visible(p, '#makeResults')) && res.some((x) => x.includes('연결') && x.includes('같은 곳이 없어요')) && res.some((x) => x.includes('껐음')) && (await p.textContent('#btnMakeRun')) === '닫기' && !(await visible(p, '#makeOpts')), JSON.stringify(res));
@@ -1419,6 +1433,7 @@ async function saveAndGet(p) {
   await p.waitForTimeout(60);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'already-bound': 3 }, preview: false, reqId: ap.reqId });
+  await wizTs(p, ap.reqId);
   await p.waitForTimeout(80);
   check('17 연결 0곳 · 이미 모두 연결됨 → 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
   await p.close();
@@ -2990,6 +3005,7 @@ async function fillBoth(p) {
   await p.waitForTimeout(60);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId, mainsBound: ['a'] });
+  await wizTs(p, ap.reqId);
   await p.waitForTimeout(120);
   check('28c 만들기 다 됨 줄에 "메인 컴포넌트" 없음', (await visible(p, '#selHome')) && !(await p.textContent('#statusText')).includes('메인'), await p.textContent('#statusText'));
   await p.waitForTimeout(450);
@@ -3172,7 +3188,7 @@ async function backHome30(p, libs) {
   await backHome30(p, []);
   await enterMake30(p, 'go');
   const on2 = await mkOnRows30(p);
-  check('30 ⑩ 상태 5에서 들어갔다 나온 뒤 상태 6에서 [변수 만들기] → 모두 켬(8줄 — 글자만 끔)', on2.length === 8, JSON.stringify(on2));
+  check('30 ⑩ 상태 5에서 들어갔다 나온 뒤 상태 6에서 [변수 만들기] → 라이브러리가 없어 같은 값 줄은 켬 · 이미 다 붙은 값(spacing/12 — free 0)은 B.35 뒤 상태와 상관없이 끔 · 글자 끔(7줄)', on2.length === 7 && on2.includes('spacing/8') && !on2.includes('spacing/12'), JSON.stringify(on2));
   // 상태 6 → 5: 사용자가 바꾸지 않은 줄은 다시 꺼짐. 상태 6에서 사용자가 켠 줄(spacing/8 — 껐다 켬)은 켜진 채(한계)
   await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
   await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
@@ -4405,6 +4421,67 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
     t1[0] === '있는 변수 · 용도 더함' && t1[1].includes('이 자리 용도를 더해 써요') && t2 === '있는 변수' && (await p.textContent('#makeTopText')) === '켠 값만 만들거나 있는 변수에 연결해요' && (await p.textContent('#btnMakeRun')) === '변수 0개 만들기',
     JSON.stringify([t1, t2, await p.textContent('#btnMakeRun')]));
   await p.close();
+}
+
+// B.35 — 만들기 연결 단계: 켠 줄만(only) · 기존 텍스트 스타일 · 결과 줄 · 상태 7 free 0 끔
+{
+  const setup = async () => {
+    const p = await open(560, 'layer');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await recv(p, { ...sel(1, 0), ids: ['w1'], firstName: 'Card' });
+    await p.waitForTimeout(450); // 선택 탭 첫 화면이 쓰는 변수를 먼저 읽는다(실제 흐름)
+    const su = (await sent(p, 'SCAN_USAGE')).at(-1);
+    if (su) await recv(p, usageResult(su.reqId, {}));
+    await goSub(p, 'make');
+    await p.waitForTimeout(50);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
+      { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 4, freeBy: { GAP: 4 } },
+      { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2, freeBy: { GAP: 2 } },
+      { name: 'radius/4', category: 'radius', value: 4, sources: ['radius'], count: 3, freeBy: {} }, // 모든 자리가 이미 붙음
+    ] });
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    if (sc) await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(80);
+    const pv = (await sent(p, 'CREATE_TOKENS')).at(-1);
+    if (pv) await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 2, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: {}, roleRows: [] });
+    await p.waitForTimeout(60);
+    return p;
+  };
+  const p = await setup();
+  const r4 = await p.$eval('#makeTree [data-tkey="gk:radius"] .bv-switch', (b) => b.getAttribute('aria-checked'));
+  check('B.35 ③ 상태 7 — 이미 다 붙은 값(free 0) 줄은 처음 꺼짐(Radius 머리 끔 · 접힘) · 다른 줄은 켬', r4 === 'false' && (await p.getAttribute('#makeTree [data-tkey="gk:radius"]', 'aria-expanded')) === 'false' && (await p.$eval('#makeTree [data-tkey="g:spacing/16"] .bv-switch', (b) => b.getAttribute('aria-checked'))) === 'true', r4);
+  // spacing/8 끄고 실행
+  await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
+  await p.waitForTimeout(40);
+  const pv2 = (await sent(p, 'CREATE_TOKENS')).at(-1);
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv2.reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: {}, roleRows: [] });
+  await p.waitForTimeout(40);
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(50);
+  const cr = (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+  await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(80);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  check('B.35 ① 연결 단계 APPLY.only — 켠 줄(spacing/16)만 · 끈 줄(spacing/8) · free 0 줄 없음', JSON.stringify(ap?.only) === JSON.stringify([{ value: 16, groups: ['GAP'] }]), JSON.stringify(ap?.only));
+  await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
+  const tsRows = [{ styleId: 'S:1', name: 'body/medium', nodeIds: ['t1', 't2'], summary: '' }];
+  const pts = await wizTs(p, ap.reqId, tsRows, 9);
+  const as = (await sent(p, 'APPLY_SELECTED')).filter((m) => m.reqId === ap.reqId).at(-1);
+  check('B.35 ④ 변수 연결 뒤 PREVIEW_TEXT_STYLES(기준 · 마법사 reqId) → APPLY_SELECTED{items: [], textStyles}', !!pts && pts.nodeIds?.[0] === 'w1' && !!as && as.items.length === 0 && as.textStyles?.[0]?.styleId === 'S:1', JSON.stringify(as));
+  await p.waitForTimeout(150);
+  check('B.35 다 됨 줄 — "… · 4곳 연결 · Text Style 9곳"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')).endsWith('4곳 연결 · Text Style 9곳'), await p.textContent('#statusText'));
+  await p.close();
+  // 켠 Global 줄 없음(모두 끄기) + 스타일만 → APPLY 없이 ④ → "Text Style {t}곳 연결"
+  const q = await setup();
+  await q.click('#makeAllOff');
+  await q.waitForTimeout(40);
+  const apBefore = (await sent(q, 'APPLY')).filter((m) => m.preview === false).length;
+  // 텍스트 스타일 줄이 없어 실행할 게 없으면 버튼이 잠긴다 — 이 경우는 단위 테스트(makeDoneText)로 본다
+  check('B.35 켠 줄이 없으면 실행 전 APPLY 없음(대조)', (await sent(q, 'APPLY')).filter((m) => m.preview === false).length === apBefore);
+  await q.close();
 }
 
 await browser.close();

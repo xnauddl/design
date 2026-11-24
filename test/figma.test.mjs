@@ -9681,3 +9681,55 @@ test('B.33 mergeScopes — ALL_FILLS가 들어가면 개별 칠 용도를 빼고
   assert.deepEqual(mergeScopes(['ALL_SCOPES'], ['ALL_FILLS'], 'COLOR'), ['ALL_SCOPES']);
   assert.deepEqual(mergeScopes(['GAP'], ['CORNER_RADIUS'], 'FLOAT').sort(), ['CORNER_RADIUS', 'GAP']);
 });
+
+/* ---- 7-8 A 만들기 연결 단계 — only(ia-v4 §4.3 B.35 ①) ---- */
+test('B.35 only — 켠 값 · 묶음만 붙고, 끈 값 · 같은 값 다른 용도 자리는 그대로', async () => {
+  installFigma();
+  await createTokens([
+    { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'color/ff0000', category: 'color', sources: ['fill'], value: '#ff0000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ], 16);
+  const mk = (id, hex, gap) => ({
+    type: 'FRAME', id, name: id, fills: [{ type: 'SOLID', color: hex === '#000000' ? { r: 0, g: 0, b: 0 } : { r: 1, g: 0, b: 0 } }], strokes: [], effects: [],
+    layoutMode: 'HORIZONTAL', itemSpacing: gap, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], parent: { type: 'PAGE' },
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  });
+  const a = mk('a', '#000000', 16);
+  const b = mk('b', '#ff0000', 16);
+  const all = await bindSelection([mk('a0', '#000000', 16), mk('b0', '#ff0000', 16)], false, {}, { noNewRoles: true });
+  assert.ok(all.bound >= 2, '거르지 않으면 두 색 모두 후보');
+  // #000000(칠 · 프레임)만 켬 — #ff0000 · 간격 16은 끔
+  const res = await bindSelection([a, b], true, {}, { noNewRoles: true, only: [{ value: '#000000', groups: ['ALL_FILLS|FRAME_FILL'] }] });
+  assert.equal(res.bound, 1);
+  assert.ok(a.fills[0].boundVariables?.color, '켠 값은 붙음');
+  assert.equal(b.fills[0].boundVariables, undefined, '끈 값은 그대로');
+  assert.equal(a._bound?.itemSpacing, undefined, '끈 간격은 그대로');
+  assert.equal(res.reasons['no-match'] ?? 0, 0, '걸러진 자리는 사유 없이 버린다');
+  // 같은 값이지만 다른 묶음(글자 칠) → 안 붙음
+  const c = mk('c', '#000000', 16);
+  const r2 = await bindSelection([c], true, {}, { noNewRoles: true, only: [{ value: '#000000', groups: ['ALL_FILLS|TEXT_FILL'] }] });
+  assert.equal(r2.bound, 0);
+  // 숫자 값만 같고 묶음이 다르면(글자 크기 16) 간격 16은 안 붙음
+  const d = mk('d', '#000000', 16);
+  const r3 = await bindSelection([d], true, {}, { noNewRoles: true, only: [{ value: 16, groups: ['FONT_SIZE'] }] });
+  assert.equal(r3.bound, 0);
+  assert.equal(d._bound?.itemSpacing, undefined);
+  // 간격 16 켬 → 붙음
+  const e = mk('e', '#000000', 16);
+  const r4 = await bindSelection([e], true, {}, { noNewRoles: true, only: [{ value: 16, groups: ['GAP'] }] });
+  assert.equal(r4.bound, 1);
+  assert.ok(e._bound?.itemSpacing);
+});
+
+test('B.35 only — 알약 자리는 9999로 견준다(원래 값 150 아님)', async () => {
+  installFigma();
+  await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
+  const pill = () => a20Frame('p' + Math.random(), { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
+  const n1 = pill();
+  const r1 = await bindSelection([n1], true, {}, { only: [{ value: 9999, groups: ['CORNER_RADIUS'] }] });
+  assert.equal(r1.bound, 4);
+  const n2 = pill();
+  const r2 = await bindSelection([n2], true, {}, { only: [{ value: 150, groups: ['CORNER_RADIUS'] }] });
+  assert.equal(r2.bound, 0);
+});

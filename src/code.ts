@@ -1407,6 +1407,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
             // 무료 자동 연결은 새 Semantic을 만들지 않는다 — 찾기 · 실제 연결 · 카드 1의 m이 같은 규칙(IA v4 §2.3-7 · F6).
             ...(isPaid() ? {} : { noNewRoles: true }),
+            // 만들기 실행의 연결 단계 — 켠 줄의 값만(IA v4 §4.3 B.35 ①)
+            ...(msg.only && !msg.preview ? { only: msg.only } : {}),
           },
         );
         post({
