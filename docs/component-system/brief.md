@@ -688,3 +688,195 @@ Figma Plugin API에서 실제 지원하는 속성과 메서드를 기준으로 �
 ## 보충 (2026-11-24, 같은 날) — Font Size
 
 Font Size는 Figma Variable 바인딩 대상에 포함한다. Font Size 값이 정수인 경우 FLOAT 타입의 Variable을 생성하거나 기존 Variable을 재사용하여 Text Style의 fontSize 속성에 바인딩한다. 소수점이 포함된 Font Size는 Variable 연결 대상에서 제외하고 기존 값을 유지한다. 실제 Figma Plugin API의 지원 여부와 바인딩 성공 여부를 검증한 후 처리한다.
+
+## 9. Component Properties 자동 생성 및 텍스트 수정 / Instance Swap 지원
+
+> 2026-11-24 같은 날 뒤이어 받은 장.
+
+### 9-1. 목적
+
+자동 생성되는 모든 Main Component 및 Component Set에 대해 Figma의 Component Properties를 분석하고 자동 생성한다.
+
+컴포넌트를 사용하는 디자이너가 Instance를 Detach하지 않고도 텍스트를 수정하거나 내부 요소를 교체할 수 있도록 구성한다.
+
+Figma Plugin API의 실제 지원 기능을 활용하며, 단순한 레이어 이름 변경이나 수동 Override가 아닌 Figma 네이티브 Component Property로 등록한다.
+
+### 9-2. TEXT Property 자동 생성
+
+컴포넌트 내부의 TextNode를 탐색하고, 사용자에게 수정이 필요한 텍스트 레이어를 식별한다.
+
+다음과 같은 텍스트를 TEXT Property 대상으로 분류한다.
+
+- Button Label
+- Navigation Label
+- Tab Label
+- Tag Label
+- Title
+- Description
+- Placeholder
+- Helper Text
+- Badge Label
+- Card Title
+- Card Description
+
+처리 규칙:
+
+1. TextNode의 레이어명과 텍스트 내용을 분석한다.
+2. 레이어의 역할을 파악하여 의미 있는 Property 이름을 생성한다.
+3. Figma API의 `addComponentProperty()`를 사용해 `TEXT` Property를 생성한다.
+4. 생성된 Property ID를 해당 TextNode의 `componentPropertyReferences.characters`에 연결한다.
+5. 기본 텍스트는 기존 디자인의 텍스트를 유지한다.
+6. 동일한 역할의 텍스트 레이어는 일관된 Property 명명 규칙을 적용한다.
+
+Property 명명 예시:
+
+- `Button Text`
+- `Title`
+- `Description`
+- `Placeholder`
+- `Navigation Label`
+
+텍스트 수정 시 기존 TextNode의 폰트, 폰트 크기, 색상, 정렬, Line Height, Letter Spacing 등의 서식을 최대한 유지한다.
+
+주의사항:
+
+- TEXT Property는 텍스트 내용 변경을 목적으로 한다.
+- Rich Text, 여러 서식이 혼합된 텍스트, 리스트 등의 서식이 TEXT Property를 통해 완전히 보존된다고 가정하지 않는다.
+- 혼합 서식이 있는 TextNode는 분석 결과에서 별도로 표시하고 자동 연결 여부를 선택할 수 있도록 한다.
+- 텍스트가 디자인 구조상 고정되어야 하는 경우에는 자동으로 TEXT Property를 생성하지 않는다.
+
+### 9-3. INSTANCE_SWAP Property 자동 생성
+
+컴포넌트 내부에 중첩된 InstanceNode를 탐색하고, 다른 컴포넌트로 교체할 필요가 있는 요소를 식별한다.
+
+주요 대상:
+
+- Leading Icon
+- Trailing Icon
+- Avatar
+- Profile Image
+- Thumbnail
+- Logo
+- Status Icon
+- Card Image
+- 기타 교체 가능한 Nested Component
+
+처리 규칙:
+
+1. 컴포넌트 내부의 InstanceNode를 탐색한다.
+2. 해당 Instance의 Main Component와 역할을 분석한다.
+3. 같은 역할 또는 같은 카테고리에 해당하는 교체 가능한 컴포넌트를 검색한다.
+4. Figma API의 `addComponentProperty()`를 사용해 `INSTANCE_SWAP` Property를 생성한다.
+5. 해당 Nested Instance의 `componentPropertyReferences.mainComponent`에 생성한 Property ID를 연결한다.
+6. 현재 사용 중인 컴포넌트를 기본값으로 지정한다.
+7. 교체 가능한 컴포넌트 목록을 `preferredValues`로 등록한다.
+8. 실제 Instance에서 교체 가능한 항목이 정상적으로 표시되는지 검증한다.
+
+Property 명명 예시:
+
+- `Leading Icon`
+- `Trailing Icon`
+- `Avatar`
+- `Profile Image`
+- `Thumbnail`
+- `Logo`
+
+### 9-4. 교체 가능한 컴포넌트 자동 분류
+
+모든 컴포넌트를 무분별하게 Instance Swap 대상으로 등록하지 않는다.
+
+컴포넌트 이름, 레이어 구조, 크기, 형태, 역할 등을 분석하여 교체 가능한 컴포넌트끼리 그룹화한다.
+
+예시:
+
+- Icon / Navigation
+- Icon / Action
+- Icon / Status
+- Avatar / Small
+- Avatar / Medium
+- Avatar / Large
+- Image / Thumbnail
+- Image / Banner
+
+서로 다른 역할이나 구조를 가진 컴포넌트는 동일한 Instance Swap 목록에 포함하지 않는다.
+
+교체 가능한 컴포넌트가 명확하지 않은 경우에는 자동 등록하지 않고 사용자 확인 대상으로 분류한다.
+
+### 9-5. BOOLEAN Property 자동 생성
+
+컴포넌트 내부에서 표시 여부를 변경할 수 있는 요소를 탐색한다.
+
+대상 예시:
+
+- Leading Icon
+- Trailing Icon
+- Badge
+- Helper Text
+- Avatar
+- Thumbnail
+- Divider
+
+Figma API의 `BOOLEAN` Property를 생성하고 해당 하위 레이어의 `componentPropertyReferences.visible`에 연결한다.
+
+기본값은 기존 디자인의 표시 상태를 유지한다.
+
+### 9-6. Component 전체 교체 및 Variant 연동
+
+다음 두 기능을 구분하여 처리한다.
+
+- 동일 컴포넌트 내부의 요소 교체: INSTANCE_SWAP Property 사용
+- 컴포넌트 전체를 다른 Main Component로 교체: InstanceNode의 `swapComponent()` 또는 적절한 Main Component 교체 API 사용
+
+Variant가 존재하는 Component Set은 기존 Variant 구조를 유지하면서 속성 변경이 가능하도록 구성한다.
+
+Variant 간 텍스트 및 Instance Swap Property 이름과 역할을 일관되게 유지한다.
+
+### 9-7. 기존 디자인 및 Override 보존
+
+Property 생성 및 연결 과정에서 다음 항목을 최대한 보존한다.
+
+- 기존 레이어 계층 구조
+- 텍스트 콘텐츠 및 서식
+- Auto Layout
+- Padding 및 Gap
+- Width 및 Height
+- Fill 및 Stroke
+- Effects
+- 기존 Variant
+- 기존 Instance Override
+
+이미 Property가 존재하는 경우 중복 생성하지 않고 기존 Property를 재사용하거나 필요한 부분만 보완한다.
+
+Instance Swap 실행 시 Figma의 Override 보존 동작을 고려하고, 기존 사용자 수정 내용이 불필요하게 초기화되지 않도록 한다.
+
+### 9-8. 플러그인 UI
+
+Component Properties 설정 화면을 추가한다.
+
+다음 항목을 제공한다.
+
+- TEXT Property 자동 생성 ON/OFF
+- INSTANCE_SWAP Property 자동 생성 ON/OFF
+- BOOLEAN Property 자동 생성 ON/OFF
+- 자동 등록할 텍스트 레이어 목록
+- 교체 가능한 Nested Instance 목록
+- 교체 가능한 컴포넌트 후보 목록
+- Preferred Values 설정
+- Property 이름 수정
+- 기존 Property 재사용 여부
+- 자동 생성 제외 항목 설정
+
+각 항목은 실제 등록 전에 미리 확인할 수 있도록 한다.
+
+### 9-9. 검증 및 예외 처리
+
+- Property ID는 `addComponentProperty()` 반환값을 사용하며 임의로 생성하지 않는다.
+- TEXT Property는 TextNode의 `characters`에 연결한다.
+- INSTANCE_SWAP Property는 Nested Instance의 `mainComponent`에 연결한다.
+- BOOLEAN Property는 해당 노드의 `visible`에 연결한다.
+- Property 연결 후 Component 및 Instance에서 정상적으로 동작하는지 검증한다.
+- 중복 Property 및 이름 충돌을 검사한다.
+- 교체 대상 컴포넌트가 삭제되거나 접근할 수 없는 경우 예외 처리한다.
+- API에서 지원하지 않는 구조는 임의로 처리하지 말고 사용자 확인 대상으로 표시한다.
+
+최종 목표는 자동 생성된 컴포넌트가 단순한 디자인 에셋이 아니라, 텍스트 수정, 요소 교체, 표시 여부 변경까지 가능한 실사용 Design System Component가 되도록 하는 것이다.
