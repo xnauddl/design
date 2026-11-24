@@ -19,9 +19,9 @@ import { rgbToHex, exportColorHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor } from './lib/naming';
 import { ExportCollectionInput, ExportModeValue, ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportGlobalDupes, exportTokens, resolveExportModes, resolveExportTokens } from './lib/exporters';
 import { tabInfo } from './lib/componentLike';
-import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
+import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, memberFitIssue, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
-import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
+import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, familyMissingVariants, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
 import type { CompPropType, StructNode, StructGroup, CompPropPlan, ReuseCandidate } from './lib/components';
 import { generateDarkMode, darkPrereq, darkChangedBeforeError } from './lib/themeApply';
 import { Tier, Feature, isTier } from './lib/entitlements';
@@ -782,7 +782,7 @@ interface InstMain {
 type InstMains = ReadonlyMap<string, InstMain>;
 
 /** Tab Item 세트 이름(§4.7 "묶기" 1번 "[등록] 뒤 다시 찾기") — `Tab Item` · `Tab Item {숫자}`. */
-const TAB_ITEM_SET_RE = /^Tab Item( \d+)?$/;
+const TAB_ITEM_SET_RE = /^Tab Item(-(Text|Pill|Box))?( \d+)?$/; // C-D20 · C-D27 — `Tab Item-Pill` · `Tab Item-Pill 2`도
 
 /**
  * 루트 아래 INSTANCE마다 메인 정보를 미리 비동기로 구한다(§4.7 "묶기" 4번 — 동기 `mainComponent`는 dynamic-page에서 비어 있다).
@@ -876,6 +876,8 @@ function toStructNode(node: SceneNode, isRoot = true, mains?: InstMains): Struct
     // 페인트/이펙트는 판정에 필요한 필드만 얕게 복사한다(원본 배열은 트리 전체로 무겁다).
     cornerRadius: a.cornerRadius as number | symbol | undefined,
     topLeftRadius: num(a.topLeftRadius),
+    // 섞인 모서리면 네 모서리를 견준다(§4.7 "묶기" 4번 C-D21)
+    ...(typeof a.cornerRadius === 'number' ? {} : { topRightRadius: num(a.topRightRadius), bottomRightRadius: num(a.bottomRightRadius), bottomLeftRadius: num(a.bottomLeftRadius) }),
     opacity: num(a.opacity),
     gridRowCount: num(a.gridRowCount),
     gridColumnCount: num(a.gridColumnCount),
@@ -1008,7 +1010,7 @@ function propValuesFromNode(root: SceneNode, plan: readonly CompPropPlan[]): Rec
  * **인스턴스 내부로는 진입하지 않는다** — 중첩 컴포넌트는 swap 후보로만.
  * 반환: 노출된 `속성명:타입` 목록.
  */
-function exposeProperties(container: ComponentNode | ComponentSetNode, scopes: readonly ComponentNode[], mains?: InstMains): string[] {
+function exposeProperties(container: ComponentNode | ComponentSetNode, scopes: readonly ComponentNode[], mains?: InstMains, textFallback = false): string[] {
   const rep = scopes[0];
   if (!rep) return [];
   const layered = ownComponentLayersWithPath(rep);
@@ -1020,7 +1022,23 @@ function exposeProperties(container: ComponentNode | ComponentSetNode, scopes: r
       characters: node.type === 'TEXT' ? node.characters : undefined,
     })),
   );
-  return exposePropertiesFromPlan(container, scopes, plan, mains);
+  return exposePropertiesFromPlan(container, scopes, plan, mains, textFallback);
+}
+
+/** 자신과 조상(루트 아래)이 모두 보이는가. */
+function visibleUnder(n: SceneNode, root: SceneNode): boolean {
+  let cur: BaseNode | null = n;
+  while (cur && cur !== root) {
+    if ((cur as SceneNode).visible === false) return false;
+    cur = cur.parent;
+  }
+  return true;
+}
+
+/** 변형의 보이는 TEXT가 정확히 하나면 그것(인스턴스 안은 세지 않음 — C-D28 글자 속성 대체 찾기). */
+function soleVisibleText(scope: ComponentNode): SceneNode | null {
+  const texts = ownComponentLayersWithPath(scope).map((x) => x.node).filter((n) => n.type === 'TEXT' && visibleUnder(n, scope));
+  return texts.length === 1 ? texts[0] : null;
 }
 
 /** 주어진 계획만 속성으로 노출(접힘: 값이 다른 슬롯만). */
@@ -1029,6 +1047,7 @@ function exposePropertiesFromPlan(
   scopes: readonly ComponentNode[],
   plan: readonly CompPropPlan[],
   mains?: InstMains,
+  textFallback = false,
 ): string[] {
   const out: string[] = [];
   for (const p of plan) {
@@ -1037,7 +1056,10 @@ function exposePropertiesFromPlan(
     try {
       const id = container.addComponentProperty(p.propName, p.type, propDefaultFor(repTarget, p.type, mains));
       for (const scope of scopes) {
-        const target = resolvePropTarget(scope, p);
+        // 버튼 · 칩 한 세트(C-D28): 대표 경로에 글자가 없는 변형은 그 변형의 보이는 TEXT가 하나면 그것에 묶는다.
+        let target = resolvePropTarget(scope, p);
+        if (target && textFallback && p.type === 'TEXT' && target.type !== 'TEXT') target = null;
+        if (!target && textFallback && p.type === 'TEXT') target = soleVisibleText(scope);
         if (!target) continue;
         const refs = { ...(target.componentPropertyReferences ?? {}) };
         refs[p.field] = id;
@@ -1150,7 +1172,9 @@ async function reuseCandidates(exclude: ReadonlySet<string>): Promise<{ list: Re
       const key = c.getPluginData(REUSE_KEY);
       if (!key) continue;
       byId.set(c.id, c);
-      list.push({ id: c.id, key, setId: c.parent?.type === 'COMPONENT_SET' ? c.parent.id : null });
+      const set = c.parent?.type === 'COMPONENT_SET' ? c.parent : null;
+      // 세트의 변형 수 — 키가 없는 변형도 센다(2026-11-24 C-D25 · 탭 "그 둘뿐").
+      list.push({ id: c.id, key, setId: set ? set.id : null, ...(set ? { setSize: set.children.filter((k) => k.type === 'COMPONENT').length } : {}) });
     }
   } catch { /* 못 찾으면 재사용하지 않는다(지금처럼 새로 만든다) */ }
   return { list, byId };
@@ -1848,19 +1872,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             const name = groupNames[gi];
             const on = (id: string) => defaultChecked.has(id);
             if (g.tab) {
-              // 탭 그룹(§4.7 "묶기" 2번 "후보 트리 줄") — 대표 바 · Tab Bar 인스턴스가 될 바는 "Tab Bar · Style=…"(Style 하나면
-              // 단독 `Tab Bar`), 칸만 바꿀 바는 "Tab Item · Style=…". 칸 맞추기는 [등록] 때 본다.
-              const many = g.tab.styles.length > 1;
+              // 탭 그룹(§4.7 "묶기" 2번 "후보 트리 줄" — 2026-11-23 C-D20 · C-D26) — Style 그룹마다: 대표 바 · Tab Bar 인스턴스가 될
+              // 바는 단독 "Tab Bar"(겹치면 `-{Style}`), 칸만 바꿀 바는 "Tab Item" + [변형 세트](변형 값 빈 문자열 — 꼬리 없음).
               const hit = reuseHits[gi]?.tab;
               for (const b of g.tab.bars) {
                 const asBar = b.rep || b.asBar;
-                const label = asBar ? (many ? { group: name, variant: `Style=${b.style}` } : { single: name }) : { group: g.tab.itemName, variant: `Style=${b.style}` };
+                const label = asBar ? { single: name } : { group: g.tab.itemName, variant: '' };
                 let reuse: { name: string } | undefined;
                 if (hit && asBar && hit.bars) {
-                  const comp = hit.bars[g.tab.styles.findIndex((sp) => sp.style === b.style)];
-                  reuse = { name: comp && comp.parent?.type === 'COMPONENT_SET' ? `${comp.parent.name} · ${comp.name}` : comp?.name ?? hit.barName };
+                  reuse = { name: hit.bars[0]?.name ?? hit.barName };
                 } else if (hit && !asBar) {
-                  reuse = { name: `${hit.itemName} · Style=${b.style}` };
+                  reuse = { name: hit.itemName };
                 }
                 preview.set(b.bar.id, { ...label, defaultOn: on(b.bar.id), ...(reuse ? { reuse } : {}) });
               }
@@ -1981,7 +2003,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         for (const g of groups) for (const m of g.members) groupKeyOf.set(m.id, g.key);
         const markReuse = (comp: ComponentNode, kind: 'single' | 'collapse' | 'variant', memberId: string): void => {
           const m = structById.get(memberId);
-          // 이름 키는 그룹 키(탭은 `role:tab`, §4.7 "묶기" 7번).
+          // 이름 키는 그룹 키(탭은 `role:tab:{Style}` — C-D20, §4.7 "묶기" 7번).
           const key = m && !noKeyMembers.has(memberId) ? reuseKey(kind, m, groupKeyOf.get(memberId)) : '';
           try { comp.setPluginData(REUSE_KEY, key); } catch { /* 무시 */ }
         };
@@ -2004,7 +2026,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const singles: string[] = [];
         const failures: string[] = []; // 조용히 삼키던 실패를 UI로 노출(진단)
         // 등록으로 만든 컴포넌트/세트 — 루프 후 **속성 자동 노출**(옛 '속성 노출' 버튼 통합).
-        const containers: { container: ComponentNode | ComponentSetNode; scopes: ComponentNode[] }[] = [];
+        const containers: { container: ComponentNode | ComponentSetNode; scopes: ComponentNode[]; textFallback?: boolean }[] = [];
+        const missing: string[] = []; // [등록]이 만든 세트의 같은 가족 안 빈 변형(C-D31)
         let exposedEarly = 0; // 속성접힘 경로에서 선노출한 속성 수
 
         // 원본 자리(§4.7 "인스턴스 자리"). 그룹 부모면 표지를 넣어 그룹을 지킨다 — 원본이 컴포넌트가 되어
@@ -2125,6 +2148,30 @@ figma.ui.onmessage = async (msg: UiToCode) => {
          * (Style 둘 이상이면 세트, 아니면 컴포넌트 하나 — 노출하지 않고 안 칸 인스턴스를 `isExposedInstance`) ④ 대표와 칸 수가 같고
          * 바 루트가 맞는 바는 Tab Bar 인스턴스로. 지금 트리로 다시 본 바 루트 맞추기가 걸리면 칸만 바꾼 틀로 두고 꼬리 `fillKept`.
          */
+        /**
+         * C-D23 검사 길 — 흔적 없이: 인스턴스 → 덮어쓴 값 옮기기(아이콘은 이미 있는 것만 — 탭 칸 복제본엔 아이콘 인스턴스가 없어 실제로는
+         * 불리지 않는다) → 화면 지키기 → 크기 맞춤 → 넣기 전 검사 → 지움. `keepRoots` · `made` · 진단 · 꼬리에 남기지 않는다. 걸린 까닭(없으면 null).
+         */
+        const fitCheckOnly = async (comp: ComponentNode, node: SceneNode, type: string): Promise<string | null> => {
+          const prefix = shapePrefix(comp, type);
+          let inst: InstanceNode | null = null;
+          try {
+            inst = comp.createInstance();
+            await copyOverridesAsync(node, inst, prefix, {
+              mainOf: (n) => n.getMainComponentAsync(),
+              loadFont: (f) => figma.loadFontAsync(f),
+              isIcon: (n) => iconFrameKeyOf(n) !== undefined,
+              iconFor: (v) => { const key = artKeyOf(v); return key ? iconRegistry.get(key) ?? null : null; },
+            });
+            await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS);
+            if (inst.width !== node.width || inst.height !== node.height) { try { inst.resize(node.width, node.height); } catch { /* 검사가 가른다 */ } }
+            return memberFitIssue(inst, node, prefix, fitOpts);
+          } catch (e) {
+            return errText(e);
+          } finally {
+            if (inst) { try { if (!inst.removed) inst.remove(); } catch { /* 이미 사라짐 */ } }
+          }
+        };
         const registerTabGroup = async (g: PlanGroup, barName: string, decision: ReuseDecision): Promise<void> => {
           const tp = g.tab!;
           const hit = decision.hit?.tab ?? null;
@@ -2137,6 +2184,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           // ① Tab Item 변형 — 계획 items 순서(Style 문서 순 · Selected → Default).
           const itemComp = new Map<string, ComponentNode>(); // `${style}|${state}`
           const okStyle = new Set<string>();
+          // C-D23 되돌리기용 — 이번에 만든 Tab Item 세트와 올린 수.
+          let madeItemSet: ComponentSetNode | null = null;
+          let madeItemCount = 0;
           if (hit) {
             tp.items.forEach((it, k) => itemComp.set(`${it.style}|${it.state}`, hit.items[k]));
             for (const sp of tp.styles) okStyle.add(sp.style);
@@ -2187,6 +2237,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                 sets++;
                 registered += made.length;
                 containers.push({ container: set, scopes: made.map((x) => x.comp) });
+                madeItemSet = set;
+                madeItemCount = made.length;
                 for (const x of made) {
                   itemComp.set(`${x.it.style}|${x.it.state}`, x.comp);
                   try { x.comp.setPluginData(REUSE_KEY, keepItemKey ? tabItemReuseKey(x.it.cell, x.it.style, x.it.state) : ''); } catch { /* 무시 */ }
@@ -2203,6 +2255,33 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             const { root } = reuseRootOf(comp, it.cell.type);
             // 틀 칸이면 변형 자신이 루트(COMPONENT) — 칸(FRAME)과의 타입 차는 보지 않는다.
             origCell.set(`${it.style}|${it.state}`, { ...toStructNode(root, true, await instanceMainsAsync([root])), type: it.cell.type });
+          }
+          // ①′ 대표 바의 칸 — 모두 되거나 하나도 안 함(2026-11-23 C-D23). 먼저 모든 칸을 검사만(흔적 없음) 하고, 하나라도
+          // 걸리면 이 Style 그룹을 만들지 않는다: 만든 Tab Item 세트를 지우고 수 · 노출 대상에서 빼며, 바는 모두 원본 그대로.
+          const repBar = tp.bars.find((b) => b.rep);
+          let repOk = true;
+          if (repBar && okStyle.has(repBar.style)) {
+            for (let i = 0; i < repBar.cells.length && repOk; i++) {
+              const cellNode = await liveOf(repBar.cells[i].id);
+              if (!cellNode) continue;
+              if (await fitCheckOnly(itemComp.get(`${repBar.style}|${repBar.states[i]}`)!, cellNode, repBar.cells[i].type)) repOk = false;
+            }
+          }
+          if (!repOk) {
+            if (madeItemSet) {
+              try { madeItemSet.remove(); } catch { /* 이미 사라짐 */ }
+              sets--;
+              registered -= madeItemCount;
+              const ci = containers.findIndex((c) => c.container === madeItemSet);
+              if (ci >= 0) containers.splice(ci, 1);
+            }
+            for (const b of tp.bars) {
+              const barNode = await liveOf(b.bar.id);
+              const nm = barNode?.name ?? b.bar.name;
+              fillKept.push(nm);
+              failures.push(t('component.fail.fillKept', { name: nm, causePart: '' }));
+            }
+            return; // 재사용이어도 Tab Bar 재사용 · 인스턴스 없음, 재사용 구획에 올리지 않음
           }
           // ② 칸 → Tab Item 인스턴스. 나머지 바(재사용이면 대표도)는 칸 맞추기로 바 전체를 먼저 거른다.
           const cellsDone = new Set<string>(); // 칸을 바꾼(걸려도 바 전체를 원본으로 두지 않은) 바
@@ -2259,30 +2338,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
               finish(x.comp, x.sp);
               restore([{ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.comp.name }]);
             };
-            if (madeBars.length >= 2) {
-              let set: ComponentSetNode | null = null;
-              try {
-                set = figma.combineAsVariants(madeBars.map((x) => x.comp), pageOf(madeBars[0].comp) ?? figma.currentPage);
-              } catch (e) {
-                failures.push(t('component.fail.combine', { set: barName, error: errText(e) }));
-              }
-              if (set) {
-                set.name = barName;
-                for (const x of madeBars) { x.comp.name = `Style=${x.sp.style}`; finish(x.comp, x.sp); }
-                page.appendChild(set);
-                try { arrangeSet(set); } catch (e) { failures.push(t('component.fail.arrange', { set: set.name, error: errText(e) })); }
-                set.x = cursorX;
-                set.y = 0;
-                cursorX += set.width + 48;
-                sets++;
-                keepRoots.push({ node: set, name: set.name });
-                restore(madeBars.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.comp.name })));
-              } else {
-                for (const x of madeBars) asSingle(x);
-              }
-            } else {
-              for (const x of madeBars) asSingle(x);
-            }
+            // Style 그룹마다 대표가 하나라 늘 컴포넌트 하나(2026-11-23 C-D20 — `Style=` 변형 세트를 만들지 않는다).
+            for (const x of madeBars) asSingle(x);
           }
           // 재사용 Tab Bar면 대표 바 자리도 기존 변형 인스턴스로.
           const barTargets = tp.bars.filter((b) => cellsDone.has(b.bar.id) && barComp.has(b.style) && (b.asBar || (b.rep && !!hit?.bars)));
@@ -2616,14 +2673,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             // 지금 트리로 계획한다 — 안쪽 그룹이 이미 인스턴스가 됐을 수 있다(루프 전 스냅샷은 그 안을 펼쳐 둔다).
             const liveStruct = new Map<string, StructNode>();
             for (const m of g.members) { const n = byId.get(m.id); if (n && !n.removed) liveStruct.set(m.id, toStructNode(n)); }
-            const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()])
+            // 그림 자리 계획 — 버튼 · 칩 한 세트(C-D28)는 가족마다(구조가 달라 경로를 가족끼리 견줄 수 없다).
+            const plansOf = (ms: readonly StructNode[]) => inferVaryingComponentProperties(ms.map((m) => liveStruct.get(m.id)).filter((x): x is StructNode => !!x))
               .filter((p) => p.fromVector && p.layerPath != null);
+            const allPlans = plansOf(g.members);
+            const famPlans = new Map<string, ReturnType<typeof plansOf>>();
+            if (g.mixed && g.families) {
+              for (const fam of g.families) {
+                const ms = fam.flatMap((sf) => sf.members);
+                const fp = plansOf(ms);
+                for (const m of ms) famPlans.set(m.id, fp);
+              }
+            }
             type Made = { comp: ComponentNode; variant: string; o: Origin; id: string; sf: (typeof subfamilies)[number]; type: string };
             const made: Made[] = [];
             for (const sf of subfamilies) {
               const head = sf.members[sf.master] ?? sf.members[0];
               const node = byId.get(head.id);
               if (!node) continue;
+              const vectorPlans = famPlans.get(head.id) ?? allPlans;
               // 아이콘 컴포넌트는 마스터를 컴포넌트로 바꾸기 **전에** 만든다(원본 그림을 복제한다).
               const icons = vectorPlans.map((p) => {
                 const at = nodeAtPath(node, p.layerPath!);
@@ -2689,7 +2757,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             set.y = 0;
             cursorX += set.width + 48;
             sets++;
-            containers.push({ container: set, scopes: made.map((x) => x.comp) });
+            containers.push({ container: set, scopes: made.map((x) => x.comp), ...(g.mixed ? { textFallback: true } : {}) });
+            // 같은 가족 안 빈 변형(C-D31) — 계획 그대로 세트가 된 때만(아이콘 대체로 지금 규칙이 된 세트는 알리지 않는다).
+            if (subfamilies === g.subfamilies) {
+              const miss = familyMissingVariants(g);
+              if (miss.length) missing.push(`${set.name}: ${miss.join(' / ')}`);
+            }
             restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
             // ↑ 이 그룹 자리를 즉시 채운다(중첩 보존). 소가족의 나머지 멤버도 지금(노출 전에).
             for (const x of made) await placeExtras(x);
@@ -2717,7 +2790,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // INSTANCE_SWAP 기본값은 메인 노드 id — 대표 범위의 메인 정보를 미리 구한다(§4.7 "묶기" 4번).
         const exposeMains = await instanceMainsAsync(containers.map((c) => c.scopes[0]).filter((x): x is ComponentNode => !!x));
         for (const c of containers) {
-          try { exposed += exposeProperties(c.container, c.scopes, exposeMains).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
+          try { exposed += exposeProperties(c.container, c.scopes, exposeMains, !!c.textFallback).length; } catch (e) { failures.push(t('component.fail.exposeAll', { error: errText(e) })); }
         }
         // 노출로 기본값이 된 값을 되돌린다. 못 넣은 것은 자리마다 한 번 "속성 값을 못 넣은" 꼬리에(6번과 같다).
         const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
@@ -2727,7 +2800,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 끝 정리(§4.7 "인스턴스 자리" 7번 — C-D4): 이번에 만들었는데 쓰이지 않게 된 아이콘, 이번에 만든 빈 Components 페이지.
         await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
 
-        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
+        post({ type: 'COMPONENTS_RESULT', registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing, failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
         if (registered || sets || reused.length) commitUndo(figma); // UX2 — 재사용만이어도 ⌘Z 한 번(§4.7 "재사용" 6번)
         break;
       }

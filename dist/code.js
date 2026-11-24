@@ -7349,7 +7349,7 @@
   var weightOf2 = (t2) => typeof t2.fontWeight === "number" ? t2.fontWeight : typeof t2.fontWeight === "symbol" ? "mixed" : 400;
   var underlineOf = (t2) => t2.textDecoration === "UNDERLINE";
   function tabInfo(node, opts = {}) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d, _e;
     if (node.type !== "FRAME") return null;
     if (layoutOf(node) !== "horizontal") return null;
     const d = dims(node);
@@ -7357,9 +7357,11 @@
     const cells = ((_a = node.children) != null ? _a : []).filter(isVisible);
     if (cells.length < 2) return null;
     const strict = cells.length >= 3 ? strictTab(cells) : null;
-    if (strict) return strict;
+    const textCells = cells.every((c) => c.type === "TEXT");
+    if (strict && (!textCells || isTabName((_c = (_b = node.nameKey) != null ? _b : node.name) != null ? _c : ""))) return strict;
+    if (strict && opts.wide === false) return null;
     if (opts.wide === false) return null;
-    if (!isTabName((_c = (_b = node.nameKey) != null ? _b : node.name) != null ? _c : "")) return null;
+    if (!isTabName((_e = (_d = node.nameKey) != null ? _d : node.name) != null ? _e : "")) return null;
     return wideTab(cells);
   }
   function tabCellLook(c) {
@@ -8715,7 +8717,8 @@
           seenTextContent.add(contentKey);
         }
         out.push({
-          propName: uniq(pascalCase(l.name) || "Text"),
+          propName: uniq(textPropBaseName(l)),
+          // C-D24 — 이름이 글자 내용과 같으면 `Text`
           type: "TEXT",
           layerName: l.name,
           layerPath: l.path,
@@ -9609,6 +9612,7 @@
     return (strict.length ? strict : items.filter((x) => x.grade === "loose")).map((x) => x.item);
   }
   function matchReuse(plan, comps, memberCount, grade = () => "strict") {
+    var _a;
     const result = (n, ids) => n === 1 ? { ids: ids(), keepKey: true } : { ids: null, keepKey: n === 0 };
     if (plan.kind !== "variant") {
       const graded = comps.filter((c) => c.key === plan.keys[0]).map((c) => {
@@ -9624,8 +9628,11 @@
       return result(hit.length, () => Array.from({ length: memberCount }, () => hit[0].id));
     }
     const setIds = [...new Set(comps.map((c) => c.setId).filter((id) => !!id))];
+    const distinctKeys = new Set(plan.keys).size;
     const covering = [];
     for (const setId of setIds) {
+      const size = (_a = comps.find((c) => c.setId === setId && c.setSize != null)) == null ? void 0 : _a.setSize;
+      if (size != null && size !== distinctKeys) continue;
       const picked = [];
       let setGrade = "strict";
       for (let k = 0; k < memberCount; k++) {
@@ -9648,10 +9655,18 @@
     const itemKeys = (_a = plan.itemKeys) != null ? _a : [];
     const barKeys = (_b = plan.barKeys) != null ? _b : [];
     const cover = (keys, kind, allowSingle, extra) => {
+      var _a2;
       const groups = [...new Set(comps.map((c) => c.setId))];
       const covering = [];
       for (const setId of groups) {
-        const pools = setId ? [comps.filter((c) => c.setId === setId)] : allowSingle && keys.length === 1 ? comps.filter((c) => !c.setId).map((c) => [c]) : [];
+        let pools = [];
+        if (setId) {
+          const pool = comps.filter((c) => c.setId === setId);
+          const size = (_a2 = pool.find((c) => c.setSize != null)) == null ? void 0 : _a2.setSize;
+          if (kind === "item" && (size == null || size === keys.length)) pools = [pool];
+        } else if (allowSingle && keys.length === 1) {
+          pools = comps.filter((c) => !c.setId).map((c) => [c]);
+        }
         for (const pool of pools) {
           const picked = [];
           let g = "strict";
@@ -9685,6 +9700,8 @@
       return isVec(x) && isVec(y) && ((_a = x.vectorKey) != null ? _a : "") !== ((_b = y.vectorKey) != null ? _b : "");
     };
     if (vecDiff(a, b)) return { issue: "/", viaIcon };
+    const edgeBad = (x, y) => x.type !== "TEXT" && !isVec(x) && !isVec(y) && edgeSig(x) !== edgeSig(y);
+    if (edgeBad(a, b)) return { issue: "/", viaIcon };
     const walk3 = (x, y, path) => {
       var _a, _b;
       const xs = (_a = x.children) != null ? _a : [];
@@ -9709,6 +9726,7 @@
         }
         if (xa.type !== yb.type) return p;
         if (vecDiff(xa, yb)) return p;
+        if (edgeBad(xa, yb)) return p;
         const deeper = walk3(xa, yb, p);
         if (deeper) return deeper;
       }
@@ -9725,12 +9743,19 @@
     return reusePairCheck(a, b, asInstance, iconInstances, skipFamily).issue;
   }
   var TAB_GROUP_KEY = "role:tab";
+  var r2s = (v) => String(Math.round((v != null ? v : 0) * 100) / 100);
+  function radiusSig(n) {
+    if (typeof n.cornerRadius === "number") return r2s(n.cornerRadius);
+    const c = [n.topLeftRadius, n.topRightRadius, n.bottomRightRadius, n.bottomLeftRadius];
+    return c.some((v) => typeof v === "number") ? c.map(r2s).join("-") : "0";
+  }
+  var edgeSig = (n) => `${hasVisibleStroke(n) ? "s" : ""}|${radiusSig(n)}`;
   var padOf = (n) => {
     var _a, _b, _c, _d, _e, _f;
     return [(_a = n.paddingTop) != null ? _a : 0, (_b = n.paddingRight) != null ? _b : 0, (_c = n.paddingBottom) != null ? _c : 0, (_d = n.paddingLeft) != null ? _d : 0, (_e = n.itemSpacing) != null ? _e : 0, (_f = n.counterAxisSpacing) != null ? _f : 0].join(",");
   };
   function pairDiff(a, b, family = true) {
-    const d = { split: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
+    const d = { split: false, rootEdge: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
     const isArt = (n) => !!n.iconFrame || VECTOR_TYPES.has(n.type);
     const walk3 = (x, y, path) => {
       var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r;
@@ -9791,6 +9816,11 @@
         }
       }
       if (((_i = x.layoutMode) != null ? _i : "NONE") !== ((_j = y.layoutMode) != null ? _j : "NONE")) {
+        d.split = true;
+        return;
+      }
+      if (!VECTOR_TYPES.has(x.type) && edgeSig(x) !== edgeSig(y)) {
+        if (path === "") d.rootEdge = true;
         d.split = true;
         return;
       }
@@ -9882,10 +9912,8 @@
     var _a, _b, _c;
     return path === "" ? (_a = m.fillHex) != null ? _a : "" : (_c = (_b = nodeAtStructPath(m, path)) == null ? void 0 : _b.fillHex) != null ? _c : "";
   };
-  function splitByColorConsistency(fam) {
-    const { ref, others } = colorRefPath(fam);
-    if (ref == null || !others.length) return [fam];
-    const ok = others.every((p) => {
+  function colorConsistent(fam, ref, others) {
+    return others.every((p) => {
       const map = /* @__PURE__ */ new Map();
       for (const m of fam) {
         const r = colorAt(m, ref);
@@ -9895,7 +9923,11 @@
       }
       return true;
     });
-    if (ok) return [fam];
+  }
+  function splitByColorConsistency(fam) {
+    const { ref, others } = colorRefPath(fam);
+    if (ref == null || !others.length) return [fam];
+    if (colorConsistent(fam, ref, others)) return [fam];
     const parts = /* @__PURE__ */ new Map();
     for (const m of fam) {
       const sig = [ref, ...others].map((p) => colorAt(m, p)).join("|");
@@ -9970,10 +10002,13 @@
     const byKey = new Map(sorted.map((g, i) => [g.key, labels[i]]));
     for (const s of subs) s.props.Size = byKey.get(sizeKey(s.members[s.master]));
   }
-  function familySubfamilies(fam) {
+  function familySubfamilies(fam, concatColor = false) {
     if (fam.length === 1) return [{ members: fam, master: 0, props: {} }];
     const content = fam.some((m, i) => i > 0 && pairDiff(fam[0], m).content);
-    const { ref } = colorRefPath(fam);
+    const { ref, others } = colorRefPath(fam);
+    const concat = concatColor && ref != null && others.length > 0 && !colorConsistent(fam, ref, others);
+    const colorPaths = ref == null ? [] : concat ? [ref, ...[...others].sort(comparePath)] : [ref];
+    const colorVal = (m) => colorPaths.map((p) => colorAt(m, p)).join("|");
     const sizeKey = (m) => {
       var _a, _b;
       return [
@@ -9986,10 +10021,17 @@
         })
       ].join("#");
     };
-    const key = (m) => `${ref == null ? "" : colorAt(m, ref)}#${sizeKey(m)}`;
+    const key = (m) => `${colorVal(m)}#${sizeKey(m)}`;
     const subs = subfamiliesBy(fam, key);
     if (subs.length >= 2) {
-      if (ref != null) assignAxis(subs, "Color", (s) => colorAt(s.members[s.master], ref), colorAxisLabelsOrNone);
+      if (ref != null) {
+        assignAxis(
+          subs,
+          "Color",
+          (s) => colorVal(s.members[s.master]),
+          concat ? (distinct) => uniqLabels(distinct.map((v) => v.split("|").map(colorNameOf).join("-"))) : colorAxisLabelsOrNone
+        );
+      }
       assignSizeAxis(subs, sizeKey, content);
     }
     finishProps(subs);
@@ -10007,7 +10049,7 @@
   function planOfMembers(members) {
     var _a, _b, _c, _d;
     const ms = [...members];
-    return { key: reuseNameKey((_d = (_c = (_a = ms[0]) == null ? void 0 : _a.nameKey) != null ? _c : (_b = ms[0]) == null ? void 0 : _b.name) != null ? _d : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
+    return { key: reuseNameKey((_d = (_c = (_a = ms[0]) == null ? void 0 : _a.nameKey) != null ? _c : (_b = ms[0]) == null ? void 0 : _b.name) != null ? _d : ""), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms), legacy: true };
   }
   var visibleKids = (n) => {
     var _a;
@@ -10021,7 +10063,7 @@
   function tabBarRootMatches(rep, bar) {
     if (visibleKids(rep).length !== visibleKids(bar).length) return false;
     const d = pairDiff(rep, bar);
-    return !d.rootFill && !d.rootPad;
+    return !d.rootFill && !d.rootPad && !d.rootEdge;
   }
   function planTabGroup(members) {
     var _a;
@@ -10045,7 +10087,7 @@
     const items = [];
     for (const sp of styles) {
       for (const state of ["Selected", "Default"]) {
-        items.push({ style: sp.style, state, variant: formatVariant({ State: state, Style: sp.style }), cell: state === "Selected" ? sp.selectedCell : sp.defaultCell });
+        items.push({ style: sp.style, state, variant: formatVariant({ State: state }), cell: state === "Selected" ? sp.selectedCell : sp.defaultCell });
       }
     }
     const bars = infos.map((x) => {
@@ -10087,6 +10129,66 @@
     ];
     return `variant:role:tab-bar:${hash2(parts.join(","))}`;
   }
+  function radiusLabel(n) {
+    if (typeof n.cornerRadius !== "number") {
+      const c = [n.topLeftRadius, n.topRightRadius, n.bottomRightRadius, n.bottomLeftRadius];
+      if (c.some((v) => typeof v === "number")) return c.map(r2s).join("-");
+      return "0";
+    }
+    const r = n.cornerRadius;
+    if (r > 0 && typeof n.height === "number" && r >= n.height / 2 - 1) return "full";
+    return r2s(r);
+  }
+  function buttonStyleOf(n) {
+    const f = hasVisibleFill(n);
+    const st = hasVisibleStroke(n);
+    return f && st ? "FilledOutline" : f ? "Filled" : st ? "Outline" : "Text";
+  }
+  function mergeButtonFamilies(fams, famSubs) {
+    const radius = fams.map((f) => radiusLabel(f[0]));
+    const useRadius = new Set(radius).size > 1;
+    const seen = /* @__PURE__ */ new Map();
+    const style = fams.map((f, i) => {
+      var _a;
+      const base = buttonStyleOf(f[0]);
+      const k = `${base}|${useRadius ? radius[i] : ""}`;
+      const n = ((_a = seen.get(k)) != null ? _a : 0) + 1;
+      seen.set(k, n);
+      return n > 1 ? `${base}-${n}` : base;
+    });
+    const subs = [];
+    famSubs.forEach((fs, i) => {
+      for (const sf of fs) {
+        sf.props = __spreadValues(__spreadProps(__spreadValues({}, sf.props), { Style: style[i] }), useRadius ? { Radius: radius[i] } : {});
+        subs.push(sf);
+      }
+    });
+    const keys = [...new Set(subs.flatMap((sf) => Object.keys(sf.props)))];
+    for (const sf of subs) for (const k of keys) if (!(k in sf.props)) sf.props[k] = "default";
+    if (new Set(subs.map((sf) => formatVariant(sf.props))).size !== subs.length) subs.forEach((sf, i) => {
+      sf.props.Variant = String(i + 1);
+    });
+    return subs;
+  }
+  function familyMissingVariants(g) {
+    var _a;
+    if (g.tab || g.legacy || g.subfamilies.length < 2) return [];
+    const out = [];
+    for (const fam of (_a = g.families) != null ? _a : [g.subfamilies]) {
+      const axes = ["Color", "Size"].filter((k) => new Set(fam.map((sf) => sf.props[k]).filter((v) => v != null)).size > 1);
+      if (!axes.length) continue;
+      const values = {};
+      for (const k of axes) values[k] = [...new Set(fam.map((sf) => sf.props[k]))].sort();
+      const have = new Set(fam.map((sf) => axes.map((k) => sf.props[k]).join("\0")));
+      const fixed = {};
+      for (const [k, v] of Object.entries(fam[0].props)) if (!axes.includes(k) && k !== "Variant") fixed[k] = v;
+      for (const combo of cartesian(values)) {
+        if (have.has(axes.map((k) => combo[k]).join("\0"))) continue;
+        out.push(formatVariant(__spreadValues(__spreadValues({}, fixed), combo)));
+      }
+    }
+    return out;
+  }
   function planRegisterGroups(nodes, isAncestor) {
     const order = new Map(nodes.map((n, i) => [n.id, i]));
     const dropAncestors = (ms) => ms.filter((m) => !ms.some((o) => o.id !== m.id && isAncestor(m, o)));
@@ -10094,16 +10196,38 @@
     const tabs = dropAncestors(nodes.filter((n) => tabInfo(n) != null));
     const tabIds = new Set(tabs.map((t2) => t2.id));
     const rest = nodes.filter((n) => !tabIds.has(n.id) && tabInfo(n) == null);
-    if (tabs.length) {
-      const tab = planTabGroup(tabs);
-      const subfamilies = tab.styles.map((sp) => ({ members: [sp.rep], master: 0, props: tab.styles.length > 1 ? { Style: sp.style } : {} }));
-      out.push({ key: TAB_GROUP_KEY, tab, members: tabs, nameGroupSize: tabs.length, nameMembers: tabs, subfamilies });
+    const tabStyles = [];
+    for (const t2 of tabs) {
+      const st = tabInfo(t2).style;
+      if (!tabStyles.includes(st)) tabStyles.push(st);
+    }
+    for (const st of tabStyles) {
+      const ms = tabs.filter((t2) => tabInfo(t2).style === st);
+      const tab = planTabGroup(ms);
+      out.push({ key: `${TAB_GROUP_KEY}:${st}`, tab, members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: [{ members: [tab.styles[0].rep], master: 0, props: {} }] });
     }
     for (const g of groupByExactName(rest)) {
       const members = dropAncestors(g.members);
       if (!members.length) continue;
       if (members.length > 1 && members.every((m) => highConfidenceComponentRole(m) === "heading")) {
-        out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: legacySubfamilies(members) });
+        out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: legacySubfamilies(members), legacy: true });
+        continue;
+      }
+      if (members.every((m) => {
+        const r = highConfidenceComponentRole(m);
+        return r === "button" || r === "chip";
+      })) {
+        const bfams = splitFamilies(members);
+        bfams.sort((a, b) => {
+          var _a, _b;
+          return ((_a = order.get(a[0].id)) != null ? _a : 0) - ((_b = order.get(b[0].id)) != null ? _b : 0);
+        });
+        const famSubs = bfams.map((f) => familySubfamilies(f, true));
+        if (bfams.length === 1) {
+          out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: famSubs[0] });
+        } else {
+          out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: mergeButtonFamilies(bfams, famSubs), families: famSubs, mixed: true });
+        }
         continue;
       }
       const fams = splitFamilies(members).flatMap(splitByColorConsistency);
@@ -10153,19 +10277,22 @@
       const clash = plainSet.has(b) || typedKeys.some((o) => o !== k && rawBase.get(o) === b);
       baseByKey.set(k, clash ? contextualName(typedMembers.get(k)) : b);
     }
+    const tabGroups = groups.filter((g) => !!g.tab).length;
     groups.forEach((g, i) => {
       var _a;
       if (!g.tab && g.typeIndex == null) return;
       let base;
       let next;
       if (g.tab) {
-        let item = "Tab Item";
+        const suffix = tabGroups > 1 || taken.has("Tab Item") || taken.has("Tab Bar") ? `-${g.tab.styles[0].style}` : "";
+        const itemBase = `Tab Item${suffix}`;
+        let item = itemBase;
         let ik = 2;
-        while (taken.has(item)) item = `Tab Item ${ik++}`;
+        while (taken.has(item)) item = `${itemBase} ${ik++}`;
         taken.add(item);
         g.tab.itemName = item;
-        base = "Tab Bar";
-        next = (k2) => `Tab Bar ${k2}`;
+        base = `Tab Bar${suffix}`;
+        next = (k2) => `${base} ${k2}`;
       } else {
         base = `${(_a = baseByKey.get(g.key)) != null ? _a : componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
         next = (k2) => `${base}-${k2}`;
@@ -12017,7 +12144,7 @@
     var _a;
     return (_a = vectorKeyOf(node)) != null ? _a : iconFrameKeyOf(node);
   }
-  var TAB_ITEM_SET_RE = /^Tab Item( \d+)?$/;
+  var TAB_ITEM_SET_RE = /^Tab Item(-(Text|Pill|Box))?( \d+)?$/;
   async function instanceMainsAsync(roots, into = /* @__PURE__ */ new Map()) {
     const structOf = /* @__PURE__ */ new Map();
     const read = async (n) => {
@@ -12102,7 +12229,7 @@
       }
     }
     const nameKey = readNameKey(node);
-    return __spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+    return __spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       id: node.id,
       name: node.name
     }, nameKey ? { nameKey } : {}), {
@@ -12125,7 +12252,8 @@
       // 채움도 모서리도 그림자도 없는 노드를 보게 되어 카드형 프레임이 후보에서 통째로 사라진다.
       // 페인트/이펙트는 판정에 필요한 필드만 얕게 복사한다(원본 배열은 트리 전체로 무겁다).
       cornerRadius: a.cornerRadius,
-      topLeftRadius: num(a.topLeftRadius),
+      topLeftRadius: num(a.topLeftRadius)
+    }), typeof a.cornerRadius === "number" ? {} : { topRightRadius: num(a.topRightRadius), bottomRightRadius: num(a.bottomRightRadius), bottomLeftRadius: num(a.bottomLeftRadius) }), {
       opacity: num(a.opacity),
       gridRowCount: num(a.gridRowCount),
       gridColumnCount: num(a.gridColumnCount),
@@ -12220,7 +12348,7 @@
   function propValuesFromNode(root, plan) {
     return propValuesFromStruct(toStructNode(root), plan);
   }
-  function exposeProperties(container, scopes, mains) {
+  function exposeProperties(container, scopes, mains, textFallback = false) {
     const rep = scopes[0];
     if (!rep) return [];
     const layered = ownComponentLayersWithPath(rep);
@@ -12232,9 +12360,21 @@
         characters: node.type === "TEXT" ? node.characters : void 0
       }))
     );
-    return exposePropertiesFromPlan(container, scopes, plan, mains);
+    return exposePropertiesFromPlan(container, scopes, plan, mains, textFallback);
   }
-  function exposePropertiesFromPlan(container, scopes, plan, mains) {
+  function visibleUnder(n, root) {
+    let cur = n;
+    while (cur && cur !== root) {
+      if (cur.visible === false) return false;
+      cur = cur.parent;
+    }
+    return true;
+  }
+  function soleVisibleText(scope) {
+    const texts = ownComponentLayersWithPath(scope).map((x) => x.node).filter((n) => n.type === "TEXT" && visibleUnder(n, scope));
+    return texts.length === 1 ? texts[0] : null;
+  }
+  function exposePropertiesFromPlan(container, scopes, plan, mains, textFallback = false) {
     var _a;
     const out = [];
     for (const p of plan) {
@@ -12243,7 +12383,9 @@
       try {
         const id = container.addComponentProperty(p.propName, p.type, propDefaultFor(repTarget, p.type, mains));
         for (const scope of scopes) {
-          const target = resolvePropTarget(scope, p);
+          let target = resolvePropTarget(scope, p);
+          if (target && textFallback && p.type === "TEXT" && target.type !== "TEXT") target = null;
+          if (!target && textFallback && p.type === "TEXT") target = soleVisibleText(scope);
           if (!target) continue;
           const refs = __spreadValues({}, (_a = target.componentPropertyReferences) != null ? _a : {});
           refs[p.field] = id;
@@ -12342,7 +12484,8 @@
         const key = c.getPluginData(REUSE_KEY);
         if (!key) continue;
         byId.set(c.id, c);
-        list.push({ id: c.id, key, setId: ((_a = c.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? c.parent.id : null });
+        const set = ((_a = c.parent) == null ? void 0 : _a.type) === "COMPONENT_SET" ? c.parent : null;
+        list.push(__spreadValues({ id: c.id, key, setId: set ? set.id : null }, set ? { setSize: set.children.filter((k) => k.type === "COMPONENT").length } : {}));
       }
     } catch (e) {
     }
@@ -12502,7 +12645,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -12972,17 +13115,15 @@
               const name = groupNames[gi];
               const on = (id) => defaultChecked.has(id);
               if (g.tab) {
-                const many = g.tab.styles.length > 1;
                 const hit = (_a2 = reuseHits[gi]) == null ? void 0 : _a2.tab;
                 for (const b of g.tab.bars) {
                   const asBar = b.rep || b.asBar;
-                  const label = asBar ? many ? { group: name, variant: `Style=${b.style}` } : { single: name } : { group: g.tab.itemName, variant: `Style=${b.style}` };
+                  const label = asBar ? { single: name } : { group: g.tab.itemName, variant: "" };
                   let reuse;
                   if (hit && asBar && hit.bars) {
-                    const comp = hit.bars[g.tab.styles.findIndex((sp) => sp.style === b.style)];
-                    reuse = { name: comp && ((_b2 = comp.parent) == null ? void 0 : _b2.type) === "COMPONENT_SET" ? `${comp.parent.name} \xB7 ${comp.name}` : (_c2 = comp == null ? void 0 : comp.name) != null ? _c2 : hit.barName };
+                    reuse = { name: (_c2 = (_b2 = hit.bars[0]) == null ? void 0 : _b2.name) != null ? _c2 : hit.barName };
                   } else if (hit && !asBar) {
-                    reuse = { name: `${hit.itemName} \xB7 Style=${b.style}` };
+                    reuse = { name: hit.itemName };
                   }
                   preview.set(b.bar.id, __spreadValues(__spreadProps(__spreadValues({}, label), { defaultOn: on(b.bar.id) }), reuse ? { reuse } : {}));
                 }
@@ -13106,6 +13247,7 @@
           const singles = [];
           const failures = [];
           const containers = [];
+          const missing = [];
           let exposedEarly = 0;
           const origins = [];
           const placeFailed = [];
@@ -13206,6 +13348,40 @@
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
           });
+          const fitCheckOnly = async (comp, node, type) => {
+            const prefix = shapePrefix(comp, type);
+            let inst = null;
+            try {
+              inst = comp.createInstance();
+              await copyOverridesAsync(node, inst, prefix, {
+                mainOf: (n) => n.getMainComponentAsync(),
+                loadFont: (f) => figma.loadFontAsync(f),
+                isIcon: (n) => iconFrameKeyOf(n) !== void 0,
+                iconFor: (v) => {
+                  var _a2;
+                  const key = artKeyOf(v);
+                  return key ? (_a2 = iconRegistry.get(key)) != null ? _a2 : null : null;
+                }
+              });
+              await keepLookAsync(node, inst, prefix, KEEP_LOOK_DEPS);
+              if (inst.width !== node.width || inst.height !== node.height) {
+                try {
+                  inst.resize(node.width, node.height);
+                } catch (e) {
+                }
+              }
+              return memberFitIssue(inst, node, prefix, fitOpts);
+            } catch (e) {
+              return errText(e);
+            } finally {
+              if (inst) {
+                try {
+                  if (!inst.removed) inst.remove();
+                } catch (e) {
+                }
+              }
+            }
+          };
           const registerTabGroup = async (g, barName, decision) => {
             var _a2, _b2, _c2, _d2, _e2, _f2, _g2;
             const tp = g.tab;
@@ -13219,6 +13395,8 @@
             };
             const itemComp = /* @__PURE__ */ new Map();
             const okStyle = /* @__PURE__ */ new Set();
+            let madeItemSet = null;
+            let madeItemCount = 0;
             if (hit) {
               tp.items.forEach((it, k) => itemComp.set(`${it.style}|${it.state}`, hit.items[k]));
               for (const sp of tp.styles) okStyle.add(sp.style);
@@ -13286,6 +13464,8 @@
                   sets++;
                   registered += made.length;
                   containers.push({ container: set, scopes: made.map((x) => x.comp) });
+                  madeItemSet = set;
+                  madeItemCount = made.length;
                   for (const x of made) {
                     itemComp.set(`${x.it.style}|${x.it.state}`, x.comp);
                     try {
@@ -13306,6 +13486,34 @@
               const comp = itemComp.get(`${it.style}|${it.state}`);
               const { root } = reuseRootOf(comp, it.cell.type);
               origCell.set(`${it.style}|${it.state}`, __spreadProps(__spreadValues({}, toStructNode(root, true, await instanceMainsAsync([root]))), { type: it.cell.type }));
+            }
+            const repBar = tp.bars.find((b) => b.rep);
+            let repOk = true;
+            if (repBar && okStyle.has(repBar.style)) {
+              for (let i = 0; i < repBar.cells.length && repOk; i++) {
+                const cellNode = await liveOf(repBar.cells[i].id);
+                if (!cellNode) continue;
+                if (await fitCheckOnly(itemComp.get(`${repBar.style}|${repBar.states[i]}`), cellNode, repBar.cells[i].type)) repOk = false;
+              }
+            }
+            if (!repOk) {
+              if (madeItemSet) {
+                try {
+                  madeItemSet.remove();
+                } catch (e) {
+                }
+                sets--;
+                registered -= madeItemCount;
+                const ci = containers.findIndex((c) => c.container === madeItemSet);
+                if (ci >= 0) containers.splice(ci, 1);
+              }
+              for (const b of tp.bars) {
+                const barNode = await liveOf(b.bar.id);
+                const nm = (_g2 = barNode == null ? void 0 : barNode.name) != null ? _g2 : b.bar.name;
+                fillKept.push(nm);
+                failures.push(t("component.fail.fillKept", { name: nm, causePart: "" }));
+              }
+              return;
             }
             const cellsDone = /* @__PURE__ */ new Set();
             for (const b of tp.bars) {
@@ -13373,37 +13581,7 @@
                 finish(x.comp, x.sp);
                 restore([{ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.comp.name }]);
               };
-              if (madeBars.length >= 2) {
-                let set = null;
-                try {
-                  set = figma.combineAsVariants(madeBars.map((x) => x.comp), (_g2 = pageOf2(madeBars[0].comp)) != null ? _g2 : figma.currentPage);
-                } catch (e) {
-                  failures.push(t("component.fail.combine", { set: barName, error: errText(e) }));
-                }
-                if (set) {
-                  set.name = barName;
-                  for (const x of madeBars) {
-                    x.comp.name = `Style=${x.sp.style}`;
-                    finish(x.comp, x.sp);
-                  }
-                  page.appendChild(set);
-                  try {
-                    arrangeSet(set);
-                  } catch (e) {
-                    failures.push(t("component.fail.arrange", { set: set.name, error: errText(e) }));
-                  }
-                  set.x = cursorX;
-                  set.y = 0;
-                  cursorX += set.width + 48;
-                  sets++;
-                  keepRoots.push({ node: set, name: set.name });
-                  restore(madeBars.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.comp.name })));
-                } else {
-                  for (const x of madeBars) asSingle(x);
-                }
-              } else {
-                for (const x of madeBars) asSingle(x);
-              }
+              for (const x of madeBars) asSingle(x);
             }
             const barTargets = tp.bars.filter((b) => cellsDone.has(b.bar.id) && barComp.has(b.style) && (b.asBar || b.rep && !!(hit == null ? void 0 : hit.bars)));
             for (const b of barTargets) {
@@ -13550,7 +13728,7 @@
                 const structs = live.map((n) => toStructNode(n));
                 const plan = inferVaryingComponentProperties(structs);
                 const imageSlots = inferVaryingImageSlots(structs);
-                const vectorPlans2 = plan.filter((p) => p.fromVector && p.layerPath != null);
+                const vectorPlans = plan.filter((p) => p.fromVector && p.layerPath != null);
                 const imagesOf = (root) => {
                   const out = {};
                   for (const s of imageSlots) {
@@ -13562,7 +13740,7 @@
                 };
                 let iconsReady = true;
                 for (let i = 0; i < live.length; i++) {
-                  for (const p of vectorPlans2) {
+                  for (const p of vectorPlans) {
                     const node = nodeAtPath(live[i], p.layerPath);
                     const key = structAtPathVectorKey(structs[i], p.layerPath);
                     const icon = node && key ? iconRegistry.ensure(key, node, p.layerName) : null;
@@ -13608,7 +13786,7 @@
                   failures.push(
                     ...swapVectorSlots(
                       master,
-                      vectorPlans2.map((p) => {
+                      vectorPlans.map((p) => {
                         var _a2;
                         return {
                           layerName: p.layerName,
@@ -13629,7 +13807,7 @@
                   const makerFor = (snap, name) => {
                     var _a2;
                     const vals = __spreadValues({}, snap.vals);
-                    for (const p of vectorPlans2) {
+                    for (const p of vectorPlans) {
                       const icon = iconRegistry.get(String((_a2 = vals[p.propName]) != null ? _a2 : ""));
                       if (icon) vals[p.propName] = icon.key || icon.id;
                       else delete vals[p.propName];
@@ -13720,12 +13898,22 @@
                 const n = byId.get(m.id);
                 if (n && !n.removed) liveStruct.set(m.id, toStructNode(n));
               }
-              const vectorPlans = inferVaryingComponentProperties([...liveStruct.values()]).filter((p) => p.fromVector && p.layerPath != null);
+              const plansOf = (ms) => inferVaryingComponentProperties(ms.map((m) => liveStruct.get(m.id)).filter((x) => !!x)).filter((p) => p.fromVector && p.layerPath != null);
+              const allPlans = plansOf(g.members);
+              const famPlans = /* @__PURE__ */ new Map();
+              if (g.mixed && g.families) {
+                for (const fam of g.families) {
+                  const ms = fam.flatMap((sf) => sf.members);
+                  const fp = plansOf(ms);
+                  for (const m of ms) famPlans.set(m.id, fp);
+                }
+              }
               const made = [];
               for (const sf of subfamilies) {
                 const head = (_j = sf.members[sf.master]) != null ? _j : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
+                const vectorPlans = (_k = famPlans.get(head.id)) != null ? _k : allPlans;
                 const icons = vectorPlans.map((p) => {
                   const at = nodeAtPath(node, p.layerPath);
                   const live = liveStruct.get(head.id);
@@ -13773,7 +13961,7 @@
               }
               let set;
               try {
-                const home = (_k = pageOf2(made[0].comp)) != null ? _k : figma.currentPage;
+                const home = (_l = pageOf2(made[0].comp)) != null ? _l : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -13797,7 +13985,11 @@
               set.y = 0;
               cursorX += set.width + 48;
               sets++;
-              containers.push({ container: set, scopes: made.map((x) => x.comp) });
+              containers.push(__spreadValues({ container: set, scopes: made.map((x) => x.comp) }, g.mixed ? { textFallback: true } : {}));
+              if (subfamilies === g.subfamilies) {
+                const miss = familyMissingVariants(g);
+                if (miss.length) missing.push(`${set.name}: ${miss.join(" / ")}`);
+              }
               restore(made.map((x) => ({ o: x.o, make: instanceOf(x.comp, x.o.name), label: x.variant || set.name })));
               for (const x of made) await placeExtras(x);
             }
@@ -13823,7 +14015,7 @@
           const exposeMains = await instanceMainsAsync(containers.map((c) => c.scopes[0]).filter((x) => !!x));
           for (const c of containers) {
             try {
-              exposed += exposeProperties(c.container, c.scopes, exposeMains).length;
+              exposed += exposeProperties(c.container, c.scopes, exposeMains, !!c.textFallback).length;
             } catch (e) {
               failures.push(t("component.fail.exposeAll", { error: errText(e) }));
             }
@@ -13831,7 +14023,7 @@
           const keepFailed = await restoreOverrides(keepSnaps, (id) => figma.getNodeByIdAsync(id), mainOf, (f) => figma.loadFontAsync(f));
           tallyRestoreFailures(keepRoots, keepFailed, propFailed, (name, prop) => failures.push(t("component.fail.propValue", { name, prop })));
           await cleanupAfterRegister({ registry: iconRegistry, page, pageCreated, instancesOf: (c) => c.getInstancesAsync() });
-          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing: [], failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
+          post({ type: "COMPONENTS_RESULT", registered, skipped, sets, singles, exposed, icons: iconRegistry.created(), missing, failures, placeFailed, placeCloned, propFailed, fillKept, reused, reuseKept });
           if (registered || sets || reused.length) commitUndo(figma);
           break;
         }
@@ -13862,7 +14054,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_l = nodes[0].parent) != null ? _l : figma.currentPage;
+              const parent = (_m = nodes[0].parent) != null ? _m : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {
@@ -13999,7 +14191,7 @@
             }
             throw e;
           }
-          const _m = res, { changed } = _m, r = __objRest(_m, ["changed"]);
+          const _n = res, { changed } = _n, r = __objRest(_n, ["changed"]);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
           if (changed) {
             commitUndo(figma);
