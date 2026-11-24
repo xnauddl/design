@@ -3104,9 +3104,8 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
   let fromLine: string | undefined;
   if (r.replace === false) {
     // 이름 보존(컴포넌트 등록) — 등록할 이름이 제목, 레이어 이름은 다를 때만 둘째 줄 "원래 이름 …"(ia-v4 §4.3a-3).
-    title.innerHTML = r.variant
-      ? `<span class="tree-name">${escapeHtml(r.variant.set)}</span> <span class="r-var">${escapeHtml(r.variant.name)}</span>`
-      : `<span class="tree-name">${escapeHtml(r.change)}</span>`;
+    // 변형 세트는 제목에 세트 이름만, 변형 이름은 제목 아래 변형 줄(줄바꿈 — 2026-11-24, ia-v4 §4.3a-3).
+    title.innerHTML = `<span class="tree-name">${escapeHtml(r.variant ? r.variant.set : r.change)}</span>`;
     if (r.name !== r.change) fromLine = t('component.fromName', { name: r.name });
   } else {
     // 교체(리네임·바인딩)는 before → after.
@@ -3115,6 +3114,12 @@ function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: (
 
   const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true, ...(fromLine ? { summary: fromLine, summaryMono: true } : {}), meta: r.badge?.text });
   if (fromLine) (card.querySelector('.r-sum') as HTMLElement).title = title.title;
+  if (r.replace === false && r.variant?.name) {
+    const vline = document.createElement('div');
+    vline.className = 'r-sum mono r-var';
+    vline.textContent = r.variant.name;
+    (card.querySelector('.r-title') as HTMLElement).after(vline);
+  }
   if (r.badge) {
     const meta = card.querySelector('.r-meta') as HTMLElement;
     meta.className = `tag tag-${r.badge.kind}`;

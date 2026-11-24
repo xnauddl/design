@@ -547,7 +547,7 @@
     .r-ghead .r-gcnt { color: var(--text-2); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 4px; }
     .r-ghead .r-gcnt:empty { display: none; }
     /* 컴포넌트 후보 줄 — 변형 세트의 변형 이름은 회색 보통 굵기(ia-v4 §4.3a-3) */
-    .r-title .r-var { font-weight: 400; color: var(--text-2); }
+    .r-sum.r-var { color: var(--text-2); white-space: normal; overflow: visible; overflow-wrap: anywhere; } /* 변형 줄 — 말줄임 없이 줄바꿈(ia-v4 §4.3a-3, 2026-11-24) */
     /* 베리언트 결과 — 머리 띠는 본문 글꼴, 항목은 mono 11px 보통 굵기 */
     #variantReport .r-ghead { font-family: var(--font); }
     #variantReport .r-title { font-weight: 400; }

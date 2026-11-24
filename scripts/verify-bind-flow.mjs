@@ -1968,9 +1968,9 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   check('23 후보 받음 → [등록] 풀림 · #btnRegisterComp.primary', !(await locked(p, '#btnRegisterComp')) && JSON.stringify(await prim()) === JSON.stringify(['btnRegisterComp']), JSON.stringify(await prim()));
   const ctg = await p.$eval('#compTreeGroup', (e) => ({ name: e.firstElementChild?.textContent, cnt: e.querySelector('.r-gcnt')?.textContent, bg: getComputedStyle(e).backgroundColor }));
   check('23 #compTreeGroup — "컴포넌트 후보" + "2개" 머리 띠', ctg.name === '컴포넌트 후보' && ctg.cnt === '2개' && ctg.bg === 'rgb(244, 245, 246)', JSON.stringify(ctg));
-  const crow = await p.$$eval('#compTree .r-card', (e) => e.map((c) => ({ name: c.querySelector('.r-title .tree-name')?.textContent, v: c.querySelector('.r-title .r-var')?.textContent ?? null, sum: c.querySelector('.r-sum')?.textContent ?? null, tag: c.querySelector('.tag')?.textContent, tip: c.querySelector('.r-title span')?.title })));
-  check('23 세트 후보 줄 — 제목 "Button" + 변형 "Type=primary" · 둘째 줄 "원래 이름 Button / primary" · 배지 [변형 세트]',
-    crow[0]?.name === 'Button' && crow[0]?.v === 'Type=primary' && crow[0]?.sum === '원래 이름 Button / primary' && crow[0]?.tag === '변형 세트' && crow[0]?.tip === 'Button / primary → Button · Type=primary', JSON.stringify(crow));
+  const crow = await p.$$eval('#compTree .r-card', (e) => e.map((c) => ({ name: c.querySelector('.r-title .tree-name')?.textContent, v: c.querySelector('.r-var')?.textContent ?? null, sum: c.querySelector('.r-sum:not(.r-var)')?.textContent ?? null, vAfterTitle: c.querySelector('.r-title')?.nextElementSibling?.classList.contains('r-var') ?? false, vWrap: c.querySelector('.r-var') ? getComputedStyle(c.querySelector('.r-var')).whiteSpace : null, tag: c.querySelector('.tag')?.textContent, tip: c.querySelector('.r-title span')?.title })));
+  check('23 세트 후보 줄 — 제목 "Button" · 변형 줄 "Type=primary"(제목 바로 아래 · 줄바꿈) · 원래 이름 줄 "원래 이름 Button / primary" · 배지 [변형 세트]',
+    crow[0]?.name === 'Button' && crow[0]?.v === 'Type=primary' && crow[0]?.vAfterTitle === true && crow[0]?.vWrap === 'normal' && crow[0]?.sum === '원래 이름 Button / primary' && crow[0]?.tag === '변형 세트' && crow[0]?.tip === 'Button / primary → Button · Type=primary', JSON.stringify(crow));
   check('23 이름이 같은 단일 줄은 둘째 줄 없음 · 배지 [컴포넌트]', crow[1]?.name === 'Like' && crow[1]?.sum === null && crow[1]?.tag === '컴포넌트', JSON.stringify(crow[1]));
   await p.click('#compAll'); // 일부 체크(indeterminate) → 전체 켬
   await p.click('#compAll'); // 전체 끔

@@ -547,7 +547,7 @@
     .r-ghead .r-gcnt { color: var(--text-2); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 4px; }
     .r-ghead .r-gcnt:empty { display: none; }
     /* 컴포넌트 후보 줄 — 변형 세트의 변형 이름은 회색 보통 굵기(ia-v4 §4.3a-3) */
-    .r-title .r-var { font-weight: 400; color: var(--text-2); }
+    .r-sum.r-var { color: var(--text-2); white-space: normal; overflow: visible; overflow-wrap: anywhere; } /* 변형 줄 — 말줄임 없이 줄바꿈(ia-v4 §4.3a-3, 2026-11-24) */
     /* 베리언트 결과 — 머리 띠는 본문 글꼴, 항목은 mono 11px 보통 굵기 */
     #variantReport .r-ghead { font-family: var(--font); }
     #variantReport .r-title { font-weight: 400; }
@@ -7114,7 +7114,7 @@
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
   function makeTreeRow(r, base, checked, onChange, readOnly = false) {
-    var _a3, _b;
+    var _a3, _b, _c;
     const indent = `${2 + (r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
       const title2 = document.createElement("span");
@@ -7169,13 +7169,19 @@
     title.title = `${r.name} \u2192 ${r.change}`;
     let fromLine;
     if (r.replace === false) {
-      title.innerHTML = r.variant ? `<span class="tree-name">${escapeHtml(r.variant.set)}</span> <span class="r-var">${escapeHtml(r.variant.name)}</span>` : `<span class="tree-name">${escapeHtml(r.change)}</span>`;
+      title.innerHTML = `<span class="tree-name">${escapeHtml(r.variant ? r.variant.set : r.change)}</span>`;
       if (r.name !== r.change) fromLine = t("component.fromName", { name: r.name });
     } else {
       title.innerHTML = `<span class="before">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
     }
     const card = resultCard(__spreadProps(__spreadValues(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true }), fromLine ? { summary: fromLine, summaryMono: true } : {}), { meta: (_b = r.badge) == null ? void 0 : _b.text }));
     if (fromLine) card.querySelector(".r-sum").title = title.title;
+    if (r.replace === false && ((_c = r.variant) == null ? void 0 : _c.name)) {
+      const vline = document.createElement("div");
+      vline.className = "r-sum mono r-var";
+      vline.textContent = r.variant.name;
+      card.querySelector(".r-title").after(vline);
+    }
     if (r.badge) {
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
