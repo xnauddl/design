@@ -321,23 +321,6 @@
     .dark-notice { margin: 6px 0; font-size: var(--fs); color: var(--warn); background: var(--warn-subtle); }
     .dark-notice[hidden] { display: none; }
 
-    /* ── 진행 안내 파이프라인 ── */
-    #pipelineSteps { margin: 6px 0; }
-    .pstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 4px 6px; margin: 0 -6px; cursor: pointer; border-radius: var(--r-sm); }
-    .pstep:hover { background: var(--surface-2); }
-    .pstep .pdot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 10px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
-    .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
-    .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .pstep.blocked { opacity: .55; }
-    /* todo = 막힌 게 아니라 아직 안 만든 것(다크·텍스트 스타일). blocked만큼 흐리게 두면
-       '못 한다'로 읽히므로 점만 비우고 글자는 그대로 둔다. */
-    .pstep.todo .pstat { color: var(--muted); }
-    .pstep .plabel { color: var(--text); }
-    .pstep .pstat  { font-size: 11px; }
-    .pstep.done .pstat    { color: var(--ok); }
-    .pstep.ready .pstat   { color: var(--accent-strong); }
-    .pstep.blocked .pstat { color: var(--muted); }
-
     /* ── 시스템화 마법사 스테퍼 ── */
 
     /* ── 안내 띠 — 테두리 없는 옅은 띠(카드 안 카드 금지, ia-v4 §2.8) ── */
@@ -476,12 +459,6 @@
     #tsList .r-card.ts-decimal .r-title, #tsList .r-card.ts-decimal .r-sum { color: var(--muted); }
     .tr.ts-decimal .ts-aa, .tr.ts-decimal .tr-sub, .tr.ts-decimal .bv-tw { color: var(--muted); }
     .tr.ts-decimal .ts-why { flex: 0 0 auto; white-space: nowrap; }
-    /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
-    .tsr-all { padding: 0 0 6px; }
-    .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
-    .tsr-row .tsr-from { color: var(--text-2); text-decoration: line-through; min-width: 60px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tsr-row .tsr-to { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tsr-row .tsr-clash { color: var(--warn); font-size: 11px; white-space: nowrap; }
     .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
@@ -956,8 +933,6 @@
     .vt-line { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; color: var(--text-2); border-bottom: 1px solid var(--border); cursor: pointer; }
     .vt-lib { margin-top: 10px; }
     .vt-empty { padding: 14px 6px; color: var(--text-2); }
-    .popover { position: fixed; z-index: 45; width: 240px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px; }
-    .popover[hidden] { display: none; }
     .beta-badge { display: inline-block; font-size: 10px; font-weight: 600; line-height: 14px; background: var(--beta-subtle); color: var(--beta); border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
@@ -1047,11 +1022,6 @@
         <div class="var-tree" id="varTree" role="treegrid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
-   </div>
-
-   <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
-   <div class="popover" id="readinessPop" role="menu" hidden>
-    <div id="pipelineSteps"></div>
    </div>
 
   </section>
@@ -1312,7 +1282,6 @@
            이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
       <div class="row">
         <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 KRDS 이름(heading/large…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
-        <button id="btnTsRename" type="button" data-i18n="textStyle.renameBtn">이름 다시 짓기</button>
       </div>
       <div id="tsList" class="results"></div>
       <div class="status" id="tsStatus"></div>

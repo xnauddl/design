@@ -168,7 +168,7 @@ export function countDarkUnfilled(cols: readonly VariableCollection[], vars: rea
   return n;
 }
 
-/** 준비 현황 · 다크 화면 띠에 쓰는 다크 상태(code.ts `postPrereq`). */
+/** 다크 화면 알림 띠에 쓰는 다크 상태(code.ts `postPrereq`). */
 export function darkPrereq(cols: readonly VariableCollection[], vars: readonly Variable[]): { hasDarkMode: boolean; darkUnfilled: number; darkOld: boolean; darkOldManual: boolean } {
   const global = ownedCollection(cols, 'global');
   const semantic = ownedCollection(cols, 'semantic');
@@ -391,7 +391,7 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
     }
     const moved = written.size;
     const splitWritten = splitNames.filter((n) => vars.some((v) => written.has(v.id) && v.name === n));
-    // 새로 만든 모드에 쓴 칸이 하나도 없으면 지운다(준비 현황이 ✓로 뒤집히지 않게).
+    // 새로 만든 모드에 쓴 칸이 하나도 없으면 지운다(빈 Dark 모드가 '다크 있음'으로 남지 않게).
     if (modeCreated && filled === 0 && moved === 0) {
       try {
         global.removeMode(to);

@@ -97,12 +97,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.step.rename': '이름 정리',
   // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
 
-  // 진행 안내(파이프라인) 단계 상태
-  'pipeline.stat.done': '완료',
-  'pipeline.stat.ready': '준비',
-  'pipeline.stat.blocked': '전제 미충족',
-  'pipeline.stat.todo': '만들기',
-
   // 바인딩 스킵 사유(라벨 맵)
   'reason.no-match': '매칭 없음',
   'reason.already-bound': '이미 연결됨',
@@ -148,18 +142,6 @@ export const STRINGS: Record<string, string> = {
   'wizard.seq.bindNoTier': '연결 0곳 — 계층으로 쓸 변수가 없어요',
 
   // 마법사 완료 요약(summarize, wizard.ts)
-
-  // 진행 안내 단계 라벨·안내
-  'pipeline.step.colors': '색 변수',
-  'pipeline.step.tokens': '간격·크기 토큰',
-  'pipeline.step.semantics': 'Semantic 매핑',
-  'pipeline.step.bind': '변수 연결',
-  'pipeline.step.dark': '다크 모드',
-  'pipeline.step.textStyles': '텍스트 스타일',
-  'pipeline.step.rename': '이름 정리',
-  'pipeline.hint.needTokens': '토큰을 먼저 만드세요',
-  'pipeline.hint.needBindable': '연결할 변수를 먼저 만드세요',
-  'pipeline.hint.darkUnfilled': 'Dark 값이 없는 색 {n}개',
 
   /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
   'common.cancel': '취소',
@@ -233,7 +215,6 @@ export const STRINGS: Record<string, string> = {
   'op.createVar': '새 변수',
   'op.dupVar': '복제',
   'op.delVar': '삭제',
-  'op.tsRename': '텍스트 스타일 이름 바꾸기',
   'create.sumManual': ' · 직접 만든 변수라 건너뜀 {n}',
   'common.close': '닫기',
   // 변수 관리(넓은 화면)
@@ -325,7 +306,6 @@ export const STRINGS: Record<string, string> = {
   // IA v3 변수 탭(§4.2~§4.4)
   'var.loading': '변수 정보를 불러오는 중…',
   'wizard.toBind': '연결하기 →',
-  'list.readiness': '준비 현황 {n}/{total}',
   'list.addTip': '추가',
   'list.moreTip': '더 보기',
   'list.modeTip': '모드',
@@ -350,7 +330,6 @@ export const STRINGS: Record<string, string> = {
   'list.menuExport': '코드로 내보내기…',
   'list.menuExpandAll': '사이드바 모두 펼치기',
   'list.menuCollapseAll': '사이드바 모두 접기',
-  'list.semanticsNote': 'Semantic 매핑은 토큰을 만들 때 함께 만들어져요',
   'tab.variables': '변수',
   'tab.select': '선택',
   // IA v4 선택 탭(§4.1)
@@ -445,7 +424,6 @@ export const STRINGS: Record<string, string> = {
   'make.globalN': 'Global {g}개',
   // 무료 규칙(IA v4 §4.9 F2 · §4.3a F8)
   'paid.semantic': 'Semantic 변수는 유료예요',
-  'paid.semMap': 'Semantic 매핑은 유료예요',
   // 선택 탭 만들기 카드(IA v4 §4.1 "만들기 카드" — 상태 6)
   'mkc.subFree': '찾은 값으로 Global 변수를 만들어요 · 개수 제한은 없어요',
   'mkc.subPaid': '찾은 값으로 Global · Semantic 변수를 만들고 연결해요',
@@ -859,7 +837,6 @@ export const STRINGS: Record<string, string> = {
   'textStyle.renaming': '왼쪽 글자로 이름을 다시 매기는 중…',
   'textStyle.needSpecs': '먼저 ‘스캔’으로 스타일을 읽어 주세요',
   'textStyle.nameSplit': ' · 왼쪽 글자 {a} · KRDS 이름 {b}',
-  'textStyle.renameBtn': '이름 다시 짓기',
   // 안 쓰는 변수 찾기(docs/unused-vars.md)
   'unused.menu': '안 쓰는 변수 찾기…',
   'unused.noVars': '로컬 변수가 없어요',
@@ -885,28 +862,6 @@ export const STRINGS: Record<string, string> = {
   'unused.failedTail': ' · 못 지움 {f}',
   'unused.deleteFail': '안 쓰는 변수를 지우지 못했어요',
   'op.deleteUnused': '안 쓰는 변수 지우기',
-  'textStyle.renameMenu': '텍스트 스타일 이름 다시 짓기…',
-  'textStyle.renameReading': '스타일을 읽는 중…',
-  'textStyle.renameHead': '이름 다시 짓기 · 바꿀 이름 {n}개',
-  'textStyle.renameNone': '바꿀 이름이 없어요',
-  'textStyle.renameApply': '{k}개 이름 바꾸기',
-  'textStyle.renameNeedOn': '바꿀 이름을 켜 주세요',
-  'textStyle.renameClash': '같은 이름이 남아요',
-  'textStyle.renameRowAria': '{from} → {to}',
-  'textStyle.renamed': '텍스트 스타일 {n}개 이름을 바꿨어요 · ⌘Z로 되돌리기',
-  'textStyle.renameSkipped': ' · 건너뜀 {m}',
-  'textStyle.renameRoleSkipped': ' · Semantic 변수 {n}개는 같은 이름이 있어 그대로 뒀어요',
-  'textStyle.renameRoleError': ' · Semantic 변수 {n}개는 바꾸지 못했어요',
-  'textStyle.renameRoleStuck': '되돌리지 못한 변수: {names}',
-  'textStyle.renameRoleMoveError': ' · {m}개는 Semantic 변수를 옮기지 못했어요',
-  'textStyle.renameRoleMoveNames': '옮기지 못한 스타일: {names}',
-  'textStyle.renameSkip.renamed-meanwhile': '그 사이 이름이 바뀜',
-  'textStyle.renameSkip.value-changed': '그 사이 값이 바뀜',
-  'textStyle.renameSkip.name-taken': '같은 이름이 있음',
-  'textStyle.renameSkip.error': '오류',
-  'textStyle.renameSkip.error-chain': '연결된 항목 오류로 되돌림',
-  'textStyle.renameSkip.error-stuck': '되돌리지 못함 · 지금 이름 {name}',
-  'textStyle.renameClearedTable': ' · 스캔 표를 비웠어요 — 다시 [스캔]해 주세요',
   'textStyle.missRoleStuck': '{name}: Semantic 변수 이름을 되돌리지 못했어요 — {vars}',
   'textStyle.fallbackRamp': '선택에서 텍스트를 못 찾아 기본 램프로 채웠어요. 폰트·값을 조정하세요',
   'textStyle.registered': '텍스트 스타일 {n}개 (생성 {c} / 갱신 {u}) · 연결 {b}',

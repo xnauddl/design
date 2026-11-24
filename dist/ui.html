@@ -321,23 +321,6 @@
     .dark-notice { margin: 6px 0; font-size: var(--fs); color: var(--warn); background: var(--warn-subtle); }
     .dark-notice[hidden] { display: none; }
 
-    /* ── 진행 안내 파이프라인 ── */
-    #pipelineSteps { margin: 6px 0; }
-    .pstep { display: grid; grid-template-columns: 18px 1fr auto; gap: 7px; align-items: center; padding: 4px 6px; margin: 0 -6px; cursor: pointer; border-radius: var(--r-sm); }
-    .pstep:hover { background: var(--surface-2); }
-    .pstep .pdot { width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--border-2); background: var(--surface); font-size: 10px; line-height: 14px; text-align: center; color: var(--muted); font-weight: 600; }
-    .pstep.done .pdot  { background: var(--ok); border-color: var(--ok); color: #fff; }
-    .pstep.ready .pdot { background: var(--accent); border-color: var(--accent); color: #fff; }
-    .pstep.blocked { opacity: .55; }
-    /* todo = 막힌 게 아니라 아직 안 만든 것(다크·텍스트 스타일). blocked만큼 흐리게 두면
-       '못 한다'로 읽히므로 점만 비우고 글자는 그대로 둔다. */
-    .pstep.todo .pstat { color: var(--muted); }
-    .pstep .plabel { color: var(--text); }
-    .pstep .pstat  { font-size: 11px; }
-    .pstep.done .pstat    { color: var(--ok); }
-    .pstep.ready .pstat   { color: var(--accent-strong); }
-    .pstep.blocked .pstat { color: var(--muted); }
-
     /* ── 시스템화 마법사 스테퍼 ── */
 
     /* ── 안내 띠 — 테두리 없는 옅은 띠(카드 안 카드 금지, ia-v4 §2.8) ── */
@@ -476,12 +459,6 @@
     #tsList .r-card.ts-decimal .r-title, #tsList .r-card.ts-decimal .r-sum { color: var(--muted); }
     .tr.ts-decimal .ts-aa, .tr.ts-decimal .tr-sub, .tr.ts-decimal .bv-tw { color: var(--muted); }
     .tr.ts-decimal .ts-why { flex: 0 0 auto; white-space: nowrap; }
-    /* 이름 다시 짓기 팝업(§5.2) — 구분선 줄 */
-    .tsr-all { padding: 0 0 6px; }
-    .tsr-row { display: flex; align-items: center; gap: 6px; height: 30px; border-bottom: 1px solid var(--border); min-width: 0; }
-    .tsr-row .tsr-from { color: var(--text-2); text-decoration: line-through; min-width: 60px; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tsr-row .tsr-to { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .tsr-row .tsr-clash { color: var(--warn); font-size: 11px; white-space: nowrap; }
     .bv-alpha { color: var(--text-2); font-weight: 400; margin-left: 1px; }
     .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,.12); }
     /* 텍스트 스타일 표는 헤더 고정·스냅 보정을 상한 있는 스크롤 박스 전제로 달고 있었다.
@@ -956,8 +933,6 @@
     .vt-line { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; color: var(--text-2); border-bottom: 1px solid var(--border); cursor: pointer; }
     .vt-lib { margin-top: 10px; }
     .vt-empty { padding: 14px 6px; color: var(--text-2); }
-    .popover { position: fixed; z-index: 45; width: 240px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow); padding: 6px; }
-    .popover[hidden] { display: none; }
     .beta-badge { display: inline-block; font-size: 10px; font-weight: 600; line-height: 14px; background: var(--beta-subtle); color: var(--beta); border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
@@ -1047,11 +1022,6 @@
         <div class="var-tree" id="varTree" role="treegrid" data-i18n-aria-label="list.gridAria" aria-label="변수 목록"></div>
       </div>
     </div>
-   </div>
-
-   <!-- 준비 현황 팝오버(§4.4 머리줄) — 메뉴 모양, 목록을 밀지 않는다. -->
-   <div class="popover" id="readinessPop" role="menu" hidden>
-    <div id="pipelineSteps"></div>
    </div>
 
   </section>
@@ -1312,7 +1282,6 @@
            이름이 마음에 안 들 때 눌러 덧입히는 뒤따르는 동작으로 바꾼다. 스캔해야 누를 것이 생긴다. -->
       <div class="row">
         <button id="btnTsRowLabels" disabled data-i18n="textStyle.rowLabelBtn" data-i18n-title="textStyle.rowLabelTip" title="같은 가로 줄의 왼쪽 텍스트를 라벨(이름)으로, 큰 텍스트를 표본으로 봐요. 짝을 못 찾은 행은 KRDS 이름(heading/large…) 그대로 둬요.">왼쪽 글자로 이름 채우기</button>
-        <button id="btnTsRename" type="button" data-i18n="textStyle.renameBtn">이름 다시 짓기</button>
       </div>
       <div id="tsList" class="results"></div>
       <div class="status" id="tsStatus"></div>
@@ -1523,11 +1492,6 @@
     "wizard.step.bind": "\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984 \uC815\uB9AC",
     // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
-    // 진행 안내(파이프라인) 단계 상태
-    "pipeline.stat.done": "\uC644\uB8CC",
-    "pipeline.stat.ready": "\uC900\uBE44",
-    "pipeline.stat.blocked": "\uC804\uC81C \uBBF8\uCDA9\uC871",
-    "pipeline.stat.todo": "\uB9CC\uB4E4\uAE30",
     // 바인딩 스킵 사유(라벨 맵)
     "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
     "reason.already-bound": "\uC774\uBBF8 \uC5F0\uACB0\uB428",
@@ -1571,17 +1535,6 @@
     "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
-    // 진행 안내 단계 라벨·안내
-    "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
-    "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
-    "pipeline.step.semantics": "Semantic \uB9E4\uD551",
-    "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
-    "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
-    "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
-    "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
-    "pipeline.hint.darkUnfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
     "v4.colEmpty": "\uC774 \uCEEC\uB809\uC158\uC5D4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -1654,7 +1607,6 @@
     "op.createVar": "\uC0C8 \uBCC0\uC218",
     "op.dupVar": "\uBCF5\uC81C",
     "op.delVar": "\uC0AD\uC81C",
-    "op.tsRename": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uBC14\uAFB8\uAE30",
     "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
@@ -1746,7 +1698,6 @@
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "wizard.toBind": "\uC5F0\uACB0\uD558\uAE30 \u2192",
-    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.addTip": "\uCD94\uAC00",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
@@ -1771,7 +1722,6 @@
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
-    "list.semanticsNote": "Semantic \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uB9CC\uB4E4 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
@@ -1867,7 +1817,6 @@
     "make.globalN": "Global {g}\uAC1C",
     // 무료 규칙(IA v4 §4.9 F2 · §4.3a F8)
     "paid.semantic": "Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
-    "paid.semMap": "Semantic \uB9E4\uD551\uC740 \uC720\uB8CC\uC608\uC694",
     // 선택 탭 만들기 카드(IA v4 §4.1 "만들기 카드" — 상태 6)
     "mkc.subFree": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uAC1C\uC218 \uC81C\uD55C\uC740 \uC5C6\uC5B4\uC694",
     "mkc.subPaid": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \xB7 Semantic \uBCC0\uC218\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
@@ -2282,7 +2231,6 @@
     "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
     "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 KRDS \uC774\uB984 {b}",
-    "textStyle.renameBtn": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30",
     // 안 쓰는 변수 찾기(docs/unused-vars.md)
     "unused.menu": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uCC3E\uAE30\u2026",
     "unused.noVars": "\uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -2308,28 +2256,6 @@
     "unused.failedTail": " \xB7 \uBABB \uC9C0\uC6C0 {f}",
     "unused.deleteFail": "\uC548 \uC4F0\uB294 \uBCC0\uC218\uB97C \uC9C0\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "op.deleteUnused": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uC9C0\uC6B0\uAE30",
-    "textStyle.renameMenu": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30\u2026",
-    "textStyle.renameReading": "\uC2A4\uD0C0\uC77C\uC744 \uC77D\uB294 \uC911\u2026",
-    "textStyle.renameHead": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30 \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
-    "textStyle.renameNone": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
-    "textStyle.renameApply": "{k}\uAC1C \uC774\uB984 \uBC14\uAFB8\uAE30",
-    "textStyle.renameNeedOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
-    "textStyle.renameClash": "\uAC19\uC740 \uC774\uB984\uC774 \uB0A8\uC544\uC694",
-    "textStyle.renameRowAria": "{from} \u2192 {to}",
-    "textStyle.renamed": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
-    "textStyle.renameSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
-    "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
-    "textStyle.renameRoleMoveError": " \xB7 {m}\uAC1C\uB294 Semantic \uBCC0\uC218\uB97C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "textStyle.renameRoleMoveNames": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC2A4\uD0C0\uC77C: {names}",
-    "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
-    "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
-    "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
-    "textStyle.renameSkip.error": "\uC624\uB958",
-    "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
-    "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
-    "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
     "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
@@ -4546,29 +4472,6 @@
     return map;
   }
 
-  // src/lib/pipeline.ts
-  function pipelineSteps(s) {
-    var _a3, _b;
-    return [
-      { id: "colors", status: s.hasColorVars ? "done" : "ready" },
-      { id: "tokens", status: s.hasScaleVars ? "done" : "ready" },
-      {
-        id: "semantics",
-        status: s.hasSemanticRoles ? "done" : s.hasGlobal ? "ready" : "blocked",
-        hint: s.hasGlobal || s.hasSemanticRoles ? void 0 : "pipeline.hint.needTokens"
-      },
-      // 다크: Dark 값이 없는 색이 있으면 완료가 아니다(ia-v4 §4.6 "다크 모드 줄").
-      ((_a3 = s.darkUnfilled) != null ? _a3 : 0) > 0 ? { id: "dark", status: "todo", hint: "pipeline.hint.darkUnfilled", hintParams: { n: (_b = s.darkUnfilled) != null ? _b : 0 } } : { id: "dark", status: s.hasDarkMode ? "done" : "todo" },
-      { id: "textStyles", status: s.hasTextStyles ? "done" : "todo" },
-      {
-        id: "bind",
-        status: s.hasBoundNodes ? "done" : s.hasBindable ? "ready" : "blocked",
-        hint: s.hasBindable || s.hasBoundNodes ? void 0 : "pipeline.hint.needBindable"
-      },
-      { id: "rename", status: s.hasRenamedNodes ? "done" : "ready" }
-    ];
-  }
-
   // src/lib/errors.ts
   function explainError(raw) {
     const s = (raw || "").toLowerCase();
@@ -4682,8 +4585,6 @@
   var pickGlobalOnly = () => isPaid ? {} : { globalOnly: true };
   var colorsFromPalette = false;
   var colorsCreated = false;
-  var hasColorVars = false;
-  var hasScaleVars = false;
   var hasGlobal = false;
   var hasBindable = false;
   var prereqLocalVars = 0;
@@ -4697,14 +4598,9 @@
       prereqInFlight = false;
     }, 3e3);
   }
-  var hasDarkMode = false;
   var darkUnfilled = 0;
   var darkOld = false;
   var darkOldManual = false;
-  var hasTextStyles = false;
-  var hasSemanticRoles = false;
-  var hasBoundNodes = false;
-  var hasRenamedNodes = false;
   var lastSelCount = 0;
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
@@ -5475,61 +5371,6 @@
     setStatus("tsStatus", text, cls, tip);
   }
   var tsExistingNames = [];
-  var tsrReq = 0;
-  var tsrApplyReq = 0;
-  var tsrRows = null;
-  var tsrOff = /* @__PURE__ */ new Set();
-  var tsrBody = null;
-  var tsrTitle = null;
-  var tsrApplyBtn = null;
-  var tsrOpener = null;
-  var tsrCloseBtn = null;
-  var tsrNote = null;
-  var tsrModal = null;
-  var tsrBusy = false;
-  $("btnTsRename").addEventListener("click", (e) => {
-    const b = e.currentTarget;
-    if (b.getAttribute("aria-disabled") === "true") return;
-    openTsRename(b);
-  });
-  function openTsRename(opener) {
-    if (!isPaid) {
-      showStatusLine(t("status.paid"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
-      return;
-    }
-    const lock = writeLockReason();
-    if (lock) {
-      showStatusLine(lock, { cls: "warn" });
-      return;
-    }
-    tsrOpener = opener;
-    tsrRows = null;
-    tsrOff.clear();
-    tsrBusy = false;
-    const title = document.createElement("span");
-    tsrTitle = title;
-    const body = document.createElement("div");
-    body.className = "tsr-body";
-    tsrBody = body;
-    const apply = modalButton(t("textStyle.renameApply", { k: 0 }), tsrApply, true);
-    tsrApplyBtn = apply;
-    const close = modalButton(t("common.close"), () => requestCloseModal("button"));
-    tsrCloseBtn = close;
-    const note = document.createElement("div");
-    note.className = "tsr-note";
-    note.hidden = true;
-    tsrNote = note;
-    tsrModal = openModal(title, body, [close, apply], () => tsrOpener, () => {
-      tsrBody = null;
-      tsrApplyBtn = null;
-      tsrTitle = null;
-      tsrNote = null;
-      tsrModal = null;
-    }, { focus: close, footTop: [note] });
-    tsrReq = ++bindReqSeq;
-    send({ type: "SCAN_TS_RENAME", reqId: tsrReq });
-    tsrRender();
-  }
   var unusedState = null;
   var unusedReq = 0;
   var unusedDelReq = 0;
@@ -5833,175 +5674,6 @@
     if (msg.op === "DELETE_VARIABLES" && !isMini) showStatusLine(t("unused.deleteFail"), { cls: "warn", tip: explainError(msg.message).message });
     return true;
   }
-  function tsrClash(r) {
-    return !!(tsrRows == null ? void 0 : tsrRows.some((x) => x !== r && tsrOff.has(x.id) && x.from === r.to));
-  }
-  function tsrApplicable() {
-    return (tsrRows != null ? tsrRows : []).filter((r) => !tsrOff.has(r.id) && !tsrClash(r));
-  }
-  function tsrRender() {
-    var _a3, _b, _c, _d;
-    const body = tsrBody;
-    if (!body || !tsrApplyBtn || !tsrTitle) return;
-    const rows = tsrRows;
-    tsrTitle.textContent = t("textStyle.renameHead", { n: (_a3 = rows == null ? void 0 : rows.length) != null ? _a3 : 0 });
-    const k = tsrApplicable().length;
-    tsrApplyBtn.textContent = t("textStyle.renameApply", { k });
-    const lock = tsrBusy ? t("common.running") : writeLockReason();
-    setLock(tsrApplyBtn, lock ? "prereq" : !rows || !k ? "prereq" : null, lock != null ? lock : t("textStyle.renameNeedOn"));
-    const hadFocus = body.contains(document.activeElement) ? (_c = (_b = document.activeElement.dataset.id) != null ? _b : document.activeElement.dataset.all) != null ? _c : null : null;
-    clearMount(body);
-    if (!rows) {
-      body.textContent = t("textStyle.renameReading");
-      return;
-    }
-    if (!rows.length) {
-      body.textContent = t("textStyle.renameNone");
-      return;
-    }
-    const all = document.createElement("div");
-    all.className = "tsr-all";
-    const link = (label, key, on) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "link link-btn";
-      b.textContent = label;
-      b.dataset.all = key;
-      b.addEventListener("click", () => {
-        for (const r of rows) on ? tsrOff.delete(r.id) : tsrOff.add(r.id);
-        tsrRender();
-      });
-      return b;
-    };
-    all.append(link(t("bind.allOn"), "on", true), " \xB7 ", link(t("bind.allOff"), "off", false));
-    body.appendChild(all);
-    const sws = [];
-    for (const r of rows) {
-      const row = document.createElement("div");
-      row.className = "tsr-row";
-      row.title = `${r.from} \u2192 ${r.to}`;
-      const from = document.createElement("span");
-      from.className = "tsr-from";
-      from.textContent = r.from;
-      const arrow = document.createElement("span");
-      arrow.textContent = "\u2192";
-      arrow.setAttribute("aria-hidden", "true");
-      const to = document.createElement("span");
-      to.className = "tsr-to";
-      to.textContent = r.to;
-      row.append(from, arrow, to);
-      const on = !tsrOff.has(r.id);
-      if (on && tsrClash(r)) {
-        const c = document.createElement("span");
-        c.className = "tsr-clash";
-        c.textContent = t("textStyle.renameClash");
-        row.appendChild(c);
-      }
-      const sw = document.createElement("button");
-      sw.type = "button";
-      sw.className = "bv-switch";
-      sw.dataset.id = r.id;
-      sw.setAttribute("role", "switch");
-      sw.setAttribute("aria-checked", String(on));
-      sw.setAttribute("aria-label", t("textStyle.renameRowAria", { from: r.from, to: r.to }));
-      const tr = document.createElement("span");
-      tr.className = "bv-track";
-      tr.setAttribute("aria-hidden", "true");
-      sw.appendChild(tr);
-      sw.addEventListener("click", () => {
-        on ? tsrOff.add(r.id) : tsrOff.delete(r.id);
-        tsrRender();
-      });
-      sw.addEventListener("keydown", (e) => {
-        const i = sws.indexOf(sw);
-        const go = (j) => {
-          var _a4;
-          (_a4 = sws[Math.max(0, Math.min(sws.length - 1, j))]) == null ? void 0 : _a4.focus();
-        };
-        if (e.key === "ArrowDown") go(i + 1);
-        else if (e.key === "ArrowUp") go(i - 1);
-        else return;
-        e.preventDefault();
-      });
-      sws.push(sw);
-      row.appendChild(sw);
-      body.appendChild(row);
-    }
-    if (hadFocus) (_d = body.querySelector(`[data-id="${CSS.escape(hadFocus)}"], [data-all="${CSS.escape(hadFocus)}"]`)) == null ? void 0 : _d.focus();
-  }
-  function onTsRenamePlan(msg) {
-    var _a3;
-    if (msg.reqId !== tsrReq || !tsrBody) return;
-    const stayed = document.activeElement === tsrCloseBtn;
-    tsrRows = msg.rows;
-    tsrRender();
-    if (stayed) (_a3 = tsrBody == null ? void 0 : tsrBody.querySelector(".bv-switch")) == null ? void 0 : _a3.focus();
-  }
-  function tsrApply() {
-    if (!tsrApplyBtn || tsrApplyBtn.getAttribute("aria-disabled") === "true") return;
-    const items = tsrApplicable().map((r) => __spreadValues({ id: r.id, from: r.from, to: r.to, sig: r.sig }, r.step ? { step: r.step } : {}));
-    if (!items.length) return;
-    tsrBusy = true;
-    tsrRender();
-    tsrApplyReq = ++bindReqSeq;
-    send({ type: "APPLY_TS_RENAME", reqId: tsrApplyReq, items });
-  }
-  function onTsRenameError(msg) {
-    if (msg.reqId != null && msg.reqId !== tsrApplyReq) return;
-    tsrBusy = false;
-    if (!tsrNote || !tsrModal) {
-      tsrRender();
-      return;
-    }
-    const f = explainError(msg.message);
-    const note = tsrNote;
-    const modal = tsrModal;
-    const clear = () => {
-      note.replaceChildren();
-      note.hidden = true;
-      releasePrimaries(modal);
-    };
-    const { box, retry } = errorBox(f, f.retryable ? () => {
-      const before = tsrApplyReq;
-      tsrApply();
-      if (tsrApplyReq === before) return;
-      clear();
-      tsrCloseBtn == null ? void 0 : tsrCloseBtn.focus({ preventScroll: true });
-    } : null);
-    note.replaceChildren(box);
-    note.hidden = false;
-    releasePrimaries(modal);
-    if (retry) holdPrimaries(modal, retry);
-    tsrRender();
-  }
-  function onTsRenamed(msg) {
-    var _a3;
-    if (msg.reqId !== tsrApplyReq) return;
-    tsrBusy = false;
-    if (tsrBody) closeModal();
-    let text = t("textStyle.renamed", { n: msg.renamed });
-    if (msg.skipped) text += t("textStyle.renameSkipped", { m: msg.skipped });
-    if (msg.roleVarsTaken) text += t("textStyle.renameRoleSkipped", { n: msg.roleVarsTaken });
-    if (msg.roleVarsError) text += t("textStyle.renameRoleError", { n: msg.roleVarsError });
-    if (msg.roleMoveError) text += t("textStyle.renameRoleMoveError", { m: msg.roleMoveError });
-    const stuck = msg.results.filter((r) => r.status === "error-stuck");
-    const tip = [
-      ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => k === "error-stuck" ? `${t("textStyle.renameSkip.error-stuck", { name: stuck.map((x) => x.name).join(", ") })} ${n}` : `${t("textStyle.renameSkip." + k)} ${n}`),
-      ...msg.roleVarsStuck.length ? [t("textStyle.renameRoleStuck", { names: msg.roleVarsStuck.join(", ") })] : [],
-      ...((_a3 = msg.roleMoveNames) == null ? void 0 : _a3.length) ? [t("textStyle.renameRoleMoveNames", { names: msg.roleMoveNames.join(", ") })] : []
-    ].join("\n");
-    const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError || msg.roleMoveError);
-    showStatusLine(text, __spreadValues({ cls: warn ? "warn" : "ok" }, tip ? { tip } : {}));
-    if (msg.renamed >= 1) {
-      mkTsNames.clear();
-      if (tsSpecs.length) {
-        tsSpecs = [];
-        renderTextStyles();
-        $("btnTsRowLabels").disabled = true;
-        setTsStatus(text + t("textStyle.renameClearedTable"), warn ? "warn" : "ok");
-      }
-    }
-  }
   $("btnTextStyles").addEventListener("click", () => {
     const styles = readTextStyleRows();
     if (!styles.length) {
@@ -6150,14 +5822,6 @@
       send(msg);
     });
   }
-  var lastSelBound = 0;
-  var lastSelRenamed = 0;
-  function applySelectionDone() {
-    const fresh = !hasGlobal && !hasSemanticRoles;
-    hasBoundNodes = !fresh && lastSelBound > 0;
-    hasRenamedNodes = !fresh && lastSelRenamed > 0;
-    renderPipeline();
-  }
   if (false) {
     $("devTierRow").style.display = "";
     $("tier").addEventListener("change", () => {
@@ -6238,8 +5902,6 @@
     "btnScanText",
     "btnTextStyles",
     // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
-    "btnTsRename",
-    // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
     "btnGenDark"
     // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
   ];
@@ -6330,72 +5992,6 @@
     showPick("token");
     $("createCard").scrollIntoView({ behavior: "smooth", block: "center" });
     $("btnCreate").focus();
-  }
-  var PIPELINE_TARGET = {
-    colors: { make: "color", btn: "btnColorVars" },
-    tokens: { make: "token", btn: "btnCreate" },
-    semantics: { make: "token", btn: "btnCreate" },
-    // 역할 매핑은 토큰을 적용할 때 함께 만들어진다(숨은 카드 대신)
-    dark: { make: "theme", btn: "btnGenDark" },
-    textStyles: { make: "type", btn: "btnScanText" },
-    bind: { make: null, btn: "btnApplyConfirm" },
-    // 선택 탭 첫 화면
-    rename: { make: null, btn: "btnRename", apply: "rename" }
-    // 적용 탭 · 이름 정리
-  };
-  function gotoStep(id) {
-    var _a3;
-    closeReadiness();
-    const target = PIPELINE_TARGET[id];
-    if (id === "semantics") {
-      if (isPaid) showStatusLine(t("list.semanticsNote"));
-      else showStatusLine(t("paid.semMap"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
-    }
-    if (target.make === null) {
-      showTab("select");
-      showSelSub(target.apply === "rename" && curSel.count ? "rename" : "home");
-      if (selSub === "home") {
-        (_a3 = $("selCards").querySelector("button")) == null ? void 0 : _a3.focus();
-        return;
-      }
-    } else {
-      showPick(target.make, "vars");
-    }
-    const btnId = id === "colors" && $("btnColorVars").dataset.baseLock === "prereq" ? "btnExtract" : target.btn;
-    const b = $(btnId);
-    b.scrollIntoView({ behavior: "smooth", block: "center" });
-    b.focus();
-  }
-  function renderPipeline() {
-    const box = $("pipelineSteps");
-    box.innerHTML = "";
-    const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
-    steps.forEach((s, i) => {
-      const row = document.createElement("div");
-      row.className = `pstep ${s.status}`;
-      row.dataset.step = s.id;
-      row.tabIndex = 0;
-      row.setAttribute("role", "button");
-      const dot = document.createElement("span");
-      dot.className = "pdot";
-      dot.textContent = s.status === "done" ? "\u2713" : String(i + 1);
-      const label = document.createElement("span");
-      label.className = "plabel";
-      label.textContent = t("pipeline.step." + s.id);
-      const stat = document.createElement("span");
-      stat.className = "pstat";
-      stat.textContent = s.hint ? t(s.hint, s.hintParams) : t("pipeline.stat." + s.status);
-      row.append(dot, label, stat);
-      const go = () => gotoStep(s.id);
-      row.addEventListener("click", go);
-      row.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          go();
-        }
-      });
-      box.appendChild(row);
-    });
   }
   var compScanReq = 0;
   var structStatusFind = false;
@@ -6580,9 +6176,6 @@
       case "SELECTION_STATE": {
         lastSelCount = msg.count;
         onSelectionForList(msg);
-        lastSelBound = msg.bound;
-        lastSelRenamed = msg.renamed;
-        applySelectionDone();
         refreshVariantRow(msg.comps, msg.sets);
         if (!msg.selfSelect) {
           if (!bindLinking) {
@@ -6757,12 +6350,6 @@
         );
         semStatusPrefix = "";
         break;
-      case "TS_RENAME_PLAN":
-        onTsRenamePlan(msg);
-        break;
-      case "TS_RENAMED":
-        onTsRenamed(msg);
-        break;
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
         tsExistingNames = ((_i = msg.existing) != null ? _i : []).map((e) => e.name);
@@ -6817,20 +6404,14 @@
         prereqKnown = true;
         prereqInFlight = false;
         reentry.release();
-        hasColorVars = msg.hasColorVars;
-        hasScaleVars = msg.hasScaleVars;
         hasGlobal = msg.hasGlobal;
         hasBindable = msg.hasBindable;
         prereqLocalVars = ((_m = msg.tierVars) != null ? _m : 0) + ((_n = msg.otherVars) != null ? _n : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
-        hasDarkMode = msg.hasDarkMode;
         darkUnfilled = (_o = msg.darkUnfilled) != null ? _o : 0;
         darkOld = (_p = msg.darkOld) != null ? _p : false;
         darkOldManual = (_q = msg.darkOldManual) != null ? _q : false;
-        hasTextStyles = msg.hasTextStyles;
-        hasSemanticRoles = msg.hasSemanticRoles;
         updateGates();
-        applySelectionDone();
         break;
       case "LICENSE_STATUS": {
         const statusPart = msg.status ? t("license.srcKeyStatus", { status: t(`license.status.${msg.status}`) }) : "";
@@ -6988,10 +6569,6 @@
         if (msg.op === "SCAN_COMPONENT_CANDIDATES") {
           if (!compScanReq || msg.reqId != null && msg.reqId !== compScanReq) break;
           compScanReq = 0;
-        }
-        if (msg.op === "APPLY_TS_RENAME") {
-          onTsRenameError(msg);
-          break;
         }
         const fromWizard = wizardErrorMsg === msg;
         if (fromWizard) wizardErrorMsg = null;
@@ -9297,7 +8874,6 @@ ${opts.tip}` : text;
     GENERATE_DARK_MODE: { results: ["DARK_MODE_RESULT"], label: "op.dark", go: () => showPick("theme"), write: true },
     SCAN_TEXT_STYLES: { results: ["TEXT_STYLE_CANDIDATES"], label: "op.textScan", go: () => showPick("type"), write: false },
     CREATE_TEXT_STYLES: { results: ["TEXT_STYLES_RESULT"], label: "op.textStyles", go: () => showPick("type"), write: true },
-    APPLY_TS_RENAME: { results: ["TS_RENAMED"], label: "op.tsRename", go: () => showTab("variables"), write: true },
     APPLY: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: false },
     APPLY_SELECTED: { results: ["APPLY_RESULT"], label: "op.bind", go: goLayer("bind"), write: true },
     // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
@@ -9332,8 +8908,6 @@ ${opts.tip}` : text;
     // GENERATE_DARK_MODE
     "btnTextStyles",
     // CREATE_TEXT_STYLES
-    "btnTsRename",
-    // APPLY_TS_RENAME
     "btnRename",
     // RENAME_APPLY
     "btnRegisterComp",
@@ -9358,7 +8932,6 @@ ${opts.tip}` : text;
     const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
     for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
     if (activeTab === "select" && selSub === "home" && (mcKeep() || mcNeed())) renderSelHome();
-    tsrRender();
     const other = link ? null : otherWriteOp();
     const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
@@ -9487,7 +9060,7 @@ ${opts.tip}` : text;
     }
   }
   var pointerDown = false;
-  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || activeTab === "variables" && vmUsageInFlight || !$("readinessPop").hidden;
+  var reentryHeld = () => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || activeTab === "variables" && vmUsageInFlight;
   var reentry = createReentryScheduler(() => readScreen("reentry"), reentryHeld, {
     now: () => Date.now(),
     set: (fn, ms) => setTimeout(fn, ms),
@@ -9532,7 +9105,6 @@ ${opts.tip}` : text;
   window.addEventListener("resize", syncStickyOffsets);
   updateGates();
   renderTsLink();
-  renderPipeline();
   renderTokens();
   refreshTreeEmptyStates();
   send({ type: "GET_COLLECTIONS" });
@@ -10107,7 +9679,6 @@ ${opts.tip}` : text;
     }
     closeMenu();
     closeModal();
-    closeReadiness();
   }
   function onSelectionForList(m) {
     var _a3, _b;
@@ -12297,19 +11868,16 @@ ${opts.tip}` : text;
     openPopupFrom("exportPopBody", t("export.title"), returnFocus);
   }
   function openMoreMenu() {
-    var _a3, _b;
+    var _a3;
     const btn = $("btnVarMore");
     const r = btn.getBoundingClientRect();
     openMenu(r.left, r.bottom + 2, [
-      { label: t("list.readiness", { n: readinessDone(), total: 7 }) + "\u2026", onSelect: () => openReadiness(btn), focusElsewhere: true },
       { label: t("list.menuExport"), onSelect: () => openExportPopup(btn), focusElsewhere: true },
       { label: colorView === "grid" ? t("list.colorList") : t("list.colorGrid"), separatorBefore: true, onSelect: () => setColorView(colorView === "grid" ? "list" : "grid") },
       { label: t("list.menuExpandAll"), onSelect: () => setAllGroups(true) },
       { label: t("list.menuCollapseAll"), onSelect: () => setAllGroups(false) },
       // 안 쓰는 변수 찾기(docs/unused-vars.md) — 파일 전체, 무료 · 로컬 0개 · 쓰기 잠금
-      { label: t("unused.menu"), separatorBefore: true, disabled: !vmVars.length || !!writeLockReason(), note: !vmVars.length ? t("unused.noVars") : (_a3 = writeLockReason()) != null ? _a3 : void 0, onSelect: () => openUnused(btn), focusElsewhere: true },
-      // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
-      { label: t("textStyle.renameMenu"), disabled: !isPaid || !!writeLockReason(), note: !isPaid ? t("status.paid") : (_b = writeLockReason()) != null ? _b : void 0, onSelect: () => openTsRename(btn), focusElsewhere: true }
+      { label: t("unused.menu"), separatorBefore: true, disabled: !vmVars.length || !!writeLockReason(), note: !vmVars.length ? t("unused.noVars") : (_a3 = writeLockReason()) != null ? _a3 : void 0, onSelect: () => openUnused(btn), focusElsewhere: true }
     ], btn);
   }
   function openAddMenu() {
@@ -12354,59 +11922,6 @@ ${opts.tip}` : text;
     modeName = $("modeSelect").value || null;
     renderVarList();
   });
-  function readinessDone() {
-    return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === "done").length;
-  }
-  var readinessReturn = null;
-  function openReadiness(btn) {
-    var _a3;
-    if (!$("readinessPop").hidden) {
-      closeReadiness();
-      return;
-    }
-    closeMenu();
-    renderPipeline();
-    const pop = $("readinessPop");
-    pop.hidden = false;
-    const r = btn.getBoundingClientRect();
-    const w = pop.offsetWidth;
-    pop.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - w - 4))}px`;
-    pop.style.top = `${Math.min(r.bottom + 2, window.innerHeight - pop.offsetHeight - 28)}px`;
-    readinessReturn = btn;
-    btn.setAttribute("aria-expanded", "true");
-    (_a3 = pop.querySelector(".pstep")) == null ? void 0 : _a3.focus();
-  }
-  function closeReadiness(returnFocus = false) {
-    const pop = $("readinessPop");
-    if (pop.hidden) return;
-    pop.hidden = true;
-    readinessReturn == null ? void 0 : readinessReturn.setAttribute("aria-expanded", "false");
-    if (returnFocus) readinessReturn == null ? void 0 : readinessReturn.focus();
-    readinessReturn = null;
-    reentry.release();
-  }
-  $("readinessPop").addEventListener("keydown", (e) => {
-    var _a3, _b;
-    const rows = Array.from($("readinessPop").querySelectorAll(".pstep"));
-    const i = rows.indexOf(document.activeElement);
-    if (e.key === "Escape") {
-      e.preventDefault();
-      closeReadiness(true);
-    } else if (e.key === "ArrowDown") {
-      e.preventDefault();
-      (_a3 = rows[(i + 1) % rows.length]) == null ? void 0 : _a3.focus();
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      (_b = rows[(i - 1 + rows.length) % rows.length]) == null ? void 0 : _b.focus();
-    } else if (e.key === "Tab") e.preventDefault();
-  });
-  document.addEventListener("pointerdown", (e) => {
-    const pop = $("readinessPop");
-    if (pop.hidden) return;
-    const tgt = e.target;
-    if (pop.contains(tgt) || (readinessReturn == null ? void 0 : readinessReturn.contains(tgt))) return;
-    closeReadiness();
-  }, true);
   function renderBindPrereq() {
     if (!curSel) return;
     renderBindChrome();

@@ -29,8 +29,6 @@ import {
   scanTextStyles,
   createSemanticTextStyles,
   renameTextRoleVars,
-  planTsRename,
-  applyTsRename,
   applyExistingTextStyles,
   planExistingTextStyles,
   applyTextStyleRows,
@@ -6972,18 +6970,7 @@ test('createSemanticTextStyles — 스타일 하나의 도중 오류는 그 행�
   assert.ok(r2.missing.every((m) => !/^(font-size|line-height|letter-spacing)\//.test(m)), r2.missing.join(' | '));
 });
 
-/* ================= [이름 다시 짓기] · 역할 변수 · 등록 경로 되돌림 · UI 역할(docs/text-style-krds.md §3.2-1 · §5) ================= */
-/** 값이 있는 로컬 텍스트 스타일(줄 높이 px). */
-function mkTs(figma, name, fontSize, style = 'Regular', lh = fontSize * 1.5) {
-  const st = figma.createTextStyle();
-  st.name = name;
-  st.fontName = { family: 'Inter', style };
-  st.fontSize = fontSize;
-  st.lineHeight = { unit: 'PIXELS', value: lh };
-  return st;
-}
-const tsSigOf = (st) => `${st.fontSize}|${st.lineHeight.value}|0|Inter|${st.fontName.style}`;
-const tsItem = (st, to) => ({ id: st.id, from: st.name, to, sig: tsSigOf(st) });
+/* ================= 역할 변수 · 등록 경로 되돌림 · UI 역할(docs/text-style-krds.md §3.2-1 · §6 "등록 순서") ================= */
 /** 이름 쓰기를 기록하고, 쓸 때마다 로컬 스타일 이름이 겹치지 않는지 본다. guard(n, cur)가 던지면 그 쓰기는 실패. */
 function watchNames(figma, guard = () => {}) {
   const log = [];
@@ -7004,126 +6991,92 @@ function watchNames(figma, guard = () => {}) {
   }
   return { log, dup: () => dup };
 }
-const byStatus = (r) => Object.fromEntries(r.results.map((x) => [x.id, x.status]));
 
-test('applyTsRename — 연쇄 A→B · B→C · 맞바꿈 X↔Y: 임시 이름 2단계라 같은 이름이 잠깐도 둘 생기지 않는다', async () => {
-  const figma = installFigma();
-  const a = mkTs(figma, 'a', 16);
-  const b = mkTs(figma, 'b', 17);
-  const x = mkTs(figma, 'x', 18);
-  const y = mkTs(figma, 'y', 19);
-  const w = watchNames(figma);
-  const r = await applyTsRename([tsItem(a, 'b'), tsItem(b, 'c'), tsItem(x, 'y'), tsItem(y, 'x')]);
-  assert.equal(r.renamed, 4);
-  assert.equal(r.skipped, 0);
-  assert.deepEqual([a.name, b.name, x.name, y.name], ['b', 'c', 'y', 'x']);
-  assert.equal(w.dup(), null, '이름이 겹친 순간이 없음');
-  assert.ok(w.log.some(([id, n]) => id === a.id && n === `__dsl_tmp_${a.id}`), '1단계 임시 이름');
-  assert.deepEqual(r.results.find((q) => q.id === a.id), { id: a.id, status: 'renamed', name: 'b' });
-});
-
-test('applyTsRename — 최종 이름 집합 고정점: 남는 이름과 겹치면 name-taken, 빠진 항목의 이름을 원하던 항목도 함께 빠진다', async () => {
-  const figma = installFigma();
-  const p = mkTs(figma, 'p', 16);
-  const q = mkTs(figma, 'q', 17);
-  mkTs(figma, 'z', 18); // 후보 아님
-  const r1 = mkTs(figma, 'r', 19);
-  const k1 = mkTs(figma, 'k1', 20);
-  const k2 = mkTs(figma, 'k2', 21);
-  const r = await applyTsRename([tsItem(p, 'z'), tsItem(q, 'p'), tsItem(r1, 's'), tsItem(k1, 'same'), tsItem(k2, 'same')]);
-  const st = byStatus(r);
-  assert.equal(st[p.id], 'name-taken');
-  assert.equal(st[q.id], 'name-taken', 'p가 빠져 이름 p가 남으므로');
-  assert.equal(st[k1.id], 'name-taken');
-  assert.equal(st[k2.id], 'name-taken', '같은 to를 원하는 후보 둘은 함께 빠진다');
-  assert.equal(st[r1.id], 'renamed');
-  assert.deepEqual([p.name, q.name, r1.name], ['p', 'q', 's']);
-  assert.equal(r.renamed, 1);
-  assert.equal(r.skipped, 4);
-  assert.deepEqual(r.skipReasons, { 'name-taken': 4 });
-});
-
-test('applyTsRename — 다시 확인: 그 사이 이름이 바뀜(없어진 스타일 포함) · 값이 바뀜은 건너뛴다', async () => {
-  const figma = installFigma();
-  const a = mkTs(figma, 'a', 16);
-  const b = mkTs(figma, 'b', 17);
-  const c = mkTs(figma, 'c', 18);
-  const ia = tsItem(a, 'a2');
-  const ib = tsItem(b, 'b2');
-  a.name = 'a-moved';
-  b.fontSize = 20;
-  const r = await applyTsRename([ia, ib, tsItem(c, 'c2'), { id: 'style:gone', from: 'g', to: 'g2', sig: 'x' }]);
-  assert.deepEqual(byStatus(r), { [a.id]: 'renamed-meanwhile', [b.id]: 'value-changed', [c.id]: 'renamed', 'style:gone': 'renamed-meanwhile' });
-  assert.deepEqual(r.skipReasons, { 'renamed-meanwhile': 2, 'value-changed': 1 });
-  assert.deepEqual([a.name, b.name, c.name], ['a-moved', 'b', 'c2']);
-  assert.equal(r.results.find((x) => x.id === 'style:gone').name, '');
-});
-
-test('applyTsRename — 오류는 되돌리고(error) 그 이름을 원하던 항목도 연쇄로 되돌린다(error-chain) · 되돌리지 못하면 error-stuck · 되돌린 스타일의 역할 변수는 그대로', async () => {
-  const figma = installFigma();
-  const spec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
-  await createSemanticTextStyles([spec('a', 16), spec('b', 18), spec('d', 20), spec('g', 22), spec('f', 24)]);
-  const [a, b, d, g, f] = ['a', 'b', 'd', 'g', 'f'].map((n) => figma._state.textStyles.find((s) => s.name === n));
-  watchNames(figma, (st, n, cur) => {
-    if (st === b && n === 'c') throw new Error('boom'); // 2단계 오류
-    if (st === f && n.startsWith('__dsl_tmp_')) throw new Error('boom'); // 1단계 오류 — 이름은 그대로
-    if (st === g && (n === 'h' || (n === 'g' && cur !== 'g'))) throw new Error('boom'); // 되돌림도 실패
-  });
-  const r = await applyTsRename([tsItem(a, 'b'), tsItem(b, 'c'), tsItem(d, 'e'), tsItem(g, 'h'), tsItem(f, 'f2')]);
-  assert.deepEqual(byStatus(r), { [a.id]: 'error-chain', [b.id]: 'error', [d.id]: 'renamed', [g.id]: 'error-stuck', [f.id]: 'error' });
-  assert.deepEqual([a.name, b.name, d.name, f.name], ['a', 'b', 'e', 'f']);
-  assert.equal(g.name, `__dsl_tmp_${g.id}`);
-  assert.equal(r.results.find((x) => x.id === g.id).name, `__dsl_tmp_${g.id}`, '결과에 지금 이름');
-  // 역할 변수: 바뀐 d만
-  assert.ok(findVar(figma, 'Semantic', 'font-size/e'));
-  assert.ok(findVar(figma, 'Semantic', 'font-size/a') && findVar(figma, 'Semantic', 'font-size/b') && findVar(figma, 'Semantic', 'font-size/g'));
-  assert.equal(r.roleVarsRenamed, 2, 'd의 font-size · line-height');
-});
-
-test('applyTsRename — 역할 변수도 함께: Semantic만 · 사용자 컬렉션 · 직접 만든 변수는 그대로 · 겹치면 roleVarsTaken', async () => {
-  const figma = installFigma();
-  const spec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
-  await createSemanticTextStyles([spec('a', 16), spec('b', 18), spec('c', 20)]);
-  const [a, b, c] = ['a', 'b', 'c'].map((n) => figma._state.textStyles.find((s) => s.name === n));
+/** Semantic 변수의 이름 쓰기를 지켜본다 — 쓸 때마다 같은 이름이 둘 생기지 않는지 본다. guard(v, n, cur)가 던지면 그 쓰기는 실패. */
+function watchVarNames(figma, guard = () => {}) {
   const sem = figma._state.collections.find((x) => x.name === 'Semantic');
+  const vars = () => figma._state.variables.filter((v) => v.variableCollectionId === sem.id);
+  let dup = null;
+  for (const v of vars()) {
+    let name = v.name;
+    Object.defineProperty(v, 'name', {
+      configurable: true,
+      get: () => name,
+      set: (n) => {
+        guard(v, n, name);
+        name = n;
+        const names = vars().map((x) => x.name);
+        if (new Set(names).size !== names.length && !dup) dup = names.slice();
+      },
+    });
+  }
+  return { dup: () => dup };
+}
+const roleSpec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
+
+test('renameTextRoleVars — 최종 이름 집합 고정점: 남는 이름과 겹치면 taken, 빠진 변수의 이름을 원하던 변수도 함께 빠진다 · 연쇄는 바뀐다', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('p', 16), roleSpec('q', 18), roleSpec('r', 20), roleSpec('k1', 22), roleSpec('k2', 24)]); // 짝수 크기 — 줄 높이(×1.5)가 정수라야 line-height 변수가 생긴다
+  const sem = figma._state.collections.find((x) => x.name === 'Semantic');
+  figma.variables.createVariable('font-size/z', sem, 'FLOAT'); // 후보 아님 — 최종 집합 밖의 다른 변수
+  const fs = (n) => findVar(figma, 'Semantic', `font-size/${n}`);
+  const lh = (n) => findVar(figma, 'Semantic', `line-height/${n}`);
+  const [fsP, fsQ, fsR, fsK1, fsK2] = ['p', 'q', 'r', 'k1', 'k2'].map(fs);
+  const [lhP, lhQ, lhR, lhK1, lhK2] = ['p', 'q', 'r', 'k1', 'k2'].map(lh);
+  const w = watchVarNames(figma);
+  const r = await renameTextRoleVars([{ from: 'p', to: 'z' }, { from: 'q', to: 'p' }, { from: 'r', to: 's' }, { from: 'k1', to: 'same' }, { from: 'k2', to: 'same' }]);
+  // font-size: z가 남아 p가 빠지고, p가 남으므로 q도 빠진다 · 같은 to를 원하는 k1 · k2는 함께 빠진다
+  assert.deepEqual([fsP.name, fsQ.name, fsK1.name, fsK2.name], ['font-size/p', 'font-size/q', 'font-size/k1', 'font-size/k2']);
+  assert.equal(fsR.name, 'font-size/s');
+  // line-height: z가 없으니 p → z · q → p 연쇄가 된다(임시 이름 2단계) · k1 · k2는 여기서도 빠진다
+  assert.deepEqual([lhP.name, lhQ.name, lhR.name], ['line-height/z', 'line-height/p', 'line-height/s']);
+  assert.deepEqual([lhK1.name, lhK2.name], ['line-height/k1', 'line-height/k2']);
+  assert.equal(r.taken, 6, 'font-size p · q · k1 · k2 + line-height k1 · k2');
+  assert.equal(r.renamed, 4);
+  assert.equal(r.error, 0);
+  assert.deepEqual(r.moved.map((m) => m.id).sort(), [fsR.id, lhP.id, lhQ.id, lhR.id].sort());
+  assert.equal(w.dup(), null, '같은 이름이 잠깐도 둘 생기지 않는다');
+});
+
+test('renameTextRoleVars — 오류는 되돌리고 그 이름을 원하던 변수도 연쇄로 되돌린다 · 1단계 오류는 그대로 · 되돌리지 못하면 stuck', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('a', 16), roleSpec('b', 18), roleSpec('d', 20), roleSpec('g', 22), roleSpec('f', 24)]);
+  const [a, b, d, g, f] = ['a', 'b', 'd', 'g', 'f'].map((n) => findVar(figma, 'Semantic', `font-size/${n}`));
+  const w = watchVarNames(figma, (v, n, cur) => {
+    if (v === b && n === 'font-size/c') throw new Error('boom'); // 2단계 오류
+    if (v === f && n.startsWith('__dsl_tmp_')) throw new Error('boom'); // 1단계 오류 — 이름은 그대로
+    if (v === g && (n === 'font-size/h' || (n === 'font-size/g' && cur !== n))) throw new Error('boom'); // 되돌림도 실패
+  });
+  const r = await renameTextRoleVars([{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'd', to: 'e' }, { from: 'g', to: 'h' }, { from: 'f', to: 'f2' }]);
+  // a는 b의 이름을 원했으므로 b가 되돌아올 때 함께 되돌린다(같은 이름이 둘 생기지 않게)
+  assert.deepEqual([a.name, b.name, d.name, f.name], ['font-size/a', 'font-size/b', 'font-size/e', 'font-size/f']);
+  assert.ok(g.name.startsWith('__dsl_tmp_'), g.name);
+  assert.equal(r.error, 4, 'b(오류) · a(연쇄) · f(1단계 오류) · g(되돌리지 못함)');
+  assert.deepEqual(r.stuck, [g.name], '되돌리지 못한 변수의 지금 이름');
+  // 오류 없는 line-height 5개 + font-size d
+  assert.equal(r.renamed, 6);
+  assert.ok(r.moved.some((m) => m.id === d.id) && !r.moved.some((m) => [a.id, b.id, g.id, f.id].includes(m.id)), '되돌린 변수는 moved에 없다');
+  assert.deepEqual(['b', 'c', 'e', 'h', 'f2'].map((n) => findVar(figma, 'Semantic', `line-height/${n}`)?.name), ['line-height/b', 'line-height/c', 'line-height/e', 'line-height/h', 'line-height/f2']);
+  assert.equal(w.dup(), null, '되돌림도 임시 이름 2단계 — 같은 이름이 잠깐도 둘 생기지 않는다');
+});
+
+test('renameTextRoleVars — Semantic만 · 사용자 컬렉션 · 직접 만든 변수는 그대로', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('a', 16), roleSpec('b', 18)]);
+  const a = figma._state.textStyles.find((s) => s.name === 'a');
   const user = figma.variables.createVariableCollection('Variables');
   const userVar = figma.variables.createVariable('font-size/a', user, 'FLOAT');
   findVar(figma, 'Semantic', 'line-height/b').setPluginData('dsl.manual', '1');
-  figma.variables.createVariable('font-size/c2', sem, 'FLOAT'); // 최종 집합 밖의 다른 변수
   const fsA = findVar(figma, 'Semantic', 'font-size/a');
-  const r = await applyTsRename([tsItem(a, 'heading/large'), tsItem(b, 'body/medium'), tsItem(c, 'c2')]);
-  assert.equal(r.renamed, 3);
+  const r = await renameTextRoleVars([{ from: 'a', to: 'heading/large' }, { from: 'b', to: 'body/medium' }]);
   assert.equal(fsA.name, 'font-size/heading/large', '같은 변수(연결 유지)의 이름만');
   assert.equal(a.boundVariables.fontSize.id, fsA.id);
   assert.ok(findVar(figma, 'Semantic', 'line-height/heading/large'));
   assert.ok(findVar(figma, 'Semantic', 'font-size/body/medium'));
   assert.ok(findVar(figma, 'Semantic', 'line-height/b'), '직접 만든 변수는 그대로');
   assert.equal(userVar.name, 'font-size/a', '사용자 컬렉션은 그대로');
-  assert.ok(findVar(figma, 'Semantic', 'font-size/c'), '겹친 변수는 옛 이름으로 남음');
-  assert.ok(findVar(figma, 'Semantic', 'line-height/c2'));
-  assert.equal(r.roleVarsRenamed, 4);
-  assert.equal(r.roleVarsTaken, 1);
-  assert.equal(r.roleVarsError, 0);
-  assert.deepEqual(r.roleVarsStuck, []);
-});
-
-test('applyTsRename — 값을 쓰지 않는다: 글꼴을 못 불러오고 값 쓰기가 막혀도 이름은 바뀐다', async () => {
-  const figma = installFigma();
-  await createSemanticTextStyles([{ name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
-  const a = figma._state.textStyles[0];
-  const item = tsItem(a, 'body/medium');
-  figma.loadFontAsync = async () => { throw new Error('loadFontAsync called'); };
-  for (const f of ['fontName', 'fontSize', 'lineHeight', 'letterSpacing']) {
-    const val = a[f];
-    Object.defineProperty(a, f, { configurable: true, get: () => val, set: () => { throw new Error(`write ${f}`); } });
-  }
-  a.setBoundVariable = () => { throw new Error('setBoundVariable called'); };
-  for (const v of figma._state.variables) v.setValueForMode = () => { throw new Error('setValueForMode called'); };
-  const r = await applyTsRename([item]);
-  assert.equal(r.renamed, 1);
-  assert.equal(a.name, 'body/medium');
-  assert.equal(r.roleVarsRenamed, 2);
-  assert.equal(r.roleVarsError, 0);
+  assert.equal(r.renamed, 3);
+  assert.equal(r.taken, 0);
 });
 
 test('renameTextRoleVars — onlyIds · 바꿀 변수 오류는 되돌리고 error · 되돌리지 못한 변수는 stuck', async () => {
@@ -7201,46 +7154,6 @@ test('scanTextStyles — uiRole: 부모부터 올라가 처음 역할이 있는 
   const { samples } = await scanTextStyles([btn, outer]);
   const ui = Object.fromEntries(samples.map((s) => [s.id, s.uiRole]));
   assert.deepEqual(ui, { inBtn: true, inCard: false, selfRole: true, inChip: true });
-});
-
-test('planTsRename — 로컬 스타일 전부에 KRDS 이름 · 바뀌는 줄만 · sig', async () => {
-  const figma = installFigma();
-  const h1 = mkTs(figma, 'h1', 32, 'Bold');
-  const body = mkTs(figma, 'body', 17);
-  mkTs(figma, 'body/small', 15);
-  const odd = mkTs(figma, 'odd', 26.7, 'Bold', 40.05);
-  figma.loadFontAsync = async () => { throw new Error('loadFontAsync called'); };
-  const rows = await planTsRename();
-  const by = Object.fromEntries(rows.map((r) => [r.from, r]));
-  assert.deepEqual(Object.keys(by).sort(), ['body', 'h1', 'odd'], '이름이 같은 body/small은 없음');
-  assert.deepEqual(by.h1, { id: h1.id, from: 'h1', to: 'heading/large', sig: '32|48|0|Inter|Bold', step: 'heading/large' }); // 새 이름의 크기 단계(12.12 N-D2a)
-  assert.equal(by.body.step, 'body/medium');
-  assert.equal(by.body.to, 'body/medium');
-  assert.equal(by.body.sig, tsSigOf(body));
-  assert.equal(by.odd.to, 'heading/medium');
-  assert.equal(odd.name, 'odd', '읽기만');
-});
-
-test('code.ts — SCAN_TS_RENAME → TS_RENAME_PLAN · APPLY_TS_RENAME → TS_RENAMED + ⌘Z 한 번 + 준비 상태 · 무료는 잠김', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const h1 = mkTs(figma, 'h1', 32, 'Bold');
-  let out = await p.send({ type: 'SCAN_TS_RENAME', reqId: 4 });
-  const plan = ofType(out, 'TS_RENAME_PLAN')[0];
-  assert.equal(plan.reqId, 4);
-  assert.deepEqual(plan.rows.map((r) => [r.from, r.to]), [['h1', 'heading/large']]);
-  figma._undo = 0;
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 5, items: plan.rows.map(({ id, from, to, sig }) => ({ id, from, to, sig })) });
-  const res = ofType(out, 'TS_RENAMED')[0];
-  assert.deepEqual(res, { type: 'TS_RENAMED', reqId: 5, results: [{ id: h1.id, status: 'renamed', name: 'heading/large' }], renamed: 1, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] }); // 옮겨 연결 결과 칸(12.12 N-D2a)
-  assert.equal(figma._undo, 1);
-  assert.equal(ofType(out, 'PREREQ_STATE').length, 1);
-  await p.send({ type: 'SET_LICENSE', tier: 'free' });
-  out = await p.send({ type: 'SCAN_TS_RENAME', reqId: 6 });
-  assert.equal(ofType(out, 'TS_RENAME_PLAN').length, 0);
-  assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0]?.feature, 'textStyles');
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 7, items: [] });
-  assert.equal(ofType(out, 'TS_RENAMED').length, 0);
 });
 
 /* ---------- ia-v3 A.14 — 쓰임 역할 이름 꼬리(12.5) · Global 색 이름(12.11) ---------- */
@@ -8230,45 +8143,16 @@ test('A.21 ⑧ 옛 이름 spacing/card/gap만 있는 파일 → 새 spacing/gap�
   assert.equal(roleTarget(figma, old.id), roleTarget(figma, neu.id));
 });
 
-test('A.21 ⑨ 이름 다시 짓기 · 등록 — 새 규칙 변수는 단계가 바뀐 스타일만 옮겨 연결 · 옛 규칙 변수는 이름만 함께 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
+test('A.21 ⑨ 등록 — 새 규칙 변수는 스타일 이름을 따라 바꾸지 않음 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
   let figma = installFigma();
   const spec = (name, style, step = 'body/large', fontSize = 18) => ({ name, step, fontSize, lineHeight: 27, letterSpacing: 0, family: 'Inter', style });
   await createSemanticTextStyles([spec('body/large-w500-120', 'Medium'), spec('body/large-w700-150', 'Bold')]);
-  const [s1, s2] = ['body/large-w500-120', 'body/large-w700-150'].map((n) => figma._state.textStyles.find((s) => s.name === n));
+  // 새 규칙 변수(표시 있음 · 크기 단계 이름 — 여러 스타일이 씀)는 스타일 이름을 따라 바꾸지 않는다(12.12 N-D2)
   const large = findVar(figma, 'Semantic', 'font-size/body/large');
-  const item = { ...tsItem(s1, 'body/medium-w500-120'), sig: `18|27|0|Inter|Medium`, step: 'body/medium' };
-  const r = await applyTsRename([item]);
-  assert.equal(r.renamed, 1);
-  assert.equal(r.roleMoveError, 0);
-  const medium = findVar(figma, 'Semantic', 'font-size/body/medium');
-  assert.ok(medium);
-  assert.equal(medium.getPluginData('dsl.textStep'), 'body/medium');
-  assert.equal(s1.boundVariables.fontSize.id, medium.id);
-  assert.equal(s1.boundVariables.lineHeight.id, findVar(figma, 'Semantic', 'line-height/body/medium').id);
-  assert.equal(s2.boundVariables.fontSize.id, large.id, '다른 스타일은 그대로');
-  assert.equal(large.name, 'font-size/body/large', '옛 단계 변수는 남음');
-  assert.equal(r.roleVarsRenamed, 0, '새 규칙 변수의 이름은 바꾸지 않는다');
-  // 단계가 그대로면(굵기 꼬리만) 연결을 건드리지 않는다
-  const r1 = await applyTsRename([{ ...tsItem(s2, 'body/large-w700'), sig: `18|27|0|Inter|Bold`, step: 'body/large' }]);
-  assert.equal(r1.renamed, 1);
-  assert.equal(s2.boundVariables.fontSize.id, large.id);
-  // 글꼴을 못 불러오면 옮기지 못함 — 이름은 바뀐 채, 옛 변수에 연결이 남음
-  figma.loadFontAsync = async () => { throw new Error('no font'); };
-  const r2 = await applyTsRename([{ ...tsItem(s2, 'body/small-w700'), sig: `18|27|0|Inter|Bold`, step: 'body/small' }]);
-  assert.equal(r2.renamed, 1);
-  assert.equal(r2.roleMoveError, 1);
-  assert.deepEqual(r2.roleMoveNames, ['body/small-w700']);
-  assert.equal(s2.boundVariables.fontSize.id, large.id);
-  // 옛 규칙 변수(표시 없음 · font-size/{지금 이름})에 붙은 스타일은 변수 이름만 함께 바뀐다
-  figma = installFigma();
-  await createSemanticTextStyles([{ name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
-  const a = figma._state.textStyles[0];
-  const fsA = findVar(figma, 'Semantic', 'font-size/a');
-  assert.equal(fsA.getPluginData('dsl.textStep'), '', 'step 없는 스펙은 표시 없음');
-  const ra = await applyTsRename([{ ...tsItem(a, 'body/medium'), step: 'body/medium' }]);
-  assert.equal(ra.roleVarsRenamed, 2);
-  assert.equal(fsA.name, 'font-size/body/medium');
-  assert.equal(a.boundVariables.fontSize.id, fsA.id);
+  assert.equal(large.getPluginData('dsl.textStep'), 'body/large');
+  const rr = await renameTextRoleVars([{ from: 'body/large', to: 'body/medium' }]);
+  assert.equal(rr.renamed, 0);
+  assert.equal(large.name, 'font-size/body/large');
   // 옛 스타일 body/large가 쓰던 표시 없는 font-size/body/large = 18 → body/large-w700(18) 등록은 재사용하지 않고 -2(표시)
   figma = installFigma();
   await createSemanticTextStyles([{ name: 'body/large', fontSize: 18, lineHeight: 27, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
@@ -9505,7 +9389,6 @@ test('code.ts — GENERATE_DARK_MODE: commitUndo 한 번 · DARK_MODE_RESULT에 
   f.figma._undo = 0;
   let out = await p.send({ type: 'GET_PREREQ' });
   let pre = ofType(out, 'PREREQ_STATE')[0];
-  assert.equal(pre.hasDarkMode, true);
   assert.equal(pre.darkOld, true);
   assert.equal(pre.darkUnfilled, 0);
   out = await p.send({ type: 'GENERATE_DARK_MODE' });
@@ -9529,7 +9412,6 @@ test('code.ts — GENERATE_DARK_MODE: commitUndo 한 번 · DARK_MODE_RESULT에 
   assert.equal(f.figma._undo, 2, '옮기기 + 채우기 전체가 ⌘Z 한 번');
   pre = ofType(out, 'PREREQ_STATE')[0];
   assert.equal(pre.darkOld, false);
-  assert.equal(pre.hasDarkMode, true);
   assert.equal(pre.darkUnfilled, 0);
   assert.equal(ofType(out, 'VARIABLES').length, 1);
   // 새 Global 색 → Dark 값이 없는 색 1

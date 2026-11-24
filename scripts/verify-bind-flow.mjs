@@ -17,7 +17,7 @@
        최소화, 잠금 사유, 버튼 줄 고정, 24×24, §8 목록 높이 실측
     12 변수 고치기(PR 3.5): 열 때 포커스, 이름 오류·바뀌는 것 줄, 별칭 고르개(계층·Global·순환·검색), 값 ↔ 별칭,
        저장(고친 것만 + base), 저장 중 잠금, 성공·일부 실패·다른 곳에서 바뀜·삭제됨·이름 거절, ERROR·10초, 버리기 확인, 닫은 뒤 포커스
-    14 컴포넌트(베타): 언제나 하위 탭 셋 · [베타] 배지 · 접근성 이름 · 준비 현황 각주 없음 · 켜기 체크박스 없음 · End
+    14 컴포넌트(베타): 언제나 하위 탭 셋 · [베타] 배지 · 접근성 이름 · 켜기 체크박스 없음 · End
     23 UX 검수 C(IA v4 §4.3a · B.14): 색 Layer · 빈 상태 잠금 · 주 버튼 · 팔레트 띠 · 컴포넌트 문구 · 머리 띠
     25 라이선스 구매 버튼(IA v4 §4.10 · B.21): 늘 보임 · 자리표시자면 잠금 · 티어별 글 · 툴팁 꼬리
     30 상태 5 만들기 카드(IA v4 §4.1 · B.30): 남은 값 · 같은 값 줄 · 추출 전 · 실패 · 미리보기 다시 보냄 · 만들기 화면 기본 끔
@@ -92,8 +92,9 @@ async function rightClick(p, selector) {
 const tabsOf = (p) => p.$$eval('#makeTabs [role="tab"]:not([hidden])', (e) => e.map((x) => `${x.textContent}${x.getAttribute('aria-selected') === 'true' ? '*' : ''}`));
 const visible = (p, sel) => p.$eval(sel, (e) => e.offsetParent !== null && getComputedStyle(e).display !== 'none');
 
-const PREREQ = { type: 'PREREQ_STATE', hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasDarkMode: false, hasTextStyles: false, hasSemanticRoles: true };
-const sel = (count, bound) => ({ type: 'SELECTION_STATE', count, scanned: count * 40, bindable: 12, capped: false, comps: 0, sets: 0, selfSelect: false, bound, renamed: 0, firstName: 'Card', ids: Array.from({ length: count }, (_, i) => `s${i}`) });
+const PREREQ = { type: 'PREREQ_STATE', hasGlobal: true, hasBindable: true };
+// 둘째 인자(옛 bound — 준비 현황용, S-1a에서 메시지에서 뺌)는 읽지 않는다. 부르는 곳이 많아 자리만 남겨 둔다.
+const sel = (count, _bound) => ({ type: 'SELECTION_STATE', count, scanned: count * 40, bindable: 12, capped: false, comps: 0, sets: 0, selfSelect: false, firstName: 'Card', ids: Array.from({ length: count }, (_, i) => `s${i}`) });
 const nodes = [{ id: 'n1', name: 'card', type: 'FRAME', depth: 0, parentId: null }];
 const c = (field, v = 'vA') => ({ nodeId: 'n1', field, currentValue: '8', variableId: v, variableName: 'spacing/8', tier: 1 });
 const preview = (reqId) => ({ type: 'APPLY_RESULT', preview: true, bound: 2, skipped: 0, reasons: {}, candidates: [c('itemSpacing'), c('paddingLeft')], nodes, skips: [], reqId });
@@ -312,11 +313,11 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.focus('#varSearch');
   await p.keyboard.press('Escape');
   check('9 Esc로 검색 지움', (await p.inputValue('#varSearch')) === '' && (await p.$('.vp-item[data-id="sp8"]')) !== null);
-  // ⋯ — 준비 현황 · 내보내기 · 색 격자 · 펼치기 · 접기
+  // ⋯ — 내보내기 · 색 격자 · 펼치기 · 접기 · 안 쓰는 변수 찾기(S-1a — ia-v4 §4.6 "⋯ 메뉴 — S-1a 뒤" · B.37)
   await p.click('#btnVarMore');
   const more = await p.$$eval('.ctx-menu button', (e) => e.map((x) => x.textContent));
-  check('9 ⋯ 메뉴 7개(색 격자로 보기 · 안 쓰는 변수 찾기 · 이름 다시 짓기 포함)', more.length === 7 && /^준비 현황 \d\/7…$/.test(more[0]) && more[1] === '코드로 내보내기…' && more[2] === '색 격자로 보기' && more[5] === '안 쓰는 변수 찾기…' && more[6].startsWith('텍스트 스타일 이름 다시 짓기…'), more.join('|'));
-  check('9 ⋯ 이름 다시 짓기 — 무료면 잠김 · 앞에 구분선', (await p.$eval('.ctx-menu button:last-child', (b) => b.getAttribute('aria-disabled') === 'true' || b.disabled)) && (await p.$$eval('.ctx-menu [role="separator"], .ctx-menu hr, .ctx-menu .sep', (e) => e.length)) >= 1);
+  check('9 ⋯ 메뉴 5개(코드로 내보내기… · 색 격자로 보기 · 펼치기 · 접기 · 안 쓰는 변수 찾기…) · 첫 항목 "코드로 내보내기…"', more.length === 5 && more[0] === '코드로 내보내기…' && more[1] === '색 격자로 보기' && more[2] === '사이드바 모두 펼치기' && more[3] === '사이드바 모두 접기' && more[4] === '안 쓰는 변수 찾기…', more.join('|'));
+  check('9 ⋯ 메뉴 — "준비 현황"으로 시작하는 항목 · "이름 다시 짓기" 항목 없음 · #readinessPop · #btnTsRename 없음', more.every((m) => !m.startsWith('준비 현황') && !m.includes('이름 다시 짓기')) && (await p.$('#readinessPop')) === null && (await p.$('#btnTsRename')) === null, more.join('|'));
   await p.click('.ctx-menu button >> text=색 격자로 보기');
   check('9 색 격자 — 동그라미만(이름 없음)', (await p.$$('.vp-line.vp-dot .vp-item')).length === 2 && (await p.$('.vp-line.vp-dot .vp-name')) === null);
   // ＋ 메뉴
@@ -1252,7 +1253,6 @@ async function saveAndGet(p) {
   check('14 배지 — 할 일 버튼 · 카드 제목, aria-hidden', (await p.$$eval('#btnGoComponents .beta-badge[aria-hidden="true"], #structureCard h2 .beta-badge[aria-hidden="true"]', (e) => e.length)) === 2);
   check('14 배지 주황(#C2410C 글자 · #FFF1E6 바탕)', JSON.stringify(await p.$eval('#btnGoComponents .beta-badge', (e) => [getComputedStyle(e).color, getComputedStyle(e).backgroundColor])) === JSON.stringify(['rgb(194, 65, 12)', 'rgb(255, 241, 230)']));
   check('14 접근성 이름 "컴포넌트 (베타)"', (await p.$eval('#btnGoComponents', (e) => e.getAttribute('aria-label'))) === '컴포넌트 (베타)');
-  check('14 준비 현황 각주 없음', (await p.$('#readinessPop .pop-note')) === null);
   check('14 설정에 켜기 체크박스 없음', (await p.$('#componentsBeta')) === null);
   await recv(p, PREREQ);
   await recv(p, sel(1, 0));
@@ -1545,11 +1545,11 @@ async function saveAndGet(p) {
   await p.close();
 }
 
-/* ---------- 19 텍스트 스타일 KRDS(docs/text-style-krds.md §4 · §5) — 표시 · 구분선 줄 · [이름 다시 짓기] ---------- */
+/* ---------- 19 텍스트 스타일 KRDS(docs/text-style-krds.md §4) — 표시 · 구분선 줄 · [이름 다시 짓기] 없음 ---------- */
 {
   const p = await open(560, 'variables');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
-  await recv(p, { ...PREREQ, hasTextStyles: true });
+  await recv(p, PREREQ);
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   await p.click('#btnAddVar');
   await p.click('.ctx-menu button >> text=텍스트 스타일 만들기…');
@@ -1566,45 +1566,7 @@ async function saveAndGet(p) {
   check('19 KRDS 크기 표시 없음 — #tsList .ts-off 0개 · .r-top.has-off 0개 · ×n 배지 없음', (await p.$$eval('#tsList .ts-off', (e) => e.length)) === 0 && (await p.$$eval('#tsList .r-top.has-off', (e) => e.length)) === 0 && (await p.$$eval('#tsList .r-badge', (e) => e.length)) === 0);
   check('19 13.5 줄에도 [삭제]가 같은 줄 — 크기 칸 뒤 정렬 그대로', await p.$eval('#tsList .r-card:nth-child(3)', (c) => { const sz = c.querySelector('.ts-edit input[type="number"]')?.getBoundingClientRect(); const d = c.querySelector('.r-top .link')?.getBoundingClientRect(); const t = c.querySelector('.r-top .r-title')?.getBoundingClientRect(); return !!d && !!t && !!sz && Math.abs(t.top + t.height / 2 - (d.top + d.height / 2)) < 4 && d.left > sz.right; }));
   check('19 상태 줄에 " · KRDS 밖" 꼬리 없음', !(await p.textContent('#tsStatus')).includes(' · KRDS 밖'), await p.textContent('#tsStatus'));
-  // [이름 다시 짓기] → 팝업 · 읽는 중 · 포커스 [닫기]
-  await p.click('#btnTsRename');
-  await p.waitForTimeout(30);
-  const sr = (await sent(p, 'SCAN_TS_RENAME')).at(-1);
-  check('19 팝업 — SCAN_TS_RENAME(reqId) · "스타일을 읽는 중…" · 버튼 잠금 · 포커스 [닫기]', typeof sr?.reqId === 'number' && (await p.textContent('.modal')).includes('스타일을 읽는 중…') && (await p.evaluate(() => document.activeElement?.textContent)) === '닫기');
-  const rows = [
-    { id: 's1', from: 'body', to: 'body/large', sig: 'a' },
-    { id: 's2', from: 'h1', to: 'heading/xlarge', sig: 'b' },
-    { id: 's3', from: 'caption', to: 'label/small-13_5', sig: 'c' },
-  ];
-  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows });
-  await p.waitForTimeout(30);
-  const head = await p.textContent('.modal');
-  check('19 응답 — 제목 "바꿀 이름 3개" · 줄 3 · [3개 이름 바꾸기] · 첫 스위치 포커스', head.includes('이름 다시 짓기 · 바꿀 이름 3개') && (await p.$$eval('.modal .tsr-row', (e) => e.length)) === 3 && head.includes('3개 이름 바꾸기') && (await p.evaluate(() => document.activeElement?.dataset.id)) === 's1');
-  check('19 줄 — "body → body/large" · 팝업 .ts-off 0개(크기 표시 없음)', (await p.textContent('.modal .tsr-row >> nth=0')).replace(/\s+/g, '').startsWith('body→body/large') && (await p.$$eval('.modal .ts-off', (e) => e.length)) === 0);
-  // ↓ 키로 다음 스위치 · 하나 끔 → [2개]
-  await p.keyboard.press('ArrowDown');
-  check('19 ↓ 키 — 다음 스위치로', (await p.evaluate(() => document.activeElement?.dataset.id)) === 's2');
-  await p.click('.modal .bv-switch[data-id="s2"]');
-  check('19 하나 끔 → [2개 이름 바꾸기] · 포커스 그대로', (await p.textContent('.modal')).includes('2개 이름 바꾸기') && (await p.getAttribute('.modal .bv-switch[data-id="s2"]', 'aria-checked')) === 'false');
-  // 모두 끄기 → 잠금 사유 · 모두 켜기 → [3개]
-  await p.click('.modal [data-all="off"]');
-  const applyBtn = p.locator('.modal button', { hasText: '이름 바꾸기' });
-  check('19 모두 끄기 → [0개 이름 바꾸기] 잠김', (await applyBtn.textContent()) === '0개 이름 바꾸기' && (await applyBtn.getAttribute('aria-disabled')) === 'true');
-  await p.click('.modal [data-all="on"]');
-  check('19 모두 켜기 → [3개 이름 바꾸기]', (await applyBtn.textContent()) === '3개 이름 바꾸기');
-  // 겹침 — 끈 줄의 지금 이름 = 켠 줄의 새 이름이면 그 줄은 빠진다
-  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows: [rows[0], { id: 's4', from: 'body/large', to: 'body/xlarge', sig: 'd' }] });
-  await p.click('.modal .bv-switch[data-id="s4"]');
-  check('19 겹침 — "같은 이름이 남아요" · [0개]', (await p.textContent('.modal .tsr-row >> nth=0')).includes('같은 이름이 남아요') && (await applyBtn.textContent()) === '0개 이름 바꾸기');
-  await p.click('.modal .bv-switch[data-id="s4"]');
-  await applyBtn.click();
-  const ap = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
-  check('19 [바꾸기] → APPLY_TS_RENAME(켠 줄 · id · from · to · sig) · 실행 중 잠금', typeof ap?.reqId === 'number' && JSON.stringify(ap.items) === JSON.stringify([{ id: 's1', from: 'body', to: 'body/large', sig: 'a' }, { id: 's4', from: 'body/large', to: 'body/xlarge', sig: 'd' }]) && (await applyBtn.getAttribute('aria-disabled')) === 'true', JSON.stringify(ap?.items));
-  await recv(p, { type: 'TS_RENAMED', reqId: ap.reqId, renamed: 2, skipped: 0, skipReasons: {}, results: [], roleVarsRenamed: 2, roleVarsTaken: 1, roleVarsError: 0, roleVarsStuck: [] });
-  await p.waitForTimeout(60);
-  check('19 끝 — 팝업 닫힘 · 포커스 [이름 다시 짓기]로', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.id)) === 'btnTsRename');
-  check('19 상태 줄 — "2개 이름을 바꿨어요 · ⌘Z" + Semantic 변수 그대로 · warn', (await p.textContent('#statusText')).startsWith('텍스트 스타일 2개 이름을 바꿨어요 · ⌘Z로 되돌리기 · Semantic 변수 1개는'), await p.textContent('#statusText'));
-  check('19 스캔 표 비움 · [왼쪽 글자로 이름 채우기] 잠김 · 다시 스캔 안내', (await p.$$eval('#tsList .r-card', (e) => e.length)) === 0 && (await p.$eval('#btnTsRowLabels', (b) => b.disabled)) && (await p.textContent('#tsStatus')).endsWith('스캔 표를 비웠어요 — 다시 [스캔]해 주세요'));
+  check('19 타이포 버튼 줄 — [이름 다시 짓기] 없음(S-1a · ia-v4 B.37) · [왼쪽 글자로 이름 채우기]는 그대로', (await p.$('#btnTsRename')) === null && (await visible(p, '#btnTsRowLabels')));
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/krds-after.png` : '/dev/null' }).catch(() => {});
   await p.close();
 }
@@ -2272,24 +2234,6 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
   check('24 무료 토큰 [미리보기] → CREATE_TOKENS{preview · globalOnly}', tp?.preview === true && tp.globalOnly === true, JSON.stringify(tp));
   await p.close();
 }
-{
-  // 무료 연결 — N 배지 · newRoles 꼬리 없음(플러그인이 새 Semantic 후보를 보내지 않는다 — test/figma.test.mjs) · 준비 현황 › Semantic 매핑
-  const p = await open(560, 'variables');
-  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
-  await recv(p, PREREQ);
-  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  await p.waitForTimeout(300);
-  await p.click('#btnVarMore');
-  await p.click('.ctx-menu button >> nth=0');
-  await p.waitForTimeout(30);
-  const semRow = await p.$('[data-step="semantics"], .pstep[data-id="semantics"]');
-  if (semRow) {
-    await semRow.click();
-    await p.waitForTimeout(30);
-    check('24 무료 준비 현황 › Semantic 매핑 → 상태 줄 "Semantic 매핑은 유료예요 · 라이선스 →" · 포커스 [미리보기]', (await p.textContent('#statusText')) === 'Semantic 매핑은 유료예요' && (await p.textContent('#statusAction')) === '라이선스 →' && (await p.evaluate(() => document.activeElement?.id)) === 'btnCreate', await p.textContent('#statusText'));
-  } else check('24 준비 현황 Semantic 매핑 줄 찾기', false, await p.$eval('body', (b) => b.innerHTML.slice(0, 200)));
-  await p.close();
-}
 
 /* ---------- 25 Components 정리 PR(ia-v3 A.15 · ia-v4 §2.5 · §2.8 · §4.3a-2 · §4.5 · §4.11 T-P29 ④ — C-D5 · C-D7 · C-D12 · C-D13 · C-D14) ---------- */
 const COMP_NODES = [
@@ -2515,48 +2459,6 @@ async function fillBoth(p) {
   await p.click('.ctx-menu button >> text=코드로 내보내기…');
   await p.waitForTimeout(40);
   check('25 닫았다 다시 열면 상자 없음 · [내보내기] 주 버튼', (await p.$$('.modal .ux.danger')).length === 0 && JSON.stringify(await shownPrimaries(p, '.modal')) === '["btnExport"]', JSON.stringify(await shownPrimaries(p, '.modal')));
-  await p.close();
-}
-{
-  // 이름 다시 짓기 오류(APPLY_TS_RENAME) → 팝업 안 알림 줄(B.19 오류 갈래 · T-P29 ④)
-  const p = await open(560, 'variables');
-  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
-  await recv(p, { ...PREREQ, hasTextStyles: true });
-  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  await p.waitForTimeout(200);
-  const openTsr = async () => { await p.click('#btnVarMore'); await p.click('.ctx-menu button >> text=텍스트 스타일 이름 다시 짓기…'); await p.waitForTimeout(30); };
-  await openTsr();
-  const sr = (await sent(p, 'SCAN_TS_RENAME')).at(-1);
-  const rows = [{ id: 's1', from: 'body', to: 'body/large', sig: 'a' }, { id: 's2', from: 'h1', to: 'heading/xlarge', sig: 'b' }];
-  await recv(p, { type: 'TS_RENAME_PLAN', reqId: sr.reqId, rows });
-  await p.waitForTimeout(30);
-  const applyBtn = p.locator('.modal button', { hasText: '이름 바꾸기' });
-  await applyBtn.click();
-  const a1 = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
-  await recv(p, { type: 'ERROR', message: '바꾸지 못했어요', op: 'APPLY_TS_RENAME', reqId: a1.reqId });
-  await p.waitForTimeout(30);
-  const pos = await p.$eval('.modal .tsr-note', (e) => ({ shown: !e.hidden && !!e.querySelector('.ux.danger'), next: e.nextElementSibling?.className ?? '', inBody: !!e.closest('.tsr-body') }));
-  check('25 이름 다시 짓기 오류 → 팝업 안 알림 줄(.tsr-body 밖 · 버튼 줄 바로 위)', pos.shown && pos.next === 'm-foot' && !pos.inBody, JSON.stringify(pos));
-  check('25 [k개 이름 바꾸기] 다시 누를 수 있음(tsrBusy 풀림) · 팝업 primary는 [다시 시도] 하나', (await applyBtn.getAttribute('aria-disabled')) !== 'true' && JSON.stringify(await shownPrimaries(p, '.modal')) === '["retry"]', JSON.stringify(await shownPrimaries(p, '.modal')));
-  check('25 이름 다시 짓기 오류 — 숨은 #colorStatus에 오류 없음', (await p.$$('#colorStatus .ux.danger')).length === 0);
-  await p.click('.modal .bv-switch[data-id="s2"]');
-  await p.waitForTimeout(20);
-  check('25 스위치를 바꿔도 상자 그대로', (await p.$$('.modal .tsr-note .ux.danger')).length === 1);
-  await p.click('.modal .tsr-note .retry-btn');
-  await p.waitForTimeout(20);
-  const a2 = (await sent(p, 'APPLY_TS_RENAME')).at(-1);
-  check('25 [다시 시도] → 새 reqId · 켠 줄만 · 상자 사라짐 · 포커스 [닫기]', a2.reqId !== a1.reqId && JSON.stringify(a2.items.map((i) => i.id)) === '["s1"]' && (await p.$$('.modal .tsr-note .ux.danger')).length === 0 && (await p.evaluate(() => document.activeElement?.textContent)) === '닫기', JSON.stringify({ a2, f: await p.evaluate(() => document.activeElement?.textContent) }));
-  await recv(p, { type: 'ERROR', message: '바꾸지 못했어요', op: 'APPLY_TS_RENAME', reqId: a2.reqId });
-  await p.waitForTimeout(20);
-  await p.click('.modal [data-all="off"]');
-  const n0 = (await sent(p, 'APPLY_TS_RENAME')).length;
-  await p.click('.modal .tsr-note .retry-btn');
-  await p.waitForTimeout(20);
-  check('25 켠 줄을 모두 끄고 [다시 시도] → 보내지 않음 · 상자 · 포커스 그대로', (await sent(p, 'APPLY_TS_RENAME')).length === n0 && (await p.$$('.modal .tsr-note .ux.danger')).length === 1 && (await activeId(p)) === 'retry');
-  await p.click('.modal .m-foot button >> text=닫기');
-  await p.waitForTimeout(20);
-  await openTsr();
-  check('25 닫았다 다시 열면 상자 없음', (await p.$$('.modal .tsr-note .ux.danger')).length === 0);
   await p.close();
 }
 {
@@ -2850,7 +2752,7 @@ async function fillBoth(p) {
   const openTs = async () => {
     const p = await open(560, 'variables');
     await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
-    await recv(p, { ...PREREQ, hasTextStyles: true });
+    await recv(p, PREREQ);
     await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
     await p.click('#btnAddVar');
     await p.click('.ctx-menu button >> text=텍스트 스타일 만들기…');
@@ -3509,7 +3411,7 @@ async function backHome30(p, libs) {
   // 11px 아래 글자 0(배지 10px만) · 560 가로 스크롤 0
   const small = await p.evaluate(() => {
     const bad = [];
-    const BADGE = /(\.vt-section \.badge|\.tier-chip \.badge|\.vs-badge|\.lib-tag|\.beta-badge|\.bv-new|\.mini-badge|\.tag\b|\.tr-tag|\.pstep \.pdot|\.bs-dot|\.mk-info|\.mk-row \.sw\.n)/;
+    const BADGE = /(\.vt-section \.badge|\.tier-chip \.badge|\.vs-badge|\.lib-tag|\.beta-badge|\.bv-new|\.mini-badge|\.tag\b|\.tr-tag|\.bs-dot|\.mk-info|\.mk-row \.sw\.n)/;
     for (const sh of document.styleSheets) for (const r of sh.cssRules) {
       const m = r.style && /^([\d.]+)px$/.exec(r.style.fontSize);
       if (!m) continue;
@@ -4126,7 +4028,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
 }
 
 
-/* ---------- 40 다크 구조 D-T1(ia-v3 13.7 "다크" · A.25 · ia-v4 §4.11 ② · §4.6) — 고르개 없음 · 알림 띠 · 옮기기 팝업 · 결과 글 · 준비 현황 다크 줄 ---------- */
+/* ---------- 40 다크 구조 D-T1(ia-v3 13.7 "다크" · A.25 · ia-v4 §4.11 ② · §4.6) — 고르개 없음 · 알림 띠 · 옮기기 팝업 · 결과 글 ---------- */
 {
   const p = await open(560, null);
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
@@ -4148,12 +4050,12 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   const look = await p.$eval('#darkNotice', (e) => { const c = getComputedStyle(e); const q = getComputedStyle(document.querySelector('.prereq')); return { color: c.color, pc: q.color, bg: c.backgroundColor, border: c.borderTopWidth, radius: c.borderTopLeftRadius, m: c.margin, pm: q.margin, pad: c.padding, ppad: q.padding }; });
   check('40 알림 띠 모양 — .prereq와 같은 주황 글 · 여백 · 옅은 주황 배경 · 테두리 · 둥근 모서리 없음', look.color === look.pc && look.m === look.pm && look.pad === look.ppad && look.bg === 'rgb(251, 241, 223)' && look.border === '0px' && look.radius === '0px', JSON.stringify(look));
   check('40 카드 안 카드 0 — 다크 카드', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
-  await recv(p, { ...PREREQ, hasDarkMode: true, darkOld: true });
+  await recv(p, { ...PREREQ, darkOld: true });
   check('40 darkOld → dark.needMigrate', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요');
   await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV3] });
   check('40 띠는 VARIABLES의 모드 수가 아니라 PREREQ_STATE.darkOldManual로 가른다(옛 목록이어도 그대로)', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요');
   await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV] });
-  await recv(p, { ...PREREQ, hasDarkMode: true, darkOld: true, darkOldManual: true });
+  await recv(p, { ...PREREQ, darkOld: true, darkOldManual: true });
   check('40 darkOld + darkOldManual(Semantic 모드 셋 이상) → dark.needMigrateManual · 잠금 없음', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — Semantic 모드가 3개 이상이라 옮길 수 없어요. 피그마에서 모드를 2개로 줄여 주세요' && !(await locked(p, '#btnGenDark')));
   await recv(p, PREREQ);
   check('40 필드 없음 → 띠 없음', await p.$eval('#darkNotice', (e) => e.hidden));
@@ -4205,21 +4107,9 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await recv(p, { type: 'DARK_MODE_RESULT', filled: 0, kept: 0, targets: 0, error: 'Semantic에 모드가 3개 이상이라 옮기지 못했어요 — 피그마에서 모드를 2개로 줄인 뒤 다시 눌러 주세요' });
   s0 = await st();
   check('40 결과 — 거절은 warn 그대로(팝업 없음)', s0.text.startsWith('Semantic에 모드가 3개 이상이라') && s0.cls === 'status warn' && (await p.$('.modal')) === null);
-  // 준비 현황 다크 줄
+  // 변수 탭 ＋ 메뉴 → 다크 카드
   await p.click('#tabbtn-variables');
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
-  await recv(p, { ...PREREQ, hasDarkMode: true, darkUnfilled: 0 });
-  await p.click('#btnVarMore');
-  const rd0 = Number((await p.$eval('.ctx-menu button', (e) => e.textContent)).match(/(\d)\/7/)[1]);
-  await p.keyboard.press('Escape');
-  await recv(p, { ...PREREQ, hasDarkMode: true, darkUnfilled: 3 });
-  await p.click('#btnVarMore');
-  const m1 = await p.$eval('.ctx-menu button', (e) => e.textContent);
-  const rd1 = Number(m1.match(/(\d)\/7/)[1]);
-  await p.click('.ctx-menu button >> nth=0');
-  const row = await p.$eval('#readinessPop .pstep[data-step="dark"]', (e) => ({ cls: e.className, dot: e.querySelector('.pdot').textContent, stat: e.querySelector('.pstat').textContent }));
-  check('40 준비 현황 — darkUnfilled 3이면 ✓ 아님 · "Dark 값이 없는 색 3개" · 완료 수에 안 셈', row.dot !== '✓' && row.cls.includes('todo') && row.stat === 'Dark 값이 없는 색 3개' && rd1 === rd0 - 1, JSON.stringify({ row, rd0, rd1 }));
-  await p.keyboard.press('Escape');
   await p.click('#btnAddVar');
   await p.click('.ctx-menu button >> text=다크 모드 만들기…');
   await p.waitForTimeout(50);

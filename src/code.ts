@@ -5,7 +5,7 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, planTsRename, applyTsRename, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, splitDecimalClusters, tsSig } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
@@ -202,21 +202,16 @@ async function postPrereq(): Promise<void> {
     // 거울 폐지 후 바인딩 대상은 3계층 전부 — 역할 없는 값은 Global에 붙는다(bind.ts).
     const bindableIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) > 0).map((c) => c.id));
     const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
-    const hasColorVars = globals.some((v) => v.resolvedType === 'COLOR');
-    const hasScaleVars = globals.some((v) => v.resolvedType !== 'COLOR'); // 간격·크기·폰트
     const hasGlobal = globals.length > 0;
     const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-    // 다크는 플러그인 Global의 모드가 둘 이상 또는 옛 구조(Semantic에 Dark 모드)면 완료 · Dark 값이 없는 색 수(ia-v3 13.7 D-T1).
-    const semanticIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) >= 2).map((c) => c.id));
-    const { hasDarkMode, darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
-    const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0; // 타이포 단계 「기존만 연결」 전제
-    const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId)); // 역할 별칭 존재 = 역할 매핑 완료
+    // Dark 값이 없는 색 수 · 옛 구조(Semantic에 Dark 모드) 여부(ia-v3 13.7 D-T1) — 다크 화면 알림 띠가 읽는다.
+    const { darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
     // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
     const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -565,16 +560,6 @@ function isBindableCandidate(n: SceneNode): boolean {
   const hasGap = !!lm && lm !== 'NONE' && typeof (n as { itemSpacing?: number }).itemSpacing === 'number';
   return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
 }
-/** 노드 필드 또는 fills/strokes/effects 페인트에 변수 바인딩이 하나라도 있는가. */
-function hasAnyBinding(n: SceneNode): boolean {
-  const bv = (n as { boundVariables?: Record<string, unknown> }).boundVariables;
-  if (bv && Object.keys(bv).length) return true;
-  for (const key of ['fills', 'strokes'] as const) {
-    const ps = (n as unknown as Record<string, unknown>)[key];
-    if (Array.isArray(ps) && ps.some((p) => !!(p as { boundVariables?: { color?: unknown } }).boundVariables?.color)) return true;
-  }
-  return false;
-}
 /**
  * 이번 selectionchange가 플러그인 자신이 만든 것인가(스킵 칩 → 레이어 이동).
  * UI는 선택이 바뀌면 바인딩 미리보기를 버리는데, 칩이 그 미리보기에서 나온 것이라
@@ -586,8 +571,6 @@ function postSelection(): void {
   const sel = selection();
   let scanned = 0;
   let bindable = 0;
-  let bound = 0; // 변수가 하나라도 붙은 레이어(준비 현황 '변수 연결 완료')
-  let renamed = 0; // 이름 정리가 역할을 기록한 레이어(준비 현황 '이름 정리 완료')
   let capped = false;
   // 베리언트 분류·누락 조합 생성이 실제로 잡는 것과 같은 기준(최상위 선택만).
   // 분류는 세트에 안 속한 낱개 COMPONENT를, 생성은 COMPONENT_SET을 대상으로 한다.
@@ -604,15 +587,13 @@ function postSelection(): void {
     if (n.visible === false) continue;
     scanned++;
     if (isBindableCandidate(n)) bindable++;
-    if (hasAnyBinding(n)) bound++;
-    if (readRole(n)) renamed++;
     if (n.type === 'INSTANCE') continue; // 인스턴스 내부는 바인딩 대상이 아니다
     if ('children' in n) for (const c of (n as SceneNode & ChildrenMixin).children) stack.push(c as SceneNode);
   }
   // 선택 표시줄 문구(§4.1)와 목록 기준 비교(PR 2)용 — 첫 레이어 이름과 선택 노드 ID.
   const firstName = sel[0]?.name ?? '';
   const ids = sel.map((n) => n.id);
-  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed, firstName, ids });
+  post({ type: 'SELECTION_STATE', count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, firstName, ids });
   selfSelect = false;
 }
 figma.on('selectionchange', postSelection);
@@ -1433,7 +1414,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로
           selfSelect = true; // 선택이 바뀐 게 아니다 — UI가 방금 그린 결과 트리를 지우지 않게
-          postSelection(); // 준비 현황 '변수 연결 완료' 판정 갱신(선택은 그대로라 selectionchange가 안 온다)
+          postSelection(); // 선택 상태 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
         } finally {
           bindLinkRunning = false;
@@ -1562,7 +1543,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }
         if (r.applied) {
           selfSelect = true;
-          postSelection(); // 준비 현황 '이름 정리 완료' 판정 갱신
+          postSelection(); // 선택 상태 갱신(선택은 그대로라 selectionchange가 안 온다)
         }
         break;
       }
@@ -1634,21 +1615,6 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         if (msg.reqId != null) {
           post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
         } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, existing: existingSigs });
-        break;
-      }
-      case 'SCAN_TS_RENAME': {
-        // [이름 다시 짓기] 미리보기(docs/text-style-krds.md §5.2) — 읽기만. 텍스트 스타일 기능과 같은 유료 잠금.
-        if (!requireTextStyles()) break;
-        post({ type: 'TS_RENAME_PLAN', reqId: msg.reqId, rows: await planTsRename() });
-        break;
-      }
-      case 'APPLY_TS_RENAME': {
-        // [이름 다시 짓기] 바꾸기(§5.3) — 이름만 쓴다(글꼴 · 값 없음). 스타일 · 역할 변수 이름을 ⌘Z 한 번으로.
-        if (!requireTextStyles()) break;
-        const r = await applyTsRename(msg.items);
-        post({ type: 'TS_RENAMED', reqId: msg.reqId, ...r });
-        commitUndo(figma);
-        await postPrereq();
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {

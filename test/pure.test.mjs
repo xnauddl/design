@@ -111,7 +111,6 @@ import {
   familyRole,
   suggestTokenRoles,
   mergeTokenRoles,
-  pipelineSteps,
   t,
   scopesForTypeList,
   hexToOklch,
@@ -2197,59 +2196,6 @@ test('mergeTokenRoles — 부분 맵을 덮어쓰되 빠진 카테고리는 자�
   // 덮어쓸 게 없으면 자동 추천 그대로.
   assert.deepEqual(mergeTokenRoles(tokens, 16, {}), suggestTokenRoles(tokens, 16));
   assert.deepEqual(mergeTokenRoles(tokens, 16), suggestTokenRoles(tokens, 16));
-});
-
-/* ================= pipeline.ts (진행 안내 §3) ================= */
-test('pipelineSteps — 전제에 따른 단계 상태', () => {
-  const none = {
-    hasColorVars: false, hasScaleVars: false, hasGlobal: false,
-    hasBindable: false, hasDarkMode: false, hasTextStyles: false,
-  };
-
-  // 순서 = 마법사 순서: 색·토큰·역할·다크·타이포·연결·이름.
-  // 아무것도 없음: 색·토큰=ready(언제든 시작), 역할·연결=blocked(+안내), 다크·타이포=todo, 이름=ready
-  const empty = pipelineSteps(none);
-  assert.deepEqual(empty.map((s) => [s.id, s.status]), [
-    ['colors', 'ready'], ['tokens', 'ready'], ['semantics', 'blocked'],
-    ['dark', 'todo'], ['textStyles', 'todo'], ['bind', 'blocked'], ['rename', 'ready'],
-  ]);
-  assert.ok(empty[2].hint && empty[5].hint); // blocked엔 안내
-
-  // Global만: 색·토큰=done, 역할=ready, 연결=blocked
-  const g = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true });
-  assert.deepEqual(g.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'blocked', 'ready']);
-
-  // 연결 변수까지: 역할·연결 모두 ready(안내 없음)
-  const both = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true });
-  assert.deepEqual(both.map((s) => s.status), ['done', 'done', 'ready', 'todo', 'todo', 'ready', 'ready']);
-  assert.equal(both[2].hint, undefined);
-  assert.equal(both[5].hint, undefined);
-
-  // 다크·텍스트 스타일은 전제가 아니라 '만들었는가' — 있으면 done
-  const made = pipelineSteps({ ...none, hasDarkMode: true, hasTextStyles: true });
-  assert.deepEqual(made.map((s) => s.status).slice(3, 5), ['done', 'done']);
-
-  // 색만 만든 상태: 색=done, 간격·크기=아직 ready, 역할 매핑은 Global이 있으니 ready
-  const colorOnly = pipelineSteps({ ...none, hasColorVars: true, hasGlobal: true });
-  assert.deepEqual(colorOnly.map((s) => s.status), ['done', 'ready', 'ready', 'todo', 'todo', 'blocked', 'ready']);
-
-  // 전체 실행 뒤: 역할 별칭·바인딩·이름 기록이 있으면 역할·연결·이름도 done(예전엔 '준비'로 남았다)
-  const ran = pipelineSteps({ ...none, hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasTextStyles: true, hasSemanticRoles: true, hasBoundNodes: true, hasRenamedNodes: true });
-  assert.deepEqual(ran.map((s) => s.status), ['done', 'done', 'done', 'todo', 'done', 'done', 'done']);
-});
-
-test('pipelineSteps — 다크 줄 세 모습(ia-v4 §4.6 "다크 모드 줄" · ia-v3 A.25)', () => {
-  const none = { hasColorVars: true, hasScaleVars: true, hasGlobal: true, hasBindable: true, hasDarkMode: false, hasTextStyles: false };
-  const dark = (s) => pipelineSteps({ ...none, ...s })[3];
-  // 없음 → todo(상태 글은 "만들기" — hint 없음)
-  assert.deepEqual(dark({}), { id: 'dark', status: 'todo' });
-  // 있음 · 없는 색 0(필드 없음 포함) → done
-  assert.deepEqual(dark({ hasDarkMode: true }), { id: 'dark', status: 'done' });
-  assert.deepEqual(dark({ hasDarkMode: true, darkUnfilled: 0 }), { id: 'dark', status: 'done' });
-  // 있음 · Dark 값이 없는 색 3 → todo + 상태 글 매개
-  const d = dark({ hasDarkMode: true, darkUnfilled: 3 });
-  assert.deepEqual(d, { id: 'dark', status: 'todo', hint: 'pipeline.hint.darkUnfilled', hintParams: { n: 3 } });
-  assert.equal(t(d.hint, d.hintParams), 'Dark 값이 없는 색 3개');
 });
 
 /* ================= i18n.ts (런타임 문자열 외부화) ================= */

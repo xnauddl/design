@@ -27,12 +27,11 @@ import { paletteFamilyOf } from './palette';
 import { resolveGlobalNames, type FileGlobal, type GlobalNameReq, type GlobalNameResult } from './colorName'; // Global 이름 · 덮지 않음(§2.12 12.11)
 import { AUTO_ROLE_KEY, TEXT_STEP_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
 import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
-import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig, isIntegerSize } from './textStyles';
-import { nameKrdsStyles, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
+import { TextSample, TextStyleSpec, ExistingTextStyle, isIntegerSize } from './textStyles';
 import { dsRoleOwner, mergeScopes } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
-import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow, TsRenameRow, TsRenameItem } from '../shared/messages';
+import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow } from '../shared/messages';
 
 export const GLOBAL = 'Global';
 export const SEMANTIC = 'Semantic';
@@ -903,7 +902,7 @@ export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
   return (await figma.getLocalTextStylesAsync()).map(existingOf);
 }
 
-/** 로컬 텍스트 스타일 하나 → 시그니처 매칭 모양(scanExistingTextStyles · 이름 다시 짓기의 `tsSig`가 같은 값을 쓴다). */
+/** 로컬 텍스트 스타일 하나 → 시그니처 매칭 모양(scanExistingTextStyles가 쓴다 — `tsSig`와 같은 값). */
 function existingOf(s: TextStyle): ExistingTextStyle {
   const fontSize = roundN(s.fontSize);
   const lineHeightPercent = lhPctOf(s.lineHeight);
@@ -1107,7 +1106,7 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
   // 대상 이름을 다른 스타일이 이미 쓰면 rename 충돌 — 이름·시맨틱·바인딩을 건드리지 않고 보고만.
   const renameBlocked = new Set<string>(); // boundStyleId (또는 name) 키
   const roleRenames: Array<{ from: string; to: string }> = [];
-  const roleSpecs: TextStyleSpec[] = []; // roleRenames와 같은 순서 — 3단계 뒤 되돌림(§5.3)
+  const roleSpecs: TextStyleSpec[] = []; // roleRenames와 같은 순서 — 3단계 뒤 되돌림(docs/text-style-krds.md §6 "등록 순서")
   for (const spec of specs) {
     const st = anchoredStyle(spec);
     if (!st || st.name === spec.name) continue;
@@ -1118,14 +1117,14 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
       continue;
     }
     // 역할 변수 이름을 함께 바꾸는 것은 옛 규칙 변수(표시 없음 · 이름 = `font-size/{지금 이름}`)에 연결된 스타일만(12.12 N-D2).
-    // 새 규칙 변수(표시 있음)는 여러 스타일이 쓰므로 이름을 바꾸지 않고, 연결도 그대로 둔다(옮겨 연결은 이름 다시 짓기에서만).
+    // 새 규칙 변수(표시 있음)는 여러 스타일이 쓰므로 이름을 바꾸지 않고, 연결도 그대로 둔다(새 단계 변수로 옮겨 연결하지 않는다).
     const fsBound = await styleBoundVar(st, 'fontSize');
     if (!fsBound || textStepOf(fsBound) || fsBound.name !== `font-size/${st.name}`) continue;
     roleRenames.push({ from: st.name, to: spec.name });
     roleSpecs.push(spec);
   }
-  // 역할 변수 이름을 **먼저** 바꾼다 — 3단계가 `font-size/{새 이름}`으로 변수를 찾아 붙이므로(docs/text-style-krds.md §5.3
-  // "두 경로의 순서가 다르다"). 이름 다시 짓기와 같은 공용 함수(직접 만든 변수 · 사용자 컬렉션은 건드리지 않음,
+  // 역할 변수 이름을 **먼저** 바꾼다 — 3단계가 `font-size/{새 이름}`으로 변수를 찾아 붙이므로(docs/text-style-krds.md §6
+  // "등록 순서"). 공용 함수 `renameTextRoleVars`(직접 만든 변수 · 사용자 컬렉션은 건드리지 않음,
   // 최종 집합 밖의 다른 변수와 이름이 겹치면 건너뜀 — 기존 역할 토큰을 스캔 값으로 덮지 않기 위함).
   const roleMoved = roleRenames.length ? (await renameTextRoleVars(roleRenames)).moved : [];
 
@@ -1418,7 +1417,7 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
   }
 
   // 0단계에서 변수 이름을 바꿨는데 3단계에서 그 스타일 이름 바꾸기가 끝나지 않았으면(보류 · 이름을 쓰기 전 오류)
-  // 그 스타일의 변수를 되돌린다 — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게(docs/text-style-krds.md §5.3).
+  // 그 스타일의 변수를 되돌린다 — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게(docs/text-style-krds.md §6 "등록 순서").
   // missFontKeep은 이름을 바꾸므로 여기 걸리지 않는다.
   for (let i = 0; i < roleSpecs.length; i++) {
     const spec = roleSpecs[i];
@@ -1441,8 +1440,8 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
 }
 
 /* ============================================================
-   이름 바꾸기 공용 — 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림(docs/text-style-krds.md §5.3)
-   텍스트 스타일([이름 다시 짓기])과 역할 변수(renameTextRoleVars)가 같은 방식으로 바꾼다.
+   이름 바꾸기 공용 — 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림(docs/text-style-krds.md §6 "등록 순서")
+   역할 변수(renameTextRoleVars — 텍스트 스타일 등록이 쓴다)가 이 방식으로 바꾼다.
    ============================================================ */
 
 /** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 3종(`{종류}/{스타일 이름}`). */
@@ -1538,14 +1537,14 @@ export interface RoleVarRenameResult {
   error: number;
   /** 되돌리지 못한 변수의 지금 이름. */
   stuck: string[];
-  /** 바꾼 변수 id와 그 짝의 순번(pairs 안) — 등록 경로의 되돌림(§5.3)이 쓴다. */
+  /** 바꾼 변수 id와 그 짝의 순번(pairs 안) — 등록 경로의 되돌림(docs/text-style-krds.md §6 "등록 순서")이 쓴다. */
   moved: { id: string; pair: number }[];
 }
 
 /**
  * 역할 변수 `font-size/{from}` · `line-height/{from}` · `letter-spacing/{from}`을 `{to}`로 바꾼다
- * (docs/text-style-krds.md §5.3). 플러그인 Semantic 컬렉션 안에서만 — 사용자 컬렉션 · 직접 만든 변수(`isManualVar`)는
- * 건드리지 않는다. 스타일과 같은 방식(최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 시 되돌림).
+ * (docs/text-style-krds.md §6 "등록 순서"). 플러그인 Semantic 컬렉션 안에서만 — 사용자 컬렉션 · 직접 만든 변수(`isManualVar`)는
+ * 건드리지 않는다. 바꾸는 방식은 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 시 되돌림.
  * `onlyIds`를 주면 그 변수만(등록 경로의 되돌림이 0단계에서 옮긴 변수만 되돌린다).
  */
 export async function renameTextRoleVars(
@@ -1596,187 +1595,6 @@ export async function renameTextRoleVars(
     } else {
       res.error++;
       if (st === 'error-stuck') res.stuck.push(c.v.name);
-    }
-  }
-  return res;
-}
-
-/** 이름 다시 짓기의 스타일 하나 → KRDS 입력(쓰인 횟수를 세지 않는다 — count · uiCount 0, §3.1). */
-function krdsInputOf(s: TextStyle): KrdsInput {
-  const e = existingOf(s);
-  return {
-    id: e.id,
-    name: e.name,
-    fontSize: e.fontSize,
-    lineHeight: e.lineHeight,
-    ...(e.lineHeightPercent ? { lineHeightPercent: e.lineHeightPercent } : {}),
-    letterSpacing: e.letterSpacing,
-    family: e.family,
-    style: e.style,
-    count: 0,
-    uiCount: 0,
-  };
-}
-
-/**
- * [이름 다시 짓기] 미리보기(docs/text-style-krds.md §5.2) — 이 파일의 로컬 텍스트 스타일 전부에 §3을 한 번에 적용한다
- * (앵커 없음, count 0). 대상이 파일의 모든 스타일이고 각자 자기 지금 이름은 예약하지 않으므로(§3.4) 예약 이름은 비어 있다 —
- * 지금 이름끼리의 겹침은 바꾸기의 최종 이름 집합(§5.3)이 맡는다(맞바꿈 A↔B도 된다). 이름이 바뀌는 줄만 돌려준다.
- * 읽기만 한다 — 글꼴을 불러오지 않는다.
- */
-export async function planTsRename(): Promise<TsRenameRow[]> {
-  const styles = await figma.getLocalTextStylesAsync();
-  const steps: string[] = []; // 새 이름의 크기 단계(`sizeKey`) — 바꾸기의 옮겨 연결이 쓴다(12.12 N-D2a)
-  const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: new Set<string>(), path: 'rename', steps });
-  const rows: TsRenameRow[] = [];
-  styles.forEach((s, i) => {
-    const to = names[i];
-    if (!to || to === s.name) return;
-    rows.push({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)), ...(steps[i] ? { step: steps[i] } : {}) });
-  });
-  return rows;
-}
-
-/** TS_RENAMED의 내용(type · reqId 제외). */
-export interface TsRenameResult {
-  results: { id: string; status: string; name: string }[];
-  renamed: number;
-  skipped: number;
-  skipReasons: Record<string, number>;
-  roleVarsRenamed: number;
-  roleVarsTaken: number;
-  roleVarsError: number;
-  roleVarsStuck: string[];
-  /** 새 단계의 변수로 옮겨 연결하지 못한 스타일 수(12.12 N-D2a) · 그 스타일 이름. */
-  roleMoveError: number;
-  roleMoveNames: string[];
-}
-
-/**
- * 새 규칙 변수에 연결된 스타일을 새 크기 단계의 역할 변수로 옮겨 연결한다(12.12 N-D2a). 글꼴을 불러오고(§5.1의 예외),
- * 최종 이름은 placeTextRoleVars(없으면 만듦 · 같은 값이면 재사용 · 다른 값이면 꼬리), 별칭은 같은 값 Global(없으면 createTokens로).
- * 실패하면 throw — 부르는 쪽이 "옮기지 못함"으로 센다(스타일 이름은 되돌리지 않는다).
- */
-async function moveStyleToStep(st: TextStyle, step: string): Promise<void> {
-  await figma.loadFontAsync(st.fontName);
-  const fontSize = roundN(st.fontSize);
-  const lh = lhPxOf(fontSize, st.lineHeight);
-  const ls = lsPxOf(fontSize, st.letterSpacing);
-  const toks: DraftToken[] = [{ name: numberTokenName('font-size', fontSize), category: 'fontSize', value: fontSize, sources: ['fontSize'] }];
-  const reqs: { field: 'fontSize' | 'lineHeight' | 'letterSpacing'; req: TextRoleReq }[] = [{ field: 'fontSize', req: { base: `font-size/${step}`, value: fontSize, step, token: toks[0].name } }];
-  // 줄 높이 · 자간은 등록과 같이 px 정수일 때만(%는 스타일이 보관)
-  if (lh > 0 && lhPctOf(st.lineHeight) === 0 && Number.isInteger(lh)) {
-    const name = numberTokenName('line-height', lh);
-    toks.push({ name, category: 'lineHeight', value: lh, unit: 'px', sources: ['lineHeight'] });
-    reqs.push({ field: 'lineHeight', req: { base: `line-height/${step}`, value: lh, step, token: name } });
-  }
-  if (ls !== 0 && lsPctOf(st.letterSpacing) === 0 && Number.isInteger(ls)) {
-    const name = numberTokenName('letter-spacing', ls);
-    toks.push({ name, category: 'letterSpacing', value: ls, unit: 'px', sources: ['letterSpacing'] });
-    reqs.push({ field: 'letterSpacing', req: { base: `letter-spacing/${step}`, value: ls, step, token: name } });
-  }
-  const made = await createTokens(toks, 16);
-  const allVars = new Map((await figma.variables.getLocalVariablesAsync()).map((v) => [v.id, v]));
-  const placed = await placeTextRoleVars(
-    reqs.map((r) => r.req),
-    (token) => {
-      const id = made.globalOf.get(token);
-      return id ? allVars.get(id) : undefined;
-    },
-  );
-  if (placed.some((p) => !p.v)) throw new Error('no global');
-  reqs.forEach((r, i) => st.setBoundVariable(r.field, placed[i].v as Variable));
-}
-
-/**
- * [이름 다시 짓기] 바꾸기(docs/text-style-krds.md §5.3). 이름만 쓴다 — 글꼴을 불러오지 않고 값을 쓰지 않는다(§5.1 "글꼴").
- * 1) 다시 확인: 지금 이름 ≠ from → 'renamed-meanwhile'(스타일이 없어져도), 시그니처 ≠ sig → 'value-changed'.
- * 2) 최종 이름 집합 고정점 → 'name-taken'. 3) 임시 이름 2단계 · 실패 되돌림(닫힘) → 'error' · 'error-chain' · 'error-stuck'.
- * 4) 'renamed'인 항목의 역할 변수만 `renameTextRoleVars`로(변수 쪽 실패는 스타일 이름을 되돌리지 않는다).
- */
-export async function applyTsRename(items: readonly TsRenameItem[]): Promise<TsRenameResult> {
-  const styles = await figma.getLocalTextStylesAsync();
-  const byId = new Map(styles.map((s) => [s.id, s]));
-  const status = new Map<string, string>();
-  const order: string[] = [];
-  const cands: { key: string; from: string; to: string; st: TextStyle }[] = [];
-  for (const it of items) {
-    if (status.has(it.id)) continue; // 같은 id가 두 번 오면 처음 것만
-    order.push(it.id);
-    const st = byId.get(it.id);
-    if (!st || st.name !== it.from) status.set(it.id, 'renamed-meanwhile');
-    else if (tsSig(existingOf(st)) !== it.sig) status.set(it.id, 'value-changed');
-    else {
-      status.set(it.id, 'pending');
-      cands.push({ key: it.id, from: it.from, to: it.to, st });
-    }
-  }
-  const candIds = new Set(cands.map((c) => c.key));
-  const taken = finalNameTaken(cands, styles.filter((s) => !candIds.has(s.id)).map((s) => s.name));
-  for (const k of taken) status.set(k, 'name-taken');
-  const live = cands.filter((c) => !taken.has(c.key));
-  const done = twoPhaseRename(
-    live.map((c) => ({
-      key: c.key,
-      from: c.from,
-      to: c.to,
-      tmp: `__dsl_tmp_${c.key}`,
-      get: () => c.st.name,
-      set: (n: string) => {
-        c.st.name = n; // 이름 쓰기는 글꼴 없이 된다(ia-v4 §4.3 "글꼴")
-      },
-    })),
-  );
-  for (const [k, v] of done) status.set(k, v);
-
-  const res: TsRenameResult = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] };
-  for (const id of order) {
-    const st = status.get(id) as string;
-    res.results.push({ id, status: st, name: byId.get(id)?.name ?? '' });
-    if (st === 'renamed') res.renamed++;
-    else {
-      res.skipped++;
-      res.skipReasons[st] = (res.skipReasons[st] ?? 0) + 1;
-    }
-  }
-  // 역할 변수(12.12 N-D2): 스타일마다 지금 연결된 글자 크기 변수를 보고 정한다.
-  // 옛 규칙 변수(표시 없음 · 이름 = `font-size/{옛 이름}`) → 변수 이름도 함께 바꿈. 새 규칙 변수(표시 있음) → 크기 단계가 바뀌었으면 옮겨 연결(N-D2a).
-  const stepOf = new Map(items.map((it) => [it.id, it.step]));
-  const pairs: { from: string; to: string }[] = [];
-  const moves: { st: TextStyle; step: string }[] = [];
-  for (const c of live) {
-    if (status.get(c.key) !== 'renamed') continue;
-    let fs: Variable | null = null;
-    try {
-      fs = await styleBoundVar(c.st, 'fontSize');
-    } catch {
-      fs = null;
-    }
-    if (!fs) continue; // 연결 없음 — 아무것도 하지 않는다
-    const mark = textStepOf(fs);
-    const step = stepOf.get(c.key);
-    if (!mark) {
-      if (fs.name === `font-size/${c.from}`) pairs.push({ from: c.from, to: c.to });
-    } else if (step && step !== mark) moves.push({ st: c.st, step });
-  }
-  for (const m of moves) {
-    try {
-      await moveStyleToStep(m.st, m.step);
-    } catch {
-      res.roleMoveError++;
-      res.roleMoveNames.push(m.st.name);
-    }
-  }
-  if (pairs.length) {
-    try {
-      const rv = await renameTextRoleVars(pairs);
-      res.roleVarsRenamed = rv.renamed;
-      res.roleVarsTaken = rv.taken;
-      res.roleVarsError = rv.error;
-      res.roleVarsStuck = rv.stuck;
-    } catch {
-      // 변수 목록을 읽지 못함 — 스타일 이름은 그대로 두고(§5.3) 짝마다 하나씩 오류로 센다.
-      res.roleVarsError = pairs.length;
     }
   }
   return res;
