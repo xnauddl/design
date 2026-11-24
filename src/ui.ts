@@ -3811,7 +3811,7 @@ function renderMakeResults(): void {
   box.appendChild(top);
   for (const r of mkResults ?? []) {
     const row = document.createElement('div');
-    row.className = 'tr tr-head';
+    row.className = 'tr tr-head mk-res';
     const mark = document.createElement('span');
     mark.className = 'tr-car';
     mark.style.color = r.mark === 'ok' ? 'var(--ok)' : r.mark === 'warn' ? 'var(--warn)' : 'var(--text-2)';

@@ -2610,6 +2610,37 @@ async function fillBoth(p) {
   const after = await p.evaluate(() => Array.from(document.querySelectorAll('#colorCard button.primary, #createCard button.primary')).map((b) => b.id).join(','));
   check('25 마법사 단계 오류 → 만들기 화면 결과에 실패 · 카드 상태 자리에 오류 상자 없음 · 카드 primary 그대로', (await visible(p, '#makeResults')) && res.length > 0 && (await p.$$('.status .ux.danger')).length === 0 && before === after, JSON.stringify({ res, before, after }));
   await p.close();
+  {
+    // 긴 오류 글(Figma 연결 끊김 등) — 단계 이름이 밀려 사라지지 않고, 글은 줄바꿈해 카드 밖으로 나가지 않는다(ia-v4 §4.3 "일부 실패 · 건너뜀")
+    const q = await open(400, 'select');
+    await recv(q, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(q, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(q, { ...sel(1, 0), ids: ['w2'] });
+    await goSub(q, 'make');
+    await q.waitForTimeout(30);
+    const ex2 = (await sent(q, 'EXTRACT')).at(-1);
+    await recv(q, { type: 'EXTRACT_RESULT', reqId: ex2.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+    await recv(q, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(q, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+    await q.waitForTimeout(30);
+    await recv(q, { type: 'CREATE_RESULT', reqId: (await sent(q, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+    await q.waitForTimeout(30);
+    await q.click('#btnMakeRun');
+    await q.waitForTimeout(30);
+    const cr2 = (await sent(q, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+    await recv(q, { type: 'ERROR', message: 'Unable to establish connection to Figma after 10 seconds. Please check your internet connection and try again later.', op: 'CREATE_TOKENS', reqId: cr2.reqId });
+    await q.waitForTimeout(80);
+    const m = await q.evaluate(() => {
+      const box = document.getElementById('makeResults');
+      const row = Array.from(box.querySelectorAll('.tr-head.mk-res')).find((r) => r.textContent.includes('Unable'));
+      if (!row) return null;
+      const nm = row.querySelector('.tr-name').getBoundingClientRect();
+      const tx = row.querySelector('.tr-cnt').getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      return { name: row.querySelector('.tr-name').textContent, nameW: nm.width, txRight: tx.right, boxRight: b.right, txH: tx.height, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    });
+    check('25b 긴 오류 글 — 단계 이름 보임 · 글 줄바꿈 · 카드 밖으로 안 나감 · 가로 스크롤 없음', !!m && m.name === '만들기' && m.nameW > 20 && m.txRight <= m.boxRight + 0.5 && m.txH > 20 && !m.overflow, JSON.stringify(m));
+    await q.close();
+  }
 }
 
 {
