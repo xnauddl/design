@@ -532,6 +532,17 @@ test('⑧ tabCellMatches — 글자 · 폭만 다르면 참, 테마 색 · 패�
   assert.equal(tabCellMatches(c(), c({ cornerRadius: 24 })), false, '칸 모서리(C-D21)');
 });
 
+test('C-D32 tabCellMatches — 원본 칸의 아이콘 자리가 아이콘 인스턴스(iconMain)여도 날 벡터 · 아이콘 프레임 칸과 맞다(아이콘 차) · 아이콘이 아닌 인스턴스는 가른다', () => {
+  const cell = (icon) => ({ id: 'c', name: 'cell', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 40, cornerRadius: 20, fillHex: '#3d5fdb', fills: visible,
+    paddingLeft: 16, paddingRight: 16, children: [icon, text('ct', 'Home', '#ffffff')] });
+  const vec = (key) => ({ id: 'v', name: 'Vector', type: 'VECTOR', width: 12, height: 12, vectorKey: key });
+  const inst = (o) => ({ id: 'i', name: 'Vector', type: 'INSTANCE', width: 12, height: 12, mainComponentKey: 'k1', ...o });
+  assert.equal(tabCellMatches(cell(inst({ iconMain: true })), cell(vec('b'))), true, '아이콘 인스턴스 ↔ 날 벡터(그림 다름)');
+  assert.equal(tabCellMatches(cell(inst({ iconMain: true })), cell({ id: 'f', name: 'icon', type: 'FRAME', width: 16, height: 16, iconFrame: true, vectorKey: 'f:1', children: [] })), true, '↔ 아이콘 프레임');
+  assert.equal(tabCellMatches(cell(inst({})), cell(vec('b'))), false, '아이콘이 아닌 인스턴스 ↔ 날 벡터');
+  assert.equal(tabCellMatches(cell(inst({ iconMain: true })), cell({ ...vec('b'), visible: false })), false, '보이기가 다르면 가른다');
+});
+
 test('⑨ resolvePlanNames — Tab Item · Tab Bar, 문서에 있으면 -{Style}(C-D27), 이름 그룹 "Tab"과 같이 있어도 겹치지 않음', () => {
   const tabNamed = (id) => ({ id, name: 'Tab', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 32, cornerRadius: 4, fillHex: '#ffffff', fills: visible, children: [text(`${id}t`, 'Go')] });
   const groups = planRegisterGroups([tabNamed('x'), menuN('m', 5)], noAncestors);

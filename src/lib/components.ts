@@ -2266,12 +2266,26 @@ const visibleKids = (n: StructNode): StructNode[] => (n.children ?? []).filter((
 
 /**
  * 칸 맞추기(§4.7 "묶기" 2번 — 2026-11-19 명세 규칙 ④): 가족을 가르는 차 · 색 차(루트 채움 · 안쪽 · 글자 색) · 여백 · 간격 차가
- * 모두 없고 칸 모양(색 · 굵기 · 밑줄 · 막대)이 같으면 참. 글자 · 아이콘 · 크기 차는 괜찮다.
+ * 모두 없고 칸 모양(색 · 굵기 · 밑줄 · 막대)이 같으면 참. 글자 · 아이콘 · 크기 차는 괜찮다 — 아이콘 인스턴스 ↔ 날 벡터 · 아이콘 프레임도
+ * 아이콘 차다(C-D32 — `iconInstAsArt`).
  */
 export function tabCellMatches(orig: StructNode, cell: StructNode): boolean {
-  const d = pairDiff(orig, cell);
+  const a = iconInstAsArt(orig);
+  const b = iconInstAsArt(cell);
+  const d = pairDiff(a, b);
   if (d.split || d.rootFill || d.colorPaths.length || d.rootPad || d.innerPad) return false;
-  return tabCellLook(orig as LikeNode) === tabCellLook(cell as LikeNode);
+  return tabCellLook(a as LikeNode) === tabCellLook(b as LikeNode);
+}
+
+/**
+ * 칸 맞추기 전용(§4.7 "묶기" 2번 C-D32) — 칸 안의 아이콘 인스턴스(`iconMain`)를 그림 슬롯(아이콘 프레임 자리 — `pairDiff` 그림 슬롯 갈래, 채움 · 크기는 보지 않음)으로 읽는다. 재사용 Tab Item
+ * 변형의 아이콘 자리는 아이콘 인스턴스라, 날 벡터 · 아이콘 프레임 칸과 타입 차(가족을 가르는 차)가 아니라 아이콘 차로 보게 한다.
+ * 가족 판정 · 탭 판정 등 다른 곳은 그대로다. 그림 지문은 `icon:{메인 키}`(날 벡터 지문과 늘 다르다 — 아이콘 차일 뿐이라 괜찮다).
+ */
+function iconInstAsArt(n: StructNode): StructNode {
+  if (n.type === 'INSTANCE') return n.iconMain ? { ...n, type: 'FRAME', iconFrame: true, children: [], vectorKey: `icon:${n.mainComponentKey ?? ''}` } : n;
+  if (!n.children?.length) return n;
+  return { ...n, children: n.children.map(iconInstAsArt) };
 }
 
 /** 바 루트 맞추기 — 보이는 칸 수가 같고 바 루트끼리 채움 · 여백 · 간격 · 테두리 유무 · 모서리 값이 같다(크기 차는 괜찮다 — C-D21). */
