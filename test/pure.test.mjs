@@ -3855,18 +3855,20 @@ test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 �
 });
 
 /* ---- 끈 값 키(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35) ---- */
-test('B.35 tokenOffKey · slotOffKey — 색 · 반투명 · 그림자 색 · 간격 · 알약 반경 · 글꼴 · 소수 반올림이 같은 키', async () => {
+test('B.35 tokenOffKey · slotOffKey — 색(칠 · 선 · 그림자 한 종류) · 반투명 · 간격 · 알약 반경(9999 줄) · 글꼴 · 소수 반올림이 같은 키', async () => {
   const { tokenOffKey, slotOffKey } = await import('../dist/pure.mjs');
   assert.equal(tokenOffKey({ category: 'color', value: '#333333' }), 'color|#333333');
   assert.equal(slotOffKey('fills', 'color', '#333333'), 'color|#333333');
   assert.equal(slotOffKey('strokes', 'color', '#333333'), 'color|#333333');
   assert.equal(tokenOffKey({ category: 'color', value: '#000000', alpha: 0.08 }), slotOffKey('fills', 'color', '#000000@0.08'));
   assert.equal(tokenOffKey({ category: 'effectColor', value: '#000000', alpha: 0.25 }), slotOffKey('effects', 'color', '#000000@0.25'));
-  assert.notEqual(slotOffKey('effects', 'color', '#333333'), tokenOffKey({ category: 'color', value: '#333333' }), '그림자 색은 칠 색과 다른 줄');
+  assert.equal(slotOffKey('effects', 'color', '#333333'), tokenOffKey({ category: 'color', value: '#333333' }), '그림자 색도 색 키 하나 — 만들기가 같은 이름의 칠 · 그림자 색을 한 줄(color)로 합친다(1회차 검토 R1-1)');
+  assert.equal(tokenOffKey({ category: 'effectColor', value: '#333333' }), 'color|#333333', '그림자만 쓰는 색 줄도 color 키');
   assert.equal(tokenOffKey({ category: 'gap', value: 8 }), slotOffKey('itemSpacing', 'num', 8));
   assert.equal(tokenOffKey({ category: 'gap', value: 8 }), slotOffKey('paddingLeft', 'num', 8));
   assert.equal(tokenOffKey({ category: 'radius', value: 4 }), slotOffKey('topLeftRadius', 'num', 4));
   assert.equal(tokenOffKey({ category: 'radius', value: 9999 }), slotOffKey('topLeftRadius', 'num', 24, 9999), '알약 반경 자리는 9999');
+  assert.notEqual(tokenOffKey({ category: 'radius', value: 24 }), slotOffKey('topLeftRadius', 'num', 24, 9999), '알약 자리는 원래 값(24) 줄과 상관없다');
   assert.equal(tokenOffKey({ category: 'strokeWidth', value: 1 }), slotOffKey('strokeTopWeight', 'num', 1));
   assert.equal(tokenOffKey({ category: 'size', value: 24 }), slotOffKey('width', 'num', 24));
   assert.equal(tokenOffKey({ category: 'fontFamily', value: 'Inter' }), slotOffKey('fontFamily', 'text', 'Inter'));

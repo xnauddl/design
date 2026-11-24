@@ -9724,8 +9724,46 @@ test('B.35 code.ts APPLY excludeValues — 실제 연결만 넘기고 찾기(pre
   registerNodes(figma, [root, b]);
   let out = await p.send({ type: 'APPLY', preview: true, nodeIds: ['root'], reqId: 1, excludeValues: ['color|#333333'] });
   assert.equal(ofType(out, 'APPLY_RESULT')[0].reasons['make-off'] ?? 0, 0, '찾기는 빼지 않는다');
-  out = await p.send({ type: 'APPLY', preview: false, nodeIds: ['root'], reqId: 2, excludeValues: ['color|#333333'] });
+  out = await p.send({ type: 'APPLY', preview: false, nodeIds: ['root'], reqId: 2, skipTextStyleNodes: true, excludeValues: ['color|#333333'] }); // skipTextStyleNodes와 함께(1회차 검토 R1-10 ⑤)
   const r = ofType(out, 'APPLY_RESULT')[0];
   assert.equal(r.reasons['make-off'], 1);
   assert.equal(b.fills[0].boundVariables, undefined);
+});
+
+test('B.35 합친 색 줄(칠 · 그림자 같은 #333333)을 끄면 그림자도 붙이지 않는다(1회차 검토 R1-1)', async () => {
+  installFigma();
+  await createTokens([
+    { name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' },
+    { name: 'color/gray/800-fx', category: 'effectColor', sources: ['effectColor'], value: '#333333' },
+  ], 16);
+  const { tokenOffKey } = await import('../dist/pure.mjs');
+  // 만들기 화면은 같은 이름을 한 줄(category color)로 합친다 — 그 줄의 키
+  const off = new Set([tokenOffKey({ category: 'color', value: '#333333' })]);
+  const node = {
+    ...greyFrame('fx'),
+    effects: [{ type: 'DROP_SHADOW', color: { r: 0.2, g: 0.2, b: 0.2, a: 1 }, offset: { x: 0, y: 1 }, radius: 0, visible: true }],
+  };
+  const res = await bindSelection([node], true, {}, { noNewRoles: true, excludeValue: off });
+  assert.equal(res.bound, 0);
+  assert.equal(res.reasons['make-off'], 2, '칠 · 그림자 모두 make-off');
+  assert.equal(node.fills[0].boundVariables, undefined);
+  assert.equal(node.effects[0].boundVariables, undefined, '그림자도 붙이지 않음');
+});
+
+test('B.35 유료 경로 — 꺼진 값은 새 Semantic을 만들지 않고 붙이지 않는다(1회차 검토 R1-10 ①)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' }], 16);
+  const before = figma._state.variables.length;
+  const node = greyFrame('paid');
+  const res = await bindSelection([node], true, {}, { excludeValue: new Set(['color|#333333']) });
+  assert.equal(res.bound, 0);
+  assert.equal(res.reasons['make-off'], 1);
+  assert.ok(!res.newRoles, '새 Semantic 꼬리 없음');
+  assert.equal(figma._state.variables.length, before, '변수가 늘지 않음');
+  assert.equal(node.fills[0].boundVariables, undefined);
+  // 빼지 않으면 유료는 지금처럼 새 Semantic을 만들어 붙인다
+  const node2 = greyFrame('paid2');
+  const on = await bindSelection([node2], true, {});
+  assert.equal(on.bound, 1);
+  assert.ok(node2.fills[0].boundVariables);
 });

@@ -3382,6 +3382,8 @@ function mkRecalcOffByLib(): void {
 }
 const mkGlobalsOn = (): DraftToken[] => mkTokens.filter(mkIsOn);
 const mkSendTokens = (): DraftToken[] => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
+/** 만들기 실행의 연결 단계에서 뺄 값 키 — 꺼진 모습인 줄 모두(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35). */
+const mkExcludeValues = (): string[] => [...new Set(mkTokens.filter((tk) => !mkIsOn(tk)).map(tokenOffKey))];
 const mkTsName = (s: TextStyleSpec): string => mkTsNames.get(tsSig(s)) ?? s.name;
 const mkTsOnList = (): TextStyleSpec[] => (isPaid ? mkTs.filter((s) => mkTsOn.has(tsSig(s))) : []);
 const mkReady = (): boolean => !!baseline && mkFor === baseKey() && !mkReading && (!isPaid || (mkTsFor === baseKey() && !mkTsReading));
@@ -3943,8 +3945,8 @@ async function runMake(): Promise<void> {
       } else if (id === 'bind') {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
-        // 꺼진 줄(사용자가 끈 줄 · 기본 끔 — 잠긴 줄은 빼지 않음)의 값은 연결하지 않는다(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35).
-        const excludeValues = [...new Set(mkTokens.filter((tk) => !mkIsOn(tk) && !mkLocked(tk)).map(tokenOffKey))];
+        // 꺼진 모습인 줄 모두(사용자가 끈 줄 · 기본 끔 · 잠긴 줄 — "화면에 보이는 그대로")의 값은 연결하지 않는다(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35).
+        const excludeValues = mkExcludeValues();
         const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, ...(excludeValues.length ? { excludeValues } : {}) }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
         totals.bound = r.bound;
         mkMainsDone.push(...(r.mainsBound ?? []));

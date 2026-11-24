@@ -1873,7 +1873,7 @@
   var FIELD_CATEGORY = {
     fills: "color",
     strokes: "color",
-    effects: "effectColor",
+    effects: "color",
     itemSpacing: "gap",
     counterAxisSpacing: "gap",
     paddingLeft: "gap",
@@ -1898,8 +1898,7 @@
     fontSize: "fontSize",
     lineHeight: "lineHeight",
     letterSpacing: "letterSpacing",
-    fontFamily: "fontFamily",
-    fontWeight: "fontWeight"
+    fontFamily: "fontFamily"
   };
   function slotOffKey(field, kind, value, pill) {
     const category = FIELD_CATEGORY[field];

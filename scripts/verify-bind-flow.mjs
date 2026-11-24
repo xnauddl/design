@@ -1425,6 +1425,38 @@ async function saveAndGet(p) {
   await p.close();
 }
 {
+  // B.35 끈 값은 연결도 안 함 — 사용자가 끈 줄(spacing/8) · 잠긴 줄(직접 만든 변수 spacing/4)의 값 키가 연결 요청에 실리고, 끈 값만 남으면 ✓(bindAllOff)
+  const p = await open(560, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w2c'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [
+    { name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 2 },
+    { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing'], count: 2 },
+    { name: 'spacing/4', category: 'gap', value: 4, sources: ['itemSpacing'], count: 2 },
+  ] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 2, updated: 0, summary: '', roles: 0, skippedManual: 1, tokenStates: { 'spacing/16': { state: 'new' }, 'spacing/8': { state: 'new' }, 'spacing/4': { state: 'manual' } }, roleRows: [] });
+  await p.waitForTimeout(40);
+  await p.$eval('#makeTree [data-tkey="g:spacing/8"]', (e) => e.scrollIntoView({ block: 'center' }));
+  await p.click('#makeTree [data-tkey="g:spacing/8"] > .bv-switch');
+  await p.waitForTimeout(30);
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 1 });
+  await p.waitForTimeout(60);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  check('B.35 연결 요청 — 사용자가 끈 줄(gap|8) · 잠긴 줄(gap|4)의 키 · 켠 줄(gap|16)은 없음 · skipTextStyleNodes 그대로', !!ap && JSON.stringify([...(ap.excludeValues ?? [])].sort()) === JSON.stringify(['gap|4', 'gap|8']) && ap.skipTextStyleNodes === true, JSON.stringify(ap));
+  await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 2, reasons: { 'make-off': 2 }, preview: false, reqId: ap.reqId });
+  await p.waitForTimeout(80);
+  check('B.35 연결 0곳 · 남은 곳은 끈 값(make-off) → ✓ · 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
+  await p.close();
+}
+{
   const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
