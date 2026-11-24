@@ -9,7 +9,7 @@ import { tshirtRoles } from './roles';
 import { classifyColor } from './colorName';
 import { highConfidenceComponentRole, isHighConfidenceComponent, parseHeadingSlots, tabInfo, isIconFrame, tabCellLook } from './componentLike';
 import type { LikeNode, PaintLike, EffectLike, TabInfo, TabStyle } from './componentLike';
-import { VECTOR_TYPES } from './nodePaint'; // 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다
+import { VECTOR_TYPES, hasVisibleFill, hasVisibleStroke } from './nodePaint'; // 경로 데이터를 비교할 수 없는 도형 타입 — 지문(`vectorKey`)으로 본다
 
 /** 알려진 속성 어휘 — 값 → 속성명 추론. */
 const STATES = new Set(['default', 'hover', 'pressed', 'focus', 'active', 'disabled', 'loading']);
@@ -277,7 +277,7 @@ export function inferComponentProperties(
         seenTextContent.add(contentKey);
       }
       out.push({
-        propName: uniq(pascalCase(l.name) || 'Text'),
+        propName: uniq(textPropBaseName(l)), // C-D24 — 이름이 글자 내용과 같으면 `Text`
         type: 'TEXT',
         layerName: l.name,
         layerPath: l.path,
@@ -997,6 +997,10 @@ export interface StructNode extends ScanNode {
      둥근 모서리·채움·그림자로 알아보는 역할이 통째로 검출되지 않는다. */
   cornerRadius?: number | symbol;
   topLeftRadius?: number;
+  /** 섞인 모서리(`figma.mixed`)일 때 네 모서리를 견준다(§4.7 "묶기" 4번 C-D21). */
+  topRightRadius?: number;
+  bottomRightRadius?: number;
+  bottomLeftRadius?: number;
   opacity?: number;
   gridRowCount?: number;
   gridColumnCount?: number;
@@ -1650,6 +1654,8 @@ export interface ReuseCandidate {
   id: string;
   key: string;
   setId: string | null;
+  /** 든 세트의 변형 수(세트 노드의 COMPONENT 자식 수 — 키가 없는 변형도 센다, C-D25). 모르면 없음. */
+  setSize?: number;
 }
 
 /** 키 맞추기 결과 — ids: 멤버마다 쓸 컴포넌트 id(재사용하지 않으면 null). keepKey: 새로 만들 때 키를 남기나. */
@@ -1699,9 +1705,13 @@ export function matchReuse(
     return result(hit.length, () => Array.from({ length: memberCount }, () => hit[0].id));
   }
   // 세트마다: 멤버별로 그 세트 안에서 센 변형이 정확히 하나씩이면 그 세트는 모든 멤버를 덮는다.
+  // 세트의 변형 수가 이번 가족의 서로 다른 키 수와 같을 때만(2026-11-24 C-D25 — 변형이 더 많은 섞인 세트는 덮지 않는다).
   const setIds = [...new Set(comps.map((c) => c.setId).filter((id): id is string => !!id))];
+  const distinctKeys = new Set(plan.keys).size;
   const covering: { item: string[]; grade: PairGrade }[] = [];
   for (const setId of setIds) {
+    const size = comps.find((c) => c.setId === setId && c.setSize != null)?.setSize;
+    if (size != null && size !== distinctKeys) continue;
     const picked: string[] = [];
     let setGrade: PairGrade = 'strict';
     for (let k = 0; k < memberCount; k++) {
@@ -1720,7 +1730,7 @@ export function matchReuse(
 }
 
 /**
- * 탭 그룹 재사용 판정(§4.7 "묶기" 7번 — 탭 그룹 전체가 한 번에). ① Tab Item: 모든 `itemKeys`가 한 세트 안에 짝이 맞는 변형
+ * 탭 그룹 재사용 판정(§4.7 "묶기" 7번 — 2026-11-23 C-D20 뒤 Style 그룹마다 한 번에). ① Tab Item: 모든 `itemKeys`가 한 세트 안에 짝이 맞는 변형
  * 정확히 하나씩인 세트가 정확히 하나면 재사용(`matchReuse` 세트 단위와 같은 셈) ② Tab Bar: ①을 재사용할 때만 — 모든 `barKeys`가
  * 한 세트(키가 하나면 단독 컴포넌트도) 안에 정확히 하나씩이고 `barOk(변형 id, Tab Item 세트 id)`(칸이 모두 그 세트의 인스턴스 ·
  * 칸 수 같음)를 통과하면 재사용. 결과: 계획 순서의 컴포넌트 id(재사용하지 않으면 null)와 새로 만들 때 키를 남기나.
@@ -1737,8 +1747,16 @@ export function matchTabReuse(
     const groups: (string | null)[] = [...new Set(comps.map((c) => c.setId))];
     const covering: { item: string[]; grade: PairGrade }[] = [];
     for (const setId of groups) {
-      // 세트 밖 컴포넌트는 키가 하나일 때(Style 하나 — Tab Bar 단독)만 저마다 한 무리
-      const pools = setId ? [comps.filter((c) => c.setId === setId)] : allowSingle && keys.length === 1 ? comps.filter((c) => !c.setId).map((c) => [c]) : [];
+      // Tab Item: 세트의 변형이 그 키들뿐인 세트만(C-D20 "그 둘뿐" — 6-1b의 여러 Style 섞인 세트는 재사용하지 않는다).
+      // Tab Bar: 세트 밖 단독 컴포넌트만(6-1b의 `Tab Bar` 세트 안 변형은 재사용하지 않는다).
+      let pools: ReuseCandidate[][] = [];
+      if (setId) {
+        const pool = comps.filter((c) => c.setId === setId);
+        const size = pool.find((c) => c.setSize != null)?.setSize;
+        if (kind === 'item' && (size == null || size === keys.length)) pools = [pool];
+      } else if (allowSingle && keys.length === 1) {
+        pools = comps.filter((c) => !c.setId).map((c) => [c]);
+      }
       for (const pool of pools) {
         const picked: string[] = [];
         let g: PairGrade = 'strict';
@@ -1782,6 +1800,9 @@ export function reusePairCheck(
   const isVec = (n: StructNode) => VECTOR_TYPES.has(n.type) || !!n.iconFrame;
   const vecDiff = (x: StructNode, y: StructNode) => isVec(x) && isVec(y) && (x.vectorKey ?? '') !== (y.vectorKey ?? '');
   if (vecDiff(a, b)) return { issue: '/', viaIcon };
+  // 테두리 유무 · 모서리 값이 다르면 짝이 맞지 않는다(2026-11-23 C-D21 — `pairDiff`와 같은 비교, 키는 바꾸지 않음).
+  const edgeBad = (x: StructNode, y: StructNode): boolean => x.type !== 'TEXT' && !isVec(x) && !isVec(y) && edgeSig(x) !== edgeSig(y);
+  if (edgeBad(a, b)) return { issue: '/', viaIcon };
   const walk = (x: StructNode, y: StructNode, path: string): string | null => {
     const xs = x.children ?? [];
     const ys = y.children ?? [];
@@ -1804,6 +1825,7 @@ export function reusePairCheck(
       }
       if (xa.type !== yb.type) return p;
       if (vecDiff(xa, yb)) return p;
+      if (edgeBad(xa, yb)) return p;
       const deeper = walk(xa, yb, p);
       if (deeper) return deeper;
     }
@@ -1860,12 +1882,21 @@ export interface PlanGroup extends StructGroup {
   /** 원래 이름 그룹 전체 멤버 — 기본 이름(`componentBaseName`)을 가족 사이에 같게 하려고. */
   nameMembers: StructNode[];
   subfamilies: Subfamily[];
+  /** 버튼 · 칩 한 세트(C-D28)일 때 가족마다의 소가족(가족 문서 순 — `subfamilies`는 이것을 이어 붙인 것). */
+  families?: Subfamily[][];
+  /** 버튼 · 칩 이름 그룹의 여러 가족을 한 세트로 합쳤나(C-D28 — 글자 속성 대체 찾기). */
+  mixed?: boolean;
+  /** 지금 규칙(`deriveVariants` — heading 등) 소가족인가(C-D31 빈 변형을 알리지 않는다). */
+  legacy?: boolean;
 }
 
+/** 탭 그룹 키의 앞부분 — 그룹 키는 Style마다 `role:tab:{Style}`(2026-11-23 C-D20). */
 export const TAB_GROUP_KEY = 'role:tab';
 
 interface PairDiff {
   split: boolean;
+  /** 루트의 테두리 유무 · 모서리 값이 다름(C-D21 — 바 루트 맞추기가 쓴다). */
+  rootEdge: boolean;
   content: boolean;
   colorPaths: string[];
   rootFill: boolean;
@@ -1874,6 +1905,16 @@ interface PairDiff {
   rootPad: boolean;
   innerPad: boolean;
 }
+
+const r2s = (v: number | undefined): string => String(Math.round((v ?? 0) * 100) / 100);
+/** 모서리 값 서명 — 숫자면 그 값, 섞였으면 네 모서리(왼위 · 오른위 · 오른아래 · 왼아래). */
+function radiusSig(n: StructNode): string {
+  if (typeof n.cornerRadius === 'number') return r2s(n.cornerRadius);
+  const c = [n.topLeftRadius, n.topRightRadius, n.bottomRightRadius, n.bottomLeftRadius];
+  return c.some((v) => typeof v === 'number') ? c.map(r2s).join('-') : '0';
+}
+/** 테두리 유무 + 모서리 값(C-D21). 선 색 · 두께는 보지 않는다. */
+const edgeSig = (n: StructNode): string => `${hasVisibleStroke(n) ? 's' : ''}|${radiusSig(n)}`;
 
 const padOf = (n: StructNode): string =>
   [n.paddingTop ?? 0, n.paddingRight ?? 0, n.paddingBottom ?? 0, n.paddingLeft ?? 0, n.itemSpacing ?? 0, n.counterAxisSpacing ?? 0].join(',');
@@ -1884,7 +1925,7 @@ const padOf = (n: StructNode): string =>
  * 내용 차(`content`) — 글자 · 안쪽 인스턴스 · `?` 보이기 · 그림(사진 · 날 벡터 · 아이콘 프레임).
  */
 function pairDiff(a: StructNode, b: StructNode, family = true): PairDiff {
-  const d: PairDiff = { split: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
+  const d: PairDiff = { split: false, rootEdge: false, content: false, colorPaths: [], rootFill: false, rootSize: false, innerSize: false, rootPad: false, innerPad: false };
   const isArt = (n: StructNode) => !!n.iconFrame || VECTOR_TYPES.has(n.type);
   const walk = (x: StructNode, y: StructNode, path: string): void => {
     if (d.split) return;
@@ -1930,6 +1971,12 @@ function pairDiff(a: StructNode, b: StructNode, family = true): PairDiff {
       else { d.split = true; return; }
     }
     if ((x.layoutMode ?? 'NONE') !== (y.layoutMode ?? 'NONE')) { d.split = true; return; }
+    // 테두리 유무 · 모서리 값(2026-11-23 C-D21) — 날 벡터는 선이 그림의 일부라 보지 않는다.
+    if (!VECTOR_TYPES.has(x.type) && edgeSig(x) !== edgeSig(y)) {
+      if (path === '') d.rootEdge = true;
+      d.split = true;
+      return;
+    }
     if ((x.fillHex ?? null) !== (y.fillHex ?? null)) {
       if (path === '') d.rootFill = true;
       else d.colorPaths.push(path);
@@ -1993,7 +2040,7 @@ function innerSig(root: StructNode, pick: (n: StructNode) => string): string {
 }
 
 /** 구조 가족 나누기 — 입력 순서대로 첫 멤버와 비교(§4.7 "묶기" 4번). */
-function splitFamilies(members: readonly StructNode[]): StructNode[][] {
+export function splitFamilies(members: readonly StructNode[]): StructNode[][] {
   const fams: StructNode[][] = [];
   for (const m of members) {
     const f = fams.find((x) => !pairDiff(x[0], m).split);
@@ -2023,11 +2070,9 @@ function colorRefPath(fam: readonly StructNode[]): { ref: string | null; others:
 
 const colorAt = (m: StructNode, path: string): string => (path === '' ? m.fillHex ?? '' : nodeAtStructPath(m, path)?.fillHex ?? '');
 
-/** 함께 바뀜 검사(5번 2단계) — 어긋나면 (기준 색 × 다른 노드 색) 조합으로 가족을 더 나눈다. */
-function splitByColorConsistency(fam: StructNode[]): StructNode[][] {
-  const { ref, others } = colorRefPath(fam);
-  if (ref == null || !others.length) return [fam];
-  const ok = others.every((p) => {
+/** 함께 바뀜 검사(5번 2단계) — 기준 색이 같은 멤버끼리 다른 노드 색도 같은가. */
+function colorConsistent(fam: readonly StructNode[], ref: string, others: readonly string[]): boolean {
+  return others.every((p) => {
     const map = new Map<string, string>();
     for (const m of fam) {
       const r = colorAt(m, ref);
@@ -2037,7 +2082,13 @@ function splitByColorConsistency(fam: StructNode[]): StructNode[][] {
     }
     return true;
   });
-  if (ok) return [fam];
+}
+
+/** 함께 바뀜 검사(5번 2단계) — 어긋나면 (기준 색 × 다른 노드 색) 조합으로 가족을 더 나눈다. */
+function splitByColorConsistency(fam: StructNode[]): StructNode[][] {
+  const { ref, others } = colorRefPath(fam);
+  if (ref == null || !others.length) return [fam];
+  if (colorConsistent(fam, ref, others)) return [fam];
   const parts = new Map<string, StructNode[]>();
   for (const m of fam) {
     const sig = [ref, ...others].map((p) => colorAt(m, p)).join('|');
@@ -2126,11 +2177,17 @@ function assignSizeAxis(subs: Subfamily[], sizeKey: (m: StructNode) => string, c
   for (const s of subs) s.props.Size = byKey.get(sizeKey(s.members[s.master]))!;
 }
 
-/** 가족 하나의 소가족(§4.7 "묶기" 5번 3단계 · 축). */
-function familySubfamilies(fam: StructNode[]): Subfamily[] {
+/**
+ * 가족 하나의 소가족(§4.7 "묶기" 5번 3단계 · 축). `concatColor`(버튼 · 칩 이름 그룹 — 2026-11-24 C-D30): 함께 바뀜 검사에
+ * 걸려도 가족을 나누지 않고(부르는 쪽이 `splitByColorConsistency`를 쓰지 않음) Color 값을 갈리는 색 이름을 경로 순서로 이어 붙인다.
+ */
+function familySubfamilies(fam: StructNode[], concatColor = false): Subfamily[] {
   if (fam.length === 1) return [{ members: fam, master: 0, props: {} }];
   const content = fam.some((m, i) => i > 0 && pairDiff(fam[0], m).content);
-  const { ref } = colorRefPath(fam);
+  const { ref, others } = colorRefPath(fam);
+  const concat = concatColor && ref != null && others.length > 0 && !colorConsistent(fam, ref, others);
+  const colorPaths: string[] = ref == null ? [] : concat ? [ref, ...[...others].sort(comparePath)] : [ref];
+  const colorVal = (m: StructNode): string => colorPaths.map((p) => colorAt(m, p)).join('|');
   /** 소가족 열쇠에서 Color 값을 뺀 나머지 — 같은 것끼리 같은 Size 값(2026-11-18 C-D16). */
   const sizeKey = (m: StructNode): string => [
     content ? '' : `${m.width ?? 0}x${m.height ?? 0}`,
@@ -2138,11 +2195,14 @@ function familySubfamilies(fam: StructNode[]): Subfamily[] {
     innerSig(m, padOf),
     content ? '' : innerSig(m, (n) => `${n.width ?? 0}x${n.height ?? 0}`),
   ].join('#');
-  const key = (m: StructNode): string => `${ref == null ? '' : colorAt(m, ref)}#${sizeKey(m)}`;
+  const key = (m: StructNode): string => `${colorVal(m)}#${sizeKey(m)}`;
   const subs = subfamiliesBy(fam, key);
   if (subs.length >= 2) {
-    // 채움 없음도 Color 값 `none`(2026-11-13 C-D8) — 축을 버리지 않는다.
-    if (ref != null) assignAxis(subs, 'Color', (s) => colorAt(s.members[s.master], ref), colorAxisLabelsOrNone);
+    // 채움 없음도 Color 값 `none`(2026-11-13 C-D8) — 축을 버리지 않는다. 이어 붙인 값은 색 이름을 `-`로(C-D30 · C-D9 꼴).
+    if (ref != null) {
+      assignAxis(subs, 'Color', (s) => colorVal(s.members[s.master]),
+        concat ? (distinct) => uniqLabels(distinct.map((v) => v.split('|').map(colorNameOf).join('-'))) : colorAxisLabelsOrNone);
+    }
     assignSizeAxis(subs, sizeKey, content);
   }
   finishProps(subs);
@@ -2160,7 +2220,7 @@ function legacySubfamilies(members: StructNode[]): Subfamily[] {
 /** 멤버 묶음 하나를 지금 규칙으로 계획(재사용 하위 호환 · 테스트). */
 export function planOfMembers(members: readonly StructNode[]): PlanGroup {
   const ms = [...members];
-  return { key: reuseNameKey(ms[0]?.nameKey ?? ms[0]?.name ?? ''), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms) };
+  return { key: reuseNameKey(ms[0]?.nameKey ?? ms[0]?.name ?? ''), members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: legacySubfamilies(ms), legacy: true };
 }
 
 /* ---------- 탭 그룹 → Tab Item · Tab Bar(§4.7 "묶기" 2번 — 2026-11-19 C-D17 상세 2 · 3) ---------- */
@@ -2207,7 +2267,7 @@ const visibleKids = (n: StructNode): StructNode[] => (n.children ?? []).filter((
 /**
  * 칸 맞추기(§4.7 "묶기" 2번 — 2026-11-19 명세 규칙 ④): 가족을 가르는 차 · 색 차(루트 채움 · 안쪽 · 글자 색) · 여백 · 간격 차가
  * 모두 없고 칸 모양(색 · 굵기 · 밑줄 · 막대)이 같으면 참. 글자 · 아이콘 · 크기 차는 괜찮다 — 아이콘 인스턴스 ↔ 날 벡터 · 아이콘 프레임도
- * 아이콘 차다(C-D27 — `iconInstAsArt`).
+ * 아이콘 차다(C-D32 — `iconInstAsArt`).
  */
 export function tabCellMatches(orig: StructNode, cell: StructNode): boolean {
   const a = iconInstAsArt(orig);
@@ -2218,7 +2278,7 @@ export function tabCellMatches(orig: StructNode, cell: StructNode): boolean {
 }
 
 /**
- * 칸 맞추기 전용(§4.7 "묶기" 2번 C-D27) — 칸 안의 아이콘 인스턴스(`iconMain`)를 그림 슬롯(아이콘 프레임 자리 — `pairDiff` 그림 슬롯 갈래, 채움 · 크기는 보지 않음)으로 읽는다. 재사용 Tab Item
+ * 칸 맞추기 전용(§4.7 "묶기" 2번 C-D32) — 칸 안의 아이콘 인스턴스(`iconMain`)를 그림 슬롯(아이콘 프레임 자리 — `pairDiff` 그림 슬롯 갈래, 채움 · 크기는 보지 않음)으로 읽는다. 재사용 Tab Item
  * 변형의 아이콘 자리는 아이콘 인스턴스라, 날 벡터 · 아이콘 프레임 칸과 타입 차(가족을 가르는 차)가 아니라 아이콘 차로 보게 한다.
  * 가족 판정 · 탭 판정 등 다른 곳은 그대로다. 그림 지문은 `icon:{메인 키}`(날 벡터 지문과 늘 다르다 — 아이콘 차일 뿐이라 괜찮다).
  */
@@ -2228,11 +2288,11 @@ function iconInstAsArt(n: StructNode): StructNode {
   return { ...n, children: n.children.map(iconInstAsArt) };
 }
 
-/** 바 루트 맞추기 — 보이는 칸 수가 같고 바 루트끼리 채움 · 여백 · 간격이 같다(크기 차 · 선 · 모서리는 보지 않는다 — 알고 받아들인 한계). */
+/** 바 루트 맞추기 — 보이는 칸 수가 같고 바 루트끼리 채움 · 여백 · 간격 · 테두리 유무 · 모서리 값이 같다(크기 차는 괜찮다 — C-D21). */
 export function tabBarRootMatches(rep: StructNode, bar: StructNode): boolean {
   if (visibleKids(rep).length !== visibleKids(bar).length) return false;
   const d = pairDiff(rep, bar);
-  return !d.rootFill && !d.rootPad;
+  return !d.rootFill && !d.rootPad && !d.rootEdge;
 }
 
 /**
@@ -2262,7 +2322,7 @@ export function planTabGroup(members: readonly StructNode[]): TabPlan {
   const items: TabPlan['items'] = [];
   for (const sp of styles) {
     for (const state of ['Selected', 'Default'] as TabState[]) {
-      items.push({ style: sp.style, state, variant: formatVariant({ State: state, Style: sp.style }), cell: state === 'Selected' ? sp.selectedCell : sp.defaultCell });
+      items.push({ style: sp.style, state, variant: formatVariant({ State: state }), cell: state === 'Selected' ? sp.selectedCell : sp.defaultCell });
     }
   }
   const bars: TabBarPlan[] = infos.map((x) => {
@@ -2293,6 +2353,80 @@ export function tabBarReuseKey(bar: StructNode, style: string): string {
 }
 
 /**
+ * `Radius` 값(2026-11-24 C-D29) — 섞인 모서리면 네 값(`8-8-0-0`), 아니면 높이의 절반 이상(`isChipLike`와 같은 식)이면 `full`,
+ * 그 밖은 숫자 그대로(`0` 포함).
+ */
+export function radiusLabel(n: StructNode): string {
+  if (typeof n.cornerRadius !== 'number') {
+    const c = [n.topLeftRadius, n.topRightRadius, n.bottomRightRadius, n.bottomLeftRadius];
+    if (c.some((v) => typeof v === 'number')) return c.map(r2s).join('-');
+    return '0';
+  }
+  const r = n.cornerRadius;
+  if (r > 0 && typeof n.height === 'number' && r >= n.height / 2 - 1) return 'full';
+  return r2s(r);
+}
+
+/** `Style` 값(C-D28) — 루트의 보이는 채움 · 선으로. */
+function buttonStyleOf(n: StructNode): string {
+  const f = hasVisibleFill(n);
+  const st = hasVisibleStroke(n);
+  return f && st ? 'FilledOutline' : f ? 'Filled' : st ? 'Outline' : 'Text';
+}
+
+/**
+ * 버튼 · 칩 가족들을 한 세트로(2026-11-24 C-D28 · C-D29). 가족마다 `Style`(대표 루트 칠 · 선) · 모서리가 갈리면 `Radius`,
+ * 칠 · 선 · Radius 표시 값이 같은 가족은 문서 순서로 뒤의 것에 `Style` `-2` · `-3`. 가족에 없는 축은 `default`,
+ * 그래도 변형 이름이 겹치면 `Variant=`.
+ */
+function mergeButtonFamilies(fams: readonly StructNode[][], famSubs: readonly Subfamily[][]): Subfamily[] {
+  const radius = fams.map((f) => radiusLabel(f[0]));
+  const useRadius = new Set(radius).size > 1;
+  const seen = new Map<string, number>();
+  const style = fams.map((f, i) => {
+    const base = buttonStyleOf(f[0]);
+    const k = `${base}|${useRadius ? radius[i] : ''}`;
+    const n = (seen.get(k) ?? 0) + 1;
+    seen.set(k, n);
+    return n > 1 ? `${base}-${n}` : base;
+  });
+  const subs: Subfamily[] = [];
+  famSubs.forEach((fs, i) => {
+    for (const sf of fs) {
+      sf.props = { ...sf.props, Style: style[i], ...(useRadius ? { Radius: radius[i] } : {}) };
+      subs.push(sf);
+    }
+  });
+  const keys = [...new Set(subs.flatMap((sf) => Object.keys(sf.props)))];
+  for (const sf of subs) for (const k of keys) if (!(k in sf.props)) sf.props[k] = 'default';
+  if (new Set(subs.map((sf) => formatVariant(sf.props))).size !== subs.length) subs.forEach((sf, i) => { sf.props.Variant = String(i + 1); });
+  return subs;
+}
+
+/**
+ * [등록]이 만든 세트의 빈 변형(2026-11-24 C-D31) — 가족마다 그 가족 안에서 값이 갈리는 축(Color · Size만)의 곱에서 없는 조합.
+ * 가족끼리 섞은 조합은 세지 않는다. 지금 규칙(`legacy`) · 탭 · 세트가 아닌 그룹은 빈 목록. 이름은 가족의 고정 값을 붙인 `formatVariant`.
+ */
+export function familyMissingVariants(g: PlanGroup): string[] {
+  if (g.tab || g.legacy || g.subfamilies.length < 2) return [];
+  const out: string[] = [];
+  for (const fam of g.families ?? [g.subfamilies]) {
+    const axes = ['Color', 'Size'].filter((k) => new Set(fam.map((sf) => sf.props[k]).filter((v) => v != null)).size > 1);
+    if (!axes.length) continue;
+    const values: Record<string, string[]> = {};
+    for (const k of axes) values[k] = [...new Set(fam.map((sf) => sf.props[k]))].sort();
+    const have = new Set(fam.map((sf) => axes.map((k) => sf.props[k]).join('\u0000')));
+    const fixed: Record<string, string> = {};
+    for (const [k, v] of Object.entries(fam[0].props)) if (!axes.includes(k) && k !== 'Variant') fixed[k] = v;
+    for (const combo of cartesian(values)) {
+      if (have.has(axes.map((k) => combo[k]).join('\u0000'))) continue;
+      out.push(formatVariant({ ...fixed, ...combo }));
+    }
+  }
+  return out;
+}
+
+/**
  * [등록] 묶기 계획(§4.7 "묶기"). 입력은 등록 후보의 StructNode(문서 순서).
  * `isAncestor(a, b)`: a가 b의 조상인가 — 같은 그룹 안의 조상 · 자손은 자손만 남긴다.
  * 결과는 문서 순서(그룹 첫 멤버 기준).
@@ -2307,17 +2441,32 @@ export function planRegisterGroups(
   const tabs = dropAncestors(nodes.filter((n) => tabInfo(n as LikeNode) != null));
   const tabIds = new Set(tabs.map((t) => t.id));
   const rest = nodes.filter((n) => !tabIds.has(n.id) && tabInfo(n as LikeNode) == null);
-  if (tabs.length) {
-    const tab = planTabGroup(tabs);
-    // subfamilies는 Tab Bar 변형(대표 바)만 — Style 하나면 props 빔(컴포넌트 하나).
-    const subfamilies: Subfamily[] = tab.styles.map((sp) => ({ members: [sp.rep], master: 0, props: (tab.styles.length > 1 ? { Style: sp.style } : {}) as Record<string, string> }));
-    out.push({ key: TAB_GROUP_KEY, tab, members: tabs, nameGroupSize: tabs.length, nameMembers: tabs, subfamilies });
+  // 탭은 Style마다 한 그룹(2026-11-23 C-D20 — `role:tab:{Style}`). 그룹마다 Tab Item 세트 하나 + Tab Bar 컴포넌트 하나.
+  const tabStyles: TabStyle[] = [];
+  for (const t of tabs) { const st = tabInfo(t as LikeNode)!.style; if (!tabStyles.includes(st)) tabStyles.push(st); }
+  for (const st of tabStyles) {
+    const ms = tabs.filter((t) => tabInfo(t as LikeNode)!.style === st);
+    const tab = planTabGroup(ms);
+    // subfamilies는 Tab Bar(대표 바) 하나 — 늘 컴포넌트 하나.
+    out.push({ key: `${TAB_GROUP_KEY}:${st}`, tab, members: ms, nameGroupSize: ms.length, nameMembers: ms, subfamilies: [{ members: [tab.styles[0].rep], master: 0, props: {} }] });
   }
   for (const g of groupByExactName(rest)) {
     const members = dropAncestors(g.members);
     if (!members.length) continue;
     if (members.length > 1 && members.every((m) => highConfidenceComponentRole(m as LikeNode) === 'heading')) {
-      out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: legacySubfamilies(members) });
+      out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: legacySubfamilies(members), legacy: true });
+      continue;
+    }
+    // 버튼 · 칩 이름 그룹(2026-11-24 C-D28 · C-D30): 함께 바뀜으로 나누지 않고, 가족이 여럿이면 한 세트(`Style` · `Radius`).
+    if (members.every((m) => { const r = highConfidenceComponentRole(m as LikeNode); return r === 'button' || r === 'chip'; })) {
+      const bfams = splitFamilies(members);
+      bfams.sort((a, b) => (order.get(a[0].id) ?? 0) - (order.get(b[0].id) ?? 0));
+      const famSubs = bfams.map((f) => familySubfamilies(f, true));
+      if (bfams.length === 1) {
+        out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: famSubs[0] });
+      } else {
+        out.push({ key: g.key, members, nameGroupSize: members.length, nameMembers: members, subfamilies: mergeButtonFamilies(bfams, famSubs), families: famSubs, mixed: true });
+      }
       continue;
     }
     const fams = splitFamilies(members).flatMap(splitByColorConsistency);
@@ -2363,19 +2512,23 @@ export function resolvePlanNames(groups: readonly PlanGroup[], existing: readonl
     const clash = plainSet.has(b) || typedKeys.some((o) => o !== k && rawBase.get(o) === b);
     baseByKey.set(k, clash ? contextualName(typedMembers.get(k)!) : b);
   }
+  const tabGroups = groups.filter((g) => !!g.tab).length;
   groups.forEach((g, i) => {
     if (!g.tab && g.typeIndex == null) return;
     let base: string;
     let next: (k: number) => string;
     if (g.tab) {
-      // Tab Item을 먼저, 그다음 Tab Bar — 이름에 빈칸이 있어 숫자도 빈칸 뒤(`Tab Item 2` · `Tab Bar 2`).
-      let item = 'Tab Item';
+      // Tab Item을 먼저, 그다음 Tab Bar. Style 그룹이 둘 이상이거나 `Tab Item` · `Tab Bar`가 이미 있으면 `-{Style}`
+      // (2026-11-23 C-D20 · 24 C-D27). 그래도 겹칠 때만 빈칸 뒤 숫자(`Tab Item-Pill 2`).
+      const suffix = tabGroups > 1 || taken.has('Tab Item') || taken.has('Tab Bar') ? `-${g.tab.styles[0].style}` : '';
+      const itemBase = `Tab Item${suffix}`;
+      let item = itemBase;
       let ik = 2;
-      while (taken.has(item)) item = `Tab Item ${ik++}`;
+      while (taken.has(item)) item = `${itemBase} ${ik++}`;
       taken.add(item);
       g.tab.itemName = item;
-      base = 'Tab Bar';
-      next = (k) => `Tab Bar ${k}`;
+      base = `Tab Bar${suffix}`;
+      next = (k) => `${base} ${k}`;
     } else {
       base = `${baseByKey.get(g.key) ?? componentBaseName(g.nameMembers)}-Type${g.typeIndex}`;
       next = (k) => `${base}-${k}`;

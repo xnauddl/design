@@ -4529,6 +4529,8 @@ function compRows(): TreeRow[] {
       return { ...base, change: n.reuse.name, badge: { text: t('component.badgeReuse'), kind: 'reuse' as const } };
     }
     if (n.group) {
+      // 변형 값이 빈 문자열이면 꼬리 없이 세트 이름만(2026-11-23 C-D26 — 칸만 Tab Item 인스턴스로 바뀌는 탭 바 줄). 없으면(undefined) 대체 글.
+      if (n.variant === '') return { ...base, change: n.group, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
       const variant = n.variant || t('component.variantFallback');
       return { ...base, change: `${n.group} · ${variant}`, variant: { set: n.group, name: variant }, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
     }
