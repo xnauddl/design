@@ -515,7 +515,7 @@ export interface BindOptions {
    */
   noNewRoles?: boolean;
   /**
-   * 만들기 실행의 연결 단계(IA v4 §4.3 "B.34 뒤 연결 단계" ①) — 켠 줄의 값 · 용도 묶음에 맞는 자리만 붙인다.
+   * 만들기 실행의 연결 단계(IA v4 §4.3 "B.35 뒤 연결 단계" ①) — 켠 줄의 값 · 용도 묶음에 맞는 자리만 붙인다.
    * 맞지 않는 자리는 사유 없이 버린다. 없으면 거르지 않는다(연결 화면 · 찾기).
    */
   only?: readonly OnlyItem[];
@@ -528,7 +528,7 @@ export interface OnlyItem {
   groups: readonly string[];
 }
 
-/** 자리가 거름 항목 중 하나와 맞는가(§4.3 B.34 ① — 알약 자리는 9999로, 묶음 키는 `allowed.join('|')`). */
+/** 자리가 거름 항목 중 하나와 맞는가(§4.3 B.35 ① — 알약 자리는 9999로, 묶음 키는 `allowed.join('|')`). */
 function onlyMatch(only: readonly OnlyItem[], s: Slot): boolean {
   const key = s.allowed.join('|');
   const v = slotValue(s);
@@ -599,7 +599,7 @@ export async function bindSelection(
   }
   ctx.mainId = undefined;
   if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
-  if (opts.only) ctx.slots = ctx.slots.filter((s) => onlyMatch(opts.only as readonly OnlyItem[], s)); // 만들기 연결 단계 — 켠 줄만(§4.3 B.34 ①)
+  if (opts.only) ctx.slots = ctx.slots.filter((s) => onlyMatch(opts.only as readonly OnlyItem[], s)); // 만들기 연결 단계 — 켠 줄만(§4.3 B.35 ①)
   resolveSlots(ctx); // 자리마다 붙일 변수(또는 새 역할)를 고른다 — 색 밝기 · 번호는 찾기 전체를 보고 정한다(§2.12)
   if (apply && preview.candidates.length) {
     // 적용 모드도 같은 규칙 — 찾은 후보를 연결 경로(bindSelectedItems)로 붙인다(§2.12 12.9).

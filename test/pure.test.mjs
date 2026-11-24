@@ -3854,7 +3854,7 @@ test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 �
   assert.deepEqual(['FLOAT', 'STRING', 'BOOLEAN', 'COLOR'].map(varTypeMark), ['#', 'Aa', '✓', '']);
 });
 
-test('B.34 tokenGroups · libSameGroups · onlyItems — 묶음 · 라이브러리 같은 값 묶음 뺌 · 묶음 0개 토큰 뺌', async () => {
+test('B.35 tokenGroups · libSameGroups · onlyItems — 묶음 · 라이브러리 같은 값 묶음 뺌 · 묶음 0개 토큰 뺌', async () => {
   const { tokenGroups, libSameGroups, onlyItems } = await import('../dist/pure.mjs');
   const fill = { name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { 'ALL_FILLS|FRAME_FILL': 10, 'ALL_FILLS|TEXT_FILL': 3 } };
   const bound = { name: 'color/green/500', category: 'color', value: '#00AA00', freeBy: {} }; // 모두 붙음

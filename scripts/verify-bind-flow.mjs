@@ -63,7 +63,7 @@ async function goSub(p, sub) {
 }
 const recv = (p, m) => p.evaluate((m) => window.dispatchEvent(new MessageEvent('message', { data: { pluginMessage: m } })), m);
 const sent = (p, type) => p.evaluate((t) => window.__sent.filter((m) => m && m.type === t), type);
-/** 만들기 연결 단계의 기존 텍스트 스타일 미리보기(ia-v4 §4.3 B.34 ④)에 답한다 — rows가 있으면 APPLY_SELECTED에도 답한다. */
+/** 만들기 연결 단계의 기존 텍스트 스타일 미리보기(ia-v4 §4.3 B.35 ④)에 답한다 — rows가 있으면 APPLY_SELECTED에도 답한다. */
 async function wizTs(p, reqId, rows = [], applied = 0) {
   await p.waitForTimeout(30);
   const pv = (await sent(p, 'PREVIEW_TEXT_STYLES')).filter((m) => m.reqId === reqId).at(-1);
@@ -3188,7 +3188,7 @@ async function backHome30(p, libs) {
   await backHome30(p, []);
   await enterMake30(p, 'go');
   const on2 = await mkOnRows30(p);
-  check('30 ⑩ 상태 5에서 들어갔다 나온 뒤 상태 6에서 [변수 만들기] → 라이브러리가 없어 같은 값 줄은 켬 · 이미 다 붙은 값(spacing/12 — free 0)은 B.34 뒤 상태와 상관없이 끔 · 글자 끔(7줄)', on2.length === 7 && on2.includes('spacing/8') && !on2.includes('spacing/12'), JSON.stringify(on2));
+  check('30 ⑩ 상태 5에서 들어갔다 나온 뒤 상태 6에서 [변수 만들기] → 라이브러리가 없어 같은 값 줄은 켬 · 이미 다 붙은 값(spacing/12 — free 0)은 B.35 뒤 상태와 상관없이 끔 · 글자 끔(7줄)', on2.length === 7 && on2.includes('spacing/8') && !on2.includes('spacing/12'), JSON.stringify(on2));
   // 상태 6 → 5: 사용자가 바꾸지 않은 줄은 다시 꺼짐. 상태 6에서 사용자가 켠 줄(spacing/8 — 껐다 켬)은 켜진 채(한계)
   await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
   await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
@@ -4423,7 +4423,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await p.close();
 }
 
-// B.34 — 만들기 연결 단계: 켠 줄만(only) · 기존 텍스트 스타일 · 결과 줄 · 상태 7 free 0 끔
+// B.35 — 만들기 연결 단계: 켠 줄만(only) · 기존 텍스트 스타일 · 결과 줄 · 상태 7 free 0 끔
 {
   const setup = async () => {
     const p = await open(560, 'layer');
@@ -4452,7 +4452,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   };
   const p = await setup();
   const r4 = await p.$eval('#makeTree [data-tkey="gk:radius"] .bv-switch', (b) => b.getAttribute('aria-checked'));
-  check('B.34 ③ 상태 7 — 이미 다 붙은 값(free 0) 줄은 처음 꺼짐(Radius 머리 끔 · 접힘) · 다른 줄은 켬', r4 === 'false' && (await p.getAttribute('#makeTree [data-tkey="gk:radius"]', 'aria-expanded')) === 'false' && (await p.$eval('#makeTree [data-tkey="g:spacing/16"] .bv-switch', (b) => b.getAttribute('aria-checked'))) === 'true', r4);
+  check('B.35 ③ 상태 7 — 이미 다 붙은 값(free 0) 줄은 처음 꺼짐(Radius 머리 끔 · 접힘) · 다른 줄은 켬', r4 === 'false' && (await p.getAttribute('#makeTree [data-tkey="gk:radius"]', 'aria-expanded')) === 'false' && (await p.$eval('#makeTree [data-tkey="g:spacing/16"] .bv-switch', (b) => b.getAttribute('aria-checked'))) === 'true', r4);
   // spacing/8 끄고 실행
   await p.click('#makeTree [data-tkey="g:spacing/8"] .bv-switch');
   await p.waitForTimeout(40);
@@ -4465,14 +4465,14 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await recv(p, { type: 'CREATE_RESULT', reqId: cr.reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
   await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
-  check('B.34 ① 연결 단계 APPLY.only — 켠 줄(spacing/16)만 · 끈 줄(spacing/8) · free 0 줄 없음', JSON.stringify(ap?.only) === JSON.stringify([{ value: 16, groups: ['GAP'] }]), JSON.stringify(ap?.only));
+  check('B.35 ① 연결 단계 APPLY.only — 켠 줄(spacing/16)만 · 끈 줄(spacing/8) · free 0 줄 없음', JSON.stringify(ap?.only) === JSON.stringify([{ value: 16, groups: ['GAP'] }]), JSON.stringify(ap?.only));
   await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   const tsRows = [{ styleId: 'S:1', name: 'body/medium', nodeIds: ['t1', 't2'], summary: '' }];
   const pts = await wizTs(p, ap.reqId, tsRows, 9);
   const as = (await sent(p, 'APPLY_SELECTED')).filter((m) => m.reqId === ap.reqId).at(-1);
-  check('B.34 ④ 변수 연결 뒤 PREVIEW_TEXT_STYLES(기준 · 마법사 reqId) → APPLY_SELECTED{items: [], textStyles}', !!pts && pts.nodeIds?.[0] === 'w1' && !!as && as.items.length === 0 && as.textStyles?.[0]?.styleId === 'S:1', JSON.stringify(as));
+  check('B.35 ④ 변수 연결 뒤 PREVIEW_TEXT_STYLES(기준 · 마법사 reqId) → APPLY_SELECTED{items: [], textStyles}', !!pts && pts.nodeIds?.[0] === 'w1' && !!as && as.items.length === 0 && as.textStyles?.[0]?.styleId === 'S:1', JSON.stringify(as));
   await p.waitForTimeout(150);
-  check('B.34 다 됨 줄 — "… · 4곳 연결 · Text Style 9곳"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')).endsWith('4곳 연결 · Text Style 9곳'), await p.textContent('#statusText'));
+  check('B.35 다 됨 줄 — "… · 4곳 연결 · Text Style 9곳"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')).endsWith('4곳 연결 · Text Style 9곳'), await p.textContent('#statusText'));
   await p.close();
   // 켠 Global 줄 없음(모두 끄기) + 스타일만 → APPLY 없이 ④ → "Text Style {t}곳 연결"
   const q = await setup();
@@ -4480,7 +4480,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await q.waitForTimeout(40);
   const apBefore = (await sent(q, 'APPLY')).filter((m) => m.preview === false).length;
   // 텍스트 스타일 줄이 없어 실행할 게 없으면 버튼이 잠긴다 — 이 경우는 단위 테스트(makeDoneText)로 본다
-  check('B.34 켠 줄이 없으면 실행 전 APPLY 없음(대조)', (await sent(q, 'APPLY')).filter((m) => m.preview === false).length === apBefore);
+  check('B.35 켠 줄이 없으면 실행 전 APPLY 없음(대조)', (await sent(q, 'APPLY')).filter((m) => m.preview === false).length === apBefore);
   await q.close();
 }
 

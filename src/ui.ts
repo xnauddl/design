@@ -3366,7 +3366,7 @@ function mkSetOn(name: string, on: boolean): void {
 function mkRecalcOffByLib(): void {
   mkOffByLib.clear();
   if (!baseline || !usageMap) return; // 쓰는 변수 결과 전 · 기준이 바뀐 뒤 결과 전 — 거르지 않는다(판정할 수 없음)
-  // B.34 뒤 — 첫 화면 상태와 상관없이 늘, 라이브러리 목록이 비어도 free = 0 토큰은 끔(ia-v4 §4.3 Global 탭 "B.30 PR 뒤")
+  // B.35 뒤 — 첫 화면 상태와 상관없이 늘, 라이브러리 목록이 비어도 free = 0 토큰은 끔(ia-v4 §4.3 Global 탭 "B.30 PR 뒤")
   const libs = libDirectNow();
   const toks = mkTokens.filter((tk) => mkKind(tk) !== 'text');
   const left = new Set(libSameSplit(toks, libs).left.map((tk) => tk.name));
@@ -3936,7 +3936,7 @@ async function runMake(): Promise<void> {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
         try {
-          // ① 켠 줄의 값만 · ② 라이브러리와 같은 값 묶음은 뺌(ia-v4 §4.3 "B.34 뒤 연결 단계")
+          // ① 켠 줄의 값만 · ② 라이브러리와 같은 값 묶음은 뺌(ia-v4 §4.3 "B.35 뒤 연결 단계")
           const only = onlyItems(mkSendTokens(), libDirectNow());
           const r = only.length
             ? await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, ['APPLY_RESULT'], wizBindReq)

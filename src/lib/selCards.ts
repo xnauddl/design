@@ -172,7 +172,7 @@ function libScopeOk(v: LibSameVar, key: string): boolean {
   return v.scopes.includes('ALL_SCOPES') || key.split('|').some((s) => v.scopes!.includes(s));
 }
 
-/** 글자 토큰의 용도 묶음 키(freeBy가 없는 종류 — 연결 글자 자리의 `allowed`와 같다, §4.3 B.34 ①). */
+/** 글자 토큰의 용도 묶음 키(freeBy가 없는 종류 — 연결 글자 자리의 `allowed`와 같다, §4.3 B.35 ①). */
 const TEXT_GROUP: Record<string, string> = { fontSize: 'FONT_SIZE', lineHeight: 'LINE_HEIGHT', letterSpacing: 'LETTER_SPACING', fontFamily: 'FONT_FAMILY' };
 
 /** freeBy가 없는 옛 토큰의 종류별 묶음(연결 자리의 `allowed.join('|')` — 칠은 레이어 종류마다 셋, `scopes.ts`). */
@@ -196,12 +196,12 @@ export function tokenGroups(tk: LibSameToken): string[] {
   return g ? [g] : [...(KIND_GROUPS[tk.category] ?? [])];
 }
 
-/** 같은 값 · 그 묶음 스코프를 받는 라이브러리 변수가 있는 묶음 키(§4.3 B.34 ② — libSameSplit과 같은 판정). */
+/** 같은 값 · 그 묶음 스코프를 받는 라이브러리 변수가 있는 묶음 키(§4.3 B.35 ② — libSameSplit과 같은 판정). */
 export function libSameGroups(tk: LibSameToken, libs: readonly LibSameVar[]): string[] {
   return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
 }
 
-/** 만들기 연결 단계의 거름 항목(§4.3 B.34 ①②) — 묶음에서 라이브러리 같은 값 묶음을 빼고, 묶음이 0개인 토큰은 뺀다. */
+/** 만들기 연결 단계의 거름 항목(§4.3 B.35 ①②) — 묶음에서 라이브러리 같은 값 묶음을 빼고, 묶음이 0개인 토큰은 뺀다. */
 export function onlyItems(tokens: readonly LibSameToken[], libs: readonly LibSameVar[]): { value: string | number; alpha?: number; groups: string[] }[] {
   const out: { value: string | number; alpha?: number; groups: string[] }[] = [];
   for (const tk of tokens) {

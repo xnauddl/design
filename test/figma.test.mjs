@@ -9539,8 +9539,8 @@ test('B.33 mergeScopes — ALL_FILLS가 들어가면 개별 칠 용도를 빼고
   assert.deepEqual(mergeScopes(['GAP'], ['CORNER_RADIUS'], 'FLOAT').sort(), ['CORNER_RADIUS', 'GAP']);
 });
 
-/* ---- 7-8 A 만들기 연결 단계 — only(ia-v4 §4.3 B.34 ①) ---- */
-test('B.34 only — 켠 값 · 묶음만 붙고, 끈 값 · 같은 값 다른 용도 자리는 그대로', async () => {
+/* ---- 7-8 A 만들기 연결 단계 — only(ia-v4 §4.3 B.35 ①) ---- */
+test('B.35 only — 켠 값 · 묶음만 붙고, 끈 값 · 같은 값 다른 용도 자리는 그대로', async () => {
   installFigma();
   await createTokens([
     { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/background', count: 1 }] },
@@ -9579,7 +9579,7 @@ test('B.34 only — 켠 값 · 묶음만 붙고, 끈 값 · 같은 값 다른 �
   assert.ok(e._bound?.itemSpacing);
 });
 
-test('B.34 only — 알약 자리는 9999로 견준다(원래 값 150 아님)', async () => {
+test('B.35 only — 알약 자리는 9999로 견준다(원래 값 150 아님)', async () => {
   installFigma();
   await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
   const pill = () => a20Frame('p' + Math.random(), { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });

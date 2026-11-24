@@ -96,7 +96,7 @@ test('A.18 결정 B — makeDoneText에 메인 컴포넌트 부분이 없다(메
   assert.ok(!s.includes('메인'), s);
 });
 
-test('makeDoneText — B.34 연결 부분: n > 0 꼬리 · n = 0 · t > 0 독립 · 건너뜀 · 돌린 0 · 0은 "0곳 연결"', () => {
+test('makeDoneText — B.35 연결 부분: n > 0 꼬리 · n = 0 · t > 0 독립 · 건너뜀 · 돌린 0 · 0은 "0곳 연결"', () => {
   const o = { isPaid: true, linkOff: false };
   assert.equal(makeDoneText({ created: { g: 1, r: 1, m: 0 }, bound: 15, tsBound: 9 }, o), 'Global 1개 · Semantic 1개 · 15곳 연결 · Text Style 9곳');
   assert.equal(makeDoneText({ created: { g: 1, r: 1, m: 0 }, bound: 0, tsBound: 9 }, o), 'Global 1개 · Semantic 1개 · Text Style 9곳 연결');
