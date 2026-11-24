@@ -52,6 +52,8 @@ export interface MakeTotals {
   /** 텍스트 스타일: s = created + updated, a = 붙인 글자 수, missing = 알림 목록(§4.3 "글꼴"). */
   styles?: { s: number; a: number; missing?: string[] };
   bound?: number;
+  /** 연결 단계가 붙인 기존 텍스트 스타일 글자 수(ia-v4 §4.3 B.35 ④). */
+  tsBound?: number;
   renamed?: number;
 }
 
@@ -65,7 +67,11 @@ export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOf
   if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
   if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
   if (totals.styles?.missing?.length) parts.push(t('make.done.missing', { k: totals.styles.missing.length })); // 텍스트 스타일 바로 뒤(§4.3 "글꼴")
-  if (totals.bound != null) parts.push(t('make.done.bind', { n: totals.bound }));
+  // 연결 부분(B.35): n > 0이면 "{b}곳 연결" + Text Style 꼬리, n = 0 · t > 0(건너뜀 포함)이면 "Text Style {t}곳 연결", 돌려 0 · 0이면 "0곳 연결"
+  const tsB = totals.tsBound ?? 0;
+  if (totals.bound && totals.bound > 0) parts.push(t('make.done.bind', { n: totals.bound }) + (tsB ? t('wizard.seq.bindTs', { t: tsB }) : ''));
+  else if (tsB) parts.push(t('wizard.seq.bindTsOnly', { t: tsB }));
+  else if (totals.bound != null) parts.push(t('make.done.bind', { n: totals.bound }));
   if (totals.renamed != null) parts.push(t('make.done.rename', { c: totals.renamed }));
   if (totals.created && totals.created.m > 0) parts.push(t('make.done.manual', { m: totals.created.m }));
   if (opts.linkOff) parts.push(t('make.done.notLinked'));

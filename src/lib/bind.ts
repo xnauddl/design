@@ -4,7 +4,6 @@
      새 Semantic 역할을 만들어(같은 값 Global의 별칭) 붙인다. 이미 붙은 연결은 바꾸지도 풀지도 않는다(§2.12 12.8).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
-import { slotOffKey } from './makeOff';
 import { rgbToHex, colorKey, roundAlpha, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
 import { collectionTiers, ensureOwnedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
@@ -516,10 +515,29 @@ export interface BindOptions {
    */
   noNewRoles?: boolean;
   /**
-   * 만들기 실행의 연결(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35) — 값 키(`makeOff.ts` `slotOffKey`)가 이 모음에 있는
-   * 자리는 붙이지 않고 사유 `make-off`로 센다.
+   * 만들기 실행의 연결 단계(IA v4 §4.3 "B.35 뒤 연결 단계" ①) — 켠 줄의 값 · 용도 묶음에 맞는 자리만 붙인다.
+   * 맞지 않는 자리는 사유 없이 버린다. 없으면 거르지 않는다(연결 화면 · 찾기).
    */
-  excludeValue?: ReadonlySet<string>;
+  only?: readonly OnlyItem[];
+}
+
+/** 연결 거름 항목 — 값(색 hex · 숫자 · 글꼴 이름) · 색 투명도 · 허용 용도 묶음 키(스코프를 `|`로 이은 것). */
+export interface OnlyItem {
+  value: string | number;
+  alpha?: number;
+  groups: readonly string[];
+}
+
+/** 자리가 거름 항목 중 하나와 맞는가(§4.3 B.35 ① — 알약 자리는 9999로, 묶음 키는 `allowed.join('|')`). */
+function onlyMatch(only: readonly OnlyItem[], s: Slot): boolean {
+  const key = s.allowed.join('|');
+  const v = slotValue(s);
+  return only.some((it) => {
+    if (!it.groups.includes(key)) return false;
+    if (s.kind === 'color') return typeof it.value === 'string' && colorKey(it.value, it.alpha) === v;
+    if (typeof v === 'number') return typeof it.value === 'number' && sameNumber(it.value, v);
+    return it.value === v;
+  });
 }
 
 /** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). 텍스트 스타일 label 판정(`inUiRole`)이 쓴다. */
@@ -557,7 +575,6 @@ export async function bindSelection(
     slots: [],
     skipText: opts.skipTextStyleNode,
     noNewRoles: !!opts.noNewRoles,
-    ...(opts.excludeValue?.size ? { exclude: opts.excludeValue } : {}),
     mainOf: mains.mainOf,
     remote: mains.remote,
     visited: new Set(),
@@ -582,6 +599,7 @@ export async function bindSelection(
   }
   ctx.mainId = undefined;
   if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
+  if (opts.only) ctx.slots = ctx.slots.filter((s) => onlyMatch(opts.only as readonly OnlyItem[], s)); // 만들기 연결 단계 — 켠 줄만(§4.3 B.35 ①)
   resolveSlots(ctx); // 자리마다 붙일 변수(또는 새 역할)를 고른다 — 색 밝기 · 번호는 찾기 전체를 보고 정한다(§2.12)
   if (apply && preview.candidates.length) {
     // 적용 모드도 같은 규칙 — 찾은 후보를 연결 경로(bindSelectedItems)로 붙인다(§2.12 12.9).
@@ -795,8 +813,6 @@ interface Ctx {
   res: BindResult;
   preview: Preview;
   slots: Slot[];
-  /** 꺼진 만들기 줄의 값 키(BindOptions.excludeValue). */
-  exclude?: ReadonlySet<string>;
   skipText?: (node: TextNode) => boolean;
   /** 무료 — 새 역할 없이 Global에 붙인다(BindOptions.noNewRoles). */
   noNewRoles?: boolean;
@@ -866,13 +882,6 @@ function resolveSlots(ctx: Ctx): void {
     return cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0] ?? null;
   };
   for (const s of ctx.slots) {
-    if (ctx.exclude) {
-      const k = slotOffKey(s.field, s.kind, s.value, s.pill);
-      if (k && ctx.exclude.has(k)) {
-        skip(res, 'make-off', s.node, preview, s.field);
-        continue;
-      }
-    }
     const cands = sameValueEntries(ctx, s);
     const d = pickDesigned(cands, s.kind);
     if (d) {

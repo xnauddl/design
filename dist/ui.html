@@ -1562,9 +1562,12 @@
     "wizard.seq.renameDone": "{count}\uAC1C \uC774\uB984 \uC801\uC6A9",
     "wizard.seq.bindDone": "{n}\uACF3 \uC5F0\uACB0",
     "wizard.seq.bindRoles": " \xB7 \uC0C8 Semantic {k}\uAC1C",
+    "wizard.seq.bindTs": " \xB7 Text Style {t}\uACF3",
+    "wizard.seq.bindTsOnly": "Text Style {t}\uACF3 \uC5F0\uACB0",
+    "wizard.seq.bindNoneOn": "\uC5F0\uACB0\uD560 \uCF20 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "wizard.seq.bindTsFail": " \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC5F0\uACB0 \uBABB \uD568",
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
-    "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
     // 진행 안내 단계 라벨·안내
@@ -2503,17 +2506,6 @@
     return `${group}/${v}`;
   }
 
-  // src/lib/makeOff.ts
-  var round2 = (n) => Math.round(n * 100) / 100;
-  var tokenKind = (category) => category === "effectColor" ? "color" : category;
-  var valuePart = (category, value, alpha) => {
-    if (category === "color" || category === "effectColor") return colorKey(String(value), alpha);
-    return typeof value === "number" ? String(round2(value)) : value;
-  };
-  function tokenOffKey(tk) {
-    return `${tokenKind(tk.category)}|${valuePart(tk.category, tk.value, tk.alpha)}`;
-  }
-
   // src/lib/bindDisplay.ts
   var PADDING = ["paddingTop", "paddingRight", "paddingBottom", "paddingLeft"];
   var RADIUS = ["topLeftRadius", "topRightRadius", "bottomRightRadius", "bottomLeftRadius"];
@@ -2642,6 +2634,35 @@
   function libScopeOk(v, key) {
     if (!v.scopes || !key) return true;
     return v.scopes.includes("ALL_SCOPES") || key.split("|").some((s) => v.scopes.includes(s));
+  }
+  var TEXT_GROUP = { fontSize: "FONT_SIZE", lineHeight: "LINE_HEIGHT", letterSpacing: "LETTER_SPACING", fontFamily: "FONT_FAMILY" };
+  var KIND_GROUPS = {
+    color: ["ALL_FILLS|TEXT_FILL", "ALL_FILLS|FRAME_FILL", "ALL_FILLS|SHAPE_FILL", "STROKE_COLOR"],
+    effectColor: ["EFFECT_COLOR"],
+    gap: ["GAP"],
+    radius: ["CORNER_RADIUS"],
+    size: ["WIDTH_HEIGHT"],
+    strokeWidth: ["STROKE_FLOAT"],
+    opacity: ["OPACITY"]
+  };
+  function tokenGroups(tk) {
+    var _a3;
+    if (tk.freeBy) return Object.entries(tk.freeBy).filter(([, n]) => n > 0).map(([k]) => k);
+    const g = TEXT_GROUP[tk.category];
+    return g ? [g] : [...(_a3 = KIND_GROUPS[tk.category]) != null ? _a3 : []];
+  }
+  function libSameGroups(tk, libs) {
+    return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
+  }
+  function onlyItems(tokens2, libs) {
+    const out = [];
+    for (const tk of tokens2) {
+      const lib = new Set(libSameGroups(tk, libs));
+      const groups = tokenGroups(tk).filter((k) => !lib.has(k));
+      if (!groups.length) continue;
+      out.push(__spreadProps(__spreadValues({ value: tk.value }, tk.alpha != null && tk.alpha < 1 ? { alpha: tk.alpha } : {}), { groups }));
+    }
+    return out;
   }
   function libSameSplit(tokens2, libs) {
     var _a3, _b;
@@ -4599,13 +4620,16 @@
     return vars.some((v) => v.owned === "global");
   }
   function makeDoneText(totals, opts) {
-    var _a3, _b;
+    var _a3, _b, _c;
     const parts = [];
     if (totals.created) parts.push(makeCreatedText(totals.created, opts.isPaid));
     if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
     if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
     if ((_b = (_a3 = totals.styles) == null ? void 0 : _a3.missing) == null ? void 0 : _b.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
-    if (totals.bound != null) parts.push(t("make.done.bind", { n: totals.bound }));
+    const tsB = (_c = totals.tsBound) != null ? _c : 0;
+    if (totals.bound && totals.bound > 0) parts.push(t("make.done.bind", { n: totals.bound }) + (tsB ? t("wizard.seq.bindTs", { t: tsB }) : ""));
+    else if (tsB) parts.push(t("wizard.seq.bindTsOnly", { t: tsB }));
+    else if (totals.bound != null) parts.push(t("make.done.bind", { n: totals.bound }));
     if (totals.renamed != null) parts.push(t("make.done.rename", { c: totals.renamed }));
     if (totals.created && totals.created.m > 0) parts.push(t("make.done.manual", { m: totals.created.m }));
     if (opts.linkOff) parts.push(t("make.done.notLinked"));
@@ -6945,7 +6969,7 @@
         }
         if (onUnusedError(msg)) break;
         if (onVarOpError(msg)) break;
-        if (msg.op === "PREVIEW_TEXT_STYLES") {
+        if (msg.op === "PREVIEW_TEXT_STYLES" && wizardErrorMsg !== msg) {
           if (bindTsPending) {
             bindTsPending = false;
             bindTsRows = [];
@@ -7472,17 +7496,13 @@
   function mkRecalcOffByLib() {
     mkOffByLib.clear();
     if (!baseline || !usageMap) return;
-    const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
-    if (!vmTableKnown && !prereqKnown) return;
     const libs = libDirectNow();
-    if (!libs.length || !(localZero || mcKeep())) return;
     const toks = mkTokens.filter((tk) => mkKind(tk) !== "text");
     const left = new Set(libSameSplit(toks, libs).left.map((tk) => tk.name));
     for (const tk of toks) if (!left.has(tk.name)) mkOffByLib.add(tk.name);
   }
   var mkGlobalsOn = () => mkTokens.filter(mkIsOn);
   var mkSendTokens = () => mkTokens.filter((tk) => mkIsOn(tk) || mkLocked(tk));
-  var mkExcludeValues = () => [...new Set(mkTokens.filter((tk) => !mkIsOn(tk)).map(tokenOffKey))];
   var mkTsName = (s) => {
     var _a3;
     return (_a3 = mkTsNames.get(tsSig(s))) != null ? _a3 : s.name;
@@ -8040,7 +8060,7 @@
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -8120,22 +8140,47 @@
         } else if (id === "bind") {
           wizBindReq = ++bindReqSeq;
           wizBindPending = true;
-          const excludeValues = mkExcludeValues();
-          const r = await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true }, excludeValues.length ? { excludeValues } : {}), ["APPLY_RESULT"], wizBindReq).finally(() => {
-            wizBindPending = false;
-          });
-          totals.bound = r.bound;
-          mkMainsDone.push(...(_e = r.mainsBound) != null ? _e : []);
-          const reasons = (_f = r.reasons) != null ? _f : {};
-          if (r.bound) results.push({ id, mark: "ok", text: t("wizard.seq.bindDone", { n: r.bound }) + (r.newRoles ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") });
-          else {
-            const noMatch = ((_g = reasons["no-match"]) != null ? _g : 0) + ((_h = reasons["scope-add"]) != null ? _h : 0);
-            const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : !noMatch && ((_i = reasons["make-off"]) != null ? _i : 0) > 0 ? "wizard.seq.bindAllOff" : ((_j = reasons["already-bound"]) != null ? _j : 0) > 0 && !noMatch ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
-            if (zero === "wizard.seq.bindAllBound" || zero === "wizard.seq.bindAllOff") results.push({ id, mark: "ok", text: t(zero) });
-            else {
-              results.push({ id, mark: "warn", text: t(zero) });
-              stay = true;
+          try {
+            const only = onlyItems(mkSendTokens(), libDirectNow());
+            const r = only.length ? await wizardRequest({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, ["APPLY_RESULT"], wizBindReq) : null;
+            const n = (_e = r == null ? void 0 : r.bound) != null ? _e : 0;
+            if (r) {
+              totals.bound = r.bound;
+              mkMainsDone.push(...(_f = r.mainsBound) != null ? _f : []);
             }
+            let ts = 0;
+            let tsFail = false;
+            try {
+              const pv = await wizardRequest({ type: "PREVIEW_TEXT_STYLES", reqId: wizBindReq, nodeIds: ids }, ["TEXT_STYLES_PREVIEW"], wizBindReq);
+              if (pv.rows.length) {
+                const textStyles = pv.rows.map((row) => {
+                  var _a4;
+                  return __spreadValues({ styleId: row.styleId, nodeIds: row.nodeIds }, ((_a4 = row.mainIds) == null ? void 0 : _a4.some(Boolean)) ? { mainIds: row.mainIds } : {});
+                });
+                const ar = await wizardRequest({ type: "APPLY_SELECTED", items: [], textStyles, reqId: wizBindReq }, ["APPLY_RESULT"], wizBindReq);
+                ts = (_g = ar.textStylesApplied) != null ? _g : 0;
+                mkMainsDone.push(...(_h = ar.mainsBound) != null ? _h : []);
+              }
+            } catch (e) {
+              tsFail = true;
+            }
+            if (ts) totals.tsBound = ts;
+            const reasons = (_i = r == null ? void 0 : r.reasons) != null ? _i : {};
+            const tsTail = (ts ? t("wizard.seq.bindTs", { t: ts }) : "") + (tsFail ? t("wizard.seq.bindTsFail") : "");
+            if (n) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindDone", { n }) + ((r == null ? void 0 : r.newRoles) ? t("wizard.seq.bindRoles", { k: r.newRoles }) : "") + tsTail });
+            else if (ts) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindTsOnly", { t: ts }) + (tsFail ? t("wizard.seq.bindTsFail") : "") });
+            else if (!r) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindNoneOn") + (tsFail ? t("wizard.seq.bindTsFail") : "") });
+            else {
+              const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_j = reasons["already-bound"]) != null ? _j : 0) > 0 && !(((_k = reasons["no-match"]) != null ? _k : 0) + ((_l = reasons["scope-add"]) != null ? _l : 0)) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+              if (zero === "wizard.seq.bindAllBound" && !tsFail) results.push({ id, mark: "ok", text: t(zero) });
+              else {
+                results.push({ id, mark: "warn", text: t(zero) + (tsFail ? t("wizard.seq.bindTsFail") : "") });
+                stay = true;
+              }
+            }
+            if (tsFail) stay = true;
+          } finally {
+            wizBindPending = false;
           }
         } else if (id === "rename") {
           const rid = mkNextReq();
@@ -8153,7 +8198,7 @@
         break;
       }
     }
-    const finishedSteps = (_k = mkProg == null ? void 0 : mkProg.done) != null ? _k : [];
+    const finishedSteps = (_m = mkProg == null ? void 0 : mkProg.done) != null ? _m : [];
     rememberMainsBound(mkMainsDone, mkBase);
     mkRunning = false;
     mkProg = null;
@@ -8180,7 +8225,7 @@
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    const doneTip = (_m = (_l = totals.styles) == null ? void 0 : _l.missing) == null ? void 0 : _m.join("\n");
+    const doneTip = (_o = (_n = totals.styles) == null ? void 0 : _n.missing) == null ? void 0 : _o.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");

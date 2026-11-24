@@ -9682,88 +9682,54 @@ test('B.33 mergeScopes — ALL_FILLS가 들어가면 개별 칠 용도를 빼고
   assert.deepEqual(mergeScopes(['GAP'], ['CORNER_RADIUS'], 'FLOAT').sort(), ['CORNER_RADIUS', 'GAP']);
 });
 
-/* ---- 끈 값은 연결도 안 함(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35 — 2026-11-24 실기) ---- */
-const greyFrame = (id, bound) => ({
-  type: 'FRAME', id, name: id,
-  fills: [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2 }, ...(bound ? { boundVariables: { color: { type: 'VARIABLE_ALIAS', id: bound } } } : {}) }],
-  strokes: [], effects: [],
-  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
-});
-
-test('B.35 끈 값(color|#333333)은 실제 연결에서 붙이지 않는다 — 사유 make-off · 이미 붙은 곳 그대로 · 빼지 않으면 붙임', async () => {
-  installFigma();
-  await createTokens([{ name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' }], 16);
-  const g = globalThis.figma._state.variables.find((v) => v.name === 'color/gray/800');
-  const { tokenOffKey } = await import('../dist/pure.mjs');
-  const off = new Set([tokenOffKey({ category: 'color', value: '#333333' })]);
-  const a = greyFrame('a', g.id);
-  const b = greyFrame('b');
-  const res = await bindSelection([a, b], true, {}, { noNewRoles: true, excludeValue: off });
-  assert.equal(res.bound, 0);
-  assert.equal(res.reasons['make-off'], 1, '안 붙은 b만 make-off');
-  assert.equal(b.fills[0].boundVariables, undefined, '끈 값은 붙이지 않음');
-  assert.equal(a.fills[0].boundVariables.color.id, g.id, '이미 붙은 곳은 그대로');
-  // 줄을 켜면(빼는 키 없음) 지금처럼 붙인다
-  const b2 = greyFrame('b2');
-  const on = await bindSelection([b2], true, {}, { noNewRoles: true });
-  assert.equal(on.bound, 1);
-  assert.equal(b2.fills[0].boundVariables.color.id, g.id);
-  // 다른 값의 키만 빼면 영향 없음
-  const b3 = greyFrame('b3');
-  const other = await bindSelection([b3], true, {}, { noNewRoles: true, excludeValue: new Set(['color|#3d5fdb']) });
-  assert.equal(other.bound, 1);
-});
-
-test('B.35 code.ts APPLY excludeValues — 실제 연결만 넘기고 찾기(preview)는 그대로 센다', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  await createTokens([{ name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' }], 16);
-  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, fills: [], strokes: [], effects: [], layoutMode: 'NONE', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [], parent: { type: 'PAGE' } };
-  const b = { ...greyFrame('b'), visible: true, parent: root };
-  root.children = [b];
-  registerNodes(figma, [root, b]);
-  let out = await p.send({ type: 'APPLY', preview: true, nodeIds: ['root'], reqId: 1, excludeValues: ['color|#333333'] });
-  assert.equal(ofType(out, 'APPLY_RESULT')[0].reasons['make-off'] ?? 0, 0, '찾기는 빼지 않는다');
-  out = await p.send({ type: 'APPLY', preview: false, nodeIds: ['root'], reqId: 2, skipTextStyleNodes: true, excludeValues: ['color|#333333'] }); // skipTextStyleNodes와 함께(1회차 검토 R1-10 ⑤)
-  const r = ofType(out, 'APPLY_RESULT')[0];
-  assert.equal(r.reasons['make-off'], 1);
-  assert.equal(b.fills[0].boundVariables, undefined);
-});
-
-test('B.35 합친 색 줄(칠 · 그림자 같은 #333333)을 끄면 그림자도 붙이지 않는다(1회차 검토 R1-1)', async () => {
+/* ---- 7-8 A 만들기 연결 단계 — only(ia-v4 §4.3 B.35 ①) ---- */
+test('B.35 only — 켠 값 · 묶음만 붙고, 끈 값 · 같은 값 다른 용도 자리는 그대로', async () => {
   installFigma();
   await createTokens([
-    { name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' },
-    { name: 'color/gray/800-fx', category: 'effectColor', sources: ['effectColor'], value: '#333333' },
+    { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'color/ff0000', category: 'color', sources: ['fill'], value: '#ff0000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
   ], 16);
-  const { tokenOffKey } = await import('../dist/pure.mjs');
-  // 만들기 화면은 같은 이름을 한 줄(category color)로 합친다 — 그 줄의 키
-  const off = new Set([tokenOffKey({ category: 'color', value: '#333333' })]);
-  const node = {
-    ...greyFrame('fx'),
-    effects: [{ type: 'DROP_SHADOW', color: { r: 0.2, g: 0.2, b: 0.2, a: 1 }, offset: { x: 0, y: 1 }, radius: 0, visible: true }],
-  };
-  const res = await bindSelection([node], true, {}, { noNewRoles: true, excludeValue: off });
-  assert.equal(res.bound, 0);
-  assert.equal(res.reasons['make-off'], 2, '칠 · 그림자 모두 make-off');
-  assert.equal(node.fills[0].boundVariables, undefined);
-  assert.equal(node.effects[0].boundVariables, undefined, '그림자도 붙이지 않음');
+  const mk = (id, hex, gap) => ({
+    type: 'FRAME', id, name: id, fills: [{ type: 'SOLID', color: hex === '#000000' ? { r: 0, g: 0, b: 0 } : { r: 1, g: 0, b: 0 } }], strokes: [], effects: [],
+    layoutMode: 'HORIZONTAL', itemSpacing: gap, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], parent: { type: 'PAGE' },
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  });
+  const a = mk('a', '#000000', 16);
+  const b = mk('b', '#ff0000', 16);
+  const all = await bindSelection([mk('a0', '#000000', 16), mk('b0', '#ff0000', 16)], false, {}, { noNewRoles: true });
+  assert.ok(all.bound >= 2, '거르지 않으면 두 색 모두 후보');
+  // #000000(칠 · 프레임)만 켬 — #ff0000 · 간격 16은 끔
+  const res = await bindSelection([a, b], true, {}, { noNewRoles: true, only: [{ value: '#000000', groups: ['ALL_FILLS|FRAME_FILL'] }] });
+  assert.equal(res.bound, 1);
+  assert.ok(a.fills[0].boundVariables?.color, '켠 값은 붙음');
+  assert.equal(b.fills[0].boundVariables, undefined, '끈 값은 그대로');
+  assert.equal(a._bound?.itemSpacing, undefined, '끈 간격은 그대로');
+  assert.equal(res.reasons['no-match'] ?? 0, 0, '걸러진 자리는 사유 없이 버린다');
+  // 같은 값이지만 다른 묶음(글자 칠) → 안 붙음
+  const c = mk('c', '#000000', 16);
+  const r2 = await bindSelection([c], true, {}, { noNewRoles: true, only: [{ value: '#000000', groups: ['ALL_FILLS|TEXT_FILL'] }] });
+  assert.equal(r2.bound, 0);
+  // 숫자 값만 같고 묶음이 다르면(글자 크기 16) 간격 16은 안 붙음
+  const d = mk('d', '#000000', 16);
+  const r3 = await bindSelection([d], true, {}, { noNewRoles: true, only: [{ value: 16, groups: ['FONT_SIZE'] }] });
+  assert.equal(r3.bound, 0);
+  assert.equal(d._bound?.itemSpacing, undefined);
+  // 간격 16 켬 → 붙음
+  const e = mk('e', '#000000', 16);
+  const r4 = await bindSelection([e], true, {}, { noNewRoles: true, only: [{ value: 16, groups: ['GAP'] }] });
+  assert.equal(r4.bound, 1);
+  assert.ok(e._bound?.itemSpacing);
 });
 
-test('B.35 유료 경로 — 꺼진 값은 새 Semantic을 만들지 않고 붙이지 않는다(1회차 검토 R1-10 ①)', async () => {
-  const figma = installFigma();
-  await createTokens([{ name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' }], 16);
-  const before = figma._state.variables.length;
-  const node = greyFrame('paid');
-  const res = await bindSelection([node], true, {}, { excludeValue: new Set(['color|#333333']) });
-  assert.equal(res.bound, 0);
-  assert.equal(res.reasons['make-off'], 1);
-  assert.ok(!res.newRoles, '새 Semantic 꼬리 없음');
-  assert.equal(figma._state.variables.length, before, '변수가 늘지 않음');
-  assert.equal(node.fills[0].boundVariables, undefined);
-  // 빼지 않으면 유료는 지금처럼 새 Semantic을 만들어 붙인다
-  const node2 = greyFrame('paid2');
-  const on = await bindSelection([node2], true, {});
-  assert.equal(on.bound, 1);
-  assert.ok(node2.fills[0].boundVariables);
+test('B.35 only — 알약 자리는 9999로 견준다(원래 값 150 아님)', async () => {
+  installFigma();
+  await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
+  const pill = () => a20Frame('p' + Math.random(), { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
+  const n1 = pill();
+  const r1 = await bindSelection([n1], true, {}, { only: [{ value: 9999, groups: ['CORNER_RADIUS'] }] });
+  assert.equal(r1.bound, 4);
+  const n2 = pill();
+  const r2 = await bindSelection([n2], true, {}, { only: [{ value: 150, groups: ['CORNER_RADIUS'] }] });
+  assert.equal(r2.bound, 0);
 });

@@ -138,9 +138,12 @@ export const STRINGS: Record<string, string> = {
   'wizard.seq.renameDone': '{count}개 이름 적용',
   'wizard.seq.bindDone': '{n}곳 연결',
   'wizard.seq.bindRoles': ' · 새 Semantic {k}개',
+  'wizard.seq.bindTs': ' · Text Style {t}곳',
+  'wizard.seq.bindTsOnly': 'Text Style {t}곳 연결',
+  'wizard.seq.bindNoneOn': '연결할 켠 값이 없어요',
+  'wizard.seq.bindTsFail': ' · 텍스트 스타일 연결 못 함',
   'wizard.seq.bindNone': '연결 0곳 — 변수와 값이 같은 곳이 없어요',
   'wizard.seq.bindAllBound': '연결 0곳 — 이미 모두 연결돼 있어요',
-  'wizard.seq.bindAllOff': '연결 0곳 — 남은 곳은 끈 값이에요',
   'wizard.seq.bindNoTier': '연결 0곳 — 계층으로 쓸 변수가 없어요',
 
   // 마법사 완료 요약(summarize, wizard.ts)

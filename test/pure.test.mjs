@@ -3854,24 +3854,29 @@ test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 �
   assert.deepEqual(['FLOAT', 'STRING', 'BOOLEAN', 'COLOR'].map(varTypeMark), ['#', 'Aa', '✓', '']);
 });
 
-/* ---- 끈 값 키(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35) ---- */
-test('B.35 tokenOffKey · slotOffKey — 색(칠 · 선 · 그림자 한 종류) · 반투명 · 간격 · 알약 반경(9999 줄) · 글꼴 · 소수 반올림이 같은 키', async () => {
-  const { tokenOffKey, slotOffKey } = await import('../dist/pure.mjs');
-  assert.equal(tokenOffKey({ category: 'color', value: '#333333' }), 'color|#333333');
-  assert.equal(slotOffKey('fills', 'color', '#333333'), 'color|#333333');
-  assert.equal(slotOffKey('strokes', 'color', '#333333'), 'color|#333333');
-  assert.equal(tokenOffKey({ category: 'color', value: '#000000', alpha: 0.08 }), slotOffKey('fills', 'color', '#000000@0.08'));
-  assert.equal(tokenOffKey({ category: 'effectColor', value: '#000000', alpha: 0.25 }), slotOffKey('effects', 'color', '#000000@0.25'));
-  assert.equal(slotOffKey('effects', 'color', '#333333'), tokenOffKey({ category: 'color', value: '#333333' }), '그림자 색도 색 키 하나 — 만들기가 같은 이름의 칠 · 그림자 색을 한 줄(color)로 합친다(1회차 검토 R1-1)');
-  assert.equal(tokenOffKey({ category: 'effectColor', value: '#333333' }), 'color|#333333', '그림자만 쓰는 색 줄도 color 키');
-  assert.equal(tokenOffKey({ category: 'gap', value: 8 }), slotOffKey('itemSpacing', 'num', 8));
-  assert.equal(tokenOffKey({ category: 'gap', value: 8 }), slotOffKey('paddingLeft', 'num', 8));
-  assert.equal(tokenOffKey({ category: 'radius', value: 4 }), slotOffKey('topLeftRadius', 'num', 4));
-  assert.equal(tokenOffKey({ category: 'radius', value: 9999 }), slotOffKey('topLeftRadius', 'num', 24, 9999), '알약 반경 자리는 9999');
-  assert.notEqual(tokenOffKey({ category: 'radius', value: 24 }), slotOffKey('topLeftRadius', 'num', 24, 9999), '알약 자리는 원래 값(24) 줄과 상관없다');
-  assert.equal(tokenOffKey({ category: 'strokeWidth', value: 1 }), slotOffKey('strokeTopWeight', 'num', 1));
-  assert.equal(tokenOffKey({ category: 'size', value: 24 }), slotOffKey('width', 'num', 24));
-  assert.equal(tokenOffKey({ category: 'fontFamily', value: 'Inter' }), slotOffKey('fontFamily', 'text', 'Inter'));
-  assert.equal(tokenOffKey({ category: 'lineHeight', value: 20 }), slotOffKey('lineHeight', 'text', 20.001));
-  assert.equal(slotOffKey('unknownField', 'num', 1), null, '종류를 모르는 필드는 키 없음');
+test('B.35 tokenGroups · libSameGroups · onlyItems — 묶음 · 라이브러리 같은 값 묶음 뺌 · 묶음 0개 토큰 뺌', async () => {
+  const { tokenGroups, libSameGroups, onlyItems } = await import('../dist/pure.mjs');
+  const fill = { name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { 'ALL_FILLS|FRAME_FILL': 10, 'ALL_FILLS|TEXT_FILL': 3 } };
+  const bound = { name: 'color/green/500', category: 'color', value: '#00AA00', freeBy: {} }; // 모두 붙음
+  const fs = { name: 'font-size/16', category: 'fontSize', value: 16 };
+  const fam = { name: 'font-family/Inter', category: 'fontFamily', value: 'Inter' };
+  const old = { name: 'spacing/8', category: 'gap', value: 8 }; // freeBy 없는 옛 토큰
+  assert.deepEqual(tokenGroups(fill), ['ALL_FILLS|FRAME_FILL', 'ALL_FILLS|TEXT_FILL']);
+  assert.deepEqual(tokenGroups(bound), []);
+  assert.deepEqual(tokenGroups(fs), ['FONT_SIZE']);
+  assert.deepEqual(tokenGroups(fam), ['FONT_FAMILY']);
+  assert.deepEqual(tokenGroups(old), ['GAP']);
+  // 라이브러리 #3B82F6 — FRAME_FILL만 받음 → 프레임 칠 묶음만 같은 값
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#3b82f6' }, scopes: ['FRAME_FILL'] }, { type: 'FLOAT', value: { kind: 'number', text: '16' }, scopes: ['GAP'] }];
+  assert.deepEqual(libSameGroups(fill, libs), ['ALL_FILLS|FRAME_FILL']);
+  assert.deepEqual(libSameGroups(fs, libs), [], '라이브러리 spacing 16(GAP)은 글자 크기 묶음과 무관');
+  const items = onlyItems([fill, bound, fs, fam, old], libs);
+  assert.deepEqual(items, [
+    { value: '#3B82F6', groups: ['ALL_FILLS|TEXT_FILL'] },
+    { value: 16, groups: ['FONT_SIZE'] },
+    { value: 'Inter', groups: ['FONT_FAMILY'] },
+    { value: 8, groups: ['GAP'] },
+  ]);
+  assert.deepEqual(onlyItems([{ ...fill, freeBy: { 'ALL_FILLS|FRAME_FILL': 10 } }], libs), [], '묶음이 모두 라이브러리 같은 값이면 토큰을 뺀다');
+  assert.deepEqual(onlyItems([{ name: 'x', category: 'color', value: '#000000', alpha: 0.1, freeBy: { EFFECT_COLOR: 1 } }], []), [{ value: '#000000', alpha: 0.1, groups: ['EFFECT_COLOR'] }]);
 });
