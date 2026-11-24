@@ -2470,10 +2470,10 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 
 계기: 실기 피드백 "변수 연결과 글자 스타일" — 라이브러리 텍스트 스타일을 쓰는 파일에서 값이 같은 글자가 Text Style 후보가 되지 않음. 줄 번호는 커밋 `f4754f0` 기준이다.
 
-- [ ] 명세 검토(코드 대조) 중대 결함 0 → 화면 시안(대략 시안 확인함 — 표시 없음, 바뀐 화면 없음)
+- [x] 명세 검토(코드 대조) 중대 결함 0(4회차) → 화면 시안(대략 시안 확인함 — 표시 없음, 화면 모양은 바뀌지 않고 줄 · 수만 늘어남)
 - [ ] `src/lib/variables.ts` 새 `remoteTextStyles(roots, extraIds?)`: 현재 페이지 ∪ 루트가 있는 페이지의 글자(`findAllWithCriteria({types: ['TEXT']})`)에서 `textStyleId`(빈 값 아닌 문자열)를 모으고 + `extraIds` → id마다 `getStyleByIdAsync` 한 번 → `remote && type === 'TEXT'`만. `figma.currentPage?.findAllWithCriteria`가 없으면(테스트 목) 빈 목록.
 - [ ] `textStyleIndex(remote)`(1915): 로컬 먼저(지금 그대로) → 원격은 키에 로컬이 없을 때만(원격끼리 다른 id 둘 이상이면 null). 호출하는 곳(`planExistingTextStyles`(PREVIEW의 `wm.roots`) · `applyTextStyleRows`(루트 = 줄의 글자 + 줄의 styleId) · `textStyleCandidateTest`(APPLY — `withLocalMains(sel).roots`, 미리보기와 같은 범위) · `applyRegisteredTextStyles` → 안의 `applyTextStyleRows`에 인덱스 넘김 · `applyExistingTextStyles`)에 루트를 넘긴다. `code.ts`의 `PREVIEW_TEXT_STYLES` · `APPLY`(skipTextStyleNodes) · `APPLY_SELECTED` · `CREATE_TEXT_STYLES`.
-- [ ] 만들기 Text Style 탭(RT-D5): reqId `SCAN_TEXT_STYLES`에서 `splitDecimalClusters` 뒤 `rest`의 로컬 앵커 없는 묶음 중 표본 글자(`TextSample.id`)가 모두 같은 원격 스타일 하나로 정해지는(붙어 있음 또는 인덱스가 고름) 묶음을 뺀다. 루트 페이지마다 현재 페이지가 아니면 `loadAsync` 뒤 훑는다.
+- [ ] 만들기 Text Style 탭(RT-D5): reqId `SCAN_TEXT_STYLES`에서 `splitDecimalClusters` 뒤 `rest`의 로컬 앵커 없는 묶음 중 표본 글자(`TextSample.id`)가 모두 같은 원격 스타일 하나로 정해지는(인스턴스 안쪽이 아니고, 붙어 있으며 typoKey가 같거나 인덱스가 고름) 묶음을 뺀다. 노드는 `scanTextStyles`가 걸은 것을 id → 노드 맵으로 받는다(`TextScanResult`에 맵을 더하거나 내부 함수로 나눔). 루트 페이지마다 현재 페이지가 아니면 `loadAsync` 뒤 훑는다.
 - [ ] 단위 테스트(`test/figma.test.mjs` — 목에 `currentPage` · 원격 스타일(`remote: true`)을 더하고 `getStyleByIdAsync`가 둘 다 찾게): 원격만 맞음 → 줄 · 붙음 / 로컬 · 원격 함께 → 로컬 / 원격 둘 같은 키 → ambiguous / 원격 목록 밖(다른 페이지에만)의 원격은 후보 아님 · 기준 루트가 있는 페이지의 원격은 후보 / 구간 스타일(mixed) 글자의 스타일은 모으지 않음 / `textStyleCandidateTest` · `applyTextStyleRows` 다시 확인도 원격을 봄(줄 styleId 더함) / 만들기 후보에서 원격과 같은 묶음 빠짐 · 로컬 앵커 묶음은 그대로 · 표본 하나가 대문자(UPPER)라 R과 typoKey가 다르면 묶음 그대로 · R이 붙었지만 크기를 바꾼 글자만의 묶음 → 그대로 · 인스턴스 안쪽 표본이 섞인 묶음 → 그대로 · 같은 tsSig 원격 둘(모호)이면 묶음 그대로.
 - [ ] 4검사 · `dist/`
 - [ ] 실기 확인(사용자, 피그마): 라이브러리 텍스트 스타일이 붙은 글자가 있는 페이지에서, 스타일 없고 값이 같은 글자를 고름 → 연결 화면 Text Style 줄에 그 스타일 · [연결] 뒤 붙음 / 만들기 실행 결과 " · Text Style {t}곳"
