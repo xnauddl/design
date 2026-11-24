@@ -1439,6 +1439,35 @@ async function saveAndGet(p) {
   await p.close();
 }
 {
+  // B.36 — 끈 값만 남은 연결 0곳(make-off만 · already-bound 없음)도 ✓ · 다 됨(2026-11-24, ia-v4 §4.3 "연결 0곳 사유"). 17과 같은 흐름
+  const p = await open(560, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w2c'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+  await p.waitForTimeout(30);
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(20);
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(60);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'make-off': 2 }, preview: false, reqId: ap.reqId });
+  await wizTs(p, ap.reqId);
+  await p.waitForTimeout(80);
+  check('B.36 연결 0곳 · 남은 곳은 끈 값(make-off) → ✓ · 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
+  await p.close();
+}
+{
   const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
@@ -4497,6 +4526,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   check('B.35 ① 연결 단계 APPLY.only — 켠 줄(spacing/16)만 · 끈 줄(spacing/8) · free 0 줄 없음', JSON.stringify(ap?.only) === JSON.stringify([{ value: 16, groups: ['GAP'] }]), JSON.stringify(ap?.only));
+  check('B.36 APPLY.off — 끈 줄(spacing/8) 실림 · 켠 줄 · free 0 줄(묶음 0개)은 없음', JSON.stringify(ap?.off) === JSON.stringify([{ value: 8, groups: ['GAP'] }]), JSON.stringify(ap?.off));
   await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   const tsRows = [{ styleId: 'S:1', name: 'body/medium', nodeIds: ['t1', 't2'], summary: '' }];
   const pts = await wizTs(p, ap.reqId, tsRows, 9);

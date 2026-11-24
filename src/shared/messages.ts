@@ -220,7 +220,7 @@ export type UiToCode =
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
   // 매칭은 언제나 "같은 값"(IA v3 §2.11 — 숫자 소수 2자리, 색 #RRGGBB + 양쪽 불투명). 허용오차는 없앴다.
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
-  | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean; only?: { value: string | number; alpha?: number; groups: string[] }[] } // preview: UX1 dry-run(바인딩 없음)
+  | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean; only?: { value: string | number; alpha?: number; groups: string[] }[]; off?: { value: string | number; alpha?: number; groups: string[] }[] } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'PREVIEW_TEXT_STYLES'; reqId: number; nodeIds?: string[] } // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다
   | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string; pillFrom?: number; scopeAdd?: string }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)

@@ -9733,3 +9733,36 @@ test('B.35 only — 알약 자리는 9999로 견준다(원래 값 150 아님)', 
   const r2 = await bindSelection([n2], true, {}, { only: [{ value: 150, groups: ['CORNER_RADIUS'] }] });
   assert.equal(r2.bound, 0);
 });
+
+test('B.36 off — only가 버린 자리 중 꺼진 줄 값만 make-off로 센다(skipped 그대로) · ② 묶음 · 소수 · off에 없는 값은 안 셈', async () => {
+  installFigma();
+  await createTokens([
+    { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'color/ff0000', category: 'color', sources: ['fill'], value: '#ff0000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ], 16);
+  const mk = (id, hex, gap) => ({
+    type: 'FRAME', id, name: id, fills: [{ type: 'SOLID', color: hex === '#000000' ? { r: 0, g: 0, b: 0 } : { r: 1, g: 0, b: 0 } }], strokes: [], effects: [],
+    layoutMode: 'HORIZONTAL', itemSpacing: gap, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], parent: { type: 'PAGE' },
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  });
+  const only = [{ value: '#000000', groups: ['ALL_FILLS|FRAME_FILL'] }];
+  // 끈 줄: #ff0000(칠) · 간격 16 → 둘 다 make-off
+  const base = await bindSelection([mk('a0', '#000000', 16), mk('b0', '#ff0000', 16)], true, {}, { noNewRoles: true, only });
+  const r1 = await bindSelection([mk('a', '#000000', 16), mk('b', '#ff0000', 16)], true, {}, {
+    noNewRoles: true, only, off: [{ value: '#ff0000', groups: ['ALL_FILLS|FRAME_FILL'] }, { value: 16, groups: ['GAP'] }],
+  });
+  assert.equal(r1.bound, 1);
+  assert.equal(r1.reasons['make-off'], 3, '#ff0000 칠 1 + 간격 16 두 곳');
+  assert.equal(r1.skipped, base.skipped, 'skipped는 그대로');
+  assert.equal(base.reasons['make-off'] ?? 0, 0, 'off가 없으면 세지 않는다(B.35 그대로)');
+  // off에 없는 값(간격 16 줄이 없음 — ② 묶음 · 줄 없는 값과 같음) → 세지 않음
+  const r2 = await bindSelection([mk('c', '#000000', 16)], true, {}, { noNewRoles: true, only, off: [{ value: '#ff0000', groups: ['ALL_FILLS|FRAME_FILL'] }] });
+  assert.equal(r2.reasons['make-off'] ?? 0, 0);
+  // 같은 값이라도 묶음이 다르면 세지 않음(켠 줄의 ②로 빠진 묶음은 off에 없다)
+  const r3 = await bindSelection([mk('d', '#ff0000', 0)], true, {}, { noNewRoles: true, only, off: [{ value: '#ff0000', groups: ['ALL_FILLS|TEXT_FILL'] }] });
+  assert.equal(r3.reasons['make-off'] ?? 0, 0);
+  // 소수 간격(16.5 — 줄이 없는 값)은 off에 16이 있어도 세지 않음
+  const r4 = await bindSelection([mk('e', '#000000', 16.5)], true, {}, { noNewRoles: true, only, off: [{ value: 16, groups: ['GAP'] }] });
+  assert.equal(r4.reasons['make-off'] ?? 0, 0);
+});

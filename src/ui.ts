@@ -3942,9 +3942,12 @@ async function runMake(): Promise<void> {
         wizBindPending = true;
         try {
           // ① 켠 줄의 값만 · ② 라이브러리와 같은 값 묶음은 뺌(ia-v4 §4.3 "B.35 뒤 연결 단계")
-          const only = onlyItems(mkSendTokens(), libDirectNow());
+          const sendToks = mkSendTokens();
+          const only = onlyItems(sendToks, libDirectNow());
+          // 꺼진 줄(보내지 않은 추출 토큰)의 값 — 끈 값만 남은 0곳을 가린다(B.36). ②로 빼지 않는다.
+          const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
           const r = only.length
-            ? await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, ['APPLY_RESULT'], wizBindReq)
+            ? await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only, ...(off.length ? { off } : {}) }, ['APPLY_RESULT'], wizBindReq)
             : null; // 켠 값이 없으면 변수 연결은 건너뛴다(④는 돈다)
           const n = r?.bound ?? 0;
           if (r) {
@@ -3972,9 +3975,11 @@ async function runMake(): Promise<void> {
           else if (ts) results.push({ id, mark: tsFail ? 'warn' : 'ok', text: t('wizard.seq.bindTsOnly', { t: ts }) + (tsFail ? t('wizard.seq.bindTsFail') : '') });
           else if (!r) results.push({ id, mark: tsFail ? 'warn' : 'ok', text: t('wizard.seq.bindNoneOn') + (tsFail ? t('wizard.seq.bindTsFail') : '') });
           else {
-            const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !((reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0)) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
+            const noMatch = (reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0);
+            const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : !noMatch && (reasons['make-off'] ?? 0) > 0 ? 'wizard.seq.bindAllOff' : (reasons['already-bound'] ?? 0) > 0 && !noMatch ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
             // 이미 모두 연결됨이면 할 일이 없었던 것 — 실패가 아니라 ✓, 결과도 "다 됨"(2026-11-19 사용자 결정, ia-v4 §4.3 "연결 0곳 사유")
-            if (zero === 'wizard.seq.bindAllBound' && !tsFail) results.push({ id, mark: 'ok', text: t(zero) });
+            // 끈 값만 남았으면 사용자가 끈 것이라 ✓(2026-11-24, B.36)
+            if ((zero === 'wizard.seq.bindAllBound' || zero === 'wizard.seq.bindAllOff') && !tsFail) results.push({ id, mark: 'ok', text: t(zero) });
             else {
               results.push({ id, mark: 'warn', text: t(zero) + (tsFail ? t('wizard.seq.bindTsFail') : '') });
               stay = true;
