@@ -36,6 +36,7 @@ import {
   applyTextStyleRows,
   applyRegisteredTextStyles,
   textStyleCandidateTest,
+  dropRemoteClusters,
   bindSelection,
   collectLocalMains,
   createRole,
@@ -9765,4 +9766,112 @@ test('B.36 off — only가 버린 자리 중 꺼진 줄 값만 make-off로 센�
   // 소수 간격(16.5 — 줄이 없는 값)은 off에 16이 있어도 세지 않음
   const r4 = await bindSelection([mk('e', '#000000', 16.5)], true, {}, { noNewRoles: true, only, off: [{ value: 16, groups: ['GAP'] }] });
   assert.equal(r4.reasons['make-off'] ?? 0, 0);
+});
+
+/* ---- B.37 원격(라이브러리) 텍스트 스타일 후보(ia-v4 §4.2 RT-D1–RT-D5) ---- */
+function remoteStyle(id, name, fontSize, family = 'Inter') {
+  return { id, name, type: 'TEXT', remote: true, fontName: { family, style: 'Regular' }, fontSize, lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 } };
+}
+function rtText(id, fontSize, extra = {}) {
+  return {
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'hi', visible: true, textStyleId: '', _styleId: null,
+    async setTextStyleIdAsync(sid) { this._styleId = sid; this.textStyleId = sid; },
+    ...extra,
+  };
+}
+/** 원격 스타일 목: getStyleByIdAsync가 원격도 찾고, 페이지는 findAllWithCriteria로 글자를 준다. */
+function installRemote(figma, remotes, pageTexts, otherPages = []) {
+  const local = figma.getStyleByIdAsync;
+  figma.getStyleByIdAsync = async (id) => remotes.find((s) => s.id === id) ?? (await local(id));
+  const page = { type: 'PAGE', id: 'page:cur', parent: null, findAllWithCriteria: () => pageTexts };
+  for (const t of pageTexts) t.parent ??= page;
+  figma.currentPage = page;
+  for (const op of otherPages) {
+    op.loaded = false;
+    op.loadAsync = async () => { op.loaded = true; };
+    op.findAllWithCriteria = () => { assert.ok(op.loaded, '다른 페이지는 loadAsync 뒤에 훑는다'); return op.texts; };
+    for (const t of op.texts) t.parent ??= op;
+  }
+  return page;
+}
+
+test('B.37 원격 스타일 — 현재 페이지에 쓰인 원격만 후보 · 붙음 / 로컬 우선 / 원격 둘 같은 키는 모호', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([{ name: 'local/24', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
+  const local24 = figma._state.textStyles.find((s) => s.name === 'local/24');
+  const R16 = remoteStyle('S:r16', 'Lib/Body', 16);
+  const R24 = remoteStyle('S:r24', 'Lib/Title', 24);
+  const R20a = remoteStyle('S:r20a', 'Lib/A', 20);
+  const R20b = remoteStyle('S:r20b', 'Lib/B', 20);
+  const R40 = remoteStyle('S:r40', 'Lib/Huge', 40); // 다른 페이지에만 쓰임 → 후보 아님
+  const used = [16, 24, 20, 20].map((fs, i) => rtText(`used${i}`, fs, { textStyleId: [R16, R24, R20a, R20b][i].id }));
+  installRemote(figma, [R16, R24, R20a, R20b, R40], used);
+  const a = rtText('a', 16), b = rtText('b', 24), c = rtText('c', 20), d = rtText('d', 40);
+  const plan = await planExistingTextStyles([a, b, c, d]);
+  assert.deepEqual(plan.rows.map((r) => [r.name, r.nodeIds]).sort(), [['Lib/Body', ['a']], ['local/24', ['b']]]);
+  assert.equal(plan.skipReasons.ambiguous, 1, '원격 둘이 같은 키 → 모호');
+  assert.equal(plan.skipReasons.noStyle, 1, '다른 페이지에만 쓰인 원격은 후보 아님');
+  registerNodes(figma, [a, b]);
+  const r = await applyTextStyleRows([{ styleId: R16.id, nodeIds: ['a'] }, { styleId: local24.id, nodeIds: ['b'] }]);
+  assert.equal(r.applied, 2);
+  assert.equal(a._styleId, R16.id);
+  assert.equal(b._styleId, local24.id);
+  // 텍스트 스타일이 먼저(skipTextStyleNodes) 판정도 원격을 본다
+  const test1 = await textStyleCandidateTest([rtText('e', 16)]);
+  assert.equal(test1(rtText('f', 16)), true);
+  assert.equal(test1(rtText('g', 40)), false);
+});
+
+test('B.37 원격 스타일 — 기준 루트가 있는 페이지도 훑는다(loadAsync) · 다시 확인은 줄 styleId를 더한다 · 구간 스타일은 모으지 않음', async () => {
+  const figma = installFigma();
+  const R18 = remoteStyle('S:r18', 'Lib/Eighteen', 18);
+  const R30 = remoteStyle('S:r30', 'Lib/Thirty', 30);
+  const other = { type: 'PAGE', id: 'page:other', parent: null, texts: [] };
+  const onOther = rtText('o1', 18, { textStyleId: R18.id });
+  const target = rtText('t', 18);
+  other.texts.push(onOther, target);
+  const mixedUser = rtText('m', 30, { textStyleId: figma.mixed });
+  installRemote(figma, [R18, R30], [mixedUser], [other]);
+  const plan = await planExistingTextStyles([target]);
+  assert.deepEqual(plan.rows.map((r) => r.name), ['Lib/Eighteen'], '루트 페이지의 원격');
+  assert.equal((await planExistingTextStyles([rtText('x', 30)])).rows.length, 0, '구간 스타일(mixed) 글자의 스타일은 모으지 않는다');
+  // 다시 확인: 그 원격을 쓰던 글자가 사라져도 줄의 styleId로 남는다
+  other.texts.splice(0, 1);
+  registerNodes(figma, [target]);
+  const r = await applyTextStyleRows([{ styleId: R18.id, nodeIds: ['t'] }]);
+  assert.equal(r.applied, 1);
+  assert.equal(target._styleId, R18.id);
+});
+
+test('B.37 원격 스타일 — 만들기 후보에서 원격과 같은 묶음만 뺀다(RT-D5)', async () => {
+  const figma = installFigma();
+  const R16 = remoteStyle('S:r16', 'Lib/Body', 16);
+  const R20a = remoteStyle('S:r20a', 'Lib/A', 20);
+  const R20b = remoteStyle('S:r20b', 'Lib/B', 20);
+  const used = [rtText('u16', 16, { textStyleId: R16.id }), rtText('u20a', 20, { textStyleId: R20a.id }), rtText('u20b', 20, { textStyleId: R20b.id })];
+  installRemote(figma, [R16, R20a, R20b], used);
+  const nodes = {
+    a: rtText('a', 16), b: rtText('b', 16), // 원격 16과 같음 → 빠짐
+    up1: rtText('up1', 24, { textCase: 'UPPER' }), up2: rtText('up2', 24), // 24는 원격 없음 → 그대로
+    c: rtText('c', 20), // 원격 둘(모호) → 그대로
+    o1: rtText('o1', 16, { textStyleId: R16.id, fontSize: 17 }), // R이 붙었지만 크기를 바꿈 → 그대로
+  };
+  const nodeById = new Map(Object.entries(nodes).map(([, n]) => [n.id, n]));
+  const clusters = [
+    { key: 'r16', nodeIds: ['a', 'b'] },
+    { key: 'mixUpper', nodeIds: ['up1', 'up2'] },
+    { key: 'amb', nodeIds: ['c'] },
+    { key: 'changed', nodeIds: ['o1'] },
+    { key: 'r16+attached', nodeIds: ['a', 'u16'] },
+    { key: 'anchored', nodeIds: ['b'] },
+  ];
+  nodeById.set('u16', used[0]);
+  const inst = { type: 'INSTANCE', id: 'inst', parent: null };
+  const inInst = rtText('ii', 16, { parent: inst });
+  nodeById.set('ii', inInst);
+  clusters.push({ key: 'instance', nodeIds: ['a', 'ii'] });
+  const kept = await dropRemoteClusters(clusters, nodeById, [], (c) => c.key === 'anchored');
+  assert.deepEqual(kept.map((c) => c.key), ['mixUpper', 'amb', 'changed', 'anchored', 'instance']);
 });
