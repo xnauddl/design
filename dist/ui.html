@@ -547,7 +547,7 @@
     .r-ghead .r-gcnt { color: var(--text-2); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 4px; }
     .r-ghead .r-gcnt:empty { display: none; }
     /* 컴포넌트 후보 줄 — 변형 세트의 변형 이름은 회색 보통 굵기(ia-v4 §4.3a-3) */
-    .r-title .r-var { font-weight: 400; color: var(--text-2); }
+    .r-sum.r-var { color: var(--text-2); white-space: normal; overflow: visible; overflow-wrap: anywhere; } /* 변형 줄 — 말줄임 없이 줄바꿈(ia-v4 §4.3a-3, 2026-11-24) */
     /* 베리언트 결과 — 머리 띠는 본문 글꼴, 항목은 mono 11px 보통 굵기 */
     #variantReport .r-ghead { font-family: var(--font); }
     #variantReport .r-title { font-weight: 400; }
@@ -729,6 +729,10 @@
     .tr-group .tr-name { font-size: 12.5px; }
     .tr-name.muted { font-weight: 500; color: var(--text-2); }
     .tr-cnt { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; margin-left: 4px; }
+    /* 만들기 결과 줄(ia-v4 §4.3 "일부 실패 · 건너뜀") — 단계 이름은 줄지 않고, 긴 결과 · 사유(Figma 오류 글 등)는 줄바꿈해 카드 안에 다 보인다 */
+    .tr.mk-res { align-items: baseline; padding-top: 7px; padding-bottom: 7px; }
+    .tr.mk-res .tr-car, .tr.mk-res .tr-name { flex: 0 0 auto; }
+    .tr.mk-res .tr-cnt { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
     .tr .grow { flex: 1 1 auto; min-width: 4px; }
     .tr-tag { font: 500 10px/16px var(--font); padding: 0 5px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); flex: 0 0 auto; white-space: nowrap; }
     .tr-tag.warn { background: var(--warn-subtle, #fff4e5); color: var(--warn); }
@@ -1564,6 +1568,7 @@
     "wizard.seq.bindTsFail": " \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC5F0\uACB0 \uBABB \uD568",
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
     // 진행 안내 단계 라벨·안내
@@ -7150,7 +7155,7 @@
     return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
   }
   function makeTreeRow(r, base, checked, onChange, readOnly = false) {
-    var _a3, _b;
+    var _a3, _b, _c;
     const indent = `${2 + (r.depth - base) * 12}px`;
     if (r.change === void 0 && r.keep) {
       const title2 = document.createElement("span");
@@ -7205,13 +7210,19 @@
     title.title = `${r.name} \u2192 ${r.change}`;
     let fromLine;
     if (r.replace === false) {
-      title.innerHTML = r.variant ? `<span class="tree-name">${escapeHtml(r.variant.set)}</span> <span class="r-var">${escapeHtml(r.variant.name)}</span>` : `<span class="tree-name">${escapeHtml(r.change)}</span>`;
+      title.innerHTML = `<span class="tree-name">${escapeHtml(r.variant ? r.variant.set : r.change)}</span>`;
       if (r.name !== r.change) fromLine = t("component.fromName", { name: r.name });
     } else {
       title.innerHTML = `<span class="before">${escapeHtml(r.name)}</span> \u2192 <span class="after">${escapeHtml(r.change)}</span>`;
     }
     const card = resultCard(__spreadProps(__spreadValues(__spreadProps(__spreadValues({}, readOnly ? {} : { check: cb }), { title, titleMono: true }), fromLine ? { summary: fromLine, summaryMono: true } : {}), { meta: (_b = r.badge) == null ? void 0 : _b.text }));
     if (fromLine) card.querySelector(".r-sum").title = title.title;
+    if (r.replace === false && ((_c = r.variant) == null ? void 0 : _c.name)) {
+      const vline = document.createElement("div");
+      vline.className = "r-sum mono r-var";
+      vline.textContent = r.variant.name;
+      card.querySelector(".r-title").after(vline);
+    }
     if (r.badge) {
       const meta = card.querySelector(".r-meta");
       meta.className = `tag tag-${r.badge.kind}`;
@@ -7988,7 +7999,7 @@
     box.appendChild(top);
     for (const r of mkResults != null ? mkResults : []) {
       const row = document.createElement("div");
-      row.className = "tr tr-head";
+      row.className = "tr tr-head mk-res";
       const mark = document.createElement("span");
       mark.className = "tr-car";
       mark.style.color = r.mark === "ok" ? "var(--ok)" : r.mark === "warn" ? "var(--warn)" : "var(--text-2)";
@@ -8050,7 +8061,7 @@
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -8131,8 +8142,10 @@
           wizBindReq = ++bindReqSeq;
           wizBindPending = true;
           try {
-            const only = onlyItems(mkSendTokens(), libDirectNow());
-            const r = only.length ? await wizardRequest({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, ["APPLY_RESULT"], wizBindReq) : null;
+            const sendToks = mkSendTokens();
+            const only = onlyItems(sendToks, libDirectNow());
+            const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
+            const r = only.length ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
             const n = (_e = r == null ? void 0 : r.bound) != null ? _e : 0;
             if (r) {
               totals.bound = r.bound;
@@ -8161,8 +8174,9 @@
             else if (ts) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindTsOnly", { t: ts }) + (tsFail ? t("wizard.seq.bindTsFail") : "") });
             else if (!r) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindNoneOn") + (tsFail ? t("wizard.seq.bindTsFail") : "") });
             else {
-              const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : ((_j = reasons["already-bound"]) != null ? _j : 0) > 0 && !(((_k = reasons["no-match"]) != null ? _k : 0) + ((_l = reasons["scope-add"]) != null ? _l : 0)) ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
-              if (zero === "wizard.seq.bindAllBound" && !tsFail) results.push({ id, mark: "ok", text: t(zero) });
+              const noMatch = ((_j = reasons["no-match"]) != null ? _j : 0) + ((_k = reasons["scope-add"]) != null ? _k : 0);
+              const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : !noMatch && ((_l = reasons["make-off"]) != null ? _l : 0) > 0 ? "wizard.seq.bindAllOff" : ((_m = reasons["already-bound"]) != null ? _m : 0) > 0 && !noMatch ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+              if ((zero === "wizard.seq.bindAllBound" || zero === "wizard.seq.bindAllOff") && !tsFail) results.push({ id, mark: "ok", text: t(zero) });
               else {
                 results.push({ id, mark: "warn", text: t(zero) + (tsFail ? t("wizard.seq.bindTsFail") : "") });
                 stay = true;
@@ -8188,7 +8202,7 @@
         break;
       }
     }
-    const finishedSteps = (_m = mkProg == null ? void 0 : mkProg.done) != null ? _m : [];
+    const finishedSteps = (_n = mkProg == null ? void 0 : mkProg.done) != null ? _n : [];
     rememberMainsBound(mkMainsDone, mkBase);
     mkRunning = false;
     mkProg = null;
@@ -8215,7 +8229,7 @@
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    const doneTip = (_o = (_n = totals.styles) == null ? void 0 : _n.missing) == null ? void 0 : _o.join("\n");
+    const doneTip = (_p = (_o = totals.styles) == null ? void 0 : _o.missing) == null ? void 0 : _p.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");

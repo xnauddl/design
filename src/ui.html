@@ -547,7 +547,7 @@
     .r-ghead .r-gcnt { color: var(--text-2); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 4px; }
     .r-ghead .r-gcnt:empty { display: none; }
     /* 컴포넌트 후보 줄 — 변형 세트의 변형 이름은 회색 보통 굵기(ia-v4 §4.3a-3) */
-    .r-title .r-var { font-weight: 400; color: var(--text-2); }
+    .r-sum.r-var { color: var(--text-2); white-space: normal; overflow: visible; overflow-wrap: anywhere; } /* 변형 줄 — 말줄임 없이 줄바꿈(ia-v4 §4.3a-3, 2026-11-24) */
     /* 베리언트 결과 — 머리 띠는 본문 글꼴, 항목은 mono 11px 보통 굵기 */
     #variantReport .r-ghead { font-family: var(--font); }
     #variantReport .r-title { font-weight: 400; }
@@ -729,6 +729,10 @@
     .tr-group .tr-name { font-size: 12.5px; }
     .tr-name.muted { font-weight: 500; color: var(--text-2); }
     .tr-cnt { color: var(--text-2); font-size: 11px; font-variant-numeric: tabular-nums; flex: 0 0 auto; margin-left: 4px; }
+    /* 만들기 결과 줄(ia-v4 §4.3 "일부 실패 · 건너뜀") — 단계 이름은 줄지 않고, 긴 결과 · 사유(Figma 오류 글 등)는 줄바꿈해 카드 안에 다 보인다 */
+    .tr.mk-res { align-items: baseline; padding-top: 7px; padding-bottom: 7px; }
+    .tr.mk-res .tr-car, .tr.mk-res .tr-name { flex: 0 0 auto; }
+    .tr.mk-res .tr-cnt { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
     .tr .grow { flex: 1 1 auto; min-width: 4px; }
     .tr-tag { font: 500 10px/16px var(--font); padding: 0 5px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); flex: 0 0 auto; white-space: nowrap; }
     .tr-tag.warn { background: var(--warn-subtle, #fff4e5); color: var(--warn); }

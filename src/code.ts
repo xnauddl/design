@@ -1409,6 +1409,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             ...(isPaid() ? {} : { noNewRoles: true }),
             // 만들기 실행의 연결 단계 — 켠 줄의 값만(IA v4 §4.3 B.35 ①)
             ...(msg.only && !msg.preview ? { only: msg.only } : {}),
+            // 꺼진 줄의 값 — 거름에서 버린 자리 가운데 이것과 맞는 자리만 make-off로 센다(IA v4 §4.3 B.36)
+            ...(msg.only && msg.off?.length && !msg.preview ? { off: msg.off } : {}),
           },
         );
         post({

@@ -1439,6 +1439,35 @@ async function saveAndGet(p) {
   await p.close();
 }
 {
+  // B.36 — 끈 값만 남은 연결 0곳(make-off만 · already-bound 없음)도 ✓ · 다 됨(2026-11-24, ia-v4 §4.3 "연결 0곳 사유"). 17과 같은 흐름
+  const p = await open(560, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['w2c'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(30);
+  const ex = (await sent(p, 'EXTRACT')).at(-1);
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+  await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+  await p.waitForTimeout(30);
+  await p.click('#makeTab-semantic');
+  await p.waitForTimeout(20);
+  await p.click('#makeTab-global');
+  await p.waitForTimeout(20);
+  await p.click('#btnMakeRun');
+  await p.waitForTimeout(30);
+  await recv(p, { type: 'CREATE_RESULT', reqId: (await sent(p, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1).reqId, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0 });
+  await p.waitForTimeout(60);
+  const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
+  await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'make-off': 2 }, preview: false, reqId: ap.reqId });
+  await wizTs(p, ap.reqId);
+  await p.waitForTimeout(80);
+  check('B.36 연결 0곳 · 남은 곳은 끈 값(make-off) → ✓ · 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
+  await p.close();
+}
+{
   const p = await open(560, 'select');
   await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
   await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
@@ -1983,9 +2012,9 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   check('23 후보 받음 → [등록] 풀림 · #btnRegisterComp.primary', !(await locked(p, '#btnRegisterComp')) && JSON.stringify(await prim()) === JSON.stringify(['btnRegisterComp']), JSON.stringify(await prim()));
   const ctg = await p.$eval('#compTreeGroup', (e) => ({ name: e.firstElementChild?.textContent, cnt: e.querySelector('.r-gcnt')?.textContent, bg: getComputedStyle(e).backgroundColor }));
   check('23 #compTreeGroup — "컴포넌트 후보" + "2개" 머리 띠', ctg.name === '컴포넌트 후보' && ctg.cnt === '2개' && ctg.bg === 'rgb(244, 245, 246)', JSON.stringify(ctg));
-  const crow = await p.$$eval('#compTree .r-card', (e) => e.map((c) => ({ name: c.querySelector('.r-title .tree-name')?.textContent, v: c.querySelector('.r-title .r-var')?.textContent ?? null, sum: c.querySelector('.r-sum')?.textContent ?? null, tag: c.querySelector('.tag')?.textContent, tip: c.querySelector('.r-title span')?.title })));
-  check('23 세트 후보 줄 — 제목 "Button" + 변형 "Type=primary" · 둘째 줄 "원래 이름 Button / primary" · 배지 [변형 세트]',
-    crow[0]?.name === 'Button' && crow[0]?.v === 'Type=primary' && crow[0]?.sum === '원래 이름 Button / primary' && crow[0]?.tag === '변형 세트' && crow[0]?.tip === 'Button / primary → Button · Type=primary', JSON.stringify(crow));
+  const crow = await p.$$eval('#compTree .r-card', (e) => e.map((c) => ({ name: c.querySelector('.r-title .tree-name')?.textContent, v: c.querySelector('.r-var')?.textContent ?? null, sum: c.querySelector('.r-sum:not(.r-var)')?.textContent ?? null, vAfterTitle: c.querySelector('.r-title')?.nextElementSibling?.classList.contains('r-var') ?? false, vWrap: c.querySelector('.r-var') ? getComputedStyle(c.querySelector('.r-var')).whiteSpace : null, tag: c.querySelector('.tag')?.textContent, tip: c.querySelector('.r-title span')?.title })));
+  check('23 세트 후보 줄 — 제목 "Button" · 변형 줄 "Type=primary"(제목 바로 아래 · 줄바꿈) · 원래 이름 줄 "원래 이름 Button / primary" · 배지 [변형 세트]',
+    crow[0]?.name === 'Button' && crow[0]?.v === 'Type=primary' && crow[0]?.vAfterTitle === true && crow[0]?.vWrap === 'normal' && crow[0]?.sum === '원래 이름 Button / primary' && crow[0]?.tag === '변형 세트' && crow[0]?.tip === 'Button / primary → Button · Type=primary', JSON.stringify(crow));
   check('23 이름이 같은 단일 줄은 둘째 줄 없음 · 배지 [컴포넌트]', crow[1]?.name === 'Like' && crow[1]?.sum === null && crow[1]?.tag === '컴포넌트', JSON.stringify(crow[1]));
   await p.click('#compAll'); // 일부 체크(indeterminate) → 전체 켬
   await p.click('#compAll'); // 전체 끔
@@ -2592,6 +2621,37 @@ async function fillBoth(p) {
   const after = await p.evaluate(() => Array.from(document.querySelectorAll('#colorCard button.primary, #createCard button.primary')).map((b) => b.id).join(','));
   check('25 마법사 단계 오류 → 만들기 화면 결과에 실패 · 카드 상태 자리에 오류 상자 없음 · 카드 primary 그대로', (await visible(p, '#makeResults')) && res.length > 0 && (await p.$$('.status .ux.danger')).length === 0 && before === after, JSON.stringify({ res, before, after }));
   await p.close();
+  {
+    // 긴 오류 글(Figma 연결 끊김 등) — 단계 이름이 밀려 사라지지 않고, 글은 줄바꿈해 카드 밖으로 나가지 않는다(ia-v4 §4.3 "일부 실패 · 건너뜀")
+    const q = await open(400, 'select');
+    await recv(q, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(q, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(q, { ...sel(1, 0), ids: ['w2'] });
+    await goSub(q, 'make');
+    await q.waitForTimeout(30);
+    const ex2 = (await sent(q, 'EXTRACT')).at(-1);
+    await recv(q, { type: 'EXTRACT_RESULT', reqId: ex2.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+    await recv(q, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(q, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: [] });
+    await q.waitForTimeout(30);
+    await recv(q, { type: 'CREATE_RESULT', reqId: (await sent(q, 'CREATE_TOKENS')).at(-1).reqId, preview: true, created: 1, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: { 'spacing/16': { state: 'new' } }, roleRows: [] });
+    await q.waitForTimeout(30);
+    await q.click('#btnMakeRun');
+    await q.waitForTimeout(30);
+    const cr2 = (await sent(q, 'CREATE_TOKENS')).filter((m) => !m.preview).at(-1);
+    await recv(q, { type: 'ERROR', message: 'Unable to establish connection to Figma after 10 seconds. Please check your internet connection and try again later.', op: 'CREATE_TOKENS', reqId: cr2.reqId });
+    await q.waitForTimeout(80);
+    const m = await q.evaluate(() => {
+      const box = document.getElementById('makeResults');
+      const row = Array.from(box.querySelectorAll('.tr-head.mk-res')).find((r) => r.textContent.includes('Unable'));
+      if (!row) return null;
+      const nm = row.querySelector('.tr-name').getBoundingClientRect();
+      const tx = row.querySelector('.tr-cnt').getBoundingClientRect();
+      const b = box.getBoundingClientRect();
+      return { name: row.querySelector('.tr-name').textContent, nameW: nm.width, txRight: tx.right, boxRight: b.right, txH: tx.height, overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    });
+    check('25b 긴 오류 글 — 단계 이름 보임 · 글 줄바꿈 · 카드 밖으로 안 나감 · 가로 스크롤 없음', !!m && m.name === '만들기' && m.nameW > 20 && m.txRight <= m.boxRight + 0.5 && m.txH > 20 && !m.overflow, JSON.stringify(m));
+    await q.close();
+  }
 }
 
 {
@@ -4466,6 +4526,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   check('B.35 ① 연결 단계 APPLY.only — 켠 줄(spacing/16)만 · 끈 줄(spacing/8) · free 0 줄 없음', JSON.stringify(ap?.only) === JSON.stringify([{ value: 16, groups: ['GAP'] }]), JSON.stringify(ap?.only));
+  check('B.36 APPLY.off — 끈 줄(spacing/8) 실림 · 켠 줄 · free 0 줄(묶음 0개)은 없음', JSON.stringify(ap?.off) === JSON.stringify([{ value: 8, groups: ['GAP'] }]), JSON.stringify(ap?.off));
   await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   const tsRows = [{ styleId: 'S:1', name: 'body/medium', nodeIds: ['t1', 't2'], summary: '' }];
   const pts = await wizTs(p, ap.reqId, tsRows, 9);
