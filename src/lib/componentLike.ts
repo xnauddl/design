@@ -443,7 +443,7 @@ export function isTabName(name: string): boolean {
  * 틀 칸의 막대(§4.7 "묶기" 1번 ②) — 마지막 보이는 직접 자식이면서 LINE이거나 높이 4 이하 RECTANGLE, 폭 ≥ 칸 폭 / 2,
  * 칸 아래 끝에 붙음(`y` + 높이 ≥ 칸 높이 − 1). 아니면 null.
  */
-function cellBar(cell: LikeNode): LikeNode | null {
+export function cellBar(cell: LikeNode): LikeNode | null {
   const kids = (cell.children ?? []).filter(isVisible);
   const last = kids[kids.length - 1];
   if (!last) return null;

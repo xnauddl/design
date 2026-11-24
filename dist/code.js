@@ -10029,9 +10029,17 @@
     return ((_a = n.children) != null ? _a : []).filter((c) => c.visible !== false);
   };
   function tabCellMatches(orig, cell) {
-    const d = pairDiff(orig, cell);
+    const a = iconInstAsArt(orig);
+    const b = iconInstAsArt(cell);
+    const d = pairDiff(a, b);
     if (d.split || d.rootFill || d.colorPaths.length || d.rootPad || d.innerPad) return false;
-    return tabCellLook(orig) === tabCellLook(cell);
+    return tabCellLook(a) === tabCellLook(b);
+  }
+  function iconInstAsArt(n) {
+    var _a, _b;
+    if (n.type === "INSTANCE") return n.iconMain ? __spreadProps(__spreadValues({}, n), { type: "FRAME", iconFrame: true, children: [], vectorKey: `icon:${(_a = n.mainComponentKey) != null ? _a : ""}` }) : n;
+    if (!((_b = n.children) == null ? void 0 : _b.length)) return n;
+    return __spreadProps(__spreadValues({}, n), { children: n.children.map(iconInstAsArt) });
   }
   function tabBarRootMatches(rep, bar) {
     if (visibleKids(rep).length !== visibleKids(bar).length) return false;
@@ -12185,6 +12193,15 @@
   function ownComponentLayers(root) {
     return ownComponentLayersWithPath(root).map((x) => x.node);
   }
+  function structAtPath2(root, path) {
+    var _a;
+    let cur = root;
+    for (const seg of path.split("/").filter(Boolean)) {
+      cur = ((_a = cur == null ? void 0 : cur.children) != null ? _a : [])[Number(seg)];
+      if (!cur) return void 0;
+    }
+    return cur;
+  }
   function structAtPathVectorKey(root, path) {
     var _a, _b;
     let cur = root;
@@ -13221,8 +13238,67 @@
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
             return shown != null ? shown : resolved[gi];
           });
+          const tabItemIcons = async (bars, variants) => {
+            var _a2;
+            const isArt = (n) => !!n && (!!n.iconFrame || VECTOR_TYPES2.has(n.type));
+            const barIndex = (c) => {
+              var _a3;
+              const bar = cellBar(c);
+              return bar ? ((_a3 = c.children) != null ? _a3 : []).indexOf(bar) : -1;
+            };
+            const artAt = (c, path) => {
+              const segs = path.split("/").filter(Boolean);
+              if (segs.length === 1 && Number(segs[0]) === barIndex(c)) return void 0;
+              const n = structAtPath2(c, path);
+              return isArt(n) ? n : void 0;
+            };
+            const masked = (c) => {
+              var _a3;
+              const bi = barIndex(c);
+              if (bi < 0) return c;
+              return __spreadProps(__spreadValues({}, c), { children: ((_a3 = c.children) != null ? _a3 : []).map((k, j) => j === bi ? __spreadProps(__spreadValues({}, k), { type: "RECTANGLE", iconFrame: false, children: [] }) : k) });
+            };
+            const cells = bars.flatMap((b) => b.cells.map((s, i) => ({ s, state: b.states[i] })));
+            const paths = /* @__PURE__ */ new Set();
+            for (const pick of [cells, cells.filter((c) => c.state === "Selected"), cells.filter((c) => c.state === "Default")]) {
+              for (const p of inferVaryingComponentProperties(pick.map((c) => masked(c.s)))) {
+                if (p.fromVector && p.layerPath) paths.add(p.layerPath);
+              }
+            }
+            if (!paths.size) return true;
+            let ready = true;
+            for (const path of paths) {
+              for (const c of cells) {
+                const art = artAt(c.s, path);
+                if (!art) continue;
+                const live = (_a2 = byId.get(c.s.id)) != null ? _a2 : await figma.getNodeByIdAsync(c.s.id);
+                const node = live && !live.removed ? nodeAtPath(live, path) : null;
+                const icon = node && art.vectorKey ? iconRegistry.ensure(art.vectorKey, node, node.name) : null;
+                if (!icon) {
+                  if (!node || !art.vectorKey) failures.push(t("component.fail.iconSwap", { layer: art.name }));
+                  ready = false;
+                }
+              }
+            }
+            if (!ready) return false;
+            for (const v of variants) {
+              const prefix = shapePrefix(v.comp, v.it.cell.type);
+              const slots = [...paths].flatMap((path) => {
+                const art = artAt(v.it.cell, path);
+                if (!(art == null ? void 0 : art.vectorKey)) return [];
+                return [{ layerName: art.name, layerPath: joinPath(prefix, path), icon: iconRegistry.get(art.vectorKey) }];
+              });
+              if (!slots.length) continue;
+              const errs = swapVectorSlots(v.comp, slots);
+              if (errs.length) {
+                failures.push(...errs);
+                return false;
+              }
+            }
+            return true;
+          };
           const registerTabGroup = async (g, barName, decision) => {
-            var _a2, _b2, _c2, _d2, _e2, _f2, _g2;
+            var _a2, _b2, _c2, _d2, _e2, _f2, _g2, _h2, _i2;
             const tp = g.tab;
             const hit = (_b2 = (_a2 = decision.hit) == null ? void 0 : _a2.tab) != null ? _b2 : null;
             const keepItemKey = (_d2 = (_c2 = decision.tabKeep) == null ? void 0 : _c2.item) != null ? _d2 : true;
@@ -13240,7 +13316,25 @@
             } else {
               const made = [];
               for (const sp of tp.styles) {
+                const styleBars = tp.bars.filter((b) => b.style === sp.style);
+                const origOf = (state) => {
+                  var _a3;
+                  return (_a3 = tp.items.find((x) => x.style === sp.style && x.state === state)) == null ? void 0 : _a3.cell;
+                };
+                const cellsOk = (b) => b.cells.every((c, i) => {
+                  const o = origOf(b.states[i]);
+                  return !!o && tabCellMatches(o, c);
+                });
+                if (styleBars.some((b) => b.rep && !cellsOk(b))) {
+                  for (const b of styleBars) {
+                    const name = (_h2 = (_g2 = await liveOf(b.bar.id)) == null ? void 0 : _g2.name) != null ? _h2 : b.bar.name;
+                    fillKept.push(name);
+                    failures.push(t("component.fail.fillKept", { name, causePart: "" }));
+                  }
+                  continue;
+                }
                 const mine = [];
+                const mineMade = [];
                 let ok = true;
                 for (const it of tp.items.filter((x) => x.style === sp.style)) {
                   const cell = await liveOf(it.cell.id);
@@ -13252,6 +13346,7 @@
                       const comp = figma.createComponentFromNode(cl);
                       comp.name = it.variant;
                       mine.push(comp);
+                      mineMade.push({ comp, it });
                       made.push({ comp, it });
                     } catch (e) {
                       try {
@@ -13266,6 +13361,7 @@
                     break;
                   }
                 }
+                if (ok) ok = await tabItemIcons(styleBars.filter((b) => b.rep || cellsOk(b)), mineMade);
                 if (ok) okStyle.add(sp.style);
                 else for (const c of mine) {
                   try {
@@ -13391,7 +13487,7 @@
               if (madeBars.length >= 2) {
                 let set = null;
                 try {
-                  set = figma.combineAsVariants(madeBars.map((x) => x.comp), (_g2 = pageOf2(madeBars[0].comp)) != null ? _g2 : figma.currentPage);
+                  set = figma.combineAsVariants(madeBars.map((x) => x.comp), (_i2 = pageOf2(madeBars[0].comp)) != null ? _i2 : figma.currentPage);
                 } catch (e) {
                   failures.push(t("component.fail.combine", { set: barName, error: errText(e) }));
                 }

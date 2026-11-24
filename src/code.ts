@@ -18,7 +18,7 @@ import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './l
 import { rgbToHex, exportColorHex } from './lib/tokens';
 import { pascalCase, ROLE_KEY, NAME_KEY, nameKeyFor } from './lib/naming';
 import { ExportCollectionInput, ExportModeValue, ExportTextStyle, ExportVarInput, TokenKind, exportClashes, exportGlobalDupes, exportTokens, resolveExportModes, resolveExportTokens } from './lib/exporters';
-import { tabInfo } from './lib/componentLike';
+import { tabInfo, cellBar, type LikeNode } from './lib/componentLike';
 import { createIconRegistry, cleanupAfterRegister, tallyRestoreFailures, type KeepRoot, swapVectorSlots, transplantImageFills, applyInstancePropValues, propIdsByName, nodeAtPath, joinPath, shapePrefix, replaceMember, replaceMemberAsync, copyOverridesAsync, keepLookAsync, snapshotOverrides, restoreOverrides, swapMemberAsync, type OverrideSnap } from './lib/artwork';
 import { captureOrigin as captureOriginAt, fillOrigin, tallyFill, releaseOrigin, type Origin } from './lib/placement';
 import { missingVariants, variantGrid, inferComponentProperties, inferVaryingComponentProperties, scanComponentCandidates, gateComponentCandidates, isAutoNamedCandidate, groupByExactName, deriveVariants, resolveGroupNames, componentEligible, pickCollapseMasterIndex, propValuesFromStruct, inferVaryingImageSlots, reusePlanFor, matchReuse, formatVariant, planRegisterGroups, resolvePlanNames, defaultOnFor, type PlanGroup, reusePairIssue, reusePairGrade, reuseKey, isHeadingCollapseGroup, REUSE_KEY, ICON_KEY, matchTabReuse, tabItemReuseKey, tabBarReuseKey, tabCellMatches, tabBarRootMatches } from './lib/components';
@@ -923,6 +923,16 @@ function ownComponentLayersWithPath(root: ComponentNode | SceneNode): { node: Sc
 /** @deprecated 경로 없는 목록 — 동명 레이어 매칭에 취약. 가급적 withPath 사용. */
 function ownComponentLayers(root: ComponentNode | SceneNode): SceneNode[] {
   return ownComponentLayersWithPath(root).map((x) => x.node);
+}
+
+/** StructNode 트리에서 인덱스 경로의 노드. 없으면 undefined. */
+function structAtPath(root: StructNode, path: string): StructNode | undefined {
+  let cur: StructNode | undefined = root;
+  for (const seg of path.split('/').filter(Boolean)) {
+    cur = (cur?.children ?? [])[Number(seg)];
+    if (!cur) return undefined;
+  }
+  return cur;
 }
 
 /** StructNode 트리에서 인덱스 경로의 그림 지문(`vectorKey`)을 읽는다. 없으면 null. */
@@ -2127,6 +2137,72 @@ figma.ui.onmessage = async (msg: UiToCode) => {
          * (Style 둘 이상이면 세트, 아니면 컴포넌트 하나 — 노출하지 않고 안 칸 인스턴스를 `isExposedInstance`) ④ 대표와 칸 수가 같고
          * 바 루트가 맞는 바는 Tab Bar 인스턴스로. 지금 트리로 다시 본 바 루트 맞추기가 걸리면 칸만 바꾼 틀로 두고 꼬리 `fillKept`.
          */
+        /**
+         * Tab Item 변형의 아이콘 자리 → 아이콘 인스턴스(§4.7 "묶기" 2번 C-D27). `bars` = 칸 맞추기를 통과할 그 Style의 바(볼 칸),
+         * `variants` = 그 Style의 새 변형. 경로 모음 P = `inferVaryingComponentProperties`(모두 · Selected · Default)의 `fromVector` 합
+         * (막대는 (칸, 자리) 단위로 거름). P의 자리마다 볼 칸 모두의 아이콘을 먼저 구하고, 변형마다 원래 칸 그림의 아이콘 인스턴스로 바꾼다.
+         * 아이콘을 하나라도 못 구하거나 교체 진단이 나오면 거짓(그 Style 실패 — 부르는 쪽이 변형을 지운다).
+         */
+        const tabItemIcons = async (
+          bars: NonNullable<PlanGroup['tab']>['bars'],
+          variants: readonly { comp: ComponentNode; it: { cell: StructNode; state: string } }[],
+        ): Promise<boolean> => {
+          const isArt = (n: StructNode | undefined): boolean => !!n && (!!n.iconFrame || VECTOR_TYPES.has(n.type));
+          const barIndex = (c: StructNode): number => {
+            const bar = cellBar(c as unknown as LikeNode);
+            return bar ? (c.children ?? []).indexOf(bar as unknown as StructNode) : -1;
+          };
+          /** 그 칸 그 자리의 그림 슬롯(막대면 없음). */
+          const artAt = (c: StructNode, path: string): StructNode | undefined => {
+            const segs = path.split('/').filter(Boolean);
+            if (segs.length === 1 && Number(segs[0]) === barIndex(c)) return undefined;
+            const n = structAtPath(c, path);
+            return isArt(n) ? n : undefined;
+          };
+          /** 추론용 — 막대 자리를 그림이 아닌 것으로 가린다(자식 수는 그대로). */
+          const masked = (c: StructNode): StructNode => {
+            const bi = barIndex(c);
+            if (bi < 0) return c;
+            return { ...c, children: (c.children ?? []).map((k, j) => (j === bi ? { ...k, type: 'RECTANGLE', iconFrame: false, children: [] } : k)) };
+          };
+          const cells = bars.flatMap((b) => b.cells.map((s, i) => ({ s, state: b.states[i] })));
+          const paths = new Set<string>();
+          for (const pick of [cells, cells.filter((c) => c.state === 'Selected'), cells.filter((c) => c.state === 'Default')]) {
+            for (const p of inferVaryingComponentProperties(pick.map((c) => masked(c.s)))) {
+              if (p.fromVector && p.layerPath) paths.add(p.layerPath);
+            }
+          }
+          if (!paths.size) return true;
+          // 아이콘 먼저 모두 — 칸은 아직 하나도 바뀌지 않았다(접힘 길의 iconsReady와 같다).
+          let ready = true;
+          for (const path of paths) {
+            for (const c of cells) {
+              const art = artAt(c.s, path);
+              if (!art) continue;
+              const live = byId.get(c.s.id) ?? ((await figma.getNodeByIdAsync(c.s.id)) as SceneNode | null);
+              const node = live && !live.removed ? nodeAtPath(live, path) : null;
+              const icon = node && art.vectorKey ? iconRegistry.ensure(art.vectorKey, node, node.name) : null;
+              if (!icon) {
+                // 못 만들었으면 등록부가 이미 진단(`component.fail.iconComponent`)을 남겼다 — 레이어를 못 찾은 때만 여기서.
+                if (!node || !art.vectorKey) failures.push(t('component.fail.iconSwap', { layer: art.name }));
+                ready = false;
+              }
+            }
+          }
+          if (!ready) return false;
+          for (const v of variants) {
+            const prefix = shapePrefix(v.comp, v.it.cell.type);
+            const slots = [...paths].flatMap((path) => {
+              const art = artAt(v.it.cell, path);
+              if (!art?.vectorKey) return [];
+              return [{ layerName: art.name, layerPath: joinPath(prefix, path), icon: iconRegistry.get(art.vectorKey) }];
+            });
+            if (!slots.length) continue;
+            const errs = swapVectorSlots(v.comp, slots);
+            if (errs.length) { failures.push(...errs); return false; }
+          }
+          return true;
+        };
         const registerTabGroup = async (g: PlanGroup, barName: string, decision: ReuseDecision): Promise<void> => {
           const tp = g.tab!;
           const hit = decision.hit?.tab ?? null;
@@ -2145,7 +2221,20 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           } else {
             const made: { comp: ComponentNode; it: (typeof tp.items)[number] }[] = [];
             for (const sp of tp.styles) {
+              const styleBars = tp.bars.filter((b) => b.style === sp.style);
+              const origOf = (state: string): StructNode | undefined => tp.items.find((x) => x.style === sp.style && x.state === state)?.cell;
+              const cellsOk = (b: (typeof tp.bars)[number]): boolean => b.cells.every((c, i) => { const o = origOf(b.states[i]); return !!o && tabCellMatches(o, c); });
+              // (0) 대표 바 칸 맞추기 — 한 칸이라도 걸리면 그 Style은 만들지 않고 바를 모두 원본 그대로(§4.7 "묶기" 2번 C-D27).
+              if (styleBars.some((b) => b.rep && !cellsOk(b))) {
+                for (const b of styleBars) {
+                  const name = (await liveOf(b.bar.id))?.name ?? b.bar.name;
+                  fillKept.push(name);
+                  failures.push(t('component.fail.fillKept', { name, causePart: '' }));
+                }
+                continue;
+              }
               const mine: ComponentNode[] = [];
+              const mineMade: { comp: ComponentNode; it: (typeof tp.items)[number] }[] = [];
               let ok = true;
               for (const it of tp.items.filter((x) => x.style === sp.style)) {
                 const cell = await liveOf(it.cell.id);
@@ -2157,6 +2246,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                     const comp = figma.createComponentFromNode(cl);
                     comp.name = it.variant;
                     mine.push(comp);
+                    mineMade.push({ comp, it });
                     made.push({ comp, it });
                   } catch (e) {
                     try { if (!cl.removed) cl.remove(); } catch { /* 이미 사라짐 */ }
@@ -2168,6 +2258,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
                   break;
                 }
               }
+              // (1) 아이콘 자리 → 아이콘 인스턴스 — 같은 Style 칸끼리 그림이 다른 자리만, 합치기 전에(C-D27).
+              if (ok) ok = await tabItemIcons(styleBars.filter((b) => b.rep || cellsOk(b)), mineMade);
               if (ok) okStyle.add(sp.style);
               else for (const c of mine) { try { c.remove(); } catch { /* 이미 사라짐 */ } made.splice(made.findIndex((x) => x.comp === c), 1); }
             }

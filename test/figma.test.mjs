@@ -8477,7 +8477,7 @@ function regWorld(figma) {
     reg.set(n.id, n);
     return n;
   };
-  const KEYS = ['name', 'visible', 'x', 'y', 'width', 'height', 'layoutMode', 'itemSpacing', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'fills', 'strokes', 'cornerRadius', 'characters', 'fontName', 'fontWeight', 'layoutSizingHorizontal', 'layoutSizingVertical'];
+  const KEYS = ['name', 'visible', 'x', 'y', 'width', 'height', 'layoutMode', 'itemSpacing', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'fills', 'strokes', 'cornerRadius', 'characters', 'fontName', 'fontWeight', 'layoutSizingHorizontal', 'layoutSizingVertical', 'fillGeometry'];
   function copyTree(src, idOf, srcLink = false) {
     const props = {};
     for (const k of KEYS) if (src[k] !== undefined) props[k] = src[k];
@@ -8527,7 +8527,8 @@ function regWorld(figma) {
       figma.currentPage.appendChild(i);
       return i;
     };
-    n.getInstancesAsync = async () => [];
+    // 쓰는 인스턴스 — [등록] 끝 정리(C-D4)가 이번에 만든 아이콘을 지울지 본다.
+    n.getInstancesAsync = async () => [...reg.values()].filter((x) => x.type === 'INSTANCE' && !x.removed && x._main === n);
     return n;
   }
   Object.assign(figma, {
@@ -8641,6 +8642,77 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   assert.equal(await mainName(root2.children[0]), 'Style=Text');
   assert.equal(root2.children[2].type, 'FRAME');
   assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
+});
+
+test('C-D27 [등록] 탭 길(목) — 칸마다 다른 날 벡터 아이콘 3칸 바 → 칸마다 제 아이콘(Tab Item 두 변형의 아이콘 자리가 아이콘 인스턴스) · 재사용 · 대표 바 칸 맞추기', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const w = regWorld(figma);
+  const T = (id, chars, color) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontName: { family: 'Inter', style: 'Regular' },
+    getRangeAllFontNames() { return [this.fontName]; } });
+  const V = (id, d) => w.base('VECTOR', { id, name: 'Vector', width: 16, height: 16, fills: solid61('#222222'), fillGeometry: [{ data: d, windingRule: 'NONZERO' }] });
+  // 목은 오토레이아웃 배치를 흉내 내지 않는다 — 칸 안 레이어 x · y는 0으로 둔다(새 인스턴스와 자리가 같게).
+  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
+  const ICONS = ['M0 0L16 0L16 16Z', 'M8 0L16 16L0 16Z', 'M0 8L8 0L16 8L8 16Z'];
+  const bar = (id, labels, icons) => F(id, { name: 'tabs', layoutMode: 'HORIZONTAL', width: 360, height: 40, itemSpacing: 8, fills: [] },
+    labels.map((l, i) => F(`${id}-${i}`, { name: 'tab', layoutMode: 'HORIZONTAL', width: 110, height: 40, cornerRadius: i === 0 ? 20 : 0, paddingLeft: 8, paddingRight: 8, fills: i === 0 ? solid61('#3d5fdb') : [] },
+      [...(icons[i] ? [V(`${id}-${i}v`, icons[i])] : []), T(`${id}-${i}t`, l, i === 0 ? '#ffffff' : '#7a7a7a')])));
+  const geo = (n) => n.fillGeometry?.[0]?.data;
+  const iconOf = async (cell) => {
+    const icon = cell.children.find((k) => k.name === 'Vector');
+    assert.equal(icon?.type, 'INSTANCE', `${cell.name}: 아이콘 자리가 아이콘 인스턴스`);
+    const main = await icon.getMainComponentAsync();
+    assert.ok(main && !main.removed, '아이콘 컴포넌트가 남아 있음(끝 정리가 지우지 않음)');
+    assert.ok(main.getPluginData('dsl.icon'), '아이콘 지문');
+    return geo(main);
+  };
+  const b1 = bar('a', ['Home', 'Search', 'Profile'], ICONS);
+  const root = F('root', { name: 'Screen', width: 800, height: 600, fills: [] }, [b1]);
+  w.page.appendChild(root);
+  w.page.selection = [root];
+  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['a'] }), 'COMPONENTS_RESULT')[0];
+  assert.ok(r, 'COMPONENTS_RESULT');
+  assert.deepEqual(r.fillKept, [], JSON.stringify(r.failures));
+  assert.deepEqual(r.placeFailed, []);
+  const comps = figma.root.children.find((x) => x.name === 'Components');
+  const item = comps.children.find((x) => x.name === 'Tab Item');
+  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected, Style=Pill', 'State=Default, Style=Pill']);
+  for (const v of item.children) assert.equal(v.children.find((k) => k.name === 'Vector')?.type, 'INSTANCE', `${v.name}: 변형의 아이콘 자리가 아이콘 인스턴스`);
+  assert.ok(Object.values(item._props).some((x) => x.type === 'INSTANCE_SWAP'), 'Tab Item에 아이콘 바꾸기 속성');
+  const iconComps = comps.children.filter((x) => x.getPluginData('dsl.icon'));
+  assert.equal(iconComps.length, 3, '아이콘 컴포넌트 3(칸마다 하나)');
+  const tb = root.children[0];
+  assert.equal(tb.type, 'INSTANCE', '바 자리는 Tab Bar 인스턴스');
+  assert.deepEqual(await Promise.all(tb.children.map(iconOf)), ICONS, '칸마다 제 아이콘(고치기 전: 셋째 칸이 둘째 칸 아이콘)');
+  assert.deepEqual(tb.children.map((c) => c.children.find((k) => k.type === 'TEXT').characters), ['Home', 'Search', 'Profile']);
+
+  // 같은 바를 다시 붙여 넣고 [등록] → 재사용 Tab Item(아이콘 자리 = 아이콘 인스턴스 ↔ 날 벡터 칸 맞추기) · 칸마다 제 아이콘
+  const b2 = bar('b', ['Home', 'Search', 'Profile'], ICONS);
+  const root2 = F('root2', { name: 'Screen 2', width: 800, height: 600, fills: [] }, [b2]);
+  w.page.appendChild(root2);
+  w.page.selection = [root2];
+  const r2 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['b'] }), 'COMPONENTS_RESULT')[0];
+  assert.ok(r2.reused.includes('Tab Item'), JSON.stringify(r2));
+  assert.deepEqual(r2.fillKept, [], '재사용 칸 맞추기 — 아이콘 인스턴스 ↔ 날 벡터는 아이콘 차');
+  const tb2 = root2.children[0];
+  assert.equal(tb2.type, 'INSTANCE');
+  assert.deepEqual(await Promise.all(tb2.children.map(iconOf)), ICONS);
+  assert.equal(comps.children.filter((x) => x.getPluginData('dsl.icon')).length, 3, '같은 그림은 기존 아이콘을 쓴다');
+
+  // 대표 바 칸 맞추기 — 둘째 칸(Default 원본)만 아이콘이 없으면 그 Style을 만들지 않고 바 원본 그대로
+  const b3 = bar('c', ['All', 'Search', 'Profile'], [ICONS[0], null, ICONS[2]]);
+  b3.name = 'tabs-mixed';
+  const root3 = F('root3', { name: 'Screen 3', width: 800, height: 600, fills: [] }, [b3]);
+  w.page.appendChild(root3);
+  w.page.selection = [root3];
+  const setsBefore = comps.children.length;
+  const r3 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['c'] }), 'COMPONENTS_RESULT')[0];
+  assert.ok(r3, 'COMPONENTS_RESULT');
+  assert.deepEqual(r3.fillKept, ['tabs-mixed']);
+  assert.equal(root3.children[0], b3, '바 원본 그대로');
+  assert.ok(b3.children.every((c) => c.type === 'FRAME'), '칸도 원본');
+  assert.equal(b3.children[1].children.length, 1, '아이콘 없던 칸에 아이콘이 생기지 않음');
+  assert.equal(comps.children.length, setsBefore, 'Tab Item · Tab Bar · 아이콘을 새로 만들지 않음');
 });
 
 /* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.28, 2026-11-19) ---------- */
