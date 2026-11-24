@@ -2440,4 +2440,4 @@ PR #155(6-1c 명세 PR)에서 함께 한다. 6-1c 명세(B.26 · ia-v3 A.20 · i
 - [x] 단위 테스트(`test/figma.test.mjs`): `only` — 켠 값만 붙음 · 끈 값 자리 그대로 · 묶음 키가 다르면(같은 값 다른 용도) 안 붙음 · 알약 자리 9999로 견줌 · 글자 fontSize 16 켬 → 간격 16 · 행간 16 자리 안 붙음 · 글꼴 문자열 · 빈 `only`. (`test/pure.test.mjs` 또는 ui 순수 함수로 뺄 수 있으면) `libSameGroups` · `only` 만들기 — 라이브러리 같은 값 묶음 뺌 · 모두 빠지면 토큰 없음 · free = 0 토큰 없음. `makeDoneText`의 Text Style — n > 0 꼬리 · n = 0 독립 "Text Style {t}곳 연결"(`test/wizard.test.mjs`).
 - [x] verify-bind-flow — 실행 시 `APPLY.only`가 켠 줄만 · 라이브러리 같은 값 묶음 빠짐 · 뒤이어 `PREVIEW_TEXT_STYLES` · `APPLY_SELECTED.textStyles` · 결과 줄 " · Text Style {t}곳", 상태 7 처음 모습에서 free = 0 줄 꺼짐.
 - [x] 4검사 · 스크린샷 시안 대조 · `dist/`
-- [ ] 실기 확인(사용자, 피그마): 상태 7 파일에서 줄 하나를 끄고 실행 → 그 값 자리는 그대로 / 라이브러리 같은 값 줄 · 이미 다 붙은 값 줄은 처음부터 꺼짐 / 기존 텍스트 스타일이 있는 글자는 실행 뒤 스타일이 붙음
+- [x] 실기 확인(사용자, 피그마): 상태 7 파일에서 줄 하나를 끄고 실행 → 그 값 자리는 그대로 / 라이브러리 같은 값 줄 · 이미 다 붙은 값 줄은 처음부터 꺼짐 / 기존 텍스트 스타일이 있는 글자는 실행 뒤 스타일이 붙음
