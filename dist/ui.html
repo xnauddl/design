@@ -8729,6 +8729,7 @@
         return __spreadProps(__spreadValues({}, base), { change: n.reuse.name, badge: { text: t("component.badgeReuse"), kind: "reuse" } });
       }
       if (n.group) {
+        if (n.variant === "") return __spreadProps(__spreadValues({}, base), { change: n.group, badge: { text: t("component.badgeSet"), kind: "set" } });
         const variant = n.variant || t("component.variantFallback");
         return __spreadProps(__spreadValues({}, base), { change: `${n.group} \xB7 ${variant}`, variant: { set: n.group, name: variant }, badge: { text: t("component.badgeSet"), kind: "set" } });
       }

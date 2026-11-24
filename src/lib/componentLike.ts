@@ -517,7 +517,10 @@ export function tabInfo(node: LikeNode, opts: { wide?: boolean } = {}): TabInfo 
   const cells = (node.children ?? []).filter(isVisible);
   if (cells.length < 2) return null;
   const strict = cells.length >= 3 ? strictTab(cells) : null;
-  if (strict) return strict;
+  // 글자 칸 줄은 ①이어도 이름 조건이 있어야 탭(2026-11-23 C-D19 — `wide`와 상관없이). 틀 칸 ①은 이름 없이 탭.
+  const textCells = cells.every((c) => c.type === 'TEXT');
+  if (strict && (!textCells || isTabName(node.nameKey ?? node.name ?? ''))) return strict;
+  if (strict && opts.wide === false) return null;
   if (opts.wide === false) return null;
   if (!isTabName(node.nameKey ?? node.name ?? '')) return null;
   return wideTab(cells);

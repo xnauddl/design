@@ -516,19 +516,30 @@ test('③ tabItemReuseKey · tabBarReuseKey — Style · State · 칸 모양 · 
   assert.equal(tabBarReuseKey(bar(5), 'Text'), tabBarReuseKey({ ...bar(5), width: 999 }, 'Text'));
 });
 
-test('④ matchTabReuse — 모든 Style이 한 세트에 있을 때만 Tab Item 재사용, 새 Style이 있으면 새로 · Tab Bar는 그다음', () => {
-  const plan = { kind: 'tab', keys: [], itemKeys: ['iT1', 'iT2', 'iP1', 'iP2'], barKeys: ['bT', 'bP'] };
-  const items = [{ id: 's1', key: 'iT1', setId: 'TI' }, { id: 's2', key: 'iT2', setId: 'TI' }, { id: 's3', key: 'iP1', setId: 'TI' }, { id: 's4', key: 'iP2', setId: 'TI' }];
-  const bars = [{ id: 'b1', key: 'bT', setId: 'TB' }, { id: 'b2', key: 'bP', setId: 'TB' }];
-  const r = matchTabReuse(plan, [...items, ...bars]);
-  assert.deepEqual(r.item.ids, ['s1', 's2', 's3', 's4']);
-  assert.deepEqual(r.bar.ids, ['b1', 'b2']);
-  assert.equal(matchTabReuse(plan, [...items.slice(0, 2), ...bars]).item.ids, null, '새 Style(Pill) — 새 Tab Item');
-  assert.equal(matchTabReuse(plan, [...items, ...bars]).bar.ids !== null, true);
-  assert.equal(matchTabReuse(plan, [...items, ...bars], undefined, () => false).bar.ids, null, '칸이 그 Tab Item 세트의 인스턴스가 아니면 새 Tab Bar');
-  const one = { kind: 'tab', keys: [], itemKeys: ['iT1', 'iT2'], barKeys: ['bT'] };
-  assert.deepEqual(matchTabReuse(one, [...items, { id: 'solo', key: 'bT', setId: null }]).bar.ids, ['solo'], 'Style 하나 — 단독 Tab Bar');
+test('④ matchTabReuse — Style 그룹마다(C-D20): 그 Style의 둘뿐인 세트만 Tab Item 재사용, 6-1b 섞인 세트 · Tab Bar 세트는 재사용 안 함 · Tab Bar는 단독만', () => {
+  const plan = { kind: 'tab', keys: [], itemKeys: ['iP1', 'iP2'], barKeys: ['bP'] };
+  const items = [{ id: 's1', key: 'iP1', setId: 'TI', setSize: 2 }, { id: 's2', key: 'iP2', setId: 'TI', setSize: 2 }];
+  const solo = { id: 'solo', key: 'bP', setId: null };
+  const r = matchTabReuse(plan, [...items, solo]);
+  assert.deepEqual(r.item.ids, ['s1', 's2']);
+  assert.deepEqual(r.bar.ids, ['solo']);
+  assert.equal(matchTabReuse(plan, [items[0], solo]).item.ids, null, 'Default 키가 없으면 새 Tab Item');
+  assert.equal(matchTabReuse(plan, [...items, solo], undefined, () => false).bar.ids, null, '칸이 그 Tab Item 세트의 인스턴스가 아니면 새 Tab Bar');
+  // 6-1b의 여러 Style 섞인 Tab Item 세트(변형 4) — "그 둘뿐"이 아니라 재사용하지 않는다
+  const mixed = [{ id: 'm1', key: 'iT1', setId: 'OLD', setSize: 4 }, { id: 'm2', key: 'iT2', setId: 'OLD', setSize: 4 }, { id: 'm3', key: 'iP1', setId: 'OLD', setSize: 4 }, { id: 'm4', key: 'iP2', setId: 'OLD', setSize: 4 }];
+  assert.deepEqual(matchTabReuse(plan, [...mixed, solo]).item, { ids: null, keepKey: true });
+  // 6-1b의 Tab Bar 세트 안 변형(Style=Pill)은 Tab Bar로 재사용하지 않는다
+  assert.equal(matchTabReuse(plan, [...items, { id: 'tb', key: 'bP', setId: 'TB', setSize: 2 }]).bar.ids, null);
   assert.deepEqual(matchTabReuse(plan, [...items, ...items.map((x) => ({ ...x, id: x.id + 'c', setId: 'TI2' }))]).item, { ids: null, keepKey: false }, '복제된 세트 둘 — 키를 남기지 않는다');
+});
+
+test('C-D25 matchReuse — 세트의 변형 수가 이번 가족의 서로 다른 키 수와 같을 때만 덮는다', () => {
+  const plan = { kind: 'variant', keys: ['kA', 'kB', 'kB'] };
+  const fit = [{ id: 'a', key: 'kA', setId: 'S', setSize: 2 }, { id: 'b', key: 'kB', setId: 'S', setSize: 2 }];
+  assert.deepEqual(matchReuse(plan, fit, 3).ids, ['a', 'b', 'b']);
+  const more = fit.map((c) => ({ ...c, setSize: 3 }));
+  assert.deepEqual(matchReuse(plan, more, 3), { ids: null, keepKey: true }, '변형이 더 많은(섞인) 세트는 덮지 않는다 — 키가 없는 변형도 센다');
+  assert.deepEqual(matchReuse(plan, fit.map(({ setSize, ...c }) => c), 3).ids, ['a', 'b', 'b'], '변형 수를 모르면 지금처럼');
 });
 
 test('swapMemberAsync(6-1b 공용 칸 바꾸기) — 글자 칸 → Tab Item 인스턴스(감싼 앞붙이 0): replaced · 크기가 맞지 않으면 mismatch(원본 그대로)', async () => {
@@ -565,4 +576,13 @@ test('swapMemberAsync(6-1b 공용 칸 바꾸기) — 글자 칸 → Tab Item 인
   assert.equal(row2.children[0], cell2);
   assert.deepEqual(c2.fillKept, ['Destination']);
   assert.equal(c2.failures.length, 1);
+});
+
+test('C-D21 reusePairIssue — 테두리 유무 · 모서리 값이 다른 기존 컴포넌트와는 짝이 맞지 않는다(키는 그대로)', () => {
+  const t = (id) => ({ id, name: 'Go', type: 'TEXT', characters: 'Go', fillHex: '#ffffff', width: 20, height: 16 });
+  const btn = (id, o = {}) => ({ id, name: 'button', type: 'FRAME', layoutMode: 'HORIZONTAL', width: 80, height: 40, cornerRadius: 20, fillHex: '#3d5fdb', fills: [{ visible: true, type: 'SOLID' }], ...o, children: [t(`${id}t`)] });
+  assert.equal(reusePairIssue(btn('a'), btn('b')), null);
+  assert.notEqual(reusePairIssue(btn('a'), btn('b', { cornerRadius: 24 })), null, '모서리');
+  assert.notEqual(reusePairIssue(btn('a'), btn('b', { strokes: [{ visible: true, type: 'SOLID' }] })), null, '테두리');
+  assert.equal(reuseKey('variant', btn('a'), 'button'), reuseKey('variant', btn('b', { cornerRadius: 24 }), 'button'), '재사용 키는 바꾸지 않는다');
 });
