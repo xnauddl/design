@@ -4,6 +4,7 @@
 import type { TsRenameRow } from './shared/messages';
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig, MainUnitInfo } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
+import { tokenOffKey } from './lib/makeOff';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
 import { placeKey, carryRowChecks, groupByVarKind, type RowGroup } from './lib/bindGroups';
@@ -3942,15 +3943,19 @@ async function runMake(): Promise<void> {
       } else if (id === 'bind') {
         wizBindReq = ++bindReqSeq;
         wizBindPending = true;
-        const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
+        // 꺼진 줄(사용자가 끈 줄 · 기본 끔 — 잠긴 줄은 빼지 않음)의 값은 연결하지 않는다(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35).
+        const excludeValues = [...new Set(mkTokens.filter((tk) => !mkIsOn(tk) && !mkLocked(tk)).map(tokenOffKey))];
+        const r = await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, ...(excludeValues.length ? { excludeValues } : {}) }, ['APPLY_RESULT'], wizBindReq).finally(() => { wizBindPending = false; });
         totals.bound = r.bound;
         mkMainsDone.push(...(r.mainsBound ?? []));
         const reasons = r.reasons ?? {};
         if (r.bound) results.push({ id, mark: 'ok', text: t('wizard.seq.bindDone', { n: r.bound }) + (r.newRoles ? t('wizard.seq.bindRoles', { k: r.newRoles }) : '') });
         else {
-          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : (reasons['already-bound'] ?? 0) > 0 && !((reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0)) ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
-          // 이미 모두 연결됨이면 할 일이 없었던 것 — 실패가 아니라 ✓, 결과도 "다 됨"(2026-11-19 사용자 결정, ia-v4 §4.3 "연결 0곳 사유")
-          if (zero === 'wizard.seq.bindAllBound') results.push({ id, mark: 'ok', text: t(zero) });
+          const noMatch = (reasons['no-match'] ?? 0) + (reasons['scope-add'] ?? 0);
+          const zero = prereqKnown && !hasBindable ? 'wizard.seq.bindNoTier' : !noMatch && (reasons['make-off'] ?? 0) > 0 ? 'wizard.seq.bindAllOff' : (reasons['already-bound'] ?? 0) > 0 && !noMatch ? 'wizard.seq.bindAllBound' : 'wizard.seq.bindNone';
+          // 이미 모두 연결됨이면 할 일이 없었던 것 — 실패가 아니라 ✓, 결과도 "다 됨"(2026-11-19 사용자 결정, ia-v4 §4.3 "연결 0곳 사유").
+          // 끈 값만 남았으면(2026-11-24 B.35) 사용자가 끈 것이라 ✓.
+          if (zero === 'wizard.seq.bindAllBound' || zero === 'wizard.seq.bindAllOff') results.push({ id, mark: 'ok', text: t(zero) });
           else {
             results.push({ id, mark: 'warn', text: t(zero) });
             stay = true;

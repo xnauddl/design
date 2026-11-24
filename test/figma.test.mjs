@@ -9681,3 +9681,51 @@ test('B.33 mergeScopes — ALL_FILLS가 들어가면 개별 칠 용도를 빼고
   assert.deepEqual(mergeScopes(['ALL_SCOPES'], ['ALL_FILLS'], 'COLOR'), ['ALL_SCOPES']);
   assert.deepEqual(mergeScopes(['GAP'], ['CORNER_RADIUS'], 'FLOAT').sort(), ['CORNER_RADIUS', 'GAP']);
 });
+
+/* ---- 끈 값은 연결도 안 함(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35 — 2026-11-24 실기) ---- */
+const greyFrame = (id, bound) => ({
+  type: 'FRAME', id, name: id,
+  fills: [{ type: 'SOLID', color: { r: 0.2, g: 0.2, b: 0.2 }, ...(bound ? { boundVariables: { color: { type: 'VARIABLE_ALIAS', id: bound } } } : {}) }],
+  strokes: [], effects: [],
+  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
+});
+
+test('B.35 끈 값(color|#333333)은 실제 연결에서 붙이지 않는다 — 사유 make-off · 이미 붙은 곳 그대로 · 빼지 않으면 붙임', async () => {
+  installFigma();
+  await createTokens([{ name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' }], 16);
+  const g = globalThis.figma._state.variables.find((v) => v.name === 'color/gray/800');
+  const { tokenOffKey } = await import('../dist/pure.mjs');
+  const off = new Set([tokenOffKey({ category: 'color', value: '#333333' })]);
+  const a = greyFrame('a', g.id);
+  const b = greyFrame('b');
+  const res = await bindSelection([a, b], true, {}, { noNewRoles: true, excludeValue: off });
+  assert.equal(res.bound, 0);
+  assert.equal(res.reasons['make-off'], 1, '안 붙은 b만 make-off');
+  assert.equal(b.fills[0].boundVariables, undefined, '끈 값은 붙이지 않음');
+  assert.equal(a.fills[0].boundVariables.color.id, g.id, '이미 붙은 곳은 그대로');
+  // 줄을 켜면(빼는 키 없음) 지금처럼 붙인다
+  const b2 = greyFrame('b2');
+  const on = await bindSelection([b2], true, {}, { noNewRoles: true });
+  assert.equal(on.bound, 1);
+  assert.equal(b2.fills[0].boundVariables.color.id, g.id);
+  // 다른 값의 키만 빼면 영향 없음
+  const b3 = greyFrame('b3');
+  const other = await bindSelection([b3], true, {}, { noNewRoles: true, excludeValue: new Set(['color|#3d5fdb']) });
+  assert.equal(other.bound, 1);
+});
+
+test('B.35 code.ts APPLY excludeValues — 실제 연결만 넘기고 찾기(preview)는 그대로 센다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  await createTokens([{ name: 'color/gray/800', category: 'color', sources: ['fill'], value: '#333333' }], 16);
+  const root = { type: 'FRAME', id: 'root', name: 'root', visible: true, fills: [], strokes: [], effects: [], layoutMode: 'NONE', layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', children: [], parent: { type: 'PAGE' } };
+  const b = { ...greyFrame('b'), visible: true, parent: root };
+  root.children = [b];
+  registerNodes(figma, [root, b]);
+  let out = await p.send({ type: 'APPLY', preview: true, nodeIds: ['root'], reqId: 1, excludeValues: ['color|#333333'] });
+  assert.equal(ofType(out, 'APPLY_RESULT')[0].reasons['make-off'] ?? 0, 0, '찾기는 빼지 않는다');
+  out = await p.send({ type: 'APPLY', preview: false, nodeIds: ['root'], reqId: 2, excludeValues: ['color|#333333'] });
+  const r = ofType(out, 'APPLY_RESULT')[0];
+  assert.equal(r.reasons['make-off'], 1);
+  assert.equal(b.fills[0].boundVariables, undefined);
+});

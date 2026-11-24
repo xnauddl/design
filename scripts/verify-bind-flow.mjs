@@ -1352,6 +1352,7 @@ async function saveAndGet(p) {
   await p.waitForTimeout(80);
   const ap = (await sent(p, 'APPLY')).filter((m) => m.preview === false).at(-1);
   check('17 연결 — APPLY(preview 아님) · skipTextStyleNodes · 시작 때 기준 · reqId', !!ap && ap.skipTextStyleNodes === true && ap.nodeIds?.[0] === 'w1' && typeof ap.reqId === 'number', JSON.stringify(ap));
+  check('B.35 연결 — 꺼진 줄(글자 기본 끔 font-size/14)의 값 키만 excludeValues로', JSON.stringify(ap?.excludeValues) === JSON.stringify(['fontSize|14']), JSON.stringify(ap?.excludeValues));
   check('17 실행 중 [연결] 잠금', await locked(p, '#btnApplyConfirm'));
   await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   await p.waitForTimeout(120);

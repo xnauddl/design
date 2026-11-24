@@ -4,6 +4,7 @@
      새 Semantic 역할을 만들어(같은 값 Global의 별칭) 붙인다. 이미 붙은 연결은 바꾸지도 풀지도 않는다(§2.12 12.8).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
+import { slotOffKey } from './makeOff';
 import { rgbToHex, colorKey, roundAlpha, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
 import { collectionTiers, ensureOwnedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
@@ -514,6 +515,11 @@ export interface BindOptions {
    * 없는 자리는 새 Semantic이 가리켰을 Global(`globalFor`)에 바로 붙인다(그런 Global도 없으면 지금처럼 건너뜀).
    */
   noNewRoles?: boolean;
+  /**
+   * 만들기 실행의 연결(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35) — 값 키(`makeOff.ts` `slotOffKey`)가 이 모음에 있는
+   * 자리는 붙이지 않고 사유 `make-off`로 센다.
+   */
+  excludeValue?: ReadonlySet<string>;
 }
 
 /** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). 텍스트 스타일 label 판정(`inUiRole`)이 쓴다. */
@@ -551,6 +557,7 @@ export async function bindSelection(
     slots: [],
     skipText: opts.skipTextStyleNode,
     noNewRoles: !!opts.noNewRoles,
+    ...(opts.excludeValue?.size ? { exclude: opts.excludeValue } : {}),
     mainOf: mains.mainOf,
     remote: mains.remote,
     visited: new Set(),
@@ -788,6 +795,8 @@ interface Ctx {
   res: BindResult;
   preview: Preview;
   slots: Slot[];
+  /** 꺼진 만들기 줄의 값 키(BindOptions.excludeValue). */
+  exclude?: ReadonlySet<string>;
   skipText?: (node: TextNode) => boolean;
   /** 무료 — 새 역할 없이 Global에 붙인다(BindOptions.noNewRoles). */
   noNewRoles?: boolean;
@@ -857,6 +866,13 @@ function resolveSlots(ctx: Ctx): void {
     return cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0] ?? null;
   };
   for (const s of ctx.slots) {
+    if (ctx.exclude) {
+      const k = slotOffKey(s.field, s.kind, s.value, s.pill);
+      if (k && ctx.exclude.has(k)) {
+        skip(res, 'make-off', s.node, preview, s.field);
+        continue;
+      }
+    }
     const cands = sameValueEntries(ctx, s);
     const d = pickDesigned(cands, s.kind);
     if (d) {

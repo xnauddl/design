@@ -1405,6 +1405,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           {
             // 만들기 실행의 연결(IA v4 §4.3) — 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다(실제 연결만).
             ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
+            // 만들기 실행의 연결 — 꺼진 줄의 값은 붙이지 않는다(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35).
+            ...(msg.excludeValues?.length && !msg.preview ? { excludeValue: new Set(msg.excludeValues) } : {}),
             // 무료 자동 연결은 새 Semantic을 만들지 않는다 — 찾기 · 실제 연결 · 카드 1의 m이 같은 규칙(IA v4 §2.3-7 · F6).
             ...(isPaid() ? {} : { noNewRoles: true }),
           },

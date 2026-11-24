@@ -151,6 +151,7 @@
     "wizard.seq.bindRoles": " \xB7 \uC0C8 Semantic {k}\uAC1C",
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
+    "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
     // 진행 안내 단계 라벨·안내
@@ -1867,6 +1868,47 @@
   var AUTO_ROLE_KEY = "dsl.autoRole";
   var TEXT_STEP_KEY = "dsl.textStep";
 
+  // src/lib/makeOff.ts
+  var round2 = (n) => Math.round(n * 100) / 100;
+  var FIELD_CATEGORY = {
+    fills: "color",
+    strokes: "color",
+    effects: "effectColor",
+    itemSpacing: "gap",
+    counterAxisSpacing: "gap",
+    paddingLeft: "gap",
+    paddingRight: "gap",
+    paddingTop: "gap",
+    paddingBottom: "gap",
+    gridRowGap: "gap",
+    gridColumnGap: "gap",
+    topLeftRadius: "radius",
+    topRightRadius: "radius",
+    bottomLeftRadius: "radius",
+    bottomRightRadius: "radius",
+    cornerRadius: "radius",
+    strokeWeight: "strokeWidth",
+    strokeTopWeight: "strokeWidth",
+    strokeRightWeight: "strokeWidth",
+    strokeBottomWeight: "strokeWidth",
+    strokeLeftWeight: "strokeWidth",
+    width: "size",
+    height: "size",
+    opacity: "opacity",
+    fontSize: "fontSize",
+    lineHeight: "lineHeight",
+    letterSpacing: "letterSpacing",
+    fontFamily: "fontFamily",
+    fontWeight: "fontWeight"
+  };
+  function slotOffKey(field, kind, value, pill) {
+    const category = FIELD_CATEGORY[field];
+    if (!category) return null;
+    if (kind === "color") return `${category}|${String(value)}`;
+    const v = pill != null ? pill : value;
+    return `${category}|${typeof v === "number" ? String(round2(v)) : v}`;
+  }
+
   // src/lib/tiers.ts
   var TIER_NUM = { global: 1, semantic: 2, component: 3 };
   var CANONICAL_NAME = { global: "Global", semantic: "Semantic" };
@@ -2318,9 +2360,9 @@
   }
 
   // src/lib/bind.ts
-  var round2 = (n) => Math.round(n * 100) / 100;
+  var round22 = (n) => Math.round(n * 100) / 100;
   function sameNumber(a, b) {
-    return round2(a) === round2(b);
+    return round22(a) === round22(b);
   }
   var SKIP_PREVIEW_CAP = 200;
   function capSkipsByReason(skips, cap) {
@@ -2588,7 +2630,7 @@
     return pickOwner(role, void 0, isKnownRole);
   }
   async function bindSelection(selection2, apply = true, hooks = {}, opts = {}) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const index = await buildIndex();
     const mains = await collectLocalMains(selection2);
     const mainRoots = mains.units.flatMap((u) => u.roots);
@@ -2596,17 +2638,18 @@
     const res = { bound: 0, skipped: 0, reasons: {} };
     const prog = { done: 0, total: hooks.onProgress ? countNodes(selection2, mains.units) : 0, every: 50 };
     const preview = { candidates: [], nodeIndex: [], skips: [], skipSeen: /* @__PURE__ */ new Set() };
-    const ctx = {
+    const ctx = __spreadProps(__spreadValues({
       index,
       res,
       preview,
       slots: [],
       skipText: opts.skipTextStyleNode,
-      noNewRoles: !!opts.noNewRoles,
+      noNewRoles: !!opts.noNewRoles
+    }, ((_a = opts.excludeValue) == null ? void 0 : _a.size) ? { exclude: opts.excludeValue } : {}), {
       mainOf: mains.mainOf,
       remote: mains.remote,
       visited: /* @__PURE__ */ new Set()
-    };
+    });
     for (const node of selection2) {
       if (!isEffectivelyVisible(node)) {
         note(res, "hidden", node, preview);
@@ -2638,7 +2681,7 @@
       );
       res.bound = r.bound;
       res.skipped += r.skipped;
-      for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_a = res.reasons[k]) != null ? _a : 0) + v;
+      for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_b = res.reasons[k]) != null ? _b : 0) + v;
       res.newRoles = r.newRoles;
       if (r.mainsBound.length) res.mainsBound = r.mainsBound;
       for (const c of preview.candidates) {
@@ -2652,10 +2695,10 @@
       res.nodes = pruneToAffected(preview.nodeIndex, res.candidates, skips);
       res.skips = skips;
       const layers = {};
-      for (const s of preview.skips) layers[s.reason] = ((_b = layers[s.reason]) != null ? _b : 0) + 1;
+      for (const s of preview.skips) layers[s.reason] = ((_c = layers[s.reason]) != null ? _c : 0) + 1;
       res.skipLayers = layers;
     }
-    (_c = hooks.onProgress) == null ? void 0 : _c.call(hooks, prog.done, prog.total);
+    (_d = hooks.onProgress) == null ? void 0 : _d.call(hooks, prog.done, prog.total);
     return res;
   }
   async function buildIndex() {
@@ -2804,6 +2847,13 @@
       return (_a2 = cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0]) != null ? _a2 : null;
     };
     for (const s of ctx.slots) {
+      if (ctx.exclude) {
+        const k = slotOffKey(s.field, s.kind, s.value, s.pill);
+        if (k && ctx.exclude.has(k)) {
+          skip(res, "make-off", s.node, preview, s.field);
+          continue;
+        }
+      }
       const cands = sameValueEntries(ctx, s);
       const d = pickDesigned(cands, s.kind);
       if (d) {
@@ -2921,7 +2971,7 @@
   function entryDisplay(e, s) {
     var _a;
     if (e.colorHex) return e.colorHex;
-    if (e.num != null) return String(round2(e.num));
+    if (e.num != null) return String(round22(e.num));
     return (_a = e.str) != null ? _a : s.display;
   }
   var numAllowed = (field) => {
@@ -12662,7 +12712,7 @@
     return out;
   }
   figma.ui.onmessage = async (msg) => {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n;
     try {
       switch (msg.type) {
         case "EXTRACT": {
@@ -12724,7 +12774,7 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              __spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true })
+              __spreadValues(__spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), ((_a = msg.excludeValues) == null ? void 0 : _a.length) && !msg.preview ? { excludeValue: new Set(msg.excludeValues) } : {}), isPaid() ? {} : { noNewRoles: true })
             );
             post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",
@@ -12825,7 +12875,7 @@
           bindCancel = false;
           bindLinkRunning = true;
           try {
-            const ts = ((_a = msg.textStyles) == null ? void 0 : _a.length) ? await applyTextStyleRows(msg.textStyles) : null;
+            const ts = ((_b = msg.textStyles) == null ? void 0 : _b.length) ? await applyTextStyleRows(msg.textStyles) : null;
             if (ts == null ? void 0 : ts.applied) written += ts.applied;
             const r = await bindSelectedItems(msg.items, {
               onProgress: (done, total) => post({ type: "PROGRESS", op: "link", done, total }),
@@ -12839,7 +12889,7 @@
               }
             });
             const mainsBound = [...r.mainsBound];
-            if (((_b = ts == null ? void 0 : ts.appliedIds) == null ? void 0 : _b.length) && msg.textStyles) {
+            if (((_c = ts == null ? void 0 : ts.appliedIds) == null ? void 0 : _c.length) && msg.textStyles) {
               const mainOfText = /* @__PURE__ */ new Map();
               for (const row of msg.textStyles) row.nodeIds.forEach((id, i) => {
                 var _a2;
@@ -13062,7 +13112,7 @@
               if (v.resolvedType === "COLOR" && raw && typeof raw === "object" && "r" in raw) return { value: exportColorHex(raw) };
               return { value: raw };
             };
-            const inp = __spreadValues({ id: v.id, name: v.name, tier: (_c = tiers.get(col.id)) != null ? _c : 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, collectionName: col.name }, read(v.valuesByMode[col.defaultModeId]));
+            const inp = __spreadValues({ id: v.id, name: v.name, tier: (_d = tiers.get(col.id)) != null ? _d : 0, type: v.resolvedType, kind: kindOf(v), collectionId: col.id, collectionName: col.name }, read(v.valuesByMode[col.defaultModeId]));
             if (v.description) inp.description = v.description;
             const others = col.modes.filter((m) => m.modeId !== col.defaultModeId);
             if (others.length) inp.modeValues = Object.fromEntries(others.map((m) => [m.modeId, read(v.valuesByMode[m.modeId])]));
@@ -13359,7 +13409,7 @@
               return (_a2 = existingIcons.get(key)) != null ? _a2 : null;
             }
           });
-          const shownNames = (_d = msg.names) != null ? _d : {};
+          const shownNames = (_e = msg.names) != null ? _e : {};
           const groupNames = groups.map((g, gi) => {
             if (g.tab) return resolved[gi];
             const shown = g.members.map((m) => shownNames[m.id]).find((n) => !!n);
@@ -13773,7 +13823,7 @@
                   for (const key of newIcons) iconRegistry.discard(key);
                   if (r.result === "mismatch") {
                     fillKept.push(name);
-                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_e = r.why) != null ? _e : "" }) }));
+                    failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_f = r.why) != null ? _f : "" }) }));
                   } else {
                     placeFailed.push(name);
                     failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -13853,7 +13903,7 @@
                 } else {
                   const snaps = live.map((n) => ({ n, vals: propValuesFromNode(n, plan), images: imagesOf(n) }));
                   const preferLive = pickCollapseMasterIndex(structs);
-                  const masterSnap = (_f = snaps[preferLive]) != null ? _f : snaps[0];
+                  const masterSnap = (_g = snaps[preferLive]) != null ? _g : snaps[0];
                   const masterOrigin = captureOrigin2(masterSnap.n);
                   let master;
                   try {
@@ -13874,7 +13924,7 @@
                     } catch (e) {
                     }
                   } else markReuse(master, "collapse", masterSnap.n.id);
-                  const prefix = shapePrefix(master, (_h = (_g = structs[preferLive]) == null ? void 0 : _g.type) != null ? _h : "");
+                  const prefix = shapePrefix(master, (_i = (_h = structs[preferLive]) == null ? void 0 : _h.type) != null ? _i : "");
                   placeOnPage(master);
                   keepRoots.push({ node: master, name: master.name });
                   singles.push(master.name);
@@ -13980,7 +14030,7 @@
                     if (propFailed.length > before) propFailed.splice(before);
                     if (r.result === "mismatch") {
                       fillKept.push(name);
-                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_i = r.why) != null ? _i : "" }) }));
+                      failures.push(t("component.fail.fillKept", { name, causePart: t("component.fail.cause", { why: (_j = r.why) != null ? _j : "" }) }));
                     } else {
                       placeFailed.push(name);
                       failures.push(t("component.fail.memberKept", { name, causePart: r.why ? t("component.fail.cause", { why: r.why }) : "" }));
@@ -14006,10 +14056,10 @@
               }
               const made = [];
               for (const sf of subfamilies) {
-                const head = (_j = sf.members[sf.master]) != null ? _j : sf.members[0];
+                const head = (_k = sf.members[sf.master]) != null ? _k : sf.members[0];
                 const node = byId.get(head.id);
                 if (!node) continue;
-                const vectorPlans = (_k = famPlans.get(head.id)) != null ? _k : allPlans;
+                const vectorPlans = (_l = famPlans.get(head.id)) != null ? _l : allPlans;
                 const icons = vectorPlans.map((p) => {
                   const at = nodeAtPath(node, p.layerPath);
                   const live = liveStruct.get(head.id);
@@ -14057,7 +14107,7 @@
               }
               let set;
               try {
-                const home = (_l = pageOf2(made[0].comp)) != null ? _l : figma.currentPage;
+                const home = (_m = pageOf2(made[0].comp)) != null ? _m : figma.currentPage;
                 set = figma.combineAsVariants(made.map((x) => x.comp), home);
               } catch (e) {
                 failures.push(t("component.fail.combine", { set: setName, error: errText(e) }));
@@ -14150,7 +14200,7 @@
             }
             const variantById = new Map(deriveVariants(g.members).map((d) => [d.id, d.variant]));
             try {
-              const parent = (_m = nodes[0].parent) != null ? _m : figma.currentPage;
+              const parent = (_n = nodes[0].parent) != null ? _n : figma.currentPage;
               const set = figma.combineAsVariants(nodes, parent);
               set.name = groupNames[gi];
               for (const m of g.members) {
@@ -14287,7 +14337,7 @@
             }
             throw e;
           }
-          const _n = res, { changed } = _n, r = __objRest(_n, ["changed"]);
+          const _o = res, { changed } = _o, r = __objRest(_o, ["changed"]);
           post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
           if (changed) {
             commitUndo(figma);

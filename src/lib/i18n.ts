@@ -140,6 +140,7 @@ export const STRINGS: Record<string, string> = {
   'wizard.seq.bindRoles': ' · 새 Semantic {k}개',
   'wizard.seq.bindNone': '연결 0곳 — 변수와 값이 같은 곳이 없어요',
   'wizard.seq.bindAllBound': '연결 0곳 — 이미 모두 연결돼 있어요',
+  'wizard.seq.bindAllOff': '연결 0곳 — 남은 곳은 끈 값이에요',
   'wizard.seq.bindNoTier': '연결 0곳 — 계층으로 쓸 변수가 없어요',
 
   // 마법사 완료 요약(summarize, wizard.ts)

@@ -3853,3 +3853,23 @@ test('varValueText · lastTwo · varTypeMark — 값 글 "#RRGGBB {p}%" · 칩 �
   assert.equal(lastTwo('(삭제된 변수)'), '(삭제된 변수)');
   assert.deepEqual(['FLOAT', 'STRING', 'BOOLEAN', 'COLOR'].map(varTypeMark), ['#', 'Aa', '✓', '']);
 });
+
+/* ---- 끈 값 키(IA v4 §4.3 "끈 값은 연결하지 않는다" · B.35) ---- */
+test('B.35 tokenOffKey · slotOffKey — 색 · 반투명 · 그림자 색 · 간격 · 알약 반경 · 글꼴 · 소수 반올림이 같은 키', async () => {
+  const { tokenOffKey, slotOffKey } = await import('../dist/pure.mjs');
+  assert.equal(tokenOffKey({ category: 'color', value: '#333333' }), 'color|#333333');
+  assert.equal(slotOffKey('fills', 'color', '#333333'), 'color|#333333');
+  assert.equal(slotOffKey('strokes', 'color', '#333333'), 'color|#333333');
+  assert.equal(tokenOffKey({ category: 'color', value: '#000000', alpha: 0.08 }), slotOffKey('fills', 'color', '#000000@0.08'));
+  assert.equal(tokenOffKey({ category: 'effectColor', value: '#000000', alpha: 0.25 }), slotOffKey('effects', 'color', '#000000@0.25'));
+  assert.notEqual(slotOffKey('effects', 'color', '#333333'), tokenOffKey({ category: 'color', value: '#333333' }), '그림자 색은 칠 색과 다른 줄');
+  assert.equal(tokenOffKey({ category: 'gap', value: 8 }), slotOffKey('itemSpacing', 'num', 8));
+  assert.equal(tokenOffKey({ category: 'gap', value: 8 }), slotOffKey('paddingLeft', 'num', 8));
+  assert.equal(tokenOffKey({ category: 'radius', value: 4 }), slotOffKey('topLeftRadius', 'num', 4));
+  assert.equal(tokenOffKey({ category: 'radius', value: 9999 }), slotOffKey('topLeftRadius', 'num', 24, 9999), '알약 반경 자리는 9999');
+  assert.equal(tokenOffKey({ category: 'strokeWidth', value: 1 }), slotOffKey('strokeTopWeight', 'num', 1));
+  assert.equal(tokenOffKey({ category: 'size', value: 24 }), slotOffKey('width', 'num', 24));
+  assert.equal(tokenOffKey({ category: 'fontFamily', value: 'Inter' }), slotOffKey('fontFamily', 'text', 'Inter'));
+  assert.equal(tokenOffKey({ category: 'lineHeight', value: 20 }), slotOffKey('lineHeight', 'text', 20.001));
+  assert.equal(slotOffKey('unknownField', 'num', 1), null, '종류를 모르는 필드는 키 없음');
+});
