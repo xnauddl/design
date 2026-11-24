@@ -8376,19 +8376,26 @@ async function scan61(rootKids, o = {}) {
   const out = await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 1 });
   return ofType(out, 'COMPONENT_CANDIDATES')[0];
 }
-const label61 = (n) => (n.group ? `${n.group} · ${n.variant}` : n.single);
+const label61 = (n) => (n.group ? (n.variant === '' ? n.group : `${n.group} · ${n.variant}`) : n.single); // 빈 변형 값은 꼬리 없음(C-D26)
 
-test('6-1b ① ② — 탭 바 둘(nav · card) → Tab Bar · Style=Text / Pill, 칸은 후보 아님 · 같은 Style 칸 4 바 → Tab Item · Style=Text', async () => {
-  const r = await scan61([menu61('m1', 5), menu61('m2', 5, 2), menu61('m3', 4), pill61('p')]);
+test('6-1b ① ② — 탭 바(tabs 글자 메뉴 · card 알약) → Style 그룹마다 Tab Bar-Text / -Pill(C-D20), 칸은 후보 아님 · 같은 Style 칸 4 바 → Tab Item-Text(꼬리 없음 — C-D26)', async () => {
+  const r = await scan61([menu61('m1', 5, 0, 'tabs'), menu61('m2', 5, 2, 'tabs'), menu61('m3', 4, 0, 'tabs'), pill61('p')]);
   const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
-  assert.equal(label61(by.m1), 'Tab Bar · Style=Text');
-  assert.equal(label61(by.m2), 'Tab Bar · Style=Text', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
-  assert.equal(label61(by.m3), 'Tab Item · Style=Text', '칸 수가 다른 바 — 칸만');
-  assert.equal(label61(by.p), 'Tab Bar · Style=Pill');
+  assert.equal(label61(by.m1), 'Tab Bar-Text');
+  assert.equal(label61(by.m2), 'Tab Bar-Text', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
+  assert.equal(label61(by.m3), 'Tab Item-Text', '칸 수가 다른 바 — 칸만');
+  assert.equal(by.m3.variant, '', '변형 값은 빈 문자열');
+  assert.equal(label61(by.p), 'Tab Bar-Pill');
   assert.ok(r.nodes.every((n) => n.defaultOn || !n.eligible));
   assert.ok(!r.nodes.some((n) => /^(m\d|p)-/.test(n.id)), '칸은 후보 아님');
-  const one = await scan61([menu61('m1', 5)]);
+  const one = await scan61([menu61('m1', 5, 0, 'tabs')]);
   assert.equal(label61(one.nodes.find((n) => n.id === 'm1')), 'Tab Bar', 'Style 하나 → 단독 Tab Bar');
+  // 이름 없는 글자 메뉴(C-D19) — 탭이 아니다(nav · 일반 구조어라 꺼짐)
+  const nav = await scan61([menu61('n1', 5), pill61('p2')]);
+  const n1 = nav.nodes.find((n) => n.id === 'n1');
+  assert.ok(!n1 || !String(label61(n1) ?? '').startsWith('Tab'), JSON.stringify(n1));
+  assert.ok(!n1?.defaultOn);
+  assert.equal(label61(nav.nodes.find((n) => n.id === 'p2')), 'Tab Bar');
 });
 
 const bkList = (id, mainOf, o) => sn({ type: 'FRAME', id, name: 'BkList', layoutMode: 'HORIZONTAL', width: 900, height: 200, itemSpacing: 16, fills: [],
@@ -8520,10 +8527,10 @@ function regWorld(figma) {
     n._props = {};
     n.addComponentProperty = function (name, type, def) { if (type === 'INSTANCE_SWAP' && !reg.get(def)) throw new Error('incompatible'); const id = `${name}#${seq++}`; this._props[id] = { type, defaultValue: def }; return id; };
     n.createInstance = function () {
-      const i = base('INSTANCE', { name: this.name, width: this.width, height: this.height });
+      const i = base('INSTANCE', { name: this.name, width: this.width, height: this.height, ...(this.layoutMode ? { layoutMode: this.layoutMode } : {}) });
       makeInstanceOf(i, this);
       // 감싼 글자(제약 SCALE) 흉내 — 인스턴스 크기를 바꾸면 안 글자도
-      i.resize = function (w, h) { this.width = w; this.height = h; if (this.children.length === 1 && this.children[0].type === 'TEXT') { this.children[0].width = w; this.children[0].height = h; } };
+      i.resize = function (w, h) { this.width = w; this.height = h; if (!this.layoutMode && this.children.length === 1 && this.children[0].type === 'TEXT') { this.children[0].width = w; this.children[0].height = h; } }; // 오토레이아웃 틀(여백 있는 칸)은 글자를 늘이지 않는다
       figma.currentPage.appendChild(i);
       return i;
     };
@@ -8567,19 +8574,19 @@ function regWorld(figma) {
   return { base, withKids, page, reg };
 }
 
-test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 다른 5) + 알약형 1 → Tab Item 세트 4변형 · Tab Bar 세트 2변형 · 자리 인스턴스 · 꼬리', async () => {
+test('6-1b [등록] 탭 길(목) — tabs 메뉴형 바 4(칸 5 · 5 · 4 · 테마 다른 5) + 알약형 1 → Style 그룹마다(C-D20) Tab Item-Text · -Pill 세트(State 2) · Tab Bar 컴포넌트 · 자리 인스턴스 · 꼬리', async () => {
   const figma = installFigma();
   const p = await loadPlugin(figma);
   const w = regWorld(figma);
   const T = (id, chars, color, o = {}) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontName: { family: 'Inter', style: 'Regular' },
     getRangeAllFontNames() { return [this.fontName]; }, ...o });
   const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
-  const menu = (id, n, active, selColor = '#000000', name = 'nav') => F(id, { name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [] },
+  const menu = (id, n, active, selColor = '#000000', name = 'tabs') => F(id, { name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [] },
     ['About', 'Services', 'Offers', 'Seats', 'Destination'].slice(0, n).map((c, i) => T(`${id}-${i}`, c, i === active ? selColor : '#7a7a7a')));
   const pill = F('p', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
     ['Economy', 'Business Class', 'Fast Class'].map((l, i) => F(`p-${i}`, { name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24, fills: i === 1 ? solid61('#3d5fdb') : [] },
       [T(`p-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')])));
-  const bars = [menu('m1', 5, 0), menu('m2', 5, 2, '#000000', 'nav-copy'), menu('m3', 4, 0, '#000000', 'nav-4'), menu('mb', 5, 0, '#2563eb', 'nav-blue'), pill];
+  const bars = [menu('m1', 5, 0), menu('m2', 5, 2, '#000000', 'tabs-copy'), menu('m3', 4, 0, '#000000', 'tabs-4'), menu('mb', 5, 0, '#2563eb', 'tabs-blue'), pill];
   const root = F('root', { name: 'Flightin website', width: 1440, height: 900, fills: [] }, bars);
   w.page.appendChild(root);
   w.page.selection = [root];
@@ -8587,27 +8594,32 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   const r = ofType(out, 'COMPONENTS_RESULT')[0];
   assert.ok(r, JSON.stringify(out).slice(0, 400));
   assert.equal(r.sets, 2, JSON.stringify(r.failures));
-  assert.deepEqual(r.singles, []);
-  assert.deepEqual(r.fillKept, ['nav-blue'], '테마 색이 다른 바는 원본 그대로');
+  assert.deepEqual(r.singles, ['Tab Bar-Text', 'Tab Bar-Pill'], 'Tab Bar는 Style 그룹마다 컴포넌트 하나');
+  assert.deepEqual(r.fillKept, ['tabs-blue'], '테마 색이 다른 바는 원본 그대로');
   assert.deepEqual(r.placeFailed, []);
   const comps = figma.root.children.find((x) => x.name === 'Components');
-  const item = comps.children.find((x) => x.name === 'Tab Item');
-  const tbar = comps.children.find((x) => x.name === 'Tab Bar');
-  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected, Style=Text', 'State=Default, Style=Text', 'State=Selected, Style=Pill', 'State=Default, Style=Pill']);
-  assert.ok(item.children.every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-item:')));
-  assert.deepEqual(tbar.children.map((c) => c.name), ['Style=Text', 'Style=Pill']);
-  assert.ok(tbar.children.every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-bar:')));
+  const item = comps.children.find((x) => x.name === 'Tab Item-Text');
+  const itemP = comps.children.find((x) => x.name === 'Tab Item-Pill');
+  const tbar = comps.children.find((x) => x.name === 'Tab Bar-Text');
+  const tbarP = comps.children.find((x) => x.name === 'Tab Bar-Pill');
+  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected', 'State=Default']);
+  assert.deepEqual(itemP.children.map((c) => c.name), ['State=Selected', 'State=Default']);
+  assert.ok([...item.children, ...itemP.children].every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-item:')));
+  assert.equal(tbar.type, 'COMPONENT');
+  assert.equal(tbarP.type, 'COMPONENT');
+  assert.ok([tbar, tbarP].every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-bar:')));
   assert.ok(tbar.x > item.x, 'Tab Bar는 Tab Item 오른쪽');
-  assert.ok(tbar.children.every((v) => v.children.every((k) => k.type === 'INSTANCE' && k.isExposedInstance === true)), 'Tab Bar 안 칸은 노출된 Tab Item 인스턴스');
+  assert.ok([tbar, tbarP].every((v) => v.children.every((k) => k.type === 'INSTANCE' && k.isExposedInstance === true)), 'Tab Bar 안 칸은 노출된 Tab Item 인스턴스');
   assert.ok(Object.values(item._props).some((x) => x.type === 'TEXT'), 'Tab Item에는 글자 속성 노출');
+  assert.ok(Object.entries(item._props).some(([k, x]) => x.type === 'TEXT' && k.startsWith('Text#')), '글자 속성 이름 Text(C-D24)');
   assert.deepEqual(Object.keys(tbar._props), [], 'Tab Bar에는 노출하지 않는다');
-  assert.deepEqual(tbar.children[0].children.map((c) => c.children[0].characters), ['About', 'Services', 'Offers', 'Seats', 'Destination'], '노출 뒤에도 칸마다 제 글자(9번 값 지키기)');
+  assert.deepEqual(tbar.children.map((c) => c.children[0].characters), ['About', 'Services', 'Offers', 'Seats', 'Destination'], '노출 뒤에도 칸마다 제 글자(9번 값 지키기)');
   const kids = root.children;
   const mainName = async (n) => (await n.getMainComponentAsync())?.name;
   assert.equal(kids[0].type, 'INSTANCE');
-  assert.equal(await mainName(kids[0]), 'Style=Text');
+  assert.equal(await mainName(kids[0]), 'Tab Bar-Text');
   assert.equal(kids[1].type, 'INSTANCE', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
-  assert.equal(await mainName(kids[1].children[2]), 'State=Selected, Style=Text', '선택 위치는 원래대로');
+  assert.equal(await mainName(kids[1].children[2]), 'State=Selected', '선택 위치는 원래대로');
   assert.equal(kids[1].children[1].children[0].characters, 'Services');
   assert.equal(kids[2].type, 'FRAME', '칸 수가 다른 바 — 틀 그대로');
   assert.ok(kids[2].children.every((c) => c.type === 'INSTANCE'), '칸만 Tab Item 인스턴스');
@@ -8615,14 +8627,14 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   assert.equal(kids[3].type, 'FRAME');
   assert.ok(kids[3].children.every((c) => c.type === 'TEXT'), 'nav-blue 칸도 그대로');
   assert.equal(kids[4].type, 'INSTANCE');
-  assert.equal(await mainName(kids[4]), 'Style=Pill');
+  assert.equal(await mainName(kids[4]), 'Tab Bar-Pill');
   assert.equal(figma._undo, 1);
   // 같은 프레임을 다시 찾기 — Tab Bar 인스턴스 · 칸만 바꾼 칸 4 바는 후보에 없다(일반 후보로 떨어지지 않음)
   const again = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 2 }), 'COMPONENT_CANDIDATES')[0];
-  assert.deepEqual(again.nodes.filter((n) => n.eligible).map((n) => n.name), ['nav-blue'], '남은 것은 원본 그대로 둔 nav-blue뿐');
+  assert.deepEqual(again.nodes.filter((n) => n.eligible).map((n) => n.name), ['tabs-blue'], '남은 것은 원본 그대로 둔 nav-blue뿐');
   assert.equal(again.autoNamed, 0);
   // 원본을 한 번 더 붙여 넣은 사본 → 재사용 Tab Item · Tab Bar
-  const bars2 = [menu('c1', 5, 0), menu('c2', 5, 2, '#000000', 'nav-copy'), menu('c3', 4, 0, '#000000', 'nav-4'), F('cp', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
+  const bars2 = [menu('c1', 5, 0), menu('c2', 5, 2, '#000000', 'tabs-copy'), menu('c3', 4, 0, '#000000', 'tabs-4'), F('cp', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
     ['Economy', 'Business Class', 'Fast Class'].map((l, i) => F(`cp-${i}`, { name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24, fills: i === 1 ? solid61('#3d5fdb') : [] },
       [T(`cp-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')])))];
   const root2 = F('root2', { name: 'Flightin website 2', width: 1440, height: 900, fills: [] }, bars2);
@@ -8630,17 +8642,148 @@ test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 �
   w.page.selection = [root2];
   const pre = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root2'], reqId: 3 }), 'COMPONENT_CANDIDATES')[0];
   const pby = Object.fromEntries(pre.nodes.map((n) => [n.id, n]));
-  assert.equal(pby.c1.reuse?.name, 'Tab Bar · Style=Text');
-  assert.equal(pby.c3.reuse?.name, 'Tab Item · Style=Text');
+  assert.equal(pby.c1.reuse?.name, 'Tab Bar-Text', '재사용 라벨에 · Style= 꼬리 없음');
+  assert.equal(pby.c3.reuse?.name, 'Tab Item-Text');
   const r2 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: bars2.map((b) => b.id) }), 'COMPONENTS_RESULT')[0];
-  assert.deepEqual(r2.reused, ['Tab Item', 'Tab Bar'], JSON.stringify(r2.failures));
+  assert.deepEqual(r2.reused, ['Tab Item-Text', 'Tab Bar-Text', 'Tab Item-Pill', 'Tab Bar-Pill'], JSON.stringify(r2.failures));
   assert.equal(r2.sets, 0);
   assert.deepEqual(r2.fillKept, [], '재사용 칸 맞추기 — 틀 칸(알약)도 기존 변형과 맞는다');
   assert.equal(root2.children[3].type, 'INSTANCE', '알약 바도 기존 Tab Bar 인스턴스');
   assert.equal(root2.children[0].type, 'INSTANCE');
-  assert.equal(await mainName(root2.children[0]), 'Style=Text');
+  assert.equal(await mainName(root2.children[0]), 'Tab Bar-Text');
   assert.equal(root2.children[2].type, 'FRAME');
   assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
+});
+
+/* ---------- A.27 재현(2026-11-23 실기 피드백 `DSL 등록 품질` 수치) ---------- */
+function pillWorld(figma) {
+  const w = regWorld(figma);
+  const T = (id, chars, color, width, weight = 500) => w.base('TEXT', { id, name: chars, characters: chars, width, height: 23, fills: solid61(color), fontWeight: weight, fontName: { family: 'Inter', style: 'Regular' },
+    getRangeAllFontNames() { return [this.fontName]; }, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG' });
+  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
+  const cell = (id, label, width, padX, fill, textColor, textW, weight) => F(id, { name: 'button', layoutMode: 'HORIZONTAL', width, height: 47, paddingTop: 12, paddingBottom: 12, paddingLeft: padX, paddingRight: padX, itemSpacing: 10, cornerRadius: 24,
+    fills: fill ? solid61(fill) : [], layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG' }, [T(`${id}t`, label, textColor, textW, weight)]);
+  const bar = F('pill', { name: 'Frame 10', layoutMode: 'HORIZONTAL', width: 462, height: 71, paddingTop: 12, paddingBottom: 12, cornerRadius: 32, fills: solid61('#f4f9fa') }, [
+    // 칸 폭 = 글자 폭 + 좌우 여백(실기 128 · 196 · 138과 같은 짜임 — 목의 글자 폭은 40 + 글자 수)
+    cell('pe', 'Economy', 47 + 48, 24, null, '#a3a3a3', 47, 500),
+    cell('pb', 'Business Class', 54 + 64, 32, '#3d5fdb', '#ffffff', 54, 600),
+    cell('pf', 'Fast Class', 50 + 48, 24, null, '#a3a3a3', 50, 500),
+  ]);
+  const root = F('root', { name: 'Frame 19', width: 1000, height: 165, fills: [] }, [bar]);
+  w.page.appendChild(root);
+  w.page.selection = [root];
+  return { w, bar, root };
+}
+
+function buttonWorld(figma) {
+  const w = regWorld(figma);
+  const T = (id, chars, color, width, weight = 600) => w.base('TEXT', { id, name: chars, characters: chars, width, height: 23, fills: solid61(color), fontWeight: weight, fontName: { family: 'Inter', style: 'Regular' }, getRangeAllFontNames() { return [this.fontName]; } });
+  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
+  const stroke = [{ type: 'SOLID', visible: true, color: { r: 0.64, g: 0.64, b: 0.64 } }];
+  const arrow = (id) => F(id, { name: 'arrow', width: 13, height: 13, visible: false, fills: [] }, [w.base('VECTOR', { id: `${id}v`, name: 'Vector', width: 4, height: 7, fills: solid61('#000000') })]);
+  const app = (id) => F(id, { name: 'button', layoutMode: 'HORIZONTAL', width: 76, height: 30, paddingTop: 6, paddingRight: 8, paddingBottom: 8, paddingLeft: 8, itemSpacing: 2, cornerRadius: 4, fills: [], strokes: [{ type: 'SOLID', visible: true, color: { r: 0.9, g: 0.9, b: 0.9 } }] },
+    [arrow(`${id}a`), T(`${id}t`, '앱다운로드', '#000000', 45, 400), arrow(`${id}b`)]);
+  const contact = F('bc', { name: 'button', layoutMode: 'HORIZONTAL', width: 126, height: 44, paddingTop: 12, paddingRight: 32, paddingBottom: 12, paddingLeft: 32, itemSpacing: 10, cornerRadius: 20, fills: solid61('#3d5fdb') }, [T('bct', 'Contact', '#ffffff', 47)]);
+  const viewAll = F('bv', { name: 'button', layoutMode: 'HORIZONTAL', width: 135, height: 47, paddingTop: 12, paddingRight: 32, paddingBottom: 12, paddingLeft: 32, itemSpacing: 10, cornerRadius: 24, fills: [], strokes: stroke }, [T('bvt', 'View All', '#000000', 48)]);
+  const subscribe = F('bs', { name: 'button', layoutMode: 'HORIZONTAL', width: 180, height: 48, paddingTop: 13, paddingRight: 24, paddingBottom: 13, paddingLeft: 24, itemSpacing: 10, cornerRadius: 20, fills: solid61('#3d5fdb') }, [T('bst', 'Subscribe Now', '#ffffff', 53)]);
+  const a1 = app('ba1');
+  const a2 = app('ba2');
+  const root = F('root', { name: 'page copy', width: 1440, height: 900, fills: [] }, [F('w1', { name: 'Frame 29', width: 151, height: 70, fills: [] }, [a1]), F('w2', { name: 'Frame 29', width: 151, height: 70, fills: [] }, [a2]), contact, viewAll, subscribe]);
+  w.page.appendChild(root);
+  w.page.selection = [root];
+  return { w, root, ids: ['ba1', 'ba2', 'bc', 'bv', 'bs'] };
+}
+
+test('A.27 ② — 글자 메뉴 `items` + 알약 `Frame 10` [등록]: 메뉴는 탭이 아님(C-D19) · 알약은 Tab Item(State 2) + Tab Bar, 칸 셋 모두 인스턴스(Fast Class는 Default)', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const { w, root, bar } = pillWorld(figma);
+  const T = (id, chars, color) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontWeight: 500, fontName: { family: 'Inter', style: 'Regular' }, getRangeAllFontNames() { return [this.fontName]; } });
+  const items = w.withKids(w.base('FRAME', { id: 'items', name: 'items', layoutMode: 'HORIZONTAL', width: 440, height: 20, itemSpacing: 24, fills: [] }));
+  ['About', 'Services', 'Offers', 'Seats', 'Destination'].forEach((c, i) => items.appendChild(T(`it${i}`, c, i === 0 ? '#000000' : '#7a7a7a')));
+  root.insertChild(0, items);
+  const scan = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 1 }), 'COMPONENT_CANDIDATES')[0];
+  const by = Object.fromEntries(scan.nodes.map((n) => [n.id, n]));
+  assert.ok(!String(by.items?.single ?? by.items?.group ?? '').startsWith('Tab'), JSON.stringify(by.items));
+  assert.equal(by.items?.defaultOn, false, '글자 메뉴는 꺼짐');
+  assert.equal(by.pill?.single, 'Tab Bar');
+  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['pill'] }), 'COMPONENTS_RESULT')[0];
+  assert.deepEqual(r.fillKept, [], JSON.stringify(r.failures));
+  assert.equal(r.sets, 1);
+  assert.deepEqual(r.singles, ['Tab Bar']);
+  const comps = figma.root.children.find((x) => x.name === 'Components');
+  const item = comps.children.find((x) => x.name === 'Tab Item');
+  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected', 'State=Default']);
+  const tbar = comps.children.find((x) => x.name === 'Tab Bar');
+  assert.ok(tbar.children.every((k) => k.type === 'INSTANCE'), 'Tab Bar 안 칸 셋 모두 인스턴스');
+  const mainName = async (n) => (await n.getMainComponentAsync())?.name;
+  assert.deepEqual(await Promise.all(tbar.children.map(mainName)), ['State=Default', 'State=Selected', 'State=Default']);
+  assert.equal(tbar.children[2].children[0].characters, 'Fast Class');
+  assert.equal(root.children[0].type, 'FRAME', '글자 메뉴는 그대로');
+  assert.equal(bar.removed || root.children[1].type === 'INSTANCE', true);
+});
+
+test('A.27 C-D27 — 문서에 Tab Item · Tab Bar가 있으면 알약 탭은 Tab Item-Pill · Tab Bar-Pill(숫자 아님)', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const { w } = pillWorld(figma);
+  const old = w.withKids(w.base('COMPONENT', { name: 'Tab Bar' }));
+  w.page.appendChild(old);
+  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['pill'] }), 'COMPONENTS_RESULT')[0];
+  assert.deepEqual(r.singles, ['Tab Bar-Pill'], JSON.stringify(r.failures));
+  const comps = figma.root.children.find((x) => x.name === 'Components');
+  assert.ok(comps.children.some((x) => x.name === 'Tab Item-Pill'));
+});
+
+test('A.27 C-D23 — 대표 바 칸 하나가 넣기 전 검사에 걸리면 그 Style을 만들지 않는다: 세트 지움 · 수 0 · 바 원본 · 처리 중 문제 바 한 줄 · 남는 인스턴스 없음', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const { w, bar } = pillWorld(figma);
+  bar.children[2].children[0].height = 30; // Fast Class 글자 높이만 다름 → Default 인스턴스와 자리 · 크기가 어긋남
+  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['pill'] }), 'COMPONENTS_RESULT')[0];
+  assert.equal(r.sets, 0);
+  assert.equal(r.registered, 0);
+  assert.deepEqual(r.singles, []);
+  assert.deepEqual(r.fillKept, ['Frame 10']);
+  assert.equal(r.failures.filter((f) => f.includes('채움·크기')).length, 1, '칸 줄이 아니라 바 한 줄');
+  assert.ok(bar.children.every((c) => c.type === 'FRAME' && !c.removed), '칸은 원본 그대로');
+  const comps = figma.root.children.find((x) => x.name === 'Components');
+  assert.ok(!comps || !comps.children.some((x) => /^Tab (Item|Bar)/.test(x.name) && !x.removed), '만든 Tab Item 세트는 지워짐');
+  assert.ok(![...w.reg.values()].some((n) => n.type === 'INSTANCE' && !n.removed && n.parent), '검사 길의 인스턴스가 남지 않음');
+});
+
+test('A.27 C-D28 · C-D24 — 버튼 넷(실기 수치) [등록] → 한 Button 세트 변형 4 · 글자 속성 Text 하나가 네 변형 모두에(앱 버튼은 경로 1, 나머지는 대체 찾기) · 빈 변형 없음', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const { ids } = buttonWorld(figma);
+  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ids }), 'COMPONENTS_RESULT')[0];
+  assert.equal(r.sets, 1, JSON.stringify(r.failures));
+  assert.deepEqual(r.missing, [], '같은 가족 안 빈칸 없음(C-D31)');
+  const comps = figma.root.children.find((x) => x.name === 'Components');
+  const set = comps.children.find((x) => x.type === 'COMPONENT_SET');
+  assert.equal(set.name, 'Button');
+  assert.deepEqual(set.children.map((v) => v.name), ['Radius=4, Size=default, Style=Outline', 'Radius=20, Size=md, Style=Filled', 'Radius=20, Size=lg, Style=Filled', 'Radius=full, Size=default, Style=Outline']);
+  const textProps = Object.entries(set._props).filter(([, v]) => v.type === 'TEXT').map(([k]) => k);
+  assert.equal(textProps.length, 1);
+  assert.match(textProps[0], /^Text#/);
+  const bound = set.children.map((v) => { const ts = []; const walk = (n) => { for (const c of n.children ?? []) { if (c.type === 'TEXT') ts.push(c); walk(c); } }; walk(v); return ts.filter((t) => t.componentPropertyReferences?.characters === textProps[0]).length; });
+  assert.deepEqual(bound, [1, 1, 1, 1], '네 변형 모두 묶임');
+});
+
+test('A.27 C-D31 — 채움 버튼 가족 Color 2 × Size 2에 하나 빠짐 → [등록] 결과 빈 변형 그 하나', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const w = regWorld(figma);
+  const T = (id) => w.base('TEXT', { id, name: 'Go', characters: 'Go', width: 42, height: 20, fills: solid61('#ffffff'), fontName: { family: 'Inter', style: 'Regular' }, getRangeAllFontNames() { return [this.fontName]; } });
+  const B = (id, bg, wd, pad) => { const f = w.withKids(w.base('FRAME', { id, name: 'cta', layoutMode: 'HORIZONTAL', width: wd, height: 40, cornerRadius: 8, paddingLeft: pad, paddingRight: pad, fills: solid61(bg) })); f.appendChild(T(`${id}t`)); return f; };
+  const root = w.withKids(w.base('FRAME', { id: 'root', name: 'root', width: 900, height: 400, fills: [] }));
+  for (const b of [B('a', '#3d5fdb', 80, 8), B('b', '#3d5fdb', 120, 16), B('c', '#f97316', 80, 8)]) root.appendChild(b);
+  w.page.appendChild(root);
+  w.page.selection = [root];
+  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['a', 'b', 'c'] }), 'COMPONENTS_RESULT')[0];
+  assert.equal(r.sets, 1, JSON.stringify(r.failures));
+  assert.equal(r.missing.length, 1);
+  assert.match(r.missing[0], /^Cta: .*Size=lg/);
 });
 
 /* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.28, 2026-11-19) ---------- */
