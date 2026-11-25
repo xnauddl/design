@@ -1,6 +1,6 @@
 # 플러그인 디자인 시스템 — 명세
 
-> 2026-11-25 작성 · 2회차(1회차 검토 중대 13 · 사소 18 반영, 디자인 방향 DS-D5–DS-D9 반영). 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
+> 2026-11-25 작성 · 검토 4회(중대 13 → 4 → 2 → 1 → 0, 남은 사소는 구현 때 고침), 디자인 방향 DS-D5–DS-D9 반영. 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
 > 이 문서가 토큰 · 컴포넌트 · 레이아웃 · 사용 규칙의 **단일 명세**다. 토큰 값의 **단일 원본**은 `design-tokens/tokens.json`이고, 이 문서의 표는 그 원본과 같아야 한다(다르면 원본이 맞고 표를 고친다).
 > 본문 §3의 값은 **최종 값(DS-1 ② 단계 뒤)** 이다. ① 단계의 임시 값과 옮기기 규칙은 부록 A.
 > 기준: 본문 §0–§9에 중대 결함 0(CLAUDE.md 4단계). 부록 A(옮기기)와 B(체크리스트)는 DS-1 PR에서 닫는다.
@@ -235,7 +235,7 @@
 
 - 버튼 · 입력의 높이는 **`height`로** 정한다(`height: var(--size-control-md)`, 좌우 `padding`만, 위아래 0). 지금처럼 위아래 padding + 줄 높이로 높이를 만들지 않는다.
   - 높이는 **기본 `button` 규칙과 한 줄 입력(`input[type=text]` · `input[type=number]` · `select`)에만** 준다. `textarea`는 높이를 주지 않는다.
-  - 아래 버튼은 글자 안에 놓이거나 자기 모양이 있어 `height: auto`로 지금 높이를 지킨다: `button.link` · `button.link-btn`(`.sel-diff` 안 포함 — 24 이하) · `.step-chip` · `.ctx-menu button` · `.var-use` · `.ed-copy`. 작은 한 줄 입력 `.ts-edit input`(텍스트 스타일 편집 줄, 지금 약 21) · `select.r-role`(색 목록 역할 고르개, 지금 약 24)도 `height: auto`로 지금 높이를 지킨다. 자기 `height`를 이미 정한 버튼 · 칸(`.bv-switch` · `.mk-row button` · `.tr-edit` 22 · `.subtab` 32 등)은 맞는 크기 토큰이 있으면 토큰으로, 없으면 그 값 그대로(너비 · 높이는 검사 밖 — §3.6 마지막 줄).
+  - 아래 버튼은 글자 안에 놓이거나 자기 모양이 있어 `height: auto`로 지금 높이를 지킨다: `button.link` · `button.link-btn`(`.sel-diff` 안 포함 — 24 이하) · `.step-chip` · `.ctx-menu button` · `.var-use` · `.ed-copy`. 작은 한 줄 입력 `.ts-edit input`(텍스트 스타일 편집 줄, 지금 약 21) · `select.r-role`(색 목록 역할 고르개, 지금 약 24)도 `height: auto`로 둔다(위아래 padding 3 → 4는 A.3대로 받아들여 약 2px 커짐). 자기 `height`를 이미 정한 버튼 · 칸(`.bv-switch` · `.mk-row button` · `.tr-edit` 22 · `.subtab` 32 등)은 맞는 크기 토큰이 있으면 토큰으로, 없으면 그 값 그대로(너비 · 높이는 검사 밖 — §3.6 마지막 줄).
   - 탭: `.tabs`는 `min-height: var(--size-nav)`(36 — 지금과 같음) · 안쪽 `space-0-5`, `.tab-btn`은 `height: var(--size-control-sm)`(24 — 지금과 같음), `.tab-min` 28은 `size-control-md`.
 - **26px 칸**은 모두 `size-compact`로 한다(28로 올리지 않음 — 옆 줄과 맞춘 값이라): `.vp-pill .vp-item` · `.make-opts` · `.ed-field`(min-height) · `.ed-go` · `.ed-type` · `.list-head .search-box input` · `input[type="color"]`, 그리고 그 칸과 줄을 맞춘 `line-height: 26px`(`.ed-dl dt` · `dd.ed-plain`).
 - 너비 · 높이의 다른 px(열 폭 88 · 견본 14 등)는 검사하지 않는다 — DS-2에서 컴포넌트로 옮길 때 정한다.
@@ -248,7 +248,7 @@
 | `motion-duration-spin` | 900ms | 돌기 한 바퀴 (지금 .9s · 1s) |
 | `z-below` | -1 | 그림 뒤에 까는 장식 |
 | `z-raised` | 1 | 붙는 카드 머리 · 도구 줄 |
-| `z-sticky` | 2 | 붙는 목록 머리 · 아래 실행 줄(`.vt-section` · `.vl-head` · `.make-foot`) |
+| `z-sticky` | 2 | 붙는 목록 머리 · 아래 실행 줄(`.vl-head` · `.make-foot`) |
 | `z-sticky-top` | 3 | 탭 줄 · 목록 머리(`#varList .list-head`) |
 | `z-fixed` | 20 | 창 바닥 상태 줄 · 고르개 펼침 |
 | `z-popover` | 30 | 고정 툴팁(`#uiTip`) |
@@ -257,7 +257,7 @@
 | `z-tooltip` | 60 | 표 툴팁(`.vt-tip`) · Toast |
 | `opacity-disabled` | .5 | `:disabled` 버튼 · 꺼진 스위치 — 흐리되 읽힘(DS-D5 "과하게 흐리지 않게") |
 
-- 투명도는 `opacity-disabled`만 토큰이다. 그 밖의 `opacity`(옛 결과 흐림 `.results.stale` 등)는 검사하지 않는다.
+- 투명도는 `opacity-disabled`만 토큰이다. 그 밖의 `opacity`는 검사하지 않는다.
 
 ### 3.8 Component 치수 (사용자 결정 숫자 — §1-9)
 
@@ -362,7 +362,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | Modal | 기본 | `size-modal-sm` · `-md` | 열림 (닫기 F) | Modal Layout(§5) · `color-overlay` · `z-modal` | `.modal-backdrop` · `.modal` |
 | Confirm Dialog | 일반 · 위험(Destructive 확인) | `size-modal-sm` | 열림 | Modal과 같음 | 없음(지금 `.ed-confirm`은 대화 상자가 아니라 팝업 아래의 확인 줄 — DS-2에서 이 컴포넌트로 바꿀지 정함) |
 | Empty State | 처음 · 결과 없음 | 가운데, 위아래 `space-10` | D | `text-display` · `text-body-sm` · 아이콘 `size-icon-lg` | `.sel-empty` · `.var-empty` · `.vt-empty` · `.bind-empty` · `.unused-none` |
-| Loading State | 줄 뼈대 · 돌기 | 목록 / 화면 | L | `color-surface-secondary` 뼈대 · `motion-duration-spin` | `.var-loading` · `.tr-skel` · `.icon-btn.spinning` |
+| Loading State | 줄 뼈대 · 돌기 | 목록 / 화면 | L | `color-surface-secondary` 뼈대 · `motion-duration-spin` | `.var-loading` · `.tr-skel` · `.mini-mark.spin` |
 | Error State | 화면 · 칸 | — | D (다시 시도) | `color-state-error` · 아이콘 · 다시 시도 Secondary | `.ed-alert.err` · `.ed-ferr` |
 | Success State | 화면 · 줄 | — | D | `color-state-success` · 아이콘 | `.bind-empty.done` · `.status-line.ok` |
 
@@ -452,7 +452,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | `--surface-hover` | `--color-interactive-hover` |
 | `--text` | `--color-text-primary` |
 | `--text-2` | `--color-text-secondary` |
-| `--muted` | 아래 닫힌 목록대로 나눈다(§3.1 — tertiary는 자리 표시 · 비활성 · 장식만). **tertiary(그대로 #9298a1):** `::placeholder` · `[aria-disabled="true"]` 규칙 전부(`button` · `button.primary` · `label.inline:has(…)` · `.ctx-menu button` · `.ed-opt`) · `.ctx-menu button:disabled` · `.r-role.lk` · 장식(`.step-head .chev` · `.ts-edit .ts-sep` · `.be-art.icon` · `.tree.vlike button.tr-car` · `.vt-group .tw`) · 흐린 소수 크기 줄(TR-D14 · ia-v4 §4.3 — `#tsList .r-card.ts-decimal .r-title/.r-sum` · `.tr.ts-decimal .ts-aa/.tr-sub/.bv-tw` · `.tree.vlike .tr.ts-decimal .tr-lt` · `.tree.vlike .tr.ts-decimal .vchip .vl`) · 꺼진 줄 이름(`.tr-name.muted` — 새 규칙 한 줄로 tertiary 유지). **secondary★(#9298a1 → #5e636b, 읽어야 하는 글자):** 공용 `.muted`(카드 제목 개수 · 만들기 "단계 i/n" · `.unused-sum` · 새 그룹 메모 등) · `.ed-changes .muted` · `.ctx-menu .menu-note` · `.col-role .sub` · `.r-sum` · `.r-meta` · `.vu-props` · `.ed-changes .ed-ch-h` · `.ed-phead` · `.ed-pnote` · `.modal dt` · `.ed-ptag`. **쓰는 곳 없음(B.12에서 지움):** `.pipe-mini span` · `.bind-steps .bs` · `.bs-dot` · `.vs-tw`. 이 목록에 없는 `--muted`가 구현 때 나오면 tertiary로 두고 PR에 적는다 |
+| `--muted` | 아래 닫힌 목록대로 나눈다(§3.1 — tertiary는 자리 표시 · 비활성 · 장식만). **tertiary(그대로 #9298a1):** `::placeholder` · `[aria-disabled="true"]` 규칙 전부(`button` · `button.primary` · `label.inline:has(…)` · `.ctx-menu button` · `.ed-opt`) · `.ctx-menu button:disabled` · `.r-role.lk` · 장식(`.step-head .chev` · `.ts-edit .ts-sep` · `.be-art.icon` · `.tree.vlike button.tr-car` · `.vt-group .tw`) · 흐린 소수 크기 줄(TR-D14 · ia-v4 §4.3 — `#tsList .r-card.ts-decimal .r-title/.r-sum` · `.tr.ts-decimal .ts-aa/.tr-sub/.bv-tw` · `.tree.vlike .tr.ts-decimal .tr-lt` · `.tree.vlike .tr.ts-decimal .vchip .vl`). (꺼진 줄 이름 `.tr-name.muted`는 자기 규칙이 `--text-2`라 A.1대로 `color-text-secondary` — 지금 색 그대로, 새 규칙 없음.) **secondary★(#9298a1 → #5e636b, 읽어야 하는 글자):** 공용 `.muted`(카드 제목 개수 · 만들기 "단계 i/n" · `.unused-sum` · 새 그룹 메모 등) · `.ed-changes .muted` · `.ctx-menu .menu-note` · `.r-sum` · `.r-meta` · `.ed-changes .ed-ch-h` · `.ed-phead` · `.ed-pnote` · `.modal dt` · `.ed-ptag`. **쓰는 곳 없음(B.12에서 지움):** `.pipe-mini span` · `.bind-steps .bs` · `.bs-dot` · `.vs-tw` · `.col-role .sub` · `.vu-props`. 이 목록에 없는 `--muted`가 구현 때 나오면 tertiary로 두고 PR에 적는다 |
 | `--border` | `--color-border-default` (`var(--border-2, var(--border))` → `--color-border-strong`) |
 | `--border-2` | `button` 기본 테두리 = `--color-secondary-border`, 그 밖 = `--color-border-strong` |
 | `--accent` | 포커스 링 · 외곽선 · 고르개 테두리 · 체크박스 `accent-color` · 편집 중 칸 테두리(`.tr input.tr-edit`) · 메뉴가 열린 알약 테두리(`.vp-item.menu-open`) = `--color-interactive-focus` · 켠 스위치 · 진행 막대 · 돌기 · 고른 밑줄 = `--color-primary`(★) · 글자(`.ed-copy` · `.ed-plink`) = `--color-text-link`(★) |
@@ -547,4 +547,4 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 - [ ] B.9 ① 커밋: 검사 4개 통과 + 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 모달)으로 **★과 A.3 규칙(둥글기 · 줄 높이 · 글자 크기 · 간격 · 투명도 맞추기)에 따른 변화 밖**의 차이가 없는지
 - [ ] B.10 ② 커밋: A.4 + 검사 4개 통과 + 새 모양 스크린샷
 - [ ] B.11 `ROADMAP.md`에 DS-1 · DS-2 · DS-3 자리, `docs/ia-v4.md` §2.8 · §8에서 이 문서를 가리킴. ①에서 바뀌는 ia-v4 §8의 숫자(사용자 결정이 아닌 것 — 카드 안쪽 10 · 12 → 12 · 12, 만들기 아래 줄 위아래 6 · 8 → 8 · 8로 합계 80 → 82, 입력 높이 ≈31 → 28, 변수 탭 머리 줄 높이 등)를 ia-v4 §8에 적는다
-- [ ] B.12 쓰는 곳이 없는 규칙을 지운다(HTML 본문 · `ui.ts` · `treeList.ts`에 0곳 — 3회차 검토 확인): `.pipe-mini` · `.bind-steps` · `.bs` · `.bs-dot` · `.vs-tw` · `.bv-tw` · `.bd-all` · `.tier-chip` · `.subtabs`(`.subtab`은 남김). 지우기 전에 한 번 더 grep
+- [ ] B.12 쓰는 곳이 없는 규칙을 지운다(HTML 본문 · `ui.ts` · `treeList.ts`에 0곳 — 3회차 검토 확인): `.pipe-mini` · `.bind-steps` · `.bs` · `.bs-dot` · `.vs-tw` · `.bv-tw` · `.bd-all` · `.tier-chip` · `.subtabs`(`.subtab`은 남김) · `.vt-section` · `.vu-props` · `.col-role .sub` · `.icon-btn.spinning` · `.results.stale` · `.vusage` · `.alias-pill` · `.vt-line` · `.vt-lib` · `.tr-note` · `.bind-done` · `.situation`(4회차 검토 확인). 지우기 전에 한 번 더 grep. `scripts/verify-bind-flow.mjs`에 이름만 남은 `.tier-chip`(카드 찾기 제외) · `.tier-chip .badge` · `.bs-dot`(배지 예외)도 함께 정리. §5 · §6의 "지금 코드" 칸은 실제로 쓰는 클래스만 적는다
