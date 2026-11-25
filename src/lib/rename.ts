@@ -165,7 +165,7 @@ async function recurse(
         col.changes.push({ id: node.id, before, after, ...(nameKey ? { nameKey } : {}) });
         if (opts.apply) node.name = after;
       }
-      // 판정한 역할을 노드에 남긴다 — 등록이 머리명사로 읽어 이름 파싱 추측을 없앤다.
+      // 판정한 역할을 노드에 남긴다 — 다음 이름 정리와 텍스트 스타일 label 판정이 읽어 이름 파싱 추측을 없앤다.
       // 이름이 안 바뀐 재실행에서도 기록해 예전 리네임 결과에 값을 채운다(멱등).
       if (opts.apply && decided.role) writeRole(node, decided.role);
       if (opts.apply) writeNameKey(node, nameKey ?? null);

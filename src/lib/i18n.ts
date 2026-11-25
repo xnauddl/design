@@ -49,27 +49,6 @@ export const STRINGS: Record<string, string> = {
   // 리네임
   'rename.none': '바꿀 이름이 없어요',
 
-  // 컴포넌트 / 베리언트
-  'component.scanning': '컴포넌트 후보를 찾는 중…',
-  'component.registering': '컴포넌트 등록 중…',
-  'component.classifying': '변형 세트로 묶는 중…',
-  'component.generating': '빠진 변형을 채우는 중…',
-  'component.noEligible': '선택 아래에 등록할 수 있는 프레임이 없어요.',
-  'component.noEligibleShort': '등록할 수 있는 프레임이 없어요',
-  'component.noChecked': '등록할 후보를 체크해 주세요',
-  'component.candidates': '등록 후보 {total}개 · {sel}개 체크',
-  'component.registered': '컴포넌트 {total} (변형 세트 {sets} · 컴포넌트 {singles}){extraPart}',
-  'component.variants': '변형 세트 {sets}개를 만들었어요{extraPart}',
-  'component.generated': '빠진 변형 {generated}개를 채웠어요(변형 세트 {sets})',
-  'component.placeFailed': ' · 제자리에 못 둔 {n}개: {names}',
-  'component.placeFailedMore': ' 외',
-  'common.beta': '베타',
-  'layer.componentsBetaAria': '컴포넌트 (베타)',
-  'component.propFailed': ' · 속성 값을 못 넣은 {n}개: {names}',
-  // [등록] 재사용(§4.7 "재사용" 8번) — 꼬리 형식은 placeFailed와 같다(이름 3개까지 + " 외").
-  'component.reuseKept': ' · 구조가 달라 원본을 둔 {n}개: {names}',
-  'component.placeCloned': ' · 제자리에 인스턴스를 못 넣어 복사본을 둔 {n}개: {names}',
-
   // 마법사
 
   // 다크 테마 생성
@@ -401,7 +380,6 @@ export const STRINGS: Record<string, string> = {
   'v4.back': '돌아가기',
   'v4.backHome': '← 돌아가기',
   'v4.subBind': '연결',
-  'v4.subComponents': '컴포넌트 베타',
   'v4.subMake': '값을 직접 고르기',
   'v4.varEmpty': '아직 변수가 없어요',
   'v4.makeFromSel': '선택에서 변수 만들기',
@@ -413,7 +391,6 @@ export const STRINGS: Record<string, string> = {
   'ui.expandFail': '펼치기 · 실패한 작업 있음',
   // 선택 표시줄(§4.1)
   'sel.unnamed': '(이름 없음)',
-  'sel.noneHere': '선택이 없어요 — 캔버스에서 레이어를 선택하세요',
   // 변수 만들기 화면(IA v4 §4.3)
   'make.title': '변수 만들기',
   'make.subRight': '에서 찾은 값',
@@ -527,7 +504,6 @@ export const STRINGS: Record<string, string> = {
   'op.textStyles': '텍스트 스타일 등록',
   'op.bind': '연결',
   'op.rename': '이름 정리',
-  'op.components': '컴포넌트',
   'op.export': '내보내기',
   'op.unbind': '삭제된 변수 연결 풀기',
   'op.wizard': '한 번에 정리',
@@ -541,7 +517,6 @@ export const STRINGS: Record<string, string> = {
   'rail.themeSub': '다크 모드',
   'rail.type': '타이포',
   'rail.typeSub': '텍스트 스타일',
-  'rail.structure': '컴포넌트',
   'rail.next': '다음 →',
   // 플러그인 설정(#19) — 설정 탭에만
   'settings.title': '기본값',
@@ -564,7 +539,6 @@ export const STRINGS: Record<string, string> = {
   // 칩의 「변수연결」과 체크박스의 「역할 매핑」을 가르는 범례 — 붙여 쓴 「변수연결」은
   // 파이프 칩(wizard.step.bind) 표기 그대로다(적용 탭 카드 제목은 띄어 쓴 「변수 연결」).
   // 공통(정적 라벨)
-  'common.selectAll': '전체',
   'prereq.gotoCreate': '토큰 만들기로 →',
   // 온보딩 / 가이드
   // 첫 실행 배너(온보딩 흡수)
@@ -669,22 +643,6 @@ export const STRINGS: Record<string, string> = {
   'rename.doneStatus': '이름 {k}개 바꿈 · ⌘Z로 되돌리기',
   'rename.subRight': '바꿀 이름 {n}개',
   // 이름을 지키는 사유(#7b) — 미리보기의 흐린 행에 붙는다. 키는 KeepReason과 1:1.
-  // 컴포넌트 / 베리언트
-  'structure.title': '컴포넌트',
-  'structure.groupComp': '컴포넌트 후보',
-  'structure.groupVariant': '선택한 컴포넌트 정리',
-  'component.hint': '후보를 찾아 컴포넌트로 등록해요',
-  'component.scanBtn': '컴포넌트 후보 찾기',
-  'component.registerBtn': '등록',
-  'component.classifyBtn': '변형 세트로 묶기',
-  'component.genMissingBtn': '빠진 변형 채우기',
-  'component.scanHelp': '선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.',
-  'component.registerHelp': '체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.',
-  'component.classifyHelp': '이미 만든 컴포넌트를 이름이 같은 것끼리 변형 세트로 묶어요.',
-  'component.genMissingHelp': '선택한 변형 세트의 빠진 조합을 첫 변형을 복제해 채워요.',
-  'component.needScan': '먼저 ‘컴포넌트 후보 찾기’를 눌러 주세요',
-  'component.autoNamed': '이름 없는 레이어 {n}개 — ‘이름 정리’를 먼저 하면 후보가 돼요',
-  'component.fromName': '원래 이름 {name}',
   // 내보내기
   'export.title': '코드로 내보내기',
   'export.hint': '누르면 바로 코드 파일로 저장돼요',
@@ -730,53 +688,6 @@ export const STRINGS: Record<string, string> = {
   'bind.waitOp': '{op} 작업이 끝나면 다시 해 주세요',
   'bind.skipSelected': '{reason} 레이어 {n}개 선택',
   // 레이어 › 이름
-  // 레이어 › 컴포넌트 — 등록 결과 꼬리 · 트리 배지 · 리포트
-  'component.extraSkipped': ' · 건너뜀 {n}',
-  'component.extraSingles': ' · 컴포넌트 {n}',
-  'component.extraProps': ' · 속성 {n}',
-  'component.extraIcons': ' · 아이콘 {n}',
-  'component.extraMissing': ' · 빈 변형 있음',
-  'component.variantFallback': '변형',
-  'component.badgeSet': '변형 세트',
-  'component.badgeProps': '속성 컴포넌트',
-  'component.nameFallback': '컴포넌트',
-  'component.badgeSingle': '컴포넌트',
-  'component.badgeReuse': '재사용',
-  'component.headMissing': '빈 변형',
-  'component.headIssue': '처리 중 문제',
-  'component.headReused': '기존 컴포넌트 재사용',
-  // 컴포넌트 “처리 중 문제” 진단 — 내부 말(속성접힘 · 결합 · 정렬)은 그대로(결정 ⑨)
-  'component.fail.copyPlaced': '인스턴스 대신 복사본을 뒀어요({label} → {name}){causePart}',
-  'component.fail.nothingPlaced': '제자리에 아무것도 두지 못했어요({label} → {name}){causePart}',
-  'component.fail.cause': ' — {why}',
-  'component.fail.instanceMake': '인스턴스를 만들지 못했어요: {error}',
-  'component.fail.instancePlace': '제자리에 인스턴스를 넣지 못했어요',
-  'component.fail.propValue': '속성 값을 못 넣어 마스터 값으로 뒀어요({name} · {prop})',
-  'component.fail.reuseShape': '구조가 달라 재사용하지 않고 원본을 뒀어요({name})',
-  'component.fail.fillKept': '채움·크기가 달라 묶지 않고 원본을 뒀어요({name}){causePart}',
-  'component.fail.memberKept': '제자리에 넣지 못해 원본을 뒀어요({name}){causePart}',
-  // 속성 접힘 멤버 검사(§4.7 8번) 사유 — 위 두 줄의 {causePart}에 들어간다
-  'component.fit.size': '크기 {w}×{h} ≠ {mw}×{mh}',
-  'component.fit.noPhoto': '사진 자리 없음({path})',
-  'component.fit.self': '자신',
-  'component.fit.photoDiff': '사진 다름({name})',
-  'component.fit.photoSize': '사진 크기 {w}×{h} ≠ {mw}×{mh}({name})',
-  'component.fit.layout': '자리·크기 다름({name})',
-  'component.fail.single': '단독 등록 실패({name}): {error}',
-  'component.fail.propsRegister': '속성접힘 등록 실패({set}): {error}',
-  'component.fail.iconFallback': '아이콘을 만들지 못해 세트로 등록해요({set})',
-  'component.fail.propsComponentize': '속성접힘 컴포넌트화 실패({name}): {error}',
-  'component.fail.expose': '속성 노출 실패({name}): {error}',
-  'component.fail.exposeAll': '속성 노출 실패: {error}',
-  'component.fail.componentize': '컴포넌트화 실패({name}): {error}',
-  'component.fail.combine': '결합 실패({set}): {error}',
-  'component.fail.arrange': '정렬 실패({set}): {error}',
-  'component.fail.iconComponent': '아이콘 컴포넌트 실패({name}): {error}',
-  'component.fail.iconSwap': '아이콘 자리 교체 실패({layer})',
-  'component.fail.iconSwapPlace': '아이콘 자리 교체 실패({layer}): 제자리에 넣지 못했어요',
-  'component.fail.iconSwapErr': '아이콘 자리 교체 실패({layer}): {error}',
-  'component.fail.photoNoSlot': '사진 이식 실패({path}) — 자리를 찾지 못했어요',
-  'component.fail.photo': '사진 이식 실패({path}): {error}',
   // 만들기 › 색 · 토큰
   'create.hintPreview': '‘미리보기’를 누르세요.',
   'create.hintNoSel': '레이어를 먼저 선택하세요.',

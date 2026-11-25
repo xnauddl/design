@@ -1,7 +1,7 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig, MainUnitInfo } from './shared/messages';
+import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, VarUpdateError, TokenState, RoleRow, ExistingStyleSig, MainUnitInfo } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
 import { isHexColor } from './lib/bindDisplay';
@@ -237,25 +237,6 @@ function addSwatch(card: HTMLElement, hex: string): void {
   title.classList.add('has-swatch');
 }
 
-/** 목록의 그룹 머리(트리 루트·리포트 구분줄) — 카드가 아니라 라벨이다.
- *  count가 있으면 이름 뒤에 개수 "{n}개"(베리언트 결과 구분줄만 — ia-v4 §2.8 ② 예외 · §4.3a-3). */
-function resultGroup(label: string, count?: number): HTMLElement {
-  const el = document.createElement('div');
-  el.className = 'r-group r-ghead'; // 목록 안 그룹 머리 띠(ia-v4 §2.8 B안 ②)
-  el.title = label;
-  if (count === undefined) {
-    el.textContent = label;
-    return el;
-  }
-  const name = document.createElement('span');
-  name.textContent = label;
-  const cnt = document.createElement('span');
-  cnt.className = 'r-gcnt';
-  cnt.textContent = t('tree.count', { n: count });
-  el.append(name, cnt);
-  return el;
-}
-
 /** 타입 칩 안의 단위 표기 — 칩이 88px 고정 폭이라 낱말 대신 기호로 줄인다
     (`letterSpacing·percent` 106px → `letterSpacing·%` 81px). 온전한 표기는 칩 title에 남는다.
     추출이 실제로 만드는 비-px 단위는 percent뿐이고(lineHeight·letterSpacing), 나머지는 대비용. */
@@ -358,27 +339,6 @@ function makeTokenRow(tok: DraftToken): HTMLElement {
   // 색 토큰은 renderTokens가 걸러내 여기 오지 않는다(색은 위 ‘색 정리’ 담당) → effectColor만.
   if (tok.category === 'effectColor' && typeof tok.value === 'string') addSwatch(card, tok.value);
   return card;
-}
-
-/** 공통 빈 상태 — 가운데 굵은 헤드라인 + 안내 + (선택) 비활성 버튼. 캐논 108:2 패턴. */
-function renderEmptyState(box: HTMLElement, title: string, guide: string, actionLabel?: string): void {
-  clearMount(box); // 진행 중이던 청크가 안내 문구 아래로 계속 쌓이지 않게
-  const wrap = document.createElement('div');
-  wrap.className = 'empty-state';
-  const t = document.createElement('div');
-  t.className = 'es-title';
-  t.textContent = title;
-  const g = document.createElement('div');
-  g.className = 'es-guide';
-  g.textContent = guide;
-  wrap.append(t, g);
-  if (actionLabel) {
-    const btn = document.createElement('button');
-    btn.textContent = actionLabel;
-    btn.disabled = true;
-    wrap.appendChild(btn);
-  }
-  box.appendChild(wrap);
 }
 
 // 버튼 역할 분리: ‘선택에서 토큰 추출’은 색만(colorRevealed), ‘미리보기’는 색 외 토큰만
@@ -1524,7 +1484,7 @@ $('btnApplyCancel').addEventListener('click', () => {
 });
 
 /* ============================================================
-   시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수→컴포넌트화)를
+   시스템화 마법사 — 기존 메시지(추출→생성→시맨틱→바인딩→정돈→검수)를
    순서대로 호출하는 UI 시퀀서. 신규 로직은 lib/wizard.ts(순수)에 분리.
    기존 window.onmessage 스위치는 그대로 두고, 별도 리스너로 단계 완료를 await한다.
    ============================================================ */
@@ -1675,16 +1635,14 @@ async function deactivateInstance(key: string, instanceId: string): Promise<void
 
 /* ---------- 유료(Paid) 기능 게이트 ----------
    Free/Paid 2티어. Paid에서 해금: 팔레트·토큰 생성(미리보기+적용)·다크 테마 생성·시맨틱·
-   텍스트 스타일·컴포넌트/베리언트.
+   텍스트 스타일.
    Free: 추출·색 정리·바인딩·리네임·내보내기. */
 const PAID_LOCK = '🔒'; // 와이어의 잠금 배지는 자물쇠 하나 — 사유는 버튼·배지 툴팁(setLockTitle)
-const COMPONENT_FIELDS = ['btnScanComp', 'btnRegisterComp', 'btnClassifyVariants', 'btnGenMissing'];
 // 사전 잠금 대상 유료 버튼 전체(시맨틱은 전제 가드와 결합돼 아래에서 별도 처리).
 // 미리보기도 함께 잠근다: '적용'이 Paid인 카드에서 미리보기만 열어두면, 눌러도 적용이 회색이라
 // 이유를 알 수 없는 막다른 길이 된다. 브랜드 팔레트([팔레트 생성] · [팔레트 만들기])는 무료다
 // (2026-11-18 — ia-v4 §4.3a "브랜드 팔레트 무료": 무료의 [색 변수 만들기]가 Global 색만 만든다).
 const PAID_FIELDS = [
-  ...COMPONENT_FIELDS,
   // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
   'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
@@ -1704,7 +1662,7 @@ function updateGates(): void {
   // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성'·'색 변수 만들기')가 한 툴바에 섞여
   // 있어 카드 배지만으로는 어느 쪽이 잠긴 건지 알 수 없다 → 두 버튼 모두에 자물쇠를 붙인다
   // (와이어 rev k). 400px에서 툴바가 두 줄이 되는 건 감수 — 결론 버튼의 잠금이 먼저다.
-  for (const id of ['componentLock', 'darkLock', 'semLock', 'tsLock']) {
+  for (const id of ['darkLock', 'semLock', 'tsLock']) {
     $(id).textContent = isPaid ? '' : PAID_LOCK;
   }
   // 색 변수화 · 토큰 만들기 · 브랜드 팔레트는 무료(F8 · ia-v4 §4.3a) — 🔒 없음(색 카드 제목의 🔒도 — F-D9).
@@ -1720,7 +1678,7 @@ function updateGates(): void {
   updateEmptyLocks(); // 빈 상태 잠금 · 주 버튼 — 유료 잠금 뒤에(유료가 먼저, ia-v4 §4.3a-2)
 }
 
-/* ---------- 빈 상태 잠금 · 주 버튼(ia-v4 §4.3a-2 — 색 · 컴포넌트 카드만) ----------
+/* ---------- 빈 상태 잠금 · 주 버튼(ia-v4 §4.3a-2 — 색 카드만) ----------
    할 것이 없을 때 누르면 아무 일도 없던 실행 버튼을 전제 잠금으로 두고, 그때는 찾기 · 추출 버튼을 주 버튼으로.
    유료 잠금이 먼저다(무료는 PAID_FIELDS 루프의 'paid' 그대로). 잠긴 버튼에는 primary를 두지 않는다 —
    판정은 dataset.baseLock(유료 · 전제)만 본다. 대기 잠금(setWait)은 잠깐이라 주 버튼을 옮기지 않는다. */
@@ -1757,38 +1715,15 @@ function updateEmptyLocks(): void {
   const colorVars = $('btnColorVars');
   setEmptyLock(colorVars, colorsVisible() ? null : t('color.needColors'));
   setCardPrimary([extract, colorVars], baseLocked(colorVars) ? [extract] : [colorVars, extract]);
-  // 컴포넌트
-  const scan = $('btnScanComp');
-  const reg = $('btnRegisterComp');
-  const eligible = compEligibleCount();
-  const checked = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).length;
-  // 목록 기준이 없으면 찾기 버튼도 잠근다(ia-v4 §4.5 "선택 없음" — 유료 잠금이 먼저).
-  const noBase = !baseline;
-  const prevActive = document.activeElement;
-  const lockedBefore = prevActive === scan ? baseLocked(prevActive as HTMLElement) : true;
-  setEmptyLock(scan, noBase ? t('status.noSelection') : null);
-  setEmptyLock(reg,
-    !compScanned ? t('component.needScan')
-      : !eligible ? t('component.noEligibleShort')
-        : !checked ? t('component.noChecked') : null);
-  // 판정: 등록할 후보 1개 이상 → [등록], 아니면 [컴포넌트 후보 찾기]. 고른 버튼이 잠겼으면(후보는 있는데 체크 0)
-  // [컴포넌트 후보 찾기]. 무료는 둘 다 유료 잠금이라 주 버튼이 없다(2026-11-19 닮은 프레임 찾기 제거 — ia-v4 §4.3a-2).
-  const first = eligible > 0 ? reg : scan;
-  setCardPrimary([scan, reg], [first, scan]);
-  // 포커스가 있던 찾기 버튼이 잠기면 그 모습의 주 버튼, 없으면 ←(ia-v4 §4.5 "선택 없음" · C-D7).
-  if (!lockedBefore && baseLocked(prevActive as HTMLElement)) compFocusPrimary();
 }
 
-/** 유료 잠금 사유를 툴팁으로. 원래 문구(기능 설명)는 dataset에 1회 백업해 보존·복원한다.
- *  구조 버튼은 native title이 아니라 커스텀 툴팁(data-tip)을 쓴다 — title에 넣으면 사유가
- *  보이는 툴팁 옆에 겹쳐 뜨거나 아예 안 보인다. 그래서 실제로 뜨는 쪽 하나에만 얹는다. */
+/** 유료 잠금 사유를 툴팁으로. 원래 문구(기능 설명)는 dataset에 1회 백업해 보존·복원한다. */
 function setLockTitle(el: HTMLElement, locked: boolean): void {
-  const attr = el.hasAttribute('data-tip') ? 'data-tip' : 'title';
-  if (el.dataset.baseTip === undefined) el.dataset.baseTip = el.getAttribute(attr) ?? '';
+  if (el.dataset.baseTip === undefined) el.dataset.baseTip = el.getAttribute('title') ?? '';
   const base = el.dataset.baseTip;
   // 툴팁은 기존 설명 뒤에 " · 유료 기능 · 설정 › 라이선스"를 붙인다(IA v3 §2.3).
   const note = t('lock.tipSuffix');
-  el.setAttribute(attr, locked ? (base ? `${base} · ${note}` : note) : base);
+  el.setAttribute('title', locked ? (base ? `${base} · ${note}` : note) : base);
   reapplyWaitTip(el);
 }
 /** 툴팁을 새로 쓴 뒤 — 연결 중 대기 꼬리가 있었으면 다시 붙인다(§4.6 "연결 중의 다른 일"). */
@@ -1816,24 +1751,6 @@ function goToCreate(): void {
   $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   ($('btnCreate') as HTMLButtonElement).focus();
 }
-
-/* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
-/* 찾기 요청 — 목록 기준의 nodeIds(ia-v4 §2.5) · reqId(§4.5 "비운 뒤 늦게 온 찾기 응답은 버린다"). 목록을 비우면
-   기다리던 reqId를 지워, 비우기 전에 보낸 응답 · 오류(C-D12)는 그리지 않는다. */
-/** 기다리는 [컴포넌트 후보 찾기]의 reqId — 0이면 없음. */
-let compScanReq = 0;
-/** 상태 자리 글이 찾기 쪽(찾는 중 · 찾기 결과 · 오류)인가 — 목록을 비울 때 함께 지운다(쓰기 결과 글은 남김). */
-let structStatusFind = false;
-function setFindStatus(text: string, cls: 'ok' | 'warn' | ''): void {
-  setStatus('structureStatus', text, cls);
-  structStatusFind = true;
-}
-function startCompScan(): void {
-  setFindStatus(t('component.scanning'), '');
-  compScanReq = ++bindReqSeq; // 다른 화면의 reqId와 겹치지 않게 같은 순번(makeTakes · mcTakes가 reqId로 가로챈다)
-  send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: baseline?.ids ?? [], reqId: compScanReq });
-}
-$('btnScanComp').addEventListener('click', startCompScan);
 
 /* ---------- 다크 테마 생성 ---------- */
 // 문서의 3계층 변수 목록 — 다크 카드가 컬렉션·모드 선택지를 여기서 읽는다(값 편집은 Figma Variables 몫).
@@ -1908,59 +1825,6 @@ function openDarkMigrate(need: { removeDark: number; mode: string }): void {
   // [취소] · Esc · 바깥 누름 — "만드는 중"을 지운다. 포커스는 [다크 만들기](returnFocus).
   openModal(t('dark.migrateTitle'), body, [cancel, go], () => btn, () => { if (!going) setStatus('darkStatus', '', ''); }, { focus: cancel });
 }
-
-$('btnRegisterComp').addEventListener('click', () => {
-  // #1: 늘 후보를 보고 체크한 노드만 보낸다 — 후보 없이 선택 전체를 등록하던 길은 닫았다(ia-v4 §4.3a-2).
-  // 후보 없음 · 등록할 후보 0 · 체크 0은 잠금(updateEmptyLocks)이 사유를 띄운다.
-  const nodeIds = compCandidates.filter((c) => c.eligible && compChecked.has(c.id)).map((c) => c.id);
-  if (!nodeIds.length) return;
-  setStatus('structureStatus', t('component.registering'), '');
-  // 트리에 보여 준 이름을 그대로 보낸다(WYSIWYG). 이름 충돌은 **후보 전체**를 보고 풀리므로,
-  // 일부만 체크해 보내면 code 쪽에서 충돌이 사라져 `ProfileAvatar`가 `Avatar`로 등록됐다.
-  const names: Record<string, string> = {};
-  for (const c of compCandidates) {
-    // [재사용] 줄의 이름은 기존 컴포넌트 것이다 — 보내지 않는다. [등록] 판정이 재사용이 아니면 code 쪽이
-    // 숫자 접미사 규칙으로 새 이름을 정한다(§4.7 "재사용" 7번 — 같은 이름이 둘 생기지 않게).
-    if (c.reuse) continue;
-    const shown = c.group ?? c.single;
-    if (shown && compChecked.has(c.id)) names[c.id] = shown;
-  }
-  send({ type: 'REGISTER_COMPONENTS', nodeIds, names });
-});
-
-$('compAll').addEventListener('change', (e) => {
-  const on = (e.target as HTMLInputElement).checked;
-  compChecked.clear();
-  if (on) for (const c of compCandidates) if (c.eligible) compChecked.add(c.id);
-  renderCompTree();
-});
-
-
-/**
- * 베리언트 줄(#variantRow) 노출 — 툴바는 와이어대로 스캔→등록 4개만 두고, '이미 만든
- * 컴포넌트를 정리'하는 두 동작은 대상이 실제로 선택돼 있을 때만 결과 목록 아래에 띄운다.
- * 판단 기준은 code 쪽 핸들러와 같다(낱개 COMPONENT=분류 / COMPONENT_SET=누락 조합).
- */
-function refreshVariantRow(comps: number, sets: number): void {
-  $('variantRow').hidden = comps === 0 && sets === 0;
-  // [변형 세트로 묶기]는 낱개 컴포넌트가 있을 때만, [빠진 변형 채우기]는 세트가 있을 때만(ia-v4 §4.5).
-  const classify = $('btnClassifyVariants');
-  const gen = $('btnGenMissing');
-  const lost = (classify.hidden !== (comps === 0) && document.activeElement === classify) || (gen.hidden !== (sets === 0) && document.activeElement === gen);
-  classify.hidden = comps === 0;
-  gen.hidden = sets === 0;
-  if (lost) compFocusPrimary();
-}
-
-$('btnClassifyVariants').addEventListener('click', () => {
-  setStatus('structureStatus', t('component.classifying'), '');
-  send({ type: 'CLASSIFY_VARIANTS' });
-});
-
-$('btnGenMissing').addEventListener('click', () => {
-  setStatus('structureStatus', t('component.generating'), '');
-  send({ type: 'GENERATE_MISSING_VARIANTS' });
-});
 
 /* ---------- 내보내기 (코드) ---------- */
 $('btnExport').addEventListener('click', () => {
@@ -2059,7 +1923,6 @@ window.onmessage = (event: MessageEvent) => {
       onSelectionForList(msg); // 변수 목록 기준(③) — 플러그인이 만든 선택은 기준을 바꾸지 않는다
       // 연결 현황 자동 읽기 — 선택이 작고(≤ AUTO_SCAN_MAX) 바인딩이 있을 때만(Tokens Studio처럼 선택 기준 표시).
       // 큰 선택은 버튼으로(Design Lint 방식) — 선택만 바꿔도 플러그인이 버벅이면 안 된다.
-      refreshVariantRow(msg.comps, msg.sets);
       // 스킵 칩이 만든 선택 변경(selfSelect)이면 미리보기를 유지한다 — 지우면 칩을 한 번 누르는 순간
       // 칩 줄과 체크해둔 후보가 통째로 사라져 두 번째 사유를 볼 수 없다.
       if (!msg.selfSelect) {
@@ -2079,7 +1942,7 @@ window.onmessage = (event: MessageEvent) => {
       bindLayerSelectPending = false;
       renderBindPrereq();
       if (!tokens.length) renderTokens(); // 선택 변화에 맞춰 빈 상태 문구 갱신
-      refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드 빈 상태 갱신
+      renderMakeNoSel(); // 선택 변화에 맞춰 만들기 화면의 선택 없음 안내 갱신
       break;
     }
     case 'CREATE_RESULT': {
@@ -2361,68 +2224,6 @@ window.onmessage = (event: MessageEvent) => {
       setStatus('exportStatus', tail ? `${saved} ${tail}` : saved, tail ? 'warn' : 'ok');
       break;
     }
-    case 'COMPONENT_CANDIDATES': {
-      // 목록을 비운 뒤 늦게 온, 비우기 전에 보낸 찾기 응답은 버린다(ia-v4 §4.5 — reqId 대조).
-      if (msg.reqId !== compScanReq) break;
-      compScanReq = 0;
-      const hadFocus = compFocusInLists();
-      // #1: 하위 등록 후보를 트리로. 기본 체크는 code.ts가 정한 `defaultOn`만 본다(§4.7 "묶기" 6번 —
-      // 반복 이름 · 속성 접힘 · 버튼 · 칩 · 탭). 잡음(컨테이너/래퍼 단발성)은 체크 해제 상태로 둔다.
-      compScanned = true; // 찾은 적 있음 — 결과가 0개여도 [등록] 사유는 ②(ia-v4 §4.3a-2)
-      compCandidates = msg.nodes;
-      setCompAutoNamed(msg.autoNamed ?? 0); // 이름 없는 레이어 안내(C-D15 — ia-v4 §4.5)
-      compChecked.clear();
-      for (const c of msg.nodes) if (c.eligible && c.defaultOn) compChecked.add(c.id);
-      renderCompTree();
-      // 다시 스캔했으면 이전 등록/분류 리포트는 남의 얘기다. 개수를 카드 제목에 올린 뒤로는
-      // 카드를 접어 둬도 옛 수치가 계속 보여, 새 후보와 짝이 안 맞는다.
-      renderVariantReport([]);
-      // 스캔 완료 시 반드시 ‘스캔 중’을 덮어쓴다(후보 0·비eligible만 있어도).
-      if (!compCandidates.length || !compEligibleCount()) {
-        setFindStatus(t('component.noEligible'), 'warn');
-      } else {
-        updateCompRegister();
-      }
-      refreshTreeEmptyStates();
-      if (hadFocus) compFocusPrimary();
-      break;
-    }
-    case 'COMPONENTS_RESULT': {
-      // 후보 목록은 작업 직후 다시 읽는 때에 비웠다(opReceived → readScreen('work') — §4.5 "목록 비우기").
-      const misplaced = msg.placeFailed ?? [];
-      const cloned = msg.placeCloned ?? [];
-      const propFailed = msg.propFailed ?? [];
-      const fillKept = msg.fillKept ?? [];
-      const reused = msg.reused ?? [];
-      const reuseKept = msg.reuseKept ?? [];
-      // 컴포넌트 수 = 새로 만든 맨 위 단위(변형 세트 + 컴포넌트, §4.7 6번 "세는 단위"). 컴포넌트(단일)는 괄호 안에만 쓴다.
-      // 건너뜀 = 컴포넌트로 만들지 못한 대상 수(§4.7 6번 · 용어 §2.9). 자리 결과는 꼬리 두 개로 따로 센다.
-      const extraPart =
-        (msg.skipped ? t('component.extraSkipped', { n: msg.skipped }) : '') +
-        (msg.exposed ? t('component.extraProps', { n: msg.exposed }) : '') +
-        (msg.icons ? t('component.extraIcons', { n: msg.icons }) : '') +
-        placeTailText('component.propFailed', propFailed) +
-        placeTailText('component.reuseKept', reuseKept) +
-        placeTailText('component.placeCloned', cloned) +
-        placeFailedText(misplaced);
-      // 속성 값을 못 넣었거나(6번) 원본을 그대로 뒀거나 복사본으로 채웠거나 비운 자리(5번)가 있으면 성공이어도 경고(§4.7 "인스턴스 자리").
-      // 등록 · 세트 · 재사용 중 하나라도 있으면 성공(꼬리가 있으면 경고 — §4.7 "재사용" 6번).
-      setStatus('structureStatus', t('component.registered', { total: msg.sets + msg.singles.length, sets: msg.sets, singles: msg.singles.length, extraPart }), (msg.registered || msg.sets || reused.length) && !misplaced.length && !cloned.length && !propFailed.length && !fillKept.length && !reuseKept.length ? 'ok' : 'warn');
-      // 빈 조합(미생성) + 실패(진단) + 재사용 리포트 — 채움·크기 · 재사용은 상태 줄이 아니라 여기에만(2026-11-19 사용자 결정 — 중복 없앰)
-      renderVariantReport(variantIssueSections(msg.missing, msg.failures, reused));
-      break;
-    }
-    case 'VARIANTS_RESULT': {
-      renderVariantReport(variantIssueSections(msg.missing, msg.failures));
-      const extraPart = (msg.singles.length ? t('component.extraSingles', { n: msg.singles.length }) : '') + (msg.missing.length ? t('component.extraMissing') : '');
-      setStatus('structureStatus', t('component.variants', { sets: msg.sets, extraPart }), msg.sets ? 'ok' : 'warn');
-      break;
-    }
-    case 'GENERATE_RESULT': {
-      renderVariantReport([{ items: msg.combos, marker: 'added' }]);
-      setStatus('structureStatus', t('component.generated', { generated: msg.generated, sets: msg.sets }), msg.generated ? 'ok' : 'warn');
-      break;
-    }
     case 'UI_SIZE': {
       // 최소화/펼치기 확인 — 화면은 setMini가 이미 바꿨다. 다른 값이면(드문 경합) code 쪽을 따른다.
       if ((msg.mode === 'mini') !== isMini) setMini(msg.mode === 'mini', false);
@@ -2471,7 +2272,6 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
-      // (컴포넌트는 ‘적용’ 탭, 프리셋은 ‘관리’ 탭, 나머지는 ‘만들기’ 탭)
       // IA v3: 잠금 사유는 공통 상태 줄로(§2.3). 카드 상태 영역은 그 카드 작업의 결과 요약만 남긴다.
       showPaidReason();
       break;
@@ -2507,11 +2307,6 @@ window.onmessage = (event: MessageEvent) => {
         bindFindFailed = true;
         selFindInFlight = false;
         renderSelHome();
-      }
-      // 컴포넌트 화면 찾기 — 목록을 비운 뒤 늦게 온, 비우기 전에 보낸 찾기의 오류는 보이지 않는다(C-D12 — reqId 대조).
-      if (msg.op === 'SCAN_COMPONENT_CANDIDATES') {
-        if (!compScanReq || (msg.reqId != null && msg.reqId !== compScanReq)) break;
-        compScanReq = 0;
       }
       // 만들기 화면 실행(마법사)이 보낸 요청의 오류는 만들기 화면 결과에만 — 카드 상태 자리에는 띄우지 않는다(ia-v4 §2.8).
       const fromWizard = wizardErrorMsg === msg;
@@ -2556,10 +2351,6 @@ const OP_STATUS: Record<string, string> = {
   SELECT_NODES: 'applyStatus',
   RENAME: 'renameStatus',
   EXPORT: 'exportStatus',
-  SCAN_COMPONENT_CANDIDATES: 'structureStatus',
-  REGISTER_COMPONENTS: 'structureStatus',
-  CLASSIFY_VARIANTS: 'structureStatus',
-  GENERATE_MISSING_VARIANTS: 'structureStatus', // 컴포넌트 화면 네 작업 모두(ia-v4 §4.5 "상태 줄")
   RENAME_APPLY: 'renameStatus', // 이름 정리 [이름 바꾸기]
   GENERATE_DARK_MODE: 'darkStatus', // 도구 탭 PR 뒤에는 다크 화면 상태 줄(§4.11 T-P7)
   UNBIND_DELETED: STATUS_LINE, // 선택 탭 삭제된 변수 카드 — 결과 DELETED_UNBOUND와 같은 자리
@@ -2573,7 +2364,7 @@ const OP_STATUS: Record<string, string> = {
 /* ---------- 오류 상자의 [다시 시도]가 그 카드의 유일한 주 버튼(2026-11-17 사용자 결정 C-D14 — ia-v4 §4.3a-2) ----------
    공통 오류 상자(빨강 띠)에 [다시 시도]가 있는 동안은 그 카드(상태 자리를 담은 `.step` · `.modal`, 카드가 없는 화면은
    그 화면 패널)의 다른 버튼에서 `primary`를 떼고(잠긴 버튼 포함) `data-primary-held`로 기억한다. 상자가 사라질 때
-   (같은 상태 자리를 덮는 setStatus · 다음 showError · 컴포넌트 목록 비우기 · 내보내기 팝업 닫기) 되돌리고 다시 판정한다. */
+   (같은 상태 자리를 덮는 setStatus · 다음 showError · 내보내기 팝업 닫기) 되돌리고 다시 판정한다. */
 const RETRY_CLS = 'retry-btn';
 /** 상태 자리 · 버튼이 속한 카드. */
 function cardOf(el: HTMLElement): HTMLElement | null {
@@ -2658,19 +2449,11 @@ function showError(id: string, f: FriendlyError, op?: string): void {
   el.innerHTML = '';
   if (id === 'licenseStatus') el.removeAttribute('title'); // 이전 알림의 툴팁(noteTip)이 오류 박스에 남지 않게
   // [다시 시도] — 연결 오류는 마지막 연결 자리(lastLinkItems)로 연결 길을 다시 탄다(§4.6 "연결 중의 다른 일").
-  // 컴포넌트 화면 찾기는 찾기 버튼과 같은 함수로 지금 목록 기준 · 새 reqId로(ia-v4 §4.3a-2 "찾기의 [다시 시도]").
   // 오류의 종류가 마지막 요청과 다르면 무엇을 다시 할지 모르므로 숨긴다.
   const linkRetry = op === 'APPLY_SELECTED' ? lastLinkItems : null;
-  const scanRetry = op === 'SCAN_COMPONENT_CANDIDATES';
-  const retry = linkRetry || scanRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
-  const onRetry = f.retryable && (linkRetry || scanRetry || retry) ? (): void => {
+  const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
+  const onRetry = f.retryable && (linkRetry || retry) ? (): void => {
     if (linkRetry) { startLink(linkRetry); return; }
-    if (scanRetry) {
-      // 상태 글이 "…찾는 중…"으로 바뀌어 상자가 바로 사라진다 — 포커스는 찾기 버튼.
-      startCompScan();
-      $('btnScanComp').focus({ preventScroll: true });
-      return;
-    }
     if (!retry) return;
     // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
     if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
@@ -2681,151 +2464,6 @@ function showError(id: string, f: FriendlyError, op?: string): void {
   // C-D14 — [다시 시도]가 있는 동안 그 카드의 다른 주 버튼은 보조 모양(잠긴 버튼 포함).
   const card = cardOf(el);
   if (retryBtn && card) holdPrimaries(card, retryBtn);
-  if (id === 'structureStatus') structStatusFind = true; // 목록을 비울 때 함께 지운다(§4.5 "비우는 것")
-}
-
-/* ============================================================
-   선택형 미리보기 트리 (#13) — 공통 컴포넌트.
-   선택 서브트리 전체를 Figma 레이어 패널처럼 들여쓰기로 표시하고,
-   영향 노드(change 보유)만 체크박스로 골라 적용한다. 나머지는 회색 맥락.
-   #6(바인딩)·#1(컴포넌트) 미리보기도 이 컴포넌트를 재사용한다.
-   ============================================================ */
-interface TreeRow {
-  id: string;
-  name: string;
-  type: string;
-  depth: number;
-  parentId: string | null;
-  /** 적용 후 라벨(리네임=after, 바인딩=변수명…). 존재 시 영향 노드(체크 가능). */
-  change?: string;
-  /** 영향 후보를 가진 노드의 헤더(맥락 숨김에도 유지, 체크 불가). */
-  header?: boolean;
-  /** false면 name을 교체(취소선)가 아니라 그대로 유지(예: 컴포넌트 등록은 이름 보존). 기본 true. */
-  replace?: boolean;
-  /** 컴포넌트 후보의 변형 세트 줄 — 제목을 세트 이름(굵게) + 회색 변형 이름으로 나눠 그린다(replace === false 갈래만). */
-  variant?: { set: string; name: string };
-  /** 행 앞 종류 배지(예: 변형 세트/컴포넌트). text=라벨, kind=색 클래스(set|single). */
-  badge?: { text: string; kind: 'set' | 'single' | 'reuse' };
-  /** 대상이 아닌 이유. 있으면 흐린 행 + 사유(reason) + 꼬리표(meta), 체크 불가.
-   *  리네임=보존(잠금) · 바인딩=건너뜀(스킵). */
-  keep?: { reason: string; meta: string };
-  /** 바인딩 줄 — `채움 색 ■ #fff = color/bg`. connected=이미 연결됨('='), 아니면 연결 예정('→'). 취소선 없음(값은 그대로다). */
-  bind?: { label: string; value: string; variable: string; connected: boolean; tip: string };
-  /** 한 줄이 여러 후보를 합친 것(네 방향 여백 등) — 체크는 이 키들을 함께 켜고 끈다. */
-  keys?: string[];
-  /** 그룹 머리를 누르면 캔버스에서 이 레이어를 선택한다. */
-  selectId?: string;
-}
-
-/** 선택 서브트리의 최소 depth(루트 기준)로 들여쓰기를 정규화한다. */
-function baseDepth(rows: TreeRow[]): number {
-  return rows.reduce((m, r) => Math.min(m, r.depth), Infinity);
-}
-
-/** 선택형 트리 1행. base는 들여쓰기 기준 depth. */
-function makeTreeRow(r: TreeRow, base: number, checked: Set<string>, onChange: () => void, readOnly = false): HTMLElement {
-  // 들여쓰기는 왼쪽 안쪽 여백으로 — 구분선 · 머리 띠가 카드 안 폭 전체에 그어지게(ia-v4 §2.8). 2px = 행 기본 여백.
-  const indent = `${2 + (r.depth - base) * 12}px`;
-
-  // 손대지 않은 레이어는 '아무 일도 안 일어난 것'과 구분해서 보여 준다 — 흐린 행 + 사유.
-  // 그냥 빼 버리면 왜 그 레이어만 빠졌는지 알 길이 없어 버그로 읽힌다(#7b 보존 · #6 건너뜀).
-  if (r.change === undefined && r.keep) {
-    const title = document.createElement('span');
-    title.className = 'tree-name';
-    title.textContent = r.name;
-    const card = resultCard({ title, titleMono: true, summary: r.keep.reason, meta: r.keep.meta, dim: true });
-    card.style.paddingLeft = indent;
-    return card;
-  }
-
-  // 맥락 노드·헤더는 행이 아니라 그룹 머리(띠)다 — 고를 대상이 아니고, 어디에 속한
-  // 변경인지만 알려준다(#18 · ia-v4 §2.8: 트리 = 그룹 머리 띠 + 구분선 행).
-  if (r.change === undefined) {
-    const group = resultGroup(r.name);
-    group.style.paddingLeft = indent;
-    if (!r.header) group.classList.add('ctx');
-    if (r.selectId) {
-      // 어느 레이어인지 캔버스에서 바로 찾게 — 목록의 이름만으로는 같은 이름이 여럿일 때 모른다.
-      const id = r.selectId;
-      group.classList.add('pick');
-      group.title = t('bind.layerSelectTip');
-      group.setAttribute('role', 'button');
-      group.tabIndex = 0;
-      group.addEventListener('click', () => selectNodes([id], 'applyStatus'));
-      group.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectNodes([id], 'applyStatus'); } });
-    }
-    return group;
-  }
-
-  const keys = r.keys ?? [r.id];
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = keys.every((k) => checked.has(k));
-  cb.addEventListener('change', () => {
-    for (const k of keys) {
-      if (cb.checked) checked.add(k);
-      else checked.delete(k);
-    }
-    onChange();
-  });
-
-  if (r.bind) {
-    const b = r.bind;
-    const title = document.createElement('span');
-    const swatch = isHexColor(b.value) ? `<span class="bf-swatch" style="background:${escapeHtml(b.value)}"></span>` : '';
-    title.innerHTML =
-      `<span class="bf-label">${escapeHtml(b.label)}</span> ${swatch}<span class="bf-val">${escapeHtml(b.value)}</span> ` +
-      `<span class="bf-op">${b.connected ? '=' : '→'}</span> <span class="after">${escapeHtml(b.variable)}</span>`;
-    title.title = b.tip;
-    const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true });
-    card.style.paddingLeft = indent;
-    return card;
-  }
-
-  const title = document.createElement('span');
-  title.title = `${r.name} → ${r.change}`;
-  let fromLine: string | undefined;
-  if (r.replace === false) {
-    // 이름 보존(컴포넌트 등록) — 등록할 이름이 제목, 레이어 이름은 다를 때만 둘째 줄 "원래 이름 …"(ia-v4 §4.3a-3).
-    // 변형 세트는 제목에 세트 이름만, 변형 이름은 제목 아래 변형 줄(줄바꿈 — 2026-11-24, ia-v4 §4.3a-3).
-    title.innerHTML = `<span class="tree-name">${escapeHtml(r.variant ? r.variant.set : r.change)}</span>`;
-    if (r.name !== r.change) fromLine = t('component.fromName', { name: r.name });
-  } else {
-    // 교체(리네임·바인딩)는 before → after.
-    title.innerHTML = `<span class="before">${escapeHtml(r.name)}</span> → <span class="after">${escapeHtml(r.change)}</span>`;
-  }
-
-  const card = resultCard({ ...(readOnly ? {} : { check: cb }), title, titleMono: true, ...(fromLine ? { summary: fromLine, summaryMono: true } : {}), meta: r.badge?.text });
-  if (fromLine) (card.querySelector('.r-sum') as HTMLElement).title = title.title;
-  if (r.replace === false && r.variant?.name) {
-    const vline = document.createElement('div');
-    vline.className = 'r-sum mono r-var';
-    vline.textContent = r.variant.name;
-    (card.querySelector('.r-title') as HTMLElement).after(vline);
-  }
-  if (r.badge) {
-    const meta = card.querySelector('.r-meta') as HTMLElement;
-    meta.className = `tag tag-${r.badge.kind}`;
-  }
-  card.style.paddingLeft = indent;
-  return card;
-}
-
-function renderSelectableTree(
-  mount: HTMLElement,
-  rows: TreeRow[],
-  checked: Set<string>,
-  opts: { onChange: () => void; hideContext: boolean; hideKeep?: boolean; readOnly?: boolean },
-): void {
-  const base = rows.length ? baseDepth(rows) : 0;
-  // 보이는 행만(맥락 숨김 시 비영향·비헤더 제외) → §4: 대형 서브트리도 청크로 비차단 렌더.
-  // 보존 행(keep)은 맥락이 아니라 '왜 안 바뀌는지'라 맥락 숨김과 별도로 켜고 끈다.
-  const visible = rows.filter(
-    (r) => r.change !== undefined || r.header || (r.keep ? !opts.hideKeep : !opts.hideContext),
-  );
-  // 세 트리(#bindTree·#diff·#compTree)가 모두 이 호출부를 지난다 — 어느 목록인지는 마운트 id가
-  // 말해 주므로 스냅·개수 줄 재계산도 여기 한 줄로 끝난다(행 0건이면 테두리·줄을 걷는다).
-  renderChunked(mount, visible, (r) => makeTreeRow(r, base, checked, opts.onChange, opts.readOnly));
 }
 
 /* ---------- 이름 정리(IA v4 §4.4): 소속 트리 + [k개 이름 바꾸기] ---------- */
@@ -2959,7 +2597,7 @@ $('btnRename').addEventListener('click', () => {
     .filter((n) => !renameOff.has(n.id))
     .map((n) => ({ id: n.id, before: n.name, after: n.after as string, role: n.role, ...(n.nameKey ? { nameKey: n.nameKey } : {}) }));
   if (!items.length) return;
-  // 이름이 그대로인 노드도 역할은 남긴다(§4.4 — 세지 않음). 「컴포넌트 등록」의 말단 후보가 이 기록을 읽는다.
+  // 이름이 그대로인 노드도 역할은 남긴다(§4.4 — 세지 않음).
   const roleOnly = renameNodes
     .filter((n) => n.after === undefined && (n.role || n.nameKey))
     .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role, ...(n.nameKey ? { nameKey: n.nameKey } : {}) }));
@@ -4231,178 +3869,6 @@ function clearBindPreview(): void {
   renderBindTree();
 }
 
-/* ---------- 컴포넌트 등록(#1): 하위 후보 트리 + 선택 등록 ---------- */
-let compCandidates: ComponentCandidate[] = [];
-const compChecked = new Set<string>(); // 체크된 등록 후보(노드 id)
-const compHideContext = true; // 항상 숨김(토글 없음)
-
-function compEligibleCount(): number {
-  return compCandidates.reduce((n, c) => n + (c.eligible ? 1 : 0), 0);
-}
-
-function compRows(): TreeRow[] {
-  return compCandidates.map((n) => {
-    if (!n.eligible) return { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId };
-    // 변형 세트: [변형 세트] · 속성접힘: [속성 컴포넌트] · 단독: [컴포넌트] · 재사용: [재사용] + 기존 컴포넌트 이름(§4.7 "재사용" 7번).
-    // 제목 = 등록할 이름(세트는 이름 + 회색 변형), 레이어 이름은 다를 때만 둘째 줄(ia-v4 §4.3a-3).
-    const base = { id: n.id, name: n.name, type: n.type, depth: n.depth, parentId: n.parentId, replace: false };
-    if (n.reuse) {
-      return { ...base, change: n.reuse.name, badge: { text: t('component.badgeReuse'), kind: 'reuse' as const } };
-    }
-    if (n.group) {
-      // 변형 값이 빈 문자열이면 꼬리 없이 세트 이름만(2026-11-23 C-D26 — 칸만 Tab Item 인스턴스로 바뀌는 탭 바 줄). 없으면(undefined) 대체 글.
-      if (n.variant === '') return { ...base, change: n.group, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
-      const variant = n.variant || t('component.variantFallback');
-      return { ...base, change: `${n.group} · ${variant}`, variant: { set: n.group, name: variant }, badge: { text: t('component.badgeSet'), kind: 'set' as const } };
-    }
-    if (n.propsOnly) {
-      return { ...base, change: n.single || t('component.nameFallback'), badge: { text: t('component.badgeProps'), kind: 'single' as const } };
-    }
-    return { ...base, change: n.single || t('component.nameFallback'), badge: { text: t('component.badgeSingle'), kind: 'single' as const } };
-  });
-}
-
-function renderCompTree(): void {
-  const has = compCandidates.length > 0;
-  ($('compTreeCtrls') as HTMLElement).style.display = has ? '' : 'none';
-  renderSelectableTree($('compTree'), compRows(), compChecked, {
-    hideContext: compHideContext,
-    onChange: updateCompRegister,
-  });
-  updateCompRegister();
-}
-
-/** 등록 버튼 라벨/상태 + 전체선택 마스터 동기화. */
-function updateCompRegister(): void {
-  const total = compEligibleCount();
-  const sel = compChecked.size;
-  // 머리 띠의 개수(ia-v4 §4.3a-3) — 트리에 뜨는 건 등록 가능한 후보뿐이라 그 수를 센다(스캔 노드 수가 아니라).
-  $('compTreeCount').textContent = total ? t('tree.count', { n: total }) : '';
-  $('compTreeGroup').style.display = total ? '' : 'none';
-  if (compCandidates.length) {
-    const all = $('compAll') as HTMLInputElement;
-    all.checked = sel === total && total > 0;
-    all.indeterminate = sel > 0 && sel < total;
-    // 오류 상자가 떠 있는 동안은 덮지 않는다 — 체크를 바꿔도 [다시 시도]가 주 버튼(C-D14 · ia-v4 §4.3a-2).
-    if (!$('structureStatus').querySelector('.ux.danger')) setFindStatus(total === 0 ? t('component.noEligibleShort') : t('component.candidates', { total, sel }), '');
-  }
-  updateEmptyLocks(); // 체크 바꿈 · 후보 트리 — [등록] 잠금 · 주 버튼
-}
-
-/** 이름 없는 레이어 안내 줄(2026-11-18 C-D15 — ia-v4 §4.5): Figma 자동 이름이라 뺀 레이어 수, 0이면 숨김. */
-function setCompAutoNamed(n: number): void {
-  const el = $('compAutoNamed');
-  el.textContent = n > 0 ? t('component.autoNamed', { n }) : '';
-  el.hidden = n <= 0;
-}
-/** 찾은 적 있는지(ia-v4 §4.3a-2 [등록] 잠금 ①②) — 결과가 0개여도 참, 목록을 비우면 거짓. */
-let compScanned = false;
-/**
- * 목록 비우기(2026-11-13 C-D5 — ia-v4 §4.5): 목록 기준이 바뀌거나 쓰기 작업이 끝나면(다시 읽는 때) 후보 목록을
- * 비운다 — 머리 띠 · 개수 · 목록 · 전체 체크 줄, 찾기 결과 상태 글 · 찾는 중 글 · 오류 상자(C-D14)도.
- * 쓰기 작업의 결과 글과 `#variantReport`는 남긴다. 기다리던 찾기는 버린다(reqId — C-D12).
- */
-function clearCompLists(): void {
-  const hadFocus = compFocusInLists();
-  compScanReq = 0;
-  compScanned = false;
-  compCandidates = [];
-  compChecked.clear();
-  clearMount($('compTree'));
-  setCompAutoNamed(0);
-  $('compTreeCount').textContent = '';
-  $('compTreeGroup').style.display = 'none';
-  ($('compTreeCtrls') as HTMLElement).style.display = 'none';
-  if (structStatusFind) setStatus('structureStatus', '', '');
-  updateEmptyLocks();
-  refreshTreeEmptyStates();
-  if (hadFocus) compFocusPrimary();
-}
-/** 포커스가 컴포넌트 화면의 목록(후보 트리 · 전체 체크) 안이거나 문서 맨 앞(지워진 요소)에 있는가. */
-function compFocusInLists(): boolean {
-  if (activeTab !== 'select' || selSub !== 'structure') return false;
-  const a = document.activeElement;
-  if (!a || a === document.body) return true;
-  return ['compTree', 'compTreeCtrls'].some((id) => $(id).contains(a));
-}
-/** 컴포넌트 화면의 주 버튼으로(C-D7 — 오류 동안은 [다시 시도], 주 버튼이 없으면 ←). 화면에 있을 때만. */
-function compFocusPrimary(): void {
-  if (activeTab !== 'select' || selSub !== 'structure') return;
-  const card = $('structureCard');
-  (cardPrimary(card) ?? $('btnSubBack')).focus({ preventScroll: true });
-}
-
-/* ---------- 등록/분류 결과 리포트(#variantReport) ----------
-   세 메시지(COMPONENTS_RESULT · VARIANTS_RESULT · GENERATE_RESULT)가 각자 다른 내용을 그리는데
-   렌더 코드가 세 번 복붙돼 있었고, 행이라는 단위 자체가 없어 맨 <div>에 **리터럴 공백**으로
-   들여썼다. 뭉뚱그려 한 모양으로 합치는 대신 ‘머리줄 + 항목 줄’이라는 공통 구조만 뽑는다. */
-
-/** 항목 앞 표시 — 내용이 아니라 장식이라 textContent가 아니라 CSS(::before)가 그린다. */
-type VariantReportMarker = 'bullet' | 'added';
-
-interface VariantReportSection {
-  /** 목록 안 머리줄(머리 띠 — 이름 뒤에 항목 수). 종류가 하나뿐이면(생성 결과) 생략 */
-  head?: string;
-  items: string[];
-  /** 진단(실패)은 경고색 */
-  warn?: boolean;
-  marker?: VariantReportMarker;
-}
-
-interface VariantReportLine {
-  text: string;
-  /** 구분줄(‘빈 변형’)인가 — 항목 줄과 달리 그룹 머리 띠로 그린다(count = 그 아래 항목 수). */
-  head?: boolean;
-  count?: number;
-  warn?: boolean;
-}
-
-function makeVariantReportRow(l: VariantReportLine): HTMLElement {
-  if (l.head) {
-    const g = resultGroup(l.text, l.count);
-    if (l.warn) g.classList.add('warn');
-    return g;
-  }
-  const card = resultCard({ title: l.text, titleMono: true });
-  if (l.warn) (card.querySelector('.r-title') as HTMLElement).classList.add('warn');
-  return card;
-}
-
-/** 등록·분류가 공유하는 구획(빈 조합 + 실패 진단) — 두 결과가 같은 리포트를 그린다. */
-function variantIssueSections(missing: string[], failures?: string[], reused: readonly string[] = []): VariantReportSection[] {
-  const f = failures || [];
-  return [
-    { head: t('component.headMissing'), items: missing },
-    { head: t('component.headIssue'), items: f, warn: true, marker: 'bullet' },
-    { head: t('component.headReused'), items: [...reused], marker: 'bullet' },
-  ];
-}
-
-function renderVariantReport(sections: VariantReportSection[]): void {
-  const filled = sections.filter((s) => s.items.length);
-  // 개수는 카드 제목이 아니라 각 구분줄 머리 띠에(ia-v4 §4.3a-3).
-  const lines: VariantReportLine[] = [];
-  for (const s of filled) {
-    if (s.head) lines.push({ text: s.head, head: true, count: s.items.length, warn: s.warn });
-    for (const it of s.items) lines.push({ text: it, warn: s.warn });
-  }
-  // 빈 조합은 베리언트 속성의 곱집합이라 세트 하나로도 수백 줄이 된다 → 청크 렌더.
-  // 줄이 0이어도 불러야 마운트가 비워지고 onDone이 테두리·푸터를 걷는다.
-  renderChunked($('variantReport'), lines, makeVariantReportRow);
-}
-
-/** 선택 의존 카드(바인딩·컴포넌트)의 빈 상태(캐논 108:2) — 미리보기/후보가 없을 때만,
-    무선택이면 캐논 빈 상태를 표시하고, 선택이 있으면 비워 둔다(액션 버튼이 흐름을 주도). */
-function refreshTreeEmptyStates(): void {
-  // 선택 표시줄이 없으므로 선택이 없으면 목록 자리에서 알린다(§4.1). 연결 화면은 빈 상태 상자가 맡는다(renderBindEmpty).
-  // "선택 없음"은 목록 기준으로 본다(ia-v4 §4.5 — 플러그인이 만든 선택만 있어도 기준이 있으면 선택 있음).
-  if (compCandidates.length === 0) {
-    if (!baseline) renderEmptyState($('compTree'), t('sel.noneHere'), '');
-    else clearMount($('compTree'));
-  }
-  renderMakeNoSel();
-}
-
 /** UX3: 스킵 사유 키 → 한글 라벨. */
 /**
  * 사유별 레이어(미리보기 dry-run에서만 채워짐). 숫자만 있으면 원인 레이어를 찾을 길이 없어,
@@ -4489,17 +3955,6 @@ function renderSkipReasons(reasons: Record<string, number>): void {
   }
 }
 
-/** 결과 줄 꼬리 — 이름은 3개까지 + " 외"(§4.7 "인스턴스 자리" 5번). 없으면 빈 문자열. */
-function placeTailText(key: 'component.placeFailed' | 'component.placeCloned' | 'component.propFailed' | 'component.reuseKept', names: readonly string[]): string {
-  if (!names.length) return '';
-  const shown = names.slice(0, 3).join(', ') + (names.length > 3 ? t('component.placeFailedMore') : '');
-  return t(key, { n: names.length, names: shown });
-}
-/** " · 제자리에 못 둔 {n}개: {이름들}" */
-function placeFailedText(names: readonly string[]): string {
-  return placeTailText('component.placeFailed', names);
-}
-
 
 /* ---------- UX6: 진행률 바 ---------- */
 /** 진행 줄을 연다. cancellable=false면 [취소]를 숨긴다 — 연결(APPLY_SELECTED)은 취소를 보지 않는다(§4.6 · 2026-11-04 결정 2). */
@@ -4531,7 +3986,6 @@ function hideApplyProgress(): void {
 function setStatus(id: string, text: string, cls: 'ok' | 'warn' | '', tip?: string): void {
   const el = $(id);
   dropErrorBox(el); // 오류 상자가 사라진다 — C-D14로 뗀 주 버튼을 되돌린다(ia-v4 §4.3a-2 "상자가 사라지는 때")
-  if (id === 'structureStatus') structStatusFind = false; // 찾기 글이면 부른 쪽이 다시 표시한다(setFindStatus)
   el.textContent = text;
   el.className = `status ${cls}`;
   // 툴팁은 쓸 때마다 새로 — 옛 목록 · 라이선스 원문 사유(noteTip, 부른 쪽이 뒤에 단다)가 다음 문구에 남지 않게.
@@ -4597,7 +4051,7 @@ function applyCardChrome(): void {
   });
 }
 
-/** 구조 툴바 버튼 호버 툴팁 — fixed #uiTip을 패널 안으로 클램프한다.
+/** 커스텀 툴팁(data-tip) — fixed #uiTip을 패널 안으로 클램프한다.
  *  버튼 ::after는 줄바꿈·가장자리에서 잘리고 가로 스크롤을 만든다. */
 
 const TIP_PAD = 8;
@@ -4930,10 +4384,6 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   DELETE_VARIABLES: { results: ['VARIABLES_DELETED'], label: 'op.deleteUnused', go: () => showTab('variables'), write: true },
   RENAME: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: false },
   RENAME_APPLY: { results: ['RENAME_RESULT'], label: 'op.rename', go: goLayer('rename'), write: true },
-  SCAN_COMPONENT_CANDIDATES: { results: ['COMPONENT_CANDIDATES'], label: 'op.components', go: goLayer('structure'), write: false },
-  REGISTER_COMPONENTS: { results: ['COMPONENTS_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
-  CLASSIFY_VARIANTS: { results: ['VARIANTS_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
-  GENERATE_MISSING_VARIANTS: { results: ['GENERATE_RESULT'], label: 'op.components', go: goLayer('structure'), write: true },
   EXPORT: { results: ['EXPORT_RESULT'], label: 'op.export', go: () => showTab('variables'), write: false },
   UNBIND_DELETED: { results: ['DELETED_UNBOUND'], label: 'op.unbind', go: () => { showTab('select'); showSelSub('home'); }, write: true },
 };
@@ -4951,9 +4401,6 @@ const WAIT_LINK_IDS = [
   'btnGenDark', // GENERATE_DARK_MODE
   'btnTextStyles', // CREATE_TEXT_STYLES
   'btnRename', // RENAME_APPLY
-  'btnRegisterComp', // REGISTER_COMPONENTS
-  'btnClassifyVariants', // CLASSIFY_VARIANTS
-  'btnGenMissing', // GENERATE_MISSING_VARIANTS
   'btnMakeRun', // 만들기 화면 실행(§4.3)
 ];
 /** 연결 화면의 [n곳 연결] — 사유는 화면 상태 줄(#applyStatus). */
@@ -5005,7 +4452,7 @@ function opSent(msg: UiToCode): void {
   if (def.write) renderWaitLocks(); // 다른 쓰기 작업 중 [🔗 연결] 잠금(§4.6 "반대 방향")
 }
 /** 결과 메시지 → 끝난 작업 판정. 실패 조건(§4.9): 오류 응답, 유료 잠금 응답, 다크 생성 오류,
- *  컴포넌트 실패 1건 이상. 취소는 표시 없음. */
+ *  안 쓰는 변수 지우기 실패 1건 이상. 취소는 표시 없음. */
 function opReceived(m: CodeToUi): void {
   if (m.type === 'PROGRESS') {
     if (m.op === 'unused') return; // 안 쓰는 변수 읽기는 팝업 안에서 — 전역 진행을 덮지 않는다(docs/unused-vars.md §5)
@@ -5040,9 +4487,6 @@ function opReceived(m: CodeToUi): void {
     let failed = false;
     let cancelled = false;
     if (m.type === 'DARK_MODE_RESULT' && m.error) failed = true;
-    if ((m.type === 'COMPONENTS_RESULT' || m.type === 'VARIANTS_RESULT') && (m.failures?.length ?? 0) > 0) failed = true;
-    // 속성 값 실패 · 복사본 · 빈 자리도 실패로(§4.7 5·6번) — failures에도 실리지만 꼬리와 같은 기준으로 한 번 더 본다.
-    if (m.type === 'COMPONENTS_RESULT' && ((m.propFailed?.length ?? 0) + (m.fillKept?.length ?? 0) + (m.reuseKept?.length ?? 0) + (m.placeCloned?.length ?? 0) + (m.placeFailed?.length ?? 0)) > 0) failed = true;
     if (m.type === 'APPLY_RESULT' && m.cancelled) cancelled = true;
     // 옮기기 확인 전 응답 — 작업은 끝내되 결과로 치지 않는다(✓ · ⚠ 없음 · 다시 읽기 없음 — 바뀐 것이 없다, ia-v4 §4.11 ②).
     if (m.type === 'DARK_MODE_RESULT' && m.needMigrate) { if (isMini) renderMiniMark(); return; }
@@ -5050,17 +4494,10 @@ function opReceived(m: CodeToUi): void {
     if (cancelled) { if (isMini) renderMiniMark(); }
     else opFinished(!failed, def);
     // 작업 직후 다시 읽기(§4.1) — 파일을 바꾼 작업만. 준비 상태 + 변수 표 + 지금 화면의 표.
-    // 실패(⚠)로 끝나도 파일을 바꿨으면 읽는다(컴포넌트 등록·분류 — §4.1 표).
-    const reread = m.type === 'VARIABLES_DELETED' ? m.deleted > 0 : !failed || changedFile(m);
+    const reread = m.type === 'VARIABLES_DELETED' ? m.deleted > 0 : !failed;
     if (def.write && reread) readScreen('work');
     return;
   }
-}
-/** 실패로 끝난 결과라도 파일을 바꿨나(§4.1 "플러그인 작업이 끝난 직후"). 그 밖의 실패는 바꾸지 않았다고 본다. */
-function changedFile(m: CodeToUi): boolean {
-  if (m.type === 'COMPONENTS_RESULT') return m.registered > 0 || m.sets > 0 || (m.reused?.length ?? 0) > 0; // 재사용만이어도 파일을 바꿨다(§4.7 "재사용" 6번)
-  if (m.type === 'VARIANTS_RESULT') return m.sets > 0;
-  return false;
 }
 function opFinished(ok: boolean, def: OpDef): void {
   if (!isMini) return;
@@ -5090,9 +4527,6 @@ function opWizardEnd(result: 'ok' | 'fail' | 'cancel'): void {
    변수 › 만들기 = 준비 상태 + 다크 카드용 컬렉션, 레이어 = 준비 상태, 설정 = 없음(계층은 팝업을 열 때 읽는다). */
 type ReadWhy = 'enter' | 'work' | 'reentry' | 'expand';
 function readScreen(why: ReadWhy): void {
-  // 쓰기 작업 직후(어느 화면의 쓰기든) — 컴포넌트 화면의 두 목록을 비운다(C-D5 · ia-v4 §4.5 "비우는 때 = 다시 읽는 때").
-  // 컴포넌트 화면은 다시 찾지 않는다(C-D6 · §7).
-  if (why === 'work') clearCompLists();
   if (isMini) return; // 최소화 상태에서는 다시 읽지 않는다
   if (activeTab !== 'settings' || why === 'work') requestPrereq();
   if (activeTab === 'variables') {
@@ -5137,7 +4571,7 @@ document.addEventListener('pointercancel', () => { pointerDown = false; reentry.
 // 초기: 컬렉션·전제·라이선스 조회. 유료 카드는 Paid 확인 전까지, 전제 카드는 변수 생성 전까지 잠금.
 applyStaticI18n(); // 정적 라벨 외부화(캐논 변형 전에 원본 요소에 적용)
 applyCardChrome(); // 캐논: 카드 접기 + 버튼 타이틀 이동
-applyButtonTips(); // 구조 버튼 호버 툴팁
+applyButtonTips(); // 커스텀 툴팁(data-tip)
 renderLicenseLink(); // 정적 i18n이 data-i18n 글로 덮은 뒤에 티어 글 · 잠금(B.21)
 syncStickyOffsets(); // 카드 헤더 sticky 오프셋(탭 바 + 선택 바 높이)
 // 선택 바는 문구가 바뀌며 높이가 변하고, 창 리사이즈로 두 바 모두 접힐 수 있다 → 계속 추적.
@@ -5155,7 +4589,7 @@ window.addEventListener('resize', syncStickyOffsets);
 updateGates();
 renderTsLink(); // 타이포 [✓] 레이어에 바로 연결 — 스캔 전에는 잠금
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
-refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 상태 표시
+renderMakeNoSel(); // 시작 시 만들기 화면의 선택 없음 안내
 send({ type: 'GET_COLLECTIONS' });
 requestPrereq(); // #11: 단계 전제 상태
 send({ type: 'GET_LICENSE' });
@@ -5172,7 +4606,7 @@ type SegTab = (typeof TABS)[number];
 /** settings = ⚙ 설정 화면(탭 밖). */
 type TabName = SegTab | 'settings';
 /** 선택 탭의 하위 화면(§2.1). */
-type SelSub = 'home' | 'bind' | 'rename' | 'structure' | 'make' | 'pick';
+type SelSub = 'home' | 'bind' | 'rename' | 'make' | 'pick';
 let activeTab: TabName = 'select';
 let selSub: SelSub = 'home';
 /** ⚙ 설정을 연 탭 — ←로 돌아간다. */
@@ -5222,7 +4656,7 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
   $('subHead').hidden = sub === 'home';
   $('varMake').style.display = sub === 'pick' ? '' : 'none';
   $('makeScreen').style.display = sub === 'make' ? '' : 'none';
-  if (sub === 'bind' || sub === 'rename' || sub === 'structure') showStep('apply', sub);
+  if (sub === 'bind' || sub === 'rename') showStep('apply', sub);
   else for (const el of Array.from(document.querySelectorAll<HTMLElement>('.step[data-apply-step]'))) el.style.display = 'none';
   if (sub === 'pick') showMakeStep(curMakeStep);
   renderSubHead();
@@ -5241,13 +4675,6 @@ function showSelSub(sub: SelSub, opener?: HTMLElement | null): void {
     if (!mkRunning && !mkResults) readMake(); else renderMakeScreen();
   }
   if (changed && sub === 'rename') { renameFocusPending = true; renameTreeFresh = true; renameFor = null; renameNodes = []; readRename(); }
-  if (changed && sub === 'structure') {
-    // 들어올 때(C-D7 — 원칙, ia-v4 §4.5 "포커스"): 접힌 카드는 먼저 펼치고, 그 모습의 주 버튼(오류 동안은 [다시 시도]), 없으면 ←.
-    $('structureCard').classList.remove('collapsed');
-    updateEmptyLocks();
-    refreshTreeEmptyStates();
-    compFocusPrimary();
-  }
   bindFocusFirst();
 }
 /** 연결 화면에 들어온 뒤 첫 스위치에 포커스를 한 번 준다. */
@@ -5288,7 +4715,7 @@ function setSubRight(name: string, tail: string, sep: string): void {
 }
 /** 하위 화면 머리 — 제목 · 오른쪽 보조 글(§4.2~§4.5). */
 function renderSubHead(): void {
-  const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', structure: 'v4.subComponents', make: 'make.title', pick: 'v4.subMake' };
+  const titles: Record<Exclude<SelSub, 'home'>, string> = { bind: 'v4.subBind', rename: 'v4.rename', make: 'make.title', pick: 'v4.subMake' };
   if (selSub === 'home') return;
   $('subTitle').textContent = selSub === 'bind' && bindSkipMode() ? t('v4.skippedTitle') : t(titles[selSub]);
   const name = baseline ? baseLabel() : '';
@@ -5314,7 +4741,7 @@ document.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-go-sub]');
   if (!el) return;
   const sub = el.dataset.goSub as SelSub;
-  if (!['home', 'bind', 'rename', 'structure', 'make', 'pick'].includes(sub)) return;
+  if (!['home', 'bind', 'rename', 'make', 'pick'].includes(sub)) return;
   showTab('select');
   showSelSub(sub, el);
 });
@@ -5359,14 +4786,13 @@ TABS.forEach((tb, i) => {
 });
 $('btnGoMake').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showMakeScreen(e.currentTarget as HTMLElement); });
 $('btnGoRename').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showSelSub('rename', e.currentTarget as HTMLElement); });
-$('btnGoComponents').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showSelSub('structure', e.currentTarget as HTMLElement); });
 $('btnVarEmptyMake').addEventListener('click', (e) => { if (!curSel.count) return; showMakeScreen(e.currentTarget as HTMLElement); });
 
 /* ---------- #5: 단계 레일 — 한 화면에 한 단계 ---------- */
 // 만들기 4단계·적용 3단계. 카드는 마크업의 data-make-step / data-apply-step으로 묶여 있고,
 // 레일은 그중 한 묶음만 보여준다.
 const MAKE_STEPS = ['color', 'token', 'theme', 'type'] as const;
-const APPLY_STEPS = ['bind', 'rename', 'structure'] as const;
+const APPLY_STEPS = ['bind', 'rename'] as const;
 type MakeStep = (typeof MAKE_STEPS)[number];
 type ApplyStep = (typeof APPLY_STEPS)[number];
 
@@ -5743,9 +5169,8 @@ function setBaseline(b: SelInfo | null): void {
   const prevKey = baseKey();
   baseline = b;
   const keyChanged = baseKey() !== prevKey;
-  // 목록 기준이 바뀌면 컴포넌트 화면의 두 목록을 비우고(C-D5) 베리언트 결과도 지운다(ia-v4 §4.5 "비우지 않는 것"의 예외).
-  if (baseKey() !== prevKey) { clearCompLists(); renderVariantReport([]); }
-  else { updateEmptyLocks(); refreshTreeEmptyStates(); }
+  updateEmptyLocks();
+  renderMakeNoSel();
   // 만들기 카드의 기억은 목록 기준이 바뀌면 지운다(§4.1 "끝나는 때" ①).
   if (mcMemo && (!b || mcMemo.base !== b.ids.join(','))) { mcMemo = null; mcJust.clear(); }
   if (mcFor !== baseKey()) mcInFlight = false; // 앞 기준의 카드 읽기는 버린다(응답은 기준으로 걸러진다)
@@ -8383,7 +7808,7 @@ function renderSelHome(): void {
   selMakeHot = false;
   const noSel = !baseline;
   // 할 일(§4.1) — 목록 기준이 없으면 잠금.
-  for (const id of ['btnGoMake', 'btnGoRename', 'btnGoComponents']) setLock($(id), (baseline ?? curSel).count ? null : 'prereq', t('status.noSelection'));
+  for (const id of ['btnGoMake', 'btnGoRename']) setLock($(id), (baseline ?? curSel).count ? null : 'prereq', t('status.noSelection'));
   // 머리 줄
   if (baseline) {
     const b = document.createElement('b');

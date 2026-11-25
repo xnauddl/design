@@ -39,8 +39,6 @@
       --ok-subtle:     #e8f5ec;
       --warn:          #9a6300;
       --warn-subtle:   #fbf1df;
-      --beta:          #c2410c;   /* [베타] 배지 글자 — 다듬는 중(§4.7) */
-      --beta-subtle:   #fff1e6;   /* [베타] 배지 바탕 */
       --danger:        #c8252f;
       --danger-subtle: #fdecec;
       --danger-border: #f4c9cc;
@@ -301,12 +299,6 @@
     }
     #uiTip.show { opacity: 1; visibility: visible; }
 
-    /* ── 빈 상태 (캐논 108:2 패턴) ── */
-    .empty-state { text-align: center; padding: 14px 10px; color: var(--text-2); }
-    .empty-state .es-title { font-weight: 600; color: var(--text); }
-    .empty-state .es-guide { margin-top: 4px; font-size: 11px; }
-    .empty-state button { margin-top: 8px; }
-
     /* ── 에러 콜아웃(위험) ── */
     .ux.danger { background: var(--danger-subtle); }
     .ux.danger .ux-t { color: var(--danger); }
@@ -431,12 +423,6 @@
     .ts-edit input[type="number"] { -moz-appearance: textfield; }
     .ts-edit input[type="number"]::-webkit-outer-spin-button,
     .ts-edit input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-    /* 그룹 머리 — 트리의 루트나 리포트의 구분줄. 카드가 아니라 라벨이다. */
-    .r-group {
-      font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: .02em;
-      margin: 6px 0 0; padding-left: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .r-group:first-child { margin-top: 0; }
     /* 스킵 사유 칩 줄 — 사유별 건수 + 누르면 해당 레이어 선택. 여러 사유가 나면 줄바꿈. */
     .skip-list { display: flex; flex-direction: column; margin-top: 6px; }
     /* 묶음 머리 — 트리 머리 모양(ia-v4 §2.8 · TR-D13 · TR-P14): 높이 32 · 글 왼쪽 2(.skip-row 글과 맞춤) · 위 1px 선(첫 묶음 머리 없음) · 배경 없음 · 12px 600 */
@@ -479,56 +465,14 @@
     .tidy { background: var(--accent-subtle); border-radius: var(--r-sm); padding: 8px; margin: 6px 0; }
     .tidy-note { display: flex; align-items: center; gap: 8px; }
 
-    /* ── diff / 선택형 미리보기 트리 ── */
-    /* 긴 이름은 nowrap이라 가로로 넘친다 — 가로만 스크롤시킨다(세로는 패널 body). */
-    #diff, #compTree {
-      font-family: var(--mono); font-size: var(--fs); overflow-x: auto;
-    }
-    .before { color: var(--muted); text-decoration: line-through; }
-    /* 연결 줄 — `채움 색 ■ #fff = color/bg`. 속성 이름은 본문 글꼴(디자인 말), 값·변수는 고정폭. 취소선 없음(값은 바뀌지 않는다). */
-    .bf-label { font-family: var(--font); font-weight: 500; color: var(--text-2); }
-    .bf-val { color: var(--muted); font-weight: 400; }
-    .bf-op { color: var(--muted); font-weight: 400; padding: 0 1px; }
     .bf-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; border: 1px solid var(--border); vertical-align: -1px; margin-right: 4px; }
-    /* 레이어 머리 — 누르면 캔버스에서 그 레이어 선택 */
-    .r-group.pick { cursor: pointer; color: var(--text-2); }
-    .r-group.pick:hover, .r-group.pick:focus-visible { color: var(--accent-strong); text-decoration: underline; outline: none; }
     /* 변수별 보기 › 어디에? — 레이어 · 속성 목록(누르면 그 레이어 선택) */
     .var-uses { display: flex; flex-direction: column; gap: 2px; margin: -2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border); }
     .var-use { text-align: left; border: none; background: transparent; padding: 3px 4px; border-radius: var(--r-sm); font-size: 11px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .var-use:hover { background: var(--surface-hover); }
     .vu-layer { font-family: var(--mono); }
     .vu-props { color: var(--muted); }
-    .tree-name { color: inherit; }
-    .after { color: var(--ok); }
     .tree-ctrls { font-size: var(--fs); margin-top: 6px; }
-    /* 등록 후보 종류 배지(세트 ↔ 단독) */
-    .tag { display: inline-block; padding: 0 5px; border-radius: 999px; font-size: 10px; font-weight: 600; line-height: 15px; border: 1px solid transparent; }
-    .tag-set { background: var(--accent-subtle); color: var(--accent-strong); border-color: var(--accent-border); }
-    .tag-single { background: var(--ok-subtle); color: var(--ok); border-color: var(--ok); }
-    /* 재사용(§4.7 "재사용" 7번) — 새로 만들지 않고 기존 컴포넌트를 쓰는 줄 */
-    .tag-reuse { background: transparent; color: var(--muted); border-color: var(--border); }
-
-    /* 리포트(#variantReport) — 빈 조합 이름이 길어 가로만 넘긴다. 행은 r-card. */
-    #variantReport { font-family: var(--mono); font-size: 11px; overflow-x: auto; }
-    .r-group.warn, .r-title.warn { color: var(--warn); }
-    .r-group.ctx { font-weight: 500; opacity: .75; }
-    /* 목록 안 그룹 머리 띠(ia-v4 §2.8 B안 ②) — resultGroup이 만든 줄만. 카드 안 목록 제목(정적 .r-group)은 작은 라벨 그대로.
-       .r-group과 특이도가 같아 이 뒤에 둔다. 블록이라 말줄임이 그대로 듣는다. */
-    .r-ghead {
-      display: block; min-height: 32px; line-height: 31px; margin: 0; padding-left: 2px;
-      background: var(--surface-2); border-bottom: 1px solid var(--border);
-      font-size: 12.5px; font-weight: 600; letter-spacing: 0; color: var(--text);
-    }
-    /* 머리 띠 안 개수 "{n}개"(ia-v4 §4.3a-3) — 트리 머리의 .tr-cnt와 같은 값 */
-    .r-ghead .r-gcnt { color: var(--text-2); font-size: 11px; font-weight: 400; font-variant-numeric: tabular-nums; margin-left: 4px; }
-    .r-ghead .r-gcnt:empty { display: none; }
-    /* 컴포넌트 후보 줄 — 변형 세트의 변형 이름은 회색 보통 굵기(ia-v4 §4.3a-3) */
-    .r-sum.r-var { color: var(--text-2); white-space: normal; overflow: visible; overflow-wrap: anywhere; } /* 변형 줄 — 말줄임 없이 줄바꿈(ia-v4 §4.3a-3, 2026-11-24) */
-    /* 베리언트 결과 — 머리 띠는 본문 글꼴, 항목은 mono 11px 보통 굵기 */
-    #variantReport .r-ghead { font-family: var(--font); }
-    #variantReport .r-title { font-weight: 400; }
-
     /* 사용처 결과 — 행 아래 접혀 붙는 설명 줄. */
     .vusage { padding: 2px 0 6px 20px; color: var(--text-2); }
     .vusage.warn { color: var(--warn); }
@@ -933,7 +877,6 @@
     .vt-line { display: flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 6px; color: var(--text-2); border-bottom: 1px solid var(--border); cursor: pointer; }
     .vt-lib { margin-top: 10px; }
     .vt-empty { padding: 14px 6px; color: var(--text-2); }
-    .beta-badge { display: inline-block; font-size: 10px; font-weight: 600; line-height: 14px; background: var(--beta-subtle); color: var(--beta); border-radius: 4px; padding: 0 4px; margin-left: 4px; vertical-align: 1px; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
     .back-link { display: inline-block; margin: 0 0 10px; padding: 4px 0; min-height: 24px; }
@@ -1035,7 +978,6 @@
         <span data-i18n="v4.tidy">할 일</span>
         <button id="btnGoMake" type="button" data-i18n="make.title">변수 만들기</button>
         <button id="btnGoRename" type="button" data-i18n="v4.rename">이름 정리</button>
-        <button id="btnGoComponents" type="button" data-i18n-aria-label="layer.componentsBetaAria" aria-label="컴포넌트 (베타)"><span data-i18n="rail.structure">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span></button>
       </div>
     </div>
     <!-- 하위 화면 머리(§2.1) — "← 제목" + 오른쪽 보조 글 -->
@@ -1082,36 +1024,6 @@
         <span class="grow"></span>
         <button id="btnRename" class="primary" type="button" data-i18n="rename.applyBtn">이름 바꾸기</button>
       </div>
-    </div>
-
-    <!-- 구조 — 컴포넌트 후보 찾기 · 등록(닮은 프레임 찾기 · 하나로 합치기는 2026-11-19 제거, ia-v4 §4.3a). -->
-    <div class="step" id="structureCard" data-apply-step="structure">
-      <h2><span data-i18n="structure.title">컴포넌트</span><span class="beta-badge" aria-hidden="true" data-i18n="common.beta">베타</span> <span class="muted lock" id="componentLock"></span></h2>
-      <div class="hint" data-i18n="component.hint">후보를 찾아 컴포넌트로 등록해요</div>
-      <div class="toolbar">
-        <button id="btnScanComp" data-i18n="component.scanBtn" data-i18n-tip="component.scanHelp" data-tip="선택 아래에서 버튼·카드 같은 고신뢰 구조 후보를 찾아요. 숨김·부모 컨테이너는 빼요.">컴포넌트 후보 찾기</button>
-        <span class="grow"></span>
-        <button id="btnRegisterComp" class="primary" data-i18n="component.registerBtn" data-i18n-tip="component.registerHelp" data-tip="체크한 후보를 Components 페이지에 컴포넌트로 등록하고, 원래 자리에는 인스턴스를 남겨요. 남긴 인스턴스의 연결과 값은 메인 컴포넌트를 따라요.">등록</button>
-      </div>
-      <div class="row tree-ctrls" id="compTreeCtrls" style="display:none">
-        <label class="inline"><input type="checkbox" id="compAll" checked /> <span data-i18n="common.selectAll">전체</span></label>
-      </div>
-      <!-- 목록 머리 띠 + 개수(ia-v4 §4.3a-3) -->
-      <div class="r-group r-ghead" id="compTreeGroup" style="display:none"><span data-i18n="structure.groupComp">컴포넌트 후보</span><span class="r-gcnt" id="compTreeCount"></span></div>
-      <div id="compTree" class="results"></div>
-      <!-- 이름 없는 레이어 안내(ia-v4 §4.5 — C-D15): 글 한 줄(테두리 · 배경 없음), 0이면 숨김 -->
-      <div class="hint comp-autonamed" id="compAutoNamed" hidden></div>
-      <!-- 베리언트 정리는 '이미 만든 컴포넌트'를 손보는 뒷일이라 툴바(스캔→등록)에서 뺐다.
-           낱개 컴포넌트나 세트를 실제로 선택했을 때만 나타난다(SELECTION_STATE.comps/sets). -->
-      <div id="variantRow" hidden>
-        <div class="r-group" data-i18n="structure.groupVariant">선택한 컴포넌트 정리</div>
-        <div class="row">
-          <button id="btnClassifyVariants" data-i18n="component.classifyBtn" data-i18n-tip="component.classifyHelp" data-tip="이미 만든 컴포넌트를 이름이 같은 것끼리 변형 세트로 묶어요.">변형 세트로 묶기</button>
-          <button id="btnGenMissing" data-i18n="component.genMissingBtn" data-i18n-tip="component.genMissingHelp" data-tip="선택한 변형 세트의 빠진 조합을 첫 변형을 복제해 채워요.">빠진 변형 채우기</button>
-        </div>
-      </div>
-      <div id="variantReport" class="results"></div>
-      <div class="status" id="structureStatus"></div>
     </div>
 
    <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
