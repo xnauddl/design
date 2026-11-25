@@ -213,6 +213,31 @@ function resolveUsesNames(tokens: readonly DraftToken[], skip: ReadonlyMap<strin
  * 거울 계층을 두지 않는다. 역할 없는 값은 바인딩이 Global에 직접 붙는다(bind.ts).
  * Semantic 컬렉션은 역할 단계가 쓸 수 있게 미리 만들어 둔다(빈 컬렉션).
  */
+/**
+ * 새로 만드는 Global의 순서(IA v4 §4.3 B.41 VO-D3) — 그룹(이름 첫 마디)은 처음 나온 순서, 그룹 안에서 숫자 아닌 토큰이
+ * 있던 자리는 그대로 두고 FLOAT 토큰끼리만 만들 px 값(`literalOf`) 작은 순(안정)으로 채운다.
+ */
+export function creationOrder(tokens: readonly DraftToken[], base: number): DraftToken[] {
+  const groups = new Map<string, DraftToken[]>();
+  for (const t of tokens) {
+    const g = t.name.split('/')[0];
+    const arr = groups.get(g);
+    if (arr) arr.push(t);
+    else groups.set(g, [t]);
+  }
+  const out: DraftToken[] = [];
+  for (const arr of groups.values()) {
+    const isNum = arr.map((t) => resolvedTypeForToken(t) === 'FLOAT');
+    const nums = arr
+      .map((t, i) => ({ t, i, v: Number(literalOf(t, 'FLOAT', base)) }))
+      .filter((x) => isNum[x.i])
+      .sort((a, b) => (Number.isFinite(a.v) && Number.isFinite(b.v) ? a.v - b.v : 0) || a.i - b.i);
+    let k = 0;
+    arr.forEach((t, i) => out.push(isNum[i] ? nums[k++].t : t));
+  }
+  return out;
+}
+
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const reuse = await pickReusable(tokens, base);
   const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), finalName: new Map() };
@@ -231,7 +256,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
     const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
     // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
     const touched = new Set<string>();
-    for (const t of toCreate) {
+    for (const t of creationOrder(toCreate, base)) {
       const type = resolvedTypeForToken(t);
       const nm = named.get(t.name);
       if (nm) {
@@ -639,6 +664,8 @@ function walkText(node: SceneNode, out: TextNode[], instanceOut?: TextNode[]): v
 export interface TextScanResult {
   samples: TextSample[];
   warnings: string[];
+  /** 표본 글자 id → 노드(만들기 탭 RT-D5 판정 — 다시 읽지 않는다). */
+  nodeById?: Map<string, TextNode>;
 }
 
 /** 노드/세그먼트 행간 → px 시그니처 + 원본 %. */
@@ -874,7 +901,7 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
       uiRole: inUiRole(node, ownerCache),
     });
   }
-  return { samples, warnings: [...warnings] };
+  return { samples, warnings: [...warnings], nodeById: new Map(texts.map((t) => [t.id, t])) };
 }
 
 /** 스타일/노드의 행간을 있는 그대로 px 환산(AUTO/혼합=0) — 값을 기록하는 경로용. */
@@ -1729,12 +1756,66 @@ export interface TextStylePlanRow {
   name: string;
   nodeIds: string[];
 }
-/** 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null). */
-async function textStyleIndex(): Promise<Map<string, TextStyle | null>> {
+/** 노드가 있는 페이지(없으면 null). */
+function pageOfNode(n: BaseNode): PageNode | null {
+  let p: BaseNode | null = n;
+  while (p && p.type !== 'PAGE') p = p.parent;
+  return (p as PageNode | null) ?? null;
+}
+
+/**
+ * 원격 목록(IA v4 §4.2 B.40 RT-D1) — 현재 페이지와 루트가 있는 페이지들의 글자에 글자 전체로 붙은 원격 텍스트 스타일
+ * (+ extraIds — 다시 확인의 줄 스타일). 현재 페이지가 아니면 훑기 전에 loadAsync(dynamic-page).
+ * 비용(받아들임): 그 페이지들의 모든 글자를 훑는다.
+ */
+export async function remoteTextStyles(roots: readonly BaseNode[], extraIds: readonly string[] = []): Promise<TextStyle[]> {
+  const cur = (figma as { currentPage?: PageNode }).currentPage;
+  const pages = new Set<PageNode>();
+  if (cur) pages.add(cur);
+  for (const r of roots) {
+    const pg = pageOfNode(r);
+    if (pg) pages.add(pg);
+  }
+  const ids = new Set<string>(extraIds.filter((x) => typeof x === 'string' && x !== ''));
+  for (const pg of pages) {
+    if (typeof (pg as { findAllWithCriteria?: unknown }).findAllWithCriteria !== 'function') continue; // 테스트 목
+    if (pg !== cur) {
+      try { await pg.loadAsync(); } catch { /* 이미 불렸거나 동적 페이지가 아님 */ }
+    }
+    for (const t of pg.findAllWithCriteria({ types: ['TEXT'] })) {
+      const id = (t as { textStyleId?: unknown }).textStyleId;
+      if (typeof id === 'string' && id !== '') ids.add(id); // 구간마다 다른 스타일(figma.mixed)은 모으지 않는다
+    }
+  }
+  const out: TextStyle[] = [];
+  for (const id of ids) {
+    try {
+      const st = await figma.getStyleByIdAsync(id);
+      if (st && st.type === 'TEXT' && (st as { remote?: boolean }).remote) out.push(st as TextStyle);
+    } catch {
+      /* 없는 스타일 */
+    }
+  }
+  return out;
+}
+
+/**
+ * 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null).
+ * 로컬을 먼저 넣고, 원격(B.40)은 그 키에 로컬이 없을 때만 — 원격끼리 다른 스타일이 둘 이상이면 모호.
+ */
+async function textStyleIndex(remote: readonly TextStyle[] = []): Promise<Map<string, TextStyle | null>> {
   const styleByKey = new Map<string, TextStyle | null>();
   for (const s of await figma.getLocalTextStylesAsync()) {
     const k = typoKey(s as unknown as TypoFields);
     styleByKey.set(k, styleByKey.has(k) ? null : s);
+  }
+  const localKeys = new Set(styleByKey.keys());
+  for (const s of remote) {
+    const k = typoKey(s as unknown as TypoFields);
+    if (localKeys.has(k)) continue; // 로컬 우선(RT-D3)
+    const ex = styleByKey.get(k);
+    if (ex === undefined) styleByKey.set(k, s);
+    else if (ex && ex.id !== s.id) styleByKey.set(k, null);
   }
   return styleByKey;
 }
@@ -1764,7 +1845,7 @@ function textStyleFor(t: TextNode, styleByKey: Map<string, TextStyle | null>): T
  */
 export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promise<{ rows: TextStylePlanRow[]; skipReasons: Record<TextStyleSkipReason, number> }> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
-  const styleByKey = await textStyleIndex();
+  const styleByKey = await textStyleIndex(await remoteTextStyles(nodes));
   const { texts, inInstance } = planTexts(nodes);
   skipReasons.instance += inInstance.length;
   const rows = new Map<string, TextStylePlanRow>();
@@ -1781,14 +1862,17 @@ export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promi
  * 켠 스타일 줄만 붙인다(IA v4 §4.2 — 연결 직전 다시 확인). 그 사이 스타일이 붙었거나 값이 달라진 글자는 건너뛴다.
  * 반환: 붙인 레이어 수 · 건너뛴 사유.
  */
-export async function applyTextStyleRows(rows: readonly { styleId: string; nodeIds: readonly string[] }[]): Promise<ApplyTextStylesResult> {
+export async function applyTextStyleRows(rows: readonly { styleId: string; nodeIds: readonly string[] }[], index?: Map<string, TextStyle | null>): Promise<ApplyTextStylesResult> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
   const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
-  const styleByKey = await textStyleIndex();
+  // 글자를 먼저 읽는다 — 다시 확인의 원격 목록 루트 = 줄의 글자 + 줄의 스타일 id(B.40 — APPLY_SELECTED에는 기준이 없다)
+  const nodeById = new Map<string, BaseNode | null>();
+  for (const row of rows) for (const id of row.nodeIds) if (!nodeById.has(id)) nodeById.set(id, await figma.getNodeByIdAsync(id).catch(() => null));
+  const styleByKey = index ?? (await textStyleIndex(await remoteTextStyles([...nodeById.values()].filter((n): n is BaseNode => !!n), rows.map((r) => r.styleId))));
   const loaded = new Set<string>();
   for (const row of rows) {
     for (const id of row.nodeIds) {
-      const t = await figma.getNodeByIdAsync(id).catch(() => null);
+      const t = nodeById.get(id) ?? null;
       if (!t || t.type !== 'TEXT') { skipReasons.noStyle++; res.skipped++; continue; }
       const r = textStyleFor(t as TextNode, styleByKey);
       if (typeof r === 'string' || r.id !== row.styleId) { skipReasons[typeof r === 'string' ? r : 'noStyle']++; res.skipped++; continue; }
@@ -1805,11 +1889,51 @@ export async function applyTextStyleRows(rows: readonly { styleId: string; nodeI
 }
 
 /**
+ * 만들기 Text Style 탭(IA v4 §4.2 B.40 RT-D5) — 로컬 앵커 없는 묶음 가운데 표본 글자가 모두 같은 원격 스타일 하나로
+ * 정해지는 묶음을 뺀다. 정해짐 = 인스턴스 안쪽이 아니고, 그 원격 스타일이 붙어 있으며 typoKey도 같거나,
+ * 스타일이 없고 연결의 인덱스(로컬 우선 · 같은 키 원격 둘 이상이면 모호)가 그 원격 스타일을 고름.
+ */
+export async function dropRemoteClusters<C extends { nodeIds?: string[] }>(
+  clusters: C[],
+  nodeById: ReadonlyMap<string, TextNode>,
+  roots: readonly SceneNode[],
+  anchored: (c: C) => boolean,
+): Promise<C[]> {
+  const remote = await remoteTextStyles(roots);
+  if (!remote.length) return clusters;
+  const index = await textStyleIndex(remote);
+  const keyOfRemote = new Map(remote.map((r) => [r.id, typoKey(r as unknown as TypoFields)]));
+  const resolved = (t: TextNode): string | null => {
+    if (insideInstance(t)) return null;
+    const sid = (t as { textStyleId?: unknown }).textStyleId;
+    if (typeof sid === 'string' && sid !== '') {
+      if (!keyOfRemote.has(sid) || isMixedTypography(t)) return null;
+      return typoKey(t as unknown as TypoFields) === keyOfRemote.get(sid) ? sid : null;
+    }
+    const r = textStyleFor(t, index);
+    return typeof r !== 'string' && keyOfRemote.has(r.id) ? r.id : null;
+  };
+  return clusters.filter((c) => {
+    if (anchored(c)) return true;
+    const ids = c.nodeIds ?? [];
+    if (!ids.length) return true;
+    let one: string | null = null;
+    for (const id of ids) {
+      const t = nodeById.get(id);
+      const got = t ? resolved(t) : null;
+      if (!got || (one && one !== got)) return true;
+      one = got;
+    }
+    return false;
+  });
+}
+
+/**
  * 텍스트 스타일 후보 판정(연결의 "텍스트 스타일이 먼저" — IA v4 §4.2 · §4.3 `APPLY.skipTextStyleNodes`).
  * `planExistingTextStyles`가 줄에 넣을 글자(인스턴스 밖 · 붙일 로컬 스타일이 하나로 정해짐)면 true.
  */
-export async function textStyleCandidateTest(): Promise<(t: TextNode) => boolean> {
-  const styleByKey = await textStyleIndex();
+export async function textStyleCandidateTest(roots: readonly SceneNode[] = []): Promise<(t: TextNode) => boolean> {
+  const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
   return (t) => !insideInstance(t) && typeof textStyleFor(t, styleByKey) !== 'string';
 }
 
@@ -1845,7 +1969,7 @@ export async function applyRegisteredTextStyles(roots: readonly SceneNode[], sty
   };
   for (const t of plan.inInstance) if (idByKey.has(keyOf(t) ?? '\u0000')) skipped('instance');
   const rows = new Map<string, string[]>();
-  const styleByKey = await textStyleIndex();
+  const styleByKey = await textStyleIndex(await remoteTextStyles(roots)); // 한 요청 안 한 번 — 아래 applyTextStyleRows에 넘긴다(B.40)
   for (const t of plan.texts) {
     const k = keyOf(t);
     if (k === undefined || !idByKey.has(k)) continue; // 범위 밖(값이 방금 스타일과 다름 · 섞인 서식)
@@ -1861,7 +1985,7 @@ export async function applyRegisteredTextStyles(roots: readonly SceneNode[], sty
     rows.set(r.id, arr);
   }
   if (rows.size) {
-    const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
+    const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })), styleByKey);
     out.applied = r.applied;
     if (r.appliedIds?.length) out.appliedIds = r.appliedIds;
   }
@@ -1875,7 +1999,7 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     skipReasons[k]++;
     res.skipped++;
   };
-  const styleByKey = await textStyleIndex();
+  const styleByKey = await textStyleIndex(await remoteTextStyles(nodes));
 
   const texts: TextNode[] = [];
   const inInstance: TextNode[] = [];

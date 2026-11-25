@@ -16,6 +16,8 @@ export {
   applyTextStyleRows,
   applyRegisteredTextStyles,
   textStyleCandidateTest,
+  dropRemoteClusters,
+  creationOrder,
   prunePaletteColors,
   isManualVar,
   createManualVariable,
