@@ -49,7 +49,7 @@ export interface RenameChange {
 /**
  * 선택형 미리보기 트리(#13)의 한 노드. 선택 서브트리 전체를 평면(pre-order)으로 담되
  * `depth`/`parentId`로 계층을 복원한다. `after`가 있으면 **영향 노드**(리네임 대상),
- * 없으면 회색 맥락(보존). 바인딩(#6)·컴포넌트(#1) 미리보기도 같은 형태를 재사용한다.
+ * 없으면 회색 맥락(보존). 바인딩(#6) 미리보기도 같은 형태를 재사용한다.
  */
 /** 리네임에서 이름을 지키는 사유(#7b). 라벨은 i18n `rename.keep.<reason>`. */
 export type KeepReason = 'root' | 'instance' | 'component' | 'text' | 'locked';
@@ -66,7 +66,7 @@ export interface RenameNode {
   /** 이름을 지킨 이유(#7b). 있으면 대상이 아니라는 뜻 — 미리보기에서 흐린 행으로 보인다.
    *  없고 after도 없으면 '역할이 지금 이름과 같아 바꿀 게 없는' 평범한 맥락 노드다. */
   keep?: KeepReason;
-  /** 이 이름을 만든 역할(card·thumbnail…). 적용 때 `dsRole`로 남겨 등록이 읽는다. */
+  /** 이 이름을 만든 역할(card·thumbnail…). 적용 때 `dsRole`로 남긴다(이름 정리 · 텍스트 스타일 label 판정이 읽는다). */
   role?: string;
   /** 판정 이름 ≠ 보이는 이름(루트 접두사를 뗌)이면 판정 이름 — 이름이 그대로인 다시 정리에서도 싣는다(ia-v4 §4.4). */
   nameKey?: string;
@@ -146,28 +146,6 @@ export interface BindNode {
   parentId: string | null;
 }
 
-/** 컴포넌트 등록 후보(#1) — 선택 하위에서 스캔한 노드. eligible=등록 가능(체크). */
-export interface ComponentCandidate {
-  id: string;
-  name: string;
-  type: string;
-  depth: number;
-  parentId: string | null;
-  eligible: boolean;
-  /** 구조 그룹으로 묶일 세트 이름(미리보기). 세트(2개+) 후보일 때만. */
-  group?: string;
-  /** 도출된 베리언트(`Size=lg, Color=blue` 등) 미리보기. 세트 멤버일 때만. */
-  variant?: string;
-  /** 단독 컴포넌트로 등록될 후보의 등록 이름(PascalCase). 단독일 때만(group과 배타). */
-  single?: string;
-  /** 텍스트/스왑/불리언만 다른 반복 → 단품+속성으로 접힘(기본 체크). */
-  propsOnly?: boolean;
-  /** 전에 만든 컴포넌트를 재사용할 줄 — [재사용] 배지 + 기존 이름(세트면 "{세트} · {변형}")(§4.7 "재사용" 7번). */
-  reuse?: { name: string };
-  /** 처음 열 때 체크(§4.7 "묶기" 6번) — code.ts가 정한다(반복 이름 · 속성 접힘 · 버튼 · 칩 · 탭). */
-  defaultOn?: boolean;
-}
-
 /**
  * [기존 스타일 연결]에서 건너뛴 텍스트의 사유(§4.6, §2.11).
  * - hasStyle: 이미 텍스트 스타일이 붙음(원격·일부 구간 포함)
@@ -245,14 +223,11 @@ export type UiToCode =
   | { type: 'DELETE_VARIABLES'; reqId: number; ids: string[] }
   | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[]; reqId?: number }
   | { type: 'UNBIND_DELETED'; reqId: number; nodeIds?: string[] } // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3)
-  // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(등록이 머리명사로 읽는다).
+  // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(이름 정리 · 텍스트 스타일 label 판정이 읽는다).
   | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
   | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
-  // [이름 다시 짓기](docs/text-style-krds.md §5): 미리보기(파일의 로컬 텍스트 스타일 전부 — 선택 무관) · 바꾸기(이름만, 역할 변수 함께)
-  | { type: 'SCAN_TS_RENAME'; reqId: number }
-  | { type: 'APPLY_TS_RENAME'; reqId: number; items: TsRenameItem[] }
   // 스캔 결과에 가로 행 라벨 이름을 덧입힌다. 스캔의 옵션이 아니라 뒤따르는 별도 동작이다
   // (결정 2026-08-06) — 켜고 스캔하는 대신, 결과를 보고 마음에 안 들면 눌러 이름만 다시 매긴다.
   | { type: 'NAME_TEXT_STYLES_BY_ROW' }
@@ -269,12 +244,6 @@ export type UiToCode =
   // URL은 code가 licenseConfig에서 해석한다(임의 URL 전달 금지 — 열린 리다이렉트 방지).
   | { type: 'OPEN_LICENSE_LINK'; target: 'purchase' | 'portal' }
   | { type: 'EXPORT'; format: ExportFormat; fontSizeUnit: 'px' | 'rem'; base: number } // 토큰 코드 내보내기
-  | { type: 'SCAN_COMPONENT_CANDIDATES'; nodeIds?: string[]; reqId?: number } // #1(Paid): 목록 기준(nodeIds — ia-v4 §2.5) 하위 순회 → 등록 후보 트리. reqId는 응답에 돌려받아 비운 뒤 늦게 온 응답을 버린다(§4.5)
-  // names: 트리가 보여 준 노드별 이름(WYSIWYG). 이름 충돌 해소는 후보 전체를 봐야 같은 답이
-  // 나오는데 등록은 체크한 것만 받으므로, 미리보기의 결론을 그대로 실어 보낸다.
-  | { type: 'REGISTER_COMPONENTS'; nodeIds?: string[]; names?: Record<string, string> } // Phase 3(Paid): 후보(트리 선택 nodeIds, 없으면 선택 프레임 '내부' 후보) → 메인 컴포넌트 등록 + 베이스 묶음 베리언트 세트
-  | { type: 'CLASSIFY_VARIANTS' } // Phase 3(Paid): 같은 베이스 컴포넌트 → 베리언트 세트
-  | { type: 'GENERATE_MISSING_VARIANTS' } // Phase 4(Paid): 선택 세트의 빠진 조합 자동 생성
   | { type: 'GET_SETTINGS' } // #19: 설정 탭 설정(기준 크기·리네임 맥락 깊이) 불러오기
   | { type: 'SET_SETTINGS'; base: number; maxDepth: number; grid: number } // 바뀔 때마다 clientStorage에 보관
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
@@ -287,9 +256,7 @@ export type CodeToUi =
   | { type: 'UI_SIZE'; mode: 'default' | 'mini' } // 지금 창 크기(최소화 여부)
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number; reqId?: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
-  // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
-  // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
-  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number; firstName?: string; ids?: string[] } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; selfSelect?: boolean; firstName?: string; ids?: string[] } // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
   // 변수 고치기 응답 — applied: 바꾼 것('name' 또는 modeId), 순서대로. 변수 표는 따로 보내지 않는다(UI가 다시 읽는다).
   | { type: 'VARIABLE_APPLIED'; reqId: number; applied: number; skipped: number; skipReasons: Record<string, number>; name: string } // applied · skipped = 레이어 수
@@ -313,8 +280,6 @@ export type CodeToUi =
   // existing: 로컬 텍스트 스타일 전부 — 이름 겹침 잠금(IA v4 §4.3) · 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프 rampToSpecs).
   // decimalRows: 앵커 없는 소수 크기 군집 — 만들지 않는 흐린 줄(§2.11 11번 · ia-v4 §4.3 "소수 크기 줄").
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; decimalRows?: StyleCluster[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
-  | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
-  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[]; roleMoveError: number; roleMoveNames: string[] }
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number>; mainsApplied?: string[] } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
@@ -322,14 +287,8 @@ export type CodeToUi =
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
   | {
       type: 'PREREQ_STATE';
-      hasColorVars: boolean;
-      hasScaleVars: boolean;
       hasGlobal: boolean;
       hasBindable: boolean;
-      hasDarkMode: boolean;
-      hasTextStyles: boolean;
-      /** Semantic에 역할 별칭이 있음(역할 매핑 완료). */
-      hasSemanticRoles: boolean;
       /** 계층(Global·Semantic·Component) 안의 변수 수 · 그중 색 — '이미 변수 N개' 안내용. */
       tierVars?: number;
       tierColorVars?: number;
@@ -363,11 +322,6 @@ export type CodeToUi =
   | { type: 'REQUEST_VERIFY'; key: string; instanceId?: string } // M2.2: code → UI에 (재)검증 요청(WebCrypto는 UI에서). instanceId: 같은 기기로 validate
   | { type: 'REQUEST_DEACTIVATE'; key: string; instanceId: string } // 해제 시 code → UI: 이 기기의 LS 활성화 슬롯 반납(best-effort)
   | { type: 'EXPORT_RESULT'; format: ExportFormat; content: string; clashes: string[]; globalDupes: string[]; globalDupesFrom?: string } // 토큰 코드 내보내기 결과 · clashes = Global과 같은 이름의 거울 아닌 Semantic · globalDupes = 같은 이름 Global끼리(앞의 것만 냄) · globalDupesFrom = 남은 쪽 컬렉션 이름이 하나일 때(ia-v3 §4.4)
-  | { type: 'COMPONENT_CANDIDATES'; nodes: ComponentCandidate[]; autoNamed?: number; reqId?: number } // #1: 등록 후보 트리(영향+조상)
-  // icons: 날 벡터가 그림마다 달라 새로 만든 아이콘 컴포넌트 수(스왑 속성의 재료 — 등록 수와 별개로 센다).
-  | { type: 'COMPONENTS_RESULT'; registered: number; skipped: number; sets: number; singles: string[]; exposed?: number; icons?: number; missing: string[]; failures?: string[]; placeFailed?: string[]; placeCloned?: string[]; propFailed?: string[]; fillKept?: string[]; reused?: string[]; reuseKept?: string[] } // Phase 3: 등록 + 세트 묶음 + 속성 자동 노출(exposed). failures: 실패 진단. placeFailed: 비운 자리 · placeCloned: 복사본으로 채운 자리의 원본 이름(§4.7 5번). propFailed: 속성 값·사진을 못 넣은 멤버(§4.7 6번). fillKept: 사진·크기 검사로 묶지 않은 멤버(§4.7 8번). reused: 재사용한 기존 컴포넌트 이름(그룹마다 하나, 세트는 세트 이름) · reuseKept: 바꾸기 직전 다시 맞추기에 걸려 원본을 둔 멤버(§4.7 "재사용")
-  | { type: 'VARIANTS_RESULT'; sets: number; missing: string[]; singles: string[]; failures?: string[] } // Phase 3(베리언트 분류, failures: 결합/정렬 실패 진단)
-  | { type: 'GENERATE_RESULT'; generated: number; sets: number; combos: string[] } // Phase 4
   | { type: 'SETTINGS'; base: number; maxDepth: number; grid: number } // #19: 보관된 설정(없으면 기본값). grid=만들기가 값을 맞추는 간격
   | { type: 'VARIABLES'; vars: VarInfo[] } // 3계층 변수 목록(다크 카드의 컬렉션·모드 선택지)
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
@@ -390,23 +344,4 @@ export type CodeToUi =
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {
   figma.ui.postMessage(msg);
-}
-
-/** [이름 다시 짓기] 미리보기 줄(docs/text-style-krds.md §5.2). sig = tsSig(바꾸기 때 그대로 돌려보냄). */
-export interface TsRenameRow {
-  id: string;
-  from: string;
-  to: string;
-  sig: string;
-  /** 새 이름의 크기 단계(KRDS `sizeKey`, ia-v3 §2.12 12.12 N-D2a) — 바꾸기가 새 단계 변수로 옮겨 연결할 때 쓴다. */
-  step?: string;
-}
-/** [이름 다시 짓기] 바꾸기 항목. */
-export interface TsRenameItem {
-  id: string;
-  from: string;
-  to: string;
-  sig: string;
-  /** 새 이름의 크기 단계(TsRenameRow.step 그대로). */
-  step?: string;
 }

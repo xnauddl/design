@@ -3,7 +3,7 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickScope as pickScopePure, highConfidenceComponentRole as hcRolePure, isKnownRole as isKnownRolePure } from '../dist/pure.mjs';
+import { pickScope as pickScopePure, isKnownRole as isKnownRolePure } from '../dist/pure.mjs';
 import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles, nameColorsByHue, resolveGlobalNames, isExtractOnlyColorName } from '../dist/pure.mjs';
 import {
   extractFromSelection,
@@ -29,8 +29,6 @@ import {
   scanTextStyles,
   createSemanticTextStyles,
   renameTextRoleVars,
-  planTsRename,
-  applyTsRename,
   applyExistingTextStyles,
   planExistingTextStyles,
   applyTextStyleRows,
@@ -67,11 +65,6 @@ import {
   DARK_FILL_KEY,
   ensureDarkMode,
   DARK_MODE_NAME,
-  createIconRegistry,
-  cleanupAfterRegister,
-  tallyRestoreFailures,
-  swapVectorSlots,
-  transplantImageFills,
   applyVariableToNodes,
   isManualVar,
   createManualVariable,
@@ -4130,209 +4123,6 @@ test('createSemanticTextStyles — 같은 px 자간 이름에 원본이 갈리�
 
 /* themeApply.ts(다크) 테스트는 파일 끝 — D-T1(ia-v3 13.7 · A.25) */
 
-/* ================= artwork.ts (그림 슬롯 이식) ================= */
-/** 최소 씬그래프 목 — clone은 실물처럼 **형제로** 끼운다(코드가 즉시 페이지로 옮기는지 본다). */
-function sceneMock() {
-  let seq = 0;
-  const detach = (n) => {
-    if (n.parent) n.parent.children.splice(n.parent.children.indexOf(n), 1);
-    n.parent = null;
-  };
-  const mk = (props = {}) => {
-    const n = {
-      id: `n${seq++}`,
-      name: 'node',
-      type: 'FRAME',
-      x: 0,
-      y: 0,
-      width: 16,
-      height: 16,
-      fills: [],
-      parent: null,
-      removed: false,
-      ...props,
-      children: [], // 스프레드 뒤에 새 배열로 — props.children을 그대로 쓰면 아래 appendChild가 같은 배열에 또 담는다
-      appendChild(c) { detach(c); c.parent = this; this.children.push(c); },
-      insertChild(i, c) { detach(c); c.parent = this; this.children.splice(i, 0, c); },
-      resize(w, h) { this.width = w; this.height = h; },
-      remove() { detach(this); this.removed = true; },
-      clone() {
-        const copy = mk({ ...this, id: `n${seq++}`, children: [], parent: null });
-        for (const k of this.children) copy.appendChild(k.clone());
-        if (this.parent) this.parent.appendChild(copy); // 실물: 같은 부모의 형제로 들어온다
-        return copy;
-      },
-    };
-    for (const c of props.children ?? []) n.appendChild(c);
-    return n;
-  };
-  const page = mk({ name: 'Components', type: 'PAGE' });
-  globalThis.figma = {
-    createComponentFromNode(node) {
-      node.type = 'COMPONENT';
-      node.key = `key:${node.id}`;
-      node.createInstance = function () {
-        const inst = mk({ ...this, id: `n${seq++}`, type: 'INSTANCE', children: [], parent: null, mainComponent: this });
-        for (const k of this.children) inst.appendChild(k.clone());
-        page.appendChild(inst);
-        return inst;
-      };
-      return node;
-    },
-  };
-  return { mk, page };
-}
-
-test('createIconRegistry — 지문별 1개 · 복제본을 멤버 트리 밖으로 즉시 꺼낸다', () => {
-  const { mk, page } = sceneMock();
-  const placed = [];
-  const failures = [];
-  const reg = createIconRegistry({
-    page,
-    place: (c) => placed.push(c),
-    uniqueName: (b) => (placed.length ? `${b}${placed.length + 1}` : b),
-    onFailure: (m) => failures.push(m),
-  });
-
-  const heart = mk({ name: 'icon', type: 'VECTOR' });
-  const star = mk({ name: 'icon', type: 'VECTOR' });
-  const cardA = mk({ name: 'card', children: [heart, mk({ name: 'label', type: 'TEXT' })] });
-  const cardB = mk({ name: 'card', children: [star, mk({ name: 'label', type: 'TEXT' })] });
-
-  const a = reg.ensure('k1', heart, 'Icon');
-  const b = reg.ensure('k2', star, 'Icon');
-  const again = reg.ensure('k1', heart, 'Icon');
-
-  assert.equal(reg.created(), 2); // 같은 지문은 다시 만들지 않는다
-  assert.equal(again, a);
-  assert.notEqual(a, b);
-  assert.deepEqual(placed.map((c) => c.name), ['Icon', 'Icon2']);
-  assert.equal(a.type, 'COMPONENT');
-  // 복제본이 멤버 안에 남으면 뒤따르는 슬롯의 인덱스 경로가 어긋난다 — 자식 수는 그대로여야 한다.
-  assert.equal(cardA.children.length, 2);
-  assert.equal(cardB.children.length, 2);
-  assert.equal(reg.get('k1'), a);
-  assert.equal(reg.get('없는키'), null);
-  assert.deepEqual(failures, []);
-});
-
-/* [등록] 끝 정리(ia-v3 §4.7 "인스턴스 자리" 7번 — 2026-11-13 사용자 결정 C-D4, A.15) */
-function registerCleanupFixture(pageName = 'Components') {
-  const { mk, page } = sceneMock();
-  page.name = pageName;
-  const doc = mk({ name: 'doc', type: 'DOCUMENT' });
-  doc.appendChild(page);
-  const reg = createIconRegistry({ page, place: (c) => page.appendChild(c), uniqueName: (b) => b, onFailure: () => {} });
-  // 문서 전체 인스턴스 — mainComponent로 센다(피그마 getInstancesAsync 대신)
-  const all = [];
-  const instancesOf = async (comp) => all.filter((i) => i.mainComponent === comp && !i.removed);
-  const use = (comp, parent) => { const inst = comp.createInstance(); parent.appendChild(inst); all.push(inst); return inst; };
-  return { mk, page, doc, reg, instancesOf, use };
-}
-
-test('[등록] 끝 정리 — 마스터를 못 만들면 새로 만든 아이콘 · 이번에 만든 Components 페이지를 지운다(아이콘 0)', async () => {
-  const { mk, page, doc, reg, instancesOf } = registerCleanupFixture();
-  reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star'); // 마스터 만들기 전에 만든 아이콘 — 마스터 실패로 아무도 안 씀
-  assert.equal(reg.created(), 1);
-  const removed = await cleanupAfterRegister({ registry: reg, page, pageCreated: true, instancesOf });
-  assert.equal(removed, 1);
-  assert.equal(reg.created(), 0, '"아이콘 n"에서 빠진다');
-  assert.equal(page.removed, true, '이번에 만든 빈 페이지는 지운다');
-  assert.ok(!doc.children.includes(page));
-});
-
-test('[등록] 끝 정리 — 전부터 있던 빈 Components 페이지는 남긴다', async () => {
-  const { mk, page, reg, instancesOf } = registerCleanupFixture();
-  reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star');
-  await cleanupAfterRegister({ registry: reg, page, pageCreated: false, instancesOf });
-  assert.equal(page.children.length, 0);
-  assert.equal(page.removed, false);
-});
-
-test('[등록] 끝 정리 — 원본으로 남은 나머지 멤버 몫 아이콘은 지우고, 쓰이는 아이콘 · 컴포넌트가 있는 페이지는 남긴다', async () => {
-  const { mk, page, reg, instancesOf, use } = registerCleanupFixture();
-  const heart = reg.ensure('heart', mk({ name: 'heart', type: 'VECTOR' }), 'Heart'); // 마스터가 씀
-  const star = reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star'); // 넣지 못해 원본으로 남은 멤버 몫
-  const master = mk({ name: 'Card', type: 'COMPONENT' });
-  page.appendChild(master);
-  use(heart, master);
-  const removed = await cleanupAfterRegister({ registry: reg, page, pageCreated: true, instancesOf });
-  assert.equal(removed, 1);
-  assert.equal(star.removed, true);
-  assert.equal(heart.removed, false);
-  assert.equal(reg.created(), 1);
-  assert.equal(page.removed, false);
-});
-
-test('[등록] 속성 값 꼬리 — 한 자리는 한 번만(넣을 때 센 자리의 되돌리기 실패는 다시 세지 않음) · 이름이 같은 다른 자리는 따로', () => {
-  const roots = [{ node: {}, name: 'Card', counted: true }, { node: {}, name: 'Card' }, { node: {}, name: 'Card' }];
-  const propFailed = ['Card']; // 0번 자리를 넣을 때 셌다
-  const diag = [];
-  tallyRestoreFailures(roots, new Map([[0, ['Title', 'Body']]]), propFailed, (n, p) => diag.push(`${n}:${p}`));
-  assert.deepEqual(propFailed, ['Card'], '같은 자리 두 번 실패 → 1');
-  assert.deepEqual(diag, ['Card:Title', 'Card:Body'], '진단은 속성마다');
-  const tail = [];
-  tallyRestoreFailures(roots, new Map([[1, ['Title']], [2, ['Title']]]), tail, () => {});
-  assert.deepEqual(tail, ['Card', 'Card'], '이름이 같은 두 자리가 따로 실패 → 2');
-});
-
-test('swapVectorSlots — 벡터 자리를 아이콘 인스턴스로(자리·이름·크기 유지)', () => {
-  const { mk, page } = sceneMock();
-  const reg = createIconRegistry({ page, place: () => {}, uniqueName: (b) => b, onFailure: () => {} });
-  const icon = reg.ensure('k1', mk({ name: 'icon', type: 'VECTOR' }), 'Icon');
-
-  const vector = mk({ name: 'icon-heart', type: 'VECTOR', width: 20, height: 20, x: 4, y: 6 });
-  const master = mk({
-    name: 'Chip',
-    type: 'COMPONENT',
-    layoutMode: 'NONE',
-    children: [mk({ name: 'label', type: 'TEXT' }), vector, mk({ name: 'tail', type: 'TEXT' })],
-  });
-
-  const failures = swapVectorSlots(master, [{ layerName: 'icon-heart', layerPath: '1', icon }]);
-  assert.deepEqual(failures, []);
-  assert.equal(master.children.length, 3); // 자식 수 유지 → 다른 슬롯 경로가 살아 있다
-  const slot = master.children[1];
-  assert.equal(slot.type, 'INSTANCE');
-  assert.equal(slot.mainComponent, icon);
-  assert.equal(slot.name, 'icon-heart'); // 원래 레이어 이름 보존
-  assert.deepEqual([slot.width, slot.height, slot.x, slot.y], [20, 20, 4, 6]);
-  assert.equal(vector.removed, true);
-  assert.deepEqual(master.children.map((c) => c.name), ['label', 'icon-heart', 'tail']);
-});
-
-test('swapVectorSlots — 아이콘을 못 만들었으면 원본을 그대로 둔다(사유 보고)', () => {
-  const { mk } = sceneMock();
-  const vector = mk({ name: 'icon', type: 'VECTOR' });
-  const master = mk({ name: 'Chip', type: 'COMPONENT', children: [vector] });
-  const failures = swapVectorSlots(master, [{ layerName: 'icon', layerPath: '0', icon: null }]);
-  assert.equal(failures.length, 1);
-  assert.match(failures[0], /아이콘 자리 교체 실패/);
-  assert.equal(master.children[0], vector); // 그림을 잃지 않는다
-  assert.equal(vector.removed, false);
-});
-
-test('transplantImageFills — 인스턴스의 같은 경로에 원본 사진 fill을 이식', () => {
-  const { mk } = sceneMock();
-  const photo = [{ type: 'IMAGE', imageHash: 'h2', visible: true }];
-  const inst = mk({
-    name: 'Card',
-    type: 'INSTANCE',
-    children: [mk({ name: 'body', children: [mk({ name: 'thumbnail', type: 'RECTANGLE', fills: [{ type: 'IMAGE', imageHash: 'h1' }] })] })],
-  });
-
-  const ok = transplantImageFills(inst, { '0/0': photo });
-  assert.equal(ok.applied, 1);
-  assert.deepEqual(ok.failures, []);
-  assert.deepEqual(inst.children[0].children[0].fills, photo);
-
-  // 자리를 못 찾으면 조용히 넘어가지 않고 사유를 남긴다(사진이 마스터 것으로 통일된 셈).
-  const bad = transplantImageFills(inst, { '9/9': photo });
-  assert.equal(bad.applied, 0);
-  assert.equal(bad.failures.length, 1);
-  assert.match(bad.failures[0], /사진 이식 실패/);
-});
-
 /* ================= 플러그인 컬렉션 · 사용자 컬렉션(§2.13, A.12) ================= */
 const withRoot = (figma) => {
   const data = {};
@@ -6974,18 +6764,7 @@ test('createSemanticTextStyles — 스타일 하나의 도중 오류는 그 행�
   assert.ok(r2.missing.every((m) => !/^(font-size|line-height|letter-spacing)\//.test(m)), r2.missing.join(' | '));
 });
 
-/* ================= [이름 다시 짓기] · 역할 변수 · 등록 경로 되돌림 · UI 역할(docs/text-style-krds.md §3.2-1 · §5) ================= */
-/** 값이 있는 로컬 텍스트 스타일(줄 높이 px). */
-function mkTs(figma, name, fontSize, style = 'Regular', lh = fontSize * 1.5) {
-  const st = figma.createTextStyle();
-  st.name = name;
-  st.fontName = { family: 'Inter', style };
-  st.fontSize = fontSize;
-  st.lineHeight = { unit: 'PIXELS', value: lh };
-  return st;
-}
-const tsSigOf = (st) => `${st.fontSize}|${st.lineHeight.value}|0|Inter|${st.fontName.style}`;
-const tsItem = (st, to) => ({ id: st.id, from: st.name, to, sig: tsSigOf(st) });
+/* ================= 역할 변수 · 등록 경로 되돌림 · UI 역할(docs/text-style-krds.md §3.2-1 · §6 "등록 순서") ================= */
 /** 이름 쓰기를 기록하고, 쓸 때마다 로컬 스타일 이름이 겹치지 않는지 본다. guard(n, cur)가 던지면 그 쓰기는 실패. */
 function watchNames(figma, guard = () => {}) {
   const log = [];
@@ -7006,126 +6785,92 @@ function watchNames(figma, guard = () => {}) {
   }
   return { log, dup: () => dup };
 }
-const byStatus = (r) => Object.fromEntries(r.results.map((x) => [x.id, x.status]));
 
-test('applyTsRename — 연쇄 A→B · B→C · 맞바꿈 X↔Y: 임시 이름 2단계라 같은 이름이 잠깐도 둘 생기지 않는다', async () => {
-  const figma = installFigma();
-  const a = mkTs(figma, 'a', 16);
-  const b = mkTs(figma, 'b', 17);
-  const x = mkTs(figma, 'x', 18);
-  const y = mkTs(figma, 'y', 19);
-  const w = watchNames(figma);
-  const r = await applyTsRename([tsItem(a, 'b'), tsItem(b, 'c'), tsItem(x, 'y'), tsItem(y, 'x')]);
-  assert.equal(r.renamed, 4);
-  assert.equal(r.skipped, 0);
-  assert.deepEqual([a.name, b.name, x.name, y.name], ['b', 'c', 'y', 'x']);
-  assert.equal(w.dup(), null, '이름이 겹친 순간이 없음');
-  assert.ok(w.log.some(([id, n]) => id === a.id && n === `__dsl_tmp_${a.id}`), '1단계 임시 이름');
-  assert.deepEqual(r.results.find((q) => q.id === a.id), { id: a.id, status: 'renamed', name: 'b' });
-});
-
-test('applyTsRename — 최종 이름 집합 고정점: 남는 이름과 겹치면 name-taken, 빠진 항목의 이름을 원하던 항목도 함께 빠진다', async () => {
-  const figma = installFigma();
-  const p = mkTs(figma, 'p', 16);
-  const q = mkTs(figma, 'q', 17);
-  mkTs(figma, 'z', 18); // 후보 아님
-  const r1 = mkTs(figma, 'r', 19);
-  const k1 = mkTs(figma, 'k1', 20);
-  const k2 = mkTs(figma, 'k2', 21);
-  const r = await applyTsRename([tsItem(p, 'z'), tsItem(q, 'p'), tsItem(r1, 's'), tsItem(k1, 'same'), tsItem(k2, 'same')]);
-  const st = byStatus(r);
-  assert.equal(st[p.id], 'name-taken');
-  assert.equal(st[q.id], 'name-taken', 'p가 빠져 이름 p가 남으므로');
-  assert.equal(st[k1.id], 'name-taken');
-  assert.equal(st[k2.id], 'name-taken', '같은 to를 원하는 후보 둘은 함께 빠진다');
-  assert.equal(st[r1.id], 'renamed');
-  assert.deepEqual([p.name, q.name, r1.name], ['p', 'q', 's']);
-  assert.equal(r.renamed, 1);
-  assert.equal(r.skipped, 4);
-  assert.deepEqual(r.skipReasons, { 'name-taken': 4 });
-});
-
-test('applyTsRename — 다시 확인: 그 사이 이름이 바뀜(없어진 스타일 포함) · 값이 바뀜은 건너뛴다', async () => {
-  const figma = installFigma();
-  const a = mkTs(figma, 'a', 16);
-  const b = mkTs(figma, 'b', 17);
-  const c = mkTs(figma, 'c', 18);
-  const ia = tsItem(a, 'a2');
-  const ib = tsItem(b, 'b2');
-  a.name = 'a-moved';
-  b.fontSize = 20;
-  const r = await applyTsRename([ia, ib, tsItem(c, 'c2'), { id: 'style:gone', from: 'g', to: 'g2', sig: 'x' }]);
-  assert.deepEqual(byStatus(r), { [a.id]: 'renamed-meanwhile', [b.id]: 'value-changed', [c.id]: 'renamed', 'style:gone': 'renamed-meanwhile' });
-  assert.deepEqual(r.skipReasons, { 'renamed-meanwhile': 2, 'value-changed': 1 });
-  assert.deepEqual([a.name, b.name, c.name], ['a-moved', 'b', 'c2']);
-  assert.equal(r.results.find((x) => x.id === 'style:gone').name, '');
-});
-
-test('applyTsRename — 오류는 되돌리고(error) 그 이름을 원하던 항목도 연쇄로 되돌린다(error-chain) · 되돌리지 못하면 error-stuck · 되돌린 스타일의 역할 변수는 그대로', async () => {
-  const figma = installFigma();
-  const spec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
-  await createSemanticTextStyles([spec('a', 16), spec('b', 18), spec('d', 20), spec('g', 22), spec('f', 24)]);
-  const [a, b, d, g, f] = ['a', 'b', 'd', 'g', 'f'].map((n) => figma._state.textStyles.find((s) => s.name === n));
-  watchNames(figma, (st, n, cur) => {
-    if (st === b && n === 'c') throw new Error('boom'); // 2단계 오류
-    if (st === f && n.startsWith('__dsl_tmp_')) throw new Error('boom'); // 1단계 오류 — 이름은 그대로
-    if (st === g && (n === 'h' || (n === 'g' && cur !== 'g'))) throw new Error('boom'); // 되돌림도 실패
-  });
-  const r = await applyTsRename([tsItem(a, 'b'), tsItem(b, 'c'), tsItem(d, 'e'), tsItem(g, 'h'), tsItem(f, 'f2')]);
-  assert.deepEqual(byStatus(r), { [a.id]: 'error-chain', [b.id]: 'error', [d.id]: 'renamed', [g.id]: 'error-stuck', [f.id]: 'error' });
-  assert.deepEqual([a.name, b.name, d.name, f.name], ['a', 'b', 'e', 'f']);
-  assert.equal(g.name, `__dsl_tmp_${g.id}`);
-  assert.equal(r.results.find((x) => x.id === g.id).name, `__dsl_tmp_${g.id}`, '결과에 지금 이름');
-  // 역할 변수: 바뀐 d만
-  assert.ok(findVar(figma, 'Semantic', 'font-size/e'));
-  assert.ok(findVar(figma, 'Semantic', 'font-size/a') && findVar(figma, 'Semantic', 'font-size/b') && findVar(figma, 'Semantic', 'font-size/g'));
-  assert.equal(r.roleVarsRenamed, 2, 'd의 font-size · line-height');
-});
-
-test('applyTsRename — 역할 변수도 함께: Semantic만 · 사용자 컬렉션 · 직접 만든 변수는 그대로 · 겹치면 roleVarsTaken', async () => {
-  const figma = installFigma();
-  const spec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
-  await createSemanticTextStyles([spec('a', 16), spec('b', 18), spec('c', 20)]);
-  const [a, b, c] = ['a', 'b', 'c'].map((n) => figma._state.textStyles.find((s) => s.name === n));
+/** Semantic 변수의 이름 쓰기를 지켜본다 — 쓸 때마다 같은 이름이 둘 생기지 않는지 본다. guard(v, n, cur)가 던지면 그 쓰기는 실패. */
+function watchVarNames(figma, guard = () => {}) {
   const sem = figma._state.collections.find((x) => x.name === 'Semantic');
+  const vars = () => figma._state.variables.filter((v) => v.variableCollectionId === sem.id);
+  let dup = null;
+  for (const v of vars()) {
+    let name = v.name;
+    Object.defineProperty(v, 'name', {
+      configurable: true,
+      get: () => name,
+      set: (n) => {
+        guard(v, n, name);
+        name = n;
+        const names = vars().map((x) => x.name);
+        if (new Set(names).size !== names.length && !dup) dup = names.slice();
+      },
+    });
+  }
+  return { dup: () => dup };
+}
+const roleSpec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
+
+test('renameTextRoleVars — 최종 이름 집합 고정점: 남는 이름과 겹치면 taken, 빠진 변수의 이름을 원하던 변수도 함께 빠진다 · 연쇄는 바뀐다', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('p', 16), roleSpec('q', 18), roleSpec('r', 20), roleSpec('k1', 22), roleSpec('k2', 24)]); // 짝수 크기 — 줄 높이(×1.5)가 정수라야 line-height 변수가 생긴다
+  const sem = figma._state.collections.find((x) => x.name === 'Semantic');
+  figma.variables.createVariable('font-size/z', sem, 'FLOAT'); // 후보 아님 — 최종 집합 밖의 다른 변수
+  const fs = (n) => findVar(figma, 'Semantic', `font-size/${n}`);
+  const lh = (n) => findVar(figma, 'Semantic', `line-height/${n}`);
+  const [fsP, fsQ, fsR, fsK1, fsK2] = ['p', 'q', 'r', 'k1', 'k2'].map(fs);
+  const [lhP, lhQ, lhR, lhK1, lhK2] = ['p', 'q', 'r', 'k1', 'k2'].map(lh);
+  const w = watchVarNames(figma);
+  const r = await renameTextRoleVars([{ from: 'p', to: 'z' }, { from: 'q', to: 'p' }, { from: 'r', to: 's' }, { from: 'k1', to: 'same' }, { from: 'k2', to: 'same' }]);
+  // font-size: z가 남아 p가 빠지고, p가 남으므로 q도 빠진다 · 같은 to를 원하는 k1 · k2는 함께 빠진다
+  assert.deepEqual([fsP.name, fsQ.name, fsK1.name, fsK2.name], ['font-size/p', 'font-size/q', 'font-size/k1', 'font-size/k2']);
+  assert.equal(fsR.name, 'font-size/s');
+  // line-height: z가 없으니 p → z · q → p 연쇄가 된다(임시 이름 2단계) · k1 · k2는 여기서도 빠진다
+  assert.deepEqual([lhP.name, lhQ.name, lhR.name], ['line-height/z', 'line-height/p', 'line-height/s']);
+  assert.deepEqual([lhK1.name, lhK2.name], ['line-height/k1', 'line-height/k2']);
+  assert.equal(r.taken, 6, 'font-size p · q · k1 · k2 + line-height k1 · k2');
+  assert.equal(r.renamed, 4);
+  assert.equal(r.error, 0);
+  assert.deepEqual(r.moved.map((m) => m.id).sort(), [fsR.id, lhP.id, lhQ.id, lhR.id].sort());
+  assert.equal(w.dup(), null, '같은 이름이 잠깐도 둘 생기지 않는다');
+});
+
+test('renameTextRoleVars — 오류는 되돌리고 그 이름을 원하던 변수도 연쇄로 되돌린다 · 1단계 오류는 그대로 · 되돌리지 못하면 stuck', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('a', 16), roleSpec('b', 18), roleSpec('d', 20), roleSpec('g', 22), roleSpec('f', 24)]);
+  const [a, b, d, g, f] = ['a', 'b', 'd', 'g', 'f'].map((n) => findVar(figma, 'Semantic', `font-size/${n}`));
+  const w = watchVarNames(figma, (v, n, cur) => {
+    if (v === b && n === 'font-size/c') throw new Error('boom'); // 2단계 오류
+    if (v === f && n.startsWith('__dsl_tmp_')) throw new Error('boom'); // 1단계 오류 — 이름은 그대로
+    if (v === g && (n === 'font-size/h' || (n === 'font-size/g' && cur !== n))) throw new Error('boom'); // 되돌림도 실패
+  });
+  const r = await renameTextRoleVars([{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'd', to: 'e' }, { from: 'g', to: 'h' }, { from: 'f', to: 'f2' }]);
+  // a는 b의 이름을 원했으므로 b가 되돌아올 때 함께 되돌린다(같은 이름이 둘 생기지 않게)
+  assert.deepEqual([a.name, b.name, d.name, f.name], ['font-size/a', 'font-size/b', 'font-size/e', 'font-size/f']);
+  assert.ok(g.name.startsWith('__dsl_tmp_'), g.name);
+  assert.equal(r.error, 4, 'b(오류) · a(연쇄) · f(1단계 오류) · g(되돌리지 못함)');
+  assert.deepEqual(r.stuck, [g.name], '되돌리지 못한 변수의 지금 이름');
+  // 오류 없는 line-height 5개 + font-size d
+  assert.equal(r.renamed, 6);
+  assert.ok(r.moved.some((m) => m.id === d.id) && !r.moved.some((m) => [a.id, b.id, g.id, f.id].includes(m.id)), '되돌린 변수는 moved에 없다');
+  assert.deepEqual(['b', 'c', 'e', 'h', 'f2'].map((n) => findVar(figma, 'Semantic', `line-height/${n}`)?.name), ['line-height/b', 'line-height/c', 'line-height/e', 'line-height/h', 'line-height/f2']);
+  assert.equal(w.dup(), null, '되돌림도 임시 이름 2단계 — 같은 이름이 잠깐도 둘 생기지 않는다');
+});
+
+test('renameTextRoleVars — Semantic만 · 사용자 컬렉션 · 직접 만든 변수는 그대로', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('a', 16), roleSpec('b', 18)]);
+  const a = figma._state.textStyles.find((s) => s.name === 'a');
   const user = figma.variables.createVariableCollection('Variables');
   const userVar = figma.variables.createVariable('font-size/a', user, 'FLOAT');
   findVar(figma, 'Semantic', 'line-height/b').setPluginData('dsl.manual', '1');
-  figma.variables.createVariable('font-size/c2', sem, 'FLOAT'); // 최종 집합 밖의 다른 변수
   const fsA = findVar(figma, 'Semantic', 'font-size/a');
-  const r = await applyTsRename([tsItem(a, 'heading/large'), tsItem(b, 'body/medium'), tsItem(c, 'c2')]);
-  assert.equal(r.renamed, 3);
+  const r = await renameTextRoleVars([{ from: 'a', to: 'heading/large' }, { from: 'b', to: 'body/medium' }]);
   assert.equal(fsA.name, 'font-size/heading/large', '같은 변수(연결 유지)의 이름만');
   assert.equal(a.boundVariables.fontSize.id, fsA.id);
   assert.ok(findVar(figma, 'Semantic', 'line-height/heading/large'));
   assert.ok(findVar(figma, 'Semantic', 'font-size/body/medium'));
   assert.ok(findVar(figma, 'Semantic', 'line-height/b'), '직접 만든 변수는 그대로');
   assert.equal(userVar.name, 'font-size/a', '사용자 컬렉션은 그대로');
-  assert.ok(findVar(figma, 'Semantic', 'font-size/c'), '겹친 변수는 옛 이름으로 남음');
-  assert.ok(findVar(figma, 'Semantic', 'line-height/c2'));
-  assert.equal(r.roleVarsRenamed, 4);
-  assert.equal(r.roleVarsTaken, 1);
-  assert.equal(r.roleVarsError, 0);
-  assert.deepEqual(r.roleVarsStuck, []);
-});
-
-test('applyTsRename — 값을 쓰지 않는다: 글꼴을 못 불러오고 값 쓰기가 막혀도 이름은 바뀐다', async () => {
-  const figma = installFigma();
-  await createSemanticTextStyles([{ name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
-  const a = figma._state.textStyles[0];
-  const item = tsItem(a, 'body/medium');
-  figma.loadFontAsync = async () => { throw new Error('loadFontAsync called'); };
-  for (const f of ['fontName', 'fontSize', 'lineHeight', 'letterSpacing']) {
-    const val = a[f];
-    Object.defineProperty(a, f, { configurable: true, get: () => val, set: () => { throw new Error(`write ${f}`); } });
-  }
-  a.setBoundVariable = () => { throw new Error('setBoundVariable called'); };
-  for (const v of figma._state.variables) v.setValueForMode = () => { throw new Error('setValueForMode called'); };
-  const r = await applyTsRename([item]);
-  assert.equal(r.renamed, 1);
-  assert.equal(a.name, 'body/medium');
-  assert.equal(r.roleVarsRenamed, 2);
-  assert.equal(r.roleVarsError, 0);
+  assert.equal(r.renamed, 3);
+  assert.equal(r.taken, 0);
 });
 
 test('renameTextRoleVars — onlyIds · 바꿀 변수 오류는 되돌리고 error · 되돌리지 못한 변수는 stuck', async () => {
@@ -7203,46 +6948,6 @@ test('scanTextStyles — uiRole: 부모부터 올라가 처음 역할이 있는 
   const { samples } = await scanTextStyles([btn, outer]);
   const ui = Object.fromEntries(samples.map((s) => [s.id, s.uiRole]));
   assert.deepEqual(ui, { inBtn: true, inCard: false, selfRole: true, inChip: true });
-});
-
-test('planTsRename — 로컬 스타일 전부에 KRDS 이름 · 바뀌는 줄만 · sig', async () => {
-  const figma = installFigma();
-  const h1 = mkTs(figma, 'h1', 32, 'Bold');
-  const body = mkTs(figma, 'body', 17);
-  mkTs(figma, 'body/small', 15);
-  const odd = mkTs(figma, 'odd', 26.7, 'Bold', 40.05);
-  figma.loadFontAsync = async () => { throw new Error('loadFontAsync called'); };
-  const rows = await planTsRename();
-  const by = Object.fromEntries(rows.map((r) => [r.from, r]));
-  assert.deepEqual(Object.keys(by).sort(), ['body', 'h1', 'odd'], '이름이 같은 body/small은 없음');
-  assert.deepEqual(by.h1, { id: h1.id, from: 'h1', to: 'heading/large', sig: '32|48|0|Inter|Bold', step: 'heading/large' }); // 새 이름의 크기 단계(12.12 N-D2a)
-  assert.equal(by.body.step, 'body/medium');
-  assert.equal(by.body.to, 'body/medium');
-  assert.equal(by.body.sig, tsSigOf(body));
-  assert.equal(by.odd.to, 'heading/medium');
-  assert.equal(odd.name, 'odd', '읽기만');
-});
-
-test('code.ts — SCAN_TS_RENAME → TS_RENAME_PLAN · APPLY_TS_RENAME → TS_RENAMED + ⌘Z 한 번 + 준비 상태 · 무료는 잠김', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const h1 = mkTs(figma, 'h1', 32, 'Bold');
-  let out = await p.send({ type: 'SCAN_TS_RENAME', reqId: 4 });
-  const plan = ofType(out, 'TS_RENAME_PLAN')[0];
-  assert.equal(plan.reqId, 4);
-  assert.deepEqual(plan.rows.map((r) => [r.from, r.to]), [['h1', 'heading/large']]);
-  figma._undo = 0;
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 5, items: plan.rows.map(({ id, from, to, sig }) => ({ id, from, to, sig })) });
-  const res = ofType(out, 'TS_RENAMED')[0];
-  assert.deepEqual(res, { type: 'TS_RENAMED', reqId: 5, results: [{ id: h1.id, status: 'renamed', name: 'heading/large' }], renamed: 1, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] }); // 옮겨 연결 결과 칸(12.12 N-D2a)
-  assert.equal(figma._undo, 1);
-  assert.equal(ofType(out, 'PREREQ_STATE').length, 1);
-  await p.send({ type: 'SET_LICENSE', tier: 'free' });
-  out = await p.send({ type: 'SCAN_TS_RENAME', reqId: 6 });
-  assert.equal(ofType(out, 'TS_RENAME_PLAN').length, 0);
-  assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0]?.feature, 'textStyles');
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 7, items: [] });
-  assert.equal(ofType(out, 'TS_RENAMED').length, 0);
 });
 
 /* ---------- ia-v3 A.14 — 쓰임 역할 이름 꼬리(12.5) · Global 색 이름(12.11) ---------- */
@@ -7899,7 +7604,7 @@ test('B.24 ② 글자 버튼 — 숨긴 앞뒤 아이콘 + 글자 1개 → butto
   assert.equal(r.changes.find((c) => c.id === 'bar')?.after, 'header');
 });
 
-test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 · [라벨 + 입력 상자]는 field (rename · componentLike)', async () => {
+test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 · [라벨 + 입력 상자]는 field (rename)', async () => {
   installFigma();
   const item = (i) => ({ type: 'FRAME', id: `p${i}`, name: `Frame ${30 + i}`, width: 292, height: 490, children: [T(`pt${i}`, 'x')] });
   const list = { type: 'FRAME', id: 'lst', name: '3타입', layoutMode: 'HORIZONTAL', width: 1264, height: 490, children: [item(0), item(1), item(2)] };
@@ -7910,12 +7615,10 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   assert.notEqual(a.get('sec'), 'field');
   assert.ok(!String(a.get('lst')).startsWith('field'));
   assert.ok(!String(a.get('more')).startsWith('field'));
-  assert.notEqual(hcRolePure(sec), 'field');
   const field = { type: 'FRAME', id: 'fd', name: 'Frame 1', layoutMode: 'VERTICAL', width: 300, height: 70, children: [
     T('lb', 'Email'), { type: 'FRAME', id: 'in', name: 'Frame 2', width: 300, height: 44, strokes: vis, children: [T('ph', 'you@x')] }] };
   const r2 = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [field] }], { apply: false, maxDepth: 5 });
   assert.equal(r2.changes.find((c) => c.id === 'fd')?.after, 'field');
-  assert.equal(hcRolePure(field), 'field');
   // 실기 2: [두 줄 안내 글 + 76×30 테두리 버튼] → field 아님, 버튼은 button
   const app = { type: 'FRAME', id: 'app', name: 'Frame 29', layoutMode: 'VERTICAL', width: 151, height: 70, children: [
     T('desc', '일상구독 앱을 다운받고\n다양한 혜택을 만나보세요.', { width: 135, height: 32 }),
@@ -7929,7 +7632,6 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   // 이름 `button` + 글자 버튼 판정 button → 이름 그대로(B.28 이름 힌트 r === h — 전에는 card-button)
   assert.ok(!a3.has('ab'));
   assert.equal(r3.nodes.find((n) => n.id === 'ab')?.role, 'button');
-  assert.notEqual(hcRolePure(app), 'field');
 });
 
 test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서가 뒤집혀도 actions는 가장 오른쪽', async () => {
@@ -8232,45 +7934,16 @@ test('A.21 ⑧ 옛 이름 spacing/card/gap만 있는 파일 → 새 spacing/gap�
   assert.equal(roleTarget(figma, old.id), roleTarget(figma, neu.id));
 });
 
-test('A.21 ⑨ 이름 다시 짓기 · 등록 — 새 규칙 변수는 단계가 바뀐 스타일만 옮겨 연결 · 옛 규칙 변수는 이름만 함께 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
+test('A.21 ⑨ 등록 — 새 규칙 변수는 스타일 이름을 따라 바꾸지 않음 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
   let figma = installFigma();
   const spec = (name, style, step = 'body/large', fontSize = 18) => ({ name, step, fontSize, lineHeight: 27, letterSpacing: 0, family: 'Inter', style });
   await createSemanticTextStyles([spec('body/large-w500-120', 'Medium'), spec('body/large-w700-150', 'Bold')]);
-  const [s1, s2] = ['body/large-w500-120', 'body/large-w700-150'].map((n) => figma._state.textStyles.find((s) => s.name === n));
+  // 새 규칙 변수(표시 있음 · 크기 단계 이름 — 여러 스타일이 씀)는 스타일 이름을 따라 바꾸지 않는다(12.12 N-D2)
   const large = findVar(figma, 'Semantic', 'font-size/body/large');
-  const item = { ...tsItem(s1, 'body/medium-w500-120'), sig: `18|27|0|Inter|Medium`, step: 'body/medium' };
-  const r = await applyTsRename([item]);
-  assert.equal(r.renamed, 1);
-  assert.equal(r.roleMoveError, 0);
-  const medium = findVar(figma, 'Semantic', 'font-size/body/medium');
-  assert.ok(medium);
-  assert.equal(medium.getPluginData('dsl.textStep'), 'body/medium');
-  assert.equal(s1.boundVariables.fontSize.id, medium.id);
-  assert.equal(s1.boundVariables.lineHeight.id, findVar(figma, 'Semantic', 'line-height/body/medium').id);
-  assert.equal(s2.boundVariables.fontSize.id, large.id, '다른 스타일은 그대로');
-  assert.equal(large.name, 'font-size/body/large', '옛 단계 변수는 남음');
-  assert.equal(r.roleVarsRenamed, 0, '새 규칙 변수의 이름은 바꾸지 않는다');
-  // 단계가 그대로면(굵기 꼬리만) 연결을 건드리지 않는다
-  const r1 = await applyTsRename([{ ...tsItem(s2, 'body/large-w700'), sig: `18|27|0|Inter|Bold`, step: 'body/large' }]);
-  assert.equal(r1.renamed, 1);
-  assert.equal(s2.boundVariables.fontSize.id, large.id);
-  // 글꼴을 못 불러오면 옮기지 못함 — 이름은 바뀐 채, 옛 변수에 연결이 남음
-  figma.loadFontAsync = async () => { throw new Error('no font'); };
-  const r2 = await applyTsRename([{ ...tsItem(s2, 'body/small-w700'), sig: `18|27|0|Inter|Bold`, step: 'body/small' }]);
-  assert.equal(r2.renamed, 1);
-  assert.equal(r2.roleMoveError, 1);
-  assert.deepEqual(r2.roleMoveNames, ['body/small-w700']);
-  assert.equal(s2.boundVariables.fontSize.id, large.id);
-  // 옛 규칙 변수(표시 없음 · font-size/{지금 이름})에 붙은 스타일은 변수 이름만 함께 바뀐다
-  figma = installFigma();
-  await createSemanticTextStyles([{ name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
-  const a = figma._state.textStyles[0];
-  const fsA = findVar(figma, 'Semantic', 'font-size/a');
-  assert.equal(fsA.getPluginData('dsl.textStep'), '', 'step 없는 스펙은 표시 없음');
-  const ra = await applyTsRename([{ ...tsItem(a, 'body/medium'), step: 'body/medium' }]);
-  assert.equal(ra.roleVarsRenamed, 2);
-  assert.equal(fsA.name, 'font-size/body/medium');
-  assert.equal(a.boundVariables.fontSize.id, fsA.id);
+  assert.equal(large.getPluginData('dsl.textStep'), 'body/large');
+  const rr = await renameTextRoleVars([{ from: 'body/large', to: 'body/medium' }]);
+  assert.equal(rr.renamed, 0);
+  assert.equal(large.name, 'font-size/body/large');
   // 옛 스타일 body/large가 쓰던 표시 없는 font-size/body/large = 18 → body/large-w700(18) 등록은 재사용하지 않고 -2(표시)
   figma = installFigma();
   await createSemanticTextStyles([{ name: 'body/large', fontSize: 18, lineHeight: 27, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
@@ -8340,7 +8013,7 @@ test('A.21 ⑩ QA 5 모양 입력 — 주인 여럿 × 같은 간격 값, 18px �
   console.log(`A.21 ⑩ Semantic — 간격 ${spacingBefore} → ${spacingAfter}, 글자 ${textBefore} → ${textAfter}`);
 });
 
-/* ---------- 6-1b 컴포넌트 규칙 — SCAN_COMPONENT_CANDIDATES(ia-v3 A.19 6번 figma.test ①–⑥) ---------- */
+/* ---------- 6-1b ⑥ — 탭 모양 줄의 추출(EXTRACT)과 그 목 도우미 ---------- */
 
 const hexRgb = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
 const sn = (o) => ({ visible: true, getPluginData: () => '', setPluginData() {}, ...o });
@@ -8356,82 +8029,6 @@ function link(n, parent) {
 function allNodes(n, out = []) { out.push(n); for (const c of n.children ?? []) allNodes(c, out); return out; }
 const menu61 = (id, n = 5, active = 0, name = 'nav') => sn({ type: 'FRAME', id, name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [],
   children: ['About', 'Services', 'Offers', 'Seats', 'Destination'].slice(0, n).map((c, i) => txt61(`${id}-${i}`, c, i === active ? '#000000' : '#7a7a7a')) });
-const pill61 = (id) => sn({ type: 'FRAME', id, name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa'),
-  children: ['Economy', 'Business Class', 'Fast Class'].map((l, i) => sn({ type: 'FRAME', id: `${id}-${i}`, name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24,
-    fills: i === 1 ? solid61('#3d5fdb') : [], children: [txt61(`${id}-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')] })) });
-/** 목 인스턴스 — 메인(세트 변형 또는 단독). `syncThrows`면 동기 mainComponent가 던진다(dynamic-page 흉내). */
-function inst61(id, main, { syncThrows = false } = {}) {
-  const n = sn({ type: 'INSTANCE', id, name: 'item', width: 160, height: 200, fills: [], children: [], getMainComponentAsync: async () => main });
-  Object.defineProperty(n, 'mainComponent', { get() { if (syncThrows) throw new Error('sync main in dynamic-page'); return null; } });
-  return n;
-}
-function variant61(id, setName, setKey, pd = {}) {
-  const set = { type: 'COMPONENT_SET', id: `${setKey}-id`, key: setKey, name: setName };
-  return { type: 'COMPONENT', id, key: `${id}-key`, name: 'State=Default', parent: set, width: 160, height: 200, children: [], visible: true, fills: [], getPluginData: (k) => pd[k] ?? '' };
-}
-async function scan61(rootKids, o = {}) {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  figma.loadAllPagesAsync = async () => {};
-  const root = link(sn({ type: 'FRAME', id: 'root', name: o.rootName ?? 'Flightin website', width: 1440, height: 900, fills: [], children: rootKids }), { type: 'PAGE', id: 'page' });
-  registerNodes(figma, allNodes(root));
-  const out = await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 1 });
-  return ofType(out, 'COMPONENT_CANDIDATES')[0];
-}
-const label61 = (n) => (n.group ? (n.variant === '' ? n.group : `${n.group} · ${n.variant}`) : n.single); // 빈 변형 값은 꼬리 없음(C-D26)
-
-test('6-1b ① ② — 탭 바(tabs 글자 메뉴 · card 알약) → Style 그룹마다 Tab Bar-Text / -Pill(C-D20), 칸은 후보 아님 · 같은 Style 칸 4 바 → Tab Item-Text(꼬리 없음 — C-D26)', async () => {
-  const r = await scan61([menu61('m1', 5, 0, 'tabs'), menu61('m2', 5, 2, 'tabs'), menu61('m3', 4, 0, 'tabs'), pill61('p')]);
-  const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
-  assert.equal(label61(by.m1), 'Tab Bar-Text');
-  assert.equal(label61(by.m2), 'Tab Bar-Text', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
-  assert.equal(label61(by.m3), 'Tab Item-Text', '칸 수가 다른 바 — 칸만');
-  assert.equal(by.m3.variant, '', '변형 값은 빈 문자열');
-  assert.equal(label61(by.p), 'Tab Bar-Pill');
-  assert.ok(r.nodes.every((n) => n.defaultOn || !n.eligible));
-  assert.ok(!r.nodes.some((n) => /^(m\d|p)-/.test(n.id)), '칸은 후보 아님');
-  const one = await scan61([menu61('m1', 5, 0, 'tabs')]);
-  assert.equal(label61(one.nodes.find((n) => n.id === 'm1')), 'Tab Bar', 'Style 하나 → 단독 Tab Bar');
-  // 이름 없는 글자 메뉴(C-D19) — 탭이 아니다(nav · 일반 구조어라 꺼짐)
-  const nav = await scan61([menu61('n1', 5), pill61('p2')]);
-  const n1 = nav.nodes.find((n) => n.id === 'n1');
-  assert.ok(!n1 || !String(label61(n1) ?? '').startsWith('Tab'), JSON.stringify(n1));
-  assert.ok(!n1?.defaultOn);
-  assert.equal(label61(nav.nodes.find((n) => n.id === 'p2')), 'Tab Bar');
-});
-
-const bkList = (id, mainOf, o) => sn({ type: 'FRAME', id, name: 'BkList', layoutMode: 'HORIZONTAL', width: 900, height: 200, itemSpacing: 16, fills: [],
-  children: Array.from({ length: 5 }, (_, i) => inst61(`${id}-${i}`, mainOf(i), o)) });
-
-test('6-1b ③ ④ — C-D18: 다른 컴포넌트 세트를 담은 같은 이름 목록 둘 → -Type1 · -Type2(동기 mainComponent가 던져도 같다)', async () => {
-  for (const syncThrows of [false, true]) {
-    const card = variant61('card-v', 'Card', 'S-card');
-    const cell = variant61('cell-v', 'TabCell', 'S-cell');
-    const r = await scan61([bkList('k1', () => card, { syncThrows }), bkList('k2', () => cell, { syncThrows })], { rootName: 'Booking' });
-    const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
-    assert.match(label61(by.k1), /-Type1$/, String(syncThrows));
-    assert.match(label61(by.k2), /-Type2$/, String(syncThrows));
-    assert.ok(by.k1.single && by.k2.single, '저마다 단독');
-  }
-  // 같은 세트(다른 변형)면 한 가족
-  const a = variant61('card-a', 'Card', 'S-card');
-  const b = variant61('card-b', 'Card', 'S-card');
-  const r2 = await scan61([bkList('k1', () => a), bkList('k2', () => b)], { rootName: 'Booking' });
-  const by2 = Object.fromEntries(r2.nodes.map((n) => [n.id, n]));
-  assert.ok(!/-Type/.test(label61(by2.k1)), '한 가족');
-});
-
-test('6-1b ⑤ — 칸이 모두 Tab Item 인스턴스인 줄은 후보 목록에 없고 자동 이름 수에도 없다', async () => {
-  const ti = variant61('ti-v', 'Tab Item', 'S-ti', { 'dsl.reuse': 'variant:role:tab-item:abc' });
-  const row = (id, name) => sn({ type: 'FRAME', id, name, layoutMode: 'HORIZONTAL', width: 400, height: 20, fills: [],
-    children: Array.from({ length: 4 }, (_, i) => Object.assign(inst61(`${id}-${i}`, ti), { width: 60, height: 20 })) });
-  const other = variant61('x-v', 'Other', 'S-x');
-  const plain = sn({ type: 'FRAME', id: 'pl', name: 'Frame 9', layoutMode: 'HORIZONTAL', width: 400, height: 20, fills: [],
-    children: Array.from({ length: 4 }, (_, i) => Object.assign(inst61(`pl-${i}`, other), { width: 60, height: 20 })) });
-  const r = await scan61([row('r1', 'nav-4'), row('r2', 'Frame 7'), plain]);
-  assert.ok(!r.nodes.some((n) => n.id === 'r1' || n.id === 'r2'));
-  assert.equal(r.autoNamed, 1, 'Tab Item 줄(Frame 7)은 세지 않고, 다른 인스턴스 줄(Frame 9)만');
-});
 
 test('6-1b ⑥ — EXTRACT: 이름 tabs인 굵기 표지 줄 — 쓰임 이름에 주인이 새지 않음(6-2 N-D1 뒤)', async () => {
   const figma = installFigma();
@@ -8446,418 +8043,6 @@ test('6-1b ⑥ — EXTRACT: 이름 tabs인 굵기 표지 줄 — 쓰임 이름�
   // 6-2(ia-v3 §2.12 12.12 N-D1)부터 쓰임 이름에 주인이 없다 — 탭 판정(엄격 · 넓힌 구조)이 이름에 새지 않는지만 본다.
   assert.ok(uses.includes('spacing/gap'), `주인 없는 gap: ${uses}`);
   assert.ok(!uses.some((u) => /\/(tab|nav)(\/|$)/.test(u)), `쓰임 이름에 주인(tab · nav) 없음: ${uses}`);
-});
-
-/* ---------- 6-1b [등록] 탭 길 — 목 피그마 위의 REGISTER_COMPONENTS(실기 전 흐름 확인용) ----------
-   피그마의 동작 몇 가지만 흉내 낸다: 컴포넌트화는 그 자리에서(TEXT는 컴포넌트가 감싼다), 인스턴스는 메인 트리를 복제
-   (안 레이어 id `I{인스턴스};{원본}`), 인스턴스 레이어의 속성 연결은 메인을 따른다. 오토레이아웃 배치는 흉내 내지 않는다. */
-function regWorld(figma) {
-  let seq = 0;
-  const reg = new Map();
-  const detach = (n) => { const p = n.parent; if (p?.children) { const j = p.children.indexOf(n); if (j >= 0) p.children.splice(j, 1); } n.parent = null; };
-  const withKids = (n) => {
-    n.children = n.children ?? [];
-    n.insertChild = function (i, c) { detach(c); c.parent = this; this.children.splice(Math.min(i, this.children.length), 0, c); };
-    n.appendChild = function (c) { this.insertChild(this.children.length, c); };
-    return n;
-  };
-  const base = (type, props = {}) => {
-    const n = {
-      id: props.id ?? `n${seq++}`, type, name: type, visible: true, removed: false, x: 0, y: 0, width: 10, height: 10, parent: null, _pd: {}, _refs: null,
-      getPluginData(k) { return this._pd[k] ?? ''; }, setPluginData(k, v) { this._pd[k] = v; },
-      resize(w, h) { this.width = w; this.height = h; }, resizeWithoutConstraints(w, h) { this.width = w; this.height = h; },
-      remove() { const mark = (x) => { x.removed = true; for (const c of x.children ?? []) mark(c); }; mark(this); detach(this); },
-      ...props,
-    };
-    Object.defineProperty(n, 'componentPropertyReferences', {
-      get() { return this._refs ?? this._src?.componentPropertyReferences ?? null; },
-      set(v) { this._refs = v; }, configurable: true, enumerable: true,
-    });
-    if (type === 'TEXT') {
-      // 글자 자동 폭(WIDTH_AND_HEIGHT) 흉내 — 글자가 바뀌면 폭도
-      let chars = n.characters ?? '';
-      Object.defineProperty(n, 'characters', { get() { return chars; }, set(v) { chars = v; this.width = 40 + v.length; }, configurable: true, enumerable: true });
-    }
-    n.clone = function () {
-      const c = copyTree(this, (s) => `n${seq++}`);
-      if (this.parent) this.parent.insertChild(this.parent.children.indexOf(this) + 1, c);
-      return c;
-    };
-    reg.set(n.id, n);
-    return n;
-  };
-  const KEYS = ['name', 'visible', 'x', 'y', 'width', 'height', 'layoutMode', 'itemSpacing', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'fills', 'strokes', 'cornerRadius', 'characters', 'fontName', 'fontWeight', 'layoutSizingHorizontal', 'layoutSizingVertical', 'fillGeometry'];
-  function copyTree(src, idOf, srcLink = false) {
-    const props = {};
-    for (const k of KEYS) if (src[k] !== undefined) props[k] = src[k];
-    const c = base(src.type, { ...props, id: idOf(src) });
-    if (srcLink) c._src = src;
-    if (src.type === 'TEXT') c.getRangeAllFontNames = () => [c.fontName];
-    if (src.type === 'INSTANCE') makeInstanceOf(c, src._main, false);
-    if (src.children) { withKids(c); for (const k of src.children) c.appendChild(copyTree(k, idOf, srcLink)); }
-    return c;
-  }
-  function makeInstanceOf(i, main, build = true) {
-    i.type = 'INSTANCE';
-    i._main = main;
-    i.getMainComponentAsync = async () => i._main;
-    Object.defineProperty(i, 'mainComponent', { get() { return i._main; }, configurable: true });
-    i.swapComponent = function (c) {
-      this._main = c;
-      for (const k of [...(this.children ?? [])]) detach(k);
-      withKids(this);
-      for (const k of c.children ?? []) this.appendChild(copyTree(k, (s) => `I${this.id};${s.id}`, true));
-    };
-    i.setProperties = function (p) {
-      for (const [key, v] of Object.entries(p)) {
-        const own = [];
-        const walk = (n) => { for (const c of n.children ?? []) { own.push(c); if (c.type !== 'INSTANCE') walk(c); } };
-        walk(this);
-        const tgt = own.find((l) => l.componentPropertyReferences && Object.values(l.componentPropertyReferences).includes(key));
-        if (!tgt) throw new Error(`no prop ${key}`);
-        const field = Object.keys(tgt.componentPropertyReferences).find((f) => tgt.componentPropertyReferences[f] === key);
-        if (field === 'mainComponent') tgt.swapComponent(reg.get(v));
-        else tgt[field] = v;
-      }
-    };
-    if (build) { withKids(i); for (const k of main.children ?? []) i.appendChild(copyTree(k, (s) => `I${i.id};${s.id}`, true)); }
-    return i;
-  }
-  function asComponent(n) {
-    n.type = 'COMPONENT';
-    n.key = `${n.id}-key`;
-    n._props = {};
-    n.addComponentProperty = function (name, type, def) { if (type === 'INSTANCE_SWAP' && !reg.get(def)) throw new Error('incompatible'); const id = `${name}#${seq++}`; this._props[id] = { type, defaultValue: def }; return id; };
-    n.createInstance = function () {
-      const i = base('INSTANCE', { name: this.name, width: this.width, height: this.height, ...(this.layoutMode ? { layoutMode: this.layoutMode } : {}) });
-      makeInstanceOf(i, this);
-      // 감싼 글자(제약 SCALE) 흉내 — 인스턴스 크기를 바꾸면 안 글자도
-      i.resize = function (w, h) { this.width = w; this.height = h; if (!this.layoutMode && this.children.length === 1 && this.children[0].type === 'TEXT') { this.children[0].width = w; this.children[0].height = h; } }; // 오토레이아웃 틀(여백 있는 칸)은 글자를 늘이지 않는다
-      figma.currentPage.appendChild(i);
-      return i;
-    };
-    // 쓰는 인스턴스 — [등록] 끝 정리(C-D4)가 이번에 만든 아이콘을 지울지 본다.
-    n.getInstancesAsync = async () => [...reg.values()].filter((x) => x.type === 'INSTANCE' && !x.removed && x._main === n);
-    return n;
-  }
-  Object.assign(figma, {
-    loadAllPagesAsync: async () => {},
-    loadFontAsync: async () => {},
-    getNodeByIdAsync: async (id) => reg.get(id) ?? null,
-    createPage() { const p = withKids(base('PAGE', { name: 'Page' })); p.parent = figma.root; figma.root.children.push(p); return p; },
-    createComponentFromNode(node) {
-      if (node.type === 'TEXT') {
-        const p = node.parent;
-        const at = p ? p.children.indexOf(node) : -1;
-        const comp = asComponent(withKids(base('FRAME', { name: node.name, width: node.width, height: node.height, x: node.x, y: node.y })));
-        if (p) p.insertChild(at, comp);
-        comp.appendChild(node);
-        node.x = 0; node.y = 0;
-        return comp;
-      }
-      return asComponent(node);
-    },
-    combineAsVariants(comps, parent) {
-      const set = withKids(base('COMPONENT_SET', { name: 'Component Set' }));
-      set.key = `${set.id}-key`;
-      set._props = {};
-      set.addComponentProperty = function (name, type, def) { const id = `${name}#${seq++}`; this._props[id] = { type, defaultValue: def }; return id; };
-      parent.appendChild(set);
-      for (const c of comps) set.appendChild(c);
-      return set;
-    },
-  });
-  const page = withKids(base('PAGE', { name: 'Page 1' }));
-  const findAll = ({ types, pluginData }) => [...reg.values()].filter((n) => types.includes(n.type) && !n.removed && n.parent
-    && (!pluginData || pluginData.keys.every((k) => !!n._pd[k])));
-  figma.root = { type: 'DOCUMENT', children: [page], getPluginData: () => '', setPluginData() {}, findAllWithCriteria: findAll };
-  page.parent = figma.root;
-  figma.currentPage = page;
-  page.selection = [];
-  return { base, withKids, page, reg };
-}
-
-test('6-1b [등록] 탭 길(목) — tabs 메뉴형 바 4(칸 5 · 5 · 4 · 테마 다른 5) + 알약형 1 → Style 그룹마다(C-D20) Tab Item-Text · -Pill 세트(State 2) · Tab Bar 컴포넌트 · 자리 인스턴스 · 꼬리', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const w = regWorld(figma);
-  const T = (id, chars, color, o = {}) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontName: { family: 'Inter', style: 'Regular' },
-    getRangeAllFontNames() { return [this.fontName]; }, ...o });
-  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
-  const menu = (id, n, active, selColor = '#000000', name = 'tabs') => F(id, { name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [] },
-    ['About', 'Services', 'Offers', 'Seats', 'Destination'].slice(0, n).map((c, i) => T(`${id}-${i}`, c, i === active ? selColor : '#7a7a7a')));
-  const pill = F('p', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
-    ['Economy', 'Business Class', 'Fast Class'].map((l, i) => F(`p-${i}`, { name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24, fills: i === 1 ? solid61('#3d5fdb') : [] },
-      [T(`p-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')])));
-  const bars = [menu('m1', 5, 0), menu('m2', 5, 2, '#000000', 'tabs-copy'), menu('m3', 4, 0, '#000000', 'tabs-4'), menu('mb', 5, 0, '#2563eb', 'tabs-blue'), pill];
-  const root = F('root', { name: 'Flightin website', width: 1440, height: 900, fills: [] }, bars);
-  w.page.appendChild(root);
-  w.page.selection = [root];
-  const out = await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: bars.map((b) => b.id) });
-  const r = ofType(out, 'COMPONENTS_RESULT')[0];
-  assert.ok(r, JSON.stringify(out).slice(0, 400));
-  assert.equal(r.sets, 2, JSON.stringify(r.failures));
-  assert.deepEqual(r.singles, ['Tab Bar-Text', 'Tab Bar-Pill'], 'Tab Bar는 Style 그룹마다 컴포넌트 하나');
-  assert.deepEqual(r.fillKept, ['tabs-blue'], '테마 색이 다른 바는 원본 그대로');
-  assert.deepEqual(r.placeFailed, []);
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  const item = comps.children.find((x) => x.name === 'Tab Item-Text');
-  const itemP = comps.children.find((x) => x.name === 'Tab Item-Pill');
-  const tbar = comps.children.find((x) => x.name === 'Tab Bar-Text');
-  const tbarP = comps.children.find((x) => x.name === 'Tab Bar-Pill');
-  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected', 'State=Default']);
-  assert.deepEqual(itemP.children.map((c) => c.name), ['State=Selected', 'State=Default']);
-  assert.ok([...item.children, ...itemP.children].every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-item:')));
-  assert.equal(tbar.type, 'COMPONENT');
-  assert.equal(tbarP.type, 'COMPONENT');
-  assert.ok([tbar, tbarP].every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-bar:')));
-  assert.ok(tbar.x > item.x, 'Tab Bar는 Tab Item 오른쪽');
-  assert.ok([tbar, tbarP].every((v) => v.children.every((k) => k.type === 'INSTANCE' && k.isExposedInstance === true)), 'Tab Bar 안 칸은 노출된 Tab Item 인스턴스');
-  assert.ok(Object.values(item._props).some((x) => x.type === 'TEXT'), 'Tab Item에는 글자 속성 노출');
-  assert.ok(Object.entries(item._props).some(([k, x]) => x.type === 'TEXT' && k.startsWith('Text#')), '글자 속성 이름 Text(C-D24)');
-  assert.deepEqual(Object.keys(tbar._props), [], 'Tab Bar에는 노출하지 않는다');
-  assert.deepEqual(tbar.children.map((c) => c.children[0].characters), ['About', 'Services', 'Offers', 'Seats', 'Destination'], '노출 뒤에도 칸마다 제 글자(9번 값 지키기)');
-  const kids = root.children;
-  const mainName = async (n) => (await n.getMainComponentAsync())?.name;
-  assert.equal(kids[0].type, 'INSTANCE');
-  assert.equal(await mainName(kids[0]), 'Tab Bar-Text');
-  assert.equal(kids[1].type, 'INSTANCE', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
-  assert.equal(await mainName(kids[1].children[2]), 'State=Selected', '선택 위치는 원래대로');
-  assert.equal(kids[1].children[1].children[0].characters, 'Services');
-  assert.equal(kids[2].type, 'FRAME', '칸 수가 다른 바 — 틀 그대로');
-  assert.ok(kids[2].children.every((c) => c.type === 'INSTANCE'), '칸만 Tab Item 인스턴스');
-  assert.deepEqual(kids[2].children.map((c) => c.children[0].characters), ['About', 'Services', 'Offers', 'Seats']);
-  assert.equal(kids[3].type, 'FRAME');
-  assert.ok(kids[3].children.every((c) => c.type === 'TEXT'), 'nav-blue 칸도 그대로');
-  assert.equal(kids[4].type, 'INSTANCE');
-  assert.equal(await mainName(kids[4]), 'Tab Bar-Pill');
-  assert.equal(figma._undo, 1);
-  // 같은 프레임을 다시 찾기 — Tab Bar 인스턴스 · 칸만 바꾼 칸 4 바는 후보에 없다(일반 후보로 떨어지지 않음)
-  const again = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 2 }), 'COMPONENT_CANDIDATES')[0];
-  assert.deepEqual(again.nodes.filter((n) => n.eligible).map((n) => n.name), ['tabs-blue'], '남은 것은 원본 그대로 둔 nav-blue뿐');
-  assert.equal(again.autoNamed, 0);
-  // 원본을 한 번 더 붙여 넣은 사본 → 재사용 Tab Item · Tab Bar
-  const bars2 = [menu('c1', 5, 0), menu('c2', 5, 2, '#000000', 'tabs-copy'), menu('c3', 4, 0, '#000000', 'tabs-4'), F('cp', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
-    ['Economy', 'Business Class', 'Fast Class'].map((l, i) => F(`cp-${i}`, { name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24, fills: i === 1 ? solid61('#3d5fdb') : [] },
-      [T(`cp-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')])))];
-  const root2 = F('root2', { name: 'Flightin website 2', width: 1440, height: 900, fills: [] }, bars2);
-  w.page.appendChild(root2);
-  w.page.selection = [root2];
-  const pre = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root2'], reqId: 3 }), 'COMPONENT_CANDIDATES')[0];
-  const pby = Object.fromEntries(pre.nodes.map((n) => [n.id, n]));
-  assert.equal(pby.c1.reuse?.name, 'Tab Bar-Text', '재사용 라벨에 · Style= 꼬리 없음');
-  assert.equal(pby.c3.reuse?.name, 'Tab Item-Text');
-  const r2 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: bars2.map((b) => b.id) }), 'COMPONENTS_RESULT')[0];
-  assert.deepEqual(r2.reused, ['Tab Item-Text', 'Tab Bar-Text', 'Tab Item-Pill', 'Tab Bar-Pill'], JSON.stringify(r2.failures));
-  assert.equal(r2.sets, 0);
-  assert.deepEqual(r2.fillKept, [], '재사용 칸 맞추기 — 틀 칸(알약)도 기존 변형과 맞는다');
-  assert.equal(root2.children[3].type, 'INSTANCE', '알약 바도 기존 Tab Bar 인스턴스');
-  assert.equal(root2.children[0].type, 'INSTANCE');
-  assert.equal(await mainName(root2.children[0]), 'Tab Bar-Text');
-  assert.equal(root2.children[2].type, 'FRAME');
-  assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
-});
-
-/* ---------- A.27 재현(2026-11-23 실기 피드백 `DSL 등록 품질` 수치) ---------- */
-function pillWorld(figma) {
-  const w = regWorld(figma);
-  const T = (id, chars, color, width, weight = 500) => w.base('TEXT', { id, name: chars, characters: chars, width, height: 23, fills: solid61(color), fontWeight: weight, fontName: { family: 'Inter', style: 'Regular' },
-    getRangeAllFontNames() { return [this.fontName]; }, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG' });
-  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
-  const cell = (id, label, width, padX, fill, textColor, textW, weight) => F(id, { name: 'button', layoutMode: 'HORIZONTAL', width, height: 47, paddingTop: 12, paddingBottom: 12, paddingLeft: padX, paddingRight: padX, itemSpacing: 10, cornerRadius: 24,
-    fills: fill ? solid61(fill) : [], layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG' }, [T(`${id}t`, label, textColor, textW, weight)]);
-  const bar = F('pill', { name: 'Frame 10', layoutMode: 'HORIZONTAL', width: 462, height: 71, paddingTop: 12, paddingBottom: 12, cornerRadius: 32, fills: solid61('#f4f9fa') }, [
-    // 칸 폭 = 글자 폭 + 좌우 여백(실기 128 · 196 · 138과 같은 짜임 — 목의 글자 폭은 40 + 글자 수)
-    cell('pe', 'Economy', 47 + 48, 24, null, '#a3a3a3', 47, 500),
-    cell('pb', 'Business Class', 54 + 64, 32, '#3d5fdb', '#ffffff', 54, 600),
-    cell('pf', 'Fast Class', 50 + 48, 24, null, '#a3a3a3', 50, 500),
-  ]);
-  const root = F('root', { name: 'Frame 19', width: 1000, height: 165, fills: [] }, [bar]);
-  w.page.appendChild(root);
-  w.page.selection = [root];
-  return { w, bar, root };
-}
-
-function buttonWorld(figma) {
-  const w = regWorld(figma);
-  const T = (id, chars, color, width, weight = 600) => w.base('TEXT', { id, name: chars, characters: chars, width, height: 23, fills: solid61(color), fontWeight: weight, fontName: { family: 'Inter', style: 'Regular' }, getRangeAllFontNames() { return [this.fontName]; } });
-  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
-  const stroke = [{ type: 'SOLID', visible: true, color: { r: 0.64, g: 0.64, b: 0.64 } }];
-  const arrow = (id) => F(id, { name: 'arrow', width: 13, height: 13, visible: false, fills: [] }, [w.base('VECTOR', { id: `${id}v`, name: 'Vector', width: 4, height: 7, fills: solid61('#000000') })]);
-  const app = (id) => F(id, { name: 'button', layoutMode: 'HORIZONTAL', width: 76, height: 30, paddingTop: 6, paddingRight: 8, paddingBottom: 8, paddingLeft: 8, itemSpacing: 2, cornerRadius: 4, fills: [], strokes: [{ type: 'SOLID', visible: true, color: { r: 0.9, g: 0.9, b: 0.9 } }] },
-    [arrow(`${id}a`), T(`${id}t`, '앱다운로드', '#000000', 45, 400), arrow(`${id}b`)]);
-  const contact = F('bc', { name: 'button', layoutMode: 'HORIZONTAL', width: 126, height: 44, paddingTop: 12, paddingRight: 32, paddingBottom: 12, paddingLeft: 32, itemSpacing: 10, cornerRadius: 20, fills: solid61('#3d5fdb') }, [T('bct', 'Contact', '#ffffff', 47)]);
-  const viewAll = F('bv', { name: 'button', layoutMode: 'HORIZONTAL', width: 135, height: 47, paddingTop: 12, paddingRight: 32, paddingBottom: 12, paddingLeft: 32, itemSpacing: 10, cornerRadius: 24, fills: [], strokes: stroke }, [T('bvt', 'View All', '#000000', 48)]);
-  const subscribe = F('bs', { name: 'button', layoutMode: 'HORIZONTAL', width: 180, height: 48, paddingTop: 13, paddingRight: 24, paddingBottom: 13, paddingLeft: 24, itemSpacing: 10, cornerRadius: 20, fills: solid61('#3d5fdb') }, [T('bst', 'Subscribe Now', '#ffffff', 53)]);
-  const a1 = app('ba1');
-  const a2 = app('ba2');
-  const root = F('root', { name: 'page copy', width: 1440, height: 900, fills: [] }, [F('w1', { name: 'Frame 29', width: 151, height: 70, fills: [] }, [a1]), F('w2', { name: 'Frame 29', width: 151, height: 70, fills: [] }, [a2]), contact, viewAll, subscribe]);
-  w.page.appendChild(root);
-  w.page.selection = [root];
-  return { w, root, ids: ['ba1', 'ba2', 'bc', 'bv', 'bs'] };
-}
-
-test('A.27 ② — 글자 메뉴 `items` + 알약 `Frame 10` [등록]: 메뉴는 탭이 아님(C-D19) · 알약은 Tab Item(State 2) + Tab Bar, 칸 셋 모두 인스턴스(Fast Class는 Default)', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const { w, root, bar } = pillWorld(figma);
-  const T = (id, chars, color) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontWeight: 500, fontName: { family: 'Inter', style: 'Regular' }, getRangeAllFontNames() { return [this.fontName]; } });
-  const items = w.withKids(w.base('FRAME', { id: 'items', name: 'items', layoutMode: 'HORIZONTAL', width: 440, height: 20, itemSpacing: 24, fills: [] }));
-  ['About', 'Services', 'Offers', 'Seats', 'Destination'].forEach((c, i) => items.appendChild(T(`it${i}`, c, i === 0 ? '#000000' : '#7a7a7a')));
-  root.insertChild(0, items);
-  const scan = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 1 }), 'COMPONENT_CANDIDATES')[0];
-  const by = Object.fromEntries(scan.nodes.map((n) => [n.id, n]));
-  assert.ok(!String(by.items?.single ?? by.items?.group ?? '').startsWith('Tab'), JSON.stringify(by.items));
-  assert.equal(by.items?.defaultOn, false, '글자 메뉴는 꺼짐');
-  assert.equal(by.pill?.single, 'Tab Bar');
-  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['pill'] }), 'COMPONENTS_RESULT')[0];
-  assert.deepEqual(r.fillKept, [], JSON.stringify(r.failures));
-  assert.equal(r.sets, 1);
-  assert.deepEqual(r.singles, ['Tab Bar']);
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  const item = comps.children.find((x) => x.name === 'Tab Item');
-  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected', 'State=Default']);
-  const tbar = comps.children.find((x) => x.name === 'Tab Bar');
-  assert.ok(tbar.children.every((k) => k.type === 'INSTANCE'), 'Tab Bar 안 칸 셋 모두 인스턴스');
-  const mainName = async (n) => (await n.getMainComponentAsync())?.name;
-  assert.deepEqual(await Promise.all(tbar.children.map(mainName)), ['State=Default', 'State=Selected', 'State=Default']);
-  assert.equal(tbar.children[2].children[0].characters, 'Fast Class');
-  assert.equal(root.children[0].type, 'FRAME', '글자 메뉴는 그대로');
-  assert.equal(bar.removed || root.children[1].type === 'INSTANCE', true);
-});
-
-test('A.27 C-D27 — 문서에 Tab Item · Tab Bar가 있으면 알약 탭은 Tab Item-Pill · Tab Bar-Pill(숫자 아님)', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const { w } = pillWorld(figma);
-  const old = w.withKids(w.base('COMPONENT', { name: 'Tab Bar' }));
-  w.page.appendChild(old);
-  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['pill'] }), 'COMPONENTS_RESULT')[0];
-  assert.deepEqual(r.singles, ['Tab Bar-Pill'], JSON.stringify(r.failures));
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  assert.ok(comps.children.some((x) => x.name === 'Tab Item-Pill'));
-});
-
-test('A.27 C-D23 — 대표 바 칸 하나가 넣기 전 검사에 걸리면 그 Style을 만들지 않는다: 세트 지움 · 수 0 · 바 원본 · 처리 중 문제 바 한 줄 · 남는 인스턴스 없음', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const { w, bar } = pillWorld(figma);
-  bar.children[2].children[0].height = 30; // Fast Class 글자 높이만 다름 → Default 인스턴스와 자리 · 크기가 어긋남
-  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['pill'] }), 'COMPONENTS_RESULT')[0];
-  assert.equal(r.sets, 0);
-  assert.equal(r.registered, 0);
-  assert.deepEqual(r.singles, []);
-  assert.deepEqual(r.fillKept, ['Frame 10']);
-  assert.equal(r.failures.filter((f) => f.includes('채움·크기')).length, 1, '칸 줄이 아니라 바 한 줄');
-  assert.ok(bar.children.every((c) => c.type === 'FRAME' && !c.removed), '칸은 원본 그대로');
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  assert.ok(!comps || !comps.children.some((x) => /^Tab (Item|Bar)/.test(x.name) && !x.removed), '만든 Tab Item 세트는 지워짐');
-  assert.ok(![...w.reg.values()].some((n) => n.type === 'INSTANCE' && !n.removed && n.parent), '검사 길의 인스턴스가 남지 않음');
-});
-
-test('A.27 C-D28 · C-D24 — 버튼 넷(실기 수치) [등록] → 한 Button 세트 변형 4 · 글자 속성 Text 하나가 네 변형 모두에(앱 버튼은 경로 1, 나머지는 대체 찾기) · 빈 변형 없음', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const { ids } = buttonWorld(figma);
-  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ids }), 'COMPONENTS_RESULT')[0];
-  assert.equal(r.sets, 1, JSON.stringify(r.failures));
-  assert.deepEqual(r.missing, [], '같은 가족 안 빈칸 없음(C-D31)');
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  const set = comps.children.find((x) => x.type === 'COMPONENT_SET');
-  assert.equal(set.name, 'Button');
-  assert.deepEqual(set.children.map((v) => v.name), ['Radius=4, Size=default, Style=Outline', 'Radius=20, Size=md, Style=Filled', 'Radius=20, Size=lg, Style=Filled', 'Radius=full, Size=default, Style=Outline']);
-  const textProps = Object.entries(set._props).filter(([, v]) => v.type === 'TEXT').map(([k]) => k);
-  assert.equal(textProps.length, 1);
-  assert.match(textProps[0], /^Text#/);
-  const bound = set.children.map((v) => { const ts = []; const walk = (n) => { for (const c of n.children ?? []) { if (c.type === 'TEXT') ts.push(c); walk(c); } }; walk(v); return ts.filter((t) => t.componentPropertyReferences?.characters === textProps[0]).length; });
-  assert.deepEqual(bound, [1, 1, 1, 1], '네 변형 모두 묶임');
-});
-
-test('A.27 C-D31 — 채움 버튼 가족 Color 2 × Size 2에 하나 빠짐 → [등록] 결과 빈 변형 그 하나', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const w = regWorld(figma);
-  const T = (id) => w.base('TEXT', { id, name: 'Go', characters: 'Go', width: 42, height: 20, fills: solid61('#ffffff'), fontName: { family: 'Inter', style: 'Regular' }, getRangeAllFontNames() { return [this.fontName]; } });
-  const B = (id, bg, wd, pad) => { const f = w.withKids(w.base('FRAME', { id, name: 'cta', layoutMode: 'HORIZONTAL', width: wd, height: 40, cornerRadius: 8, paddingLeft: pad, paddingRight: pad, fills: solid61(bg) })); f.appendChild(T(`${id}t`)); return f; };
-  const root = w.withKids(w.base('FRAME', { id: 'root', name: 'root', width: 900, height: 400, fills: [] }));
-  for (const b of [B('a', '#3d5fdb', 80, 8), B('b', '#3d5fdb', 120, 16), B('c', '#f97316', 80, 8)]) root.appendChild(b);
-  w.page.appendChild(root);
-  w.page.selection = [root];
-  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['a', 'b', 'c'] }), 'COMPONENTS_RESULT')[0];
-  assert.equal(r.sets, 1, JSON.stringify(r.failures));
-  assert.equal(r.missing.length, 1);
-  assert.match(r.missing[0], /^Cta: .*Size=lg/);
-});
-
-test('C-D32 [등록] 탭 길(목) — 칸마다 다른 날 벡터 아이콘 3칸 바 → 칸마다 제 아이콘(Tab Item 두 변형의 아이콘 자리가 아이콘 인스턴스) · 재사용 · 대표 바 칸 맞추기', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const w = regWorld(figma);
-  const T = (id, chars, color) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontName: { family: 'Inter', style: 'Regular' },
-    getRangeAllFontNames() { return [this.fontName]; } });
-  const V = (id, d) => w.base('VECTOR', { id, name: 'Vector', width: 16, height: 16, fills: solid61('#222222'), fillGeometry: [{ data: d, windingRule: 'NONZERO' }] });
-  // 목은 오토레이아웃 배치를 흉내 내지 않는다 — 칸 안 레이어 x · y는 0으로 둔다(새 인스턴스와 자리가 같게).
-  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
-  const ICONS = ['M0 0L16 0L16 16Z', 'M8 0L16 16L0 16Z', 'M0 8L8 0L16 8L8 16Z'];
-  const bar = (id, labels, icons) => F(id, { name: 'tabs', layoutMode: 'HORIZONTAL', width: 360, height: 40, itemSpacing: 8, fills: [] },
-    labels.map((l, i) => F(`${id}-${i}`, { name: 'tab', layoutMode: 'HORIZONTAL', width: 110, height: 40, cornerRadius: i === 0 ? 20 : 0, paddingLeft: 8, paddingRight: 8, fills: i === 0 ? solid61('#3d5fdb') : [] },
-      [...(icons[i] ? [V(`${id}-${i}v`, icons[i])] : []), T(`${id}-${i}t`, l, i === 0 ? '#ffffff' : '#7a7a7a')])));
-  const geo = (n) => n.fillGeometry?.[0]?.data;
-  const iconOf = async (cell) => {
-    const icon = cell.children.find((k) => k.name === 'Vector');
-    assert.equal(icon?.type, 'INSTANCE', `${cell.name}: 아이콘 자리가 아이콘 인스턴스`);
-    const main = await icon.getMainComponentAsync();
-    assert.ok(main && !main.removed, '아이콘 컴포넌트가 남아 있음(끝 정리가 지우지 않음)');
-    assert.ok(main.getPluginData('dsl.icon'), '아이콘 지문');
-    return geo(main);
-  };
-  const b1 = bar('a', ['Home', 'Search', 'Profile'], ICONS);
-  const root = F('root', { name: 'Screen', width: 800, height: 600, fills: [] }, [b1]);
-  w.page.appendChild(root);
-  w.page.selection = [root];
-  const r = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['a'] }), 'COMPONENTS_RESULT')[0];
-  assert.ok(r, 'COMPONENTS_RESULT');
-  assert.deepEqual(r.fillKept, [], JSON.stringify(r.failures));
-  assert.deepEqual(r.placeFailed, []);
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  const item = comps.children.find((x) => x.name === 'Tab Item');
-  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected', 'State=Default']); // C-D20 — Style 그룹마다 세트, State 하나
-  for (const v of item.children) assert.equal(v.children.find((k) => k.name === 'Vector')?.type, 'INSTANCE', `${v.name}: 변형의 아이콘 자리가 아이콘 인스턴스`);
-  assert.ok(Object.values(item._props).some((x) => x.type === 'INSTANCE_SWAP'), 'Tab Item에 아이콘 바꾸기 속성');
-  const iconComps = comps.children.filter((x) => x.getPluginData('dsl.icon'));
-  assert.equal(iconComps.length, 3, '아이콘 컴포넌트 3(칸마다 하나)');
-  const tb = root.children[0];
-  assert.equal(tb.type, 'INSTANCE', '바 자리는 Tab Bar 인스턴스');
-  assert.deepEqual(await Promise.all(tb.children.map(iconOf)), ICONS, '칸마다 제 아이콘(고치기 전: 셋째 칸이 둘째 칸 아이콘)');
-  assert.deepEqual(tb.children.map((c) => c.children.find((k) => k.type === 'TEXT').characters), ['Home', 'Search', 'Profile']);
-
-  // 같은 바를 다시 붙여 넣고 [등록] → 재사용 Tab Item(아이콘 자리 = 아이콘 인스턴스 ↔ 날 벡터 칸 맞추기) · 칸마다 제 아이콘
-  const b2 = bar('b', ['Home', 'Search', 'Profile'], ICONS);
-  const root2 = F('root2', { name: 'Screen 2', width: 800, height: 600, fills: [] }, [b2]);
-  w.page.appendChild(root2);
-  w.page.selection = [root2];
-  const r2 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['b'] }), 'COMPONENTS_RESULT')[0];
-  assert.ok(r2.reused.includes('Tab Item'), JSON.stringify(r2));
-  assert.deepEqual(r2.fillKept, [], '재사용 칸 맞추기 — 아이콘 인스턴스 ↔ 날 벡터는 아이콘 차');
-  const tb2 = root2.children[0];
-  assert.equal(tb2.type, 'INSTANCE');
-  assert.deepEqual(await Promise.all(tb2.children.map(iconOf)), ICONS);
-  assert.equal(comps.children.filter((x) => x.getPluginData('dsl.icon')).length, 3, '같은 그림은 기존 아이콘을 쓴다');
-
-  // 대표 바 칸 맞추기 — 둘째 칸(Default 원본)만 아이콘이 없으면 그 Style을 만들지 않고 바 원본 그대로
-  const b3 = bar('c', ['All', 'Search', 'Profile'], [ICONS[0], null, ICONS[2]]);
-  b3.name = 'tabs-mixed';
-  const root3 = F('root3', { name: 'Screen 3', width: 800, height: 600, fills: [] }, [b3]);
-  w.page.appendChild(root3);
-  w.page.selection = [root3];
-  const setsBefore = comps.children.length;
-  const r3 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: ['c'] }), 'COMPONENTS_RESULT')[0];
-  assert.ok(r3, 'COMPONENTS_RESULT');
-  assert.deepEqual(r3.fillKept, ['tabs-mixed']);
-  assert.equal(root3.children[0], b3, '바 원본 그대로');
-  assert.ok(b3.children.every((c) => c.type === 'FRAME'), '칸도 원본');
-  assert.equal(b3.children[1].children.length, 1, '아이콘 없던 칸에 아이콘이 생기지 않음');
-  assert.equal(comps.children.length, setsBefore, 'Tab Item · Tab Bar · 아이콘을 새로 만들지 않음');
 });
 
 /* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.28, 2026-11-19) ---------- */
@@ -9507,7 +8692,6 @@ test('code.ts — GENERATE_DARK_MODE: commitUndo 한 번 · DARK_MODE_RESULT에 
   f.figma._undo = 0;
   let out = await p.send({ type: 'GET_PREREQ' });
   let pre = ofType(out, 'PREREQ_STATE')[0];
-  assert.equal(pre.hasDarkMode, true);
   assert.equal(pre.darkOld, true);
   assert.equal(pre.darkUnfilled, 0);
   out = await p.send({ type: 'GENERATE_DARK_MODE' });
@@ -9531,7 +8715,6 @@ test('code.ts — GENERATE_DARK_MODE: commitUndo 한 번 · DARK_MODE_RESULT에 
   assert.equal(f.figma._undo, 2, '옮기기 + 채우기 전체가 ⌘Z 한 번');
   pre = ofType(out, 'PREREQ_STATE')[0];
   assert.equal(pre.darkOld, false);
-  assert.equal(pre.hasDarkMode, true);
   assert.equal(pre.darkUnfilled, 0);
   assert.equal(ofType(out, 'VARIABLES').length, 1);
   // 새 Global 색 → Dark 값이 없는 색 1
@@ -9769,7 +8952,7 @@ test('B.36 off — only가 버린 자리 중 꺼진 줄 값만 make-off로 센�
   assert.equal(r4.reasons['make-off'] ?? 0, 0);
 });
 
-/* ---- B.37 원격(라이브러리) 텍스트 스타일 후보(ia-v4 §4.2 RT-D1–RT-D5) ---- */
+/* ---- B.40 원격(라이브러리) 텍스트 스타일 후보(ia-v4 §4.2 RT-D1–RT-D5) ---- */
 function remoteStyle(id, name, fontSize, family = 'Inter') {
   return { id, name, type: 'TEXT', remote: true, fontName: { family, style: 'Regular' }, fontSize, lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 } };
 }
@@ -9798,7 +8981,7 @@ function installRemote(figma, remotes, pageTexts, otherPages = []) {
   return page;
 }
 
-test('B.37 원격 스타일 — 현재 페이지에 쓰인 원격만 후보 · 붙음 / 로컬 우선 / 원격 둘 같은 키는 모호', async () => {
+test('B.40 원격 스타일 — 현재 페이지에 쓰인 원격만 후보 · 붙음 / 로컬 우선 / 원격 둘 같은 키는 모호', async () => {
   const figma = installFigma();
   await createSemanticTextStyles([{ name: 'local/24', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
   const local24 = figma._state.textStyles.find((s) => s.name === 'local/24');
@@ -9825,7 +9008,7 @@ test('B.37 원격 스타일 — 현재 페이지에 쓰인 원격만 후보 · �
   assert.equal(test1(rtText('g', 40)), false);
 });
 
-test('B.37 원격 스타일 — 기준 루트가 있는 페이지도 훑는다(loadAsync) · 다시 확인은 줄 styleId를 더한다 · 구간 스타일은 모으지 않음', async () => {
+test('B.40 원격 스타일 — 기준 루트가 있는 페이지도 훑는다(loadAsync) · 다시 확인은 줄 styleId를 더한다 · 구간 스타일은 모으지 않음', async () => {
   const figma = installFigma();
   const R18 = remoteStyle('S:r18', 'Lib/Eighteen', 18);
   const R30 = remoteStyle('S:r30', 'Lib/Thirty', 30);
@@ -9846,7 +9029,7 @@ test('B.37 원격 스타일 — 기준 루트가 있는 페이지도 훑는다(l
   assert.equal(target._styleId, R18.id);
 });
 
-test('B.37 원격 스타일 — 만들기 후보에서 원격과 같은 묶음만 뺀다(RT-D5)', async () => {
+test('B.40 원격 스타일 — 만들기 후보에서 원격과 같은 묶음만 뺀다(RT-D5)', async () => {
   const figma = installFigma();
   const R16 = remoteStyle('S:r16', 'Lib/Body', 16);
   const R20a = remoteStyle('S:r20a', 'Lib/A', 20);
@@ -9877,7 +9060,7 @@ test('B.37 원격 스타일 — 만들기 후보에서 원격과 같은 묶음�
   assert.deepEqual(kept.map((c) => c.key), ['mixUpper', 'amb', 'changed', 'anchored', 'instance']);
 });
 
-test('B.38 creationOrder · createTokens — 그룹 안 숫자 값 작은 순 · 그룹은 처음 나온 순서 · px 값으로', async () => {
+test('B.41 creationOrder · createTokens — 그룹 안 숫자 값 작은 순 · 그룹은 처음 나온 순서 · px 값으로', async () => {
   const tk = (name, category, value, extra = {}) => ({ name, category, sources: [category], value, ...extra });
   assert.deepEqual(creationOrder([tk('spacing/16', 'gap', 16), tk('spacing/4', 'gap', 4), tk('spacing/8', 'gap', 8)], 16).map((t) => t.name), ['spacing/4', 'spacing/8', 'spacing/16']);
   assert.deepEqual(creationOrder([tk('radius/2', 'radius', 2), tk('spacing/4', 'gap', 4), tk('radius/1', 'radius', 1)], 16).map((t) => t.name), ['radius/1', 'radius/2', 'spacing/4']);

@@ -1,5 +1,5 @@
 /* 레이어 칠하기 · 타입 판정 공용 부품 — figma 전역을 쓰지 않는 순수 함수라
-   순수 분석(componentLike)과 Figma 노드(extract · rename)가 함께 쓴다. */
+   순수 판정(componentLike)과 Figma 노드(extract · rename)가 함께 쓴다. */
 
 /** 벡터로 치는 레이어 타입 — 아이콘 판정 · 그림 판정이 같은 목록을 쓴다. */
 export const VECTOR_TYPES: ReadonlySet<string> = new Set(['VECTOR', 'BOOLEAN_OPERATION', 'STAR', 'POLYGON', 'LINE']);

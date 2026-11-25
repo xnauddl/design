@@ -1,7 +1,6 @@
 /* ============================================================
    themeApply.ts — 다크 모드 자동 채움 (figma 의존 → 목으로 테스트)
    값 변환 자체는 순수 themeGen.ts가 맡고, 여기서는 변수 그래프를 읽고 쓴다.
-   (components.ts ↔ artwork.ts와 같은 분리)
 
    결정 D-T1(ia-v3 §2.13 13.7 "다크" · A.25): Dark 모드는 **플러그인 Global**에 더한다 —
    같은 Global 변수가 모드마다 다른 값을 가지고, Semantic은 모드 하나다. `dark/…` 복사본은 만들지 않는다.
@@ -168,7 +167,7 @@ export function countDarkUnfilled(cols: readonly VariableCollection[], vars: rea
   return n;
 }
 
-/** 준비 현황 · 다크 화면 띠에 쓰는 다크 상태(code.ts `postPrereq`). */
+/** 다크 화면 알림 띠에 쓰는 다크 상태(code.ts `postPrereq`). */
 export function darkPrereq(cols: readonly VariableCollection[], vars: readonly Variable[]): { hasDarkMode: boolean; darkUnfilled: number; darkOld: boolean; darkOldManual: boolean } {
   const global = ownedCollection(cols, 'global');
   const semantic = ownedCollection(cols, 'semantic');
@@ -391,7 +390,7 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
     }
     const moved = written.size;
     const splitWritten = splitNames.filter((n) => vars.some((v) => written.has(v.id) && v.name === n));
-    // 새로 만든 모드에 쓴 칸이 하나도 없으면 지운다(준비 현황이 ✓로 뒤집히지 않게).
+    // 새로 만든 모드에 쓴 칸이 하나도 없으면 지운다(빈 Dark 모드가 '다크 있음'으로 남지 않게).
     if (modeCreated && filled === 0 && moved === 0) {
       try {
         global.removeMode(to);

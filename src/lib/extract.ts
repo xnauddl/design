@@ -333,7 +333,7 @@ function hasIconAncestor(node: SceneNode): boolean {
  * - 대상: FRAME · COMPONENT · INSTANCE. 정사각형 · 64 이하(isSmallSquare).
  * - 아이콘(isIconSelf) 또는 아바타(isAvatarSelf).
  * - 가장 바깥 틀만: 조상에 아이콘 틀이 있으면 아니다(자기 자신이 통과할 때만 조상을 본다).
- * §4.7 "묶기"의 iconFrameKeyOf · isIconLike(상한 96)와는 따로다.
+ * `componentLike.ts` `isIconLike`(상한 96)와는 따로다.
  */
 export function isIconOrAvatar(node: SceneNode): node is SizeTarget {
   if (!isSmallSquare(node)) return false;

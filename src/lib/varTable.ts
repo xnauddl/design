@@ -637,7 +637,7 @@ export function varAncestorKeys(v: Pick<VarRow, 'collectionId' | 'name'>): strin
 }
 
 /**
- * 변수 탭 Global 알약 순서(IA v4 §4.6 B.38 VO-D1) — 고른 모드의 숫자 값 작은 순 → 숫자 아님(글자 · 참거짓 · 값 없음) → 별칭.
+ * 변수 탭 Global 알약 순서(IA v4 §4.6 B.41 VO-D1) — 고른 모드의 숫자 값 작은 순 → 숫자 아님(글자 · 참거짓 · 값 없음) → 별칭.
  * 각 묶음 안은 들어온(피그마) 순서 — 안정 정렬.
  */
 export function pillOrder<T>(rows: readonly T[], cellOf: (r: T) => VarCell | undefined): T[] {
