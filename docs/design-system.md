@@ -421,7 +421,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | DS-O2 | 상태 글자 대비(DS-D7 — 지정 값 그대로): Warning #B7791F 흰 바탕 3.6:1 · 옅은 바탕 3.3:1, Error #D64545 흰 바탕 4.4:1 · 옅은 바탕 3.8:1 · 흰 글자를 얹은 삭제 버튼 4.4:1, Success #16845B 옅은 바탕 4.1:1. 대비 검사 예외 | 사용자 결정으로 유지 |
 | DS-O3 | 포커스 모양이 두 가지(`focus-ring-default` · `focus-ring-field`)이고, 스위치 · 일부 줄은 `outline`으로 따로 그린다 | DS-2 |
 | DS-O4 | 잠긴 버튼(`aria-disabled`)과 꺼진 버튼(`:disabled`)의 모양이 다르다(글자 흐림 · 투명도) | DS-2 |
-| DS-O5 | `.ed-copy` · `.ed-plink`가 포커스 색(`--accent` 2.9:1)을 글자에 썼다 — ① 단계에서 `color-text-link`로 옮김(부록 A.1). ② 뒤 #111111로 해결 | DS-1에서 닫힘 |
+| DS-O5 | `.ed-copy` · `.ed-plink`가 포커스 색(`--accent` 2.9:1)을 글자에 썼다 — ① 단계에서 `color-text-link`로 옮김(부록 A.1). ② 뒤 #111111로 해결 | 닫힘(DS-1) |
 
 ---
 
@@ -536,15 +536,15 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 ## 부록 B. DS-1 체크리스트
 
-- [ ] B.1 `design-tokens/tokens.json` ① 단계(A.0) — §3의 모든 토큰, `$description` = 쓰임, DS-2 예약 토큰은 `$extensions.reserved`
-- [ ] B.2 `build.mjs` — 원본 → `:root` CSS를 `/* @design-tokens */`에, 참조는 `var()`로, watch가 원본 변경도 봄
-- [ ] B.3 `src/ui.html` `:root`의 옛 변수 지우고 자리 표시만(`color-scheme: light`는 남김)
-- [ ] B.4 `src/ui.html` CSS 전부 A.1–A.3대로(직접 값 0)
-- [ ] B.5 `src/ui.html` 본문 `style="font-size:…"` 2곳 → 토큰(나머지 `display:none` · 너비는 §8-1 대상 속성이 아님)
-- [ ] B.6 `src/ui.ts` · `src/treeList.ts`의 옛 변수 이름과 innerHTML · `style.margin*` 안 직접 간격 · 둥글기 · 색 → 토큰(`treeList.ts`의 4px · 16px 그룹 여백 → `var(--space-1)` · `var(--space-4)`)
-- [ ] B.7 `test/design-tokens.test.mjs` — §8의 1–7
-- [ ] B.8 `scripts/verify-bind-flow.mjs`가 읽는 옛 변수 이름(`--border` · `--text` · `--text-2` · `--muted` · `--swatch-line`)을 새 이름으로. 글자 크기 검사(`^[\d.]+px$`)는 계산된 값을 보도록. 바뀐 px 기대값(★ 입력 높이 등)은 고치고 목록을 PR에 적는다
-- [ ] B.9 ① 커밋: 검사 4개 통과 + 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 모달)으로 **★과 A.3 규칙(둥글기 · 줄 높이 · 글자 크기 · 간격 · 투명도 맞추기)에 따른 변화 밖**의 차이가 없는지
-- [ ] B.10 ② 커밋: A.4 + 검사 4개 통과 + 새 모양 스크린샷
-- [ ] B.11 `ROADMAP.md`에 DS-1 · DS-2 · DS-3 자리, `docs/ia-v4.md` §2.8 · §8에서 이 문서를 가리킴. ①에서 바뀌는 ia-v4 §8의 숫자(사용자 결정이 아닌 것 — 카드 안쪽 10 · 12 → 12 · 12, 만들기 아래 줄 위아래 6 · 8 → 8 · 8로 합계 80 → 82, 입력 높이 ≈31 → 28, 변수 탭 머리 줄 높이 등)를 ia-v4 §8에 적는다
-- [ ] B.12 쓰는 곳이 없는 규칙을 지운다(HTML 본문 · `ui.ts` · `treeList.ts`에 0곳 — 3회차 검토 확인): `.pipe-mini` · `.bind-steps` · `.bs` · `.bs-dot` · `.vs-tw` · `.bv-tw` · `.bd-all` · `.tier-chip` · `.subtabs`(`.subtab`은 남김) · `.vt-section` · `.vu-props` · `.col-role .sub` · `.icon-btn.spinning` · `.results.stale` · `.vusage` · `.alias-pill` · `.vt-line` · `.vt-lib` · `.tr-note` · `.bind-done` · `.situation`(4회차 검토 확인). 지우기 전에 한 번 더 grep. `scripts/verify-bind-flow.mjs`에 이름만 남은 `.tier-chip`(카드 찾기 제외) · `.tier-chip .badge` · `.bs-dot`(배지 예외)도 함께 정리. §5 · §6의 "지금 코드" 칸은 실제로 쓰는 클래스만 적는다
+- [x] B.1 `design-tokens/tokens.json` ① 단계(A.0) — §3의 모든 토큰, `$description` = 쓰임, DS-2 예약 토큰은 `$extensions.reserved`
+- [x] B.2 `build.mjs` — 원본 → `:root` CSS를 `/* @design-tokens */`에, 참조는 `var()`로, watch가 원본 변경도 봄
+- [x] B.3 `src/ui.html` `:root`의 옛 변수 지우고 자리 표시만(`color-scheme: light`는 남김)
+- [x] B.4 `src/ui.html` CSS 전부 A.1–A.3대로(직접 값 0)
+- [x] B.5 `src/ui.html` 본문 `style="font-size:…"` 2곳 → 토큰(나머지 `display:none` · 너비는 §8-1 대상 속성이 아님)
+- [x] B.6 `src/ui.ts` · `src/treeList.ts`의 옛 변수 이름과 innerHTML · `style.margin*` 안 직접 간격 · 둥글기 · 색 → 토큰(`treeList.ts`의 4px · 16px 그룹 여백 → `var(--space-1)` · `var(--space-4)`)
+- [x] B.7 `test/design-tokens.test.mjs` — §8의 1–7
+- [x] B.8 `scripts/verify-bind-flow.mjs`가 읽는 옛 변수 이름(`--border` · `--text` · `--text-2` · `--muted` · `--swatch-line`)을 새 이름으로. 글자 크기 검사(`^[\d.]+px$`)는 계산된 값을 보도록. 바뀐 px 기대값(★ 입력 높이 등)은 고치고 목록을 PR에 적는다
+- [x] B.9 ① 커밋: 검사 4개 통과 + 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 모달)으로 **★과 A.3 규칙(둥글기 · 줄 높이 · 글자 크기 · 간격 · 투명도 맞추기)에 따른 변화 밖**의 차이가 없는지
+- [x] B.10 ② 커밋: A.4 + 검사 4개 통과 + 새 모양 스크린샷
+- [x] B.11 `ROADMAP.md`에 DS-1 · DS-2 · DS-3 자리, `docs/ia-v4.md` §2.8 · §8에서 이 문서를 가리킴. ①에서 바뀌는 ia-v4 §8의 숫자(사용자 결정이 아닌 것 — 카드 안쪽 10 · 12 → 12 · 12, 만들기 아래 줄 위아래 6 · 8 → 8 · 8로 합계 80 → 82, 입력 높이 ≈31 → 28, 변수 탭 머리 줄 높이 등)를 ia-v4 §8에 적는다
+- [x] B.12 쓰는 곳이 없는 규칙을 지운다(HTML 본문 · `ui.ts` · `treeList.ts`에 0곳 — 3회차 검토 확인): `.pipe-mini` · `.bind-steps` · `.bs` · `.bs-dot` · `.vs-tw` · `.bv-tw` · `.bd-all` · `.tier-chip` · `.subtabs`(`.subtab`은 남김) · `.vt-section` · `.vu-props` · `.col-role .sub` · `.icon-btn.spinning` · `.results.stale` · `.vusage` · `.alias-pill` · `.vt-line` · `.vt-lib` · `.tr-note` · `.bind-done` · `.situation`(4회차 검토 확인). 지우기 전에 한 번 더 grep. `scripts/verify-bind-flow.mjs`에 이름만 남은 `.tier-chip`(카드 찾기 제외) · `.tier-chip .badge` · `.bs-dot`(배지 예외)도 함께 정리. §5 · §6의 "지금 코드" 칸은 실제로 쓰는 클래스만 적는다
