@@ -240,7 +240,7 @@
 
 | 단계 | 내용 | 파일을 바꾸나 | 왜 이 순서 |
 |---|---|---|---|
-| 0 | 옛 컴포넌트 기능 삭제(S-1b) · 옛 명세 보관 | — | 결정됨(SC-D13 · SC-D14) |
+| 0 | ✓ 옛 컴포넌트 기능 삭제(S-1b) · 옛 명세 보관(`docs/archive/components-v1.md`) | — | 결정됨(SC-D13 · SC-D14) — 구현 끝(2026-11-25, 실기 확인 기다림) |
 | 1 | **분석만**: 구조 지문 · 가족 · Type A/B/C · 요약 숫자 · 묶음 목록 · 미리보기 | 아니오 | 가장 어려운 "묶기 규칙"을 위험 없이 실기 파일로 맞춘다 |
 | 2 | **Type A 실행**: 메인 만들기 + 인스턴스로 바꾸기 + 앞뒤 비교 · 되돌림 · 다시 실행 안전 | 예 | 화면 보존 절차를 가장 단순한 경우로 굳힌다 |
 | 3 | **Type B**: Variant 세트 · 축과 값 이름 제안과 고치기 · 중첩(안쪽 먼저) | 예 | 2단계 위에 얹는다 |
@@ -278,12 +278,12 @@
 
 ## 6. 옛 코드에서 다시 쓸 수 있는 부품
 
-옛 컴포넌트 코드는 지우지만(SC-D13) 다음은 같은 문제를 이미 푼 코드다. 지운 뒤에는 git 기록에서 꺼내 쓴다(마지막 커밋 번호는 S-1b에서 ROADMAP에 적는다).
+옛 컴포넌트 코드는 지웠지만(SC-D13) 다음은 같은 문제를 이미 푼 코드다. S-1b에서 지웠으므로 git 기록에서 꺼내 쓴다 — 마지막 컴포넌트 코드 커밋은 `1b1f419`(ROADMAP §0 S-1b · `docs/archive/components-v1.md` 머리에도 적었다). 꺼내는 법: `git show 1b1f419:{경로}`. 옛 명세 · 결정은 `docs/archive/components-v1.md`.
 
 | 부품 | 옛 자리 | 새 설계에서 |
 |---|---|---|
-| 사진 채움 옮기기(자르기 포함) · 벡터 그림 지문 · 아이콘 스왑 | `src/lib/artwork.ts` | §3.6 덮어쓰기 옮기기 · §3.8 에셋 |
-| 인스턴스를 원래 자리에 놓기(위치 · 크기 · 오토 레이아웃 자식 속성) | `src/lib/placement.ts` | §3.6 2번 |
-| 구조 지문 · Variant 축 유도 · 누락 조합 | `src/lib/components.ts`(`structFingerprint` · `deriveVariants` 등) | §3.2 · §3.4 · §3.5 — 규칙은 새로, 뼈대는 참고 |
-| 아이콘 프레임 판정 | `src/lib/componentLike.ts` `isIconFrame`(이름 정리가 써서 남는다) | §3.2 · §3.8 |
-| 속성 노출(글자 · 인스턴스 교체) | `src/code.ts` `exposeProperties` | §3.8 |
+| 사진 채움 옮기기(자르기 포함) · 벡터 그림 지문 · 아이콘 스왑 | `src/lib/artwork.ts`(커밋 `1b1f419`) | §3.6 덮어쓰기 옮기기 · §3.8 에셋 |
+| 인스턴스를 원래 자리에 놓기(위치 · 크기 · 오토 레이아웃 자식 속성) | `src/lib/placement.ts`(커밋 `1b1f419`) | §3.6 2번 |
+| 구조 지문 · Variant 축 유도 · 누락 조합 | `src/lib/components.ts`(`structFingerprint` · `deriveVariants` · `missingVariants` 등 — 커밋 `1b1f419`. 테스트 `test/grouping.test.mjs` · `reuse.test.mjs` · `placement.test.mjs`도 같은 커밋) | §3.2 · §3.4 · §3.5 — 규칙은 새로, 뼈대는 참고 |
+| 아이콘 프레임 판정 | `src/lib/componentLike.ts` `isIconFrame`(이름 정리가 써서 지금 코드에 남아 있다. 지운 부분 — 고신뢰 역할 · 머리글 자리 · 탭 판정 — 은 커밋 `1b1f419`) | §3.2 · §3.8 |
+| 속성 노출(글자 · 인스턴스 교체) | `src/code.ts` `exposeProperties` · `exposePropertiesFromPlan`(커밋 `1b1f419`) | §3.8 |

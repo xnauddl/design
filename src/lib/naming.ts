@@ -87,14 +87,14 @@ export const ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES] as const;
 
 /**
  * 리네임이 판정한 역할을 노드에 남기는 pluginData 키.
- * 컴포넌트 등록이 이 값을 머리명사로 읽는다 — 이름 텍스트만으로는 사람이 지은 복합 명사
- * (`nav-button`)와 리네임이 지은 `{맥락}-{역할}`(`card-thumbnail`)을 구분할 수 없다.
+ * 이름 정리 자신(전에 지은 이름 판정)과 텍스트 스타일 label 판정(`bind.ts` `dsRoleOwner`)이 읽는다 — 이름 텍스트만으로는
+ * 사람이 지은 복합 명사(`nav-button`)와 리네임이 지은 `{맥락}-{역할}`(`card-thumbnail`)을 구분할 수 없다.
  */
 export const ROLE_KEY = 'dsRole';
 
 /**
  * 이름 정리가 보이는 이름에서 루트 접두사를 뗐을 때(ia-v4 §4.4 "맨 위 이름은 보이는 이름에 붙이지 않는다")
- * 떼기 전 이름을 남기는 pluginData 키. [등록]의 이름 키(`StructNode.nameKey`)가 읽어 묶기 · 재사용 키를 지금과 같게 한다.
+ * 떼기 전 이름을 남기는 pluginData 키. 이름 힌트로 이름을 둔 노드의 키 판정(`rename.ts` — `nameKeyFor`)이 읽는다.
  */
 export const NAME_KEY = 'dsNameKey';
 
