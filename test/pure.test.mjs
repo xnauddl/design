@@ -2781,3 +2781,18 @@ test('B.35 tokenGroups · libSameGroups · onlyItems — 묶음 · 라이브러�
   assert.deepEqual(onlyItems([{ ...fill, freeBy: { 'ALL_FILLS|FRAME_FILL': 10 } }], libs), [], '묶음이 모두 라이브러리 같은 값이면 토큰을 뺀다');
   assert.deepEqual(onlyItems([{ name: 'x', category: 'color', value: '#000000', alpha: 0.1, freeBy: { EFFECT_COLOR: 1 } }], []), [{ value: '#000000', alpha: 0.1, groups: ['EFFECT_COLOR'] }]);
 });
+
+test('B.41 pillOrder — 숫자 작은 순 → 숫자 아님(글자 · 값 없음) → 별칭, 같은 값은 들어온 순서', async () => {
+  const { pillOrder } = await import('../dist/pure.mjs');
+  const rows = [
+    { id: 'a', c: { kind: 'number', text: '14' } },
+    { id: 'b', c: { kind: 'number', text: '2' } },
+    { id: 'al', c: { kind: 'alias', aliasId: 'x', name: 'x' } },
+    { id: 's', c: { kind: 'string', text: '16px' } },
+    { id: 'c', c: { kind: 'number', text: '4' } },
+    { id: 'none', c: undefined },
+    { id: 'd', c: { kind: 'number', text: '4' } },
+    { id: 'e', c: { kind: 'number', text: '1.5' } },
+  ];
+  assert.deepEqual(pillOrder(rows, (r) => r.c).map((r) => r.id), ['e', 'b', 'c', 'd', 'a', 's', 'none', 'al']);
+});

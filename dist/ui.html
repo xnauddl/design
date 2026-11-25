@@ -782,7 +782,9 @@
     .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: 11px; }
     /* ── 변수 목록 결정 B(§4.4): 머리줄 고정 · 사이드바(128px, 고정 + 따로 스크롤) · 오른쪽 목록 머리 고정 ── */
     #varList .list-head { position: sticky; top: var(--tabs-h, 41px); z-index: 3; background: var(--bg); padding: 2px 0 6px; margin: 0; }
-    .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--border); }
+    .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--border);
+      /* 사이드바 아래까지 경계선(ia-v4 §4.6 B.41 VO-D2) — 사이드바 border-right와 같은 x 127px */
+      background: linear-gradient(to right, transparent 127px, var(--border) 127px 128px, transparent 128px) no-repeat; }
     .vl-side {
       width: 128px; flex: 0 0 128px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
       max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--border);
@@ -3775,6 +3777,19 @@
     if (cut <= 0) return [];
     const segs = v.name.slice(0, cut).split("/");
     return segs.map((_, i) => `${v.collectionId}|${segs.slice(0, i + 1).join("/")}`);
+  }
+  function pillOrder(rows, cellOf) {
+    const num = [];
+    const other = [];
+    const alias = [];
+    rows.forEach((r, i) => {
+      const c = cellOf(r);
+      if ((c == null ? void 0 : c.kind) === "alias") alias.push(r);
+      else if ((c == null ? void 0 : c.kind) === "number" && Number.isFinite(Number(c.text))) num.push({ r, v: Number(c.text), i });
+      else other.push(r);
+    });
+    num.sort((a, b) => a.v - b.v || a.i - b.i);
+    return [...num.map((x) => x.r), ...other, ...alias];
   }
 
   // src/lib/reread.ts
@@ -9492,7 +9507,7 @@ ${opts.tip}` : text;
       if (global) {
         const colors = rows.filter((v) => v.type === "COLOR");
         const others = rows.filter((v) => v.type !== "COLOR");
-        if (others.length) grp.appendChild(paletteLineEl(others, "pill", level));
+        if (others.length) grp.appendChild(paletteLineEl(pillOrder(others, currentModeCell), "pill", level));
         if (colors.length) {
           if (colorView === "grid") grp.appendChild(paletteLineEl(colors, "dot", level));
           else for (const v of colors) grp.appendChild(varRowEl(v, true, level));
