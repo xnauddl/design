@@ -110,11 +110,6 @@
     "wizard.step.bind": "\uC5F0\uACB0",
     "wizard.step.rename": "\uC774\uB984 \uC815\uB9AC",
     // 역할 매핑 단계 — 쓰임 역할은 만들기 단계가 이미 만들었을 때(§2.12 12.10).
-    // 진행 안내(파이프라인) 단계 상태
-    "pipeline.stat.done": "\uC644\uB8CC",
-    "pipeline.stat.ready": "\uC900\uBE44",
-    "pipeline.stat.blocked": "\uC804\uC81C \uBBF8\uCDA9\uC871",
-    "pipeline.stat.todo": "\uB9CC\uB4E4\uAE30",
     // 바인딩 스킵 사유(라벨 맵)
     "reason.no-match": "\uB9E4\uCE6D \uC5C6\uC74C",
     "reason.already-bound": "\uC774\uBBF8 \uC5F0\uACB0\uB428",
@@ -158,17 +153,6 @@
     "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
     "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
-    // 진행 안내 단계 라벨·안내
-    "pipeline.step.colors": "\uC0C9 \uBCC0\uC218",
-    "pipeline.step.tokens": "\uAC04\uACA9\xB7\uD06C\uAE30 \uD1A0\uD070",
-    "pipeline.step.semantics": "Semantic \uB9E4\uD551",
-    "pipeline.step.bind": "\uBCC0\uC218 \uC5F0\uACB0",
-    "pipeline.step.dark": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "pipeline.step.textStyles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C",
-    "pipeline.step.rename": "\uC774\uB984 \uC815\uB9AC",
-    "pipeline.hint.needTokens": "\uD1A0\uD070\uC744 \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
-    "pipeline.hint.needBindable": "\uC5F0\uACB0\uD560 \uBCC0\uC218\uB97C \uBA3C\uC800 \uB9CC\uB4DC\uC138\uC694",
-    "pipeline.hint.darkUnfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C",
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
     "v4.colEmpty": "\uC774 \uCEEC\uB809\uC158\uC5D4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -241,7 +225,6 @@
     "op.createVar": "\uC0C8 \uBCC0\uC218",
     "op.dupVar": "\uBCF5\uC81C",
     "op.delVar": "\uC0AD\uC81C",
-    "op.tsRename": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uBC14\uAFB8\uAE30",
     "create.sumManual": " \xB7 \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {n}",
     "common.close": "\uB2EB\uAE30",
     // 변수 관리(넓은 화면)
@@ -333,7 +316,6 @@
     // IA v3 변수 탭(§4.2~§4.4)
     "var.loading": "\uBCC0\uC218 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "wizard.toBind": "\uC5F0\uACB0\uD558\uAE30 \u2192",
-    "list.readiness": "\uC900\uBE44 \uD604\uD669 {n}/{total}",
     "list.addTip": "\uCD94\uAC00",
     "list.moreTip": "\uB354 \uBCF4\uAE30",
     "list.modeTip": "\uBAA8\uB4DC",
@@ -358,7 +340,6 @@
     "list.menuExport": "\uCF54\uB4DC\uB85C \uB0B4\uBCF4\uB0B4\uAE30\u2026",
     "list.menuExpandAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uD3BC\uCE58\uAE30",
     "list.menuCollapseAll": "\uC0AC\uC774\uB4DC\uBC14 \uBAA8\uB450 \uC811\uAE30",
-    "list.semanticsNote": "Semantic \uB9E4\uD551\uC740 \uD1A0\uD070\uC744 \uB9CC\uB4E4 \uB54C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC838\uC694",
     "tab.variables": "\uBCC0\uC218",
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
@@ -454,7 +435,6 @@
     "make.globalN": "Global {g}\uAC1C",
     // 무료 규칙(IA v4 §4.9 F2 · §4.3a F8)
     "paid.semantic": "Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
-    "paid.semMap": "Semantic \uB9E4\uD551\uC740 \uC720\uB8CC\uC608\uC694",
     // 선택 탭 만들기 카드(IA v4 §4.1 "만들기 카드" — 상태 6)
     "mkc.subFree": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uAC1C\uC218 \uC81C\uD55C\uC740 \uC5C6\uC5B4\uC694",
     "mkc.subPaid": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \xB7 Semantic \uBCC0\uC218\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
@@ -869,7 +849,6 @@
     "textStyle.renaming": "\uC67C\uCABD \uAE00\uC790\uB85C \uC774\uB984\uC744 \uB2E4\uC2DC \uB9E4\uAE30\uB294 \uC911\u2026",
     "textStyle.needSpecs": "\uBA3C\uC800 \u2018\uC2A4\uCE94\u2019\uC73C\uB85C \uC2A4\uD0C0\uC77C\uC744 \uC77D\uC5B4 \uC8FC\uC138\uC694",
     "textStyle.nameSplit": " \xB7 \uC67C\uCABD \uAE00\uC790 {a} \xB7 KRDS \uC774\uB984 {b}",
-    "textStyle.renameBtn": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30",
     // 안 쓰는 변수 찾기(docs/unused-vars.md)
     "unused.menu": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uCC3E\uAE30\u2026",
     "unused.noVars": "\uB85C\uCEEC \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
@@ -895,28 +874,6 @@
     "unused.failedTail": " \xB7 \uBABB \uC9C0\uC6C0 {f}",
     "unused.deleteFail": "\uC548 \uC4F0\uB294 \uBCC0\uC218\uB97C \uC9C0\uC6B0\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "op.deleteUnused": "\uC548 \uC4F0\uB294 \uBCC0\uC218 \uC9C0\uC6B0\uAE30",
-    "textStyle.renameMenu": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30\u2026",
-    "textStyle.renameReading": "\uC2A4\uD0C0\uC77C\uC744 \uC77D\uB294 \uC911\u2026",
-    "textStyle.renameHead": "\uC774\uB984 \uB2E4\uC2DC \uC9D3\uAE30 \xB7 \uBC14\uAFC0 \uC774\uB984 {n}\uAC1C",
-    "textStyle.renameNone": "\uBC14\uAFC0 \uC774\uB984\uC774 \uC5C6\uC5B4\uC694",
-    "textStyle.renameApply": "{k}\uAC1C \uC774\uB984 \uBC14\uAFB8\uAE30",
-    "textStyle.renameNeedOn": "\uBC14\uAFC0 \uC774\uB984\uC744 \uCF1C \uC8FC\uC138\uC694",
-    "textStyle.renameClash": "\uAC19\uC740 \uC774\uB984\uC774 \uB0A8\uC544\uC694",
-    "textStyle.renameRowAria": "{from} \u2192 {to}",
-    "textStyle.renamed": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C \uC774\uB984\uC744 \uBC14\uAFE8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
-    "textStyle.renameSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
-    "textStyle.renameRoleSkipped": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uAC19\uC740 \uC774\uB984\uC774 \uC788\uC5B4 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "textStyle.renameRoleError": " \xB7 Semantic \uBCC0\uC218 {n}\uAC1C\uB294 \uBC14\uAFB8\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "textStyle.renameRoleStuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD55C \uBCC0\uC218: {names}",
-    "textStyle.renameRoleMoveError": " \xB7 {m}\uAC1C\uB294 Semantic \uBCC0\uC218\uB97C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "textStyle.renameRoleMoveNames": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC2A4\uD0C0\uC77C: {names}",
-    "textStyle.renameSkip.renamed-meanwhile": "\uADF8 \uC0AC\uC774 \uC774\uB984\uC774 \uBC14\uB01C",
-    "textStyle.renameSkip.value-changed": "\uADF8 \uC0AC\uC774 \uAC12\uC774 \uBC14\uB01C",
-    "textStyle.renameSkip.name-taken": "\uAC19\uC740 \uC774\uB984\uC774 \uC788\uC74C",
-    "textStyle.renameSkip.error": "\uC624\uB958",
-    "textStyle.renameSkip.error-chain": "\uC5F0\uACB0\uB41C \uD56D\uBAA9 \uC624\uB958\uB85C \uB418\uB3CC\uB9BC",
-    "textStyle.renameSkip.error-stuck": "\uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD568 \xB7 \uC9C0\uAE08 \uC774\uB984 {name}",
-    "textStyle.renameClearedTable": " \xB7 \uC2A4\uCE94 \uD45C\uB97C \uBE44\uC6E0\uC5B4\uC694 \u2014 \uB2E4\uC2DC [\uC2A4\uCE94]\uD574 \uC8FC\uC138\uC694",
     "textStyle.missRoleStuck": "{name}: Semantic \uBCC0\uC218 \uC774\uB984\uC744 \uB418\uB3CC\uB9AC\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {vars}",
     "textStyle.fallbackRamp": "\uC120\uD0DD\uC5D0\uC11C \uD14D\uC2A4\uD2B8\uB97C \uBABB \uCC3E\uC544 \uAE30\uBCF8 \uB7A8\uD504\uB85C \uCC44\uC6E0\uC5B4\uC694. \uD3F0\uD2B8\xB7\uAC12\uC744 \uC870\uC815\uD558\uC138\uC694",
     "textStyle.registered": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {n}\uAC1C (\uC0DD\uC131 {c} / \uAC31\uC2E0 {u}) \xB7 \uC5F0\uACB0 {b}",
@@ -6104,146 +6061,6 @@
       } else {
         res.error++;
         if (st === "error-stuck") res.stuck.push(c.v.name);
-      }
-    }
-    return res;
-  }
-  function krdsInputOf(s) {
-    const e = existingOf(s);
-    return __spreadProps(__spreadValues({
-      id: e.id,
-      name: e.name,
-      fontSize: e.fontSize,
-      lineHeight: e.lineHeight
-    }, e.lineHeightPercent ? { lineHeightPercent: e.lineHeightPercent } : {}), {
-      letterSpacing: e.letterSpacing,
-      family: e.family,
-      style: e.style,
-      count: 0,
-      uiCount: 0
-    });
-  }
-  async function planTsRename() {
-    const styles = await figma.getLocalTextStylesAsync();
-    const steps = [];
-    const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: /* @__PURE__ */ new Set(), path: "rename", steps });
-    const rows = [];
-    styles.forEach((s, i) => {
-      const to = names[i];
-      if (!to || to === s.name) return;
-      rows.push(__spreadValues({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)) }, steps[i] ? { step: steps[i] } : {}));
-    });
-    return rows;
-  }
-  async function moveStyleToStep(st, step) {
-    await figma.loadFontAsync(st.fontName);
-    const fontSize = roundN(st.fontSize);
-    const lh = lhPxOf(fontSize, st.lineHeight);
-    const ls = lsPxOf(fontSize, st.letterSpacing);
-    const toks = [{ name: numberTokenName("font-size", fontSize), category: "fontSize", value: fontSize, sources: ["fontSize"] }];
-    const reqs = [{ field: "fontSize", req: { base: `font-size/${step}`, value: fontSize, step, token: toks[0].name } }];
-    if (lh > 0 && lhPctOf(st.lineHeight) === 0 && Number.isInteger(lh)) {
-      const name = numberTokenName("line-height", lh);
-      toks.push({ name, category: "lineHeight", value: lh, unit: "px", sources: ["lineHeight"] });
-      reqs.push({ field: "lineHeight", req: { base: `line-height/${step}`, value: lh, step, token: name } });
-    }
-    if (ls !== 0 && lsPctOf(st.letterSpacing) === 0 && Number.isInteger(ls)) {
-      const name = numberTokenName("letter-spacing", ls);
-      toks.push({ name, category: "letterSpacing", value: ls, unit: "px", sources: ["letterSpacing"] });
-      reqs.push({ field: "letterSpacing", req: { base: `letter-spacing/${step}`, value: ls, step, token: name } });
-    }
-    const made = await createTokens(toks, 16);
-    const allVars = new Map((await figma.variables.getLocalVariablesAsync()).map((v) => [v.id, v]));
-    const placed = await placeTextRoleVars(
-      reqs.map((r) => r.req),
-      (token) => {
-        const id = made.globalOf.get(token);
-        return id ? allVars.get(id) : void 0;
-      }
-    );
-    if (placed.some((p) => !p.v)) throw new Error("no global");
-    reqs.forEach((r, i) => st.setBoundVariable(r.field, placed[i].v));
-  }
-  async function applyTsRename(items) {
-    var _a, _b, _c;
-    const styles = await figma.getLocalTextStylesAsync();
-    const byId = new Map(styles.map((s) => [s.id, s]));
-    const status = /* @__PURE__ */ new Map();
-    const order = [];
-    const cands = [];
-    for (const it of items) {
-      if (status.has(it.id)) continue;
-      order.push(it.id);
-      const st = byId.get(it.id);
-      if (!st || st.name !== it.from) status.set(it.id, "renamed-meanwhile");
-      else if (tsSig(existingOf(st)) !== it.sig) status.set(it.id, "value-changed");
-      else {
-        status.set(it.id, "pending");
-        cands.push({ key: it.id, from: it.from, to: it.to, st });
-      }
-    }
-    const candIds = new Set(cands.map((c) => c.key));
-    const taken = finalNameTaken(cands, styles.filter((s) => !candIds.has(s.id)).map((s) => s.name));
-    for (const k of taken) status.set(k, "name-taken");
-    const live = cands.filter((c) => !taken.has(c.key));
-    const done = twoPhaseRename(
-      live.map((c) => ({
-        key: c.key,
-        from: c.from,
-        to: c.to,
-        tmp: `__dsl_tmp_${c.key}`,
-        get: () => c.st.name,
-        set: (n) => {
-          c.st.name = n;
-        }
-      }))
-    );
-    for (const [k, v] of done) status.set(k, v);
-    const res = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] };
-    for (const id of order) {
-      const st = status.get(id);
-      res.results.push({ id, status: st, name: (_b = (_a = byId.get(id)) == null ? void 0 : _a.name) != null ? _b : "" });
-      if (st === "renamed") res.renamed++;
-      else {
-        res.skipped++;
-        res.skipReasons[st] = ((_c = res.skipReasons[st]) != null ? _c : 0) + 1;
-      }
-    }
-    const stepOf = new Map(items.map((it) => [it.id, it.step]));
-    const pairs = [];
-    const moves = [];
-    for (const c of live) {
-      if (status.get(c.key) !== "renamed") continue;
-      let fs = null;
-      try {
-        fs = await styleBoundVar(c.st, "fontSize");
-      } catch (e) {
-        fs = null;
-      }
-      if (!fs) continue;
-      const mark = textStepOf(fs);
-      const step = stepOf.get(c.key);
-      if (!mark) {
-        if (fs.name === `font-size/${c.from}`) pairs.push({ from: c.from, to: c.to });
-      } else if (step && step !== mark) moves.push({ st: c.st, step });
-    }
-    for (const m of moves) {
-      try {
-        await moveStyleToStep(m.st, m.step);
-      } catch (e) {
-        res.roleMoveError++;
-        res.roleMoveNames.push(m.st.name);
-      }
-    }
-    if (pairs.length) {
-      try {
-        const rv = await renameTextRoleVars(pairs);
-        res.roleVarsRenamed = rv.renamed;
-        res.roleVarsTaken = rv.taken;
-        res.roleVarsError = rv.error;
-        res.roleVarsStuck = rv.stuck;
-      } catch (e) {
-        res.roleVarsError = pairs.length;
       }
     }
     return res;
@@ -11708,22 +11525,14 @@
         return ((_a = tiers.get(c.id)) != null ? _a : 0) > 0;
       }).map((c) => c.id));
       const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
-      const hasColorVars = globals.some((v) => v.resolvedType === "COLOR");
-      const hasScaleVars = globals.some((v) => v.resolvedType !== "COLOR");
       const hasGlobal = globals.length > 0;
       const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
-      const semanticIds = new Set(cols.filter((c) => {
-        var _a;
-        return ((_a = tiers.get(c.id)) != null ? _a : 0) >= 2;
-      }).map((c) => c.id));
-      const { hasDarkMode, darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
-      const hasTextStyles = (await figma.getLocalTextStylesAsync()).length > 0;
-      const hasSemanticRoles = vars.some((v) => semanticIds.has(v.variableCollectionId));
+      const { darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
       const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, hasTextStyles, hasSemanticRoles, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+      post({ type: "PREREQ_STATE", hasGlobal, hasBindable, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
     } catch (e) {
     }
   }
@@ -12021,26 +11830,12 @@
     const hasGap = !!lm && lm !== "NONE" && typeof n.itemSpacing === "number";
     return hasFills || hasStrokes || hasRadius || hasFont || hasGap;
   }
-  function hasAnyBinding(n) {
-    const bv = n.boundVariables;
-    if (bv && Object.keys(bv).length) return true;
-    for (const key of ["fills", "strokes"]) {
-      const ps = n[key];
-      if (Array.isArray(ps) && ps.some((p) => {
-        var _a;
-        return !!((_a = p.boundVariables) == null ? void 0 : _a.color);
-      })) return true;
-    }
-    return false;
-  }
   var selfSelect = false;
   function postSelection() {
     var _a, _b;
     const sel = selection();
     let scanned = 0;
     let bindable = 0;
-    let bound = 0;
-    let renamed = 0;
     let capped = false;
     const comps = sel.filter((n) => {
       var _a2;
@@ -12057,14 +11852,12 @@
       if (n.visible === false) continue;
       scanned++;
       if (isBindableCandidate(n)) bindable++;
-      if (hasAnyBinding(n)) bound++;
-      if (readRole(n)) renamed++;
       if (n.type === "INSTANCE") continue;
       if ("children" in n) for (const c of n.children) stack.push(c);
     }
     const firstName = (_b = (_a = sel[0]) == null ? void 0 : _a.name) != null ? _b : "";
     const ids = sel.map((n) => n.id);
-    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, bound, renamed, firstName, ids });
+    post({ type: "SELECTION_STATE", count: sel.length, scanned, bindable, capped, comps, sets, selfSelect, firstName, ids });
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
@@ -12946,19 +12739,6 @@
           if (msg.reqId != null) {
             post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
           } else post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, existing: existingSigs });
-          break;
-        }
-        case "SCAN_TS_RENAME": {
-          if (!requireTextStyles()) break;
-          post({ type: "TS_RENAME_PLAN", reqId: msg.reqId, rows: await planTsRename() });
-          break;
-        }
-        case "APPLY_TS_RENAME": {
-          if (!requireTextStyles()) break;
-          const r = await applyTsRename(msg.items);
-          post(__spreadValues({ type: "TS_RENAMED", reqId: msg.reqId }, r));
-          commitUndo(figma);
-          await postPrereq();
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {

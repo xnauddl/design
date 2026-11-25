@@ -1,7 +1,6 @@
 /* ============================================================
    ui.ts — iframe UI 로직 (postMessage 송수신, 폼 상태)
    ============================================================ */
-import type { TsRenameRow } from './shared/messages';
 import type { UiToCode, CodeToUi, RenameNode, BindCandidate, BindSkip, ComponentCandidate, VarUpdateError, TokenState, RoleRow, ExistingStyleSig, MainUnitInfo } from './shared/messages';
 import { type DraftToken, type Unit, tidyNumberTokens, colorKey, alphaPct } from './lib/tokens';
 import { t, hasString } from './lib/i18n';
@@ -22,7 +21,6 @@ import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
 import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMap } from './lib/roles';
-import { pipelineSteps, type PipelineStep } from './lib/pipeline';
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, makeCreatedText, hasDarkTarget, darkResultText, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
@@ -55,10 +53,7 @@ let isPaid = false; // Free/Paid 2티어 — 유료면 모든 유료 기능 해�
 const pickGlobalOnly = (): { globalOnly?: true } => (isPaid ? {} : { globalOnly: true });
 let colorsFromPalette = false; // 지금 목록의 색이 팔레트 생성으로 온 것인가(변수 생성 시 이전 팔레트 정리)
 let colorsCreated = false; // 이 세션에서 색 변수를 만들었는가(토큰 단계 안내용)
-// #11: 단계 전제 — Global 변수 존재(역할 매핑) · 연결 가능 변수 존재(변수 연결) · 텍스트 스타일 존재(기존만 연결).
-// 색/색 외/다크는 게이트가 아니라 '준비 현황' 목록에만 쓴다(만들기 탭의 할 일).
-let hasColorVars = false;
-let hasScaleVars = false;
+// #11: 단계 전제 — Global 변수 존재(역할 매핑) · 연결 가능 변수 존재(변수 연결).
 let hasGlobal = false;
 let hasBindable = false;
 /** 로컬 변수 수(계층 있음 + 없음) — 연결할 변수가 없을 때 안내 4행(§4.6)을 가른다. */
@@ -74,15 +69,10 @@ function requestPrereq(): void {
   // 응답이 끝내 안 오면(플러그인 쪽 오류) 다음 요청이 영영 막히지 않게 풀어 둔다.
   setTimeout(() => { prereqInFlight = false; }, 3000);
 }
-let hasDarkMode = false;
 /** Dark 값이 없는 색 수 · 옛 구조(PREREQ_STATE — ia-v3 13.7 D-T1). 필드가 없으면 0 · 거짓. */
 let darkUnfilled = 0;
 let darkOld = false;
 let darkOldManual = false;
-let hasTextStyles = false;
-let hasSemanticRoles = false; // 역할 별칭 존재(역할 매핑 완료)
-let hasBoundNodes = false; // 현재 선택에 변수 붙은 레이어 존재(변수 연결 완료)
-let hasRenamedNodes = false; // 현재 선택에 이름 정리된 레이어 존재(이름 정리 완료)
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
@@ -1134,53 +1124,6 @@ function setTsStatus(text: string, cls: 'ok' | 'warn' | '', tip?: string): void 
 }
 /** 이 파일의 로컬 텍스트 스타일 이름(TEXT_STYLE_CANDIDATES.existing) — 기본 램프의 예약 이름. */
 let tsExistingNames: string[] = [];
-
-/* ---------- [이름 다시 짓기] 팝업(docs/text-style-krds.md §5) ---------- */
-let tsrReq = 0;
-let tsrApplyReq = 0;
-/** 미리보기 줄 — null이면 읽는 중. */
-let tsrRows: TsRenameRow[] | null = null;
-const tsrOff = new Set<string>();
-let tsrBody: HTMLElement | null = null;
-let tsrTitle: HTMLElement | null = null;
-let tsrApplyBtn: HTMLButtonElement | null = null;
-let tsrOpener: HTMLElement | null = null;
-let tsrCloseBtn: HTMLElement | null = null;
-/** 팝업 안 알림 줄 — `.tsr-body` 밖, 버튼 줄 바로 위(APPLY_TS_RENAME 오류 · ia-v4 §4.11 T-P29 ④). */
-let tsrNote: HTMLElement | null = null;
-let tsrModal: HTMLElement | null = null;
-let tsrBusy = false;
-$('btnTsRename').addEventListener('click', (e) => {
-  const b = e.currentTarget as HTMLElement;
-  if (b.getAttribute('aria-disabled') === 'true') return;
-  openTsRename(b);
-});
-function openTsRename(opener: HTMLElement): void {
-  if (!isPaid) { showStatusLine(t('status.paid'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } }); return; }
-  const lock = writeLockReason();
-  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
-  tsrOpener = opener;
-  tsrRows = null;
-  tsrOff.clear();
-  tsrBusy = false;
-  const title = document.createElement('span');
-  tsrTitle = title;
-  const body = document.createElement('div');
-  body.className = 'tsr-body';
-  tsrBody = body;
-  const apply = modalButton(t('textStyle.renameApply', { k: 0 }), tsrApply, true);
-  tsrApplyBtn = apply;
-  const close = modalButton(t('common.close'), () => requestCloseModal('button'));
-  tsrCloseBtn = close;
-  const note = document.createElement('div');
-  note.className = 'tsr-note';
-  note.hidden = true;
-  tsrNote = note;
-  tsrModal = openModal(title, body, [close, apply], () => tsrOpener, () => { tsrBody = null; tsrApplyBtn = null; tsrTitle = null; tsrNote = null; tsrModal = null; }, { focus: close, footTop: [note] });
-  tsrReq = ++bindReqSeq;
-  send({ type: 'SCAN_TS_RENAME', reqId: tsrReq });
-  tsrRender();
-}
 /* ---------- 안 쓰는 변수 찾기(docs/unused-vars.md) — 변수 탭 ⋯ 메뉴 · 팝업 하나 ---------- */
 type UnusedState = 'loading' | 'reading' | 'result' | 'checking' | 'error';
 let unusedState: UnusedState | null = null;
@@ -1451,159 +1394,6 @@ function onUnusedError(msg: Extract<CodeToUi, { type: 'ERROR' }>): boolean {
   if (msg.op === 'DELETE_VARIABLES' && !isMini) showStatusLine(t('unused.deleteFail'), { cls: 'warn', tip: explainError(msg.message).message });
   return true;
 }
-/** 켠 줄 중 바꿀 수 있는 것 — 끈 줄의 지금 이름과 새 이름이 겹치면 뺀다(§5.2). */
-function tsrClash(r: TsRenameRow): boolean {
-  return !!tsrRows?.some((x) => x !== r && tsrOff.has(x.id) && x.from === r.to);
-}
-function tsrApplicable(): TsRenameRow[] {
-  return (tsrRows ?? []).filter((r) => !tsrOff.has(r.id) && !tsrClash(r));
-}
-function tsrRender(): void {
-  const body = tsrBody;
-  if (!body || !tsrApplyBtn || !tsrTitle) return;
-  const rows = tsrRows;
-  tsrTitle.textContent = t('textStyle.renameHead', { n: rows?.length ?? 0 });
-  const k = tsrApplicable().length;
-  tsrApplyBtn.textContent = t('textStyle.renameApply', { k });
-  const lock = tsrBusy ? t('common.running') : writeLockReason();
-  setLock(tsrApplyBtn, lock ? 'prereq' : !rows || !k ? 'prereq' : null, lock ?? t('textStyle.renameNeedOn'));
-  const hadFocus = body.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.id ?? (document.activeElement as HTMLElement).dataset.all ?? null : null;
-  clearMount(body);
-  if (!rows) { body.textContent = t('textStyle.renameReading'); return; }
-  if (!rows.length) { body.textContent = t('textStyle.renameNone'); return; }
-  const all = document.createElement('div');
-  all.className = 'tsr-all';
-  const link = (label: string, key: string, on: boolean): HTMLButtonElement => {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'link link-btn';
-    b.textContent = label;
-    b.dataset.all = key;
-    b.addEventListener('click', () => { for (const r of rows) on ? tsrOff.delete(r.id) : tsrOff.add(r.id); tsrRender(); });
-    return b;
-  };
-  all.append(link(t('bind.allOn'), 'on', true), ' · ', link(t('bind.allOff'), 'off', false));
-  body.appendChild(all);
-  const sws: HTMLButtonElement[] = [];
-  for (const r of rows) {
-    const row = document.createElement('div');
-    row.className = 'tsr-row';
-    row.title = `${r.from} → ${r.to}`;
-    const from = document.createElement('span');
-    from.className = 'tsr-from';
-    from.textContent = r.from;
-    const arrow = document.createElement('span');
-    arrow.textContent = '→';
-    arrow.setAttribute('aria-hidden', 'true');
-    const to = document.createElement('span');
-    to.className = 'tsr-to';
-    to.textContent = r.to;
-    row.append(from, arrow, to);
-    const on = !tsrOff.has(r.id);
-    if (on && tsrClash(r)) {
-      const c = document.createElement('span');
-      c.className = 'tsr-clash';
-      c.textContent = t('textStyle.renameClash');
-      row.appendChild(c);
-    }
-    const sw = document.createElement('button');
-    sw.type = 'button';
-    sw.className = 'bv-switch';
-    sw.dataset.id = r.id;
-    sw.setAttribute('role', 'switch');
-    sw.setAttribute('aria-checked', String(on));
-    sw.setAttribute('aria-label', t('textStyle.renameRowAria', { from: r.from, to: r.to }));
-    const tr = document.createElement('span');
-    tr.className = 'bv-track';
-    tr.setAttribute('aria-hidden', 'true');
-    sw.appendChild(tr);
-    sw.addEventListener('click', () => { on ? tsrOff.add(r.id) : tsrOff.delete(r.id); tsrRender(); });
-    sw.addEventListener('keydown', (e) => {
-      const i = sws.indexOf(sw);
-      const go = (j: number): void => { sws[Math.max(0, Math.min(sws.length - 1, j))]?.focus(); };
-      if (e.key === 'ArrowDown') go(i + 1);
-      else if (e.key === 'ArrowUp') go(i - 1);
-      else return;
-      e.preventDefault();
-    });
-    sws.push(sw);
-    row.appendChild(sw);
-    body.appendChild(row);
-  }
-  if (hadFocus) body.querySelector<HTMLElement>(`[data-id="${CSS.escape(hadFocus)}"], [data-all="${CSS.escape(hadFocus)}"]`)?.focus();
-}
-function onTsRenamePlan(msg: Extract<CodeToUi, { type: 'TS_RENAME_PLAN' }>): void {
-  if (msg.reqId !== tsrReq || !tsrBody) return;
-  const stayed = document.activeElement === tsrCloseBtn; // 열 때 포커스는 [닫기]
-  tsrRows = msg.rows;
-  tsrRender();
-  // 응답이 오면 첫 줄 스위치로 — 사용자가 그 사이 포커스를 옮겼으면 그대로(§5.2)
-  if (stayed) tsrBody?.querySelector<HTMLElement>('.bv-switch')?.focus();
-}
-function tsrApply(): void {
-  if (!tsrApplyBtn || tsrApplyBtn.getAttribute('aria-disabled') === 'true') return;
-  const items = tsrApplicable().map((r) => ({ id: r.id, from: r.from, to: r.to, sig: r.sig, ...(r.step ? { step: r.step } : {}) }));
-  if (!items.length) return;
-  tsrBusy = true;
-  tsrRender();
-  tsrApplyReq = ++bindReqSeq;
-  send({ type: 'APPLY_TS_RENAME', reqId: tsrApplyReq, items });
-}
-/** 이름 다시 짓기 오류(ERROR{op: 'APPLY_TS_RENAME'}) — `tsrBusy`를 풀고 팝업은 그대로, 팝업 안 알림 줄에 오류 +
- *  [다시 시도](ia-v4 §2.8 · §4.11 T-P29 ④ · B.19). [다시 시도]가 있는 동안 [{k}개 이름 바꾸기]는 보조(C-D14). */
-function onTsRenameError(msg: Extract<CodeToUi, { type: 'ERROR' }>): void {
-  if (msg.reqId != null && msg.reqId !== tsrApplyReq) return;
-  tsrBusy = false;
-  if (!tsrNote || !tsrModal) { tsrRender(); return; } // 팝업을 닫은 뒤 — 보일 자리가 없다
-  const f = explainError(msg.message);
-  const note = tsrNote;
-  const modal = tsrModal;
-  const clear = (): void => {
-    note.replaceChildren();
-    note.hidden = true;
-    releasePrimaries(modal);
-  };
-  const { box, retry } = errorBox(f, f.retryable ? (): void => {
-    // 지금 켠 줄 · 새 reqId로 다시 보낸다(tsrApply). 보낼 수 없으면(켠 줄 0 · 쓰기 잠금 · 바꿀 줄 없음) 상자 · 포커스 그대로.
-    const before = tsrApplyReq;
-    tsrApply();
-    if (tsrApplyReq === before) return;
-    clear();
-    tsrCloseBtn?.focus({ preventScroll: true }); // 다시 보내는 동안 [{k}개 이름 바꾸기]는 잠김
-  } : null);
-  note.replaceChildren(box);
-  note.hidden = false;
-  releasePrimaries(modal);
-  if (retry) holdPrimaries(modal, retry);
-  tsrRender();
-}
-function onTsRenamed(msg: Extract<CodeToUi, { type: 'TS_RENAMED' }>): void {
-  if (msg.reqId !== tsrApplyReq) return;
-  tsrBusy = false;
-  if (tsrBody) closeModal(); // 팝업을 닫으면 연 버튼으로 포커스가 돌아간다
-  let text = t('textStyle.renamed', { n: msg.renamed });
-  if (msg.skipped) text += t('textStyle.renameSkipped', { m: msg.skipped });
-  if (msg.roleVarsTaken) text += t('textStyle.renameRoleSkipped', { n: msg.roleVarsTaken });
-  if (msg.roleVarsError) text += t('textStyle.renameRoleError', { n: msg.roleVarsError });
-  if (msg.roleMoveError) text += t('textStyle.renameRoleMoveError', { m: msg.roleMoveError }); // 새 단계 변수로 옮기지 못함(ia-v3 §2.12 12.12 N-D2a)
-  const stuck = msg.results.filter((r) => r.status === 'error-stuck');
-  const tip = [
-    ...Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => (k === 'error-stuck' ? `${t('textStyle.renameSkip.error-stuck', { name: stuck.map((x) => x.name).join(', ') })} ${n}` : `${t('textStyle.renameSkip.' + k)} ${n}`)),
-    ...(msg.roleVarsStuck.length ? [t('textStyle.renameRoleStuck', { names: msg.roleVarsStuck.join(', ') })] : []),
-    ...(msg.roleMoveNames?.length ? [t('textStyle.renameRoleMoveNames', { names: msg.roleMoveNames.join(', ') })] : []),
-  ].join('\n');
-  const warn = !!(msg.skipped || msg.roleVarsTaken || msg.roleVarsError || msg.roleMoveError);
-  showStatusLine(text, { cls: warn ? 'warn' : 'ok', ...(tip ? { tip } : {}) });
-  if (msg.renamed >= 1) {
-    mkTsNames.clear(); // 만들기 화면의 고친 이름 — 남기면 다음 실행이 옛 손 이름으로 되돌린다(§5.2b)
-    if (tsSpecs.length) {
-      tsSpecs = [];
-      renderTextStyles();
-      ($('btnTsRowLabels') as HTMLButtonElement).disabled = true;
-      setTsStatus(text + t('textStyle.renameClearedTable'), warn ? 'warn' : 'ok');
-    }
-  }
-}
 $('btnTextStyles').addEventListener('click', () => {
   const styles = readTextStyleRows();
   if (!styles.length) {
@@ -1788,21 +1578,6 @@ function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[], r
   });
 }
 
-let lastSelBound = 0;
-let lastSelRenamed = 0;
-/**
- * 선택 기준 '완료' 판정 + 전체 실행 라벨. SELECTION_STATE와 PREREQ_STATE 어느 쪽이 먼저 와도 같은 답이 나오게
- * 둘 다 여기로 모은다. Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 다른 파일에서 복사해 온
- * 프레임) 이전 이름 정리 기록이 남아 있어도 '처음'으로 본다 — 변수가 없으면 어차피 전부 다시 한다.
- */
-function applySelectionDone(): void {
-  // 변수 컬렉션이 없으면 레이어에 남은 바인딩은 지워진 변수를 가리키는 잔상이다 — 연결도 '처음'으로 본다.
-  const fresh = !hasGlobal && !hasSemanticRoles;
-  hasBoundNodes = !fresh && lastSelBound > 0;
-  hasRenamedNodes = !fresh && lastSelRenamed > 0;
-  renderPipeline();
-}
-
 // 개발용 강제 티어 토글 — 개발 빌드에서만 노출/동작(배포 빌드 백도어 차단).
 // HTML은 기본 display:none(배포 안전). dev 빌드에서만 여기서 노출한다.
 if (__DEV__) {
@@ -1912,7 +1687,6 @@ const PAID_FIELDS = [
   ...COMPONENT_FIELDS,
   // [팔레트 생성] · [팔레트 만들기] · [색 변수 만들기] · 토큰 [미리보기] · [적용]은 무료(Global만 — F8)
   'btnScanText', 'btnTextStyles', // 스캔(미리보기)도 잠금 — 등록이 Paid라 스캔만 열면 막다른 길
-  'btnTsRename', // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1)
   'btnGenDark', // 다크 Global을 새로 만드니 토큰 생성과 같은 등급
 ];
 
@@ -2041,77 +1815,6 @@ function goToCreate(): void {
   showPick('token'); // 토큰 생성은 '토큰' 단계에 있다 — 단계를 안 맞추면 빈 화면으로 보낸다
   $('createCard').scrollIntoView({ behavior: 'smooth', block: 'center' });
   ($('btnCreate') as HTMLButtonElement).focus();
-}
-
-/* ---------- 진행 안내 파이프라인(§3) ---------- */
-
-/** 준비 현황 줄 클릭 → 그 일을 하는 단계로. 목록 순서 = 만들기 레일 순서 + 적용 첫 단계. */
-const PIPELINE_TARGET: Record<PipelineStep['id'], { make: MakeStep | null; btn: string; apply?: ApplyStep }> = {
-  colors: { make: 'color', btn: 'btnColorVars' },
-  tokens: { make: 'token', btn: 'btnCreate' },
-  semantics: { make: 'token', btn: 'btnCreate' }, // 역할 매핑은 토큰을 적용할 때 함께 만들어진다(숨은 카드 대신)
-  dark: { make: 'theme', btn: 'btnGenDark' },
-  textStyles: { make: 'type', btn: 'btnScanText' },
-  bind: { make: null, btn: 'btnApplyConfirm' }, // 선택 탭 첫 화면
-  rename: { make: null, btn: 'btnRename', apply: 'rename' }, // 적용 탭 · 이름 정리
-};
-
-function gotoStep(id: PipelineStep['id']): void {
-  closeReadiness();
-  const target = PIPELINE_TARGET[id];
-  // 무료는 토큰을 만들어도 Semantic 매핑이 생기지 않는다(F8) — 도착 · 포커스는 그대로.
-  if (id === 'semantics') {
-    if (isPaid) showStatusLine(t('list.semanticsNote'));
-    else showStatusLine(t('paid.semMap'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } });
-  }
-  if (target.make === null) {
-    // v4 §4.6 준비 현황 표: 연결 → 선택 탭 첫 화면, 이름 → 이름 정리(선택이 없으면 첫 화면).
-    showTab('select');
-    showSelSub(target.apply === 'rename' && curSel.count ? 'rename' : 'home');
-    if (selSub === 'home') { $('selCards').querySelector<HTMLElement>('button')?.focus(); return; }
-  } else {
-    showPick(target.make, 'vars');
-  }
-  // 색: [색 변수 만들기]가 빈 상태 잠금이면 할 수 있는 첫 일 [선택에서 추출]로(유료 잠금이면 그대로 — ia-v4 §4.3a-2).
-  const btnId = id === 'colors' && $('btnColorVars').dataset.baseLock === 'prereq' ? 'btnExtract' : target.btn;
-  const b = $(btnId) as HTMLButtonElement;
-  b.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  b.focus();
-}
-
-/** PREREQ_STATE 기반으로 의존 파이프라인 단계 상태를 그린다(시작 탭). */
-function renderPipeline(): void {
-  const box = $('pipelineSteps');
-  box.innerHTML = '';
-  const steps = pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes });
-  steps.forEach((s, i) => {
-    const row = document.createElement('div');
-    row.className = `pstep ${s.status}`;
-    row.dataset.step = s.id;
-    row.tabIndex = 0;
-    row.setAttribute('role', 'button');
-
-    const dot = document.createElement('span');
-    dot.className = 'pdot';
-    dot.textContent = s.status === 'done' ? '✓' : String(i + 1);
-    const label = document.createElement('span');
-    label.className = 'plabel';
-    label.textContent = t('pipeline.step.' + s.id);
-    const stat = document.createElement('span');
-    stat.className = 'pstat';
-    stat.textContent = s.hint ? t(s.hint, s.hintParams) : t('pipeline.stat.' + s.status);
-
-    row.append(dot, label, stat);
-    const go = (): void => gotoStep(s.id);
-    row.addEventListener('click', go);
-    row.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        go();
-      }
-    });
-    box.appendChild(row);
-  });
 }
 
 /* ---------- 컴포넌트 / 베리언트 (Phase 3, Paid) ---------- */
@@ -2354,12 +2057,6 @@ window.onmessage = (event: MessageEvent) => {
     case 'SELECTION_STATE': {
       lastSelCount = msg.count;
       onSelectionForList(msg); // 변수 목록 기준(③) — 플러그인이 만든 선택은 기준을 바꾸지 않는다
-      // 준비 현황의 '완료'는 현재 선택 기준 — 선택이 바뀌면 다시 판정한다.
-      // Global/Semantic이 없으면(컬렉션을 지우고 처음부터 하는 QA 흐름, 또는 다른 파일에서 복사해 온
-      // 프레임) 이전 이름 정리 기록이 남아 있어도 '처음'으로 본다 — 변수가 없으면 어차피 전부 다시 한다.
-      lastSelBound = msg.bound;
-      lastSelRenamed = msg.renamed;
-      applySelectionDone();
       // 연결 현황 자동 읽기 — 선택이 작고(≤ AUTO_SCAN_MAX) 바인딩이 있을 때만(Tokens Studio처럼 선택 기준 표시).
       // 큰 선택은 버튼으로(Design Lint 방식) — 선택만 바꿔도 플러그인이 버벅이면 안 된다.
       refreshVariantRow(msg.comps, msg.sets);
@@ -2551,12 +2248,6 @@ window.onmessage = (event: MessageEvent) => {
       );
       semStatusPrefix = '';
       break;
-    case 'TS_RENAME_PLAN':
-      onTsRenamePlan(msg);
-      break;
-    case 'TS_RENAMED':
-      onTsRenamed(msg);
-      break;
     case 'TEXT_STYLE_CANDIDATES': {
       // 「왼쪽 글자로 이름 채우기」는 스캔이 실제 표본을 물어왔을 때만 누를 것이 있다.
       // 램프 폴백(styles 0)은 캔버스에서 온 글자가 아니라 행 라벨을 찾을 데가 없다.
@@ -2622,24 +2313,18 @@ window.onmessage = (event: MessageEvent) => {
       // 존재 확인용 프로브(별도 UI 없음).
       break;
     case 'PREREQ_STATE':
-      // #11: 단계 전제 갱신 → 통합 게이트 재평가 + 진행 안내(§3).
+      // #11: 단계 전제 갱신 → 통합 게이트 재평가.
       prereqKnown = true;
       prereqInFlight = false;
       reentry.release();
-      hasColorVars = msg.hasColorVars;
-      hasScaleVars = msg.hasScaleVars;
       hasGlobal = msg.hasGlobal;
       hasBindable = msg.hasBindable;
       prereqLocalVars = (msg.tierVars ?? 0) + (msg.otherVars ?? 0);
       if (activeTab === 'select') queueMicrotask(readLayerLibUse); // 로컬 변수 0개가 확인되면 ② 판정용으로 읽는다
-      hasDarkMode = msg.hasDarkMode;
       darkUnfilled = msg.darkUnfilled ?? 0;
       darkOld = msg.darkOld ?? false;
       darkOldManual = msg.darkOldManual ?? false;
-      hasTextStyles = msg.hasTextStyles;
-      hasSemanticRoles = msg.hasSemanticRoles;
       updateGates();
-      applySelectionDone(); // renderPipeline 포함 — 변수 유무가 '처음/다시' 판정을 바꾼다
       break;
     case 'LICENSE_STATUS': {
       // 상태값(active/grace/expired)은 한국어로(결정 5-(b)). FREE/PAID는 그대로(§2.9 예외).
@@ -2828,8 +2513,6 @@ window.onmessage = (event: MessageEvent) => {
         if (!compScanReq || (msg.reqId != null && msg.reqId !== compScanReq)) break;
         compScanReq = 0;
       }
-      // 텍스트 스타일 이름 다시 짓기 — 팝업 안 알림 줄(ia-v4 §2.8 · §4.11 T-P29 ④, B.19 APPLY_TS_RENAME 오류 갈래).
-      if (msg.op === 'APPLY_TS_RENAME') { onTsRenameError(msg); break; }
       // 만들기 화면 실행(마법사)이 보낸 요청의 오류는 만들기 화면 결과에만 — 카드 상태 자리에는 띄우지 않는다(ia-v4 §2.8).
       const fromWizard = wizardErrorMsg === msg;
       if (fromWizard) wizardErrorMsg = null;
@@ -5236,7 +4919,6 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   GENERATE_DARK_MODE: { results: ['DARK_MODE_RESULT'], label: 'op.dark', go: () => showPick('theme'), write: true },
   SCAN_TEXT_STYLES: { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.textScan', go: () => showPick('type'), write: false },
   CREATE_TEXT_STYLES: { results: ['TEXT_STYLES_RESULT'], label: 'op.textStyles', go: () => showPick('type'), write: true },
-  APPLY_TS_RENAME: { results: ['TS_RENAMED'], label: 'op.tsRename', go: () => showTab('variables'), write: true },
   APPLY: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: false },
   APPLY_SELECTED: { results: ['APPLY_RESULT'], label: 'op.bind', go: goLayer('bind'), write: true },
   // IA v4 §4.6 쓰기 잠금 — 클릭 연결 · 새 변수 · 복제 · 삭제
@@ -5268,7 +4950,6 @@ const WAIT_LINK_IDS = [
   'btnSemantics', // CREATE_SEMANTICS
   'btnGenDark', // GENERATE_DARK_MODE
   'btnTextStyles', // CREATE_TEXT_STYLES
-  'btnTsRename', // APPLY_TS_RENAME
   'btnRename', // RENAME_APPLY
   'btnRegisterComp', // REGISTER_COMPONENTS
   'btnClassifyVariants', // CLASSIFY_VARIANTS
@@ -5291,7 +4972,6 @@ function renderWaitLocks(): void {
   const varLock = varOp ? t('bind.waitOp', { op: t(opPending.get(varOp)!.label) }) : null;
   for (const id of WAIT_LINK_IDS) setWait($(id), link ?? varLock);
   if (activeTab === 'select' && selSub === 'home' && (mcKeep() || mcNeed())) renderSelHome(); // 만들기 카드의 쓰기 잠금(§4.1)
-  tsrRender(); // 이름 다시 짓기 팝업의 [k개 이름 바꾸기] 잠금(§5.1)
   const other = link ? null : otherWriteOp();
   const wiz = opWizard || wizardRunning ? t('bind.waitOp', { op: t('op.wizard') }) : null;
   for (const id of WAIT_CARD_IDS) {
@@ -5432,10 +5112,10 @@ function readScreen(why: ReadWhy): void {
   }
 }
 
-// 보류(④): 메뉴·팝업·팝오버 열림, 포인터 눌림, 진행 테두리 대상 작업 실행 중, 같은 종류 직전 요청 미완료.
+// 보류(④): 메뉴·팝업 열림, 포인터 눌림, 진행 테두리 대상 작업 실행 중, 같은 종류 직전 요청 미완료.
 let pointerDown = false;
 // 같은 종류의 직전 요청 — 변수 목록의 사용 수는 변수 탭에 있을 때만 이 화면의 요청이다(응답이 오면 풀린다).
-const reentryHeld = (): boolean => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || (activeTab === 'variables' && vmUsageInFlight) || !$('readinessPop').hidden;
+const reentryHeld = (): boolean => !!menuEl || !!modalEl || pointerDown || opBusy() || prereqInFlight || (activeTab === 'variables' && vmUsageInFlight);
 const reentry = createReentryScheduler(() => readScreen('reentry'), reentryHeld, {
   now: () => Date.now(),
   set: (fn, ms) => setTimeout(fn, ms),
@@ -5474,7 +5154,6 @@ window.addEventListener('resize', syncStickyOffsets);
 // 하나로 모아 디바운스한다(드래그가 멎은 뒤 한 번만 재계산해도 결과는 같다).
 updateGates();
 renderTsLink(); // 타이포 [✓] 레이어에 바로 연결 — 스캔 전에는 잠금
-renderPipeline(); // §3: 진행 안내 초기 표시(이후 PREREQ_STATE로 갱신)
 renderTokens(); // UX4: 시작 시 빈 상태 안내 표시
 refreshTreeEmptyStates(); // 바인딩·컴포넌트 카드도 시작 시 빈 상태 표시
 send({ type: 'GET_COLLECTIONS' });
@@ -6047,7 +5726,6 @@ function leaveManagerUi(): void {
   if (vmUsageTimer) { clearTimeout(vmUsageTimer); vmUsageTimer = null; }
   closeMenu();
   closeModal();
-  closeReadiness();
   // 시작 화면 고정(①): 요약을 본 뒤 변수 탭을 떠나면 푼다.
 }
 
@@ -6157,7 +5835,7 @@ function clearLibVars(): void {
   libVars = [];
   libRedraw();
 }
-/** 미루는 보류 — 메뉴 · 어느 팝업이든 · 포인터 눌림(`reentryHeld`와 같은 것 가운데, 준비 현황 팝오버는 빼고). */
+/** 미루는 보류 — 메뉴 · 어느 팝업이든 · 포인터 눌림(`reentryHeld`와 같은 것 가운데). */
 const libRedrawHeld = (): boolean => !!menuEl || !!modalEl || pointerDown;
 /** 변수 탭이 열려 있으면 다시 그린다. 보류 중이면 표시만 하고 풀릴 때 한 번(releaseLibRedraw). */
 function libRedraw(): void {
@@ -8142,15 +7820,12 @@ function openMoreMenu(): void {
   const btn = $('btnVarMore');
   const r = btn.getBoundingClientRect();
   openMenu(r.left, r.bottom + 2, [
-    { label: t('list.readiness', { n: readinessDone(), total: 7 }) + '…', onSelect: () => openReadiness(btn), focusElsewhere: true },
     { label: t('list.menuExport'), onSelect: () => openExportPopup(btn), focusElsewhere: true },
     { label: colorView === 'grid' ? t('list.colorList') : t('list.colorGrid'), separatorBefore: true, onSelect: () => setColorView(colorView === 'grid' ? 'list' : 'grid') },
     { label: t('list.menuExpandAll'), onSelect: () => setAllGroups(true) },
     { label: t('list.menuCollapseAll'), onSelect: () => setAllGroups(false) },
     // 안 쓰는 변수 찾기(docs/unused-vars.md) — 파일 전체, 무료 · 로컬 0개 · 쓰기 잠금
     { label: t('unused.menu'), separatorBefore: true, disabled: !vmVars.length || !!writeLockReason(), note: !vmVars.length ? t('unused.noVars') : writeLockReason() ?? undefined, onSelect: () => openUnused(btn), focusElsewhere: true },
-    // 텍스트 스타일 이름 다시 짓기(docs/text-style-krds.md §5.1) — 파일 전체, 유료 · 쓰기 잠금
-    { label: t('textStyle.renameMenu'), disabled: !isPaid || !!writeLockReason(), note: !isPaid ? t('status.paid') : writeLockReason() ?? undefined, onSelect: () => openTsRename(btn), focusElsewhere: true },
   ], btn);
 }
 /** [＋] 메뉴(§4.6 ⑥) — 새 변수 · (구분선) · 선택에서 변수 만들기… · 다크 모드 만들기… · 텍스트 스타일 만들기…. */
@@ -8186,52 +7861,6 @@ $('varSearch').addEventListener('input', () => { query = ($('varSearch') as HTML
 $('varSearch').addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); clearSearch(); } });
 $('btnSearchClear').addEventListener('click', () => clearSearch(true));
 $('modeSelect').addEventListener('change', () => { modeName = ($('modeSelect') as HTMLSelectElement).value || null; renderVarList(); });
-/* =====================================================================
-   시작 화면(§4.3) · 마법사 위치 · 준비 현황 팝오버
-   ===================================================================== */
-/* ---------- 준비 현황 팝오버 ---------- */
-function readinessDone(): number {
-  return pipelineSteps({ hasColorVars, hasScaleVars, hasGlobal, hasBindable, hasDarkMode, darkUnfilled, hasTextStyles, hasSemanticRoles, hasBoundNodes, hasRenamedNodes }).filter((s) => s.status === 'done').length;
-}
-let readinessReturn: HTMLElement | null = null;
-function openReadiness(btn: HTMLElement): void {
-  if (!$('readinessPop').hidden) { closeReadiness(); return; }
-  closeMenu();
-  renderPipeline();
-  const pop = $('readinessPop');
-  pop.hidden = false;
-  const r = btn.getBoundingClientRect();
-  const w = pop.offsetWidth;
-  pop.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - w - 4))}px`;
-  pop.style.top = `${Math.min(r.bottom + 2, window.innerHeight - pop.offsetHeight - 28)}px`;
-  readinessReturn = btn;
-  btn.setAttribute('aria-expanded', 'true');
-  pop.querySelector<HTMLElement>('.pstep')?.focus();
-}
-function closeReadiness(returnFocus = false): void {
-  const pop = $('readinessPop');
-  if (pop.hidden) return;
-  pop.hidden = true;
-  readinessReturn?.setAttribute('aria-expanded', 'false');
-  if (returnFocus) readinessReturn?.focus();
-  readinessReturn = null;
-  reentry.release();
-}
-$('readinessPop').addEventListener('keydown', (e) => {
-  const rows = Array.from($('readinessPop').querySelectorAll<HTMLElement>('.pstep'));
-  const i = rows.indexOf(document.activeElement as HTMLElement);
-  if (e.key === 'Escape') { e.preventDefault(); closeReadiness(true); }
-  else if (e.key === 'ArrowDown') { e.preventDefault(); rows[(i + 1) % rows.length]?.focus(); }
-  else if (e.key === 'ArrowUp') { e.preventDefault(); rows[(i - 1 + rows.length) % rows.length]?.focus(); }
-  else if (e.key === 'Tab') e.preventDefault();
-});
-document.addEventListener('pointerdown', (e) => {
-  const pop = $('readinessPop');
-  if (pop.hidden) return;
-  const tgt = e.target as Node;
-  if (pop.contains(tgt) || readinessReturn?.contains(tgt)) return;
-  closeReadiness();
-}, true);
 /* =====================================================================
    레이어 › 연결(IA v3 §4.6)
    ===================================================================== */

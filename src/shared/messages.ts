@@ -250,9 +250,6 @@ export type UiToCode =
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
   | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
-  // [이름 다시 짓기](docs/text-style-krds.md §5): 미리보기(파일의 로컬 텍스트 스타일 전부 — 선택 무관) · 바꾸기(이름만, 역할 변수 함께)
-  | { type: 'SCAN_TS_RENAME'; reqId: number }
-  | { type: 'APPLY_TS_RENAME'; reqId: number; items: TsRenameItem[] }
   // 스캔 결과에 가로 행 라벨 이름을 덧입힌다. 스캔의 옵션이 아니라 뒤따르는 별도 동작이다
   // (결정 2026-08-06) — 켜고 스캔하는 대신, 결과를 보고 마음에 안 들면 눌러 이름만 다시 매긴다.
   | { type: 'NAME_TEXT_STYLES_BY_ROW' }
@@ -289,7 +286,7 @@ export type CodeToUi =
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
   // comps/sets: 선택 안의 낱개 COMPONENT·COMPONENT_SET 수. 구조 카드의 베리언트 줄을
   // '정리할 대상이 실제로 선택돼 있을 때만' 띄우는 데 쓴다(툴바는 와이어대로 4개 고정).
-  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; bound: number; renamed: number; firstName?: string; ids?: string[] } // bound/renamed: 선택 안에서 변수가 붙은·역할 기록이 있는 레이어 수(준비 현황 '완료' 판정) // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
+  | { type: 'SELECTION_STATE'; count: number; scanned: number; bindable: number; capped: boolean; comps: number; sets: number; selfSelect?: boolean; firstName?: string; ids?: string[] } // selfSelect: 플러그인이 만든 선택 변경(미리보기 유지)
   | { type: 'VAR_TABLE'; collections: VarCollection[]; vars: VarRow[] }
   // 변수 고치기 응답 — applied: 바꾼 것('name' 또는 modeId), 순서대로. 변수 표는 따로 보내지 않는다(UI가 다시 읽는다).
   | { type: 'VARIABLE_APPLIED'; reqId: number; applied: number; skipped: number; skipReasons: Record<string, number>; name: string } // applied · skipped = 레이어 수
@@ -313,8 +310,6 @@ export type CodeToUi =
   // existing: 로컬 텍스트 스타일 전부 — 이름 겹침 잠금(IA v4 §4.3) · 예약 이름(docs/text-style-krds.md §3.4 — 기본 램프 rampToSpecs).
   // decimalRows: 앵커 없는 소수 크기 군집 — 만들지 않는 흐린 줄(§2.11 11번 · ia-v4 §4.3 "소수 크기 줄").
   | { type: 'TEXT_STYLE_CANDIDATES'; styles: TextStyleSpec[]; decimalRows?: StyleCluster[]; warnings: string[]; labeled?: number; fallback?: number; reqId?: number; existing?: ExistingStyleSig[] }
-  | { type: 'TS_RENAME_PLAN'; reqId: number; rows: TsRenameRow[] }
-  | { type: 'TS_RENAMED'; reqId: number; results: { id: string; status: string; name: string }[]; renamed: number; skipped: number; skipReasons: Record<string, number>; roleVarsRenamed: number; roleVarsTaken: number; roleVarsError: number; roleVarsStuck: string[]; roleMoveError: number; roleMoveNames: string[] }
   // applied · applySkipped · applyReasons: applyTo가 있을 때만(붙인 글자 수 · 못 붙인 글자 수 · 사유별, IA v4 §4.3 "타이포 등록").
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number>; mainsApplied?: string[] } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
@@ -322,14 +317,8 @@ export type CodeToUi =
   // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
   | {
       type: 'PREREQ_STATE';
-      hasColorVars: boolean;
-      hasScaleVars: boolean;
       hasGlobal: boolean;
       hasBindable: boolean;
-      hasDarkMode: boolean;
-      hasTextStyles: boolean;
-      /** Semantic에 역할 별칭이 있음(역할 매핑 완료). */
-      hasSemanticRoles: boolean;
       /** 계층(Global·Semantic·Component) 안의 변수 수 · 그중 색 — '이미 변수 N개' 안내용. */
       tierVars?: number;
       tierColorVars?: number;
@@ -390,23 +379,4 @@ export type CodeToUi =
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {
   figma.ui.postMessage(msg);
-}
-
-/** [이름 다시 짓기] 미리보기 줄(docs/text-style-krds.md §5.2). sig = tsSig(바꾸기 때 그대로 돌려보냄). */
-export interface TsRenameRow {
-  id: string;
-  from: string;
-  to: string;
-  sig: string;
-  /** 새 이름의 크기 단계(KRDS `sizeKey`, ia-v3 §2.12 12.12 N-D2a) — 바꾸기가 새 단계 변수로 옮겨 연결할 때 쓴다. */
-  step?: string;
-}
-/** [이름 다시 짓기] 바꾸기 항목. */
-export interface TsRenameItem {
-  id: string;
-  from: string;
-  to: string;
-  sig: string;
-  /** 새 이름의 크기 단계(TsRenameRow.step 그대로). */
-  step?: string;
 }

@@ -11,8 +11,6 @@ export {
   scanExistingTextStyles,
   createSemanticTextStyles,
   renameTextRoleVars,
-  planTsRename,
-  applyTsRename,
   applyExistingTextStyles,
   planExistingTextStyles,
   applyTextStyleRows,
@@ -31,7 +29,7 @@ export {
   SEMANTIC,
   COMPONENT,
 } from './variables';
-export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult, RoleVarRenameResult, TsRenameResult } from './variables';
+export type { CreateSummary, SemanticSummary, TextScanResult, TextStyleResult, ApplyTextStylesResult, ApplyRegisteredResult, RoleVarRenameResult } from './variables';
 export { judgeUnused, collectAliasIds, scanUnusedVariables, deleteUnusedVariables } from './unusedVars';
 export { bindSelection, collectLocalMains, createRole, bindSelectedItems, countUsage, findUsers, boundVariableIds, deletedBindings, unbindDeleted, countDeleted, mergeScopes } from './bind';
 export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, colorSlotKey, colorUse, familyRe, nameKindOf, paddingProp, radiusName, strokeName, isOldPluginName, pickOwner } from './usageRoles';
