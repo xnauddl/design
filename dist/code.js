@@ -4879,6 +4879,23 @@
     }
     return resolveGlobalNames(reqs, file);
   }
+  function creationOrder(tokens, base) {
+    const groups = /* @__PURE__ */ new Map();
+    for (const t2 of tokens) {
+      const g = t2.name.split("/")[0];
+      const arr = groups.get(g);
+      if (arr) arr.push(t2);
+      else groups.set(g, [t2]);
+    }
+    const out = [];
+    for (const arr of groups.values()) {
+      const isNum = arr.map((t2) => resolvedTypeForToken(t2) === "FLOAT");
+      const nums = arr.map((t2, i) => ({ t: t2, i, v: Number(literalOf(t2, "FLOAT", base)) })).filter((x) => isNum[x.i]).sort((a, b) => (Number.isFinite(a.v) && Number.isFinite(b.v) ? a.v - b.v : 0) || a.i - b.i);
+      let k = 0;
+      arr.forEach((t2, i) => out.push(isNum[i] ? nums[k++].t : t2));
+    }
+    return out;
+  }
   async function createTokens(tokens, base) {
     const reuse = await pickReusable(tokens, base);
     const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), finalName: /* @__PURE__ */ new Map() };
@@ -4894,7 +4911,7 @@
       const idx = await buildVarIndex();
       const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
       const touched = /* @__PURE__ */ new Set();
-      for (const t2 of toCreate) {
+      for (const t2 of creationOrder(toCreate, base)) {
         const type = resolvedTypeForToken(t2);
         const nm = named.get(t2.name);
         if (nm) {
@@ -5416,7 +5433,7 @@
         uiRole: inUiRole(node, ownerCache)
       });
     }
-    return { samples, warnings: [...warnings] };
+    return { samples, warnings: [...warnings], nodeById: new Map(texts.map((t2) => [t2.id, t2])) };
   }
   function lhPxOf(fontSize, lh) {
     if (lh === figma.mixed || lh.unit === "AUTO") return 0;
@@ -6015,11 +6032,56 @@
     for (let p = node.parent; p; p = p.parent) if (p.type === "INSTANCE") return true;
     return false;
   }
-  async function textStyleIndex() {
+  function pageOfNode(n) {
+    let p = n;
+    while (p && p.type !== "PAGE") p = p.parent;
+    return p != null ? p : null;
+  }
+  async function remoteTextStyles(roots, extraIds = []) {
+    const cur = figma.currentPage;
+    const pages = /* @__PURE__ */ new Set();
+    if (cur) pages.add(cur);
+    for (const r of roots) {
+      const pg = pageOfNode(r);
+      if (pg) pages.add(pg);
+    }
+    const ids = new Set(extraIds.filter((x) => typeof x === "string" && x !== ""));
+    for (const pg of pages) {
+      if (typeof pg.findAllWithCriteria !== "function") continue;
+      if (pg !== cur) {
+        try {
+          await pg.loadAsync();
+        } catch (e) {
+        }
+      }
+      for (const t2 of pg.findAllWithCriteria({ types: ["TEXT"] })) {
+        const id = t2.textStyleId;
+        if (typeof id === "string" && id !== "") ids.add(id);
+      }
+    }
+    const out = [];
+    for (const id of ids) {
+      try {
+        const st = await figma.getStyleByIdAsync(id);
+        if (st && st.type === "TEXT" && st.remote) out.push(st);
+      } catch (e) {
+      }
+    }
+    return out;
+  }
+  async function textStyleIndex(remote = []) {
     const styleByKey = /* @__PURE__ */ new Map();
     for (const s of await figma.getLocalTextStylesAsync()) {
       const k = typoKey(s);
       styleByKey.set(k, styleByKey.has(k) ? null : s);
+    }
+    const localKeys = new Set(styleByKey.keys());
+    for (const s of remote) {
+      const k = typoKey(s);
+      if (localKeys.has(k)) continue;
+      const ex = styleByKey.get(k);
+      if (ex === void 0) styleByKey.set(k, s);
+      else if (ex && ex.id !== s.id) styleByKey.set(k, null);
     }
     return styleByKey;
   }
@@ -6043,7 +6105,7 @@
   async function planExistingTextStyles(nodes) {
     var _a;
     const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
-    const styleByKey = await textStyleIndex();
+    const styleByKey = await textStyleIndex(await remoteTextStyles(nodes));
     const { texts, inInstance } = planTexts(nodes);
     skipReasons.instance += inInstance.length;
     const rows = /* @__PURE__ */ new Map();
@@ -6059,15 +6121,17 @@
     }
     return { rows: [...rows.values()], skipReasons };
   }
-  async function applyTextStyleRows(rows) {
-    var _a;
+  async function applyTextStyleRows(rows, index) {
+    var _a, _b;
     const skipReasons = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
     const res = { applied: 0, skipped: 0, skipReasons };
-    const styleByKey = await textStyleIndex();
+    const nodeById = /* @__PURE__ */ new Map();
+    for (const row of rows) for (const id of row.nodeIds) if (!nodeById.has(id)) nodeById.set(id, await figma.getNodeByIdAsync(id).catch(() => null));
+    const styleByKey = index != null ? index : await textStyleIndex(await remoteTextStyles([...nodeById.values()].filter((n) => !!n), rows.map((r) => r.styleId)));
     const loaded = /* @__PURE__ */ new Set();
     for (const row of rows) {
       for (const id of row.nodeIds) {
-        const t2 = await figma.getNodeByIdAsync(id).catch(() => null);
+        const t2 = (_a = nodeById.get(id)) != null ? _a : null;
         if (!t2 || t2.type !== "TEXT") {
           skipReasons.noStyle++;
           res.skipped++;
@@ -6082,15 +6146,45 @@
         try {
           await attachTextStyle(t2, r.id, loaded);
           res.applied++;
-          ((_a = res.appliedIds) != null ? _a : res.appliedIds = []).push(id);
+          ((_b = res.appliedIds) != null ? _b : res.appliedIds = []).push(id);
         } catch (e) {
         }
       }
     }
     return res;
   }
-  async function textStyleCandidateTest() {
-    const styleByKey = await textStyleIndex();
+  async function dropRemoteClusters(clusters, nodeById, roots, anchored) {
+    const remote = await remoteTextStyles(roots);
+    if (!remote.length) return clusters;
+    const index = await textStyleIndex(remote);
+    const keyOfRemote = new Map(remote.map((r) => [r.id, typoKey(r)]));
+    const resolved = (t2) => {
+      if (insideInstance(t2)) return null;
+      const sid = t2.textStyleId;
+      if (typeof sid === "string" && sid !== "") {
+        if (!keyOfRemote.has(sid) || isMixedTypography(t2)) return null;
+        return typoKey(t2) === keyOfRemote.get(sid) ? sid : null;
+      }
+      const r = textStyleFor(t2, index);
+      return typeof r !== "string" && keyOfRemote.has(r.id) ? r.id : null;
+    };
+    return clusters.filter((c) => {
+      var _a;
+      if (anchored(c)) return true;
+      const ids = (_a = c.nodeIds) != null ? _a : [];
+      if (!ids.length) return true;
+      let one = null;
+      for (const id of ids) {
+        const t2 = nodeById.get(id);
+        const got = t2 ? resolved(t2) : null;
+        if (!got || one && one !== got) return true;
+        one = got;
+      }
+      return false;
+    });
+  }
+  async function textStyleCandidateTest(roots = []) {
+    const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
     return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
   }
   async function applyRegisteredTextStyles(roots, styleIds) {
@@ -6110,7 +6204,7 @@
     };
     for (const t2 of plan.inInstance) if (idByKey.has((_a = keyOf2(t2)) != null ? _a : "\0")) skipped("instance");
     const rows = /* @__PURE__ */ new Map();
-    const styleByKey = await textStyleIndex();
+    const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
     for (const t2 of plan.texts) {
       const k = keyOf2(t2);
       if (k === void 0 || !idByKey.has(k)) continue;
@@ -6129,7 +6223,7 @@
       rows.set(r.id, arr);
     }
     if (rows.size) {
-      const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
+      const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })), styleByKey);
       out.applied = r.applied;
       if ((_c = r.appliedIds) == null ? void 0 : _c.length) out.appliedIds = r.appliedIds;
     }
@@ -8450,7 +8544,7 @@
                 shouldCancel: () => bindCancel,
                 yieldToEvents: () => new Promise((resolve) => setTimeout(resolve, 0))
               },
-              __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}), isPaid() ? {} : { noNewRoles: true }), msg.only && !msg.preview ? { only: msg.only } : {}), msg.only && ((_a = msg.off) == null ? void 0 : _a.length) && !msg.preview ? { off: msg.off } : {})
+              __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest((await withLocalMains(sel)).roots) } : {}), isPaid() ? {} : { noNewRoles: true }), msg.only && !msg.preview ? { only: msg.only } : {}), msg.only && ((_a = msg.off) == null ? void 0 : _a.length) && !msg.preview ? { off: msg.off } : {})
             );
             post(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",
@@ -8637,11 +8731,14 @@
         }
         case "SCAN_TEXT_STYLES": {
           if (!requirePaid("textStyles")) break;
-          const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
+          const scanRoots = (await withLocalMains(await resolveRoots(msg.nodeIds))).roots;
+          const { samples, warnings, nodeById } = await scanTextStyles(scanRoots);
           if (msg.reqId == null) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
           const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
-          const styles = nameTextStyles(rest, existing);
+          const anchorOf = anchorOfFor(existing);
+          const kept = msg.reqId != null && nodeById ? await dropRemoteClusters(rest, nodeById, scanRoots, (c) => anchorOf(c) !== void 0) : rest;
+          const styles = nameTextStyles(kept, existing);
           const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
           if (msg.reqId != null) {
             post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });

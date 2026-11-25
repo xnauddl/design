@@ -5,9 +5,9 @@ import type { UiToCode, CodeToUi, RenameChange, VarInfo, VarMode, VarUpdateError
 import { post } from './shared/messages';
 import { t } from './lib/i18n'; // 화면에 보이는 문구는 i18n 한 곳에서(PR 4) — 플러그인 쪽도 같은 표를 쓴다
 import { extractFromSelection } from './lib/extract';
-import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
+import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAliases, scanTextStyles, scanExistingTextStyles, createSemanticTextStyles, applyTextStyleRows, planExistingTextStyles, applyRegisteredTextStyles, textStyleCandidateTest, dropRemoteClusters, prunePaletteColors, editValueToFigma, createManualVariable, duplicateVariable, deleteVariable, VarNameError, VarGoneError } from './lib/variables';
 import { applyVariableToNodes } from './lib/applyVar';
-import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, splitDecimalClusters, tsSig } from './lib/textStyles';
+import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, splitDecimalClusters, tsSig, anchorOfFor } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
 import { bindSelection, bindSelectedItems, collectLocalMains, countDeleted, countUsage, findUsers, unbindDeleted, type LocalMains } from './lib/bind';
 import { deleteUnusedVariables, scanUnusedVariables } from './lib/unusedVars'; // 안 쓰는 변수 찾기(docs/unused-vars.md)
@@ -610,7 +610,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           },
           {
             // 만들기 실행의 연결(IA v4 §4.3) — 텍스트 스타일 후보 글자의 글자 자리는 붙이지 않는다(실제 연결만).
-            ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest() } : {}),
+            ...(msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest((await withLocalMains(sel)).roots) } : {}), // 원격 목록 범위 = 미리보기와 같은 루트(B.40)
             // 무료 자동 연결은 새 Semantic을 만들지 않는다 — 찾기 · 실제 연결 · 카드 1의 m이 같은 규칙(IA v4 §2.3-7 · F6).
             ...(isPaid() ? {} : { noNewRoles: true }),
             // 만들기 실행의 연결 단계 — 켠 줄의 값만(IA v4 §4.3 B.35 ①)
@@ -828,12 +828,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
         // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
         // ① 후보 읽기 — 인스턴스의 메인 컴포넌트 안 글자도 표본으로(ia-v3 §2.11 11번)
-        const { samples, warnings } = await scanTextStyles((await withLocalMains(await resolveRoots(msg.nodeIds))).roots);
+        const scanRoots = (await withLocalMains(await resolveRoots(msg.nodeIds))).roots;
+        const { samples, warnings, nodeById } = await scanTextStyles(scanRoots);
         if (msg.reqId == null) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
         // 앵커 없는 소수 크기 군집은 이름 짓기에서 빼 흐린 줄로(§2.11 11번 "글자 크기도 정수만")
         const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
-        const styles = nameTextStyles(rest, existing);
+        // 만들기 탭(reqId) — 원격 스타일과 같은 묶음은 후보에서 뺀다(IA v4 §4.2 B.40 RT-D5). 타이포 화면 스캔은 그대로.
+        const anchorOf = anchorOfFor(existing);
+        const kept = msg.reqId != null && nodeById ? await dropRemoteClusters(rest, nodeById, scanRoots, (c) => anchorOf(c) !== undefined) : rest;
+        const styles = nameTextStyles(kept, existing);
         // existing은 reqId 없는 스캔에도 싣는다 — 기본 램프(rampToSpecs)의 예약 이름(docs/text-style-krds.md §6).
         const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
         if (msg.reqId != null) {
