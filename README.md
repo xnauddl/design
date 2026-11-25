@@ -21,7 +21,7 @@
 
 - **창:** 560×510 고정. 최소화하면 140×104(펼치기 버튼만). 드래그로 크기를 바꿀 수 없다(`src/lib/uiSize.ts`).
 - **머리 줄:** 탭 **선택 · 변수** 둘 + ⚙ **설정** 버튼 + 최소화 버튼. 설정은 탭이 아니라 따로 열리는 화면이다.
-- **선택 탭 첫 화면:** 카드 "변수 없는 값 {n}곳"([{n}곳 연결]) · "쓰는 변수 {n}개" · "삭제된 변수 {n}곳"([선택] · [연결 풀기]), 아래 "할 일" 줄 [변수 만들기] · [이름 정리] · [컴포넌트 베타]. 로컬 변수가 없는 파일에서는 만들기 카드가 나온다. 레이어가 300개를 넘는 선택은 자동으로 읽지 않고 [읽기]를 눌러야 읽는다.
+- **선택 탭 첫 화면:** 카드 "변수 없는 값 {n}곳"([{n}곳 연결]) · "쓰는 변수 {n}개" · "삭제된 변수 {n}곳"([선택] · [연결 풀기]), 아래 "할 일" 줄 [변수 만들기] · [이름 정리]. 로컬 변수가 없는 파일에서는 만들기 카드가 나온다. 레이어가 300개를 넘는 선택은 자동으로 읽지 않고 [읽기]를 눌러야 읽는다.
   - 바뀔 예정: 카드 모음 대신 진행 줄 "만들기 → 연결 → 관리"로 다시 짠다(ROADMAP §0 S-2).
 - **하위 화면:** 연결 · 변수 만들기 · 값을 직접 고르기 · 이름 정리. 머리의 [←]로 돌아간다.
 - **공통 상태 줄:** 창 맨 아래 한 줄에 결과 · 잠금 사유 · 실패를 보인다. 바뀔 예정: 없앤다(ROADMAP §0 S-2).
@@ -81,7 +81,10 @@
 - 라이선스: 키 입력 · [검증] · [해제], [유료 구매하기 ↗] / [구독 관리 ↗].
 
 ### 컴포넌트
-옛 컴포넌트 기능은 S-1b에서 삭제한다(코드에 아직 남아 있음 — SC-D13). 새 기능은 [`docs/component-system/`](docs/component-system/)에서 다시 기획한다.
+지금 컴포넌트 기능은 없다. 옛 기능(후보 찾기 · 등록 · 변형 세트 정리)은 S-1b에서 화면 · 코드 · 테스트째 지웠다(2026-11-24 SC-D13 — 마지막 코드 커밋 `1b1f419`, 옛 명세는 [`docs/archive/components-v1.md`](docs/archive/components-v1.md)). 새 기능은 [`docs/component-system/`](docs/component-system/)에서 다시 기획한다.
+
+- 전에 등록으로 만든 "Components" 페이지 · 컴포넌트 · 변형 세트 · 인스턴스는 파일에 그대로 둔다(지우거나 되돌리지 않는다).
+- 연결이 인스턴스의 메인 컴포넌트를 함께 다루는 규칙과, 이름 정리가 컴포넌트 · 인스턴스 이름을 그대로 두는 규칙은 바뀌지 않았다.
 
 ## 무료 / 유료
 
@@ -152,10 +155,9 @@ src/
     entitlements.ts · license.ts · licenseToken.ts · licenseConfig.ts   무료 · 유료 · 라이선스
     i18n.ts · errors.ts             화면 글 · 오류를 읽는 말로
     uiSize.ts · reread.ts · a11y.ts · undo.ts   창 크기 · 다시 읽기 · 탭 키보드 · ⌘Z 한 번
-    components.ts · artwork.ts · placement.ts   옛 컴포넌트 등록 (S-1b에서 삭제)
-    componentLike.ts                옛 컴포넌트 후보 판정 (S-1b에서 삭제 — 이름 정리가 쓰는 판정은 남김)
+    componentLike.ts                이름 정리가 쓰는 아이콘 프레임 · 짧은 한 줄 글 판정
     pure.ts · figma-lib.ts          테스트용 묶음(→ dist/pure.mjs · dist/figma-lib.mjs)
-test/                  node --test — pure · palette · figma · tree · grouping · reuse · wizard · colorCluster · placement · terms · verify
+test/                  node --test — pure · palette · figma · tree · wizard · colorCluster · terms · verify
 scripts/               verify-i18n · verify-bind-flow · update · gen-license-keys · sync-roadmap-notion
 workers/verify/        라이선스 검증 서버(Cloudflare Worker)
 build.mjs              esbuild 빌드
@@ -169,8 +171,9 @@ build.mjs              esbuild 빌드
 | [`docs/ia-v4.md`](docs/ia-v4.md) | 화면 명세(기준) |
 | [`docs/ia-v3.md`](docs/ia-v3.md) | 토큰 · 연결 규칙 — 아직 유효한 절만 |
 | [`ROADMAP.md`](ROADMAP.md) | 지금 할 일 순서(§0) · 요금 · 출시 · 완료 기록 |
-| [`docs/qa/2026-11-24-scope-review.md`](docs/qa/2026-11-24-scope-review.md) | 범위 결정 SC-D1–SC-D29 |
+| [`docs/qa/2026-11-24-scope-review.md`](docs/qa/2026-11-24-scope-review.md) | 범위 결정 SC-D1–SC-D30 |
 | [`docs/component-system/`](docs/component-system/) | 새 컴포넌트 기능 기획 |
+| [`docs/archive/components-v1.md`](docs/archive/components-v1.md) | 지운 옛 컴포넌트 기능의 명세 · 결정 기록(보관) |
 | [`docs/text-style-krds.md`](docs/text-style-krds.md) · [`docs/unused-vars.md`](docs/unused-vars.md) | 텍스트 스타일 이름 규칙 · 안 쓰는 변수 찾기 명세 |
 | [`CLAUDE.md`](CLAUDE.md) | 작업 순서 · UI 규칙 · 검사 |
 | [`REDESIGN.md`](REDESIGN.md) | v2 기록(지금 기준 아님) |
