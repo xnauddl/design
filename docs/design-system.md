@@ -48,7 +48,7 @@
 ### 2.2 원본 파일 · 이름 · 빌드
 
 - **원본:** `design-tokens/tokens.json` — DTCG 형식(토큰마다 `$value` · `$type` · `$description`, Global은 `$description` 생략 가능). `$description` = §3 표의 "쓰임".
-- **그룹(JSON 첫 마디 = CSS 이름 첫 마디):** `global` · `color` · `font-family` · `font-size` · `font-weight` · `line-height` · `letter-spacing` · `space` · `radius` · `border-width` · `focus-ring` · `elevation` · `size` · `motion` · `z` · `opacity` · Component 그룹(`chip` · `swatch` · `checker` · `nav` · `tree` · `pill` · `toggle` · `list`).
+- **그룹(JSON 첫 마디 = CSS 이름 첫 마디):** `global` · `color` · `text`(글자 묶음) · `font-family` · `font-size` · `font-weight` · `line-height` · `letter-spacing` · `space` · `radius` · `border-width` · `focus-ring` · `elevation` · `size` · `motion` · `z` · `opacity` · Component 그룹(`chip` · `swatch` · `checker` · `nav` · `tree` · `pill` · `toggle` · `list`).
 - **그룹 안 키**는 하이픈으로 이은 한 단어다(`color.text-secondary`). 토큰이 그룹을 겸하지 않는다(DTCG 규칙) — 그래서 `focus-ring.default` · `focus-ring.field`처럼 둘 다 키로 둔다.
 - **CSS 이름:** `--{그룹}-{키}`. 예: `global.neutral-800` → `--global-neutral-800`, `color.text-secondary` → `--color-text-secondary`, `focus-ring.default` → `--focus-ring-default`.
 - **참조:** `$value` 안에 `{그룹.키}`(예: `{global.neutral-800}` · `{color.background-primary}`). 빌드가 `var(--그룹-키)`로 바꾼다(값을 복사하지 않음 — 개발자 도구에서 사슬이 보인다).
@@ -230,10 +230,14 @@
 | `size-header` | 40px | Plugin Header · Page Header |
 | `size-nav` | 36px | Navigation(탭 줄 — ia-v4 §8) |
 | `size-action-bar` | 52px | Bottom Action Bar |
-| `size-pill` | 26px | 알약 · 알약 모양 고르개 높이(지금 26) |
+| `size-compact` | 26px | 촘촘한 칸 높이 — 알약 · 편집 팝업 칸 · 목록 머리 검색(ia-v4 §8 "검색 26") · 색 입력 (표 아래) |
 | `size-hit-min` | 24px | 누르는 곳 최소(ia-v3 §2.10) |
 
 - 버튼 · 입력의 높이는 **`height`로** 정한다(`height: var(--size-control-md)`, 좌우 `padding`만, 위아래 0). 지금처럼 위아래 padding + 줄 높이로 높이를 만들지 않는다.
+  - 높이는 **기본 `button` 규칙과 한 줄 입력(`input[type=text]` · `input[type=number]` · `select`)에만** 준다. `textarea`는 높이를 주지 않는다.
+  - 아래 버튼은 글자 안에 놓이거나 자기 모양이 있어 `height: auto`로 지금 높이를 지킨다: `button.link` · `button.link-btn`(`.sel-diff` 안 포함 — 24 이하) · `.step-chip` · `.ctx-menu button` · `.var-use` · `.ed-copy`. 자기 `height`를 이미 정한 버튼(`.bd-all` · `.bv-switch` · `.mk-row button` 등)은 그 값 그대로(토큰으로).
+  - 탭: `.tabs`는 `min-height: var(--size-nav)`(36 — 지금과 같음) · 안쪽 `space-0-5`, `.tab-btn`은 `height: var(--size-control-sm)`(24 — 지금과 같음), `.tab-min` 28은 `size-control-md`.
+- **26px 칸**은 모두 `size-compact`로 한다(28로 올리지 않음 — 옆 줄과 맞춘 값이라): `.vp-pill .vp-item` · `.make-opts` · `.ed-field`(min-height) · `.ed-go` · `.ed-type` · `.list-head .search-box input` · `input[type="color"]`, 그리고 그 칸과 줄을 맞춘 `line-height: 26px`(`.ed-dl dt` · `dd.ed-plain`).
 - 너비 · 높이의 다른 px(열 폭 88 · 견본 14 등)는 검사하지 않는다 — DS-2에서 컴포넌트로 옮길 때 정한다.
 
 ### 3.7 Motion · 겹침 · 투명도
@@ -265,9 +269,12 @@
 | `list-row-pad-x` | 2px | 카드 안 목록 줄 · 건너뛴 곳 줄 글 왼쪽(ia-v4 §2.8 · TR-D13) |
 | `list-row-pad-y` | 6px | 카드 안 목록 줄 위아래(ia-v4 §2.8) |
 | `pill-gap` | 6px | 알약 줄 사이(V-D5) |
+| `nav-item-gap` | 3px | 사이드바 항목 안 사이(V-D5 "항목 28 · 좌우 8 · 사이 3") |
 | `pill-font-size` | 11.5px | 알약 글자(ia-v4 §8) |
 
-- `src/treeList.ts`의 `21 + 9(n − 1)` · `12 + 9k` 계산은 같은 숫자를 쓴다. DS-1은 그 숫자를 바꾸지 않는다(TS의 계산된 위치 px는 검사 예외 — §8-2). 두 곳의 숫자가 같은지는 테스트가 확인한다(§8-7).
+- `src/treeList.ts`의 `21 + 9(n − 1)` · `12 + 9k` 계산은 같은 숫자를 쓴다. DS-1은 그 숫자를 바꾸지 않는다(TS의 계산된 위치 px는 검사 예외 — §8-2). CSS의 세로 선 위치(`.vt-grp.has-bar::before { left: 12px }`)는 `var(--tree-line-x)`로 바꾼다. 두 곳의 숫자가 같은지는 테스트가 확인한다(§8-7).
+- V-D5 "목록 줄 위아래 6"(`.vt-row` padding)은 줄 높이 32가 고정이라 화면 차이가 없다 — A.3 규칙대로 옮겨도 된다(이 표에 넣지 않음).
+- ia-v4 §8의 V-D4("11px 이상 이미 정한 크기는 그대로")는 V PR 범위의 결정이었다. DS-1의 글자 크기 맞추기(A.3-4)는 이 문서의 결정(DS-D5 "위계는 크기 · 굵기로, 단계 통일")을 따르고, 사용자가 숫자로 정한 알약 11.5만 §3.8로 지킨다.
 
 ## 4. 테마 (예약)
 
@@ -337,7 +344,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | 컴포넌트 | Variant | Size | 상태 | 핵심 토큰 | 지금 코드 |
 |---|---|---|---|---|---|
 | Badge | 숫자 · 상태(성공 · 주의 · 오류 · 안내) · 짙음 | 높이 14 | D | `text-caption` · `radius-xs` · 상태 `-subtle` 바탕 + 상태 글자 · 짙음 `color-surface-inverse` | `.mini-badge` · `.vs-badge` · `.bv-new` · `.tier-chip` |
-| Tag | 변수 칩(옅은 칸 + 짙은 칸) · 일반 · 주의 | `size-pill` 이하 | D H — F X — | `chip-*` · `radius-full` · `space-0-5` | `.vchip` · `.chip` · `.tr-tag` · `.lib-tag` · `.step-chip` |
+| Tag | 변수 칩(옅은 칸 + 짙은 칸) · 일반 · 주의 | `size-compact` 이하 | D H — F X — | `chip-*` · `radius-full` · `space-0-5` | `.vchip` · `.chip` · `.tr-tag` · `.lib-tag` · `.step-chip` |
 | Tooltip | 짙음 | 최대 너비 240 | (보임 · 숨김) | `color-surface-inverse` · `color-text-inverse` · `text-body-sm` · `radius-small` · `elevation-2` | `#uiTip` · `.vt-tip` |
 | Card | 기본 · 접힘 · 상태 바탕 | — | D (접기 머리 H F) | `color-surface-primary` · `color-border-default` · `radius-medium` · `space-3` · 그림자 없음 | `.step` · `.sel-card` · `.bind-card` |
 | List Item | 한 줄 · 두 줄 · 머리 줄 | 줄 32 | D H A F X — | 구분선 `color-border-default` 또는 없음(ia-v4 §2.8 · §2.7) · `color-interactive-hover` | `.tr` · `.vt-row` · `.mk-row` · `.skip-row` · `.results .r-card` |
@@ -404,7 +411,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 4. **층 규칙:** 화면 코드에 `var(--global-*)`가 있으면 실패. 원본의 Semantic · Component 색은 Global 색 하나를 가리켜야 하고, 참조가 끊기거나 돌면 실패.
 5. **원본 형식:** Global 밖 모든 토큰에 `$value` · `$type` · `$description`.
 6. **대비(4.5:1):** `color-text-primary` · `-secondary` · `-emphasis` · `-link` · 상태 글자 ↔ `color-background-primary`, 상태 글자 ↔ 그 `-subtle`, `color-text-on-primary` ↔ `color-primary`, `color-text-inverse` ↔ `color-surface-inverse` · `color-state-error`, `chip-value-text` ↔ `chip-value-bg`. 예외는 §9 목록에 적힌 짝만(목록에 없는 미달은 실패).
-7. **같은 숫자:** `tree-content-x` · `tree-indent` · `tree-line-x`가 `src/treeList.ts`의 `21` · `9` · `12`와 같은지.
+7. **같은 숫자:** `tree-content-x` · `tree-indent` · `tree-line-x`가 `src/treeList.ts`의 `21` · `9` · `12`와 같은지, CSS 세로 선 `left`가 `var(--tree-line-x)`인지.
 
 ## 9. 열린 결함
 
@@ -422,7 +429,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 ### A.0 ① 단계 Global (지금 값 그대로)
 
-① 단계의 `tokens.json`은 아래 Global을 쓰고, Semantic은 A.1의 짝을 가리킨다. 색은 지금과 같다(★만 바뀜 — A.2). ② 단계는 Global을 §3.1의 Foundation으로 바꾸고 Semantic이 가리키는 Global을 §3.1 표로 바꾼다(Semantic 이름은 그대로).
+① 단계의 `tokens.json`은 아래 Global을 쓰고, Semantic은 A.1의 짝을 가리킨다. 색은 지금과 같다(★만 바뀜 — A.1 · A.2). ② 단계는 Global을 §3.1의 Foundation으로 바꾸고 Semantic이 가리키는 Global을 §3.1 표로 바꾼다(Semantic 이름은 그대로).
 
 | 계열 | 값 |
 |---|---|
@@ -445,10 +452,10 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | `--surface-hover` | `--color-interactive-hover` |
 | `--text` | `--color-text-primary` |
 | `--text-2` | `--color-text-secondary` |
-| `--muted` | `--color-text-tertiary` |
+| `--muted` | 쓰임별로 나눔(§3.1 — tertiary는 자리 표시 · 비활성 · 장식만): 자리 표시 글(`::placeholder`) · 잠김(`[aria-disabled]`) · `:disabled` · 접기 기호 · 화살표 · 구분 기호 같은 장식 = `--color-text-tertiary`, **읽어야 하는 글자** = `--color-text-secondary`★(목록 둘째 줄 `.r-sum` · `.r-meta` · 모달 라벨 `.modal dt` · `.ed-phead` · `.ed-pnote` · `.ctx-menu .menu-note` · `.col-role .sub` · `.vu-props` · `.ed-ch-h` · 남은 단계 `.bs` 등 — #9298a1 → #5e636b) |
 | `--border` | `--color-border-default` (`var(--border-2, var(--border))` → `--color-border-strong`) |
 | `--border-2` | `button` 기본 테두리 = `--color-secondary-border`, 그 밖 = `--color-border-strong` |
-| `--accent` | 포커스 링 · 외곽선 · 고르개 테두리 · 체크박스 `accent-color` = `--color-interactive-focus` · 켠 스위치 · 진행 막대 · 돌기 · 고른 밑줄 = `--color-primary`(★) · 글자(`.ed-copy` · `.ed-plink`) = `--color-text-link`(★) |
+| `--accent` | 포커스 링 · 외곽선 · 고르개 테두리 · 체크박스 `accent-color` · 편집 중 칸 테두리(`.tr input.tr-edit`) · 메뉴가 열린 알약 테두리(`.vp-item.menu-open`) = `--color-interactive-focus` · 켠 스위치 · 진행 막대 · 돌기 · 고른 밑줄 = `--color-primary`(★) · 글자(`.ed-copy` · `.ed-plink`) = `--color-text-link`(★) |
 | `--accent-hover` | `--color-interactive-focus-hover` |
 | `--accent-press` | `--color-primary-hover` |
 | `--accent-strong` | 주 버튼 바탕 · 테두리 · 새 표시 바탕 = `--color-primary`, 링크 글자 = `--color-text-link`, 그 밖 글자 · 안내 띠 아이콘(`background-color`) = `--color-state-info` |
@@ -474,13 +481,13 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 |---|---|---|
 | #fff | 어두운 면 · 오류 버튼 · 배지 · 새 표시 위 글자 | `--color-text-inverse`(주 버튼 위면 `--color-text-on-primary`) |
 | #fff | 스위치 손잡이 · 체커 바탕 | `--color-surface-primary` |
-| #1b1b1f · #222 | 툴팁 바탕 | `--color-surface-inverse` |
+| #1b1b1f · ★ #222 | 툴팁 바탕(`#uiTip` · ★ `.vt-tip`) | `--color-surface-inverse`(#1b1b1f) |
 | #000 | 고른 사이드 항목 글자 · 개수 | `--color-text-emphasis` |
 | #000 | 고른 사이드 항목 배지 바탕 | `--nav-selected-badge-bg` |
 | #d0d5dd | 체커 무늬 | `--checker-color` |
 | rgba(0,0,0, .1 · .12 · .15 · .18) | 사용자 색 견본 테두리 | `--swatch-outline`(.15로 합침 — 차이 .03 이내라 ★ 아님) |
 | rgba(0,0,0,.2) | 스위치 손잡이 그림자 | `--toggle-knob-shadow` |
-| rgba(0,0,0,.08) | 고르개 그림자 | `--elevation-2` |
+| ★ `0 2px 8px rgba(0,0,0,.08)` | 고르개 그림자 | `--elevation-2`(모양이 조금 바뀜) |
 | rgba(0,0,0,.28) | 모달 막 | `--color-overlay` |
 | ★ #0d99ff | 켠 스위치 · 진행 막대 · 고른 밑줄 | `--color-primary`(#0a6dbf — A.1 `--accent`) |
 
@@ -489,7 +496,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 옮길 때 값이 토큰 단계에 없으면 아래 순서로 정한다. 위에 있는 규칙이 이긴다.
 
 1. **사용자 결정 치수** → §3.8 Component 토큰(값 그대로).
-2. **컨트롤 높이**(버튼 · 입력 · 고르개) → `height: var(--size-control-*)` + 좌우 padding만(§3.6). 버튼(지금 7 · 11 + 줄 높이 1 = 28) → `size-control-md` + 좌우 `space-3`(11 → 12). 입력(지금 6 · 8 + 1.4 ≈ 31) → `size-control-md` 28 + 좌우 `space-2`(★ 3px 낮아짐). 탭 줄 `.tabs`는 높이 36 유지(`min-height: var(--size-nav)`, 안쪽 `space-0-5`, 탭 버튼 높이 = 나머지).
+2. **컨트롤 높이**(버튼 · 입력 · 고르개) → §3.6의 규칙(높이를 주는 곳 · `height: auto` 예외 · 26px 칸 = `size-compact`). 버튼(지금 7 · 11 + 줄 높이 1 = 28) → `size-control-md` + 좌우 `space-3`(11 → 12). 입력(지금 6 · 8 + 1.4 ≈ 31) → `size-control-md` 28 + 좌우 `space-2`(★ 3px 낮아짐).
 3. **간격** — 가장 가까운 단계. 가운데 값:
    | 지금 | 줄 안 요소 사이(`gap` · 가로 `margin`) · 컨트롤 · 칩 안쪽 | 상자 안쪽(카드 · 모달 · 띠 · 메뉴의 `padding`) · 블록 사이 세로 `margin` · 세로로 쌓는 `gap`(`flex-direction: column` · `grid` 행) |
    |---|---|---|
@@ -499,7 +506,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
    | 18 | 16 | 20 |
    그 밖: 1 → 0(위아래 1px로 줄 높이를 맞추던 곳) 또는 `space-0-5`(글자 좌우), 3 → 4, 5 → 4, 7 → 8, 9 → 8, 11 → 12, 21 → 20, 36 → 40, 48 → 40. 음수: `-1px`는 그대로(테두리 겹치기), `-2px` → `calc(-1 * var(--space-0-5))`, `-3px` → `calc(-1 * var(--space-1))`.
 4. **글자 크기** — 11.5 → 11, 12.5 → 12, 18 → 16(소수 내림). 단 §3.8 `pill-font-size`(11.5)는 그대로.
-5. **줄 높이** — `1` → `line-height-none`, `1.25` · `1.3` → `-tight`, `1.35` · `1.4` · `1.45` → `-snug`, `1.5` → `-normal`. px: `10px` · `12px` → `-xs`, `14px` → `-sm`, `16px` → `-md`, `26px` → `var(--size-pill)`(그 줄 높이와 같음). 줄 높이 없는 `font: 11px var(--mono)`는 줄 높이를 더하지 않는다(물려받음 그대로).
+5. **줄 높이** — `1` → `line-height-none`, `1.25` · `1.3` → `-tight`, `1.35` · `1.4` · `1.45` → `-snug`, `1.5` → `-normal`. px: `10px` · `12px` → `-xs`, `14px` → `-sm`, `16px` → `-md`, `26px` → `var(--size-compact)`(§3.6 26px 칸과 줄 맞춤). 줄 높이 없는 `font: 11px var(--mono)`는 줄 높이를 더하지 않는다(물려받음 그대로).
 6. **둥글기** — 지금 2 · 3 · 4px → `radius-xs`, 5 · 6px → `radius-small`, 7 · 8px → `radius-medium`, 10px → `radius-large`, 13px · 999px · 50% → `radius-full`(① 단계 값은 A.0).
 7. **겹침** — §3.7 표의 지금 값 → 같은 값의 토큰. `-1` → `z-below`.
 8. **움직임** — .1s · .12s → `motion-duration-fast`, .9s · 1s → `motion-duration-spin`.
@@ -509,8 +516,23 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 - Global을 §3.1 Foundation으로, Semantic · Component가 가리키는 Global을 §3.1 표로.
 - 둥글기를 §3.4(4 · 6 · 8 · 10)로, 그림자 색을 rgba(17,17,17,…)로, `opacity-disabled` .5로.
-- 카드(`.step` · `.sel-card` · `.bind-card`)의 `box-shadow: var(--elevation-1)`을 `none`으로(카드 그림자 없음 — DS-D5). 이것만 CSS 한 줄씩 바뀐다.
-- `scripts/verify-bind-flow.mjs`가 읽는 계산된 색(사이드바 고름 바탕 · 배지 · 칩 · 동그라미 테두리 등)의 기대값을 새 값으로. `docs/ia-v4.md`에서 색 이름 · 값을 적은 줄(V-D5 #ededed · 검정 배지 등)에 "② 뒤 값은 design-system.md §3.1" 한 줄.
+- 카드 그림자 없음(DS-D5): 그림자는 `.step`에만 있다(`.bind-card`는 `.step`, `.sel-card`는 그림자 없음) — `.step`의 `box-shadow: var(--elevation-1)`을 지운다. ② 단계의 CSS 변경은 이 한 줄뿐이다.
+- 카드 둘의 둥글기가 다르다(`.step` large 10 · `.sel-card` medium 8 — 지금 `--r-lg` · `--r`를 그대로 옮긴 결과). §3.4의 Card = medium으로 맞추는 일은 DS-2(컴포넌트 Card로 옮길 때).
+- `scripts/verify-bind-flow.mjs`의 색 기대값(2회차 검토 기준 줄 번호 — 구현 때 다시 확인):
+
+  | verify 줄 | 지금 값 | ② 값 | 토큰 |
+  |---|---|---|---|
+  | 715 · 1447 | rgb(94,99,107) | #555555 | `color-text-secondary` |
+  | 720 · 1655 · 1665 | rgb(236,238,240) | #F5F5F5 | `color-interactive-hover` |
+  | 1154 | rgb(10,109,191) | #111111 | `color-primary` |
+  | 1845 · 2314 · 2360 · 3597 · 3666 | rgb(244,245,246) | #F5F5F5 | `color-surface-secondary` |
+  | 2314 · 2448 · 2499 | rgb(146,152,161) | #999999 | `color-text-tertiary` |
+  | 3071 | 1px rgb(0,0,0) | #111111 | `swatch-border` |
+  | 3137 | 바탕 rgb(237,237,237) · 배지 rgb(0,0,0) | #ECECEC · #111111 | `color-surface-selected` · `nav-selected-badge-bg` |
+  | 3778 | rgb(251,241,223) | #F8F2E9 | `color-state-warning-subtle` |
+
+  검사 이름 문자열의 "#ededed · 검정"도 새 값으로. ①에서 `--muted` → secondary★로 바뀐 줄의 기대값도 이 표와 함께 확인.
+- `docs/ia-v4.md`에서 색 값을 적은 줄(V-D5 #ededed · 검정 배지 등)에 "② 뒤 값은 design-system.md §3.1" 한 줄.
 
 ## 부록 B. DS-1 체크리스트
 
@@ -522,6 +544,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 - [ ] B.6 `src/ui.ts` · `src/treeList.ts`의 옛 변수 이름과 innerHTML · `style.margin*` 안 직접 간격 · 둥글기 · 색 → 토큰(`treeList.ts`의 4px · 16px 그룹 여백 → `var(--space-1)` · `var(--space-4)`)
 - [ ] B.7 `test/design-tokens.test.mjs` — §8의 1–7
 - [ ] B.8 `scripts/verify-bind-flow.mjs`가 읽는 옛 변수 이름(`--border` · `--text` · `--text-2` · `--muted` · `--swatch-line`)을 새 이름으로. 글자 크기 검사(`^[\d.]+px$`)는 계산된 값을 보도록. 바뀐 px 기대값(★ 입력 높이 등)은 고치고 목록을 PR에 적는다
-- [ ] B.9 ① 커밋: 검사 4개 통과 + 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 모달)으로 ★ 밖의 차이가 없는지
+- [ ] B.9 ① 커밋: 검사 4개 통과 + 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 모달)으로 **★과 A.3 규칙(둥글기 · 줄 높이 · 글자 크기 · 간격 · 투명도 맞추기)에 따른 변화 밖**의 차이가 없는지
 - [ ] B.10 ② 커밋: A.4 + 검사 4개 통과 + 새 모양 스크린샷
-- [ ] B.11 `ROADMAP.md`에 DS-1 · DS-2 · DS-3 자리, `docs/ia-v4.md` §2.8 · §8에서 이 문서를 가리킴
+- [ ] B.11 `ROADMAP.md`에 DS-1 · DS-2 · DS-3 자리, `docs/ia-v4.md` §2.8 · §8에서 이 문서를 가리킴. ①에서 바뀌는 ia-v4 §8의 숫자(사용자 결정이 아닌 것 — 카드 안쪽 10 · 12 → 12 · 12, 만들기 아래 줄 위아래 6 · 8 → 8 · 8로 합계 80 → 82, 입력 높이 ≈31 → 28, 변수 탭 머리 줄 높이 등)를 ia-v4 §8에 적는다
+- [ ] B.12 쓰는 곳이 없는 `.pipe-mini` 규칙을 지운다(`ui.ts`에서 쓰지 않음)
