@@ -3353,7 +3353,7 @@ async function backHome30(p, libs) {
   const geo = () => p.evaluate(() => {
     const T = document.getElementById('varTree').getBoundingClientRect();
     const X = (v) => Math.round((v - T.left) * 10) / 10;
-    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const border = getComputedStyle(document.documentElement).getPropertyValue('--color-border-default').trim();
     const probe = document.createElement('i'); probe.style.background = border; document.body.appendChild(probe); const borderRgb = getComputedStyle(probe).backgroundColor; probe.remove();
     const grps = [...document.querySelectorAll('#varTree .vt-grp')].map((g) => {
       const s = getComputedStyle(g, '::before'); const r = g.getBoundingClientRect();
@@ -3564,7 +3564,7 @@ const trGeo = (p, sel) => p.$eval(sel, (T) => {
     };
   });
   return { rows, w: r(T.getBoundingClientRect().width), vlike: T.classList.contains('vlike'), hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth || T.scrollWidth > T.clientWidth,
-    text: probe('--text'), text2: probe('--text-2'), muted: probe('--muted'), line: probe('--swatch-line') };
+    text: probe('--color-text-primary'), text2: probe('--color-text-secondary'), muted: probe('--color-text-tertiary'), line: probe('--swatch-border') };
 });
 const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
 {
