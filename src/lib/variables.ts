@@ -128,6 +128,8 @@ async function pickReusable(tokens: readonly DraftToken[], base: number): Promis
   if (!withUses.length) return out;
   const read = await readVarInfos();
   const infos = read.infos.filter((i) => i.key != null);
+  // 색 밝기 이름 — 지을 역할 이름(`createUsageRoles`)과 같은 결과로 플러그인 역할의 가족을 본다(연결 찾기의 자리 쓰임 이름과 같다, SC-D41)
+  const { bases } = colorBasesOf(withUses, semanticIndex(await figma.variables.getLocalVariableCollectionsAsync(), await figma.variables.getLocalVariablesAsync()).existing);
   const byName = new Map<string, DraftToken[]>();
   for (const t of withUses) byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
   for (const [name, list] of byName) {
@@ -136,11 +138,28 @@ async function pickReusable(tokens: readonly DraftToken[], base: number): Promis
       const type = resolvedTypeForToken(t);
       const lit = literalOf(t, type, base);
       const key = type === 'FLOAT' ? valueKeyOf('num', Number(lit)) : String(lit);
-      // 플러그인이 만든 역할은 그 토큰 쓰임 이름의 가족일 때만 후보(색은 `color/{쓰임}/…`)
-      const uses = (t.uses ?? []).map((u) => u.name);
-      const roleOk = (n: string): boolean => uses.some((u) => (u.startsWith('color/') ? n.startsWith(`${u}/`) : familyRe(u, nameKindOf(u, key)).test(n)));
-      // 빈 자리가 있는 용도 묶음 — freeBy가 없는 옛 토큰은 종류에서 정한 묶음(`selCards.ts` tokenGroups — 연결 단계의 거름과 같은 키)
-      for (const g of tokenGroups(t)) places.push({ type, key, allowed: g.split('|'), roleOk, ...(type === 'FLOAT' ? { tokenName: t.name } : {}) });
+      // 플러그인이 만든 역할은 그 쓰임 이름의 가족일 때만 후보 — 색은 밝기까지 정한 밑이름(`color/{쓰임}/{밝기}`), 숫자는 쓰임 이름.
+      const family = (u: NonNullable<DraftToken['uses']>[number]): string => (u.name.startsWith('color/') ? bases.get(colorBaseKey(u.name, String(t.value), u.bg, t.alpha)) ?? `${u.name}/default` : u.name);
+      const okFor = (f: string) => (n: string): boolean => familyRe(f, nameKindOf(f, key)).test(n);
+      const tokenName = type === 'FLOAT' ? { tokenName: t.name } : {};
+      const uses = t.uses ?? [];
+      if (uses.some((u) => u.keys)) {
+        // 쓰임 × 빈 자리가 있는 묶음마다 한 자리 — 연결 찾기가 자리마다 자기 쓰임 이름으로 고르는 것과 같은 단위(SC-D41)
+        const seen = new Set<string>();
+        for (const u of uses) {
+          const f = family(u);
+          for (const g of u.keys ?? []) {
+            if (seen.has(`${f}\u0000${g}`)) continue;
+            seen.add(`${f}\u0000${g}`);
+            places.push({ type, key, allowed: g.split('|'), roleOk: okFor(f), ...tokenName });
+          }
+        }
+      } else {
+        // 쓰임별 묶음을 모르는 옛 토큰 — 묶음마다 쓰임 가운데 하나라도 가족이면(`selCards.ts` tokenGroups — 연결 단계의 거름과 같은 키)
+        const fams = uses.map(family);
+        const roleOk = (n: string): boolean => fams.some((f) => okFor(f)(n));
+        for (const g of tokenGroups(t)) places.push({ type, key, allowed: g.split('|'), roleOk, ...tokenName });
+      }
     }
     const picks = tokenReuse(places, infos);
     if (!picks) continue;
@@ -418,19 +437,12 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
 }
 
 /**
- * 쓰임 역할 만들기(§2.12 12.10) — 토큰의 쓰임(`uses`)마다 Semantic 역할을 만든다(같은 처리 · 같은 ⌘Z).
- * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 이름 꼬리(12.5): 같은 값 · 맞는 용도가 이미 있으면 그 이름을
- * 쓰고(만들지 않음), 다른 값이 차지했으면 후보 목록의 다음 꼬리. 이미 있는 역할의 값은 바꾸지 않는다.
- * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
- * rowsOut을 주면 preview일 때 셀 역할마다 {이름, 가리킬 Global 이름, 만든 토큰 이름}을 넣는다(IA v4 §4.3 `roleRows` — 길이 = 반환값).
+ * 이미 있는 Semantic 이름(§2.12 12.5) — Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 키 묶음(같은 이름이면 사용자 컬렉션 먼저 · 목록 순, 13.5)과
+ * 재사용 판정용 이름 → (값 키 · 변수). `createUsageRoles`와 만들기의 재사용(`pickReusable` — 색 밝기의 기준색)이 함께 쓴다.
  */
-export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[], finalName?: ReadonlyMap<string, string>): Promise<number> {
-  const withUses = tokens.filter((t) => t.uses?.length);
-  if (!withUses.length) return 0;
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const vars = await figma.variables.getLocalVariablesAsync();
-  const tiers = collectionTiers(cols, vars);
-  const owned = ownedIds(cols);
+function semanticIndex(cols: readonly VariableCollection[], vars: readonly Variable[]): { existing: Map<string, string[]>; semByName: Map<string, { key: string; v: Variable }[]> } {
+  const tiers = collectionTiers(cols as VariableCollection[], vars as Variable[]);
+  const owned = ownedIds(cols as VariableCollection[]);
   const byId = new Map(vars.map((v) => [v.id, v]));
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
   const resolve = (v: Variable): VariableValue | undefined => {
@@ -447,7 +459,6 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     if (typeof val === 'object' && 'r' in val) return colorKey(rgbToHex(val as RGB), (val as RGBA).a); // 색 값 키
     return typeof val === 'number' || typeof val === 'string' ? valueKey(val) : '';
   };
-  // 이미 있는 이름 = Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음. 같은 이름이면 사용자 컬렉션 먼저 · 목록 순(13.5).
   const colIdx = new Map(cols.map((c, i) => [c.id, i]));
   const rank = (id: string): number => (owned.has(id) ? 1e6 : 0) + (colIdx.get(id) ?? 0);
   const existing = new Map<string, string[]>();
@@ -459,6 +470,54 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     else if (k && !arr.includes(k)) arr.push(k);
     semByName.set(v.name, [...(semByName.get(v.name) ?? []), { key: k, v }]);
   }
+  return { existing, semByName };
+}
+
+/** 색 쓰임 밝기 찾기 키 — (쓰임, 색 값 · 배경 종류 · 투명도). */
+const colorBaseKey = (use: string, hex: string, bg: BgKind | undefined, alpha: number | undefined): string => `${use}\u0000${colorSlotKey(String(hex).toLowerCase(), bg, alpha)}`;
+
+/**
+ * 쓰임별 색 밝기 이름(12.4)과 기준색 — 키(`colorBaseKey`) → 역할 밑이름 `{쓰임}/{밝기}`. 입력은 쓰임이 있는 토큰 전부(곳 수 = 쓰임의 곳 수)와
+ * 이미 있는 `{쓰임}/default`의 값. `createUsageRoles`(지을 이름)와 `pickReusable`(플러그인 역할의 가족 판정)이 같은 결과를 쓴다 —
+ * 연결 찾기(`bind.ts` resolveSlots)도 그 쓰임의 연결 안 된 색 자리 전부로 같은 함수를 부른다(§2.9 SC-D40 · SC-D41).
+ */
+function colorBasesOf(withUses: readonly DraftToken[], existing: ReadonlyMap<string, string[]>): { bases: Map<string, string>; refs: Map<string, string | undefined> } {
+  const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
+  for (const t of withUses) {
+    for (const u of t.uses ?? []) {
+      if (!u.name.startsWith('color/')) continue;
+      const arr = colorUses.get(u.name) ?? [];
+      arr.push({ token: t, count: u.count, bg: u.bg });
+      colorUses.set(u.name, arr);
+    }
+  }
+  const bases = new Map<string, string>();
+  const refs = new Map<string, string | undefined>();
+  for (const [use, list] of colorUses) {
+    // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
+    const defKey = existing.get(`${use}/default`)?.[0];
+    const input = list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha }));
+    const b = colorRoleBases(input, defKey || undefined, use.slice('color/'.length)); // 색 값 키여도 colorRoleBases가 hex만 본다
+    refs.set(use, colorRoleRef(input, defKey || undefined, use.slice('color/'.length))); // 쓰임별 기준값(12.12 N-D4)
+    for (const x of list) bases.set(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha), `${use}/${b.get(colorSlotKey(String(x.token.value).toLowerCase(), x.bg, x.token.alpha)) ?? 'default'}`);
+  }
+  return { bases, refs };
+}
+
+/**
+ * 쓰임 역할 만들기(§2.12 12.10) — 토큰의 쓰임(`uses`)마다 Semantic 역할을 만든다(같은 처리 · 같은 ⌘Z).
+ * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 이름 꼬리(12.5): 같은 값 · 맞는 용도가 이미 있으면 그 이름을
+ * 쓰고(만들지 않음), 다른 값이 차지했으면 후보 목록의 다음 꼬리. 이미 있는 역할의 값은 바꾸지 않는다.
+ * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
+ * rowsOut을 주면 preview일 때 셀 역할마다 {이름, 가리킬 Global 이름, 만든 토큰 이름}을 넣는다(IA v4 §4.3 `roleRows` — 길이 = 반환값).
+ */
+export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[], finalName?: ReadonlyMap<string, string>): Promise<number> {
+  const withUses = tokens.filter((t) => t.uses?.length);
+  if (!withUses.length) return 0;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const { existing, semByName } = semanticIndex(cols, vars);
   const globalNames = pluginGlobalNames(cols, vars); // 거울(12.7 — 플러그인 Global 컬렉션의 이름과 같은 별칭, ia-v4 §2.9 S2-P4)
   const canReuse = (name: string, value: string, base: string): boolean => {
     if (globalNames.has(name)) return false; // 거울(12.7)
@@ -479,8 +538,9 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : undefined;
   };
 
-  // 요청 — 숫자는 쓰임 이름, 색은 쓰임별 밝기 이름.
+  // 요청 — 숫자는 쓰임 이름(토큰 순), 그다음 색은 쓰임별 밝기 이름(쓰임이 처음 나온 순 · 그 안은 토큰 순 — `colorBasesOf`, 만들기의 재사용과 같은 결과).
   const reqs: { base: string; value: string; count: number; token: DraftToken; refHex?: string }[] = [];
+  const { bases, refs } = colorBasesOf(withUses, existing);
   const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
   for (const t of withUses) {
     for (const u of t.uses ?? []) {
@@ -492,22 +552,10 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     }
   }
   for (const [use, list] of colorUses) {
-    // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
-    const defKey = existing.get(`${use}/default`)?.[0];
-    const bases = colorRoleBases(
-      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-      defKey || undefined, // 색 값 키여도 colorRoleBases가 hex만 본다
-      use.slice('color/'.length),
-    );
-    const refHex = colorRoleRef(
-      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-      defKey || undefined,
-      use.slice('color/'.length), // 쓰임별 기준값(12.12 N-D4)
-    );
+    const refHex = refs.get(use);
     for (const x of list) {
-      const hex = String(x.token.value).toLowerCase();
       // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 투명도 단계로 갈린다(default · default-subtle, 12.5)
-      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token, ...(refHex ? { refHex } : {}) });
+      reqs.push({ base: bases.get(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha)) ?? `${use}/default`, value: colorKey(String(x.token.value).toLowerCase(), x.token.alpha), count: x.count, token: x.token, ...(refHex ? { refHex } : {}) });
     }
   }
   const names = assignNames(reqs, existing, { canReuse });
@@ -1957,6 +2005,10 @@ export async function dropRemoteClusters<C extends { nodeIds?: string[] }>(
  * `planExistingTextStyles`가 줄에 넣을 글자(인스턴스 밖 · 붙일 로컬 스타일이 하나로 정해짐)면 true.
  */
 export async function textStyleCandidateTest(roots: readonly SceneNode[] = []): Promise<(t: TextNode) => boolean> {
+  // 선택에 글자가 없으면 판정할 글자도 없다 — 페이지 전체 글자를 훑는 원격 스타일 목록(`remoteTextStyles`)을 읽지 않는다(선택이 바뀔 때마다 도는 EXTRACT 비용).
+  // 찾아보는 함수가 없는 노드(테스트 목)는 글자가 있다고 본다.
+  const hasText = roots.some((r) => r.type === 'TEXT' || (typeof (r as { findAllWithCriteria?: unknown }).findAllWithCriteria === 'function' ? (r as ChildrenMixin).findAllWithCriteria({ types: ['TEXT'] }).length > 0 : 'children' in r));
+  if (roots.length && !hasText) return () => false;
   const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
   return (t) => !insideInstance(t) && typeof textStyleFor(t, styleByKey) !== 'string';
 }

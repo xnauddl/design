@@ -6,7 +6,7 @@
    ============================================================ */
 import { rgbToHex, colorKey, roundAlpha, numberTokenName, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
 import { collectionTiers, ensureOwnedCollection, ownedCollections, pluginGlobalNames } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13 — 이름 차지 · 배지에만, 후보 고르기에는 쓰지 않는다 ia-v4 §2.9 S2-P4)
-import { candidatePool, round2, sameNumber, splitPlaces, userRadiusKeys, valueKeyOf, type CandidatePick, type MakeValue, type SplitPlace, type VarInfo } from './sameValue'; // 같은 값 · 후보 고르기 · 자리 가르기(ia-v4 §2.9 S2-P1)
+import { round2, sameNumber, splitPlaces, userRadiusKeys, valueKeyOf, type CandidatePick, type MakeValue, type SplitPlace, type VarInfo } from './sameValue'; // 같은 값 · 후보 고르기 · 자리 가르기(ia-v4 §2.9 S2-P1)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip, MainUnitInfo, NewRoleRef } from '../shared/messages';
 import { backgroundOf, gapSkip, isIconOrAvatar, inAutoLayoutFlow, iconOrAvatarKind, isInsideIconFrame } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타 · 오토레이아웃 흐름) — 만들기와 같은 기준
@@ -941,21 +941,12 @@ function resolveSlots(ctx: Ctx): void {
     preview.candidates.push(c);
   };
 
-  // 색: 쓰임 이름(밝기)을 쓰임별로 한 번에 정한다(12.4 처리 순서 ②~④). 대상 = 사용자 별칭 후보가 없는 자리(새 역할을 만들 수 있다)와
-  // 플러그인이 만든 역할이 같은 값으로 서 있는 자리(가족 판정에 이름이 든다).
+  // 색: 쓰임 이름(밝기)을 쓰임별로 한 번에 정한다(12.4 처리 순서 ②~④). 대상 = 그 쓰임의 연결 안 된 색 자리 전부 — 별칭 후보가 있는
+  // 자리도 넣는다. 만들기(`createUsageRoles`)가 쓰임 전체로 이름을 짓는 것과 같은 기준이어야 연결 단계가 만든 역할을 다시 쓴다(§2.9 SC-D40).
   const colorBase = new Map<Slot, { base: string; refHex?: string }>();
   const byUse = new Map<string, Slot[]>();
-  const poolMemo = new Map<string, boolean>();
   for (const s of ctx.slots) {
     if (s.kind !== 'color') continue;
-    const mk = `${s.value}\u0000${s.allowed.join('|')}`;
-    let need = poolMemo.get(mk);
-    if (need === undefined) {
-      const pool = candidatePool(placeOf(s), infos);
-      need = !pool.aliases.length || pool.roles.length > 0;
-      poolMemo.set(mk, need);
-    }
-    if (!need) continue;
     const arr = byUse.get(s.usage);
     if (arr) arr.push(s);
     else byUse.set(s.usage, [s]);

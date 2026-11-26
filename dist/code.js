@@ -2845,17 +2845,8 @@
     };
     const colorBase = /* @__PURE__ */ new Map();
     const byUse = /* @__PURE__ */ new Map();
-    const poolMemo = /* @__PURE__ */ new Map();
     for (const s of ctx.slots) {
       if (s.kind !== "color") continue;
-      const mk = `${s.value}\0${s.allowed.join("|")}`;
-      let need = poolMemo.get(mk);
-      if (need === void 0) {
-        const pool = candidatePool(placeOf(s), infos);
-        need = !pool.aliases.length || pool.roles.length > 0;
-        poolMemo.set(mk, need);
-      }
-      if (!need) continue;
       const arr = byUse.get(s.usage);
       if (arr) arr.push(s);
       else byUse.set(s.usage, [s]);
@@ -3703,7 +3694,7 @@
   var fieldPlace = (acc, node, field, places = 1) => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) && !followsMain(acc, node, field) ? places : 0 });
   var followsMain = (acc, node, field, index) => !!acc.curMain && sameAsMain(node, acc.curMain, field, index);
   function add(acc, token, source, nodeId, use, bg, place) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e;
     const k = keyOf(token.category, token.value, token.unit, token.alpha);
     let existing = acc.map.get(k);
     if (existing) {
@@ -3720,9 +3711,10 @@
     }
     if (use) {
       const uses = (_d = existing.uses) != null ? _d : existing.uses = [];
-      const u = uses.find((x) => x.name === use && x.bg === bg);
+      let u = uses.find((x) => x.name === use && x.bg === bg);
       if (u) u.count++;
-      else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+      else uses.push(u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+      if (place && place.free > 0 && !((_e = u.keys) != null ? _e : u.keys = []).includes(place.key)) u.keys.push(place.key);
     }
   }
   function backgroundOf(node) {
@@ -4960,7 +4952,7 @@
     return typeof raw === "number" && Math.round(raw * 100) === Math.round(Number(lit) * 100);
   }
   async function pickReusable(tokens, base) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const out = /* @__PURE__ */ new Map();
     const withUses = tokens.filter((t2) => {
       var _a2;
@@ -4969,6 +4961,7 @@
     if (!withUses.length) return out;
     const read = await readVarInfos();
     const infos = read.infos.filter((i) => i.key != null);
+    const { bases } = colorBasesOf(withUses, semanticIndex(await figma.variables.getLocalVariableCollectionsAsync(), await figma.variables.getLocalVariablesAsync()).existing);
     const byName3 = /* @__PURE__ */ new Map();
     for (const t2 of withUses) byName3.set(t2.name, [...(_a = byName3.get(t2.name)) != null ? _a : [], t2]);
     for (const [name, list] of byName3) {
@@ -4977,16 +4970,35 @@
         const type = resolvedTypeForToken(t2);
         const lit = literalOf(t2, type, base);
         const key = type === "FLOAT" ? valueKeyOf("num", Number(lit)) : String(lit);
-        const uses = ((_b = t2.uses) != null ? _b : []).map((u) => u.name);
-        const roleOk = (n) => uses.some((u) => u.startsWith("color/") ? n.startsWith(`${u}/`) : familyRe(u, nameKindOf(u, key)).test(n));
-        for (const g of tokenGroups(t2)) places.push(__spreadValues({ type, key, allowed: g.split("|"), roleOk }, type === "FLOAT" ? { tokenName: t2.name } : {}));
+        const family = (u) => {
+          var _a2;
+          return u.name.startsWith("color/") ? (_a2 = bases.get(colorBaseKey(u.name, String(t2.value), u.bg, t2.alpha))) != null ? _a2 : `${u.name}/default` : u.name;
+        };
+        const okFor = (f) => (n) => familyRe(f, nameKindOf(f, key)).test(n);
+        const tokenName = type === "FLOAT" ? { tokenName: t2.name } : {};
+        const uses = (_b = t2.uses) != null ? _b : [];
+        if (uses.some((u) => u.keys)) {
+          const seen = /* @__PURE__ */ new Set();
+          for (const u of uses) {
+            const f = family(u);
+            for (const g of (_c = u.keys) != null ? _c : []) {
+              if (seen.has(`${f}\0${g}`)) continue;
+              seen.add(`${f}\0${g}`);
+              places.push(__spreadValues({ type, key, allowed: g.split("|"), roleOk: okFor(f) }, tokenName));
+            }
+          }
+        } else {
+          const fams = uses.map(family);
+          const roleOk = (n) => fams.some((f) => okFor(f)(n));
+          for (const g of tokenGroups(t2)) places.push(__spreadValues({ type, key, allowed: g.split("|"), roleOk }, tokenName));
+        }
       }
       const picks = tokenReuse(places, infos);
       if (!picks) continue;
       const first = read.byId.get(picks[0].variable.id);
       if (!first) continue;
       const adds = [...new Set(picks.filter((p) => p.scopeAdd).map((p) => read.byId.get(p.variable.id)).filter((v) => !!v))];
-      out.set(name, { variable: first, rawId: (_c = picks[0].variable.rawId) != null ? _c : first.id, adds });
+      out.set(name, { variable: first, rawId: (_d = picks[0].variable.rawId) != null ? _d : first.id, adds });
     }
     return out;
   }
@@ -5201,15 +5213,8 @@
     }
     return summary;
   }
-  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l;
-    const withUses = tokens.filter((t2) => {
-      var _a2;
-      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
-    });
-    if (!withUses.length) return 0;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
+  function semanticIndex(cols, vars) {
+    var _a;
     const tiers = collectionTiers(cols, vars);
     const owned = ownedIds(cols);
     const byId = new Map(vars.map((v) => [v.id, v]));
@@ -5243,6 +5248,42 @@
       else if (k && !arr.includes(k)) arr.push(k);
       semByName.set(v.name, [...(_a = semByName.get(v.name)) != null ? _a : [], { key: k, v }]);
     }
+    return { existing, semByName };
+  }
+  var colorBaseKey = (use, hex, bg, alpha) => `${use}\0${colorSlotKey(String(hex).toLowerCase(), bg, alpha)}`;
+  function colorBasesOf(withUses, existing) {
+    var _a, _b, _c, _d;
+    const colorUses = /* @__PURE__ */ new Map();
+    for (const t2 of withUses) {
+      for (const u of (_a = t2.uses) != null ? _a : []) {
+        if (!u.name.startsWith("color/")) continue;
+        const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
+        arr.push({ token: t2, count: u.count, bg: u.bg });
+        colorUses.set(u.name, arr);
+      }
+    }
+    const bases = /* @__PURE__ */ new Map();
+    const refs = /* @__PURE__ */ new Map();
+    for (const [use, list] of colorUses) {
+      const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
+      const input = list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha }));
+      const b = colorRoleBases(input, defKey || void 0, use.slice("color/".length));
+      refs.set(use, colorRoleRef(input, defKey || void 0, use.slice("color/".length)));
+      for (const x of list) bases.set(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha), `${use}/${(_d = b.get(colorSlotKey(String(x.token.value).toLowerCase(), x.bg, x.token.alpha))) != null ? _d : "default"}`);
+    }
+    return { bases, refs };
+  }
+  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    const withUses = tokens.filter((t2) => {
+      var _a2;
+      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
+    });
+    if (!withUses.length) return 0;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const { existing, semByName } = semanticIndex(cols, vars);
     const globalNames = pluginGlobalNames(cols, vars);
     const canReuse = (name, value, base) => {
       var _a2;
@@ -5265,43 +5306,31 @@
       return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : void 0;
     };
     const reqs = [];
+    const { bases, refs } = colorBasesOf(withUses, existing);
     const colorUses = /* @__PURE__ */ new Map();
     for (const t2 of withUses) {
-      for (const u of (_b = t2.uses) != null ? _b : []) {
+      for (const u of (_a = t2.uses) != null ? _a : []) {
         if (u.name.startsWith("color/")) {
-          const arr = (_c = colorUses.get(u.name)) != null ? _c : [];
+          const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
           arr.push({ token: t2, count: u.count, bg: u.bg });
           colorUses.set(u.name, arr);
         } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
       }
     }
     for (const [use, list] of colorUses) {
-      const defKey = (_d = existing.get(`${use}/default`)) == null ? void 0 : _d[0];
-      const bases = colorRoleBases(
-        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-        defKey || void 0,
-        // 색 값 키여도 colorRoleBases가 hex만 본다
-        use.slice("color/".length)
-      );
-      const refHex = colorRoleRef(
-        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-        defKey || void 0,
-        use.slice("color/".length)
-        // 쓰임별 기준값(12.12 N-D4)
-      );
+      const refHex = refs.get(use);
       for (const x of list) {
-        const hex = String(x.token.value).toLowerCase();
-        reqs.push(__spreadValues({ base: `${use}/${(_e = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _e : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
+        reqs.push(__spreadValues({ base: (_c = bases.get(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha))) != null ? _c : `${use}/default`, value: colorKey(String(x.token.value).toLowerCase(), x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
       }
     }
     const names = assignNames(reqs, existing, { canReuse });
     const infos = (await readVarInfos()).infos;
     const toMake = /* @__PURE__ */ new Map();
     for (const r of reqs) {
-      const name = (_f = names.get(`${r.base}\0${r.value}`)) != null ? _f : r.base;
+      const name = (_d = names.get(`${r.base}\0${r.value}`)) != null ? _d : r.base;
       if (existing.has(name) || toMake.has(name)) continue;
       const type = resolvedTypeForToken(r.token);
-      const need = (_i = (_h = scopeForSemanticRole(name)) != null ? _h : (_g = globalFor(r.token)) == null ? void 0 : _g.scopes) != null ? _i : scopesForType(scopesForSources(r.token.sources), type);
+      const need = (_g = (_f = scopeForSemanticRole(name)) != null ? _f : (_e = globalFor(r.token)) == null ? void 0 : _e.scopes) != null ? _g : scopesForType(scopesForSources(r.token.sources), type);
       const key = type === "COLOR" ? colorKey(String(r.token.value), r.token.alpha) : type === "FLOAT" ? valueKeyOf("num", Number(r.token.value)) : String(r.token.value);
       if (aliasCovers(infos, { type, key, need, base: r.base })) continue;
       toMake.set(name, r.token);
@@ -5310,7 +5339,7 @@
       if (rowsOut) {
         for (const [name, t2] of toMake) {
           const id = globalOf == null ? void 0 : globalOf.get(t2.name);
-          rowsOut.push({ name, global: id && ((_j = byId.get(id)) == null ? void 0 : _j.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
+          rowsOut.push({ name, global: id && ((_h = byId.get(id)) == null ? void 0 : _h.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
         }
       }
       return toMake.size;
@@ -5323,9 +5352,9 @@
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_k = scopeForSemanticRole(name)) != null ? _k : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_i = scopeForSemanticRole(name)) != null ? _i : g.scopes, g.resolvedType);
       try {
-        (_l = v.setPluginData) == null ? void 0 : _l.call(v, AUTO_ROLE_KEY, "1");
+        (_j = v.setPluginData) == null ? void 0 : _j.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -6348,6 +6377,8 @@
     });
   }
   async function textStyleCandidateTest(roots = []) {
+    const hasText = roots.some((r) => r.type === "TEXT" || (typeof r.findAllWithCriteria === "function" ? r.findAllWithCriteria({ types: ["TEXT"] }).length > 0 : "children" in r));
+    if (roots.length && !hasText) return () => false;
     const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
     return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
   }

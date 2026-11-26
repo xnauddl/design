@@ -6910,7 +6910,7 @@
     s.title = tip;
     return s;
   }
-  var mkLayers = (n) => trLeft(t("make.layers", { n: n != null ? n : 0 }));
+  var mkTsPlaces = (n) => trLeft(t("tree.places", { n: n != null ? n : 0 }));
   var tokenFree = (tk) => {
     var _a3;
     return tk.freeBy ? Object.values(tk.freeBy).reduce((a, b) => a + (b > 0 ? b : 0), 0) : (_a3 = tk.count) != null ? _a3 : 0;
@@ -6927,9 +6927,9 @@
     const libs = libDirectNow();
     let p = 0;
     for (const tk of mkGlobalsOn()) p += tokenLinkPlaces(tk, libs);
-    if (baseline && bindPreviewed && selFindFor === baseKey()) p += tsAllNodes().size;
-    return p;
+    return p + linkTsPlaces();
   }
+  var linkTsPlaces = () => baseline && bindPreviewed && selFindFor === baseKey() && !selFindInFlight ? tsAllNodes().size : 0;
   function mkTabsVisible() {
     const out = [];
     if (mkTokens.length) out.push("global", "semantic");
@@ -7015,13 +7015,13 @@
           const why = document.createElement("span");
           why.className = "tr-sub ts-why";
           why.textContent = t("textStyle.decimalRow");
-          items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: "ts-decimal", cells: [trLeadAa(), mkLayers(c.count), trChip(null, sum)], right: [why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
+          items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: "ts-decimal", cells: [trLeadAa(), mkTsPlaces(c.count), trChip(null, sum)], right: [why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
           continue;
         }
         const s = x;
         const sig = tsSig(s);
         const on = mkTsOn.has(sig);
-        const cells = [trLeadAa(), mkLayers(s.count)];
+        const cells = [trLeadAa(), mkTsPlaces(s.count)];
         if (mkEditSig === sig) cells.push(mkEditInput(s));
         else {
           const chip = trChip(mkTsName(s), tsSummary(s));
@@ -11630,7 +11630,7 @@ ${opts.tip}` : text;
   }
   var mcShown = () => {
     var _a3, _b;
-    return (_b = (_a3 = mcLibSplit()) == null ? void 0 : _a3.left) != null ? _b : mcPicked();
+    return (_b = (_a3 = mcLibSplit()) == null ? void 0 : _a3.left) != null ? _b : baseline && usageMap ? libSameSplit(mcPicked(), []).left : mcPicked();
   };
   var mcSigOf = (toks) => JSON.stringify(toks.map((tk) => {
     var _a3;
@@ -11973,8 +11973,8 @@ ${opts.tip}` : text;
     const k = picked.length - rows.length;
     if (isPaid) {
       const libs = libDirectNow();
-      const p = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + (findHere && bindPreviewed ? tsAllNodes().size : 0);
-      const go = selBtn(t("v4.makeLinkN", { n: g, p }), (el) => showSelSub("make", el), true);
+      const p = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + linkTsPlaces();
+      const go = selBtn(g > 0 ? t("v4.makeLinkN", { n: g, p }) : t("mkc.link", { o: p }), (el) => showSelSub("make", el), true);
       go.dataset.k = "mkGo";
       foot(k > 0 ? more(k) : null, go);
       tsLine(true);

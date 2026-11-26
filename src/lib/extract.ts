@@ -131,9 +131,11 @@ function add(
   }
   if (use) {
     const uses = (existing.uses ??= []);
-    const u = uses.find((x) => x.name === use && x.bg === bg);
+    let u = uses.find((x) => x.name === use && x.bg === bg);
     if (u) u.count++;
-    else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+    else uses.push((u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 }));
+    // 이 쓰임의 빈 자리가 있는 용도 묶음(만들기의 재사용이 쓰임 × 묶음마다 가족 판정 — ia-v4 §2.9 S2-P8 · SC-D41)
+    if (place && place.free > 0 && !(u.keys ??= []).includes(place.key)) u.keys.push(place.key);
   }
 }
 

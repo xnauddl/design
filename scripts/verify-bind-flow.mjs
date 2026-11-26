@@ -415,7 +415,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
   check('9 선택 없음 → "디자인에서 레이어를 선택하세요" · 할 일 두 버튼 잠금', (await p.textContent('#selCards')).includes('디자인에서 레이어를 선택하세요') && (await locked(p, '#btnGoMake')) && (await locked(p, '#btnGoRename')));
   await recv(p, { ...sel(1, 2), scanned: 40, ids: ['1:2'] });
-  check('9 읽는 중 카드', (await p.textContent('#selCards')).includes('선택을 읽는 중…'));
+  check('9 읽는 중 카드 — 제목 "연결할 곳"(S-2 · 시안 E2)', (await p.textContent('#selCards')).includes('선택을 읽는 중…') && (await p.textContent('#selCards .sel-card >> nth=0 >> .t')) === '연결할 곳', await p.textContent('#selCards'));
   await p.waitForTimeout(450);
   const ap = (await sent(p, 'APPLY')).at(-1);
   check('9 자동 찾기 — 기준 nodeIds · preview', ap?.preview === true && ap?.nodeIds?.[0] === '1:2');
@@ -2063,6 +2063,25 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => e.innerText.replac
   await cardAnswer(p2, MC_TOKENS, null, 0);
   check('24 유료 r = 0 — 버튼 글은 같다(Semantic 수 r은 버튼에 쓰지 않는다)', (await p2.textContent('[data-k="mkGo"]')) === '5개 만들고 124곳 연결 →');
   await p2.close();
+  // SC-D42 — 빈 자리 0인 값(색 스타일만 붙은 칠 등)은 카드에서도 숨기고 n · p에 세지 않는다(만들기 화면 처음 모습과 같은 판정)
+  const p4 = await openZero('paid');
+  const pv4 = await cardAnswer(p4, [{ name: 'color/222222', category: 'color', value: '#222222', sources: ['fills'], count: 50, freeBy: { 'ALL_FILLS|FRAME_FILL': 0 } }, ...MC_TOKENS]);
+  check('24 SC-D42 빈 자리 0인 값 — 줄에 없음 · 미리보기에도 없음 · 버튼 그대로 [5개 만들고 124곳 연결 →]', !(await cardText(p4)).includes('#222222') && !pv4.tokens.some((tk) => tk.name === 'color/222222') && (await p4.textContent('[data-k="mkGo"]')) === '5개 만들고 124곳 연결 →', await cardText(p4));
+  await p4.close();
+  const p5 = await openZero('paid');
+  await cardAnswer(p5, [{ name: 'color/222222', category: 'color', value: '#222222', sources: ['fills'], count: 50, freeBy: { 'ALL_FILLS|FRAME_FILL': 0 } }]);
+  check('24 SC-D42 모두 빈 자리 0 — 버튼 없이 "기본으로 만들 값이 없어요 · [외 1개 보기]"', (await p5.$('[data-k="mkGo"]')) === null && (await p5.$('[data-k="mkMore"]')) !== null, await cardText(p5));
+  await p5.close();
+  // SC-D44 — g = 0(경합: 미리보기가 새로 만들 값 0)이면 [{p}곳 연결 →]
+  const p6 = await openZero('paid');
+  const ex6 = (await sent(p6, 'EXTRACT')).at(-1);
+  await recv(p6, { type: 'EXTRACT_RESULT', reqId: ex6.reqId, warnings: [], selection: 1, tokens: MC_TOKENS });
+  await p6.waitForTimeout(20);
+  const pv6 = (await sent(p6, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  await recv(p6, { type: 'CREATE_RESULT', reqId: pv6.reqId, preview: true, created: 0, updated: 0, summary: '', roles: 0, skippedManual: 0, tokenStates: Object.fromEntries(pv6.tokens.map((tk) => [tk.name, { state: 'reuse', varName: tk.name }])), roleRows: [] });
+  await p6.waitForTimeout(40);
+  check('24 SC-D44 유료 g = 0 — [124곳 연결 →](만들기 화면으로)', (await p6.textContent('[data-k="mkGo"]')) === '124곳 연결 →', await p6.textContent('[data-k="mkGo"]'));
+  await p6.close();
   const p3 = await openZero('free');
   await cardAnswer(p3, []);
   check('24 추출 0개 — 제목 + "이 선택에서 찾은 값이 없어요"만', (await cardText(p3)) === '이 파일엔 아직 변수가 없어요 이 선택에서 찾은 값이 없어요', await cardText(p3));
@@ -2507,7 +2526,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
     await p.waitForTimeout(30);
     const rows = await p.$$eval('#makeTree .tr-row', (e) => e.map((r) => ({ k: r.dataset.tkey, dec: r.classList.contains('ts-decimal'), sw: !!r.querySelector('.bv-switch'), txt: r.textContent, aria: r.getAttribute('aria-label'), col: getComputedStyle(r.querySelector('.ts-aa')).color })));
     check('28f Text Style 탭 줄 2개 — 26.67 흐린 줄이 크기 순서 제자리(먼저) · 스위치 없음 · 오른쪽 글',
-      rows.length === 2 && rows[0].dec && !rows[0].sw && rows[0].txt.includes('글자 크기가 소수라 만들지 않아요') && rows[0].txt.includes('26.67') && rows[0].txt.includes('Layer 4') && !rows[1].dec && rows[1].sw, JSON.stringify(rows));
+      rows.length === 2 && rows[0].dec && !rows[0].sw && rows[0].txt.includes('글자 크기가 소수라 만들지 않아요') && rows[0].txt.includes('26.67') && rows[0].txt.includes('4곳') && !rows[0].txt.includes('Layer') && !rows[1].dec && rows[1].sw, JSON.stringify(rows));
     check('28f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(146, 152, 161)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
     check('28f 처음엔 스타일 꺼짐 — 만들 수에 스타일 없음(B.32)', !(await p.textContent('#makeCount')).includes('스타일'), await p.textContent('#makeCount'));
     await p.click('#makeAllOn');
@@ -3713,7 +3732,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await p.waitForTimeout(30);
   g = await trGeo(p, '#makeTree');
   const dec = g.rows.find((x) => x.k.startsWith('td:')), tr = g.rows.find((x) => x.k.startsWith('t:'));
-  check('32 Text Style 탭 — 머리 없음 · 줄 x 8 · [Aa] "Layer 6" · 칩 x 96 [→ 이름 | 값 요약] · "있음" 칩 뒤', !g.rows.some((x) => x.head) && tr.ld.x === 8 && tr.ld.t === 'Aa' && tr.ltText === 'Layer 6' && tr.ltW === 56 && tr.chX === 96 && tr.al === '→ Heading/H2' && tr.vl.startsWith('Inter') && tr.tagX === tr.chR + 4, JSON.stringify(tr));
+  check('32 Text Style 탭 — 머리 없음 · 줄 x 8 · [Aa] "6곳"(S-2 SC-D43) · 칩 x 96 [→ 이름 | 값 요약] · "있음" 칩 뒤', !g.rows.some((x) => x.head) && tr.ld.x === 8 && tr.ld.t === 'Aa' && tr.ltText === '6곳' && tr.ltW === 56 && tr.chX === 96 && tr.al === '→ Heading/H2' && tr.vl.startsWith('Inter') && tr.tagX === tr.chR + 4, JSON.stringify(tr));
   check('32 흐린 소수 크기 줄 — 짙은 칸만 · 시작 x 96(TR-P21) · 글 --muted · 짙은 칸 배경 --surface-2', dec.al === null && dec.vlX === 96 && dec.ltC === g.muted && dec.vlBg === 'rgb(244, 245, 246)' && dec.vlC === g.muted, JSON.stringify(dec));
   await p.dblclick('#makeTree [data-tkey^="t:"] .vchip .al');
   await p.waitForTimeout(30);
@@ -4165,10 +4184,20 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
     const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
     if (sc) await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
     await p.waitForTimeout(80);
-    const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
-    await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, summary: '', skippedManual: 0, roleRows: [], ...pvAns });
-    await p.waitForTimeout(60);
+    await answerPv(p, pvAns);
     return p;
+  };
+  // 마지막 미리보기에 답한다 — 켠 줄이 없으면(빈 자리 0인 값만 — 기본 끔) 미리보기를 보내지 않으므로 줄을 켠 뒤 다시 부른다.
+  // 모두 켜기 — 줄이 모두 꺼져 접힌 머리(▸)는 펼친다(줄 숫자를 읽으려고)
+  const allOn = async (p) => {
+    await p.click('#makeAllOn');
+    await p.$$eval('#makeTree .tr-head[aria-expanded="false"] > .tr-car', (cs) => cs.forEach((c) => c.click()));
+    await p.waitForTimeout(250); // 켠 줄로 미리보기를 다시 보낼 때까지
+  };
+  const answerPv = async (p, pvAns) => {
+    const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+    if (pv) await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, summary: '', skippedManual: 0, roleRows: [], ...pvAns });
+    await p.waitForTimeout(60);
   };
   const foot = async (p) => `${await p.textContent('#makeCount')} · ${await p.textContent('#btnMakeRun')}`;
   const NEW2 = [
@@ -4198,15 +4227,18 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await p.waitForTimeout(150);
   check('S-2 예 (가) 결과 — "Global 2개 · Semantic 2개 · 5곳 연결"', (await p.textContent('#statusText')) === 'Global 2개 · Semantic 2개 · 5곳 연결', await p.textContent('#statusText'));
   await p.close();
-  // 6번 — g ≥ 1 · 바로 연결 켬 · p = 0(빈 자리가 없는 옛 토큰) → [변수 {g}개 만들기]
-  p = await openMake('paid', NEW2.map(({ freeBy, ...tk }) => tk), { created: 2, updated: 0, roles: 2, tokenStates: {} });
-  check('S-2 버튼 6번 — g ≥ 1 · 바로 연결 켬 · p = 0 → [변수 2개 만들기]', (await p.textContent('#btnMakeRun')) === '변수 2개 만들기' && !(await locked(p, '#btnMakeRun')), await foot(p));
+  // 6번 — g ≥ 1 · 바로 연결 켬 · p = 0(빈 자리가 모두 붙은 값 — 기본 꺼진 줄을 켬) → [변수 {g}개 만들기]
+  const pv6 = { created: 2, updated: 0, roles: 2, tokenStates: {} };
+  p = await openMake('paid', NEW2.map((tk) => ({ ...tk, freeBy: { [FILL_G]: 0 } })), pv6);
+  await allOn(p);
+  await answerPv(p, pv6);
+  check('S-2 버튼 6번 — g ≥ 1 · 바로 연결 켬 · p = 0 → 줄 "0곳" · [변수 2개 만들기]', (await p.textContent('#makeTree [data-tkey="g:color/gray/950"] .tr-lt')) === '0곳' && (await p.textContent('#btnMakeRun')) === '변수 2개 만들기' && !(await locked(p, '#btnMakeRun')), await foot(p));
   await p.close();
 
   // 예 (나) — 켠 줄이 모두 "있는 변수"(g = 0): 8번 [{p}곳 연결] · 결과 문장 유료 "Semantic 1개 · 3곳 연결" / 무료 "3곳 연결"
   const REUSE = [NEW2[0]];
   for (const tier of ['paid', 'free']) {
-    p = await openMake(tier, REUSE, { created: 0, updated: 0, roles: tier === 'paid' ? 1 : 0, tokenStates: { 'color/gray/950': { state: 'reuse', varName: 'color/gray/950', scopeAdd: true } } });
+    p = await openMake(tier, REUSE, { created: 0, updated: 0, roles: tier === 'paid' ? 1 : 0, tokenStates: { 'color/gray/950': { state: 'reuse', varName: 'color/gray/950' } } });
     const tag = await p.$eval('#makeTree [data-tkey="g:color/gray/950"] .tr-tag', (e) => e.textContent);
     check(`S-2 만들기 화면 예 (나) ${tier} — 줄 "3곳 · 있는 변수"("용도 더함" 꼬리 없음) · "${tier === 'paid' ? 'Global 0개 · Semantic 1개' : 'Global 0개'}" · 8번 [3곳 연결]`,
       tag === '있는 변수' && !(await p.textContent('#makeTree')).includes('용도 더함') && (await p.textContent('#makeTree [data-tkey="g:color/gray/950"] .tr-lt')) === '3곳' && (await foot(p)) === `${tier === 'paid' ? 'Global 0개 · Semantic 1개' : 'Global 0개'} · 3곳 연결` && !(await locked(p, '#btnMakeRun')), `${tag} | ${await foot(p)}`);
@@ -4215,7 +4247,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
     await p.click('#makeOptLink');
     await p.waitForTimeout(30);
     check(`S-2 버튼 10번 ${tier} — g = 0 · 바로 연결 끔 → [변수 만들기] 잠금 "만들 변수가 없어요 — 바로 연결을 켜 주세요"`, (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수가 없어요 — 바로 연결을 켜 주세요', await p.textContent('#statusText'));
-    if (tier === 'paid') await s2Shot(p, 's2-B3');
+    if (tier === 'paid') { await p.waitForTimeout(200); await s2Shot(p, 's2-B4'); } // 시안 B4 — 바로 연결 끔(버튼 전환이 끝난 뒤)
     await p.click('#makeOptLink');
     await p.waitForTimeout(30);
     check(`S-2 ${tier} 바로 연결을 다시 켜면 풀린다 — [3곳 연결]`, (await p.textContent('#btnMakeRun')) === '3곳 연결' && !(await locked(p, '#btnMakeRun')));
@@ -4236,10 +4268,14 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   p = await openMake('paid', [{ ...NEW2[1], count: 2 }], { created: 0, updated: 0, roles: 0, tokenStates: { 'color/gray/0': { state: 'reuse', varName: 'surface/strong' } } });
   check('S-2 만들기 화면 예 (다) — 이름 칩 surface/strong · "Global 0개 · Semantic 0개" · [2곳 연결]', (await p.textContent('#makeTree [data-tkey="g:color/gray/0"] .vchip .al')).includes('surface/strong') && (await foot(p)) === 'Global 0개 · Semantic 0개 · 2곳 연결', await foot(p));
   await p.close();
-  // 9번 — g = 0 · 바로 연결 켬 · p = 0 → 잠금 "만들 변수도 연결할 곳도 없어요"
-  p = await openMake('paid', REUSE.map(({ freeBy, ...tk }) => tk), { created: 0, updated: 0, roles: 0, tokenStates: { 'color/gray/950': { state: 'reuse', varName: 'color/gray/950' } } });
-  check('S-2 버튼 9번 — g = 0 · 바로 연결 켬 · p = 0 → [변수 만들기] 잠금 "만들 변수도 연결할 곳도 없어요"', (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수도 연결할 곳도 없어요', await p.textContent('#statusText'));
-  await s2Shot(p, 's2-B4');
+  // 9번 — g = 0 · 바로 연결 켬 · p = 0(자리가 이미 다 붙은 "있는 변수" 줄을 켬) → 잠금 "만들 변수도 연결할 곳도 없어요"
+  const pv9 = { created: 0, updated: 0, roles: 0, tokenStates: { 'color/gray/950': { state: 'reuse', varName: 'color/gray/950' } } };
+  p = await openMake('paid', REUSE.map((tk) => ({ ...tk, freeBy: { [FILL_G]: 0 } })), pv9);
+  await allOn(p);
+  await answerPv(p, pv9);
+  check('S-2 버튼 9번 — g = 0 · 바로 연결 켬 · p = 0 → 줄 "0곳" · [변수 만들기] 잠금 "만들 변수도 연결할 곳도 없어요"', (await p.textContent('#makeTree [data-tkey="g:color/gray/950"] .tr-lt')) === '0곳' && (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수도 연결할 곳도 없어요', await p.textContent('#statusText'));
+  await p.waitForTimeout(200);
+  await s2Shot(p, 's2-B3'); // 시안 B3 — 만들 변수도 연결할 곳도 없음
   // 2번 — 켠 Global 줄 0개 · 켠 스타일 0개 → "만들 값을 켜 주세요"(그대로)
   await p.click('#makeAllOff');
   await p.waitForTimeout(40);

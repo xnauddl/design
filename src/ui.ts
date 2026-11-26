@@ -2832,7 +2832,8 @@ function mkTag(text: string, tip: string, warn = false): HTMLElement {
   return s;
 }
 /** 왼쪽 글 "Layer {n}"(TR-D4) — Text Style 탭 줄(글자 레이어 수). */
-const mkLayers = (n: number | undefined): HTMLElement => trLeft(t('make.layers', { n: n ?? 0 }));
+/** 왼쪽 글 "{n}곳" — Text Style 탭 줄(글자 레이어 수 — 텍스트 스타일은 레이어마다 한 곳, §2.9 SC-D43). */
+const mkTsPlaces = (n: number | undefined): HTMLElement => trLeft(t('tree.places', { n: n ?? 0 }));
 /** 토큰의 빈 자리 수(ia-v4 §2.9 S2-P7 — `freeBy` 합: 연결 찾기가 자리로 모으는 것과 같은 것). freeBy가 없으면(옛 응답) 레이어 수. */
 const tokenFree = (tk: DraftToken): number => (tk.freeBy ? Object.values(tk.freeBy).reduce((a, b) => a + (b > 0 ? b : 0), 0) : tk.count ?? 0);
 /** 왼쪽 글 "{n}곳" — Global 탭 줄(그 값의 빈 자리 수). */
@@ -2850,9 +2851,10 @@ function mkLinkPlaces(): number {
   const libs = libDirectNow();
   let p = 0;
   for (const tk of mkGlobalsOn()) p += tokenLinkPlaces(tk, libs);
-  if (baseline && bindPreviewed && selFindFor === baseKey()) p += tsAllNodes().size;
-  return p;
+  return p + linkTsPlaces();
 }
+/** p에 더하는 t — 지금 기준의 찾기 결과가 와 있으면(다시 찾는 중이면 0) 텍스트 스타일 후보 레이어 수. 만들기 화면 · 만들기 카드가 같은 조건(§2.9). */
+const linkTsPlaces = (): number => (baseline && bindPreviewed && selFindFor === baseKey() && !selFindInFlight ? tsAllNodes().size : 0);
 
 /** 보이는 만들기 탭(§4.3 "보이는 탭"). */
 function mkTabsVisible(): MkTab[] {
@@ -2917,20 +2919,20 @@ function makeTreeItems(tab: MkTab): TreeItem[] {
     for (const x of withDecimals(mkTs, mkTsDecimal)) {
       if ('decimal' in x) {
         // 흐린 줄 — "Aa" · (이름 칩 없음) · 값 요약 · "Layer {n}" · 스위치 자리에 사유. 고치기 · 켜기 없음.
-        // [Aa] "Layer {n}" … [짙은 칸만 — 값 요약, 열 96 — TR-P21] · 스위치 자리에 사유
+        // [Aa] "{n}곳" … [짙은 칸만 — 값 요약, 열 96 — TR-P21] · 스위치 자리에 사유
         const c = x.decimal;
         const sum = tsSummary(c);
         const why = document.createElement('span');
         why.className = 'tr-sub ts-why';
         why.textContent = t('textStyle.decimalRow');
-        items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: 'ts-decimal', cells: [trLeadAa(), mkLayers(c.count), trChip(null, sum)], right: [why], aria: `${sum} · ${t('textStyle.decimalRow')}` });
+        items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: 'ts-decimal', cells: [trLeadAa(), mkTsPlaces(c.count), trChip(null, sum)], right: [why], aria: `${sum} · ${t('textStyle.decimalRow')}` });
         continue;
       }
       const s = x;
       const sig = tsSig(s);
       const on = mkTsOn.has(sig);
-      // [Aa] "Layer {n}" … [→ 스타일 이름 | 값 요약] ["있음"] … 스위치(TR-D14) — 이름 고치기 칸은 옅은 칸 자리
-      const cells: HTMLElement[] = [trLeadAa(), mkLayers(s.count)];
+      // [Aa] "{n}곳" … [→ 스타일 이름 | 값 요약] ["있음"] … 스위치(TR-D14) — 이름 고치기 칸은 옅은 칸 자리
+      const cells: HTMLElement[] = [trLeadAa(), mkTsPlaces(s.count)];
       if (mkEditSig === sig) cells.push(mkEditInput(s));
       else {
         const chip = trChip(mkTsName(s), tsSummary(s)); // 값 요약 — KRDS 크기 표시 없음(docs/text-style-krds.md §4)
@@ -7502,8 +7504,9 @@ function mcLibSplit(): LibSameSplit<DraftToken> | null {
   const libs = libDirectNow();
   return libs.length ? libSameSplit(mcPicked(), libs) : null;
 }
-/** 지금 보여 줄 토큰 — 거르면 남은 값, 아니면 고른 토큰(값 줄 · g · k · 미리보기 · 만들기가 이 집합으로). */
-const mcShown = (): DraftToken[] => mcLibSplit()?.left ?? mcPicked();
+/** 지금 보여 줄 토큰 — 거르면 남은 값, 아니면 고른 토큰(값 줄 · g · k · 미리보기 · 만들기가 이 집합으로). 쓰는 변수 결과가 와 있으면 라이브러리 목록이
+    비어도 빈 자리 0인 토큰(색 스타일만 붙은 칠 등)은 뺀다 — 만들기 화면 처음 모습(`mkRecalcOffByLib`)과 같은 판정(§2.9 SC-D42). */
+const mcShown = (): DraftToken[] => mcLibSplit()?.left ?? (baseline && usageMap ? libSameSplit(mcPicked(), []).left : mcPicked());
 /** 토큰 집합의 표시(이름 · 값 · 투명도) — 미리보기를 다시 보낼지 견준다. */
 const mcSigOf = (toks: readonly DraftToken[]): string => JSON.stringify(toks.map((tk) => [tk.name, tk.value, tk.alpha ?? 1]));
 /** 추출 중인가(같은 기준 다시 읽기 포함) — 미리보기를 기다리는 동안은 아니다. */
@@ -7811,8 +7814,9 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n
     // [{n}개 만들고 {p}곳 연결 →] — 카드 1과 같은 글(§2.9). n = 이 카드 미리보기의 새로 만듦 수, p = 보여 줄 토큰의 빈 자리 수 합
     // (라이브러리 같은 값 묶음 뺌) + t(지금 기준의 찾기 결과가 있으면). 만들기 화면 처음 모습의 버튼과 같은 식이다.
     const libs = libDirectNow();
-    const p = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + (findHere && bindPreviewed ? tsAllNodes().size : 0);
-    const go = selBtn(t('v4.makeLinkN', { n: g, p }), (el) => showSelSub('make', el), true);
+    const p = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + linkTsPlaces();
+    // g = 0(변수 0개로 알고 있는 사이 밖에서 같은 값 변수가 생긴 경합)이면 만들기 화면 버튼 표 8번처럼 [{p}곳 연결 →](§2.9 SC-D44)
+    const go = selBtn(g > 0 ? t('v4.makeLinkN', { n: g, p }) : t('mkc.link', { o: p }), (el) => showSelSub('make', el), true);
     go.dataset.k = 'mkGo';
     foot(k > 0 ? more(k) : null, go);
     tsLine(true);

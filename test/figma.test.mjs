@@ -5668,10 +5668,10 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
   const { tokens } = extractFromSelection([card]);
   const by = (name) => tokens.find((x) => x.name === name);
   // 주인(card)을 쓰지 않는다(ia-v3 §2.12 12.12 N-D1 — 전에는 spacing/card/gap · spacing/card/padding)
-  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1 }]);
-  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4 }]);
-  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1 }]);
-  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light' }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
+  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, keys: ['GAP'] }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
+  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, keys: ['GAP'] }]);
+  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, keys: ['ALL_FILLS|FRAME_FILL'] }]);
+  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', keys: ['ALL_FILLS|TEXT_FILL'] }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
 });
 
 /* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
@@ -5756,7 +5756,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   card.parent = root;
   const { tokens } = extractFromSelection([root]);
   const white = tokens.find((x) => x.name === 'color/ffffff');
-  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma' }, { name: 'color/text', count: 1, bg: 'light' }]);
+  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', keys: ['ALL_FILLS|TEXT_FILL'] }, { name: 'color/text', count: 1, bg: 'light', keys: ['ALL_FILLS|TEXT_FILL'] }]);
   await createTokens(tokens, 16);
   await createUsageRoles(tokens);
   const inv = findVar(figma, 'Semantic', 'color/text/inverse');
@@ -7801,7 +7801,7 @@ test('A.21 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주�
   assert.equal(r.newRoles, 1);
   assert.equal(card._bound.itemSpacing, button._bound.itemSpacing);
   const uses = extractFromSelection([card, button]).tokens.find((t) => t.name === 'spacing/16').uses;
-  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2 }]);
+  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, keys: ['GAP'] }]);
 });
 
 test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {
@@ -9845,4 +9845,66 @@ test('S-2 글자 토큰에도 freeBy — 변수 · 텍스트 스타일이 붙지
   assert.equal(by('font-size/14').count, 4);
   assert.deepEqual(by('font-family/Inter').freeBy, { FONT_FAMILY: 1 }); // 같은 글꼴의 변수가 아직 없어도 빈 자리로 센다
   assert.deepEqual(by('line-height/20').freeBy, { LINE_HEIGHT: 1 });
+});
+
+/* ---------- S-2 코드 검토 반영(2026-11-26 SC-D40 · SC-D41) ---------- */
+
+test('S-2 SC-D40 밝기 이름 대상 — 사용자 별칭이 붙을 색 자리도 넣는다: 만들기가 지은 strong을 연결 단계가 다시 쓰고 안 쓰는 Semantic이 없다', async () => {
+  const figma = installFigma();
+  const white = mkVar(figma, 'white', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#ffffff'), a: 1 }, 'Brand');
+  s2Alias(figma, 'surface/base', white, ['ALL_SCOPES'], 'Brand');
+  const sel = [...[1, 2, 3].map((i) => s2Frame(`w${i}`, { fills: s2Fill('#ffffff') })), ...[1, 2].map((i) => s2Frame(`g${i}`, { fills: s2Fill('#f5f5f5') }))];
+  const card = await s2CardOf(sel, false);
+  const make = await s2MakeOf(sel, false);
+  assert.deepEqual([card.m, card.n, card.p], [3, 1, 5]);
+  assert.deepEqual([make.g, make.r, make.p], [1, 1, 5]); // 카드 n = 만들기 g
+  const run = await s2Run(sel, false);
+  assert.equal(run.roles, 1);
+  assert.equal(run.res.bound, 5);
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name), ['color/background/strong']); // 화면의 Semantic 1개 = 실제
+  assert.deepEqual(s2UnusedRoles(figma, sel), []);
+  assert.deepEqual(sel.map((n) => s2FillBound(figma, n)), ['surface/base', 'surface/base', 'surface/base', 'color/background/strong', 'color/background/strong']);
+});
+
+test('S-2 SC-D41 만들기 재사용의 가족 — 밝기까지 정한 밑이름으로 본다: 다른 밝기의 플러그인 역할(strong)은 default 자리의 후보가 아니라 카드 n = 만들기 g = 1', async () => {
+  const figma = installFigma();
+  const ink = mkVar(figma, 'brand/ink', 'COLOR', ['TEXT_FILL'], { ...rgbOf('#111111'), a: 1 }, 'Brand');
+  const col = figma.variables.createVariableCollection('Semantic');
+  col.setPluginData('dsl.owned', 'semantic');
+  const role = figma.variables.createVariable('color/background/strong', col, 'COLOR');
+  role.scopes = ['FRAME_FILL', 'SHAPE_FILL'];
+  role.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: ink.id });
+  role.setPluginData('dsl.autoRole', '1');
+  const sel = [s2Frame('k1', { fills: s2Fill('#111111') })];
+  for (const free of [false, true]) {
+    const card = await s2CardOf(sel, free);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.p], [0, 1, 1], free ? 'free card' : 'paid card');
+    assert.deepEqual([make.g, make.p], [1, 1], free ? 'free make' : 'paid make');
+    assert.equal(make.state(make.toks[0].name)?.state, 'new');
+  }
+  const run = await s2Run(sel, false);
+  assert.equal(run.s.created, 1);
+  assert.equal(run.res.bound, 1);
+  assert.equal(s2FillBound(figma, sel[0]), 'color/background/default');
+});
+
+test('S-2 SC-D41 만들기 재사용 — 같은 묶음의 쓰임이 둘이면 쓰임마다 가족을 본다(radius/top-left 역할은 radius/default 자리의 후보가 아님)', async () => {
+  const figma = installFigma();
+  const raw = mkVar(figma, 'r/8', 'FLOAT', ['GAP'], 8, 'Brand'); // 반경 용도가 없는 원시값 — 반경 자리의 후보는 역할뿐
+  const col = figma.variables.createVariableCollection('Semantic');
+  col.setPluginData('dsl.owned', 'semantic');
+  const role = figma.variables.createVariable('radius/top-left', col, 'FLOAT');
+  role.scopes = ['CORNER_RADIUS'];
+  role.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: raw.id });
+  role.setPluginData('dsl.autoRole', '1');
+  const mixed = s2Frame('m', { cornerRadius: figma.mixed, topLeftRadius: 8, topRightRadius: 4, bottomLeftRadius: 4, bottomRightRadius: 4 });
+  const even = s2Frame('e', { cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomLeftRadius: 8, bottomRightRadius: 8 });
+  const sel = [mixed, even];
+  const card = await s2CardOf(sel, false);
+  const make = await s2MakeOf(sel, false);
+  // 고치기 전: 만들기가 radius/8을 radius/top-left로 재사용해 g = 1 — 카드 n = 2와 달랐다
+  assert.deepEqual([card.m, card.n, card.p], [1, 2, 8]);
+  assert.deepEqual([make.g, make.p], [2, 8]);
+  assert.equal(make.state('radius/8')?.state, 'new');
 });
