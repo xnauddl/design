@@ -171,7 +171,7 @@ build.mjs              esbuild 빌드
 | [`docs/ia-v4.md`](docs/ia-v4.md) | 화면 명세(기준) |
 | [`docs/ia-v3.md`](docs/ia-v3.md) | 토큰 · 연결 규칙 — 아직 유효한 절만 |
 | [`ROADMAP.md`](ROADMAP.md) | 지금 할 일 순서(§0) · 요금 · 출시 · 완료 기록 |
-| [`docs/qa/2026-11-24-scope-review.md`](docs/qa/2026-11-24-scope-review.md) | 범위 결정 SC-D1–SC-D32 |
+| [`docs/qa/2026-11-24-scope-review.md`](docs/qa/2026-11-24-scope-review.md) | 범위 결정 SC-D1–SC-D33 |
 | [`docs/component-system/`](docs/component-system/) | 새 컴포넌트 기능 기획 |
 | [`docs/archive/components-v1.md`](docs/archive/components-v1.md) | 지운 옛 컴포넌트 기능의 명세 · 결정 기록(보관) |
 | [`docs/text-style-krds.md`](docs/text-style-krds.md) · [`docs/unused-vars.md`](docs/unused-vars.md) | 텍스트 스타일 이름 규칙 · 안 쓰는 변수 찾기 명세 |
