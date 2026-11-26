@@ -25,10 +25,12 @@ import {
 } from './tokens';
 import { paletteFamilyOf } from './palette';
 import { resolveGlobalNames, type FileGlobal, type GlobalNameReq, type GlobalNameResult } from './colorName'; // Global 이름 · 덮지 않음(§2.12 12.11)
-import { AUTO_ROLE_KEY, TEXT_STEP_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
-import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
+import { AUTO_ROLE_KEY, TEXT_STEP_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, familyRe, nameKindOf, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
+import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds, pluginGlobalNames } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
 import { TextSample, TextStyleSpec, ExistingTextStyle, isIntegerSize } from './textStyles';
-import { dsRoleOwner, mergeScopes } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
+import { dsRoleOwner, mergeScopes, readVarInfos } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1) · 변수 읽기(같은 값 판정의 입력)
+import { tokenGroups } from './selCards';
+import { aliasCovers, tokenReuse, valueKeyOf, type PlaceInfo } from './sameValue'; // 만들기의 재사용 · Semantic 수(ia-v4 §2.9 S2-P8)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
 import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow } from '../shared/messages';
@@ -104,34 +106,48 @@ function sameLiteral(raw: VariableValue | undefined, lit: string | number, type:
   return typeof raw === 'number' && Math.round(raw * 100) === Math.round(Number(lit) * 100);
 }
 
+/** 값으로 찾은 재사용 하나(ia-v4 §2.9 S2-P8 ①). */
+interface ReusePick {
+  /** 첫 빈 묶음에서 고른 변수("있는 변수" 줄의 이름 칩). */
+  variable: Variable;
+  /** 그 변수가 닿는 원시값 변수 id — 쓰임 역할의 별칭 대상(`globalOf`). */
+  rawId: string;
+  /** 용도 예외로 고른 플러그인 Global(직접 만든 변수 포함 — SC-D38) — 실행 때 토큰의 용도를 합친다. */
+  adds: Variable[];
+}
+
 /**
- * 쓰임 목록이 있는 토큰마다 재사용할 사용자 Global(같은 종류 · 같은 값 · 용도를 받는 직접 값 변수)을 고른다.
- * 사용자 컬렉션 목록 순 · 이름 순 첫 번째. 쓰임이 없는 토큰(글자 · 팔레트 · 텍스트 스타일)은 고르지 않는다.
+ * 쓰임 목록이 있는 토큰(값)마다 **값으로** 다시 쓸 변수를 찾는다(ia-v4 §2.9 S2-P8 ① — `sameValue.ts` `tokenReuse`).
+ * 빈 자리가 있는 용도 묶음(`freeBy`의 키)마다 후보를 고르고, 모든 묶음에 후보가 있으면 재사용이다(사용자 변수 · 플러그인 Global · 별칭 모두 —
+ * 이름이 바뀐 플러그인 Global도 값이 같으면 다시 쓴다). 빈 묶음이 0개인 토큰과 쓰임이 없는 토큰(글자 · 팔레트 · 텍스트 스타일)은 고르지 않는다.
+ * 같은 이름의 토큰이 여럿이면(채움색 · 그림자색) 묶음을 모아 한 번 판정한다.
  */
-async function pickReusable(tokens: readonly DraftToken[], base: number): Promise<Map<string, Variable>> {
-  const out = new Map<string, Variable>();
+async function pickReusable(tokens: readonly DraftToken[], base: number): Promise<Map<string, ReusePick>> {
+  const out = new Map<string, ReusePick>();
   const withUses = tokens.filter((t) => t.uses?.length);
   if (!withUses.length) return out;
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const vars = await figma.variables.getLocalVariablesAsync();
-  const tiers = collectionTiers(cols, vars);
-  const owned = ownedIds(cols);
-  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-  const userGlobals = vars
-    .filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId))
-    .sort((a, b) => (colIdx.get(a.variableCollectionId) ?? 0) - (colIdx.get(b.variableCollectionId) ?? 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  for (const t of withUses) {
-    const type = resolvedTypeForToken(t);
-    const lit = literalOf(t, type, base);
-    const allowed = scopesForType(scopesForSources(t.sources), type);
-    const hit = userGlobals.find((v) => {
-      if (v.resolvedType !== type) return false;
-      const sc = (v.scopes ?? []) as ScopeName[];
-      if (!sc.includes('ALL_SCOPES' as ScopeName) && !allowed.some((x) => sc.includes(x))) return false;
-      return sameLiteral(directValue(v, modeOf), lit, type);
-    });
-    if (hit) out.set(t.name, hit);
+  const read = await readVarInfos();
+  const infos = read.infos.filter((i) => i.key != null);
+  const byName = new Map<string, DraftToken[]>();
+  for (const t of withUses) byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
+  for (const [name, list] of byName) {
+    const places: PlaceInfo[] = [];
+    for (const t of list) {
+      const type = resolvedTypeForToken(t);
+      const lit = literalOf(t, type, base);
+      const key = type === 'FLOAT' ? valueKeyOf('num', Number(lit)) : String(lit);
+      // 플러그인이 만든 역할은 그 토큰 쓰임 이름의 가족일 때만 후보(색은 `color/{쓰임}/…`)
+      const uses = (t.uses ?? []).map((u) => u.name);
+      const roleOk = (n: string): boolean => uses.some((u) => (u.startsWith('color/') ? n.startsWith(`${u}/`) : familyRe(u, nameKindOf(u, key)).test(n)));
+      // 빈 자리가 있는 용도 묶음 — freeBy가 없는 옛 토큰은 종류에서 정한 묶음(`selCards.ts` tokenGroups — 연결 단계의 거름과 같은 키)
+      for (const g of tokenGroups(t)) places.push({ type, key, allowed: g.split('|'), roleOk, ...(type === 'FLOAT' ? { tokenName: t.name } : {}) });
+    }
+    const picks = tokenReuse(places, infos);
+    if (!picks) continue;
+    const first = read.byId.get(picks[0].variable.id);
+    if (!first) continue;
+    const adds = [...new Set(picks.filter((p) => p.scopeAdd).map((p) => read.byId.get(p.variable.id)).filter((v): v is Variable => !!v))];
+    out.set(name, { variable: first, rawId: picks[0].variable.rawId ?? first.id, adds });
   }
   return out;
 }
@@ -243,9 +259,15 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
   const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), finalName: new Map() };
   const reuseMap = readReuseMap();
   const toCreate = tokens.filter((t) => !reuse.has(t.name));
-  for (const [name, v] of reuse) {
-    summary.globalOf.set(name, v.id);
-    reuseMap[name] = v.id;
+  for (const [name, r] of reuse) {
+    summary.globalOf.set(name, r.rawId);
+    reuseMap[name] = r.rawId;
+    // 용도 예외로 고른 플러그인 Global(직접 만든 변수 포함 — SC-D38)은 값은 그대로 두고 토큰의 용도를 합친다(12.11 — 아래 ②와 같은 합치기).
+    for (const v of r.adds) {
+      const type = v.resolvedType as ResolvedType;
+      const scopes = scopesForType(scopesForSources(tokens.filter((t) => t.name === name).flatMap((t) => t.sources)), type);
+      v.scopes = mergeScopes(v.scopes as string[], scopes, type) as VariableScope[];
+    }
   }
   if (toCreate.length) {
     // 플러그인 Global은 실제로 만들 때만 만든다(13.2-3 — 모두 재사용이면 생기지 않는다).
@@ -358,8 +380,8 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   for (const t of tokens) {
     const r = reuse.get(t.name);
     if (r) {
-      summary.globalOf.set(t.name, r.id);
-      setState(t.name, { state: 'reuse', varName: r.name });
+      summary.globalOf.set(t.name, r.rawId);
+      setState(t.name, { state: 'reuse', varName: r.variable.name });
       continue;
     }
     const nm = named.get(t.name);
@@ -368,12 +390,7 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
       if (nm.reuse) {
         const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
         if (v) summary.globalOf.set(t.name, v.id);
-        // 실행 때 용도를 더하는가(ia-v4 §4.3 "있는 변수 · 용도 더함") — 지금 용도가 토큰 용도를 다 담지 못하면.
-        const type = resolvedTypeForToken(t);
-        const need = scopesForType(scopesForSources(t.sources), type) as string[];
-        const cur = (v?.scopes ?? []) as string[];
-        const scopeAdd = !!v && !cur.includes('ALL_SCOPES') && need.some((x) => !cur.includes(x) && !(cur.includes('ALL_FILLS') && ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'].includes(x)));
-        setState(t.name, scopeAdd ? { state: 'reuse', varName: nm.name, scopeAdd: true } : { state: 'reuse', varName: nm.name });
+        setState(t.name, { state: 'reuse', varName: nm.name }); // 실행이 용도를 합쳐도 태그는 "있는 변수" 하나다(ia-v4 §2.9)
         continue;
       }
       setState(t.name, nm.name !== t.name ? { state: 'new', varName: nm.name } : { state: 'new' });
@@ -442,7 +459,7 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     else if (k && !arr.includes(k)) arr.push(k);
     semByName.set(v.name, [...(semByName.get(v.name) ?? []), { key: k, v }]);
   }
-  const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+  const globalNames = pluginGlobalNames(cols, vars); // 거울(12.7 — 플러그인 Global 컬렉션의 이름과 같은 별칭, ia-v4 §2.9 S2-P4)
   const canReuse = (name: string, value: string, base: string): boolean => {
     if (globalNames.has(name)) return false; // 거울(12.7)
     const need = scopeForSemanticRole(base);
@@ -494,10 +511,17 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     }
   }
   const names = assignNames(reqs, existing, { canReuse });
+  // Semantic 수 r(ia-v4 §2.9 S2-P8) — 지은 역할 이름마다, 값 키가 같고 그 역할의 용도를 모두 덮는 별칭 후보가 이미 있으면
+  // (사용자 별칭은 이름과 상관없이, 플러그인이 만든 역할은 가족일 때) 세지도 만들지도 않는다 — 안 쓰는 Semantic을 남기지 않는다.
+  const infos = (await readVarInfos()).infos;
   const toMake = new Map<string, DraftToken>();
   for (const r of reqs) {
     const name = names.get(`${r.base}\u0000${r.value}`) ?? r.base;
     if (existing.has(name) || toMake.has(name)) continue; // 재사용(같은 값 · 맞는 용도) — 차지된 이름은 assignNames가 피했다
+    const type = resolvedTypeForToken(r.token);
+    const need = (scopeForSemanticRole(name) ?? (globalFor(r.token)?.scopes as string[] | undefined) ?? scopesForType(scopesForSources(r.token.sources), type)) as string[];
+    const key = type === 'COLOR' ? colorKey(String(r.token.value), r.token.alpha) : type === 'FLOAT' ? valueKeyOf('num', Number(r.token.value)) : String(r.token.value);
+    if (aliasCovers(infos, { type, key, need, base: r.base })) continue;
     toMake.set(name, r.token);
   }
   if (preview) {
@@ -1034,7 +1058,7 @@ async function readSemanticIndex(): Promise<{ cols: VariableCollection[]; existi
     else if (k && !arr.includes(k)) arr.push(k);
     byName.set(v.name, [...(byName.get(v.name) ?? []), { key: k, v }]);
   }
-  const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+  const globalNames = pluginGlobalNames(cols, vars); // 거울 판정은 한 정의로(ia-v4 §2.9 S2-P4)
   return { cols, existing, byName, globalNames };
 }
 

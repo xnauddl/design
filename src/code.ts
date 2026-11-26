@@ -9,7 +9,8 @@ import { createTokens, previewCreateTokens, createUsageRoles, createSemanticAlia
 import { applyVariableToNodes } from './lib/applyVar';
 import { clusterTextStyles, nameTextStyles, nameTextStylesWithRowLabels, splitDecimalClusters, tsSig, anchorOfFor } from './lib/textStyles';
 import type { TextSample } from './lib/textStyles';
-import { bindSelection, bindSelectedItems, collectLocalMains, countDeleted, countUsage, findUsers, unbindDeleted, type LocalMains } from './lib/bind';
+import { bindSelection, bindSelectedItems, collectLocalMains, countDeleted, countUsage, findUsers, readVarInfos, unbindDeleted, type LocalMains } from './lib/bind';
+import { userRadiusKeys } from './lib/sameValue';
 import { deleteUnusedVariables, scanUnusedVariables } from './lib/unusedVars'; // 안 쓰는 변수 찾기(docs/unused-vars.md)
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
 import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './lib/rename';
@@ -191,7 +192,6 @@ async function postPrereq(): Promise<void> {
     const bindableIds = new Set(cols.filter((c) => (tiers.get(c.id) ?? 0) > 0).map((c) => c.id));
     const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
     const hasGlobal = globals.length > 0;
-    const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
     // Dark 값이 없는 색 수 · 옛 구조(Semantic에 Dark 모드) 여부(ia-v3 13.7 D-T1) — 다크 화면 알림 띠가 읽는다.
     const { darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
     // '이미 변수가 있다'를 먼저 알리는 안내용 개수 — 계층 안/밖을 나눠 센다(밖이면 연결에 못 쓴다).
@@ -199,7 +199,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasGlobal, hasBindable, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+    post({ type: 'PREREQ_STATE', hasGlobal, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -538,7 +538,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const sel = await resolveRoots(msg.nodeIds);
         // 인스턴스의 메인 컴포넌트 안 값도 뽑는다(ia-v3 §2.11 11번) — 메인을 더한 인스턴스는 "인스턴스 안쪽" 건너뜀을 남기지 않는다.
         const wm = await withLocalMains(sel);
-        const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys())); // 쓰임 이름은 주인을 쓰지 않는다(§2.12 12.12 N-D1)
+        // 연결 찾기와 같은 자리 판정(ia-v4 §2.9 S2-P2 · S2-P7): 알약 반경 판정 집합(찾기 색인과 같은 변수 읽기) · 메인을 따르는 인스턴스 루트 자리 ·
+        // 텍스트 스타일 후보 글자. 값을 직접 고르기도 같은 처리라 함께 바뀐다.
+        const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys()), {
+          userRadiusKeys: userRadiusKeys((await readVarInfos()).infos),
+          mainOf: wm.mains.mainOf,
+          textStyleNode: await textStyleCandidateTest(wm.roots),
+        }); // 쓰임 이름은 주인을 쓰지 않는다(§2.12 12.12 N-D1)
         post({ type: 'EXTRACT_RESULT', tokens, warnings, selection: sel.length, ...(msg.reqId != null ? { reqId: msg.reqId } : {}) });
         break;
       }
@@ -635,6 +641,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           counts: r.counts as Record<string, Record<string, number>> | undefined, // 사유 × 종류(카드 숫자, IA v4 §4.1)
           ...(r.mains ? { mains: r.mains } : {}), // 함께 걸은 선택 밖 메인 컴포넌트 단위(ia-v3 §2.11 11번)
           ...(r.mainsBound ? { mainsBound: r.mainsBound } : {}),
+          ...(r.make ? { make: r.make } : {}), // 새로 만들 값(ia-v4 §2.9 S2-P7 — 카드의 n · q)
         });
         if (!msg.preview) {
           commitUndo(figma); // UX2: 바인딩(취소 시 부분 포함)을 단일 Undo로

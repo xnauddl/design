@@ -63,7 +63,9 @@ export interface MakeTotals {
  */
 export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOff: boolean }): string {
   const parts: string[] = [];
-  if (totals.created) parts.push(makeCreatedText(totals.created, opts.isPaid));
+  // 만들기 부분 — 만든 것이 없으면(g = 0 · r = 0, 무료 g = 0) 뺀다(ia-v4 §2.9 "결과 문장").
+  const createdText = totals.created ? makeCreatedText(totals.created, opts.isPaid) : '';
+  if (createdText) parts.push(createdText);
   if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
   if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
   if (totals.styles?.missing?.length) parts.push(t('make.done.missing', { k: totals.styles.missing.length })); // 텍스트 스타일 바로 뒤(§4.3 "글꼴")
@@ -78,9 +80,14 @@ export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOf
   return parts.join(' · ');
 }
 
-/** 만들기 부분 글 — 유료 "Global {g}개 · Semantic {r}개", 무료 "Global {g}개"(다 됨 · 취소됨 괄호 공통 — §4.3). */
+/**
+ * 만들기 부분 글 — 유료 "Global {g}개 · Semantic {r}개", 무료 "Global {g}개"(다 됨 · 취소됨 괄호 공통 — §4.3).
+ * 만든 것이 없으면 ''(ia-v4 §2.9): g = 0 · r = 0이면 뺀다, g = 0 · r > 0이면 "Semantic {r}개", 무료 g = 0이면 뺀다.
+ */
 export function makeCreatedText(c: { g: number; r: number }, isPaid: boolean): string {
-  return isPaid ? t('make.done.create', { g: c.g, r: c.r }) : t('make.globalN', { g: c.g });
+  if (!isPaid) return c.g > 0 ? t('make.globalN', { g: c.g }) : '';
+  if (c.g > 0) return t('make.done.create', { g: c.g, r: c.r });
+  return c.r > 0 ? t('make.done.semOnly', { r: c.r }) : '';
 }
 
 /** 다크 결과(`DARK_MODE_RESULT`에서 거절 · needMigrate를 뺀 것) — 결과 글을 만드는 데 쓰는 필드만. */
