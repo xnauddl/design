@@ -3119,3 +3119,27 @@ test('S-2 aliasCovers — 값 키가 같고 역할 용도를 모두 덮는 별�
   assert.equal(aliasCovers([role('color/background/default-2', 'COLOR', '#111111')], q), true);
   assert.equal(aliasCovers([alias('color/gray/950', 'COLOR', '#111111', { mirror: true })], q), false);
 });
+
+test('S-2 SC-D46 withoutLibGroups — 라이브러리 같은 값 묶음의 몫을 쓰임(free · keys · by)에서 뺀다 · freeBy는 그대로 · 라이브러리 없음 · 옛 토큰은 그대로', async () => {
+  const { withoutLibGroups } = await import('../dist/pure.mjs');
+  const F = 'ALL_FILLS|FRAME_FILL';
+  const T = 'ALL_FILLS|TEXT_FILL';
+  const tk = {
+    name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { [F]: 10, [T]: 3 },
+    uses: [
+      { name: 'color/background', count: 12, free: 10, keys: [F], by: { [F]: 10 } },
+      { name: 'color/text', count: 3, free: 3, keys: [T], by: { [T]: 3 } },
+    ],
+  };
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#3b82f6' }, scopes: ['FRAME_FILL'] }];
+  const [out] = withoutLibGroups([tk], libs);
+  assert.deepEqual(out.uses, [
+    { name: 'color/background', count: 12, free: 0, keys: [], by: {} }, // 연결 단계가 붙이지 않는 묶음 — 역할 · 밝기에서 빠진다
+    { name: 'color/text', count: 3, free: 3, keys: [T], by: { [T]: 3 } },
+  ]);
+  assert.deepEqual(out.freeBy, tk.freeBy);
+  assert.equal(tk.uses[0].free, 10, '원래 토큰은 바꾸지 않는다');
+  assert.equal(withoutLibGroups([tk], [])[0], tk);
+  const old = { name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { [F]: 10 }, uses: [{ name: 'color/background', count: 10 }] };
+  assert.equal(withoutLibGroups([old], libs)[0], old);
+});

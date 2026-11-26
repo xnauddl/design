@@ -264,6 +264,26 @@ export function libSameGroups(tk: LibSameToken, libs: readonly LibSameVar[]): st
   return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
 }
 
+/**
+ * 만들기로 보낼 토큰에서 라이브러리 같은 값 묶음의 몫을 쓰임에서 뺀다(ia-v4 §2.9 SC-D46) — 연결 단계가 그 묶음을 붙이지 않으므로(`onlyItems`)
+ * 밝기 이름 · 쓰임 역할 · 재사용 판정(`uses[].free` · `keys`)도 그 자리를 세지 않는다. `freeBy`는 그대로(줄 숫자 · p는 따로 뺀다). 묶음별 수가 없는 옛 토큰은 그대로.
+ */
+export function withoutLibGroups<T extends LibSameToken & { uses?: { free?: number; keys?: string[]; by?: Record<string, number> }[] }>(tokens: readonly T[], libs: readonly LibSameVar[]): T[] {
+  if (!libs.length) return [...tokens];
+  return tokens.map((tk) => {
+    const lib = libSameGroups(tk, libs);
+    if (!lib.length || !tk.uses?.some((u) => u.by)) return tk;
+    const uses = tk.uses.map((u) => {
+      if (!u.by) return u;
+      const by: Record<string, number> = {};
+      let cut = 0;
+      for (const [k, n] of Object.entries(u.by)) if (lib.includes(k)) cut += n; else by[k] = n;
+      return { ...u, by, free: Math.max(0, (u.free ?? 0) - cut), keys: (u.keys ?? []).filter((k) => !lib.includes(k)) };
+    });
+    return { ...tk, uses };
+  });
+}
+
 /** 만들기 연결 단계의 거름 항목(§4.3 B.35 ①②) — 묶음에서 라이브러리 같은 값 묶음을 빼고, 묶음이 0개인 토큰은 뺀다. */
 export function onlyItems(tokens: readonly LibSameToken[], libs: readonly LibSameVar[]): { value: string | number; alpha?: number; groups: string[] }[] {
   const out: { value: string | number; alpha?: number; groups: string[] }[] = [];

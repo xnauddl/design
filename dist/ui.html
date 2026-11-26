@@ -3344,6 +3344,24 @@ button.ds-tag { border: 0; cursor: pointer; }
   function libSameGroups(tk, libs) {
     return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
   }
+  function withoutLibGroups(tokens2, libs) {
+    if (!libs.length) return [...tokens2];
+    return tokens2.map((tk) => {
+      var _a3;
+      const lib = libSameGroups(tk, libs);
+      if (!lib.length || !((_a3 = tk.uses) == null ? void 0 : _a3.some((u) => u.by))) return tk;
+      const uses = tk.uses.map((u) => {
+        var _a4, _b;
+        if (!u.by) return u;
+        const by = {};
+        let cut = 0;
+        for (const [k, n] of Object.entries(u.by)) if (lib.includes(k)) cut += n;
+        else by[k] = n;
+        return __spreadProps(__spreadValues({}, u), { by, free: Math.max(0, ((_a4 = u.free) != null ? _a4 : 0) - cut), keys: ((_b = u.keys) != null ? _b : []).filter((k) => !lib.includes(k)) });
+      });
+      return __spreadProps(__spreadValues({}, tk), { uses });
+    });
+  }
   function onlyItems(tokens2, libs) {
     const out = [];
     for (const tk of tokens2) {
@@ -3867,13 +3885,13 @@ button.ds-tag { border: 0; cursor: pointer; }
     return state2 === false;
   }
   function mergeSameNameTokens(tokens2) {
-    var _a3, _b, _c, _d, _e, _f, _g, _h;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const out = [];
     const byName = /* @__PURE__ */ new Map();
     for (const t2 of tokens2) {
       const prev = byName.get(t2.name);
       if (!prev) {
-        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {})) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
+        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues(__spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {}), u.by ? { by: __spreadValues({}, u.by) } : {})) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
         byName.set(t2.name, copy);
         out.push(copy);
         continue;
@@ -3888,13 +3906,17 @@ button.ds-tag { border: 0; cursor: pointer; }
             same.count += u.count;
             if (u.free != null) same.free = ((_c = same.free) != null ? _c : 0) + u.free;
             for (const k of (_d = u.keys) != null ? _d : []) if (!((_e = same.keys) != null ? _e : same.keys = []).includes(k)) same.keys.push(k);
-          } else uses.push(__spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {}));
+            for (const [k, n] of Object.entries((_f = u.by) != null ? _f : {})) {
+              const by = (_g = same.by) != null ? _g : same.by = {};
+              by[k] = ((_h = by[k]) != null ? _h : 0) + n;
+            }
+          } else uses.push(__spreadValues(__spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {}), u.by ? { by: __spreadValues({}, u.by) } : {}));
         }
       }
-      if (t2.count != null) prev.count = Math.max((_f = prev.count) != null ? _f : 0, t2.count);
+      if (t2.count != null) prev.count = Math.max((_i = prev.count) != null ? _i : 0, t2.count);
       if (t2.freeBy) {
-        const fb = (_g = prev.freeBy) != null ? _g : prev.freeBy = {};
-        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_h = fb[k]) != null ? _h : 0) + n;
+        const fb = (_j = prev.freeBy) != null ? _j : prev.freeBy = {};
+        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_k = fb[k]) != null ? _k : 0) + n;
       }
     }
     return out;
@@ -7310,7 +7332,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     mkPreviewReq = mkNextReq();
     const base = Number($("base").value) || 16;
     opSilent = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base, preview: true, reqId: mkPreviewReq });
+    send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base, preview: true, reqId: mkPreviewReq });
     opSilent = false;
     renderMakeScreen();
   }
@@ -7876,7 +7898,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       try {
         if (id === "create") {
           const rid = mkNextReq();
-          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: toks, base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
+          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
           totals.created = { g: r.created + r.updated, r: (_a3 = r.roles) != null ? _a3 : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
@@ -12213,7 +12235,7 @@ ${opts.tip}` : text;
     mcSendBase = baseKey();
     mcPreviewReq = mcNextReq();
     opSilent = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
+    send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
     opSilent = false;
   }
   function mcResync() {
@@ -12251,7 +12273,7 @@ ${opts.tip}` : text;
     mcCreateReq = mcNextReq();
     mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
     opCardCreate = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, reqId: mcCreateReq, globalOnly: true });
+    send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base: Number($("base").value) || 16, reqId: mcCreateReq, globalOnly: true });
     opCardCreate = false;
     renderSelHome();
   }

@@ -5668,10 +5668,10 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
   const { tokens } = extractFromSelection([card]);
   const by = (name) => tokens.find((x) => x.name === name);
   // 주인(card)을 쓰지 않는다(ia-v3 §2.12 12.12 N-D1 — 전에는 spacing/card/gap · spacing/card/padding)
-  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, free: 1, keys: ['GAP'] }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
-  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, free: 4, keys: ['GAP'] }]);
-  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, free: 1, keys: ['ALL_FILLS|FRAME_FILL'] }]);
-  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'] }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
+  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, free: 1, keys: ['GAP'], by: { GAP: 1 } }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
+  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, free: 4, keys: ['GAP'], by: { GAP: 4 } }]);
+  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, free: 1, keys: ['ALL_FILLS|FRAME_FILL'], by: { 'ALL_FILLS|FRAME_FILL': 1 } }]);
+  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
 });
 
 /* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
@@ -5756,7 +5756,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   card.parent = root;
   const { tokens } = extractFromSelection([root]);
   const white = tokens.find((x) => x.name === 'color/ffffff');
-  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', free: 1, keys: ['ALL_FILLS|TEXT_FILL'] }, { name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'] }]);
+  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }, { name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }]);
   await createTokens(tokens, 16);
   await createUsageRoles(tokens);
   const inv = findVar(figma, 'Semantic', 'color/text/inverse');
@@ -7801,7 +7801,7 @@ test('A.21 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주�
   assert.equal(r.newRoles, 1);
   assert.equal(card._bound.itemSpacing, button._bound.itemSpacing);
   const uses = extractFromSelection([card, button]).tokens.find((t) => t.name === 'spacing/16').uses;
-  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, free: 2, keys: ['GAP'] }]);
+  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, free: 2, keys: ['GAP'], by: { GAP: 2 } }]);
 });
 
 test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {

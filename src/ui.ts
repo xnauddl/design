@@ -24,7 +24,7 @@ import { suggestTokenRoles, mergeTokenRoles, semanticMapToText, textToSemanticMa
 import { explainError, type FriendlyError } from './lib/errors';
 import { nextTabIndex } from './lib/a11y';
 import { planMake, makeDoneText, makeCreatedText, hasDarkTarget, darkResultText, MAKE_STEP_ORDER, type MakeStepId, type MakeTotals } from './lib/wizard';
-import { cardCounts, fieldKind, libSameGroups, libSameSplit, linkPlacesForMake, onlyItems, skipRowCounts, SEL_KINDS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type MakeItem, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
+import { cardCounts, fieldKind, libSameGroups, libSameSplit, linkPlacesForMake, onlyItems, skipRowCounts, withoutLibGroups, SEL_KINDS, FIX_SKIP_REASONS, type LibSameSplit, type CardCounts, type MakeItem, type SkipItem, type SkipRow, type ReasonCounts, type SelKind } from './lib/selCards';
 
 let lastSentMsg: UiToCode | null = null; // UX7: '다시 시도' 대상(취소는 제외)
 function send(msg: UiToCode): void {
@@ -2755,7 +2755,7 @@ function mkSendPreview(): void {
   mkPreviewReq = mkNextReq();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   opSilent = true;
-  send({ type: 'CREATE_TOKENS', tokens: toks, base, preview: true, reqId: mkPreviewReq });
+  send({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base, preview: true, reqId: mkPreviewReq }); // 라이브러리 같은 값 묶음은 쓰임에서 뺌(SC-D46)
   opSilent = false;
   renderMakeScreen();
 }
@@ -3272,7 +3272,7 @@ async function runMake(): Promise<void> {
       if (id === 'create') {
         const rid = mkNextReq();
         // 무료는 Global만(`globalOnly` — Semantic을 만들지 않는다, F4).
-        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: toks, base, reqId: rid, ...(isPaid ? {} : { globalOnly: true }) }, ['CREATE_RESULT'], rid);
+        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base, reqId: rid, ...(isPaid ? {} : { globalOnly: true }) }, ['CREATE_RESULT'], rid);
         totals.created = { g: r.created + r.updated, r: r.roles ?? 0, m: r.skippedManual ?? 0 };
         results.push({ id, mark: 'ok', text: t('wizard.seq.createDone', { created: r.created, updated: r.updated }) });
       } else if (id === 'dark') {
@@ -7609,7 +7609,7 @@ function mcSendPreview(toks: DraftToken[]): void {
   mcPreviewReq = mcNextReq();
   opSilent = true;
   // 무료도 globalOnly 없이 — r(roles)이 유료 주 버튼 · 무료 🔒 줄에 쓰인다(§4.3 "무료 — 무료 규칙 PR 뒤").
-  send({ type: 'CREATE_TOKENS', tokens: toks, base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq });
+  send({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq });
   opSilent = false;
 }
 /**
@@ -7647,7 +7647,7 @@ function mcCreate(toks: DraftToken[]): void {
   mcCreateReq = mcNextReq();
   mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
   opCardCreate = true;
-  send({ type: 'CREATE_TOKENS', tokens: toks, base: Number(($('base') as HTMLInputElement).value) || 16, reqId: mcCreateReq, globalOnly: true });
+  send({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base: Number(($('base') as HTMLInputElement).value) || 16, reqId: mcCreateReq, globalOnly: true });
   opCardCreate = false;
   renderSelHome();
 }

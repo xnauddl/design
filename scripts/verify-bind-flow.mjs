@@ -4283,6 +4283,15 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await p.close();
 }
 
+{
+  // SC-D46 — 만들기로 보내는 토큰의 쓰임에서 라이브러리 같은 값 묶음의 몫을 뺀다(연결 단계가 그 묶음을 붙이지 않음 — 밝기 · 쓰임 역할 · 재사용이 같은 자리를 센다)
+  const p = await openLib30({ tier: 'paid' });
+  const T8 = { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing', 'topLeftRadius'], count: 5, freeBy: { GAP: 9, CORNER_RADIUS: 4 }, uses: [{ name: 'spacing/gap', count: 9, free: 9, keys: ['GAP'], by: { GAP: 9 } }, { name: 'radius/default', count: 4, free: 4, keys: ['CORNER_RADIUS'], by: { CORNER_RADIUS: 4 } }] };
+  const pv = await cardAnswer(p, [T8]);
+  const uses = pv?.tokens.find((tk) => tk.value === 8)?.uses;
+  check('30 SC-D46 상태 5 카드 미리보기 — 라이브러리 LS8(GAP)과 같은 값 묶음은 쓰임에서 빠짐(spacing/gap free 0) · 반경 쓰임은 그대로', JSON.stringify(uses) === JSON.stringify([{ name: 'spacing/gap', count: 9, free: 0, keys: [], by: {} }, { name: 'radius/default', count: 4, free: 4, keys: ['CORNER_RADIUS'], by: { CORNER_RADIUS: 4 } }]), JSON.stringify(uses));
+  await p.close();
+}
 // B.35 — 만들기 연결 단계: 켠 줄만(only) · 기존 텍스트 스타일 · 결과 줄 · 상태 7 free 0 끔
 {
   const setup = async () => {

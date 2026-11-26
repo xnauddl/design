@@ -79,6 +79,8 @@ export interface DraftToken {
     keys?: string[];
     /** 이 쓰임의 빈 자리 수(`count`는 붙은 자리도 셈) — 색 밝기 이름 · 쓰임 역할은 빈 자리로 정한다(ia-v4 §2.9 SC-D45). 없으면 옛 응답(`count`로). */
     free?: number;
+    /** 묶음 키별 빈 자리 수 — UI가 만들기로 보내기 전에 라이브러리 같은 값 묶음(연결 단계가 붙이지 않는 묶음)의 몫을 뺀다(SC-D46). */
+    by?: Record<string, number>;
   }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;

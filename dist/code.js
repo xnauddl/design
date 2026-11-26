@@ -3694,7 +3694,7 @@
   var fieldPlace = (acc, node, field, places = 1) => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) && !followsMain(acc, node, field) ? places : 0 });
   var followsMain = (acc, node, field, index) => !!acc.curMain && sameAsMain(node, acc.curMain, field, index);
   function add(acc, token, source, nodeId, use, bg, place) {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const k = keyOf(token.category, token.value, token.unit, token.alpha);
     let existing = acc.map.get(k);
     if (existing) {
@@ -3715,7 +3715,11 @@
       if (u) u.count++;
       else uses.push(u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
       if (place) u.free = ((_e = u.free) != null ? _e : 0) + Math.max(0, place.free);
-      if (place && place.free > 0 && !((_f = u.keys) != null ? _f : u.keys = []).includes(place.key)) u.keys.push(place.key);
+      if (place && place.free > 0) {
+        if (!((_f = u.keys) != null ? _f : u.keys = []).includes(place.key)) u.keys.push(place.key);
+        const by = (_g = u.by) != null ? _g : u.by = {};
+        by[place.key] = ((_h = by[place.key]) != null ? _h : 0) + place.free;
+      }
     }
   }
   function backgroundOf(node) {
