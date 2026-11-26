@@ -65,55 +65,12 @@
     .step-body > * + * { margin-top: var(--space-2); }
     .step.collapsed .step-body { display: none; }
 
-    /* ── 버튼 ── */
-    button {
-      font: var(--font-weight-semibold) var(--font-size-md)/var(--line-height-none) var(--font-family-sans);
-      height: var(--size-control-md); padding: 0 var(--space-3); border-radius: var(--radius-small);
-      border: 1px solid var(--color-secondary-border); background: var(--color-secondary-bg); color: var(--color-text-primary);
-      cursor: pointer; transition: background var(--motion-duration-fast), border-color var(--motion-duration-fast), color var(--motion-duration-fast), box-shadow var(--motion-duration-fast);
-      white-space: nowrap;
-    }
-    /* hover/active는 누를 수 있는 버튼에만 — 비활성 버튼에 얹으면 primary의 파란 배경을 흰색으로
-       덮어써 흰 글씨가 사라진다(실행 중 잠긴 「전체 실행」이 그랬다). */
-    button:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--color-surface-secondary); border-color: var(--color-secondary-border); }
-    button:active:not(:disabled) { background: var(--color-interactive-hover); }
-    /* 주 버튼은 진한 강조색 — 흰 글자 대비 4.5:1 이상(IA v3 §2.10). */
-    button.primary {
-      background: var(--color-primary); color: var(--color-text-on-primary); border-color: var(--color-primary);
-      box-shadow: var(--elevation-1);
-    }
-    button.primary:hover:not(:disabled):not([aria-disabled="true"])  { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
-    button.primary:active:not(:disabled) { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
-    button:focus-visible {
-      outline: none; box-shadow: var(--focus-ring-default);
-    }
-    button:disabled { opacity: var(--opacity-disabled); cursor: default; box-shadow: none; }
-    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다. */
+    /* ── 버튼 ── 모양 · 상태는 src/ui/components/button.css(design-system §6.1 · §6.9). 여기는 자리만. */
+    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다(버튼 밖 요소도). */
     [aria-disabled="true"] { color: var(--color-text-tertiary); cursor: not-allowed; box-shadow: none; }
-    button[aria-disabled="true"], button[aria-disabled="true"]:hover, button[aria-disabled="true"]:active { background: var(--color-secondary-bg); border-color: var(--color-border-default); color: var(--color-text-tertiary); }
-    button.primary[aria-disabled="true"], button.primary[aria-disabled="true"]:hover, button.primary[aria-disabled="true"]:active { background: var(--color-surface-secondary); border-color: var(--color-border-default); color: var(--color-text-tertiary); } /* 잠긴 주 버튼도 글자는 옅게 — ia-v3 §2 원칙 3 · ia-v4 B.23 */
     label.inline:has(input[aria-disabled="true"]) { color: var(--color-text-tertiary); cursor: not-allowed; }
-    button.link {
-      border: none; background: none; padding: 0; width: auto;
-      color: var(--color-text-link); cursor: pointer; font: inherit; font-weight: var(--font-weight-semibold);
-      text-decoration: underline; text-underline-offset: 2px; height: auto;
-    }
-    button.link:hover { color: var(--color-interactive-focus-hover); background: none; }
 
-    /* ── 입력 / 셀렉트 / 텍스트영역 ── */
-    input[type="text"], input[type="number"], select, textarea {
-      font: var(--font-weight-regular) var(--font-size-md)/var(--line-height-snug) var(--font-family-sans);
-      background: var(--color-surface-secondary); color: var(--color-text-primary);
-      border: 1px solid var(--color-border-default); border-radius: var(--radius-small);
-      padding: var(--space-1) var(--space-2); transition: background var(--motion-duration-fast), border-color var(--motion-duration-fast), box-shadow var(--motion-duration-fast);
-    }
-    input[type="text"]:hover, input[type="number"]:hover, select:hover, textarea:hover { border-color: var(--color-border-strong); }
-    input[type="text"]:focus, input[type="number"]:focus, select:focus, textarea:focus {
-      outline: none; background: var(--color-surface-primary);
-      border-color: var(--color-interactive-focus); box-shadow: var(--focus-ring-field);
-    }
-    input[type="text"], input[type="number"], select { height: var(--size-control-md); padding-top: 0; padding-bottom: 0; }
-    input::placeholder, textarea::placeholder { color: var(--color-text-tertiary); }
+    /* ── 입력 / 셀렉트 / 텍스트영역 / 체크박스 ── 모양 · 상태는 src/ui/components/input.css · checkbox.css(§6.2 · §6.9). 여기는 자리만. */
     input[type="number"] { width: 56px; }
     /* 텍스트 스타일 카드의 이름 칸 — 파랑=이미 등록된 스타일(이름만 rename), 앰버=새로 만들 스타일. */
     .r-title input.ts-bound { color: var(--color-state-info); }
@@ -122,9 +79,6 @@
       width: 30px; height: var(--size-compact); padding: 0; border: 1px solid var(--color-border-strong);
       border-radius: var(--radius-small); background: var(--color-surface-primary); cursor: pointer;
     }
-    input[type="checkbox"] { accent-color: var(--color-interactive-focus); width: var(--size-checkbox); height: var(--size-checkbox); }
-    select { padding-right: var(--space-1); }
-    textarea { font-family: var(--font-family-mono); line-height: var(--line-height-normal); resize: vertical; }
 
     .row { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
     label.inline { display: inline-flex; gap: var(--space-1); align-items: center; color: var(--color-text-secondary); }
@@ -138,12 +92,7 @@
     }
     .tab-list { display: flex; gap: var(--space-1); flex: 1 1 auto; min-width: 0; }
     /* [—] 최소화 — 24×24 이상(§2.10). */
-    .tab-min {
-      flex: 0 0 28px; height: var(--size-control-md); padding: 0; border: none; background: transparent;
-      color: var(--color-text-secondary); border-radius: var(--radius-small); line-height: var(--line-height-none);
-    }
-    .tab-min:hover { background: var(--color-interactive-hover); color: var(--color-text-primary); }
-    .tab-min svg { display: block; margin: 0 auto; }
+    .tab-min { flex: 0 0 auto; } /* 모양은 ds-btn ds-icbtn ds-btn--ghost(28) */
     .tab-btn {
       flex: 1; padding: 0 var(--space-1); height: var(--size-control-sm); border: none; background: transparent;
       color: var(--color-text-secondary); font-weight: var(--font-weight-semibold); border-radius: var(--radius-small);
@@ -184,7 +133,7 @@
     .mk-row .c { color: var(--color-text-secondary); font-size: var(--font-size-sm); flex: 0 0 auto; text-align: right; min-width: 52px; }
     .mk-row .st { width: 72px; flex: 0 0 auto; text-align: center; font-size: var(--font-size-sm); }
     .mk-row .st.ok { color: var(--color-state-success); }
-    .mk-row button { height: var(--size-control-sm); min-height: var(--size-control-sm); padding: 0 var(--space-2); font-size: var(--font-size-sm); width: 72px; flex: 0 0 auto; }
+    .mk-row button { width: 72px; flex: 0 0 auto; } /* 모양은 ds-btn--sm */
     .mk-foot { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
     .mk-foot .grow { flex: 1 1 auto; }
     .mk-lock { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-1); margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
@@ -194,8 +143,7 @@
     .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: var(--space-1); min-height: 48px; border-top: 1px solid var(--color-border-default); background: var(--color-background-primary); color: var(--color-text-secondary); margin-top: var(--space-2); }
     .sub-head { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; border-bottom: 1px solid var(--color-border-default); margin: 0 0 var(--space-3); }
     .sub-head[hidden] { display: none; }
-    .sub-back { width: 28px; height: 28px; padding: 0; border: none; background: transparent; font-size: var(--font-size-xl); color: var(--color-text-primary); border-radius: var(--radius-small); }
-    .sub-back:hover { background: var(--color-interactive-hover); }
+    .sub-back { flex: none; } /* 모양은 ds-btn ds-icbtn ds-btn--ghost */
     .sub-title { font-size: var(--font-size-lg); }
     .sub-head .sub-title { flex: 0 0 auto; }
     .sub-right { display: flex; min-width: 0; font-size: var(--font-size-sm); white-space: nowrap; }
@@ -305,8 +253,7 @@
     .toolbar .muted { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     /* 다음 단계로 — 레일과 같은 이동을 카드 안에서. 보조 버튼이라 테두리 없이. */
     /* 툴바가 좁아 줄이 넘어가도 ‘다음 →’은 오른쪽 끝에 — 혼자 왼쪽에 떨어지면 다른 버튼처럼 보인다. */
-    .btn-next { border-color: transparent; color: var(--color-text-secondary); margin-left: auto; }
-    .btn-next:hover { color: var(--color-text-primary); }
+    .btn-next { margin-left: auto; } /* 모양은 ds-btn--ghost */
 
     /* ── 결과 목록(#18) ── */
     /* 목록마다 자기 스크롤 박스를 두지 않는다. 상한을 걸면 마지막 행이 반쯤 잘리고, 그걸
@@ -344,7 +291,7 @@
     .r-title { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); color: var(--color-text-primary); line-height: var(--line-height-tight); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .r-title.mono, .r-sum.mono { font-family: var(--font-family-mono); }
     .r-title input { font: inherit; border: 0; background: transparent; padding: 0; width: 100%; color: inherit; }
-    .r-title input:focus { outline: 1px solid var(--color-interactive-focus); border-radius: var(--radius-xs); }
+    .r-title input:focus { outline: none; box-shadow: var(--focus-ring-field); border-radius: var(--radius-xs); }
     .r-sum { font-size: var(--font-size-sm); color: var(--color-text-secondary); line-height: var(--line-height-snug); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .r-meta { font-size: var(--font-size-sm); font-family: var(--font-family-mono); color: var(--color-text-secondary); white-space: nowrap; }
     .r-title.has-swatch { display: flex; align-items: center; gap: var(--space-1); }
@@ -496,7 +443,7 @@
     .modal dl { display: grid; grid-template-columns: 80px 1fr; gap: var(--space-1) var(--space-2); margin: 0; font-size: var(--font-size-sm); }
     .modal dt { color: var(--color-text-secondary); }
     .modal dd { margin: 0; font-family: var(--font-family-mono); word-break: break-all; }
-    .chip { display: inline-block; font-size: var(--font-size-sm); border: 1px solid var(--color-border-default); border-radius: var(--radius-full); padding: 0 var(--space-1); margin: 0 var(--space-1) var(--space-1) 0; color: var(--color-text-secondary); font-family: var(--font-family-sans); }
+    .chip { margin: 0 var(--space-1) var(--space-1) 0; } /* 모양은 ds-tag */
     /* ── 탭 모양 3단계(§4.1) — 상단 탭(.tabs) · 레이어 하위 탭(밑줄, PR 3) · 계층 칩(PR 2) ── */
     /* 하위 탭 13px · 높이 32 · 간격 20(§4.6 — 11px은 실기에서 탭으로 읽히지 않았다) */
     
@@ -554,7 +501,7 @@
     .bv-var { background: var(--color-primary-subtle); color: var(--color-state-info); border: 1px solid transparent; flex: 0 1 auto; min-width: 0; max-width: 100%; }
     .bv-var .bv-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     /* 새 역할(§2.12) — 연결할 때 Semantic에 만든다 */
-    .bv-new { font: var(--font-weight-semibold) var(--font-size-xs)/var(--line-height-sm) var(--font-family-sans); background: var(--color-primary); color: var(--color-text-on-primary); border-radius: var(--radius-xs); padding: 0 var(--space-1); flex: 0 0 auto; }
+    .bv-new { flex: 0 0 auto; } /* 모양은 ds-badge ds-badge--solid */
     .bv-mark { flex: 0 0 auto; font-family: var(--font-family-sans); font-weight: var(--font-weight-bold); }
     .bind-empty .bv-var { max-width: 140px; }
     
@@ -688,14 +635,8 @@
     .start-head { font-size: var(--font-size-md); font-weight: var(--font-weight-semibold); margin: var(--space-1) 0 var(--space-0-5); }
     .start-foot { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
     .grow { flex: 1 1 auto; }
-    button.link-btn { min-height: var(--size-control-sm); padding: 0 var(--space-0-5); text-decoration: none; color: var(--color-text-link); height: auto;
-    }
-    button.link-btn:hover { text-decoration: underline; }
-    .icon-btn {
-      width: 24px; height: var(--size-control-sm); padding: 0; display: inline-flex; align-items: center; justify-content: center;
-      border: 1px solid transparent; background: transparent; color: var(--color-text-secondary); border-radius: var(--radius-small); flex: 0 0 auto;
-    }
-    .icon-btn:hover:not([aria-disabled="true"]) { background: var(--color-interactive-hover); color: var(--color-text-primary); border-color: transparent; }
+    button.link-btn { min-height: var(--size-control-sm); } /* 누르는 곳 24 유지 — 모양은 ds-btn--link(늘 밑줄) */
+    .icon-btn { flex: 0 0 auto; } /* 모양은 ds-btn ds-icbtn ds-btn--ghost ds-btn--sm */
     
     @media (prefers-reduced-motion: reduce) {  }
     /* 머리줄·칩 줄은 선택 표시줄 아래에 붙지 않는다 — 고정은 구역·그룹 머리(최대 두 겹). */
@@ -742,7 +683,7 @@
     .vs-num { flex: 0 0 auto; font-size: var(--font-size-sm); line-height: var(--line-height-none); color: var(--color-text-secondary); font-weight: var(--font-weight-medium); }
     .vs-item[aria-selected="true"] .vs-num { color: var(--color-text-emphasis); }
     
-    .vs-badge { font: var(--font-weight-bold) var(--font-size-xs)/var(--line-height-sm) var(--font-family-sans); min-width: 12px; padding: 0 var(--space-0-5); border-radius: var(--radius-xs); background: var(--color-surface-secondary); color: var(--color-text-secondary); text-align: center; flex: 0 0 auto; }
+    .vs-badge { flex: 0 0 auto; } /* 모양은 ds-badge */
     .vs-item[aria-selected="true"] .vs-badge { background: var(--nav-selected-badge-bg); color: var(--color-text-inverse); }
     .vs-sep { height: 1px; background: var(--color-border-default); margin: var(--space-1) var(--space-1); }
     .vl-main { flex: 1 1 auto; min-width: 0; }
@@ -813,11 +754,10 @@
     .ed-plink[hidden] { display: none; }
     .ed-ptag { font-size: var(--font-size-sm); color: var(--color-text-secondary); background: var(--color-surface-secondary); border-radius: var(--radius-xs); padding: 0 var(--space-1); margin-left: var(--space-1); }
     .ed-type { height: var(--size-compact); }
-    button.danger { background: var(--color-state-error); color: var(--color-text-inverse); border-color: transparent; }
     
     
     
-    .lib-tag { font: var(--font-weight-bold) var(--font-size-xs)/var(--line-height-xs) var(--font-family-sans); padding: 0 var(--space-1); border-radius: var(--radius-xs); border: 1px solid var(--color-border-strong); color: var(--color-text-secondary); flex: 0 0 auto; }
+    .lib-tag { flex: 0 0 auto; } /* 모양은 ds-badge ds-badge--outline */
     
     
     .vt-empty { padding: var(--space-4) var(--space-2); color: var(--color-text-secondary); }
@@ -856,12 +796,7 @@
     }
     .mini-mark.busy.spin::before { animation: mini-spin var(--motion-duration-spin) linear infinite; }
     @keyframes mini-spin { to { transform: rotate(360deg); } }
-    .mini-badge {
-      position: absolute; right: -6px; top: -6px; width: 14px; height: 14px; border-radius: var(--radius-full);
-      font: var(--font-weight-bold) var(--font-size-xs)/var(--line-height-sm) var(--font-family-sans); text-align: center; color: var(--color-text-inverse);
-    }
-    .mini-badge.ok { background: var(--color-state-success); }
-    .mini-badge.fail { background: var(--color-state-error); }
+    .mini-badge { position: absolute; right: -6px; top: -6px; } /* 모양은 ds-badge ds-badge--dot */
     @media (prefers-reduced-motion: reduce) {
       .mini-mark.busy.spin::before { animation: none; background: var(--color-primary); }
     }
@@ -875,12 +810,8 @@
       <button class="tab-btn" id="tabbtn-variables" role="tab" aria-controls="tab-variables" data-i18n="tab.variables">변수</button>
     </div>
     <!-- ⚙ 설정 — 탭 밖 화면(IA v4 §2.1). -->
-    <button class="tab-min" id="btnSettings" type="button" data-i18n-title="tab.settings" title="설정" data-i18n-aria-label="tab.settings" aria-label="설정">
-      <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
-    </button>
-    <button class="tab-min" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" data-i18n-aria-label="ui.minimize" aria-label="최소화">
-      <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2.5 6h7"/></svg>
-    </button>
+    <button class="tab-min ds-btn ds-icbtn ds-btn--ghost" id="btnSettings" type="button" data-i18n-title="tab.settings" title="설정" data-i18n-aria-label="tab.settings" aria-label="설정"><i data-ds-icon="settings"></i></button>
+    <button class="tab-min ds-btn ds-icbtn ds-btn--ghost" id="btnMinimize" type="button" data-i18n-title="ui.minimize" title="최소화" data-i18n-aria-label="ui.minimize" aria-label="최소화"><i data-ds-icon="minus"></i></button>
   </div>
 
 
@@ -890,16 +821,16 @@
 
    <!-- 변수 목록(§4.4) -->
    <!-- 로컬 변수 0개(IA v4 §4.6 빈 상태) -->
-   <div class="vt-empty var-empty" id="varEmpty" style="display:none"><span data-i18n="v4.varEmpty">아직 변수가 없어요</span> · <button class="link link-btn" id="btnVarEmptyMake" type="button" data-i18n="v4.makeFromSel">선택에서 변수 만들기</button></div>
+   <div class="vt-empty var-empty" id="varEmpty" style="display:none"><span data-i18n="v4.varEmpty">아직 변수가 없어요</span> · <button class="link link-btn ds-btn--link" id="btnVarEmptyMake" type="button" data-i18n="v4.makeFromSel">선택에서 변수 만들기</button></div>
 
    <div id="varList" style="display:none">
     <!-- IA v4 §4.6 머리 줄(고정): [🔍 변수 검색] · [모드 ▾] · [＋] · [⋯] -->
     <div class="list-head" id="listHead">
      <div class="lh-row">
-      <span class="search-box" id="searchBox"><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" data-i18n-aria-label="vm.search" aria-label="변수 검색" /><button class="icon-btn" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기" hidden>✕</button></span>
+      <span class="search-box" id="searchBox"><input id="varSearch" type="text" data-i18n-placeholder="vm.search" placeholder="변수 검색" data-i18n-aria-label="vm.search" aria-label="변수 검색" /><button class="icon-btn ds-btn ds-icbtn ds-btn--ghost ds-btn--sm" id="btnSearchClear" type="button" data-i18n-aria-label="list.searchClear" aria-label="검색 지우기" data-i18n-title="list.searchClear" title="검색 지우기" hidden><i data-ds-icon="x"></i></button></span>
       <select id="modeSelect" class="mode-select" data-i18n-title="list.modeTip" title="모드" hidden></select>
-      <button class="icon-btn" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M6 1.5v9M1.5 6h9"/></svg></button>
-      <button class="icon-btn" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" fill="currentColor"><circle cx="2" cy="6" r="1.2"/><circle cx="6" cy="6" r="1.2"/><circle cx="10" cy="6" r="1.2"/></svg></button>
+      <button class="icon-btn ds-btn ds-icbtn ds-btn--ghost ds-btn--sm" id="btnAddVar" type="button" aria-haspopup="menu" data-i18n-title="list.addTip" title="추가" data-i18n-aria-label="list.addTip" aria-label="추가"><i data-ds-icon="plus"></i></button>
+      <button class="icon-btn ds-btn ds-icbtn ds-btn--ghost ds-btn--sm" id="btnVarMore" type="button" aria-haspopup="menu" data-i18n-title="list.moreTip" title="더 보기" data-i18n-aria-label="list.moreTip" aria-label="더 보기"><i data-ds-icon="ellipsis"></i></button>
      </div>
     </div>
     <!-- 사이드바(로컬 컬렉션 listbox) + 오른쪽 목록(grid) -->
@@ -926,7 +857,7 @@
     </div>
     <!-- 하위 화면 머리(§2.1) — "← 제목" + 오른쪽 보조 글 -->
     <div class="sub-head" id="subHead" hidden>
-      <button class="sub-back" id="btnSubBack" type="button" data-i18n-aria-label="v4.back" aria-label="돌아가기">←</button>
+      <button class="sub-back ds-btn ds-icbtn ds-btn--ghost" id="btnSubBack" type="button" data-i18n-aria-label="v4.back" aria-label="돌아가기" data-i18n-title="v4.back" title="돌아가기"><i data-ds-icon="arrow-left"></i></button>
       <b class="sub-title" id="subTitle"></b>
       <span class="grow"></span>
       <span class="sub-right muted" id="subRight"></span>
@@ -942,7 +873,7 @@
         </div>
       </div>
       <div class="bind-empty" id="bindEmpty" hidden></div>
-      <div class="tree-top" id="bindAllRow" hidden><span data-i18n="v4.bindTop">켠 곳만 연결해요</span><span class="grow"></span><span><button class="link link-btn" id="bindAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn" id="bindAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+      <div class="tree-top" id="bindAllRow" hidden><span data-i18n="v4.bindTop">켠 곳만 연결해요</span><span class="grow"></span><span><button class="link link-btn ds-btn--link" id="bindAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn ds-btn--link" id="bindAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
       <div id="bindTree" class="tree" role="treegrid" data-i18n-aria-label="v4.bindListAria" aria-label="연결할 변수"></div>
       <div class="bind-badges" id="bindBadges" hidden>
         <button class="bd bd-skip" id="bindSkipToggle" type="button" aria-expanded="false" aria-controls="bindSkips"></button>
@@ -953,40 +884,40 @@
       <div class="status" id="applyStatus"></div>
       <div class="sub-foot" id="bindFoot">
         <span class="grow"></span>
-        <button id="btnApplyConfirm" class="primary bind-btn" type="button"><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
+        <button id="btnApplyConfirm" class="primary bind-btn ds-btn--primary" type="button"><span class="bl" id="btnApplyConfirmLabel" data-i18n="bind.link">연결</span></button>
       </div>
     </div>
 
     <!-- IA v4 §4.4 이름 정리(⑨) — 소속 트리(바꿀 줄 · 이름 그대로인 조상 머리) · 아래 고정 [k개 이름 바꾸기] -->
     <div class="step bind-v4" data-apply-step="rename">
       <div class="bind-empty" id="renameEmpty" hidden></div>
-      <div class="tree-top" id="renameTop" hidden><span data-i18n="rename.top">켠 이름만 바꿔요</span><span class="grow"></span><span><button class="link link-btn" id="renameAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn" id="renameAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+      <div class="tree-top" id="renameTop" hidden><span data-i18n="rename.top">켠 이름만 바꿔요</span><span class="grow"></span><span><button class="link link-btn ds-btn--link" id="renameAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button> · <button class="link link-btn ds-btn--link" id="renameAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
       <div id="renameTree" class="tree" role="treegrid" data-i18n-aria-label="rename.treeAria" aria-label="바꿀 이름"></div>
       <div class="status" id="renameStatus"></div>
       <div class="sub-foot" id="renameFoot">
         <span class="muted" style="font-size:var(--font-size-sm)" data-i18n="rename.footNote">레이어 이름만 바뀌어요 · ⌘Z로 되돌릴 수 있어요</span>
         <span class="grow"></span>
-        <button id="btnRename" class="primary" type="button" data-i18n="rename.applyBtn">이름 바꾸기</button>
+        <button id="btnRename" class="primary ds-btn--primary" type="button" data-i18n="rename.applyBtn">이름 바꾸기</button>
       </div>
     </div>
 
    <!-- IA v4 §4.3 변수 만들기(⑧) — Global · Semantic · 텍스트 스타일 묶음 트리 + 아래 고정(만든 뒤 · 만들 수 · 실행) -->
    <div class="step bind-v4" id="makeScreen" style="display:none">
       <div class="status warn" id="makeWarn" hidden></div>
-      <div class="make-free" id="makeFree" hidden><div data-i18n="make.freeBox">무료: Global 변수만</div><div class="mfb2"><span aria-hidden="true">🔒</span><span data-i18n="make.freeBoxPaid">Semantic · 텍스트 스타일 · 다크 모드</span><span aria-hidden="true">·</span><button class="link link-btn" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div></div>
+      <div class="make-free" id="makeFree" hidden><div data-i18n="make.freeBox">무료: Global 변수만</div><div class="mfb2"><span aria-hidden="true">🔒</span><span data-i18n="make.freeBoxPaid">Semantic · 텍스트 스타일 · 다크 모드</span><span aria-hidden="true">·</span><button class="link link-btn ds-btn--link" id="makeLicense" type="button" data-i18n="make.license">라이선스 →</button></div></div>
       <div class="mk-tabs" id="makeTabs" role="tablist" data-i18n-aria-label="make.tabsAria" aria-label="만들 것" hidden>
         <button type="button" role="tab" id="makeTab-global" data-mtab="global" aria-controls="makePanel" aria-selected="true">Global<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-semantic" data-mtab="semantic" aria-controls="makePanel" aria-selected="false" tabindex="-1">Semantic<span class="n"></span></button>
         <button type="button" role="tab" id="makeTab-ts" data-mtab="ts" aria-controls="makePanel" aria-selected="false" tabindex="-1">Text Style<span class="n"></span><span class="mk-dot" role="img" hidden></span></button>
       </div>
       <div id="makePanel">
-        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 만들거나 있는 변수에 연결해요</span><button class="link link-btn" id="makeSemLic" type="button" data-i18n="make.license" hidden>라이선스 →</button><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
+        <div class="tree-top mk-bar" id="makeTop" hidden><span id="makeTopText" data-i18n="make.top">켠 값만 만들거나 있는 변수에 연결해요</span><button class="link link-btn ds-btn--link" id="makeSemLic" type="button" data-i18n="make.license" hidden>라이선스 →</button><button class="mk-info" id="makeInfo" type="button" data-tip="" aria-label="" hidden>i</button><span class="grow"></span><span id="makeTopRight"><button class="link link-btn ds-btn--link" id="makeAllOn" type="button" data-i18n="bind.allOn">모두 켜기</button><span id="makeAllSep"> · </span><button class="link link-btn ds-btn--link" id="makeAllOff" type="button" data-i18n="bind.allOff">모두 끄기</button></span></div>
         <div class="bind-empty" id="makeEmpty" hidden></div>
         <div class="make-tabnote" id="makeTabNote" hidden></div>
         <div id="makeTree" class="tree" role="treegrid" aria-label="Global"></div>
       </div>
       <div class="tree" id="makeResults" hidden></div>
-      <div class="make-more" id="makeMore" hidden><span data-i18n="make.more">격자 정리 · 테마 · 타이포까지 고르려면</span> <button class="link link-btn" id="btnMakePick" type="button" data-i18n="make.pick">값을 직접 고르기 →</button></div>
+      <div class="make-more" id="makeMore" hidden><span data-i18n="make.more">격자 정리 · 테마 · 타이포까지 고르려면</span> <button class="link link-btn ds-btn--link" id="btnMakePick" type="button" data-i18n="make.pick">값을 직접 고르기 →</button></div>
       <div class="make-foot" id="makeFoot">
         <div class="make-opts" id="makeOpts">
           <span class="lab" data-i18n="make.after">만든 뒤</span>
@@ -999,7 +930,7 @@
           <span class="make-prog" id="makeProg" hidden><span class="make-prog-text" id="makeProgText"></span><span class="bar"><span class="bar-fill" id="makeProgFill"></span></span></span>
           <span class="grow"></span>
           <button id="btnMakeCancel" type="button" hidden data-i18n="common.cancel">취소</button>
-          <button id="btnMakeRun" class="primary" type="button" data-i18n="make.run">변수 만들기</button>
+          <button id="btnMakeRun" class="primary ds-btn--primary" type="button" data-i18n="make.run">변수 만들기</button>
         </div>
       </div>
    </div>
@@ -1026,8 +957,8 @@
         <!-- [팔레트 생성] = 아래 팔레트 띠를 여는 단추(ia-v4 §4.3a-4) — 글 → 🔒 → ▸/▾ -->
         <button id="btnPalette" aria-expanded="false" aria-controls="paletteBand"><span data-i18n="palette.gen">팔레트 생성</span> <span class="muted" id="paletteBtnLock"></span><span class="pb-caret" id="paletteCaret" aria-hidden="true">▸</span></button>
         <span class="grow"></span>
-        <button id="btnColorVars" class="primary"><span data-i18n="color.makeVars">색 변수 만들기</span> <span class="muted" id="colorVarsLock"></span></button>
-        <button class="btn-next" data-next-make="token" data-i18n="rail.next">다음 →</button>
+        <button id="btnColorVars" class="primary ds-btn--primary"><span data-i18n="color.makeVars">색 변수 만들기</span> <span class="muted" id="colorVarsLock"></span></button>
+        <button class="btn-next ds-btn--ghost" data-next-make="token" data-i18n="rail.next">다음 →</button>
       </div>
       <!-- "그 외" 줄 — 띠 밖(버튼 줄 아래 · 띠 위), 글이 없으면 숨김(§4.3a-4). -->
       <span class="muted" id="selInfo"></span>
@@ -1074,21 +1005,21 @@
       <div class="hint" data-i18n="create.scopeHint">여백·크기·폰트·효과만 다뤄요. 색은 이전 단계에서 이미 만들었어요</div>
       <div class="toolbar">
         <button id="btnCreate" data-i18n="create.previewBtn">미리보기</button>
-        <button id="btnCreateApply" class="primary" style="display:none" data-i18n="create.apply">적용</button>
+        <button id="btnCreateApply" class="primary ds-btn--primary" style="display:none" data-i18n="create.apply">적용</button>
         <span class="grow"></span>
-        <button class="btn-next" data-next-make="theme" data-i18n="rail.next">다음 →</button>
+        <button class="btn-next ds-btn--ghost" data-next-make="theme" data-i18n="rail.next">다음 →</button>
       </div>
       <div class="banner" id="tokenColorNote" style="display:none"></div>
       <div class="row tree-ctrls" id="tokenCtrls" style="display:none">
         <label class="inline"><input type="checkbox" id="tokenAll" checked /> <span data-i18n="create.selectAll">전체</span></label>
-        <button class="link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 풀어요 — 대개 일회성이라 토큰으로 남길 필요가 적어요">1× 해제</button>
+        <button class="link ds-btn--link" id="btnTokenDropOnce" data-i18n="create.dropOnce" data-i18n-title="create.dropOnceTip" title="한 레이어에서만 쓰인 값(1×)의 체크를 풀어요 — 대개 일회성이라 토큰으로 남길 필요가 적어요">1× 해제</button>
       </div>
       <div id="tokenList" class="results"></div>
       <!-- 격자 값이 설정 입력으로 돌아온 뒤로는 스냅이 '정책'이 아니라 사용자의 선택이다.
            색 자동 정리와 같은 자리에 되돌리기를 둔다. -->
       <div class="tidy tidy-note" id="numTidySummary" style="display:none">
         <span id="numTidyText"></span>
-        <button id="btnNumTidyUndo" class="link" data-i18n="create.tidyUndo">되돌리기</button>
+        <button id="btnNumTidyUndo" class="link ds-btn--link" data-i18n="create.tidyUndo">되돌리기</button>
       </div>
       <div class="status" id="createStatus"></div>
     </div>
@@ -1099,7 +1030,7 @@
     <div class="step" data-make-step="token" data-always-hidden style="display:none">
       <h2><span data-i18n="semantic.title">Semantic 매핑 (쓰임 이름 → Global)</span> <span class="muted lock" id="semLock"></span></h2>
       <div class="hint" data-i18n-html="semantic.formatLabel">형식: <code>Semantic = Global변수이름</code></div>
-      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
+      <div class="prereq" id="semPrereq" style="display:none"><span class="prereq-text"></span> <button class="link ds-btn--link" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <textarea id="semMap" spellcheck="false" rows="6" style="width:100%;"></textarea>
       <div class="row">
         <button id="btnSemantics" data-i18n="semantic.aliasBtn">시맨틱 별칭 생성</button>
@@ -1112,13 +1043,13 @@
       <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="색상 · 채도는 그대로 두고 밝기만 뒤집어요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.">Global 색의 밝기를 뒤집어 Dark 칸에 채워요</div>
       <!-- 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7 D-T1) — 고르개 없음. -->
       <div class="toolbar">
-        <button id="btnGenDark" class="primary" data-i18n="dark.genBtn">다크 만들기</button>
+        <button id="btnGenDark" class="primary ds-btn--primary" data-i18n="dark.genBtn">다크 만들기</button>
         <span class="grow"></span>
-        <button class="btn-next" data-next-make="type" data-i18n="rail.next">다음 →</button>
+        <button class="btn-next ds-btn--ghost" data-next-make="type" data-i18n="rail.next">다음 →</button>
       </div>
       <!-- 알림 띠(ia-v4 §4.11 ②) — 옛 구조 · Dark 값이 없는 색. 테두리 없는 옅은 주황 띠(카드 안 카드 아님 — §2.8). -->
       <div id="darkNotice" class="dark-notice" hidden></div>
-      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
+      <div class="prereq" id="darkPrereq" style="display:none"><span class="prereq-text"></span> <button class="link ds-btn--link" id="darkPrereqGotoCreate" data-goto="create" data-i18n="prereq.gotoCreate">토큰 만들기로 →</button></div>
       <div class="status" id="darkStatus"></div>
     </div>
 
@@ -1131,7 +1062,7 @@
         <button id="btnScanText" data-i18n="textStyle.scanBtn">스캔</button>
         <span class="grow"></span>
         <label class="inline" style="font-size:var(--font-size-sm)"><input type="checkbox" id="tsLinkNow" checked /> <span data-i18n="textStyle.linkNow">레이어에 바로 연결</span></label>
-        <button id="btnTextStyles" class="primary" data-i18n="textStyle.registerBtn">등록</button>
+        <button id="btnTextStyles" class="primary ds-btn--primary" data-i18n="textStyle.registerBtn">등록</button>
       </div>
       <!-- 「가로 행의 왼쪽 텍스트를 이름으로」 체크박스 폐기(결정 2026-08-06) — 스캔 전에 켜고 끄는
            옵션이라, 결과를 보기도 전에 이름 규칙을 고르라는 요구였다. 스캔은 늘 크기 순으로 두고,
@@ -1147,7 +1078,7 @@
 
   <section class="tab-section" id="tab-settings" role="region" data-i18n-aria-label="tab.settings" aria-label="설정" tabindex="-1">
     <div class="sub-head">
-      <button class="sub-back" id="btnSettingsBack" type="button" data-i18n-aria-label="v4.back" aria-label="돌아가기">←</button>
+      <button class="sub-back ds-btn ds-icbtn ds-btn--ghost" id="btnSettingsBack" type="button" data-i18n-aria-label="v4.back" aria-label="돌아가기" data-i18n-title="v4.back" title="돌아가기"><i data-ds-icon="arrow-left"></i></button>
       <b class="sub-title" data-i18n="tab.settings">설정</b>
     </div>
     <!-- #19: 기준 크기·맥락 깊이·허용오차는 여기서만. 만들기/적용 단계에는 노출하지 않는다. -->
@@ -1179,7 +1110,7 @@
       <!-- 「구독」+「관리」 이원화 폐기(결정 2026-08-06) — 한 버튼이 티어에 따라 갈린다:
            Free면 결제 페이지, Paid면 고객 포털. 사용자가 자기 상태를 알고 버튼을 고를 일이 아니다. -->
       <div class="row" id="licenseLinkRow">
-        <button id="btnLicenseLink" class="primary" data-i18n-title="license.buyTip" title="결제 페이지를 열어요" data-i18n="license.buy">유료 구매하기 ↗</button>
+        <button id="btnLicenseLink" class="primary ds-btn--primary" data-i18n-title="license.buyTip" title="결제 페이지를 열어요" data-i18n="license.buy">유료 구매하기 ↗</button>
       </div>
       <div class="hint" id="licenseLinkHint" data-i18n="license.priceHint">무료 · 유료 연 $39 · 기기 1대</div>
       <div class="hint" id="licenseSetupHint" style="display:none" data-i18n="license.setupHint">배포 전이라 키 검증·구독 링크는 아직 동작하지 않아요</div>
@@ -1204,14 +1135,14 @@
   <!-- 공통 상태 줄(§4.1) — 창 맨 아래 고정, 모든 탭 공통. 알림은 여기서만 한다. 버튼은 말줄임 밖. -->
   <div class="status-line" id="statusLine" aria-live="polite">
     <span class="sl-text" id="statusText"></span>
-    <button class="link sl-action" id="statusAction" type="button" hidden></button>
+    <button class="link sl-action ds-btn--link" id="statusAction" type="button" hidden></button>
   </div>
 
   <!-- 최소화 상태(§4.9) — 창 140×104, 가운데 펼치기 버튼(↙↗)만. 누르면 펼친다. -->
   <div class="mini" id="miniView" hidden>
     <button class="mini-mark" id="btnExpand" type="button" data-i18n-aria-label="ui.expand" aria-label="펼치기">
       <svg width="16" height="16" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3h6v6M19 3l-7 7M9 19H3v-6M3 19l7-7"/></svg>
-      <span class="mini-badge" id="miniBadge" hidden></span>
+      <span class="mini-badge ds-badge ds-badge--dot" id="miniBadge" hidden></span>
     </button>
   </div>
 
@@ -1231,7 +1162,7 @@
           <option value="rem">rem</option>
         </select>
         <span class="grow"></span>
-        <button id="btnExport" class="primary" data-i18n="export.runBtn">내보내기</button>
+        <button id="btnExport" class="primary ds-btn--primary" data-i18n="export.runBtn">내보내기</button>
       </div>
       <div class="status" id="exportStatus"></div>
     </div>

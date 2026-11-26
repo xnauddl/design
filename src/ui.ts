@@ -1003,7 +1003,7 @@ function textStyleCard(s: TextStyleSpec): HTMLElement {
   if (!scanned) {
     // 램프 행은 셀 글자가 없다 — 대신 지울 수 있어야 한다.
     const del = document.createElement('button');
-    del.className = 'link';
+    del.className = 'link ds-btn--link';
     del.textContent = t('textStyle.rowDelete');
     del.addEventListener('click', () => {
       tsSpecs = tsSpecs.filter((x) => x !== s);
@@ -1239,7 +1239,7 @@ function unusedRender(): void {
   const link = (label: string, on: boolean, key: string): HTMLButtonElement => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'link link-btn';
+    b.className = 'link link-btn ds-btn--link';
     b.textContent = label;
     b.dataset.unusedAll = key;
     if (locked) b.setAttribute('aria-disabled', 'true');
@@ -1297,7 +1297,7 @@ function unusedRender(): void {
     if (del.getAttribute('aria-disabled') === 'true') return;
     unusedStartDelete([...unusedOn].filter((id) => all.includes(id)));
   });
-  del.className = 'danger';
+  del.className = 'danger ds-btn--danger';
   del.dataset.unused = 'delete';
   const lock = writeLockReason();
   setLock(del, lock || !k ? 'prereq' : null, lock ?? t('unused.deleteNeed'));
@@ -1696,11 +1696,12 @@ function setCardPrimary(all: HTMLElement[], order: HTMLElement[]): void {
   const held = !!retryIn(card);
   for (const el of all) {
     if (held) {
-      el.classList.remove('primary');
+      el.classList.remove('primary', 'ds-btn--primary');
       if (el === pick) el.dataset.primaryHeld = '1';
       else delete el.dataset.primaryHeld;
     } else {
       el.classList.toggle('primary', el === pick);
+      el.classList.toggle('ds-btn--primary', el === pick);
       delete el.dataset.primaryHeld;
     }
   }
@@ -2377,13 +2378,13 @@ function retryIn(card: ParentNode | null): HTMLElement | null {
 function holdPrimaries(card: HTMLElement, keep: HTMLElement): void {
   for (const b of Array.from(card.querySelectorAll<HTMLElement>('button.primary'))) {
     if (b === keep) continue;
-    b.classList.remove('primary');
+    b.classList.remove('primary', 'ds-btn--primary');
     b.dataset.primaryHeld = '1';
   }
 }
 function releasePrimaries(card: HTMLElement): void {
   for (const b of Array.from(card.querySelectorAll<HTMLElement>('[data-primary-held]'))) {
-    b.classList.add('primary');
+    b.classList.add('primary', 'ds-btn--primary');
     delete b.dataset.primaryHeld;
   }
 }
@@ -2434,7 +2435,7 @@ function errorBox(f: FriendlyError, onRetry: (() => void) | null): { box: HTMLEl
   let retry: HTMLButtonElement | null = null;
   if (onRetry) {
     retry = document.createElement('button');
-    retry.className = `primary ${RETRY_CLS}`;
+    retry.className = `primary ds-btn--primary ${RETRY_CLS}`;
     retry.textContent = t('common.retry');
     retry.addEventListener('click', onRetry);
     box.appendChild(retry);
@@ -2519,7 +2520,7 @@ function renderRenameScreen(): void {
     if (action) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'link link-btn';
+      b.className = 'link link-btn ds-btn--link';
       b.textContent = action[0];
       b.addEventListener('click', action[1]);
       empty.appendChild(b);
@@ -3016,7 +3017,7 @@ function renderMakeScreen(): void {
     if (emptyAction) {
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'link link-btn';
+      b.className = 'link link-btn ds-btn--link';
       b.textContent = emptyAction[0];
       b.addEventListener('click', emptyAction[1]);
       empty.appendChild(b);
@@ -3653,7 +3654,7 @@ function renderBindEmpty(): void {
   if (action) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'link link-btn';
+    b.className = 'link link-btn ds-btn--link';
     b.textContent = action[0];
     b.addEventListener('click', action[1]);
     box.appendChild(b);
@@ -3716,7 +3717,7 @@ function renderBindTree(): void {
         if (g.newRoleOf != null) {
           // 새 역할(§2.12) — 연결할 때 Semantic에 만든다. 배지는 칩 뒤(TR-D9), 툴팁도 배지에(TR-P12).
           const badge = document.createElement('span');
-          badge.className = 'bv-new';
+          badge.className = 'bv-new ds-badge ds-badge--solid';
           badge.textContent = t('bind.newRole');
           badge.setAttribute('role', 'img');
           badge.setAttribute('aria-label', t('bind.newRoleAria'));
@@ -3905,7 +3906,7 @@ function renderSkipReasons(reasons: Record<string, number>): void {
     if (ids.length && key && FIX_SKIP_REASONS.includes(key)) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'link link-btn skip-sel';
+      btn.className = 'link link-btn skip-sel ds-btn--link';
       btn.dataset.reason = key; // 다시 그린 뒤 같은 줄로 포커스를 돌려줄 열쇠(§4.2)
       btn.textContent = t('bind.skipSelectBtn');
       const names = items.slice(0, 5).map((x) => x.name).join(', ');
@@ -4346,13 +4347,13 @@ function showMiniResult(ok: boolean, fail?: { label: string; go: () => void }): 
   if (miniOkTimer) { clearTimeout(miniOkTimer); miniOkTimer = null; }
   if (ok) {
     if (miniFailure) return; // ⚠는 펼칠 때까지 유지 — ✓가 덮지 않는다
-    badge.className = 'mini-badge ok';
+    badge.className = 'mini-badge ok ds-badge ds-badge--dot ds-badge--success';
     badge.textContent = '✓';
     badge.hidden = false;
     miniOkTimer = setTimeout(() => { badge.hidden = true; miniOkTimer = null; }, 3000);
   } else if (fail) {
     miniFailure = fail;
-    badge.className = 'mini-badge fail';
+    badge.className = 'mini-badge fail ds-badge ds-badge--dot ds-badge--error';
     badge.textContent = '!';
     badge.hidden = false;
   }
@@ -5045,7 +5046,7 @@ function modalButton(label: string, onClick: () => void, primary = false): HTMLB
   const b = document.createElement('button');
   b.type = 'button';
   b.textContent = label;
-  if (primary) b.className = 'primary';
+  if (primary) b.className = 'primary ds-btn--primary';
   b.addEventListener('click', onClick);
   return b;
 }
@@ -5367,7 +5368,7 @@ function renderSidebar(sel: SideSel): void {
     d.setAttribute('aria-label', t('list.sideColAria', { name: c.name, badge, num: String(side.total) }) + (why ? `, ${why}` : ''));
     d.tabIndex = -1;
     const b = document.createElement('span');
-    b.className = 'vs-badge';
+    b.className = 'vs-badge ds-badge';
     b.setAttribute('aria-hidden', 'true');
     b.textContent = badge;
     if (why) b.title = why; // 계층 판단 근거(§4.4 — 사이드바 배지에만)
@@ -5582,7 +5583,7 @@ function renderVarList(): void {
     if (searching) {
       d.append(t('list.noMatch', { q: query.trim() }), ' · ');
       const b = document.createElement('button');
-      b.className = 'link link-btn';
+      b.className = 'link link-btn ds-btn--link';
       b.type = 'button';
       b.textContent = t('list.searchClear');
       b.addEventListener('click', () => clearSearch(true));
@@ -5939,7 +5940,7 @@ function usesBlock(id: string): { box: HTMLElement; list: HTMLElement; run: () =
       usesList.append(t('list.detailBig'), ' ');
       const b = document.createElement('button');
       b.type = 'button';
-      b.className = 'link';
+      b.className = 'link ds-btn--link';
       b.textContent = t('list.find');
       b.addEventListener('click', findUses);
       usesList.appendChild(b);
@@ -5966,7 +5967,7 @@ function onVarUsers(msg: Extract<CodeToUi, { type: 'VAR_USERS' }>): void {
   cnt.title = t('v4.usesTip');
   const all = document.createElement('button');
   all.type = 'button';
-  all.className = 'link link-btn';
+  all.className = 'link link-btn ds-btn--link';
   all.textContent = t('detail.selectAll');
   const id = detailVarId;
   if (!msg.places || !id) setLock(all, 'prereq', t('vm.dNoUses'));
@@ -6261,7 +6262,7 @@ function edRenderField(f: EdField): void {
     const pill = document.createElement('span');
     pill.className = `ed-pill${tg.deleted ? ' warn' : ''}`;
     const hex = e.v.type === 'COLOR' && !tg.deleted ? edSwatch({ kind: 'alias', aliasId: f.aliasId, aliasName: tg.name }) : null;
-    pill.innerHTML = `${swatchHtml(hex)}→ ${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag">LIB</span>' : ''}`;
+    pill.innerHTML = `${swatchHtml(hex)}→ ${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag ds-badge ds-badge--outline">LIB</span>' : ''}`;
     pill.title = tg.name;
     b.appendChild(pill);
     b.addEventListener('click', () => edTogglePicker(f));
@@ -6481,7 +6482,7 @@ function edPicker(f: EdField): HTMLElement {
     const note = (text: string): void => { const d = document.createElement('div'); d.className = 'ed-pnote'; d.textContent = text; notes.appendChild(d); };
     if (curId && !inRules) {
       const tg = edTarget(f, curId);
-      lb.appendChild(option('', `${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag">LIB</span>' : ''}<span class="ck">✓</span>`, tg.name, null, true));
+      lb.appendChild(option('', `${escapeHtml(tg.name)}${tg.remote ? ' <span class="lib-tag ds-badge ds-badge--outline">LIB</span>' : ''}<span class="ck">✓</span>`, tg.name, null, true));
     }
     let hidden = 0;
     if (all.global) {
@@ -6665,7 +6666,7 @@ function openEditor(v: VarRow, focusName: boolean, create?: { collectionId?: str
     const scopes = document.createElement('span');
     for (const sc of v.scopes) {
       const c = document.createElement('span');
-      c.className = 'chip';
+      c.className = 'chip ds-tag';
       c.textContent = sc;
       scopes.appendChild(c);
     }
@@ -6703,7 +6704,7 @@ function openEditor(v: VarRow, focusName: boolean, create?: { collectionId?: str
     pt.textContent = t('paid.semantic') + ' · ';
     const lic = document.createElement('button');
     lic.type = 'button';
-    lic.className = 'link link-btn';
+    lic.className = 'link link-btn ds-btn--link';
     lic.textContent = t('status.paidAction');
     lic.addEventListener('click', () => { closeModal(); goToLicense(); }); // 입력은 버린다(확인 없음)
     paidAlert.append(pt, lic);
@@ -7168,7 +7169,7 @@ function confirmDeleteVar(v: VarRow, el: HTMLElement): void {
     send({ type: 'DELETE_VARIABLE', reqId: delReq, id: v.id });
     closeModal();
   });
-  del.classList.add('danger');
+  del.classList.add('danger', 'ds-btn--danger');
   openModal(title, body, [cancel, del], () => el, undefined, { focus: cancel });
 }
 function onVariableDeleted(msg: Extract<CodeToUi, { type: 'VARIABLE_DELETED' }>): void {
@@ -7393,13 +7394,13 @@ function selBtn(label: string, onClick: (b: HTMLButtonElement) => void, primary 
   const b = document.createElement('button');
   b.type = 'button';
   b.textContent = label;
-  if (primary) b.className = 'primary';
+  if (primary) b.className = 'primary ds-btn--primary';
   b.addEventListener('click', () => { if (!isLocked(b)) onClick(b); });
   return b;
 }
 function selLink(label: string, onClick: (b: HTMLButtonElement) => void): HTMLButtonElement {
   const b = selBtn(label, onClick);
-  b.className = 'link link-btn';
+  b.className = 'link link-btn ds-btn--link';
   return b;
 }
 const kindLabel = (k: SelKind): string => KIND_HEAD[k];
@@ -7745,6 +7746,7 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n
       const state = mcState(tk.name);
       if (state === 'new') {
         const b = lockBtn(selBtn(t('mkc.make'), () => mcCreate([tk])));
+        b.classList.add('ds-btn--sm');
         b.dataset.k = `mk:${tk.name}`;
         b.setAttribute('aria-label', t('mkc.makeAria', { name }));
         row.appendChild(b);
@@ -7892,6 +7894,7 @@ let selMakeHot = false;
 function updateMakeEmphasis(): void {
   const hot = selMakeHot && !!baseline && !$('selCards').querySelector('button.primary');
   $('btnGoMake').classList.toggle('primary', hot);
+  $('btnGoMake').classList.toggle('ds-btn--primary', hot);
 }
 /** 다시 그린 뒤 포커스(§4.1 할 일) — 같은 버튼, 없으면 카드 영역 첫 버튼, 그것도 없으면 할 일 [변수 만들기].
     없어진 것이 [연결 풀기]면 바로 [변수 만들기]. 버튼 강약은 포커스와 상관없이 늘 먼저 정한다. */
