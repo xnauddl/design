@@ -1,6 +1,6 @@
 # 플러그인 디자인 시스템 — 명세
 
-> 2026-11-25 작성 · DS-1 검토 4회(중대 13 → 4 → 2 → 1 → 0), 디자인 방향 DS-D5–DS-D9. 2026-11-26 DS-2 명세(§5 · §6 · 부록 C — DS-D10–DS-D13) 더함. 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
+> 2026-11-25 작성 · DS-1 검토 4회(중대 13 → 4 → 2 → 1 → 0), 디자인 방향 DS-D5–DS-D9. 2026-11-26 DS-2 명세(§5 · §6 · 부록 C — DS-D10–DS-D13) · 검토 3회(중대 19 → 5 → 0). 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
 > 이 문서가 토큰 · 컴포넌트 · 레이아웃 · 사용 규칙의 **단일 명세**다. 토큰 값의 **단일 원본**은 `design-tokens/tokens.json`이고, 이 문서의 표는 그 원본과 같아야 한다(다르면 원본이 맞고 표를 고친다).
 > 본문 §3의 값은 **최종 값(DS-1 ② 단계 뒤)** 이다. ① 단계의 임시 값과 옮기기 규칙은 부록 A.
 > 기준: 본문 §0–§9에 중대 결함 0(CLAUDE.md 4단계). 부록 A · B는 DS-1 PR, 부록 C는 DS-2 PR에서 닫는다.
@@ -107,7 +107,7 @@
 | Text | `color-text-primary` | neutral-800 | 본문 · 제목 · 버튼 글자 |
 | | `color-text-emphasis` | primary | 가장 중요한 글자 · 핵심 아이콘 · 고른 탭 · 고른 내비 글자 |
 | | `color-text-secondary` | neutral-700 | 보조 설명 · 목록 둘째 줄 · 라벨 |
-| | `color-text-tertiary` | neutral-500 | 자리 표시 글 · 비활성 · 장식 아이콘 **만** (⚠ DS-O1) |
+| | `color-text-tertiary` | neutral-500 | 자리 표시 글 · 비활성 · 장식 아이콘 **만** (⚠ DS-O1). 잠긴 체크박스의 체크 바탕 · 테두리에도 쓴다(흰 ✓가 보이는 같은 회색 — §6.2) |
 | | `color-text-link` | primary | 글자 링크 · 링크 버튼(밑줄로 구분) |
 | | `color-text-inverse` | white | 어두운 면 · 오류 버튼 위 글자 |
 | Success | `color-state-success` | success | 완료 · 성공 글자와 아이콘 |
@@ -334,7 +334,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
 |---|---|---|---|---|
 | **Button** | `.ds-btn` + `--primary` · (Secondary = 기본) · `--ghost` · `--danger` · `--link` / `--sm`(높이 24 · 좌우 `space-2` · `text-label-sm`) · md(28 · `space-3` · `text-label`) · `--lg`(32 · `space-4` · `text-label`). 둥글기는 세 크기 모두 `radius-small`(DS-D9 — xs는 16px 이하만). 아이콘 + 글자 사이 `space-1`, 버튼 안 아이콘 `size-icon-md`(sm은 `-sm`). Secondary 바탕 `color-secondary-bg` · 테두리 `color-secondary-border` · 글자 `color-text-primary`. Primary 바탕 · 테두리 `color-primary` · 글자 `color-text-on-primary` · `elevation-1`(§3.5). Ghost 테두리 · 바탕 없음 · 글자 `color-text-secondary` → hover `color-text-primary`. Destructive 바탕 `color-state-error` · 글자 `color-text-inverse`. Link: 높이 auto · 안쪽 0 · 테두리 · 바탕 없음 · 글자는 둘레를 따름(`font: inherit`, 굵기 `font-weight-semibold`) · `color-text-link` · **늘 밑줄**(아래 2px 띄움 — 링크 색이 #111111이라 글자와 밑줄로만 구분), hover 글자 `color-interactive-focus-hover` | `button({ variant, size, label, icon?, iconEnd?, onClick? })` → `{ el, setLoading(b), setDisabled(b), setLocked(reason) }` | `<button type="button">`. 잠김은 `aria-disabled` + 사유 | **바꿈**(§6.9) |
-| **Icon Button** | `.ds-btn .ds-icbtn`(두 클래스 함께) + `--ghost`(기본으로 씀) · Secondary / `--sm` 24×24 · md 28×28. 아이콘 `size-icon-md`(sm도 16 — 누르는 곳만 작음), 둥글기 `radius-small`, Ghost 글자 `color-text-secondary` | `iconButton({ icon, label, variant?, size? })` | `aria-label` = `label`, `data-tip` = `label` 필수 | **바꿈**(§6.9) |
+| **Icon Button** | `.ds-btn .ds-icbtn`(두 클래스 함께) + `--ghost`(기본으로 씀) · Secondary / `--sm` 24×24 · md 28×28. 아이콘 `size-icon-md`(sm도 16 — 누르는 곳만 작음), **안쪽 여백 0 · 가운데 맞춤 · 너비 = 높이**(`--sm`의 좌우 `space-2`를 덮음), 둥글기 `radius-small`, Ghost 글자 `color-text-secondary` | `iconButton({ icon, label, variant?, size? })` | `aria-label` = `label`, `data-tip` = `label` 필수 | **바꿈**(§6.9) |
 | **Button Group** | `.ds-btngroup` — 붙임(이웃 테두리 겹침 `margin-left: -1px`, 바깥 모서리만 둥글게) · `.ds-btngroup--spaced`(사이 `space-2`) | `buttonGroup(buttons, { attached? })` | 붙임은 `role="group"` + `aria-label` | 클래스만(DS-3에서 씀) |
 | **Split Button** | `.ds-split` = 주 버튼 + 펼침 Icon Button(▾). 둘 사이 나눔 선(펼침 단추의 왼쪽 테두리 1px): Primary는 `color-border-on-primary`(새 토큰 — 흰색 25%), Secondary는 `color-border-default` | `splitButton({ label, variant, onClick, menu: [{label, onClick}] })` | 펼침 단추 `aria-haspopup="menu"` · `aria-expanded` | 새로(모음 화면만) |
 
@@ -438,7 +438,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | 컴포넌트 | 바꾸는 것(옛 클래스 → 더할 클래스) | 바꾸지 않는 것(DS-3) |
 |---|---|---|
 | **Button** | 기본 `button` → Secondary md · `.primary`(`#btnApplyConfirm.bind-btn` 포함 — 아이콘 없음) → `ds-btn--primary` · `.danger` → `ds-btn--danger` · `.link` · `.link-btn` → `ds-btn--link`(`.link-btn`은 누르는 곳 24 유지 · 밑줄이 hover 때만에서 늘로 바뀜. 자리별로 낮춘 높이 — `.mk-lock … button.link-btn` 20 · `.ed-alert.paid button.link-btn` 18 · `.make-free .mfb2 button.link-btn` · `.mk-bar #makeSemLic` 18 · `.status-line .sl-action` 20 — 는 띠 줄 높이를 지키는 **자리 규칙으로 남긴다**) · `.btn-next` → `ds-btn--ghost` · `.mk-row button` → `ds-btn--sm` | `.step-chip`(Step) · `.ctx-menu button`(메뉴) · `.mk-tabs button` · `.tab-btn` · `.subtab`(Tab) · `.bv-switch`(Toggle) · `button.bd-skip`(`.bd` 알약 칩) · `.var-use` · `.ed-copy` · `.ed-pillbtn` · `.ed-plink` · `.ed-go` · `button.ed-dd` · `button.tr-car` · `.mk-info` · `.mini-mark` · `.bv-chip` · `.bv-val` · `.bv-var` |
-| **Icon Button** | `.icon-btn` → `ds-btn ds-icbtn ds-btn--ghost ds-btn--sm`(지금 24) · `.tab-min` · `.sub-back` → `ds-btn ds-icbtn ds-btn--ghost`(지금 28 — md). 기호 → §6.6 표의 아이콘. 툴팁이 없는 `#btnSubBack` · `#btnSettingsBack` · `#btnSearchClear`에는 `aria-label`과 같은 문구 키로 `data-i18n-title`을 더한다 | 위 칸의 아이콘처럼 생긴 단추들 |
+| **Icon Button** | `.icon-btn` → `ds-btn ds-icbtn ds-btn--ghost ds-btn--sm`(지금 24) · `.tab-min` · `.sub-back` → `ds-btn ds-icbtn ds-btn--ghost`(지금 28 — md). 기호 → §6.6 표의 아이콘. 툴팁이 없는 `#btnSubBack` · `#btnSettingsBack` · `#btnSearchClear`에는 `aria-label`과 같은 문구 키로 `data-i18n-title`과 폴백 `title`을 함께 더한다(`title="돌아가기"` · `title="검색 지우기"` — `verify-i18n`이 폴백을 요구) | 위 칸의 아이콘처럼 생긴 단추들 |
 | **Input · Select** | `input[type=text]` · `input[type=number]` · `select` · `textarea` 기본 규칙 → `.ds-input` 규칙(textarea는 `--mono`, select는 브라우저 화살표 그대로 — 그릇 · ▾ 아이콘은 DS-3). 포커스를 `focus-ring-field` 하나로(DS-O3): `.r-title input:focus`(지금 1px outline) · `.ed-field:focus-within`(이미 같음 — 확인만) · `.ts-edit input` · `select.r-role`(기본 규칙을 받음). 목록 머리 검색칸 `.list-head .search-box input`은 높이 `size-compact` 유지 | `.ed-picker input.ed-psearch`(`overflow: hidden` 고르개 안이라 바깥 띠가 잘림 — 안쪽 그림자 예외로 둠) · `.tr input.tr-edit`(늘 편집 중인 칸 — 자기 테두리) · `.palette-band` 안 입력의 흰 바탕(자리 규칙) · `.mode-select` · `input[type="color"]` |
 | **Checkbox** | 모든 `input[type="checkbox"]`(HTML 8곳 · `ui.ts` 1곳) → `ds-check` 모양(기본 요소 규칙으로 — 클래스는 붙이지 않아도 됨). `accent-color` 규칙 지움 | 스위치(`.bv-switch`) |
 | **Badge · Tag** | `.mini-badge` → `ds-badge ds-badge--dot`(`.ok` → `--success` · `.fail` → `--error` 색조, 글자 ✓ · ! 그대로) · `.bv-new` → `ds-badge ds-badge--solid` · `.vs-badge` → `ds-badge`(고른 항목 안에서는 Navigation Item 규칙으로 `nav-selected-badge-bg`) · `.lib-tag` → `ds-badge ds-badge--outline` · `.chip`(변수 고치기 팝업의 칩) → `ds-tag` | `.tr-tag`(트리 태그 — TR-D9 칩 열) · `.vchip`(TR-D3) · `.step-chip` · `.ed-ptag` · `.ed-pill` |
