@@ -73,6 +73,11 @@ function violations(d) {
   return errs;
 }
 
+test('§8-1a 선언의 괄호 짝이 맞는다(깨진 선언은 브라우저가 통째로 버린다)', () => {
+  const bad = allDecls.filter((d) => (d.value.match(/\(/g) || []).length !== (d.value.match(/\)/g) || []).length).map((d) => `${d.where}: ${d.prop}: ${d.value}`);
+  assert.deepEqual(bad, []);
+});
+
 test('§8-1 화면 CSS · style="…"에 직접 스타일 값이 없다', () => {
   const bad = allDecls.flatMap((d) => violations(d).map((e) => `${d.where}: ${d.prop}: ${d.value} — ${e}`));
   assert.deepEqual(bad, []);
