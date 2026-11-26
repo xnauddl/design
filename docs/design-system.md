@@ -212,6 +212,7 @@
 | `elevation-1` | `0 1px 1.5px rgba(17,17,17,.05)` | 주 버튼 · 고른 세그먼트 탭 |
 | `elevation-2` | `0 1px 2px rgba(17,17,17,.06), 0 2px 6px rgba(17,17,17,.05)` | 메뉴 · 툴팁 · 고르개 · Toast |
 | `elevation-3` | `0 8px 24px rgba(17,17,17,.16)` | Modal · Confirm Dialog |
+| `elevation-sticky` | `0 -2px 8px rgba(17,17,17,.08)` | 하위 화면 아래 고정 줄(Bottom Action Bar) — **그 아래로 내용이 깔릴 때만**(DS-3a — ia-v4 §4.1b S3-D10). 위 1px 선은 늘 |
 | `toggle-knob-shadow` | `0 1px 1px rgba(0,0,0,.2)` | Toggle 손잡이(Component) |
 
 - 테두리 굵기(`border*`의 굵기)는 `0` · `1px` · 토큰만. 1px는 머리카락 선이라 직접 쓴다.
@@ -247,6 +248,7 @@
 |---|---|---|
 | `motion-duration-fast` | 120ms | hover · 펼침 · 손잡이 이동 (지금 .1s · .12s) |
 | `motion-duration-spin` | 900ms | 돌기 한 바퀴 (지금 .9s · 1s) |
+| `motion-duration-highlight` | 1500ms | 잠깐 강조가 원래 바탕으로 돌아가는 시간 — 변수 탭 [변수 보기] 도착 줄(DS-3a — ia-v4 §4.1b S3-D9). `prefers-reduced-motion: reduce`면 강조 없음 |
 | `z-below` | -1 | 그림 뒤에 까는 장식 |
 | `z-raised` | 1 | 붙는 카드 머리 · 도구 줄 |
 | `z-sticky` | 2 | 붙는 목록 머리 · 아래 실행 줄(`.vl-head` · `.make-foot`) |
@@ -296,7 +298,7 @@
 | **Content Section** | `.ds-section` — `.ds-section__title`(`text-heading-sm`) · `.ds-section__desc`(`text-body-sm` `color-text-secondary`) · 본문. 절 사이 `space-6`, 제목–본문 `space-2` | `space-2` · `space-6` | `.step` |
 | **Settings Section** | `.ds-settings` — `.ds-settings__row` 줄 목록: 라벨(왼쪽, `text-label` + 설명 `text-body-sm`) · 컨트롤(오른쪽). 줄 최소 높이 `size-control-md` + 위아래 `space-1`, 줄 사이 구분선 없음 | `text-label` | ⚙ 설정 화면 |
 | **Result Section** | `.ds-result` — `.ds-result__summary`(한 줄 요약, `text-body`) + List Item 목록 + 빈 · 오류 상태 자리(§6.5 State) | `space-2` | `.results` · 트리 |
-| **Bottom Action Bar** | `.ds-actionbar` — 위 1px 선, 바탕 `color-background-primary`. `.ds-actionbar__start`(Ghost: 취소 · 뒤로) · `.ds-actionbar__end`(오른쪽 끝 Primary 하나, 그 왼쪽 Secondary). PluginLayout의 flex 자식이라 본문을 가리지 않는다(본문만 스크롤 — 아래 여백 따로 두지 않음) | `size-action-bar` · 버튼 `size-control-md` · 사이 `space-2` · 좌우 `space-3` | `.sub-foot` · `.make-foot` · `.sel-tools` |
+| **Bottom Action Bar** | `.ds-actionbar` — 위 1px 선, 바탕 `color-background-primary`. `.ds-actionbar__start`(Ghost: 취소 · 뒤로) · `.ds-actionbar__end`(오른쪽 끝 Primary 하나, 그 왼쪽 Secondary). PluginLayout의 flex 자식이라 본문을 가리지 않는다(본문만 스크롤 — 아래 여백 따로 두지 않음) | `size-action-bar` · 버튼 `size-control-md` · 사이 `space-2` · 좌우 `space-3` | `.sub-foot` · `.make-foot`(DS-3a 뒤 — 선택 탭 첫 화면의 `.sel-tools`는 아래 고정 줄이 아니라 카드 안 할 일 줄이 된다, ia-v4 §4.1b S3-D1). 내용이 밑에 깔릴 때만 `elevation-sticky`(S3-D10) |
 | **Modal Layout** | Modal(§6.5)의 짜임 — `.ds-modal__header`(제목 `text-heading` + 닫기 Icon Button sm) · `.ds-modal__body`(스크롤) · `.ds-modal__footer`(오른쪽 [취소(Ghost)] [확인(Primary 또는 Destructive)], 위 1px 선) | `size-modal-*` · `radius-large` · `elevation-3` · 안쪽 `space-4` · 머리 · 바닥 위아래 `space-3` | `.modal` |
 
 PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~ Modal Layout)을 담는다(그래서 표는 9행).
@@ -376,7 +378,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
 |---|---|---|---|---|
 | **Alert** | `.ds-alert` + `--info` · `--success` · `--warning` · `--error` — 아이콘(`size-icon-md`, `info` · `circle-check` · `triangle-alert` · `circle-alert`) + 글(`text-body-sm`, 머리말 굵게 선택). 바탕 상태 `-subtle`, 글 · 아이콘 상태색. 띠(기본 — 카드 · 모달 안): 테두리 없음 · `radius-small` · 안쪽 `space-2` `space-3`. 상자 `--box`(카드 밖): 테두리 1px — Info · Error는 상태 `-border`, Warning · Success는 `color-border-default`(상태 테두리 토큰 없음) · `radius-medium`. 닫기는 끝에 Icon Button sm | `alert({ tone, title?, text, onClose? })` | 오류는 `role="alert"`, 나머지 `role="status"` | 클래스만(지금 `.banner` · `.ux` 등은 DS-3) |
-| **Toast** | `.ds-toast` — 창 아래 가운데(아래 `space-3` 띄움), 최대 너비 = 창 − 2 × `space-3`, 바탕 `color-surface-inverse` · 글 `color-text-inverse` · `text-body-sm` · 안쪽 `space-2` `space-3` · `radius-large` · `elevation-2` · `z-tooltip`. 앞 아이콘(성공 `circle-check` · 오류 `circle-alert` · 안내 `info`) · 끝 동작 링크(밑줄, 굵게). 끝에 닫기 Icon Button(sm, `x`, `color-text-inverse`). 한 번에 하나(새 것이 옛 것을 바꿈). **남는 시간 — SC-D10을 따른다:** 잠금 사유 · 이 화면의 실패 · 진행 알림은 4초 뒤 사라짐, **다른 화면의 실패와 누를 동작이 있는 알림은 누르거나 닫을 때까지 남음**. 마우스를 올리거나 포커스가 들어가면 시간이 멈춤 | `toast({ tone, text, action?: {label, onClick}, sticky? })` → `{ close() }` — `action`이 있으면 `sticky`가 기본 | 담는 곳 하나 `role="status"` `aria-live="polite"`(오류 `assertive`) | 새로(SC-D10 상태 줄 대신은 DS-3) |
+| **Toast** | `.ds-toast` — 창 아래 가운데(아래 `space-3` 띄움), 최대 너비 = 창 − 2 × `space-3`, 바탕 `color-surface-inverse` · 글 `color-text-inverse` · `text-body-sm` · 안쪽 `space-2` `space-3` · `radius-large` · `elevation-2` · `z-tooltip`. 앞 아이콘(성공 `circle-check` · 오류 `circle-alert` · 안내 `info`) · 끝 동작 링크(밑줄, 굵게). 끝에 닫기 Icon Button(sm, `x`, `color-text-inverse`). 한 번에 하나(새 것이 옛 것을 바꿈). **남는 시간 — SC-D10을 따른다:** 잠금 사유 · 이 화면의 실패 · 진행 알림은 4초 뒤 사라짐, **다른 화면의 실패와 누를 동작이 있는 알림은 누르거나 닫을 때까지 남음**. 마우스를 올리거나 포커스가 들어가면 시간이 멈춤 | `toast({ tone, text, action?: {label, onClick}, sticky? })` → `{ close() }` — `action`이 있으면 `sticky`가 기본 | 담는 곳 하나 `role="status"` `aria-live="polite"`(오류 `assertive`) | 새로(SC-D10). **DS-3b에서 공통 상태 줄을 모든 화면에서 없애고 결과 · 실패 · 진행 알림을 Toast 하나로**(ia-v4 §4.1b S3-D7 · B.43) — 진행 알림은 "{작업} 중… {p}% · [취소]"(누를 동작이 있어 남음) → 끝나면 결과 Toast로 바뀜 |
 | **Modal** | `.ds-modal-scrim`(전체 · `color-overlay` · `z-modal` · 위 `space-10` 띄움) > `.ds-modal`(너비 `size-modal-md`, 좁으면 창 − 2 × `space-4`, 최대 높이 창 − 80 · 바탕 `color-surface-primary` · `radius-large` · `elevation-3`) + Modal Layout(§5) | `openModal({ title, body, actions, onClose })` → `{ close() }` — 처음 포커스를 첫 입력 또는 닫기에, Tab 가두기, Esc · 막 누르면 닫기(바뀐 내용이 있으면 확인), 닫으면 연 단추로 포커스 되돌림 | `role="dialog"` · `aria-modal="true"` · `aria-labelledby` | 클래스 · 함수만(지금 `.modal`은 DS-3) |
 | **Confirm Dialog** | Modal `--sm`(`size-modal-sm`) + 본문 한두 문장 + [취소(Ghost)] [확인]. 위험한 일은 확인이 Destructive | `confirmDialog({ title, text, confirmLabel, danger? })` → `Promise<boolean>` — 처음 포커스는 위험하면 **취소**, 아니면 **확인** | `role="alertdialog"` | 새로(지금 `.ed-confirm` 확인 줄은 DS-3에서 정함) |
 | **Empty State** | `.ds-state` — 가운데, 위아래 `space-8`, 아이콘 `size-icon-lg` `color-text-tertiary` · 제목 `text-display` `color-text-emphasis` · 설명 `text-body-sm` `color-text-secondary` · 동작 Button(Secondary) | `stateView({ kind: 'empty' \| 'error' \| 'success', icon, title, text, action? })` | 제목은 머리 요소(`h2` 등) | 클래스만(DS-3) |
@@ -386,11 +388,11 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 ### 6.6 아이콘 (DS-D13)
 
-- 원본: npm `lucide-static@1.79.0` — devDependency로만 둔다(플러그인 실행 때 쓰지 않음). **라이선스는 ISC이고, Feather에서 온 아이콘은 MIT(© Cole Bemis)다** — 이 세트에서는 `arrow-left` · `arrow-right` · `check` · `chevron-down` · `chevron-right` · `circle-alert` · `circle-help` · `ellipsis` · `external-link` · `info` · `lock` · `minus` · `plus` · `search` · `trash-2` · `triangle-alert` · `x`(17개 — lucide LICENSE 기준). 두 고지 전문을 생성 파일 머리에 `/*! … */`로 남기고, 빌드는 `dist/ui.html`의 **`<style>` 안 맨 앞**에 같은 고지를 CSS 주석(`/*! … */`)으로 넣는다(`<style>` 밖에 두면 HTML 글자로 보인다). JS 번들 쪽 고지는 esbuild의 법적 주석 보존(기본값)으로 남는다.
+- 원본: npm `lucide-static@1.79.0` — devDependency로만 둔다(플러그인 실행 때 쓰지 않음). **라이선스는 ISC이고, Feather에서 온 아이콘은 MIT(© Cole Bemis)다** — 이 세트에서는 `arrow-left` · `arrow-right` · `check` · `chevron-down` · `chevron-right` · `circle-alert` · `circle-help` · `ellipsis` · `external-link` · `info` · `lock` · `minus` · `plus` · `search` · `trash-2` · `triangle-alert` · `x`(17개 — lucide LICENSE 기준. DS-3a에서 더하는 `hash`도 Feather에서 왔다 — 18개). 두 고지 전문을 생성 파일 머리에 `/*! … */`로 남기고, 빌드는 `dist/ui.html`의 **`<style>` 안 맨 앞**에 같은 고지를 CSS 주석(`/*! … */`)으로 넣는다(`<style>` 밖에 두면 HTML 글자로 보인다). JS 번들 쪽 고지는 esbuild의 법적 주석 보존(기본값)으로 남는다.
 - 생성: `scripts/gen-icons.mjs`가 아래 아이콘의 SVG 안쪽(`<path>` 등)만 뽑아 `src/ui/icons.json`(이름 → 안쪽 마크업)을 만든다(커밋함). `src/ui/icons.ts`는 그 JSON을 가져와(esbuild JSON 가져오기) `icon()`을 내보내고, `build.mjs`는 같은 JSON을 읽어 정적 HTML을 바꾼다. 아이콘을 더할 때만 다시 돌린다.
 - 모양: `<svg class="ds-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">`. 크기는 `size-icon-sm`(12) · `-md`(16, 기본) · `-lg`(20)만 쓴다. **선 굵기는 크기와 상관없이 1.5px** — 안쪽 모든 도형에 `vector-effect: non-scaling-stroke` + `stroke-width: var(--icon-stroke)`(새 토큰 1.5px). 색은 글자색(`currentColor`).
 - 쓰는 법: TS `icon(name, size?)` → SVG 요소. 정적 HTML은 `<i data-ds-icon="settings"></i>`를 쓰면 빌드가 SVG로 바꾼다(없는 이름이면 빌드 실패). `data-i18n`으로 글자를 바꾸는 요소 안에는 넣지 않는다(i18n이 `textContent`로 지운다) — 그런 요소는 글자를 자식 `<span data-i18n>`에 둔다.
-- 세트(24개): `chevron-down` · `chevron-right` · `arrow-left` · `arrow-right` · `x` · `check` · `plus` · `minus` · `settings` · `ellipsis` · `search` · `info` · `circle-alert` · `triangle-alert` · `circle-check` · `circle-help` · `copy` · `trash-2` · `refresh-cw` · `lock` · `external-link` · `loader-circle` · `eye` · `eye-off`.
+- 세트(24개): `chevron-down` · `chevron-right` · `arrow-left` · `arrow-right` · `x` · `check` · `plus` · `minus` · `settings` · `ellipsis` · `search` · `info` · `circle-alert` · `triangle-alert` · `circle-check` · `circle-help` · `copy` · `trash-2` · `refresh-cw` · `lock` · `external-link` · `loader-circle` · `eye` · `eye-off`. DS-3a에서 `hash` 하나를 더한다(25개 — 만들기 화면 · 만들기 카드 미리보기의 색 아닌 줄 종류 표시, ia-v4 §4.1b S3-D11).
 - **DS-2에서 지금 화면의 기호를 바꾸는 곳은 아래뿐**(DS-D12 기본 5종 안). 나머지 기호는 그대로 두고 DS-3에서:
 
 | 지금 | 자리 | DS-2 |
