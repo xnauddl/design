@@ -104,20 +104,26 @@
     .tab-section > * { margin-bottom: var(--space-3); }
 
     /* ── IA v4 선택 탭(§4.1 · §8) ── */
-    .sel-head { display: flex; align-items: center; gap: var(--space-1); min-height: 32px; flex-wrap: nowrap; }
-    .sel-head b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-lg); }
-    .sel-head .sel-diff { flex: none; white-space: nowrap; margin-left: auto; color: var(--color-text-secondary); font-size: var(--font-size-sm); display: inline-flex; gap: var(--space-1); align-items: center; }
-    .sel-empty { padding: var(--space-10) var(--space-2); text-align: center; color: var(--color-text-secondary); }
-    .sel-empty .sub { margin-top: var(--space-1); font-size: var(--font-size-sm); }
-    .sel-card { display: flex; align-items: center; gap: var(--space-2); min-height: 56px; padding: var(--space-3) var(--space-3); border: 1px solid var(--color-border-default); border-radius: var(--radius-medium); background: var(--color-surface-primary); margin-bottom: var(--space-2); }
+    /* 첫 화면 카드 — Card lg 크기(DS-3a §4.1b "카드 치수"): 안쪽 · 묶음 사이 space-4 · 제목–둘째 줄 space-2 */
+    .sel-card { display: flex; align-items: center; gap: var(--space-2); min-height: 56px; padding: var(--space-4); border: 1px solid var(--color-border-default); border-radius: var(--radius-medium); background: var(--color-surface-primary); margin-bottom: var(--space-2); }
     .sel-card .grow { flex: 1 1 auto; min-width: 0; }
-    .sel-card .t { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+    .sel-card .t { font: var(--text-heading); }
     .sel-card .s { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-0-5); }
+    .sel-card .t + .s { margin-top: var(--space-2); }
     .sel-card .s + .s { margin-top: var(--space-2); }
+    .sel-card .s button.link-btn { font-size: var(--font-size-sm); min-height: 20px; }
+    /* 맨 위 카드 — 머리(선택 이름 · [다시 읽기]) · 본문 · 할 일 줄(S3-D1 · S3-D3). 제목만 text-display */
+    .sel-card.top { flex-direction: column; align-items: stretch; gap: var(--space-4); }
+    .sel-card.top > .sel-body { display: flex; align-items: center; gap: var(--space-2); }
+    .sel-card.mk.top { display: flex; }
+    .sel-card.mk.top > .sel-body { display: block; }
+    .sel-card.top > .sel-body .t { font: var(--text-display); }
+    .sel-card-head { display: flex; align-items: center; gap: var(--space-2); }
+    .sel-card-head b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-heading); }
+    .sel-card-head button { flex: none; margin-left: auto; }
     /* 메인 컴포넌트 회색 줄(ia-v4 §4.1 · §4.2) — 카드 안 줄이라 바탕 · 테두리 없음(§2.8) */
     .sel-card .s.mains, .mains-line { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
     .mains-line { padding: var(--space-2) var(--space-0-5) 0; }
-    .sel-card.ok { background: var(--color-state-success-subtle); border-color: transparent; }
     .sel-card.warn { background: var(--color-state-error-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--color-state-error); }
     .sel-card .acts { display: flex; gap: var(--space-1); flex: 0 0 auto; }
@@ -127,20 +133,20 @@
     .mk-lab { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-3) 0 var(--space-0-5); }
     .mk-row { display: flex; align-items: center; gap: var(--space-2); min-height: 30px; padding: var(--space-1) 0; border-bottom: 1px solid var(--color-border-default); font-size: var(--font-size-md); }
     .mk-row .sw { width: 14px; height: 14px; border-radius: var(--radius-full); box-shadow: inset 0 0 0 1px var(--swatch-outline); flex: 0 0 auto; }
-    .mk-row .sw.n { border-radius: var(--radius-xs); background: var(--color-surface-secondary); box-shadow: none; font-size: var(--font-size-xs); display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); }
+    .mk-row .sw.n { border-radius: 0; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); }
     .mk-row .v { font-family: var(--font-family-mono); font-size: var(--font-size-sm); width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mk-row .nm { flex: 1 1 auto; min-width: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mk-row .c { color: var(--color-text-secondary); font-size: var(--font-size-sm); flex: 0 0 auto; text-align: right; min-width: 52px; }
     .mk-row .st { width: 72px; flex: 0 0 auto; text-align: center; font-size: var(--font-size-sm); }
-    .mk-row .st.ok { color: var(--color-state-success); }
-    .mk-row button { width: 72px; flex: 0 0 auto; } /* 모양은 ds-btn--sm */
-    .mk-foot { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-    .mk-foot .grow { flex: 1 1 auto; }
-    .mk-lock { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-1); margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-    .mk-lock button.link-btn, .mk .s button.link-btn { font-size: var(--font-size-sm); min-height: 20px; }
+    .mk-more { margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
     .mk-ts { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-border-default); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-    .mk-ts .grow { flex: 1 1 auto; }
-    .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: var(--space-1); min-height: 48px; border-top: 1px solid var(--color-border-default); background: var(--color-background-primary); color: var(--color-text-secondary); margin-top: var(--space-2); }
+    /* 할 일 줄 — 맨 위 카드 마지막 줄, 같은 폭 · lg 32(S3-D1 · S3-D2). 아래 고정 줄이 아니다 */
+    .sel-tools { display: flex; gap: var(--space-2); }
+    .sel-tools > button { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* [변수 보기] 도착 줄 — 잠깐 강조 뒤 원래 바탕(S3-D9). to 프레임 없음 = 원래 바탕으로 */
+    @keyframes hl-flash { from { background-color: var(--color-state-success-subtle); } }
+    .hl-flash { animation: hl-flash var(--motion-duration-highlight) ease-out; }
+    @media (prefers-reduced-motion: reduce) { .hl-flash { animation: none; } }
     .sub-head { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; border-bottom: 1px solid var(--color-border-default); margin: 0 0 var(--space-3); }
     .sub-head[hidden] { display: none; }
     .sub-back { flex: none; } /* 모양은 ds-btn ds-icbtn ds-btn--ghost */
@@ -610,6 +616,8 @@
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
     .make-foot { position: sticky; bottom: 24px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: var(--space-2); padding: var(--space-2) 0 var(--space-2); z-index: var(--z-sticky); }
+    /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
+    .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }
     .make-opts { display: flex; align-items: center; gap: var(--space-0-5); height: var(--size-compact); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; }
     .make-opts .lab { color: var(--color-text-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); margin-right: var(--space-1); }
     .make-opts label.inline { display: inline-flex; align-items: center; gap: var(--space-1); margin-right: var(--space-2); }
@@ -731,6 +739,7 @@
     .vt-row:focus-visible { box-shadow: inset 0 0 0 var(--border-width-medium) var(--color-interactive-focus); }
     .vt-row .vr-sw { position: relative; overflow: hidden; flex: none; width: 16px; height: 16px; border-radius: var(--radius-full); border: 1px solid var(--swatch-border); }
     .vt-row .vr-mk { flex: none; width: 16px; text-align: center; font: var(--font-weight-semibold) var(--font-size-sm)/var(--line-height-md) var(--font-family-sans); color: var(--color-text-secondary); }
+    .vr-mk > .ds-ic { display: block; margin: 0 auto; } /* 숫자 줄 hash 아이콘(DS-3a S3-D11) */
     .vt-row .nm { flex: 1 1 auto; min-width: 0; display: flex; margin-left: var(--space-2); font-size: var(--font-size-md); font-weight: var(--font-weight-regular); color: var(--color-text-primary); line-height: var(--line-height-md); }
     .vt-row .nm .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vchip { flex: none; display: flex; margin-left: var(--space-1); height: 20px; border-radius: var(--radius-full); overflow: hidden; }
@@ -847,12 +856,11 @@
   <section class="tab-section" id="tab-select" role="tabpanel" aria-labelledby="tabbtn-select" tabindex="0">
     <!-- 선택 탭 첫 화면(IA v4 §4.1) — 머리 줄 · 카드(ui.ts renderSelHome) · 레이어 정리 -->
     <div id="selHome">
-      <div class="sel-head" id="selHead"></div>
       <div id="selCards"></div>
+      <!-- 할 일 줄 — renderSelHome이 맨 위 카드 마지막 줄로 옮긴다(ia-v4 §4.1b S3-D1). 첫 칸 [{n}곳 연결]은 그때 더한다 -->
       <div class="sel-tools" id="selTools">
-        <span data-i18n="v4.tidy">할 일</span>
-        <button id="btnGoMake" type="button" data-i18n="make.title">변수 만들기</button>
-        <button id="btnGoRename" type="button" data-i18n="v4.rename">이름 정리</button>
+        <button id="btnGoMake" class="ds-btn--lg" type="button" data-k="todo-make" data-i18n="make.title">변수 만들기</button>
+        <button id="btnGoRename" class="ds-btn--lg" type="button" data-k="todo-rename" data-i18n="v4.rename">이름 정리</button>
       </div>
     </div>
     <!-- 하위 화면 머리(§2.1) — "← 제목" + 오른쪽 보조 글 -->

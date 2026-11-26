@@ -170,6 +170,7 @@ SOFTWARE.
       --elevation-1: 0 1px 1.5px rgba(17,17,17,.05);
       --elevation-2: 0 1px 2px rgba(17,17,17,.06), 0 2px 6px rgba(17,17,17,.05);
       --elevation-3: 0 8px 24px rgba(17,17,17,.16);
+      --elevation-sticky: 0 -2px 8px rgba(17,17,17,.08);
       --toggle-knob-shadow: 0 1px 1px rgba(0,0,0,.2);
       --size-control-sm: 24px;
       --size-control-md: 28px;
@@ -192,6 +193,7 @@ SOFTWARE.
       --icon-stroke: 1.5px;
       --motion-duration-fast: 120ms;
       --motion-duration-spin: 900ms;
+      --motion-duration-highlight: 1500ms;
       --z-below: -1;
       --z-raised: 1;
       --z-sticky: 2;
@@ -705,20 +707,26 @@ button.ds-tag { border: 0; cursor: pointer; }
     .tab-section > * { margin-bottom: var(--space-3); }
 
     /* ── IA v4 선택 탭(§4.1 · §8) ── */
-    .sel-head { display: flex; align-items: center; gap: var(--space-1); min-height: 32px; flex-wrap: nowrap; }
-    .sel-head b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--font-size-lg); }
-    .sel-head .sel-diff { flex: none; white-space: nowrap; margin-left: auto; color: var(--color-text-secondary); font-size: var(--font-size-sm); display: inline-flex; gap: var(--space-1); align-items: center; }
-    .sel-empty { padding: var(--space-10) var(--space-2); text-align: center; color: var(--color-text-secondary); }
-    .sel-empty .sub { margin-top: var(--space-1); font-size: var(--font-size-sm); }
-    .sel-card { display: flex; align-items: center; gap: var(--space-2); min-height: 56px; padding: var(--space-3) var(--space-3); border: 1px solid var(--color-border-default); border-radius: var(--radius-medium); background: var(--color-surface-primary); margin-bottom: var(--space-2); }
+    /* 첫 화면 카드 — Card lg 크기(DS-3a §4.1b "카드 치수"): 안쪽 · 묶음 사이 space-4 · 제목–둘째 줄 space-2 */
+    .sel-card { display: flex; align-items: center; gap: var(--space-2); min-height: 56px; padding: var(--space-4); border: 1px solid var(--color-border-default); border-radius: var(--radius-medium); background: var(--color-surface-primary); margin-bottom: var(--space-2); }
     .sel-card .grow { flex: 1 1 auto; min-width: 0; }
-    .sel-card .t { font-size: var(--font-size-lg); font-weight: var(--font-weight-semibold); }
+    .sel-card .t { font: var(--text-heading); }
     .sel-card .s { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin-top: var(--space-0-5); }
+    .sel-card .t + .s { margin-top: var(--space-2); }
     .sel-card .s + .s { margin-top: var(--space-2); }
+    .sel-card .s button.link-btn { font-size: var(--font-size-sm); min-height: 20px; }
+    /* 맨 위 카드 — 머리(선택 이름 · [다시 읽기]) · 본문 · 할 일 줄(S3-D1 · S3-D3). 제목만 text-display */
+    .sel-card.top { flex-direction: column; align-items: stretch; gap: var(--space-4); }
+    .sel-card.top > .sel-body { display: flex; align-items: center; gap: var(--space-2); }
+    .sel-card.mk.top { display: flex; }
+    .sel-card.mk.top > .sel-body { display: block; }
+    .sel-card.top > .sel-body .t { font: var(--text-display); }
+    .sel-card-head { display: flex; align-items: center; gap: var(--space-2); }
+    .sel-card-head b { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--text-heading); }
+    .sel-card-head button { flex: none; margin-left: auto; }
     /* 메인 컴포넌트 회색 줄(ia-v4 §4.1 · §4.2) — 카드 안 줄이라 바탕 · 테두리 없음(§2.8) */
     .sel-card .s.mains, .mains-line { font-size: var(--font-size-sm); color: var(--color-text-secondary); }
     .mains-line { padding: var(--space-2) var(--space-0-5) 0; }
-    .sel-card.ok { background: var(--color-state-success-subtle); border-color: transparent; }
     .sel-card.warn { background: var(--color-state-error-subtle); border-color: transparent; }
     .sel-card.warn .t { color: var(--color-state-error); }
     .sel-card .acts { display: flex; gap: var(--space-1); flex: 0 0 auto; }
@@ -728,20 +736,20 @@ button.ds-tag { border: 0; cursor: pointer; }
     .mk-lab { font-size: var(--font-size-sm); color: var(--color-text-secondary); margin: var(--space-3) 0 var(--space-0-5); }
     .mk-row { display: flex; align-items: center; gap: var(--space-2); min-height: 30px; padding: var(--space-1) 0; border-bottom: 1px solid var(--color-border-default); font-size: var(--font-size-md); }
     .mk-row .sw { width: 14px; height: 14px; border-radius: var(--radius-full); box-shadow: inset 0 0 0 1px var(--swatch-outline); flex: 0 0 auto; }
-    .mk-row .sw.n { border-radius: var(--radius-xs); background: var(--color-surface-secondary); box-shadow: none; font-size: var(--font-size-xs); display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); }
+    .mk-row .sw.n { border-radius: 0; background: none; box-shadow: none; display: flex; align-items: center; justify-content: center; color: var(--color-text-secondary); }
     .mk-row .v { font-family: var(--font-family-mono); font-size: var(--font-size-sm); width: 64px; flex: 0 0 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mk-row .nm { flex: 1 1 auto; min-width: 0; color: var(--color-text-secondary); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mk-row .c { color: var(--color-text-secondary); font-size: var(--font-size-sm); flex: 0 0 auto; text-align: right; min-width: 52px; }
     .mk-row .st { width: 72px; flex: 0 0 auto; text-align: center; font-size: var(--font-size-sm); }
-    .mk-row .st.ok { color: var(--color-state-success); }
-    .mk-row button { width: 72px; flex: 0 0 auto; } /* 모양은 ds-btn--sm */
-    .mk-foot { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-    .mk-foot .grow { flex: 1 1 auto; }
-    .mk-lock { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-1); margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-    .mk-lock button.link-btn, .mk .s button.link-btn { font-size: var(--font-size-sm); min-height: 20px; }
+    .mk-more { margin-top: var(--space-2); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
     .mk-ts { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--color-border-default); font-size: var(--font-size-sm); color: var(--color-text-secondary); }
-    .mk-ts .grow { flex: 1 1 auto; }
-    .sel-tools { position: sticky; bottom: 24px; display: flex; align-items: center; gap: var(--space-1); min-height: 48px; border-top: 1px solid var(--color-border-default); background: var(--color-background-primary); color: var(--color-text-secondary); margin-top: var(--space-2); }
+    /* 할 일 줄 — 맨 위 카드 마지막 줄, 같은 폭 · lg 32(S3-D1 · S3-D2). 아래 고정 줄이 아니다 */
+    .sel-tools { display: flex; gap: var(--space-2); }
+    .sel-tools > button { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    /* [변수 보기] 도착 줄 — 잠깐 강조 뒤 원래 바탕(S3-D9). to 프레임 없음 = 원래 바탕으로 */
+    @keyframes hl-flash { from { background-color: var(--color-state-success-subtle); } }
+    .hl-flash { animation: hl-flash var(--motion-duration-highlight) ease-out; }
+    @media (prefers-reduced-motion: reduce) { .hl-flash { animation: none; } }
     .sub-head { display: flex; align-items: center; gap: var(--space-2); min-height: 40px; border-bottom: 1px solid var(--color-border-default); margin: 0 0 var(--space-3); }
     .sub-head[hidden] { display: none; }
     .sub-back { flex: none; } /* 모양은 ds-btn ds-icbtn ds-btn--ghost */
@@ -1211,6 +1219,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
     .make-foot { position: sticky; bottom: 24px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: var(--space-2); padding: var(--space-2) 0 var(--space-2); z-index: var(--z-sticky); }
+    /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
+    .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }
     .make-opts { display: flex; align-items: center; gap: var(--space-0-5); height: var(--size-compact); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; }
     .make-opts .lab { color: var(--color-text-secondary); font-size: var(--font-size-sm); font-weight: var(--font-weight-semibold); margin-right: var(--space-1); }
     .make-opts label.inline { display: inline-flex; align-items: center; gap: var(--space-1); margin-right: var(--space-2); }
@@ -1332,6 +1342,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     .vt-row:focus-visible { box-shadow: inset 0 0 0 var(--border-width-medium) var(--color-interactive-focus); }
     .vt-row .vr-sw { position: relative; overflow: hidden; flex: none; width: 16px; height: 16px; border-radius: var(--radius-full); border: 1px solid var(--swatch-border); }
     .vt-row .vr-mk { flex: none; width: 16px; text-align: center; font: var(--font-weight-semibold) var(--font-size-sm)/var(--line-height-md) var(--font-family-sans); color: var(--color-text-secondary); }
+    .vr-mk > .ds-ic { display: block; margin: 0 auto; } /* 숫자 줄 hash 아이콘(DS-3a S3-D11) */
     .vt-row .nm { flex: 1 1 auto; min-width: 0; display: flex; margin-left: var(--space-2); font-size: var(--font-size-md); font-weight: var(--font-weight-regular); color: var(--color-text-primary); line-height: var(--line-height-md); }
     .vt-row .nm .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vchip { flex: none; display: flex; margin-left: var(--space-1); height: 20px; border-radius: var(--radius-full); overflow: hidden; }
@@ -1448,12 +1459,11 @@ button.ds-tag { border: 0; cursor: pointer; }
   <section class="tab-section" id="tab-select" role="tabpanel" aria-labelledby="tabbtn-select" tabindex="0">
     <!-- 선택 탭 첫 화면(IA v4 §4.1) — 머리 줄 · 카드(ui.ts renderSelHome) · 레이어 정리 -->
     <div id="selHome">
-      <div class="sel-head" id="selHead"></div>
       <div id="selCards"></div>
+      <!-- 할 일 줄 — renderSelHome이 맨 위 카드 마지막 줄로 옮긴다(ia-v4 §4.1b S3-D1). 첫 칸 [{n}곳 연결]은 그때 더한다 -->
       <div class="sel-tools" id="selTools">
-        <span data-i18n="v4.tidy">할 일</span>
-        <button id="btnGoMake" type="button" data-i18n="make.title">변수 만들기</button>
-        <button id="btnGoRename" type="button" data-i18n="v4.rename">이름 정리</button>
+        <button id="btnGoMake" class="ds-btn--lg" type="button" data-k="todo-make" data-i18n="make.title">변수 만들기</button>
+        <button id="btnGoRename" class="ds-btn--lg" type="button" data-k="todo-rename" data-i18n="v4.rename">이름 정리</button>
       </div>
     </div>
     <!-- 하위 화면 머리(§2.1) — "← 제목" + 오른쪽 보조 글 -->
@@ -2074,7 +2084,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     "list.read": "\uC77D\uAE30",
     "list.sideColAria": "{name}, \uACC4\uCE35 {badge}, {num}",
     "list.noGroup": "(\uADF8\uB8F9 \uC5C6\uC74C)",
-    "list.rebase": "\uAE30\uC900 \uBC14\uAFB8\uAE30",
+    "list.rebase": "\uB2E4\uC2DC \uC77D\uAE30",
     "list.noMatch": "'{q}'\uC640 \uB9DE\uB294 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "list.searchClear": "\uAC80\uC0C9 \uC9C0\uC6B0\uAE30",
     "list.libVar": "\uB77C\uC774\uBE0C\uB7EC\uB9AC \uBCC0\uC218\uC608\uC694 \xB7 \uC6D0\uBCF8 \uD30C\uC77C\uC5D0\uC11C \uAD00\uB9AC\uD574\uC694",
@@ -2094,8 +2104,9 @@ button.ds-tag { border: 0; cursor: pointer; }
     "tab.select": "\uC120\uD0DD",
     // IA v4 선택 탭(§4.1)
     "v4.selMany": "{name} \uC678 {k}\uAC1C",
-    "v4.baseDiff": "\uC9C0\uAE08 \uC120\uD0DD\uACFC \uB2EC\uB77C\uC694",
     "v4.loading": "\uBD88\uB7EC\uC624\uB294 \uC911\u2026",
+    "v4.rebaseTip": "\uC9C0\uAE08 \uCE94\uBC84\uC2A4 \uC120\uD0DD\uC73C\uB85C \uB2E4\uC2DC \uC77D\uAE30",
+    "v4.rebaseTipEmpty": "\uCE94\uBC84\uC2A4\uC5D0 \uC120\uD0DD\uC774 \uC5C6\uC5B4\uC694 \u2014 \uB204\uB974\uBA74 \uC120\uD0DD \uC548\uB0B4\uB85C \uBC14\uB00C\uC5B4\uC694",
     "v4.noSel": "\uB514\uC790\uC778\uC5D0\uC11C \uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uC138\uC694",
     "v4.noVarsFile": "\uC774 \uD30C\uC77C\uC5D4 \uC544\uC9C1 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     "v4.reading": "\uC120\uD0DD\uC744 \uC77D\uB294 \uC911\u2026",
@@ -2115,6 +2126,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     "v4.scopePlacesTip": "\uAC19\uC740 \uAC12\uC758 \uBCC0\uC218\uAC00 \uC788\uC9C0\uB9CC \uC774 \uC790\uB9AC \uC6A9\uB3C4\uAC00 \uAEBC\uC838 \uC788\uC5B4\uC694 \u2014 [\uBCC0\uC218 \uB9CC\uB4E4\uAE30]\uAC00 \uC6A9\uB3C4\uB97C \uB354\uD574 \uC5F0\uACB0\uD574\uC694",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
+    "v4.viewVars": "\uBCC0\uC218 \uBCF4\uAE30",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
     "v4.fixPlacesChip": "\uC190\uBCFC \uACF3 {s}\uACF3",
     "v4.skipFixHead": "\uC190\uBCFC \uC218 \uC788\uB294 \uACF3",
@@ -2144,11 +2156,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     "v4.reread": "\uB2E4\uC2DC \uC77D\uAE30",
     "v4.fixPlaces": "\uC190\uBCFC \uACF3 {s}\uACF3",
     "v4.view": "\uBCF4\uAE30",
-    "v4.usesTitle0": "\uC4F0\uB294 \uBCC0\uC218",
-    "v4.usesN": "\uC4F0\uB294 \uBCC0\uC218 {n}\uAC1C",
     "v4.usesTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \uD3EC\uD568",
-    "v4.noTierName": "\uACC4\uCE35 \uC5C6\uC74C",
-    "v4.libName": "\uB77C\uC774\uBE0C\uB7EC\uB9AC",
     "v4.places": "{n}\uACF3",
     "v4.deletedN": "\uC0AD\uC81C\uB41C \uBCC0\uC218 {n}\uACF3",
     "v4.select": "\uC120\uD0DD",
@@ -2157,7 +2165,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     "v4.unboundFailed": " \xB7 {m}\uACF3\uC740 \uD480\uC9C0 \uBABB\uD588\uC5B4\uC694",
     "v4.unbindFail.font": "\uAE00\uAF34\uC744 \uBD88\uB7EC\uC62C \uC218 \uC5C6\uC74C",
     "v4.unbindFail.error": "\uC624\uB958",
-    "v4.tidy": "\uD560 \uC77C",
     "v4.rename": "\uC774\uB984 \uC815\uB9AC",
     "v4.back": "\uB3CC\uC544\uAC00\uAE30",
     "v4.backHome": "\u2190 \uB3CC\uC544\uAC00\uAE30",
@@ -2187,25 +2194,11 @@ button.ds-tag { border: 0; cursor: pointer; }
     "mkc.subFree": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uAC1C\uC218 \uC81C\uD55C\uC740 \uC5C6\uC5B4\uC694",
     "mkc.subPaid": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \xB7 Semantic \uBCC0\uC218\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
     "mkc.label": "{name}\uC5D0\uC11C \uB9CE\uC774 \uC4F4 \uAC12",
-    "mkc.make": "\uFF0B \uB9CC\uB4E4\uAE30",
-    "mkc.makeAria": "{name} \uB9CC\uB4E4\uAE30",
-    "mkc.made": "\u2713 \uB9CC\uB4E6",
-    "mkc.created": "Global \uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
-    "mkc.more": "\uC678 {k}\uAC1C \uBCF4\uAE30",
-    "mkc.makeAll": "Global {g}\uAC1C \uBAA8\uB450 \uB9CC\uB4E4\uAE30",
-    "mkc.goGR": "Global {g} \xB7 Semantic {r} \uB9CC\uB4E4\uAE30 \u2192",
-    "mkc.goG": "Global {g}\uAC1C \uB9CC\uB4E4\uAE30 \u2192",
-    "mkc.lockFull": "\u{1F512} Semantic {r}\uAC1C \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
-    "mkc.lockNoSem": "\u{1F512} \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
-    "mkc.lockAfter": "\u{1F512} Semantic {r}\uAC1C",
-    "mkc.titleMade": "Global \uBCC0\uC218 {c}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
     "mkc.titleLib": "\uBCC0\uC218\uAC00 \uC548 \uBD99\uC740 \uAC12 {n}\uACF3",
     // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
-    "mkc.subAfter": "\uAC19\uC740 \uAC12\uC744 \uC4F0\uB294 \uB808\uC774\uC5B4\uC5D0 \uC5F0\uACB0\uD574\uC694 \xB7 Semantic \uBCC0\uC218\uB294 \uC720\uB8CC\uC608\uC694",
-    "mkc.link": "{o}\uACF3 \uC5F0\uACB0 \u2192",
-    "mkc.noDefault": "\uAE30\uBCF8\uC73C\uB85C \uB9CC\uB4E4 \uAC12\uC774 \uC5C6\uC5B4\uC694",
+    "mkc.noDefault": "\uAE30\uBCF8\uC73C\uB85C \uB9CC\uB4E4 \uAC12\uC774 \uC5C6\uC5B4\uC694 \u2014 \uB9CC\uB4E4\uAE30 \uD654\uBA74\uC5D0\uC11C \uACE8\uB77C\uC694",
+    "mkc.moreNote": "\uC678 {k}\uAC1C \u2014 \uB9CC\uB4E4\uAE30 \uD654\uBA74\uC5D0\uC11C \uBAA8\uB450 \uBCF4\uACE0 \uACE8\uB77C\uC694",
     "mkc.readFailed": "\uC120\uD0DD\uC744 \uC77D\uC9C0 \uBABB\uD588\uC5B4\uC694",
-    "op.makeCard": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.license": "\uB77C\uC774\uC120\uC2A4 \u2192",
     "make.tabsAria": "\uB9CC\uB4E4 \uAC83",
     "make.semTop": "\uCF20 Global\uC744 \uB530\uB77C \uD568\uAED8 \uB9CC\uB4E4\uC5B4\uC694",
@@ -4319,6 +4312,57 @@ button.ds-tag { border: 0; cursor: pointer; }
     };
   }
 
+  // src/ui/icons.json
+  var icons_default = {
+    $source: "lucide-static@1.79.0",
+    $custom: [
+      "hash"
+    ],
+    $license: 'ISC License\n\nCopyright (c) 2026 Lucide Icons and Contributors\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES\nWITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF\nMERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR\nANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES\nWHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN\nACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF\nOR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.\n\n---\n\nThe following Lucide icons are derived from the Feather project:\n\nairplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out\n\nThe MIT License (MIT) (for the icons listed above)\n\nCopyright (c) 2013-present Cole Bemis\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the "Software"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE.',
+    icons: {
+      "chevron-down": '<path d="m6 9 6 6 6-6"/>',
+      "chevron-right": '<path d="m9 18 6-6-6-6"/>',
+      "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
+      "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+      x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+      check: '<path d="M20 6 9 17l-5-5"/>',
+      plus: '<path d="M5 12h14"/><path d="M12 5v14"/>',
+      minus: '<path d="M5 12h14"/>',
+      settings: '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
+      ellipsis: '<circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/>',
+      search: '<path d="m21 21-4.34-4.34"/><circle cx="11" cy="11" r="8"/>',
+      info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+      "circle-alert": '<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/>',
+      "triangle-alert": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      "circle-check": '<circle cx="12" cy="12" r="10"/><path d="m16 9-5.5 5.5L8 12"/>',
+      "circle-help": '<circle cx="12" cy="12" r="10"/><path d="M9 9.5a3 2.5 0 016 0c0 2-2 2-3 3.5"/><path d="M12 17h.01"/>',
+      copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+      "trash-2": '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
+      "refresh-cw": '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+      lock: '<rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+      "external-link": '<path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+      "loader-circle": '<path d="M21 12a9 9 0 1 1-6.219-8.56"/>',
+      eye: '<path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>',
+      "eye-off": '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+      hash: '<rect x="3.75" y="3.75" width="16.5" height="16.5" rx="2.36" style="stroke-width:1.2px"/><path d="M8.25 10.75H15.75M8.25 13.25H15.75M11.06 8.25L10.13 15.75M13.88 8.25L12.94 15.75" style="stroke-width:1px"/>'
+    }
+  };
+
+  // src/ui/icons.ts
+  var SVG_NS = "http://www.w3.org/2000/svg";
+  function icon(name, size = "md") {
+    const svg = document.createElementNS(SVG_NS, "svg");
+    svg.setAttribute("class", size === "md" ? "ds-ic" : `ds-ic ds-ic--${size}`);
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
+    svg.innerHTML = icons_default.icons[name];
+    return svg;
+  }
+
   // src/lib/color.ts
   var mod360 = (h) => (h % 360 + 360) % 360;
   function srgbToLinear(c) {
@@ -6017,7 +6061,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     bindPreviewed = true;
     selFindFor = bindPreviewSel ? bindPreviewSel.join(",") : null;
     selFindInFlight = false;
-    mcNoLinkUntilFind = false;
     renderBindTree();
     if (activeTab === "select" && selSub === "bind" && bindTsOnly() && !bindTsRows.length) showSelSub("home");
     renderSelHome();
@@ -7869,7 +7912,10 @@ button.ds-tag { border: 0; cursor: pointer; }
       return;
     }
     const linkOff = !link;
-    if (selSub === "make") showSelSub("home");
+    if (selSub === "make") {
+      showSelSub("home");
+      if (activeTab === "select") selFallbackFocus(true).focus();
+    }
     const doneTip = (_p = (_o = totals.styles) == null ? void 0 : _o.missing) == null ? void 0 : _p.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
@@ -8069,9 +8115,16 @@ button.ds-tag { border: 0; cursor: pointer; }
       paintSwatch(l, __spreadValues({ kind: "color", hex }, alpha != null && alpha < 1 ? { alpha } : {}));
     } else {
       l.className = "tr-lead vr-mk";
-      l.textContent = varTypeMark(type === "COLOR" ? "FLOAT" : type);
+      putTypeMark(l, type === "COLOR" ? "FLOAT" : type);
     }
     return l;
+  }
+  function putTypeMark(el, type, size = "md") {
+    if (type === "FLOAT") {
+      el.textContent = "";
+      el.dataset.mk = "hash";
+      el.appendChild(icon("hash", size));
+    } else el.textContent = varTypeMark(type);
   }
   function trLeadAa() {
     const aa = document.createElement("span");
@@ -8862,7 +8915,6 @@ ${opts.tip}` : text;
     const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
     const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
     for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
-    if (activeTab === "select" && selSub === "home" && (mcKeep() || mcNeed())) renderSelHome();
     const other = link ? null : otherWriteOp();
     const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
@@ -8879,14 +8931,9 @@ ${opts.tip}` : text;
   var opBusy = () => opWizard || opPending.size > 0;
   var opProgress = () => opProg;
   var opSilent = false;
-  var opCardCreate = false;
-  var OP_MAKE_CARD = { results: ["CREATE_RESULT"], label: "op.makeCard", go: () => {
-    showTab("select");
-    showSelSub("home");
-  }, write: true };
   function opSent(msg) {
     if (wizardRunning || opSilent) return;
-    const def = opCardCreate && msg.type === "CREATE_TOKENS" ? OP_MAKE_CARD : OPS[msg.type];
+    const def = OPS[msg.type];
     if (!def) return;
     opPending.set(msg.type, def);
     if (msg.type === "APPLY_SELECTED" || msg.type === "APPLY") opProg = null;
@@ -9172,10 +9219,23 @@ ${opts.tip}` : text;
       }
     }
     showSelSub("home");
-    const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $("selCards").querySelector("button");
-    (target != null ? target : $("btnGoMake")).focus();
+    const key = subOpener == null ? void 0 : subOpener.dataset.k;
+    const byKey = key ? $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
+    const target = byKey != null ? byKey : subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : null;
+    (target != null ? target : selFallbackFocus(true)).focus();
   }
   $("btnSubBack").addEventListener("click", subBack);
+  function syncFootShadow() {
+    const doc = document.documentElement;
+    const over = window.scrollY + window.innerHeight < doc.scrollHeight - 1;
+    for (const id of ["bindFoot", "renameFoot", "makeFoot"]) {
+      const el = $(id);
+      el.toggleAttribute("data-overlapped", over && !!el.offsetParent);
+    }
+  }
+  window.addEventListener("scroll", syncFootShadow, { passive: true });
+  window.addEventListener("resize", syncFootShadow);
+  new ResizeObserver(syncFootShadow).observe(document.body);
   document.addEventListener("click", (e) => {
     var _a3;
     const el = (_a3 = e.target) == null ? void 0 : _a3.closest("[data-go-sub]");
@@ -9237,6 +9297,10 @@ ${opts.tip}` : text;
   });
   $("btnGoMake").addEventListener("click", (e) => {
     if (!(baseline != null ? baseline : curSel).count) return;
+    if (e.currentTarget.dataset.mode === "view") {
+      viewSelVars();
+      return;
+    }
     showMakeScreen(e.currentTarget);
   });
   $("btnGoRename").addEventListener("click", (e) => {
@@ -9610,10 +9674,6 @@ ${opts.tip}` : text;
     const keyChanged = baseKey() !== prevKey;
     updateEmptyLocks();
     renderMakeNoSel();
-    if (mcMemo && (!b || mcMemo.base !== b.ids.join(","))) {
-      mcMemo = null;
-      mcJust.clear();
-    }
     if (mcFor !== baseKey()) mcInFlight = false;
     selFindInFlight = false;
     renderSelBase();
@@ -9766,9 +9826,8 @@ ${opts.tip}` : text;
     renderSelHome();
   }
   function doRebase() {
-    var _a3;
     rebaseToCurrent();
-    ((_a3 = $("selCards").querySelector("button")) != null ? _a3 : $("btnGoMake")).focus();
+    selFallbackFocus().focus();
   }
   function currentSel() {
     var _a3;
@@ -10194,7 +10253,7 @@ ${opts.tip}` : text;
       paintSwatch(lead, cell);
     } else {
       lead.className = "vr-mk";
-      lead.textContent = varTypeMark(v.type);
+      putTypeMark(lead, v.type);
     }
     const nm = document.createElement("span");
     nm.className = "nm";
@@ -11535,6 +11594,10 @@ ${opts.tip}` : text;
   var afterTable = null;
   function runAfterTable() {
     var _a3;
+    if (viewVarsPending) {
+      viewSelVars();
+      return;
+    }
     const job = afterTable;
     if (!job) return;
     if (job.openDetail) {
@@ -11565,6 +11628,55 @@ ${opts.tip}` : text;
         item.scrollIntoView({ block: "nearest" });
         item.focus({ preventScroll: true });
       }
+    }
+  }
+  var viewVarsPending = false;
+  function firstVarInListOrder(ids) {
+    for (const c of orderCollections(vmCols)) {
+      if (!vmVars.some((v) => v.collectionId === c.id && ids.has(v.id))) continue;
+      for (const n of flattenPaletteTree(paletteTree(vmCols, vmVars, c.id))) {
+        const rows = c.tier === 1 ? [...pillOrder(n.rows.filter((v) => v.type !== "COLOR"), currentModeCell), ...n.rows.filter((v) => v.type === "COLOR")] : n.rows;
+        const hit = rows.find((v) => ids.has(v.id));
+        if (hit) return hit;
+      }
+    }
+    return void 0;
+  }
+  function viewSelVars() {
+    var _a3;
+    if (!vmTableKnown) {
+      viewVarsPending = true;
+      showTab("variables");
+      return;
+    }
+    viewVarsPending = false;
+    const ids = new Set(usageMap ? vmVars.filter((v) => {
+      var _a4, _b;
+      return ((_b = (_a4 = usageMap.get(v.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
+    }).map((v) => v.id) : []);
+    const first = firstVarInListOrder(ids);
+    if (!first) {
+      showTab("variables");
+      return;
+    }
+    revealVar(first);
+    const items = gridItems();
+    const item = items.find((x) => x.dataset.key === `v:${first.id}`);
+    if (item) {
+      for (const x of items) x.tabIndex = -1;
+      item.tabIndex = 0;
+      item.scrollIntoView({ block: "nearest" });
+      item.focus({ preventScroll: true });
+    }
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const el of items) {
+      const k = el.dataset.key;
+      if (!(k == null ? void 0 : k.startsWith("v:")) || !ids.has(k.slice(2))) continue;
+      if (((_a3 = vmVars.find((x) => x.id === k.slice(2))) == null ? void 0 : _a3.collectionId) !== first.collectionId) continue;
+      el.classList.remove("hl-flash");
+      void el.offsetWidth;
+      el.classList.add("hl-flash");
+      el.addEventListener("animationend", () => el.classList.remove("hl-flash"), { once: true });
     }
   }
   function revealVar(v) {
@@ -11941,11 +12053,8 @@ ${opts.tip}` : text;
   var mcFor = null;
   var mcPrevFor = null;
   var mcStates = {};
-  var mcG = 0;
-  var mcR = null;
   var mcExtractReq = 0;
   var mcPreviewReq = 0;
-  var mcCreateReq = 0;
   var mcInFlight = false;
   var mcSendBase = "";
   var mcDeferred = false;
@@ -11953,13 +12062,6 @@ ${opts.tip}` : text;
   var mcFailedFor = null;
   var mcSendSig = "";
   var mcPrevSig = "";
-  var mcMemo = null;
-  var mcCreating = null;
-  var mcJust = /* @__PURE__ */ new Set();
-  var mcNoLinkUntilFind = false;
-  var mcLastO = null;
-  var mcFocusNext = null;
-  var mcLinkFocusFrom = null;
   var mcOwned = /* @__PURE__ */ new Set();
   var mcNextReq = () => {
     const id = ++bindReqSeq;
@@ -11989,19 +12091,11 @@ ${opts.tip}` : text;
   var mcExtracting = () => mcInFlight && mcPreviewReq === 0;
   var mcState = (name) => {
     var _a3;
-    return mcJust.has(name) ? "reuse" : (_a3 = mcStates[name]) == null ? void 0 : _a3.state;
+    return (_a3 = mcStates[name]) == null ? void 0 : _a3.state;
   };
-  var mcRemembered = (name) => !!mcMemo && mcMemo.base === baseKey() && (mcMemo.names.has(name) || mcJust.has(name));
-  var mcMadeCount = () => mcTokens.filter((tk) => mcRemembered(tk.name) && mcState(tk.name) === "reuse").length;
-  var mcNewTokens = () => mcShown().filter((tk) => mcState(tk.name) === "new");
-  function mcKeep() {
-    if (isPaid || !mcMemo || !baseline || mcMemo.base !== baseKey()) return false;
-    return mcMadeCount() >= 1;
-  }
   function mcNeed() {
     if (!baseline) return false;
-    const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
-    return localZero || !isPaid && !!mcMemo && mcMemo.base === baseKey();
+    return vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
   }
   function mcRead(user = false) {
     if (!baseline || isMini || activeTab !== "select" || !mcNeed()) return;
@@ -12027,7 +12121,6 @@ ${opts.tip}` : text;
     if (rid == null || !mcOwned.has(rid)) return false;
     if (msg.type === "EXTRACT_RESULT" && rid === mcExtractReq) onMcExtract(msg);
     else if (msg.type === "CREATE_RESULT" && msg.preview && rid === mcPreviewReq) onMcPreview(msg);
-    else if (msg.type === "CREATE_RESULT" && !msg.preview && rid === mcCreateReq) onMcCreated(msg);
     else if (msg.type === "ERROR") {
       if (rid === mcExtractReq || rid === mcPreviewReq) {
         mcInFlight = false;
@@ -12042,14 +12135,6 @@ ${opts.tip}` : text;
           mcFailedFor = mcSendBase;
           if (extractFailed) mcFor = null;
         }
-        renderSelHome();
-      } else if (rid === mcCreateReq) {
-        mcCreateReq = 0;
-        mcCreating = null;
-        showStatusLine(t("status.failed", { op: t("op.makeCard") }), { cls: "warn", tip: msg.message, action: { label: t("common.view"), run: () => {
-          showTab("select");
-          showSelSub("home");
-        } } });
         renderSelHome();
       }
     }
@@ -12067,8 +12152,6 @@ ${opts.tip}` : text;
     const shown = mcShown();
     if (!shown.length) {
       mcStates = {};
-      mcR = 0;
-      mcG = 0;
       mcPrevFor = mcFor;
       mcPrevSig = mcSigOf([]);
       mcInFlight = false;
@@ -12097,57 +12180,19 @@ ${opts.tip}` : text;
     if (sig === mcPrevSig) return false;
     if (!shown.length) {
       mcPrevSig = sig;
-      mcG = 0;
-      mcR = 0;
       return false;
     }
     mcSendPreview(shown);
     return true;
   }
   function onMcPreview(msg) {
-    var _a3, _b;
+    var _a3;
     mcInFlight = false;
     if (mcSendBase !== baseKey()) return;
     mcPrevSig = mcSendSig;
     mcStates = (_a3 = msg.tokenStates) != null ? _a3 : {};
-    mcG = msg.created + msg.updated;
-    mcR = (_b = msg.roles) != null ? _b : 0;
     mcPrevFor = mcFor;
     mcFailedFor = null;
-    mcJust.clear();
-    if (mcMemo && mcMemo.base === baseKey() && mcMadeCount() === 0) mcMemo = null;
-    renderSelHome();
-  }
-  function mcCreate(toks) {
-    if (!baseline || !toks.length) return;
-    mcCreateReq = mcNextReq();
-    mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
-    opCardCreate = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, reqId: mcCreateReq, globalOnly: true });
-    opCardCreate = false;
-    renderSelHome();
-  }
-  function onMcCreated(msg) {
-    var _a3;
-    mcCreateReq = 0;
-    const sent = mcCreating;
-    mcCreating = null;
-    showStatusLine(t("mkc.created", { n: msg.created }), { cls: "ok" });
-    if (!sent || sent.base !== baseKey()) {
-      renderSelHome();
-      return;
-    }
-    if (mcMemo && mcMemo.base === sent.base) for (const n of sent.names) mcMemo.names.add(n);
-    else mcMemo = { base: sent.base, names: new Set(sent.names) };
-    if (!msg.skippedManual) for (const n of sent.names) mcJust.add(n);
-    mcNoLinkUntilFind = true;
-    const act = document.activeElement;
-    if (act && $("selCards").contains(act)) {
-      const rows = mcRows();
-      const from = rows.findIndex((tk) => sent.names.includes(tk.name));
-      const next = (_a3 = rows.slice(from + 1).find((tk) => mcState(tk.name) === "new")) != null ? _a3 : rows.find((tk) => mcState(tk.name) === "new");
-      mcFocusNext = next ? `mk:${next.name}` : mcNewTokens().length ? "mkAll" : "mkLink";
-    }
     renderSelHome();
   }
   function mcRows() {
@@ -12156,17 +12201,17 @@ ${opts.tip}` : text;
       return ((_a3 = b.tk.count) != null ? _a3 : 0) - ((_b = a.tk.count) != null ? _b : 0) || a.i - b.i;
     }).slice(0, 4).map((x) => x.tk);
   }
-  function mcWriteLock() {
-    if (bindLinking) return t("bind.waitLink");
-    const other = otherWriteOp();
-    return other ? t("bind.waitOp", { op: other }) : null;
-  }
-  function renderMakeCard(put, keep, lib) {
-    var _a3, _b, _c, _d;
+  function renderMakeCard(put, lib) {
+    var _a3, _b;
     const base = baseKey();
-    const c = keep ? mcMadeCount() : 0;
-    const title = keep ? t("mkc.titleMade", { c }) : lib ? lib.n != null ? t("mkc.titleLib", { n: lib.n }) : t("v4.reading") : t("v4.noVarsFile");
+    const title = lib ? lib.n != null ? t("mkc.titleLib", { n: lib.n }) : t("v4.reading") : t("v4.noVarsFile");
     const findHere = selFindFor === base && !selFindInFlight;
+    const tsText = (into) => {
+      const n = bindPreviewed && findHere && !lib ? tsAllNodes().size : 0;
+      if (!n) return;
+      into([t("v4.tsPlaces", { t: n })]);
+      selTodo.link = n;
+    };
     if (mcFailedFor === base) {
       if (mcInFlight) {
         put(lib && lib.n == null ? selCard({ title }) : selCard({ title, subs: [t("v4.reading")] }));
@@ -12181,21 +12226,19 @@ ${opts.tip}` : text;
         renderSelHome();
       });
       rd.dataset.k = "mkReread";
-      put(selCard({ title: t("mkc.readFailed"), actions: [rd] }));
+      const subs = [];
+      tsText((c) => subs.push(...c));
+      put(selCard({ title: t("mkc.readFailed"), subs, actions: [rd] }));
+      selTodo.mcDone = true;
       return;
     }
     const resending = mcResync();
     const ready = mcFor === base && mcPrevFor === base && !resending;
-    if (!keep && (!ready || mcInFlight)) {
+    if (!ready || mcInFlight) {
       put(selCard({ title, subs: [t("v4.reading")] }));
       return;
     }
-    const reading = mcInFlight;
-    const writeLock = (_a3 = mcWriteLock()) != null ? _a3 : mcCreateReq ? t("bind.waitOp", { op: t("op.makeCard") }) : null;
-    const lockBtn = (b) => {
-      setWait(b, writeLock != null ? writeLock : reading ? t("v4.reading") : null);
-      return b;
-    };
+    selTodo.mcDone = true;
     const card = document.createElement("div");
     card.className = "sel-card mk";
     const tt = document.createElement("div");
@@ -12208,73 +12251,36 @@ ${opts.tip}` : text;
       d.append(...content);
       card.appendChild(d);
     };
-    const tsLine = (hasMain) => {
-      const n = bindPreviewed && findHere ? tsAllNodes().size : 0;
-      if (!n || reading || lib) return;
-      const row = document.createElement("div");
-      row.className = "mk-ts";
-      const l = document.createElement("span");
-      l.textContent = t("v4.tsPlaces", { t: n });
-      const g2 = document.createElement("span");
-      g2.className = "grow";
-      const b = selBtn(t("v4.linkN", { n }), (el) => {
-        showSelSub("bind", el);
-      }, !hasMain);
-      b.dataset.k = "tsLink";
-      row.append(l, g2, b);
-      card.appendChild(row);
-    };
-    const more = (k2) => {
-      const b = selLink(t("mkc.more", { k: k2 }), (el) => showSelSub("make", el));
-      b.dataset.k = "mkMore";
-      return b;
-    };
-    const lic = () => {
-      const b = selLink(t("status.paidAction"), () => goToLicense());
-      b.dataset.k = "mkLic";
-      return b;
-    };
-    const lockLine = (text) => {
+    const tsLine = () => tsText((c) => {
       const d = document.createElement("div");
-      d.className = "mk-lock";
-      const s1 = document.createElement("span");
-      s1.textContent = `${text} \xB7`;
-      d.append(s1, lic());
+      d.className = "mk-ts";
+      d.append(...c);
       card.appendChild(d);
-    };
-    const foot = (left, right) => {
-      const d = document.createElement("div");
-      d.className = "mk-foot";
-      const g2 = document.createElement("span");
-      g2.className = "grow";
-      if (left) d.appendChild(left);
-      d.appendChild(g2);
-      if (right) d.appendChild(right);
-      card.appendChild(d);
-    };
+    });
     const picked = mcShown();
     if (!mcTokens.length) {
       sub([t("make.zero")]);
-      tsLine(false);
+      tsLine();
       put(card);
       return;
     }
     if (!picked.length) {
-      sub([`${t("mkc.noDefault")} \xB7 `, more(mcTokens.length)]);
-      tsLine(false);
+      sub([t("mkc.noDefault")]);
+      tsLine();
       put(card);
       return;
     }
-    const newToks = mcNewTokens();
-    const g = isPaid ? mcG : newToks.length;
-    const r = mcR != null ? mcR : 0;
-    const after = !isPaid && keep && g === 0;
-    sub([isPaid ? t("mkc.subPaid") : after ? t("mkc.subAfter") : t("mkc.subFree")]);
+    selTodo.makeHot = true;
+    sub([isPaid ? t("mkc.subPaid") : t("mkc.subFree")]);
     const lab = document.createElement("div");
     lab.className = "mk-lab";
     lab.textContent = t("mkc.label", { name: baseLabel() });
     card.appendChild(lab);
     const rows = mcRows();
+    const tagged = !isPaid && rows.some((tk) => {
+      const st = mcState(tk.name);
+      return st === "reuse" || st === "update" || st === "manual";
+    });
     for (const tk of rows) {
       const row = document.createElement("div");
       row.className = "mk-row";
@@ -12284,129 +12290,87 @@ ${opts.tip}` : text;
       if (isColor) {
         sw.style.background = tk.value;
         if (tk.alpha != null && tk.alpha < 1) sw.style.opacity = String(tk.alpha);
-      } else sw.textContent = "#";
+      } else putTypeMark(sw, "FLOAT", "sm");
       sw.setAttribute("aria-hidden", "true");
       const v = document.createElement("span");
       v.className = "v";
       v.textContent = isColor ? tk.value.toUpperCase() + alphaTail(tk.alpha) : typeof tk.value === "number" && tk.unit === "percent" ? `${tk.value}%` : String(tk.value);
       const st = mcStates[tk.name];
-      const name = (_b = st == null ? void 0 : st.varName) != null ? _b : tk.name;
+      const name = (_a3 = st == null ? void 0 : st.varName) != null ? _a3 : tk.name;
       const nm = document.createElement("span");
       nm.className = "nm";
       nm.textContent = name;
       nm.title = name;
       const cnt = document.createElement("span");
       cnt.className = "c";
-      cnt.textContent = t("make.layers", { n: (_c = tk.count) != null ? _c : 0 });
+      cnt.textContent = t("make.layers", { n: (_b = tk.count) != null ? _b : 0 });
       row.append(sw, v, nm, cnt);
-      if (!isPaid) {
+      if (tagged) {
         const state2 = mcState(tk.name);
-        if (state2 === "new") {
-          const b = lockBtn(selBtn(t("mkc.make"), () => mcCreate([tk])));
-          b.classList.add("ds-btn--sm");
-          b.dataset.k = `mk:${tk.name}`;
-          b.setAttribute("aria-label", t("mkc.makeAria", { name }));
-          row.appendChild(b);
-        } else {
-          const s = document.createElement("span");
-          s.className = "st";
-          if (state2 === "reuse" && mcRemembered(tk.name)) {
-            s.classList.add("ok");
-            s.textContent = t("mkc.made");
-          } else if (state2 === "reuse") s.appendChild(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
-          else if (state2 === "update") s.appendChild(mkTag(t("make.tagHas"), t("make.tagHasTip")));
-          else if (state2 === "manual") s.appendChild(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
-          row.appendChild(s);
-        }
+        const s = document.createElement("span");
+        s.className = "st";
+        if (state2 === "reuse") s.appendChild(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
+        else if (state2 === "update") s.appendChild(mkTag(t("make.tagHas"), t("make.tagHasTip")));
+        else if (state2 === "manual") s.appendChild(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
+        row.appendChild(s);
       }
       card.appendChild(row);
     }
     const k = picked.length - rows.length;
-    if (isPaid) {
-      const go = selBtn(r > 0 ? t("mkc.goGR", { g, r }) : t("mkc.goG", { g }), (el) => showSelSub("make", el), true);
-      go.dataset.k = "mkGo";
-      foot(k > 0 ? more(k) : null, go);
-      tsLine(true);
-      put(card);
-      return;
+    if (k > 0) {
+      const d = document.createElement("div");
+      d.className = "mk-more";
+      d.textContent = t("mkc.moreNote", { k });
+      card.appendChild(d);
     }
-    if (!after) {
-      const all = lockBtn(selBtn(t("mkc.makeAll", { g }), () => mcCreate(mcNewTokens()), true));
-      all.dataset.k = "mkAll";
-      foot(k > 0 ? more(k) : null, all);
-      lockLine(r > 0 ? t("mkc.lockFull", { r }) : t("mkc.lockNoSem"));
-      tsLine(true);
-      put(card);
-      return;
-    }
-    if (r > 0) lockLine(t("mkc.lockAfter", { r }));
-    if (findHere && !mcNoLinkUntilFind) mcLastO = { base, o: bindCardCounts().m };
-    const o = mcNoLinkUntilFind ? 0 : findHere ? (_d = mcLastO == null ? void 0 : mcLastO.o) != null ? _d : 0 : (mcLastO == null ? void 0 : mcLastO.base) === base && (selFindInFlight || reading) ? mcLastO.o : 0;
-    let link = null;
-    if (o > 0) {
-      link = selBtn(t("mkc.link", { o }), (el) => showSelSub("bind", el), true);
-      link.dataset.k = "mkLink";
-      if (!findHere || reading) setWait(link, t("v4.reading"));
-      foot(null, link);
-    }
-    tsLine(!!link);
+    tsLine();
     put(card);
   }
+  var selTodo = { link: 0, makeHot: false, view: false, wait: false, mcDone: false };
+  var selHeadEl = null;
+  var SEL_TOOLS = $("selTools");
   function renderSelHome() {
     var _a3;
     if (activeTab !== "select" || selSub !== "home" || !curSel) return;
-    const head = $("selHead");
     const cards = $("selCards");
-    let hadFocus = cards.contains(document.activeElement) ? (_a3 = document.activeElement.dataset.k) != null ? _a3 : "" : null;
-    if (mcFocusNext && hadFocus !== null) {
-      hadFocus = mcFocusNext;
-    }
-    if (hadFocus === null && mcLinkFocusFrom === "btnGoMake" && document.activeElement === $("btnGoMake")) hadFocus = "btnGoMake";
-    mcFocusNext = null;
-    if (mcMemo && isPaid) {
-      mcMemo = null;
-      mcJust.clear();
-    }
-    clearMount(head);
+    const act = document.activeElement;
+    const hadFocus = act && cards.contains(act) ? (_a3 = act.dataset.k) != null ? _a3 : "" : null;
+    const slot = act && SEL_TOOLS.contains(act) ? Array.from(SEL_TOOLS.querySelectorAll("button")).indexOf(act) : -1;
+    $("selHome").appendChild(SEL_TOOLS);
     clearMount(cards);
-    selMakeHot = false;
+    Object.assign(selTodo, { link: 0, makeHot: false, view: false, wait: false, mcDone: false });
     const noSel = !baseline;
     for (const id of ["btnGoMake", "btnGoRename"]) setLock($(id), (baseline != null ? baseline : curSel).count ? null : "prereq", t("status.noSelection"));
+    selHeadEl = null;
     if (baseline) {
+      const h = document.createElement("div");
+      h.className = "sel-card-head";
       const b = document.createElement("b");
       b.textContent = baseLabel();
       b.title = baseLabel();
-      head.append(b);
+      h.append(b);
       if (baseDiffers()) {
-        const diff = document.createElement("span");
-        diff.className = "sel-diff";
-        diff.append(t("v4.baseDiff") + " \xB7 ");
         const rb = selLink(t("list.rebase"), () => doRebase());
         rb.dataset.k = "rebase";
-        diff.appendChild(rb);
-        head.appendChild(diff);
+        const tip = curSel.count ? t("v4.rebaseTip") : t("v4.rebaseTipEmpty");
+        rb.setAttribute("aria-label", tip);
+        rb.title = tip;
+        h.appendChild(rb);
       }
+      selHeadEl = h;
     }
     const put = (el) => {
       cards.appendChild(el);
     };
+    const done = () => finishSelFocus(hadFocus, slot);
     const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
     if (!vmTableKnown && !prereqKnown) {
       put(selCard({ title: t("v4.loading") }));
-      return finishSelFocus(hadFocus);
+      return done();
     }
     if (noSel) {
-      const d = document.createElement("div");
-      d.className = "sel-empty";
-      d.textContent = t("v4.noSel");
-      if (localZero) {
-        const sd = document.createElement("div");
-        sd.className = "sub";
-        sd.textContent = t("v4.noVarsFile");
-        d.appendChild(sd);
-      }
-      put(d);
-      return finishSelFocus(hadFocus);
+      put(selCard({ title: t("v4.noSel"), subs: localZero ? [t("v4.noVarsFile")] : [] }));
+      return done();
     }
     const findReady = selFindFor === baseKey() && !selFindInFlight;
     const usageReady = !!usageMap;
@@ -12417,9 +12381,8 @@ ${opts.tip}` : text;
         mcRead(true);
       });
       rd.dataset.k = "read";
-      const c = selCard({ title: t("list.big"), actions: [rd] });
-      put(c);
-      return finishSelFocus(hadFocus);
+      put(selCard({ title: t("list.big"), actions: [rd] }));
+      return done();
     }
     const counts = findReady ? bindCardCounts() : null;
     const reading = () => selCard({ title: t("v4.reading") });
@@ -12427,55 +12390,88 @@ ${opts.tip}` : text;
       mcKick();
       if (!usageReady) {
         put(reading());
-        return finishSelFocus(hadFocus);
+        return done();
       }
+      selTodo.wait = true;
       const libDirect = libDirectNow();
       if (libDirect.length) {
         const base = baseKey();
         const split = mcFor === base ? mcLibSplit() : null;
         const makeShown = mcFailedFor === base ? !split || split.left.length > 0 : !!split && split.left.length > 0;
+        if (!makeShown && split && !mcInFlight) selTodo.mcDone = true;
+        if (mcFailedFor === base && !mcInFlight) selTodo.mcDone = true;
         const subs = [];
-        const actions = [];
         if (split && split.L > 0 && !mcExtracting()) subs.push(t("v4.libSame", { k: split.L }));
-        if (!bindFindFailed) tsOnlyExtra(subs, actions, makeShown);
-        put(selCard({ title: t("v4.libOnly"), subs, actions }));
-        if (makeShown) renderMakeCard(put, false, { n: split ? split.n : null });
-        renderUsesCard(put);
+        if (!bindFindFailed) tsOnlyExtra(subs);
+        put(selCard({ title: t("v4.libOnly"), subs }));
+        if (makeShown) renderMakeCard(put, { n: split ? split.n : null });
       } else {
-        renderMakeCard(put, mcKeep());
+        renderMakeCard(put);
       }
       renderDeletedCard(put);
-      return finishSelFocus(hadFocus);
+      return done();
     }
-    if (mcKeep()) renderMakeCard(put, true);
-    else renderFindCard(put, counts);
-    renderUsesCard(put);
+    renderFindCard(put, counts);
     renderDeletedCard(put);
-    finishSelFocus(hadFocus);
+    done();
   }
-  var selMakeHot = false;
-  function updateMakeEmphasis() {
-    const hot = selMakeHot && !!baseline && !$("selCards").querySelector("button.primary");
-    $("btnGoMake").classList.toggle("primary", hot);
-    $("btnGoMake").classList.toggle("ds-btn--primary", hot);
-  }
-  function finishSelFocus(key) {
+  function buildSelTop() {
     var _a3, _b, _c;
-    updateMakeEmphasis();
-    if (key === null) {
-      mcLinkFocusFrom = null;
-      return;
+    const top = $("selCards").querySelector(":scope > .sel-card");
+    const make = $("btnGoMake");
+    const rename = $("btnGoRename");
+    (_a3 = SEL_TOOLS.querySelector('[data-k="todo-link"]')) == null ? void 0 : _a3.remove();
+    const findArrived = !selFindInFlight && (selFindFor === baseKey() || bindFindFailed);
+    const settled = !selTodo.wait || findArrived && selTodo.mcDone;
+    const linkN = settled ? selTodo.link : 0;
+    const view = selTodo.view;
+    make.textContent = view ? t("v4.viewVars") : t("make.title");
+    make.title = make.textContent;
+    make.dataset.mode = view ? "view" : "make";
+    rename.title = (_b = rename.textContent) != null ? _b : "";
+    let primary = null;
+    if (linkN > 0) {
+      const go = selBtn(t("v4.linkN", { n: linkN }), (el) => {
+        showSelSub("bind", el);
+      }, true);
+      go.dataset.k = "todo-link";
+      go.classList.add("ds-btn--lg");
+      go.title = (_c = go.textContent) != null ? _c : "";
+      SEL_TOOLS.insertBefore(go, make);
+      primary = go;
+    } else if (view || selTodo.makeHot && settled && !!baseline) primary = make;
+    for (const b of [make, rename]) {
+      const on = b === primary;
+      b.classList.toggle("primary", on);
+      b.classList.toggle("ds-btn--primary", on);
     }
+    if (!top) return;
+    top.classList.add("top");
+    const body = document.createElement("div");
+    body.className = "sel-body";
+    body.append(...Array.from(top.childNodes));
+    top.append(body);
+    if (selHeadEl) top.prepend(selHeadEl);
+    top.appendChild(SEL_TOOLS);
+  }
+  function selFallbackFocus(skipCards = false) {
+    var _a3, _b;
+    const first = (_a3 = SEL_TOOLS.querySelector("button")) != null ? _a3 : $("btnGoMake");
+    if (skipCards) return first;
+    return (_b = $("selCards").querySelector('button:not([data-k="rebase"])')) != null ? _b : first;
+  }
+  function finishSelFocus(key, slot = -1) {
+    var _a3;
+    buildSelTop();
+    if (key === null) return;
     const cards = $("selCards");
-    const link = cards.querySelector('[data-k="mkLink"]');
-    if (mcLinkFocusFrom !== null) {
-      if (link && key === mcLinkFocusFrom) key = "mkLink";
-      if (link || key !== mcLinkFocusFrom) mcLinkFocusFrom = null;
+    const same = key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
+    let target = same;
+    if (!target && slot >= 0) {
+      const bs = Array.from(SEL_TOOLS.querySelectorAll("button"));
+      target = (_a3 = bs[Math.min(slot, bs.length - 1)]) != null ? _a3 : null;
     }
-    const same = key === "btnGoMake" ? $("btnGoMake") : key ? cards.querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
-    const target = (_a3 = same != null ? same : key === "unbind" ? null : cards.querySelector("button")) != null ? _a3 : $("btnGoMake");
-    if (key === "mkLink" && !same) mcLinkFocusFrom = (_c = (_b = target.dataset.k) != null ? _b : target.id) != null ? _c : "";
-    target.focus({ preventScroll: true });
+    (target != null ? target : selFallbackFocus(key === "unbind")).focus({ preventScroll: true });
   }
   function mcKick() {
     if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || baseline.scanned > BIG_SELECTION && mcDeferUserFor !== baseKey()) return;
@@ -12486,15 +12482,11 @@ ${opts.tip}` : text;
       }
     });
   }
-  function tsOnlyExtra(subs, actions, secondary = false) {
+  function tsOnlyExtra(subs) {
     const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
     if (!n) return;
     subs.push(t("v4.tsPlaces", { t: n }));
-    const b = selBtn(t("v4.linkN", { n }), (el) => {
-      showSelSub("bind", el);
-    }, !actions.length && !secondary);
-    b.dataset.k = "tsLink";
-    actions.push(b);
+    selTodo.link = n;
   }
   function rememberMainsBound(ids, base = baseline ? baseKey() : null) {
     const uniq = [...new Set(ids)];
@@ -12504,10 +12496,9 @@ ${opts.tip}` : text;
     if (prereqKnown && !hasBindable) {
       lastMainsBound = null;
       const subs2 = [t("bind.noTier")];
-      const actions2 = [];
-      tsOnlyExtra(subs2, actions2);
-      put(selCard({ title: t("v4.find0"), subs: subs2, actions: actions2 }));
-      if (selFindFor === baseKey() && !selFindInFlight) selMakeHot = true;
+      tsOnlyExtra(subs2);
+      put(selCard({ title: t("v4.find0"), subs: subs2 }));
+      if (selFindFor === baseKey() && !selFindInFlight) selTodo.makeHot = true;
       return;
     }
     if (!counts) {
@@ -12531,19 +12522,24 @@ ${opts.tip}` : text;
       return els;
     };
     if (n === 0 && s === 0) {
+      selTodo.view = true;
       const mb = markMains(boundMains());
-      put(mainsSub(selCard({ title: t("v4.allBound"), cls: "ok", subs: mb })));
+      put(mainsSub(selCard({ title: t("v4.allBound"), cls: "done", subs: mb })));
       return;
     }
     if (n === 0) {
+      selTodo.view = true;
       const v = selLink(t("v4.view"), (el) => {
         bindSkipsOpen = true;
         showSelSub("bind", el);
         renderBindTree();
       });
       v.dataset.k = "skips";
+      const fix = document.createElement("span");
+      fix.className = "fix-line";
+      fix.append(`${t("v4.fixPlaces", { s })} \xB7 `, v);
       const mb = markMains(boundMains());
-      put(mainsSub(selCard({ title: t("v4.allLinked"), subs: [...mb, t("v4.fixPlaces", { s })], actions: [v] })));
+      put(mainsSub(selCard({ title: t("v4.allLinked"), cls: "done", subs: [...mb, fix] })));
       return;
     }
     lastMainsBound = null;
@@ -12559,48 +12555,13 @@ ${opts.tip}` : text;
       us.title = t("v4.scopePlacesTip");
       sub.appendChild(us);
     }
-    const actions = [];
-    if (m > 0) {
-      const go = selBtn(t("v4.linkN", { n: m }), (el) => {
-        showSelSub("bind", el);
-      }, true);
-      go.dataset.k = "link";
-      actions.push(go);
-    } else if (k + u > 0) selMakeHot = true;
+    if (m > 0) selTodo.link = m;
+    else if (k + u > 0) selTodo.makeHot = true;
     const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
     const subs = [sub];
     if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
-    const card = mainsSub(selCard({ title: t("v4.findN", { n }), subs, actions }));
+    const card = mainsSub(selCard({ title: t("v4.findN", { n }), subs }));
     card.querySelector(".t").title = t("v4.findTip");
-    put(card);
-  }
-  function renderUsesCard(put) {
-    var _a3;
-    if (!usageMap) {
-      put(selCard({ title: t("v4.usesTitle0"), subs: [t("v4.reading")] }));
-      return;
-    }
-    const local = vmVars.filter((v) => {
-      var _a4, _b;
-      return ((_b = (_a4 = usageMap.get(v.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
-    });
-    const lib = libVars.filter((l) => {
-      var _a4, _b;
-      return ((_b = (_a4 = usageMap.get(l.id)) == null ? void 0 : _a4.places) != null ? _b : 0) > 0;
-    });
-    const n = local.length + lib.length;
-    if (!n) return;
-    const tierN = /* @__PURE__ */ new Map();
-    for (const v of local) {
-      const c = vmCols.find((x) => x.id === v.collectionId);
-      const key = (c == null ? void 0 : c.tier) === 3 ? "Component" : (c == null ? void 0 : c.tier) === 2 ? "Semantic" : (c == null ? void 0 : c.tier) === 1 ? "Global" : t("v4.noTierName");
-      tierN.set(key, ((_a3 = tierN.get(key)) != null ? _a3 : 0) + 1);
-    }
-    if (lib.length) tierN.set(t("v4.libName"), lib.length);
-    const order = ["Component", "Semantic", "Global", t("v4.noTierName"), t("v4.libName")];
-    const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(" \xB7 ");
-    const card = selCard({ title: t("v4.usesN", { n }), subs: [sub] });
-    card.querySelector(".t").title = t("v4.usesTip");
     put(card);
   }
   function renderDeletedCard(put) {
@@ -12632,14 +12593,59 @@ ${opts.tip}` : text;
     showStatusLine(text, { cls: msg.failed ? "warn" : "ok" });
     const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t("v4.unbindFail." + k)} ${n}`).join(" \xB7 ");
     if (tip) $("statusText").title = tip;
-    if (document.activeElement === document.body || !((_a3 = document.activeElement) == null ? void 0 : _a3.isConnected)) $("btnGoMake").focus();
+    if (document.activeElement === document.body || !((_a3 = document.activeElement) == null ? void 0 : _a3.isConnected)) selFallbackFocus(true).focus();
     queueMicrotask(() => {
-      if (!$("selCards").contains(document.activeElement)) $("btnGoMake").focus();
+      if (!$("selCards").contains(document.activeElement)) selFallbackFocus(true).focus();
     });
   }
   activeTab = "variables";
   showTab("select");
 })();
+/*! Lucide icons (lucide-static@1.79.0) — 생성 데이터 src/ui/icons.json (scripts/gen-icons.mjs)
+ISC License
+
+Copyright (c) 2026 Lucide Icons and Contributors
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+---
+
+The following Lucide icons are derived from the Feather project:
+
+airplay, alert-circle, alert-octagon, alert-triangle, aperture, arrow-down-circle, arrow-down-left, arrow-down-right, arrow-down, arrow-left-circle, arrow-left, arrow-right-circle, arrow-right, arrow-up-circle, arrow-up-left, arrow-up-right, arrow-up, at-sign, calendar, cast, check, chevron-down, chevron-left, chevron-right, chevron-up, chevrons-down, chevrons-left, chevrons-right, chevrons-up, circle, clipboard, clock, code, columns, command, compass, corner-down-left, corner-down-right, corner-left-down, corner-left-up, corner-right-down, corner-right-up, corner-up-left, corner-up-right, crosshair, database, divide-circle, divide-square, dollar-sign, download, external-link, feather, frown, hash, headphones, help-circle, info, italic, key, layout, life-buoy, link-2, link, loader, lock, log-in, log-out, maximize, meh, minimize, minimize-2, minus-circle, minus-square, minus, monitor, moon, more-horizontal, more-vertical, move, music, navigation-2, navigation, octagon, pause-circle, percent, plus-circle, plus-square, plus, power, radio, rss, search, server, share, shopping-bag, sidebar, smartphone, smile, square, table-2, tablet, target, terminal, trash-2, trash, triangle, tv, type, upload, x-circle, x-octagon, x-square, x, zoom-in, zoom-out
+
+The MIT License (MIT) (for the icons listed above)
+
+Copyright (c) 2013-present Cole Bemis
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+*/
 
 </script>
   <!-- 스크립트는 반드시 마지막 — 위 마크업이 모두 있어야 리스너가 붙는다. -->
