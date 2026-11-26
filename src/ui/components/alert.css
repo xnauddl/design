@@ -1,0 +1,16 @@
+/* Alert — design-system §6.5(클래스만 — 지금 .banner · .ux는 DS-3). 띠(기본) · 상자(--box). */
+.ds-alert {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-small);
+  font: var(--text-body-sm); background: var(--color-state-info-subtle); color: var(--color-state-info);
+}
+.ds-alert > .ds-ic { margin-top: var(--space-0-5); }
+.ds-alert__body { flex: 1 1 auto; min-width: 0; }
+.ds-alert__title { font-weight: var(--font-weight-semibold); }
+.ds-alert > .ds-icbtn { margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-2)) 0 0; color: inherit; }
+.ds-alert--success { background: var(--color-state-success-subtle); color: var(--color-state-success); }
+.ds-alert--warning { background: var(--color-state-warning-subtle); color: var(--color-state-warning); }
+.ds-alert--error { background: var(--color-state-error-subtle); color: var(--color-state-error); }
+.ds-alert--box { border: 1px solid var(--color-border-default); border-radius: var(--radius-medium); }
+.ds-alert--box.ds-alert--info { border-color: var(--color-state-info-border); }
+.ds-alert--box.ds-alert--error { border-color: var(--color-state-error-border); }

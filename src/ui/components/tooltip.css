@@ -1,0 +1,10 @@
+/* Tooltip — design-system §6.4(클래스 · 함수만 — 지금 #uiTip은 DS-3). */
+.ds-tip {
+  position: fixed; z-index: var(--z-tooltip); max-width: 240px; pointer-events: none;
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-small); box-shadow: var(--elevation-2);
+  background: var(--color-surface-inverse); color: var(--color-text-inverse); font: var(--text-body-sm);
+}
+.ds-tip::after { content: ''; position: absolute; left: var(--tip-x, 50%); width: var(--space-2); height: var(--space-2); background: inherit; transform: translateX(-50%) rotate(45deg); }
+.ds-tip[data-side="top"]::after { bottom: calc(-1 * var(--space-1)); }
+.ds-tip[data-side="bottom"]::after { top: calc(-1 * var(--space-1)); }
+.ds-tip[hidden] { display: none; }

@@ -1,0 +1,12 @@
+/* Toast — design-system §6.5(새로 — 상태 줄 대신은 DS-3b). 한 번에 하나. */
+.ds-toast {
+  position: fixed; left: var(--space-3); right: var(--space-3); bottom: var(--space-3); z-index: var(--z-tooltip);
+  display: flex; align-items: center; gap: var(--space-2); margin: 0 auto; max-width: max-content;
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-large); box-shadow: var(--elevation-2);
+  background: var(--color-surface-inverse); color: var(--color-text-inverse); font: var(--text-body-sm);
+}
+.ds-toast__text { flex: 1 1 auto; min-width: 0; }
+.ds-toast__action { color: inherit; font-weight: var(--font-weight-semibold); }
+.ds-toast > .ds-icbtn { color: var(--color-text-inverse); }
+.ds-toast > .ds-icbtn:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-inverse); }
+.ds-toast[hidden] { display: none; }

@@ -79,3 +79,13 @@
 | DS-D9 | 둥글기 **xs 4(16px 이하 작은 요소) · small 6 · medium 8 · large 10 · full.** |
 
 명세를 쓰며 정한 것(사용자 결정 아님 — 이견이 있으면 바꿈): 보조 글자는 #555555만(#999999는 자리 표시 글 · 비활성 · 장식만 — 2.85:1이라), 포커스 링 #111111, Primary hover #333333, 상태색 옅은 짝(흰색에 10% · 30% 섞음), 카드 그림자 없음, Disabled 투명도 .5.
+
+## 9. DS-2 컴포넌트 결정 (2026-11-25 사용자 결정 DS-D10–DS-D13)
+
+| 번호 | 결정 |
+|---|---|
+| DS-D10 | DS-2는 **새 브랜치 · 새 PR**(`claude/ds2-components`, DS-1 브랜치 위). DS-1 PR #182는 따로 병합한다. |
+| DS-D11 | 만드는 법은 **CSS 클래스 + TS 함수** — 모양은 `ds-` 클래스(ui.html 정적 요소에 바로), ui.ts는 작은 함수(`button({ variant, size, label })` 등). 동작이 있는 것(Toast · Modal · Tooltip · Tab 등)만 함수가 동작을 맡는다. |
+| DS-D12 | 지금 화면은 **기본 5종만** 바꾼다 — Button · Icon Button · Input/Select · Checkbox · Badge/Tag. 카드 · 목록 · 탭 · 모달 · 알림은 화면 구조가 바뀌는 DS-3에서. |
+| DS-D13 | 아이콘은 **Lucide 일부**(npm `lucide-static`, 라이선스 ISC — 처음에 MIT라 적었으나 ISC). 약 23개를 16px · 선 1.5px로. |
+

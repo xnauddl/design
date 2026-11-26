@@ -1,0 +1,5 @@
+/* 아이콘 — design-system §6.6. 선 굵기는 크기와 상관없이 1.5px(non-scaling-stroke). */
+.ds-ic { width: var(--size-icon-md); height: var(--size-icon-md); flex: none; display: inline-block; vertical-align: middle; }
+.ds-ic--sm { width: var(--size-icon-sm); height: var(--size-icon-sm); }
+.ds-ic--lg { width: var(--size-icon-lg); height: var(--size-icon-lg); }
+.ds-ic * { vector-effect: non-scaling-stroke; stroke-width: var(--icon-stroke); }
