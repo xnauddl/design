@@ -444,6 +444,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | **Checkbox** | 모든 `input[type="checkbox"]`(HTML 8곳 · `ui.ts` 1곳) → `ds-check` 모양(기본 요소 규칙으로 — 클래스는 붙이지 않아도 됨). `accent-color` 규칙 지움 | 스위치(`.bv-switch`) |
 | **Badge · Tag** | `.mini-badge` → `ds-badge ds-badge--dot`(`.ok` → `--success` · `.fail` → `--error` 색조, 글자 ✓ · ! 그대로) · `.bv-new` → `ds-badge ds-badge--solid` · `.vs-badge` → `ds-badge`(고른 항목 안에서는 Navigation Item 규칙으로 `nav-selected-badge-bg`) · `.lib-tag` → `ds-badge ds-badge--outline` · `.chip`(변수 고치기 팝업의 칩) → `ds-tag` | `.tr-tag`(트리 태그 — TR-D9 칩 열) · `.vchip`(TR-D3) · `.step-chip` · `.ed-ptag` · `.ed-pill` |
 
+- **구현 메모(DS-2):** 지금 화면의 글자 버튼에는 변형 클래스만 더했다(`ds-btn--primary` · `--danger` · `--link` · `--ghost` · `--sm`) — `.ds-btn`의 `inline-flex`를 붙이면 문장 속 링크 버튼 · 줄 버튼의 배치가 바뀌어서. 모양은 기본 `button` 규칙(= Secondary md)과 변형 클래스로 같다. 아이콘 단추는 `ds-btn ds-icbtn`을 함께 붙였다(가운데 맞춤이 필요).
 - **옛 규칙 지우기:** 옛 클래스를 포함하는 **모든** 선택자(겹친 선택자 · 상태 선택자 포함, 예: `button.primary:hover…` · `button[aria-disabled="true"]` · `.mk-row button`)에서 모양 선언을 지운다. 구현 때 `grep`으로 찾은 목록을 PR에 적는다.
 - **바뀌는 굵기 · 크기:** Badge는 `text-caption`(10 · 700) — 지금 `.bv-new` 600 · `.vs-badge` · `.mini-badge` 700 · `.lib-tag` 700(10/12)이라 `.bv-new`만 600 → 700(verify "16 N 배지 … 600" 기대값을 700으로). `.lib-tag` 줄 높이 12 → 16(Badge 높이 — `.ed-pill` · 고르개 `.ed-opt` 안이라 줄이 늘지 않음). `.chip` 11 · 안쪽 4 → Tag 11 · 안쪽 8 · 높이 20. 화면 흐름 검사에서 깨지는 px 기대값은 PR에 목록으로 적고 고친다.
 - **잠긴 · 꺼진 버튼:** §6.0 상태 표대로(ia-v3 §2.3과 같음 — verify "26 잠긴 주 버튼 모양(B.23)"은 그대로 통과). `:disabled` 버튼은 지금 투명도 .5 → 투명도 없이 흐린 글자로 바뀐다. 잠긴 Destructive(예: 0개일 때 [선택한 0개 지우기])는 지금 `button.danger`가 뒤에 와 빨간 바탕 그대로 보이던 것이 회색으로 바뀐다(버그 고침).
@@ -637,14 +638,14 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 ## 부록 C. DS-2 체크리스트
 
-- [ ] C.1 토큰 더함(§6.8) — `global.error-hover` · `global.white-a25` · `color-state-error-hover` · `color-border-on-primary` · `icon-stroke`(1.5px), 대비 검사 짝 하나 더함, `color-state-error-border`의 `$description`을 "오류 알림 상자 테두리"로
-- [ ] C.2 `scripts/gen-icons.mjs` + `src/ui/icons.json` · `src/ui/icons.ts`(24개 · ISC + MIT 고지) · devDependency `lucide-static@1.79.0` · 빌드 결과에 고지 주석
-- [ ] C.3 `src/ui/components/` 30종 CSS + TS 함수 · `index.ts`, `src/ui/layouts/layouts.css`(9종)
-- [ ] C.4 `build.mjs` — `/* @ds-components */` 자리에 컴포넌트 · 레이아웃 CSS, `<i data-ds-icon>` → SVG(없는 이름이면 실패), `npm run gallery`
-- [ ] C.5 토큰 검사(§8) 대상에 `src/ui/**` · `src/gallery/*` 더함, §8-8(데이터 URI 색) 더함, 간격 · 테두리 굵기 검사가 `var()`와 `+`만 든 `calc()`도 허용하게 넓힘(§8-1 "`var()`만 든 `calc()`"와 맞춤)
-- [ ] C.6 기본 5종 바꿈(§6.9) — `ds-` 클래스 더함 · 옛 클래스 이름 남김 · `ui.html`에서 옛 모양 규칙 지움 · 글자 기호 → 아이콘
-- [ ] C.7 `src/gallery/` + `dist/ds-gallery.html`(커밋 안 함) + `scripts/verify-gallery.mjs` + `package.json` `gallery` 스크립트 + CI 단계
-- [ ] C.8 검사 4개 + 모음 화면 검사 통과, `verify-bind-flow`에서 바뀐 기대값(배지 굵기 · px)은 PR에 목록
-- [ ] C.9 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 변수 상세 · 설정) + 모음 화면 스크린샷
-- [ ] C.10 `ROADMAP.md` DS-2 줄 · `docs/ia-v4.md` · `docs/ia-v3.md` §2.3에서 바뀐 모양(꺼진 버튼 · 체크박스 · 아이콘 단추 · 링크 밑줄)을 가리키는 한 줄
+- [x] C.1 토큰 더함(§6.8) — `global.error-hover` · `global.white-a25` · `color-state-error-hover` · `color-border-on-primary` · `icon-stroke`(1.5px), 대비 검사 짝 하나 더함, `color-state-error-border`의 `$description`을 "오류 알림 상자 테두리"로
+- [x] C.2 `scripts/gen-icons.mjs` + `src/ui/icons.json` · `src/ui/icons.ts`(24개 · ISC + MIT 고지) · devDependency `lucide-static@1.79.0` · 빌드 결과에 고지 주석
+- [x] C.3 `src/ui/components/` 30종 CSS + TS 함수 · `index.ts`, `src/ui/layouts/layouts.css`(9종)
+- [x] C.4 `build.mjs` — `/* @ds-components */` 자리에 컴포넌트 · 레이아웃 CSS, `<i data-ds-icon>` → SVG(없는 이름이면 실패), `npm run gallery`
+- [x] C.5 토큰 검사(§8) 대상에 `src/ui/**` · `src/gallery/*` 더함, §8-8(데이터 URI 색) 더함, 간격 · 테두리 굵기 검사가 `var()`와 `+`만 든 `calc()`도 허용하게 넓힘(§8-1 "`var()`만 든 `calc()`"와 맞춤)
+- [x] C.6 기본 5종 바꿈(§6.9) — `ds-` 클래스 더함 · 옛 클래스 이름 남김 · `ui.html`에서 옛 모양 규칙 지움 · 글자 기호 → 아이콘
+- [x] C.7 `src/gallery/` + `dist/ds-gallery.html`(커밋 안 함) + `scripts/verify-gallery.mjs` + `package.json` `gallery` 스크립트 + CI 단계
+- [x] C.8 검사 4개 + 모음 화면 검사 통과, `verify-bind-flow`에서 바뀐 기대값(배지 굵기 · px)은 PR에 목록
+- [x] C.9 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 변수 상세 · 설정) + 모음 화면 스크린샷
+- [x] C.10 `ROADMAP.md` DS-2 줄 · `docs/ia-v4.md` · `docs/ia-v3.md` §2.3에서 바뀐 모양(꺼진 버튼 · 체크박스 · 아이콘 단추 · 링크 밑줄)을 가리키는 한 줄
 
