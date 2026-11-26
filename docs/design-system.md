@@ -1,9 +1,9 @@
 # 플러그인 디자인 시스템 — 명세
 
-> 2026-11-25 작성 · 검토 4회(중대 13 → 4 → 2 → 1 → 0, 남은 사소는 구현 때 고침), 디자인 방향 DS-D5–DS-D9 반영. 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
+> 2026-11-25 작성 · DS-1 검토 4회(중대 13 → 4 → 2 → 1 → 0), 디자인 방향 DS-D5–DS-D9. 2026-11-26 DS-2 명세(§5 · §6 · 부록 C — DS-D10–DS-D13) 더함. 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
 > 이 문서가 토큰 · 컴포넌트 · 레이아웃 · 사용 규칙의 **단일 명세**다. 토큰 값의 **단일 원본**은 `design-tokens/tokens.json`이고, 이 문서의 표는 그 원본과 같아야 한다(다르면 원본이 맞고 표를 고친다).
 > 본문 §3의 값은 **최종 값(DS-1 ② 단계 뒤)** 이다. ① 단계의 임시 값과 옮기기 규칙은 부록 A.
-> 기준: 본문 §0–§9에 중대 결함 0(CLAUDE.md 4단계). 부록 A(옮기기)와 B(체크리스트)는 DS-1 PR에서 닫는다.
+> 기준: 본문 §0–§9에 중대 결함 0(CLAUDE.md 4단계). 부록 A · B는 DS-1 PR, 부록 C는 DS-2 PR에서 닫는다.
 
 ## 0. 결정 요약
 
@@ -13,6 +13,7 @@
 | 단계 (DS-D1 · DS-D6) | **DS-1(지금, 한 PR에 두 단계)** — ① 옮기기: 토큰 원본 + `src/ui.html` · `src/ui.ts` · `src/treeList.ts`의 직접 값을 토큰으로(값은 지금과 거의 같음 — 부록 A) ② 새 값: 토큰 원본의 값만 §3의 최종 값으로. **DS-2** 공통 컴포넌트 30종 · 레이아웃 9종 + 개발용 모음 화면. **DS-3** 리디자인(작업별 탭 · Header · 하단 실행 줄 · 영어 문구, brief). |
 | 컴포넌트 범위 (DS-D2) | 요청 목록 **30종 전부**(§6). 지금 화면에 없는 5종(Split Button · Radio · Breadcrumb · Table · Toast)도 만든다. |
 | 간격 (DS-D3) | 4px 격자(4 · 8 · 12 · 16 · 20 · 24 · 32 · 40) + 2px. |
+| DS-2 (DS-D10–DS-D13) | 새 브랜치 · 새 PR · 만드는 법은 CSS 클래스(`ds-`) + TS 함수 · 지금 화면은 기본 5종(Button · Icon Button · Input/Select · Checkbox · Badge/Tag)만 바꿈 · 아이콘은 Lucide 23개(ISC) — §6 |
 | Figma (DS-D4) | 코드 먼저. 원본을 JSON(DTCG)으로 두어 나중에 이 플러그인으로 Figma 변수를 만든다. |
 | 상태색 대비 (DS-D7) | Success `#16845B` · Warning `#B7791F` · Error `#D64545`는 **지정 값 그대로** 글자에도 쓴다. 4.5:1 미달은 열린 결함(§9)으로 적고 대비 검사의 예외 목록에 둔다. |
 | Information (DS-D8) | **모노크롬** — `#111111` 글자 + ⓘ 아이콘 + Neutral 100 바탕. |
@@ -282,21 +283,21 @@
 
 ## 5. 공통 Layout System (DS-2)
 
-> 자리는 DS-3 리디자인 명세에서 확정한다(SC-D26 · SC-D27 · SC-D28). DS-2는 아래 틀을 만들어 두고, 지금 화면은 DS-3에서 옮겨 탄다.
+> DS-2는 아래 틀을 CSS 클래스로 만들고 모음 화면(§6.10)에서 보인다. **지금 화면은 옮기지 않는다** — 자리는 DS-3 리디자인 명세에서 확정한다(SC-D26 · SC-D27 · SC-D28, DS-D12).
 
 창 560 × 510(ia-v4 §8). 틀(Header 40 + 탭 36 + 실행 줄 52 = 128px)이 세로의 약 25%. 하위 화면은 Page Header 40이 더해져 콘텐츠 약 342px.
 
-| 레이아웃 | 짜임 | 토큰 | 지금 코드 |
+| 레이아웃 | 클래스 · 짜임 | 토큰 | 지금 코드(DS-3에서 옮김) |
 |---|---|---|---|
-| **PluginLayout**(그릇) | Header · Navigation · (Page Header) · 스크롤 콘텐츠 · Bottom Action Bar. 콘텐츠만 스크롤 | `color-background-primary` · 양옆 `space-3` | `body` · `.tab-section` |
-| **Plugin Header** | 왼쪽 로고 · 이름, 가운데 선택 대상(말줄임), 오른쪽 ⚙ · 도움말 Icon Button. 아래 1px 선 | `size-header` · `text-heading-sm` | 없음(SC-D27) |
-| **Navigation** | 작업별 Tab(밑줄형) 한 줄. 고른 탭은 `color-text-emphasis` + 아래 `border-width-thick` `color-primary` 막대 | `size-nav` · `text-label` | `.tabs`(세그먼트형) |
-| **Page Header** | ← Icon Button · 제목 · 오른쪽 보조 정보(말줄임) | `size-header` · `text-heading` | `.sub-head` |
-| **Content Section** | 제목 · 짧은 설명 · 본문. 절 사이 `space-6`. 카드는 꼭 필요할 때만 | `text-heading-sm` · `text-body-sm` | `.step` |
-| **Settings Section** | 라벨–컨트롤 줄(라벨 왼쪽, 컨트롤 오른쪽), 줄 높이 `size-control-md` + 위아래 `space-1` | `text-label` | ⚙ 설정 화면 |
-| **Result Section** | 요약 한 줄 + List Item 목록 + 빈 · 오류 상태 자리 | `text-body` | `.results` · 트리 |
-| **Bottom Action Bar** | 위 1px 선. 왼쪽 Ghost(취소 · 뒤로), 오른쪽 끝 Primary 하나(+ 그 왼쪽 Secondary). 콘텐츠 아래에 같은 높이 여백 | `size-action-bar` · 버튼 `size-control-md` · 사이 `space-2` | `.sub-foot` · `.make-foot` · `.sel-tools` |
-| **Modal Layout** | 제목 · 본문 · 아래 오른쪽 [취소(Ghost)] [확인(Primary 또는 Destructive)] | `size-modal-*` · `radius-large` · `elevation-3` · 안쪽 `space-4` | `.modal` |
+| **PluginLayout**(그릇) | `.ds-layout` — 세로 flex, 높이 100vh. 자식 순서 Header · Navigation · (Page Header) · `.ds-layout__body`(스크롤 — 이것만 `overflow: auto`) · Bottom Action Bar | `color-background-primary` · 본문 양옆 `space-3` | `body` · `.tab-section` |
+| **Plugin Header** | `.ds-header` — 왼쪽 `.ds-header__brand`(로고 16 + 이름 `text-heading-sm`), 가운데 `.ds-header__scope`(선택 대상, 말줄임, `text-body-sm` `color-text-secondary`), 오른쪽 Icon Button(⚙ · 도움말). 아래 1px 선 | `size-header` · 좌우 `space-3` · 사이 `space-2` | 없음(SC-D27) |
+| **Navigation** | `.ds-navbar` — 밑줄형 Tab(§6.3)을 한 줄로. 왼쪽 맞춤, 탭 사이 `space-4`. 아래 1px 선 | `size-nav` · 좌우 `space-3` | `.tabs`(세그먼트형) |
+| **Page Header** | `.ds-page-header` — ← Icon Button(sm) · 제목(`text-heading`, 말줄임) · 오른쪽 보조 정보(`text-body-sm` `color-text-secondary`, 말줄임). 아래 1px 선 | `size-header` · 사이 `space-2` | `.sub-head` |
+| **Content Section** | `.ds-section` — `.ds-section__title`(`text-heading-sm`) · `.ds-section__desc`(`text-body-sm` `color-text-secondary`) · 본문. 절 사이 `space-6`, 제목–본문 `space-2` | `space-2` · `space-6` | `.step` |
+| **Settings Section** | `.ds-settings` — `.ds-settings__row` 줄 목록: 라벨(왼쪽, `text-label` + 설명 `text-body-sm`) · 컨트롤(오른쪽). 줄 최소 높이 `size-control-md` + 위아래 `space-1`, 줄 사이 구분선 없음 | `text-label` | ⚙ 설정 화면 |
+| **Result Section** | `.ds-result` — `.ds-result__summary`(한 줄 요약, `text-body`) + List Item 목록 + 빈 · 오류 상태 자리(§6.5 State) | `space-2` | `.results` · 트리 |
+| **Bottom Action Bar** | `.ds-actionbar` — 위 1px 선, 바탕 `color-background-primary`. `.ds-actionbar__start`(Ghost: 취소 · 뒤로) · `.ds-actionbar__end`(오른쪽 끝 Primary 하나, 그 왼쪽 Secondary). 본문 아래에 같은 높이 여백(`padding-bottom: var(--size-action-bar)`)을 둬 가리지 않음 | `size-action-bar` · 버튼 `size-control-md` · 사이 `space-2` · 좌우 `space-3` | `.sub-foot` · `.make-foot` · `.sel-tools` |
+| **Modal Layout** | Modal(§6.5)의 짜임 — `.ds-modal__header`(제목 `text-heading` + 닫기 Icon Button sm) · `.ds-modal__body`(스크롤) · `.ds-modal__footer`(오른쪽 [취소(Ghost)] [확인(Primary 또는 Destructive)], 위 1px 선) | `size-modal-*` · `radius-large` · `elevation-3` · 안쪽 `space-4` · 머리 · 바닥 위아래 `space-3` | `.modal` |
 
 PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~ Modal Layout)을 담는다(그래서 표는 9행).
 
@@ -304,73 +305,159 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 ## 6. 공통 UI Component (DS-2)
 
-상태 열: D Default · H Hover · A Active · F Focus · X Disabled · L Loading. **—** = 정의하지 않음.
-"지금 코드" = DS-2에서 바꿔 끼울 지금 클래스(DS-1은 이름을 바꾸지 않고 토큰만 바꾼다). "없음" = 새로 만듦. **이 절의 "핵심 토큰"은 DS-2의 컴포넌트 기준이다** — DS-1의 옮기기는 부록 A.1을 따른다(둘이 다르면 DS-1은 A.1, DS-2에서 이 절로 맞춤).
+### 6.0 모든 컴포넌트에 같은 규칙 (DS-D11)
+
+**이름 · 쓰는 법**
+- CSS 클래스 `.ds-{이름}`, 변형 `.ds-{이름}--{변형}`, 크기 `--sm` · `--md` · `--lg`(md가 기본 — 클래스를 생략하면 md). 안쪽 부분은 `.ds-{이름}__{부분}`.
+- 정적 HTML(`ui.html`)은 클래스를 바로 쓴다. `ui.ts`는 같은 클래스를 붙이는 작은 함수(`src/ui/components/` — §6.7)를 쓴다. 함수는 DOM 요소를 돌려주고, 상태를 바꾸는 메서드가 필요한 것만 객체로 돌려준다(표의 "함수" 칸).
+- **상태는 클래스가 아니라 HTML 속성으로** 표시한다: `:hover` · `:active` · `:focus-visible` · `:disabled` · `aria-disabled="true"`(잠김) · `aria-busy="true"`(Loading) · `aria-pressed` · `aria-checked` · `aria-selected` · `aria-current` · `aria-invalid`. 상태용 클래스(`.is-hover` 등)는 모음 화면(§6.10)의 "강제 상태" 칸에서만 쓰고 그 CSS는 모음 화면 파일에만 둔다.
+
+**상태 모양(§6.1–§6.5의 상태 칸은 이 표를 따른다)**
+
+| 상태 | 모양 | 비고 |
+|---|---|---|
+| Default | 각 컴포넌트 표 | |
+| Hover | 바탕 `color-interactive-hover`. Primary는 `color-primary-hover`, Destructive는 `color-state-error-hover` | 누를 수 있는 것만 |
+| Active(누름) | Hover와 같다(토큰 하나 — DS-2 대략 시안 확인) | |
+| Focus | 누르는 것: `focus-ring-default`(`:focus-visible`만 — 마우스 클릭엔 안 보임). 입력류: 테두리 `color-interactive-focus` + `focus-ring-field` + 바탕 `color-surface-primary` | |
+| Disabled · 잠김 | **같은 모양**(DS-O4 해결): 글자 · 아이콘 `color-text-tertiary`, 바탕 `color-surface-secondary`, 테두리 `color-border-default`(테두리 없는 변형은 없음 그대로). Primary · Destructive도 색이 빠져 같은 모양. 투명도는 쓰지 않는다(흐려 보이지 않게 — DS-D5). 차이는 동작뿐: `:disabled`는 포커스 · 클릭 없음, `aria-disabled="true"`(잠김)는 포커스를 받고 누르면 사유를 보인다(ia-v3 §2.3). 커서는 둘 다 `default` | `opacity-disabled` 토큰은 Toggle · Checkbox · Radio의 꺼짐에만 남긴다 |
+| Loading | `aria-busy="true"`: 글자 · 아이콘을 투명하게 해 너비를 지키고, 가운데 돌기(12px, `border-width-thick`, `motion-duration-spin`) — 돌기 색은 그 변형의 글자색. 누르기 막음(`pointer-events: none`) | Button · Icon Button · Split Button만 |
+
+**공통**
+- 누르는 곳은 최소 `size-hit-min`(24). 그보다 작은 것(Checkbox 14 등)은 라벨까지 누르는 곳에 넣는다.
+- 아이콘만 있는 컴포넌트는 `aria-label` + 툴팁(`data-tip` — 지금 `#uiTip` 장치, §6.4 Tooltip)이 필수다.
+- 색만으로 상태를 가르지 않는다(§1-6) — 상태 Badge · Alert · Toast는 아이콘을 함께 쓴다.
+- 모든 값은 토큰(§8 — 컴포넌트 CSS도 검사 대상).
 
 ### 6.1 Action
 
-| 컴포넌트 | Variant | Size | 상태 | 핵심 토큰 | 지금 코드 |
-|---|---|---|---|---|---|
-| Button | Primary · Secondary · Ghost · Destructive · Link | sm 24 · md 28 · lg 32 | D H A F X L | Primary `color-primary(-hover)` + `color-text-on-primary` · Secondary `color-secondary-*` · Destructive `color-state-error` + `color-text-inverse` · `radius-small`(sm는 `radius-xs`) · `focus-ring-default` | `button` · `.primary` · `.danger` · `.link` · `.link-btn` · `.bd-skip` |
-| Icon Button | Ghost · Secondary | sm 24 · md 28 | D H A F X L | `color-interactive-hover` · `size-icon-md` · 툴팁 필수 | `.icon-btn` · `.tab-min` · `.sub-back` · `.ed-dd` |
-| Button Group | 붙임(테두리 공유) · 띄움(`space-2`) | 버튼 크기 | (버튼 상태) | `space-2` | `.acts` · `.row` 안 버튼 |
-| Split Button | Primary · Secondary | md | D H A F X L | 버튼과 같음 + 나눔 선 `color-border-strong` | 없음 |
-
-- Hover: Primary는 바탕 `color-primary-hover`, Secondary · Ghost는 바탕 `color-interactive-hover`. Focus: `focus-ring-default`. Disabled: `opacity-disabled` · 커서 기본. 잠김(`aria-disabled`): 글자 `color-text-tertiary` · 포커스는 받음(ia-v3 §2.3). Loading: 글자 자리를 지키고 앞에 돌기, `aria-busy`.
+| 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
+|---|---|---|---|---|
+| **Button** | `.ds-btn` + `--primary` · (Secondary = 기본) · `--ghost` · `--danger` · `--link` / `--sm`(높이 24 · 좌우 `space-2` · `text-label-sm` · `radius-xs`) · md(28 · `space-3` · `text-label` · `radius-small`) · `--lg`(32 · `space-4`). 아이콘 + 글자 사이 `space-1`, 버튼 안 아이콘 14px. Secondary 바탕 `color-secondary-bg` · 테두리 `color-secondary-border`, Primary 바탕 · 테두리 `color-primary` · 글자 `color-text-on-primary`, Ghost 테두리 · 바탕 없음, Destructive 바탕 `color-state-error` · 글자 `color-text-inverse`, Link 높이 auto · 안쪽 0 · `color-text-link` · 밑줄(아래 2px 띄움), hover 글자 `color-interactive-focus-hover` | `button({ variant, size, label, icon?, iconEnd?, onClick? })` → `{ el, setLoading(b), setDisabled(b), setLocked(reason) }` | `<button type="button">`. 잠김은 `aria-disabled` + 사유 | **바꿈**(§6.9) |
+| **Icon Button** | `.ds-btn .ds-icbtn` + `--ghost`(기본으로 씀) · Secondary / `--sm` 24×24 · md 28×28. 아이콘 16px(sm도 16 — 누르는 곳만 작음) | `iconButton({ icon, label, variant?, size? })` | `aria-label` = `label`, `data-tip` = `label` 필수 | **바꿈**(§6.9) |
+| **Button Group** | `.ds-btngroup` — 붙임(이웃 테두리 겹침 `margin-left: -1px`, 바깥 모서리만 둥글게) · `.ds-btngroup--spaced`(사이 `space-2`) | `buttonGroup(buttons, { attached? })` | 붙임은 `role="group"` + `aria-label` | 클래스만(DS-3에서 씀) |
+| **Split Button** | `.ds-split` = 주 버튼 + 펼침 Icon Button(▾). 둘 사이 나눔 선: Primary는 `color-border-on-primary`(새 토큰 — 흰색 25%), Secondary는 `color-border-default` | `splitButton({ label, variant, onClick, menu: [{label, onClick}] })` | 펼침 단추 `aria-haspopup="menu"` · `aria-expanded` | 새로(모음 화면만) |
 
 ### 6.2 Form
 
-| 컴포넌트 | Variant | Size | 상태 | 핵심 토큰 | 지금 코드 |
-|---|---|---|---|---|---|
-| Input | 기본 · Error | sm 24 · md 28 | D H — F X — | 바탕 `color-surface-secondary` · 테두리 `color-border-default` → hover `-strong` → focus `color-interactive-focus` + `focus-ring-field` · Error `color-state-error(-border)` · `radius-small` | `input[type=text/number]` · `.ed-field` |
-| Textarea | 기본 · mono | 최소 3줄 | D H — F X — | Input과 같음 · `font-family-mono` | `textarea` |
-| Select | 기본 | sm · md | D H — F X — | Input과 같음 | `select` · `.mode-select` |
-| Checkbox | 체크 · 일부 · 해제 | `size-checkbox` | D H A F X — | 체크 `color-interactive-focus` · 테두리 `color-border-strong` · `radius-xs` | `input[type=checkbox]` |
-| Radio | 고름 · 안 고름 | `size-checkbox` | D H A F X — | Checkbox와 같음 · `radius-full` | 없음 |
-| Toggle | 켬 · 끔 · 일부 | `size-toggle-*` | D H A F X — | 켬 `color-primary` · 끔 `color-border-strong` · 손잡이 `color-surface-primary` + `toggle-knob-shadow` | `button.bv-switch` · `.bv-track` |
-| Search Field | 기본 · 값 있음(지우기) | sm · md | D H — F X — | Input과 같음 + 돋보기 `size-icon-sm` | `.search-box` · `.ed-psearch` |
+| 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
+|---|---|---|---|---|
+| **Input** | `.ds-input` — 높이 md 28 · `--sm` 24 · 좌우 `space-2` · `text-body` · 바탕 `color-surface-secondary` · 테두리 `color-border-default` → hover `color-border-strong` · `radius-small`. 오류: `aria-invalid="true"` → 테두리 `color-state-error` + 아래 `.ds-help--error`(아이콘 + 글, `color-state-error`). 라벨 `.ds-label`(`text-label-sm` `color-text-secondary`) · 도움말 `.ds-help`(`text-body-sm`) · 묶음 `.ds-field`(세로, 사이 `space-1`) | `input({ value, placeholder, size?, invalid?, label?, help? })` | 라벨은 `<label for>` 또는 `aria-label` | **바꿈**(§6.9) |
+| **Textarea** | `.ds-input .ds-textarea` — 높이 자유(최소 3줄 = 64), 위아래 `space-1`, mono 선택 `--mono`(`text-mono`), 세로로만 늘림 | `textarea({ value, rows?, mono? })` | Input과 같음 | 클래스만(지금 `textarea` 1곳은 Input 규칙을 받음) |
+| **Select** | `.ds-select` 그릇 + 안의 `<select class="ds-input">` + 오른쪽 ▾ 아이콘(12px, `color-text-secondary`, 오른쪽 `space-2`). 브라우저 화살표 숨김(`appearance: none`), 오른쪽 안쪽 28 | `select({ options, value, size? })` | 기본 `<select>` 그대로(키보드 · 화면 읽기) | **바꿈**(§6.9) |
+| **Checkbox** | `.ds-check` — **기본 `<input type="checkbox">`를 그대로 두고 모양만 그림**(`appearance: none`): 14×14 · `radius-xs` · 테두리 `color-border-strong` · 바탕 `color-surface-primary`. 체크: 바탕 · 테두리 `color-interactive-focus` + 흰 ✓(`check` 아이콘을 `mask`로, `color-text-on-primary`). 일부(`indeterminate`): ✓ 대신 가로 막대(`minus`). 꺼짐: `opacity-disabled`. 라벨과 사이 `space-2`, 라벨까지 누르는 곳 | `checkbox({ label, checked, indeterminate? })` | 기본 체크박스라 키보드 · 화면 읽기 그대로 | **바꿈**(§6.9) |
+| **Radio** | `.ds-radio` — Checkbox와 같은 방식 · `radius-full` · 고름: 테두리 4px `color-interactive-focus`(가운데 흰 점처럼) | `radioGroup({ name, options, value })` | `<fieldset>` + `<legend>` 또는 `role="radiogroup"` | 새로(모음 화면만) |
+| **Toggle** | `.ds-toggle` — 트랙 `size-toggle-w` × `size-toggle-h` · `radius-full`, 끔 `color-border-strong` · 켬 `color-primary` · 일부(mixed) `color-primary` + 손잡이 가운데. 손잡이 12 · `color-surface-primary` · `toggle-knob-shadow` · 이동 `motion-duration-fast` | `toggle({ checked, mixed?, label })` | `<button role="switch" aria-checked>` | 클래스만(지금 `.bv-switch`는 모양이 같아 DS-3에서 이름만 바꿈) |
+| **Search Field** | `.ds-search` — Input + 왼쪽 돋보기(14px, `color-text-tertiary`, 왼쪽 안쪽 28) + 값이 있으면 오른쪽 지우기 Icon Button(sm, `x`) | `searchField({ placeholder, onInput, onClear })` | `type="search"`, 지우기 단추 `aria-label` | **바꿈**(§6.9 — 변수 탭 검색칸) |
 
 ### 6.3 Navigation
 
-| 컴포넌트 | Variant | Size | 상태 | 핵심 토큰 | 지금 코드 |
-|---|---|---|---|---|---|
-| Tab | 밑줄형(작업별 탭) · 세그먼트형(화면 안 나눔) | md | D H A F X — | 글자 `color-text-secondary` → 고름 `color-text-emphasis` · 밑줄 `border-width-thick` `color-primary` · 세그먼트 고름 `color-surface-primary` + `elevation-1` | `.tabs .tab-btn` · `.subtab` · `.mk-tabs` |
-| Navigation Item | 1단 · 2단 · 위험 | 줄 `size-control-md` | D H A F — — | 고름 `color-surface-selected` + `color-text-emphasis` + 배지 `nav-selected-badge-bg` · hover `color-interactive-hover` · `radius-small` | `.vs-item` |
-| Breadcrumb | 기본(마지막은 글자) | — | D H — F — — | `color-text-link` · 구분 기호 `color-text-tertiary` | 없음 |
-| Step Indicator | 가로 점 · 번호 | — | 지남 · 지금 · 남음 (+F) | 지금 `color-primary` · 지남 `color-text-secondary` · 남음 `color-border-strong` | `.steps` |
+| 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
+|---|---|---|---|---|
+| **Tab** | 밑줄형 `.ds-tabs` > `.ds-tab` — 높이 `size-nav`, 사이 `space-4`, `text-label`, 글자 `color-text-secondary` → hover `color-text-primary` → 고름 `color-text-emphasis` + 아래 `border-width-thick` `color-primary` 막대(줄 아래 1px 선과 겹침). 세그먼트형 `.ds-seg` > `.ds-seg__item` — 그릇 바탕 `color-surface-secondary` · 안쪽 `space-0-5` · `radius-small`, 항목 높이 `size-control-sm` · 좌우 `space-3` · `text-label-sm` · `radius-xs`, 고름 바탕 `color-surface-primary` + `elevation-1` + `color-text-emphasis` | `tabs({ items, value, onChange, kind: 'underline' \| 'segment' })` | `role="tablist"` · `tab` · `aria-selected` · 화살표 키로 이동(roving tabindex) | 클래스만(DS-3) |
+| **Navigation Item** | `.ds-navitem` — 높이 `size-control-md` · 좌우 `space-2` · 사이 `nav-item-gap`(3) · `radius-small`, 2단 `--lv2`(왼쪽 `space-5`), 고름(`aria-current="true"`) 바탕 `color-surface-selected` · `color-text-emphasis` · 굵게 · 개수 배지 `nav-selected-badge-bg`, hover `color-interactive-hover`, 위험 `--danger`(글자 `color-state-error`) | `navItem({ label, count?, level?, selected? })` | 목록 `role="listbox"`면 `option` + `aria-selected` | 클래스만(지금 `.vs-item`은 모양이 같아 DS-3) |
+| **Breadcrumb** | `.ds-crumb` — 링크(`color-text-link` 밑줄) · 구분 `chevron-right` 12px `color-text-tertiary` · 마지막은 글자(굵게, `aria-current="page"`), 사이 `space-1`, `text-body-sm` | `breadcrumb(items)` | `<nav aria-label>` + `<ol>` | 새로(모음 화면만) |
+| **Step Indicator** | `.ds-steps` > `.ds-step` — 원 16(번호 `text-caption`) + 글자 `text-label-sm`, 사이 선 20 × 1 `color-border-strong`. 남음: 원 테두리 `color-border-strong` · 글자 `color-text-tertiary`. 지금(`aria-current="step"`): 원 `color-primary` · 번호 `color-text-on-primary` · 글자 `color-text-emphasis`. 지남: 원 `color-surface-selected` + ✓ · 글자 `color-text-secondary` | `steps({ items, current })` | `<ol>` + 지금 단계 `aria-current="step"` | 새로(지금 `.steps`는 DS-3) |
 
 ### 6.4 Data Display
 
-| 컴포넌트 | Variant | Size | 상태 | 핵심 토큰 | 지금 코드 |
-|---|---|---|---|---|---|
-| Badge | 숫자 · 상태(성공 · 주의 · 오류 · 안내) · 짙음 | 높이 14 | D | `text-caption` · `radius-xs` · 상태 `-subtle` 바탕 + 상태 글자 · 짙음 `color-surface-inverse` | `.mini-badge` · `.vs-badge` · `.bv-new` |
-| Tag | 변수 칩(옅은 칸 + 짙은 칸) · 일반 · 주의 | `size-compact` 이하 | D H — F X — | `chip-*` · `radius-full` · `space-0-5` | `.vchip` · `.chip` · `.tr-tag` · `.lib-tag` · `.step-chip` |
-| Tooltip | 짙음 | 최대 너비 240 | (보임 · 숨김) | `color-surface-inverse` · `color-text-inverse` · `text-body-sm` · `radius-small` · `elevation-2` | `#uiTip` · `.vt-tip` |
-| Card | 기본 · 접힘 · 상태 바탕 | — | D (접기 머리 H F) | `color-surface-primary` · `color-border-default` · `radius-medium` · `space-3` · 그림자 없음 | `.step` · `.sel-card` · `.bind-card` |
-| List Item | 한 줄 · 두 줄 · 머리 줄 | 줄 32 | D H A F X — | 구분선 `color-border-default` 또는 없음(ia-v4 §2.8 · §2.7) · `color-interactive-hover` | `.tr` · `.vt-row` · `.mk-row` · `.skip-row` · `.results .r-card` |
-| Table | 기본 · 줄 고름 | 줄 32 · 머리 28 | D H A — — — | `text-label-sm` 머리 · 줄 구분선 · `radius-none` | 없음 |
-| Progress Indicator | 막대 · 돌기 · 단계 수 | 막대 높이 4 | 진행 · 끝남 · 오류 | `color-primary` · 트랙 `color-surface-secondary` · `radius-full` · `motion-duration-spin` | `#applyProgress .bar` · `.unused-prog` · `.make-prog` · `.mini-mark.busy` |
-
-- Card 안에는 Card를 넣지 않는다 — 안쪽은 List Item · 옅은 띠(`color-surface-secondary`)로(§1-7). `.results` 안 `.r-card`는 이미 카드 모양을 걷은 목록 줄이다(`ui.html`의 `.results:not(#tsList) .r-card` · `#tsList .r-card` 규칙). 기본 `.r-card` 규칙(테두리 · 둥글기 · 바탕)은 쓰이지 않는 스타일이라 DS-2에서 지운다.
+| 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
+|---|---|---|---|---|
+| **Badge** | `.ds-badge` — 높이 16 · 좌우 `space-1` · `text-caption` · `radius-xs` · 아이콘 10. 기본(숫자) 바탕 `color-surface-secondary` · 글자 `color-text-secondary`. `--success` · `--warning` · `--error` · `--info`: 바탕 상태 `-subtle` + 글자 상태색 + 아이콘 필수. `--solid`: 바탕 `color-surface-inverse` · 글자 `color-text-inverse`. `--dot`(겹쳐 붙는 숫자 원, 14 · `radius-full` — 지금 `.mini-badge`) | `badge({ text, tone?, icon? })` | 숫자만이면 뜻을 `aria-label`로(예: "변수 24개") | **바꿈**(§6.9) |
+| **Tag** | `.ds-tag` — 높이 20 · 좌우 `space-2` · `radius-full` · `text-body-sm` · 바탕 `color-surface-secondary` · 글자 `color-text-secondary`, `--warn`(주의 — 바탕 `color-state-warning-subtle` · 글자 `color-state-warning`), `--outline`(바탕 없음 · 테두리 `color-border-strong`). **변수 칩** `.ds-chip` — 옅은 칸 `.ds-chip__alias`(`chip-alias-text`) + 짙은 칸 `.ds-chip__value`(`chip-value-bg` · `chip-value-text`), mono 11 · 높이 20 · `radius-full` · 테두리 `color-border-default` | `tag({ text, tone? })` · `chip({ alias?, value? })` | 장식이면 그대로, 누를 수 있으면 `<button>` | **바꿈**(§6.9 — `.chip` · `.tr-tag` · `.lib-tag`. 변수 칩 `.vchip`은 TR-D3 모양이라 DS-3) |
+| **Tooltip** | `.ds-tip` — 바탕 `color-surface-inverse` · 글자 `color-text-inverse` · `text-body-sm` · 안쪽 `space-1` `space-2` · `radius-small` · `elevation-2` · 최대 너비 240 · 꼬리 8 | `tooltip(el, text)` — 지금 `#uiTip` 장치(`data-tip` · 창 안으로 클램프)를 그대로 쓰고 모양만 이 클래스로 | 툴팁은 보조 — 뜻은 `aria-label`에 | 모양만 바꿈(`#uiTip`에 `.ds-tip` — 아이콘 단추 툴팁이 필수라서) |
+| **Card** | `.ds-card` — 테두리 `color-border-default` · `radius-medium` · 바탕 `color-surface-primary` · 안쪽 `space-3` · 그림자 없음. 머리 `.ds-card__title`(`text-heading-sm`) + `.ds-card__desc`. **안에 Card 금지**(§1-7) | `card({ title, desc?, body })` | | 클래스만(지금 `.step` · `.sel-card`는 DS-3) |
+| **List Item** | `.ds-li` — 최소 높이 32 · 위아래 `space-1` · 좌우 `list-row-pad-x` · 사이 `space-2`, 줄 사이 구분선 `color-border-default`(`--plain`이면 없음 — TR 트리 모양), hover `color-interactive-hover`, 고름 `color-surface-selected`. 두 줄 `.ds-li__sub`(`text-body-sm` `color-text-secondary`) | `listItem({ lead?, title, sub?, trail? })` | 고를 수 있는 목록이면 `role="option"` | 클래스만(DS-3) |
+| **Table** | `.ds-table` — 머리 줄 28(`text-label-sm` `color-text-secondary` · 아래 1px `color-border-strong`) · 줄 32(아래 1px `color-border-default`) · 좌우 `space-2` · 숫자 칸 `--num`(mono · 오른쪽 맞춤) · 고른 줄 `color-surface-selected` · `radius-none` | `table({ columns, rows })` | `<table>` + `<th scope>` | 새로(모음 화면만) |
+| **Progress Indicator** | 막대 `.ds-progress`(높이 4 · 트랙 `color-surface-secondary` · 채움 `color-primary` · 오류 `--error` 채움 `color-state-error` · `radius-full` · 너비 변화 `motion-duration-fast`), 돌기 `.ds-spinner`(16 · 12 sm · 테두리 `border-width-thick` `color-surface-selected` + 위 `color-primary` · `motion-duration-spin`), 단계 수 `.ds-progress__count`(`text-body-sm`) | `progress({ value, max })` · `spinner({ size })` | 막대 `role="progressbar"` + `aria-valuenow`, 돌기 `role="status"` + 숨은 글 | 클래스만(DS-3) |
 
 ### 6.5 Feedback
 
-| 컴포넌트 | Variant | Size | 상태 | 핵심 토큰 | 지금 코드 |
-|---|---|---|---|---|---|
-| Alert | Info · Success · Warning · Error (글자 + 아이콘 필수) | 띠(카드 · 모달 안) · 상자(카드 밖) | D (닫기 H F) | 상태 글자 · `-subtle` 바탕 · 상자는 `-border` 테두리 + `radius-medium`, 띠는 테두리 없음 + `radius-small` | `.banner` · `.banner.caution` · `.ux` · `.ed-alert` · `.dark-notice` · `.tidy` |
-| Toast | Info · Success · Error | 창 아래 가운데, 최대 너비 = 창 − 2 × `space-3` | 나타남 · 사라짐(4초) | `color-surface-inverse` · `color-text-inverse` · `radius-large` · `elevation-2` · `z-tooltip` | 없음(SC-D10 — `.status-line`을 대신함) |
-| Modal | 기본 | `size-modal-sm` · `-md` | 열림 (닫기 F) | Modal Layout(§5) · `color-overlay` · `z-modal` | `.modal-backdrop` · `.modal` |
-| Confirm Dialog | 일반 · 위험(Destructive 확인) | `size-modal-sm` | 열림 | Modal과 같음 | 없음(지금 `.ed-confirm`은 대화 상자가 아니라 팝업 아래의 확인 줄 — DS-2에서 이 컴포넌트로 바꿀지 정함) |
-| Empty State | 처음 · 결과 없음 | 가운데, 위아래 `space-10` | D | `text-display` · `text-body-sm` · 아이콘 `size-icon-lg` | `.sel-empty` · `.var-empty` · `.vt-empty` · `.bind-empty` · `.unused-none` |
-| Loading State | 줄 뼈대 · 돌기 | 목록 / 화면 | L | `color-surface-secondary` 뼈대 · `motion-duration-spin` | `.var-loading` · `.tr-skel` · `.mini-mark.spin` |
-| Error State | 화면 · 칸 | — | D (다시 시도) | `color-state-error` · 아이콘 · 다시 시도 Secondary | `.ed-alert.err` · `.ed-ferr` |
-| Success State | 화면 · 줄 | — | D | `color-state-success` · 아이콘 | `.bind-empty.done` · `.status-line.ok` |
+| 컴포넌트 | 클래스 · 변형 · 크기 · 치수 | 함수 | 접근성 | 지금 코드 → DS-2 |
+|---|---|---|---|---|
+| **Alert** | `.ds-alert` + `--info` · `--success` · `--warning` · `--error` — 아이콘(14, `info` · `circle-check` · `triangle-alert` · `circle-alert`) + 글(`text-body-sm`, 머리말 굵게 선택). 바탕 상태 `-subtle`, 글 · 아이콘 상태색. 띠(기본 — 카드 · 모달 안): 테두리 없음 · `radius-small` · 안쪽 `space-2` `space-3`. 상자 `--box`(카드 밖): 테두리 상태 `-border`(Warning · Success는 `-subtle` 바탕만 — 테두리 토큰 없음) · `radius-medium`. 닫기는 끝에 Icon Button sm | `alert({ tone, title?, text, onClose? })` | 오류는 `role="alert"`, 나머지 `role="status"` | 클래스만(지금 `.banner` · `.ux` 등은 DS-3) |
+| **Toast** | `.ds-toast` — 창 아래 가운데(아래 `space-3` 띄움), 최대 너비 = 창 − 2 × `space-3`, 바탕 `color-surface-inverse` · 글 `color-text-inverse` · `text-body-sm` · 안쪽 `space-2` `space-3` · `radius-large` · `elevation-2` · `z-tooltip`. 앞 아이콘(성공 `circle-check` · 오류 `circle-alert` · 안내 `info`) · 끝 동작 링크(밑줄, 굵게). 한 번에 하나(새 것이 옛 것을 바꿈). 4초 뒤 사라짐, 마우스를 올리면 멈춤, 오류는 닫을 때까지 남음 | `toast({ tone, text, action?: {label, onClick}, duration? })` → `{ close() }` | 담는 곳 하나 `role="status"` `aria-live="polite"`(오류 `assertive`) | 새로(SC-D10 상태 줄 대신은 DS-3) |
+| **Modal** | `.ds-modal-scrim`(전체 · `color-overlay` · `z-modal` · 위 `space-10` 띄움) > `.ds-modal`(너비 `size-modal-md`, 좁으면 창 − 2 × `space-4`, 최대 높이 창 − 80 · 바탕 `color-surface-primary` · `radius-large` · `elevation-3`) + Modal Layout(§5) | `openModal({ title, body, actions, onClose })` → `{ close() }` — 처음 포커스를 첫 입력 또는 닫기에, Tab 가두기, Esc · 막 누르면 닫기(바뀐 내용이 있으면 확인), 닫으면 연 단추로 포커스 되돌림 | `role="dialog"` · `aria-modal="true"` · `aria-labelledby` | 클래스 · 함수만(지금 `.modal`은 DS-3) |
+| **Confirm Dialog** | Modal `--sm`(`size-modal-sm`) + 본문 한두 문장 + [취소(Ghost)] [확인]. 위험한 일은 확인이 Destructive | `confirmDialog({ title, text, confirmLabel, danger? })` → `Promise<boolean>` — 처음 포커스는 **취소**(위험하면) | `role="alertdialog"` | 새로(지금 `.ed-confirm` 확인 줄은 DS-3에서 정함) |
+| **Empty State** | `.ds-state` — 가운데, 위아래 `space-8`, 아이콘 `size-icon-lg` `color-text-tertiary` · 제목 `text-display` `color-text-emphasis` · 설명 `text-body-sm` `color-text-secondary` · 동작 Button(Secondary) | `stateView({ kind: 'empty' \| 'error' \| 'success', icon, title, text, action? })` | 제목은 머리 요소(`h2` 등) | 클래스만(DS-3) |
+| **Loading State** | `.ds-skeleton` 줄(높이 10 · `radius-full` · `color-surface-secondary`, 너비 60–90% 섞음) 또는 `.ds-state` + 돌기 | `skeleton(rows)` | `aria-busy="true"` + 숨은 "불러오는 중" | 클래스만(지금 `.tr-skel` · `.var-loading`은 DS-3) |
+| **Error State** | `.ds-state--error` — 아이콘 `circle-alert` `color-state-error` + 다시 시도 Button(Secondary) | `stateView({ kind: 'error' })` | `role="alert"` | 클래스만(DS-3) |
+| **Success State** | `.ds-state--success` — 아이콘 `circle-check` `color-state-success` | `stateView({ kind: 'success' })` | `role="status"` | 클래스만(DS-3) |
 
-### 6.6 만드는 방법 (DS-2)
+### 6.6 아이콘 (DS-D13)
 
-- 파일: `src/ui/components/{이름}.ts`(DOM을 만드는 작은 함수 — 예: `button({ variant, size, label, icon, loading })`) + `ds-` 접두 CSS(예: `.ds-btn.ds-btn--primary.ds-btn--md`). 레이아웃은 `src/ui/layouts/`.
-- 빌드가 컴포넌트 CSS를 `ui.html`에 함께 넣는다. 지금 클래스와 함께 붙여 화면별로 옮기고, 옮긴 뒤 옛 규칙을 지운다.
-- 모음 화면: `dist/ds-gallery.html`(개발용, 플러그인에 안 들어감) — 30종 × 상태, 토큰 표와 변수 상세(대략 시안의 상세 패널).
+- 원본: npm `lucide-static@1.79.0`(라이선스 ISC — 저작권 표시를 생성 파일 머리에 남김) · devDependency로만 둔다(플러그인 실행 때 쓰지 않음).
+- 생성: `scripts/gen-icons.mjs`가 아래 23개의 SVG 안쪽(`<path>` 등)만 뽑아 `src/ui/icons.ts`(커밋함 — `ICONS: Record<IconName, string>`)를 만든다. 아이콘을 더할 때만 다시 돌린다.
+- 모양: `<svg class="ds-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">`. 크기 `size-icon-sm` · `-md`(기본) · `-lg`. 선 굵기는 새 토큰 `icon-stroke`(2.25 — 24 격자에서, 16px로 그리면 1.5px)를 CSS `stroke-width`로. 색은 글자색을 따른다(`currentColor`).
+- 쓰는 법: TS `icon(name, size?)` → SVG 요소. 정적 HTML은 `<i data-ds-icon="settings"></i>`를 쓰면 빌드가 SVG로 바꾼다(없는 이름이면 빌드 실패).
+- 23개와 지금 바꾸는 글자 기호(아이콘 단추 · 트리 펼침만 — 문구 속 "→"는 글자라 그대로, DS-3 영어 문구에서):
+
+| 아이콘 | 바꾸는 것(DS-2) | | 아이콘 | 바꾸는 것(DS-2) |
+|---|---|---|---|---|
+| `chevron-down` | 트리 펼침 ▾ · Select · Split | | `info` | ⓘ(`.mk-info`) |
+| `chevron-right` | 트리 접힘 ▸ · Breadcrumb | | `circle-alert` | (Alert · 오류) |
+| `arrow-left` | ← 돌아가기(`.sub-back`) | | `triangle-alert` | (Alert · 주의) |
+| `arrow-right` | ↗ 이동 단추(`.ed-go`) | | `circle-check` | (Alert · 성공) |
+| `x` | ✕ 검색 지우기 · 닫기 | | `copy` | ⧉ 복사(`.ed-copy` 앞 기호) |
+| `check` | (Checkbox · Step) | | `trash-2` | (삭제) |
+| `plus` | ＋ 새 변수 | | `refresh-cw` | (↻ 다시 읽기) |
+| `minus` | — 최소화(`.tab-min`) · Checkbox 일부 | | `lock` | (🔒 잠금 — DS-3) |
+| `settings` | ⚙ 설정(`.tab-min`) | | `external-link` | (외부 링크) |
+| `ellipsis` | ⋯ 메뉴 | | `loader-circle` | (돌기 대신 쓸 때) |
+| `search` | 검색칸 돋보기 | | `eye` · `eye-off` | (보이기 · 숨기기) |
+
+### 6.7 만드는 방법 · 파일 (DS-D11)
+
+| 파일 | 내용 |
+|---|---|
+| `src/ui/components/*.css` | 컴포넌트마다 한 파일(`button.css` · `input.css` …). 토큰만 쓴다(§8). |
+| `src/ui/components/*.ts` | 같은 이름의 함수(§6.1–§6.5 "함수" 칸). DOM을 만들고 클래스 · 속성을 붙이며, 문구는 부르는 쪽이 `t()`로 넘긴다(컴포넌트 안에 한국어 · 영어 문구 없음). |
+| `src/ui/components/index.ts` | 모두 내보냄. `ui.ts`는 여기서 가져온다. |
+| `src/ui/layouts/layouts.css` | §5의 레이아웃 클래스. |
+| `src/ui/icons.ts` | §6.6 생성 파일 + `icon()` 함수. |
+| `src/gallery/gallery.html` · `gallery.ts` | §6.10 모음 화면. |
+| `build.mjs` | `src/ui/**/*.css`를 이름 순으로 이어 `ui.html`의 새 자리 표시 `/* @ds-components */`(토큰 다음)에 넣는다. `<i data-ds-icon>`을 SVG로 바꾼다. `npm run gallery`(또는 `--gallery`)는 `dist/ds-gallery.html`을 만든다(커밋하지 않음 — `.gitignore`). |
+
+- 상태 · 모양 CSS는 컴포넌트 파일에만 둔다. 화면 CSS(`ui.html` `<style>`)는 자리 · 배치만 맡는다 — DS-2에서 옮긴 5종은 `ui.html`에서 모양 규칙을 지운다(§6.9).
+- 런타임 의존을 더하지 않는다(Lucide는 생성 때만).
+
+### 6.8 컴포넌트가 새로 쓰는 토큰
+
+| 토큰 | 값 | 쓰임 |
+|---|---|---|
+| `global.error-hover` | #C13E3E (`error`에 검정 10%) | Destructive hover |
+| `color-state-error-hover` | → `global.error-hover` | Destructive 버튼 hover · 누름 바탕 |
+| `global.white-a25` | rgba(255,255,255,.25) | 주 버튼 위 나눔 선 |
+| `color-border-on-primary` | → `global.white-a25` | Split Button(Primary) 나눔 선 |
+| `icon-stroke` | 2.25 | 아이콘 선 굵기(24 격자 — 16px에서 1.5px) |
+
+- 대비 검사(§8-6)에 `color-text-inverse` ↔ `color-state-error-hover`(4.5:1 이상 — #C13E3E 위 흰 글자 5.2:1)를 더한다.
+
+### 6.9 지금 화면에서 바꾸는 기본 5종 (DS-D12)
+
+**바꾸는 방법(모두 같음):**
+1. 그 요소에 `ds-` 클래스를 더한다(HTML 본문 · `ui.ts` · `treeList.ts`의 만드는 곳). **옛 클래스 이름은 지우지 않는다** — 동작 코드와 `scripts/verify-bind-flow.mjs`가 그 이름으로 찾는다.
+2. `ui.html` `<style>`에서 옛 클래스의 **모양 규칙**(색 · 테두리 · 높이 · 글자 · 안쪽 여백 · 둥글기 · 상태)을 지운다. 자리 규칙(`margin` · `flex` · `width` · `position`)은 남긴다.
+3. 기본 요소 규칙(`button { … }` · `input[type=text] { … }` · `input[type=checkbox] { … }`)은 각 컴포넌트의 기본(Secondary md · Input md · Checkbox)과 **같은 선언**을 쓰게 바꾼다 — 클래스를 아직 안 붙인 요소도 같은 모양이 되게(같은 CSS를 두 번 쓰지 않도록 컴포넌트 CSS의 선택자에 기본 요소를 함께 적는다: `button, .ds-btn { … }`).
+
+| 컴포넌트 | 바꾸는 것(옛 클래스 → 더할 클래스) | 바꾸지 않는 것(다른 컴포넌트 — DS-3) |
+|---|---|---|
+| **Button** | 기본 `button` → Secondary md · `.primary` → `ds-btn--primary` · `.danger` → `ds-btn--danger` · `.link` · `.link-btn` → `ds-btn--link`(`.link-btn`은 누르는 곳 24 유지) · `.btn-next` → `ds-btn--ghost` · `.bind-btn` → Secondary(아이콘 + 글자) · `button.bd-skip` · `.mk-row button` → `ds-btn--sm` | `.step-chip`(Step) · `.ctx-menu button`(메뉴) · `.mk-tabs button`(Tab) · `.bv-switch`(Toggle) · `.var-use` · `.ed-copy` · `.ed-pillbtn` · `.ed-plink` · `.mini-mark`(진행 표시) |
+| **Icon Button** | `.icon-btn` · `.tab-min` · `.sub-back` → `ds-icbtn ds-btn--ghost`(sm 24 — `.tab-min`은 md 28) · `button.ed-dd` · `button.tr-car` · `.ed-go` → `ds-icbtn`(자리 · 테두리 붙임 규칙은 남김) · `.mk-info` → `ds-icbtn ds-btn--ghost ds-btn--sm`(아이콘 `info` 12 — 원형 테두리는 없어짐). 글자 기호 → §6.6 아이콘 | |
+| **Input · Select** | `input[type=text]` · `input[type=number]` · `select` · `textarea` 기본 규칙 → `.ds-input` 규칙 · 변수 탭 검색칸 `.list-head .search-box` → `ds-search`(돋보기 · 지우기 단추 `#btnSearchClear` → `x` 아이콘) · `.ed-field` · `.ed-picker input.ed-psearch` · `.ts-edit input` · `select.r-role` · `.tr input.tr-edit` → 포커스 모양만 `.ds-input`과 같게(`focus-ring-field` 하나 — DS-O3 포커스 2가지 해결), 높이 · 테두리는 자리 규칙대로 둠 | `.palette-band` 안 입력의 흰 바탕(띠 위라서 — 자리 규칙) |
+| **Checkbox** | 모든 `input[type="checkbox"]`(HTML 10곳 · `ui.ts` 1곳) → `ds-check` 모양(기본 요소 규칙으로 — 클래스는 붙이지 않아도 됨). `accent-color` 규칙 지움 | 스위치(`.bv-switch`)는 Toggle(DS-3) |
+| **Badge · Tag** | `.mini-badge` → `ds-badge ds-badge--dot` · `.bv-new` → `ds-badge ds-badge--solid` · `.vs-badge` → `ds-badge`(고른 항목 안에서는 Navigation Item 규칙으로 `nav-selected-badge-bg`) · `.lib-tag` → `ds-tag ds-tag--outline` · `.tr-tag` → `ds-tag`(`.warn`은 `ds-tag--warn`) · `.chip` → `ds-tag` | `.vchip`(변수 칩 — TR-D3) · `.step-chip` · `.ed-ptag` · `.ed-pill` |
+
+- **사용자 결정 값과 부딪치는 곳:** Badge `text-caption`(굵기 700)과 지금 `.bv-new` 600 · `.tr-tag` 500(ia-v4 · verify "16 N 배지 … 600")이 다르다. 컴포넌트 값(700)으로 맞추고 `verify-bind-flow` 기대값을 고친다(사용자 결정 숫자가 아님 — ia-v4에 굵기 결정 기록 없음). 높이: `.tr-tag` 16 · `.lib-tag` 12(줄 높이)는 Tag 20 · Badge 16과 다르다 → `.tr-tag` · `.lib-tag`는 트리 줄 높이 32 안이라 20으로 커져도 줄이 늘지 않음. 화면 흐름 검사에서 깨지는 px 기대값은 PR에 목록으로 적고 고친다.
+- `aria-disabled` 버튼의 모양이 바뀐다(지금: 흐린 글자 + 흰 바탕 / 주 버튼은 회색 바탕 → DS-2: 모두 회색 바탕 + 흐린 글자). verify "26 잠긴 주 버튼 모양(B.23)"은 그대로 통과(글자 `color-text-tertiary` · 바탕 `color-surface-secondary`).
+
+### 6.10 개발용 모음 화면 `dist/ds-gallery.html`
+
+- 플러그인에 들어가지 않는다(`manifest.json` 바꾸지 않음). 빌드: `npm run gallery`. 브라우저로 바로 연다.
+- 짜임: 왼쪽 목록(Foundations: Color · Typography · Spacing · Radius · Elevation · Icons / Components 30종 / Layouts 9종) · 오른쪽 본문. 폭 560 미리보기 틀 켜기/끄기(플러그인 창 크기로 보기).
+- Foundations: 토큰 표 + 대략 시안 4판의 **변수 상세 패널**(참조 사슬 · 쓰임 · 쓰는 곳 · 대비 · 코드)을 `tokens.json`에서 그린다.
+- 컴포넌트마다: 변형 × 크기 표 · 상태 줄(Default · Hover · Active · Focus · Disabled · 잠김 · Loading — 강제 상태 클래스) · 쓰는 토큰 목록 · 코드 예시(클래스 · 함수) · 접근성 메모.
+- 검사: `scripts/verify-gallery.mjs`(Playwright) — 30종 · 9종 칸이 모두 그려지는지, 페이지 오류 0, 가로 스크롤 0(560 틀). CI에 한 단계로 더한다(`.github/workflows`의 verify-bind-flow 다음).
 
 ## 7. 사용 규칙
 
@@ -396,7 +483,7 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 
 ## 8. 검증 (자동 검사)
 
-`test/design-tokens.test.mjs` — `npm test`에 들어가 CI에서 돈다. 대상: `src/ui.html`의 `<style>`(주석 뺌) · 본문 `style="…"`, `src/ui.ts` · `src/treeList.ts`의 문자열(innerHTML 안 `style="…"` 포함) · `style.*` · `setProperty`.
+`test/design-tokens.test.mjs` — `npm test`에 들어가 CI에서 돈다. 대상: `src/ui.html`의 `<style>`(주석 뺌) · 본문 `style="…"`, `src/ui.ts` · `src/treeList.ts`의 문자열(innerHTML 안 `style="…"` 포함) · `style.*` · `setProperty`. DS-2부터 `src/ui/**/*.css` · `src/ui/**/*.ts` · `src/gallery/*`(모음 화면 강제 상태 CSS 포함)도 같은 규칙으로 본다.
 
 1. **직접 값 금지(CSS · `style="…"`):**
    - 색: 16진 색 · `rgb()` · `rgba()` · `hsl()` · 이름 색 금지(`transparent` · `currentColor` · `inherit` 허용).
@@ -419,8 +506,8 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 |---|---|---|
 | DS-O1 | `color-text-tertiary`(#999999) 흰 바탕 2.85:1 — 글자 기준 미달. 자리 표시 글 · 비활성 · 장식에만 쓴다(보조 글자는 `-secondary` #555555 7.5:1). 대비 검사 예외 | 쓰임 제한으로 유지 |
 | DS-O2 | 상태 글자 대비(DS-D7 — 지정 값 그대로): Warning #B7791F 흰 바탕 3.6:1 · 옅은 바탕 3.3:1, Error #D64545 흰 바탕 4.4:1 · 옅은 바탕 3.8:1 · 흰 글자를 얹은 삭제 버튼 4.4:1, Success #16845B 옅은 바탕 4.1:1. 대비 검사 예외 | 사용자 결정으로 유지 |
-| DS-O3 | 포커스 모양이 두 가지(`focus-ring-default` · `focus-ring-field`)이고, 스위치 · 일부 줄은 `outline`으로 따로 그린다 | DS-2 |
-| DS-O4 | 잠긴 버튼(`aria-disabled`)과 꺼진 버튼(`:disabled`)의 모양이 다르다(글자 흐림 · 투명도) | DS-2 |
+| DS-O3 | 포커스 모양이 두 가지(`focus-ring-default` · `focus-ring-field`)이고, 스위치 · 일부 줄은 `outline`으로 따로 그린다 | DS-2에서 입력류는 `focus-ring-field` 하나로(§6.9). 누르는 것 · 입력 두 가지는 규칙으로 남김(§6.0). 스위치 · 줄의 `outline`은 DS-3 |
+| DS-O4 | 잠긴 버튼(`aria-disabled`)과 꺼진 버튼(`:disabled`)의 모양이 다르다(글자 흐림 · 투명도) | DS-2에서 같은 모양으로(§6.0 상태 표) |
 | DS-O5 | `.ed-copy` · `.ed-plink`가 포커스 색(`--accent` 2.9:1)을 글자에 썼다 — ① 단계에서 `color-text-link`로 옮김(부록 A.1). ② 뒤 #111111로 해결 | 닫힘(DS-1) |
 
 ---
@@ -548,3 +635,17 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 - [x] B.10 ② 커밋: A.4 + 검사 4개 통과 + 새 모양 스크린샷
 - [x] B.11 `ROADMAP.md`에 DS-1 · DS-2 · DS-3 자리, `docs/ia-v4.md` §2.8 · §8에서 이 문서를 가리킴. ①에서 바뀌는 ia-v4 §8의 숫자(사용자 결정이 아닌 것 — 카드 안쪽 10 · 12 → 12 · 12, 만들기 아래 줄 위아래 6 · 8 → 8 · 8로 합계 80 → 82, 입력 높이 ≈31 → 28, 변수 탭 머리 줄 높이 등)를 ia-v4 §8에 적는다
 - [x] B.12 쓰는 곳이 없는 규칙을 지운다(HTML 본문 · `ui.ts` · `treeList.ts`에 0곳 — 3회차 검토 확인): `.pipe-mini` · `.bind-steps` · `.bs` · `.bs-dot` · `.vs-tw` · `.bv-tw` · `.bd-all` · `.tier-chip` · `.subtabs`(`.subtab`은 남김) · `.vt-section` · `.vu-props` · `.col-role .sub` · `.icon-btn.spinning` · `.results.stale` · `.vusage` · `.alias-pill` · `.vt-line` · `.vt-lib` · `.tr-note` · `.bind-done` · `.situation`(4회차 검토 확인). 지우기 전에 한 번 더 grep. `scripts/verify-bind-flow.mjs`에 이름만 남은 `.tier-chip`(카드 찾기 제외) · `.tier-chip .badge` · `.bs-dot`(배지 예외)도 함께 정리. §5 · §6의 "지금 코드" 칸은 실제로 쓰는 클래스만 적는다
+
+## 부록 C. DS-2 체크리스트
+
+- [ ] C.1 토큰 더함(§6.8) — `global.error-hover` · `global.white-a25` · `color-state-error-hover` · `color-border-on-primary` · `icon-stroke`, 대비 검사 짝 하나 더함
+- [ ] C.2 `scripts/gen-icons.mjs` + `src/ui/icons.ts`(23개 · ISC 표시) · devDependency `lucide-static@1.79.0`
+- [ ] C.3 `src/ui/components/` 30종 CSS + TS 함수 · `index.ts`, `src/ui/layouts/layouts.css`(9종)
+- [ ] C.4 `build.mjs` — `/* @ds-components */` 자리에 컴포넌트 · 레이아웃 CSS, `<i data-ds-icon>` → SVG(없는 이름이면 실패), `npm run gallery`
+- [ ] C.5 토큰 검사(§8) 대상에 `src/ui/**` · `src/gallery/*` 더함
+- [ ] C.6 기본 5종 바꿈(§6.9) — `ds-` 클래스 더함 · 옛 클래스 이름 남김 · `ui.html`에서 옛 모양 규칙 지움 · 글자 기호 → 아이콘
+- [ ] C.7 `src/gallery/` + `dist/ds-gallery.html`(커밋 안 함) + `scripts/verify-gallery.mjs` + CI 단계
+- [ ] C.8 검사 4개 + 모음 화면 검사 통과, `verify-bind-flow`에서 바뀐 기대값(배지 굵기 · 잠긴 버튼 · px)은 PR에 목록
+- [ ] C.9 전후 스크린샷(선택 탭 · 변수 탭 · 연결 · 만들기 · 이름 정리 · 변수 상세 · 설정) + 모음 화면 스크린샷
+- [ ] C.10 `ROADMAP.md` DS-2 줄 · `docs/ia-v4.md`에서 바뀐 모양(잠긴 버튼 · 체크박스 · 아이콘 단추)을 가리키는 한 줄
+
