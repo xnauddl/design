@@ -1,0 +1,13 @@
+/* Empty · Loading · Error · Success State — design-system §6.5(클래스만). */
+.ds-state { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-8) var(--space-4); text-align: center; }
+.ds-state > .ds-ic { width: var(--size-icon-lg); height: var(--size-icon-lg); color: var(--color-text-tertiary); }
+.ds-state__title { margin: 0; font: var(--text-display); color: var(--color-text-emphasis); }
+.ds-state__text { margin: 0; font: var(--text-body-sm); color: var(--color-text-secondary); }
+.ds-state--error > .ds-ic { color: var(--color-state-error); }
+.ds-state--success > .ds-ic { color: var(--color-state-success); }
+.ds-skeleton { display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-skeleton__row { height: 10px; border-radius: var(--radius-full); background: var(--color-surface-secondary); }
+.ds-skeleton__row:nth-child(3n + 1) { width: 90%; }
+.ds-skeleton__row:nth-child(3n + 2) { width: 60%; }
+.ds-skeleton__row:nth-child(3n) { width: 75%; }
+.ds-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

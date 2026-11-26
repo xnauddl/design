@@ -1169,7 +1169,7 @@ async function saveAndGet(p) {
   check('16 N 배지 툴팁 "color/gray/0을 가리켜요"(TR-P12 — 칩에는 없음) · 배지는 칩 바로 뒤(TR-D9)', inv?.tip === 'color/gray/0을 가리켜요' && inv.chipTip === null && inv.after, JSON.stringify(inv));
   check('16 이미 있는 역할 줄은 "N" 없음', chips.find((x) => x.name === 'spacing/8')?.badge === undefined);
   const badgeStyle = await p.$eval('#bindTree .bv-new', (e) => { const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color, cs.borderTopWidth, cs.fontWeight]; });
-  check('16 "N" 배지 — 채운 바탕(#111111) · 흰 글자 · 테두리 없음 · 600', JSON.stringify(badgeStyle) === JSON.stringify(['rgb(17, 17, 17)', 'rgb(255, 255, 255)', '0px', '600']), JSON.stringify(badgeStyle));
+  check('16 "N" 배지 — 채운 바탕(#111111) · 흰 글자 · 테두리 없음 · 700(DS-2 Badge text-caption)', JSON.stringify(badgeStyle) === JSON.stringify(['rgb(17, 17, 17)', 'rgb(255, 255, 255)', '0px', '700']), JSON.stringify(badgeStyle));
   await p.click('#btnApplyConfirm');
   const items = (await sent(p, 'APPLY_SELECTED')).at(-1).items;
   check('16 연결 요청 — 새 역할 정보만(바꾸기 · 풀기 없음)', items.some((i) => i.newRole?.name === 'color/text/inverse') && items.every((i) => !('fromVariableId' in i) && !('unbind' in i)), JSON.stringify(items));

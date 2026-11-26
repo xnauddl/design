@@ -1,0 +1,11 @@
+/* Modal · Confirm Dialog — design-system §6.5 · Modal Layout §5(클래스 · 함수만 — 지금 .modal은 DS-3). */
+.ds-modal-scrim { position: fixed; inset: 0; z-index: var(--z-modal); background: var(--color-overlay); display: flex; align-items: flex-start; justify-content: center; padding-top: var(--space-10); }
+.ds-modal {
+  width: var(--size-modal-md); max-width: calc(100vw - var(--space-4) - var(--space-4)); max-height: calc(100vh - var(--space-10) - var(--space-10));
+  display: flex; flex-direction: column; background: var(--color-surface-primary); border-radius: var(--radius-large); box-shadow: var(--elevation-3);
+}
+.ds-modal--sm { width: var(--size-modal-sm); }
+.ds-modal__header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+.ds-modal__title { flex: 1 1 auto; min-width: 0; margin: 0; font: var(--text-heading); color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-modal__body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 var(--space-4); font: var(--text-body); color: var(--color-text-primary); }
+.ds-modal__footer { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); margin-top: var(--space-3); border-top: 1px solid var(--color-border-default); }

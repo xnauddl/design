@@ -174,7 +174,8 @@ test('terms 5a — ui.html 한글은 i18n이 덮는 폴백에만(data-i18n 요�
 function tsFiles(dir, out = []) {
   for (const e of readdirSync(dir)) {
     const p = join(dir, e);
-    if (statSync(p).isDirectory()) tsFiles(p, out);
+    // src/gallery — 개발용 모음 화면(design-system §6.10, 플러그인에 들어가지 않음)은 화면 문구 규칙 밖.
+    if (statSync(p).isDirectory()) { if (p !== join(ROOT, 'src', 'gallery')) tsFiles(p, out); }
     else if (p.endsWith('.ts') && !p.endsWith('.d.ts') && p !== join(ROOT, 'src', 'lib', 'i18n.ts')) out.push(p);
   }
   return out;

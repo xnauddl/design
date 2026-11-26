@@ -1,0 +1,21 @@
+// 공통 UI 컴포넌트 — design-system §6. ui.ts는 여기서 가져온다.
+export { button, iconButton, buttonGroup, splitButton, type ButtonApi, type ButtonVariant } from './button';
+export { input, textarea, select, searchField } from './input';
+export { checkbox, radioGroup } from './checkbox';
+export { toggle } from './toggle';
+export { tabs } from './tabs';
+export { navItem } from './navitem';
+export { breadcrumb } from './breadcrumb';
+export { steps } from './steps';
+export { badge, type Tone } from './badge';
+export { tag, chip } from './tag';
+export { tooltip } from './tooltip';
+export { card } from './card';
+export { listItem } from './listitem';
+export { table } from './table';
+export { progress, spinner } from './progress';
+export { alert } from './alert';
+export { toast } from './toast';
+export { openModal, confirmDialog, type ModalAction } from './modal';
+export { stateView, skeleton } from './state';
+export { icon, iconSvg, type IconName } from '../icons';

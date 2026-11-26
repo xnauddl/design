@@ -1,9 +1,9 @@
-// 디자인 토큰 검사 — docs/design-system.md §8(1–7).
+// 디자인 토큰 검사 — docs/design-system.md §8(1–8).
 // 화면 코드(ui.html CSS · style="…" · ui.ts · treeList.ts)에 직접 쓴 스타일 값이 없는지, 쓰인 토큰이 원본에 있는지,
 // 층 규칙 · 원본 형식 · 대비 · 트리 숫자가 맞는지 본다.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { flattenTokens, refsOf } from '../design-tokens/to-css.mjs';
 
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
@@ -16,9 +16,15 @@ const styleEnd = html.indexOf('</style>');
 const css = html.slice(styleStart, styleEnd).replace(/\/\*[\s\S]*?\*\//g, '');
 const bodyHtml = html.slice(styleEnd);
 const ts = { 'src/ui.ts': read('src/ui.ts'), 'src/treeList.ts': read('src/treeList.ts') };
+/** DS-2 — 컴포넌트 · 레이아웃 · 모음 화면 파일(§8 대상). */
+const listFiles = (dir) => (existsSync(new URL(`../${dir}`, import.meta.url)) ? readdirSync(new URL(`../${dir}`, import.meta.url), { recursive: true }).map((f) => `${dir}/${f}`.replace(/\\/g, '/')) : []);
+const dsFiles = [...listFiles('src/ui'), ...listFiles('src/gallery')];
+const dsCss = Object.fromEntries(dsFiles.filter((f) => f.endsWith('.css')).map((f) => [f, read(f).replace(/\/\*[\s\S]*?\*\//g, '')]));
+for (const f of dsFiles.filter((f) => f.endsWith('.ts'))) ts[f] = read(f);
+const dsHtml = Object.fromEntries(dsFiles.filter((f) => f.endsWith('.html')).map((f) => [f, read(f)]));
 
 /** §2.3 런타임 변수 — 토큰이 아님. */
-const RUNTIME = new Set(['--tabs-h', '--head-top', '--toolbar-top', '--toolbar-h', '--side-top', '--prog', '--band-ic']);
+const RUNTIME = new Set(['--tabs-h', '--head-top', '--toolbar-top', '--toolbar-h', '--side-top', '--prog', '--band-ic', '--tip-x']);
 
 /** CSS 선언 [{prop, value, where}] — :root 묶음(자리 표시 · color-scheme)은 뺀다. */
 function declsOf(text, where) {
@@ -37,6 +43,8 @@ const inlineDecls = (styleAttr, where) =>
 
 const allDecls = [
   ...declsOf(css, 'ui.html <style>'),
+  ...Object.entries(dsCss).flatMap(([f, s]) => declsOf(s, f)),
+  ...Object.entries(dsHtml).flatMap(([f, s]) => [...s.matchAll(/style="([^"]*)"/g)].flatMap((m) => inlineDecls(m[1], `${f} style=""`))),
   ...[...bodyHtml.matchAll(/style="([^"]*)"/g)].flatMap((m) => inlineDecls(m[1], 'ui.html style=""')),
   // TS 문자열 안의 style="…"(innerHTML) — ${…} 보간은 값이 변수에서 오므로 뺀다.
   ...Object.entries(ts).flatMap(([f, s]) => [...s.matchAll(/style="([^"]*)"/g)].flatMap((m) => inlineDecls(m[1].replace(/\$\{[^}]*\}/g, 'var(--x-interp)'), `${f} style=""`))),
@@ -57,7 +65,7 @@ function violations(d) {
     if (bare.replace(/\b(inherit|normal)\b|VAR|\//g, '').trim()) errs.push('글자 직접 값');
   }
   if (SPACING.test(d.prop)) {
-    const rest = bare.replace(/calc\(\s*-1\s*\*\s*VAR\s*\)/g, '').replace(/(^|\s)(0|auto|-1px)(?=\s|$)/g, ' ').replace(/VAR/g, '').trim();
+    const rest = bare.replace(/calc\(\s*-1\s*\*\s*VAR\s*\)/g, '').replace(/calc\(\s*VAR(?:\s*\+\s*VAR)*\s*\)/g, '').replace(/(^|\s)(0|auto|-1px)(?=\s|$)/g, ' ').replace(/VAR/g, '').trim();
     if (rest) errs.push('간격 직접 값');
   }
   if (d.prop === 'border-radius' && bare.replace(/\b(0|inherit)\b|VAR/g, '').trim()) errs.push('둥글기 직접 값');
@@ -99,7 +107,7 @@ test('§8-2 TS에서 style.* · setProperty에 직접 색 · 간격 · 둥글기
 });
 
 test('§8-3 쓰인 var(--x)는 모두 원본 토큰이거나 런타임 변수다', () => {
-  const sources = { 'ui.html': html.replace(/\/\*[\s\S]*?\*\//g, ''), ...ts };
+  const sources = { 'ui.html': html.replace(/\/\*[\s\S]*?\*\//g, ''), ...ts, ...dsCss, ...dsHtml };
   const used = new Set();
   const bad = [];
   for (const [f, s] of Object.entries(sources)) {
@@ -116,7 +124,7 @@ test('§8-3 쓰인 var(--x)는 모두 원본 토큰이거나 런타임 변수다
 });
 
 test('§8-4 층 규칙 — 화면 코드에 Global 없음 · 색 토큰은 Global 하나를 가리킴 · 참조가 끊기거나 돌지 않음', () => {
-  const screen = [css, bodyHtml, ...Object.values(ts)].join('\n');
+  const screen = [css, bodyHtml, ...Object.values(ts), ...Object.values(dsCss), ...Object.values(dsHtml)].join('\n');
   assert.equal(/var\(--global-/.test(screen), false, '화면 코드에 var(--global-*)');
   const bad = [];
   for (const t of tokens) {
@@ -168,6 +176,7 @@ test('§8-6 대비 4.5:1 — 예외는 §9 목록의 짝만', () => {
     [C('text-on-primary'), C('primary')],
     [C('text-inverse'), C('surface-inverse')],
     [C('text-inverse'), C('state-error')],
+    [C('text-inverse'), C('state-error-hover')],
     ['--chip-value-text', '--chip-value-bg'],
   ];
   const bad = [];
@@ -190,4 +199,19 @@ test('§8-7 트리 숫자 — 토큰 · treeList.ts · CSS 세로 선이 같다'
   assert.equal(px('--tree-line-x'), Number(l[1]));
   assert.equal(px('--tree-indent'), Number(l[2]));
   assert.match(css, /\.vt-grp\.has-bar::before[^{]*\{[^}]*left:\s*var\(--tree-line-x\)/);
+});
+
+test('§8-8 컴포넌트 CSS의 아이콘 데이터 URI 색은 #FFFFFF뿐이고 color-text-on-primary와 같다', () => {
+  const onPrimary = hexOf('--color-text-on-primary').toUpperCase();
+  const bad = [];
+  for (const [f, s] of Object.entries(dsCss)) {
+    for (const m of s.matchAll(/url\(\s*["']?data:image\/svg\+xml,([^"')]*)/g)) {
+      const svg = decodeURIComponent(m[1]);
+      for (const c of svg.matchAll(/#[0-9a-f]{3,8}\b|\brgba?\([^)]*\)/gi)) {
+        if (c[0].toUpperCase() !== '#FFFFFF') bad.push(`${f}: ${c[0]} — #FFFFFF만`);
+      }
+    }
+  }
+  assert.equal(onPrimary, '#FFFFFF', 'color-text-on-primary 값이 바뀌면 데이터 URI 색도 함께 바꾼다');
+  assert.deepEqual(bad, []);
 });

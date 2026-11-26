@@ -1,0 +1,17 @@
+/* Badge — design-system §6.4. */
+.ds-badge {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-0-5); flex: none;
+  height: var(--space-4); min-width: var(--space-4); padding: 0 var(--space-1); border-radius: var(--radius-xs);
+  font: var(--text-caption); background: var(--color-surface-secondary); color: var(--color-text-secondary); white-space: nowrap;
+}
+.ds-badge .ds-ic { width: var(--size-icon-sm); height: var(--size-icon-sm); }
+.ds-badge--success { background: var(--color-state-success-subtle); color: var(--color-state-success); }
+.ds-badge--warning { background: var(--color-state-warning-subtle); color: var(--color-state-warning); }
+.ds-badge--error { background: var(--color-state-error-subtle); color: var(--color-state-error); }
+.ds-badge--info { background: var(--color-state-info-subtle); color: var(--color-state-info); }
+.ds-badge--solid { background: var(--color-surface-inverse); color: var(--color-text-inverse); }
+.ds-badge--outline { background: none; border: 1px solid var(--color-border-strong); color: var(--color-text-secondary); }
+/* 겹쳐 붙는 숫자 원(지금 .mini-badge) — 색조를 채움으로 */
+.ds-badge--dot { width: calc(var(--space-3) + var(--space-0-5)); min-width: 0; height: calc(var(--space-3) + var(--space-0-5)); padding: 0; border-radius: var(--radius-full); background: var(--color-surface-inverse); color: var(--color-text-inverse); }
+.ds-badge--dot.ds-badge--success { background: var(--color-state-success); color: var(--color-text-inverse); }
+.ds-badge--dot.ds-badge--error { background: var(--color-state-error); color: var(--color-text-inverse); }

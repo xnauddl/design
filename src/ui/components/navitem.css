@@ -1,0 +1,13 @@
+/* Navigation Item — design-system §6.3(클래스만 — 지금 .vs-item은 DS-3). */
+.ds-navitem {
+  display: flex; align-items: center; gap: var(--nav-item-gap); width: 100%;
+  height: var(--size-control-md); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-small); background: none;
+  font: var(--text-body); color: var(--color-text-primary); text-align: left; cursor: pointer;
+}
+.ds-navitem:hover:not(:disabled):not([aria-disabled="true"]) { background: var(--color-interactive-hover); }
+.ds-navitem--lv2 { padding-left: var(--space-4); }
+.ds-navitem__label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-navitem[aria-current="true"], .ds-navitem[aria-selected="true"] { background: var(--color-surface-selected); color: var(--color-text-emphasis); font-weight: var(--font-weight-semibold); }
+.ds-navitem[aria-current="true"] .ds-badge, .ds-navitem[aria-selected="true"] .ds-badge { background: var(--nav-selected-badge-bg); color: var(--color-text-inverse); }
+.ds-navitem--danger { color: var(--color-state-error); }
+.ds-navitem:focus-visible { outline: none; box-shadow: var(--focus-ring-default); }

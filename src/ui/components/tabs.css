@@ -1,0 +1,18 @@
+/* Tab — 밑줄형 · 세그먼트형, design-system §6.3(클래스만 — 지금 .tabs는 DS-3). */
+.ds-tabs { display: flex; gap: var(--space-4); border-bottom: 1px solid var(--color-border-default); }
+.ds-tab {
+  position: relative; height: var(--size-nav); padding: 0; border: 0; border-radius: 0; background: none;
+  font: var(--text-label); color: var(--color-text-secondary); cursor: pointer;
+}
+.ds-tab:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
+.ds-tab[aria-selected="true"] { color: var(--color-text-emphasis); }
+.ds-tab[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: var(--border-width-thick); background: var(--color-primary); }
+.ds-tab:focus-visible { outline: none; box-shadow: var(--focus-ring-default); }
+.ds-seg { display: inline-flex; gap: var(--space-0-5); padding: var(--space-0-5); border-radius: var(--radius-small); background: var(--color-surface-secondary); }
+.ds-seg__item {
+  height: var(--size-control-sm); padding: 0 var(--space-3); border: 0; border-radius: var(--radius-small); background: none;
+  font: var(--text-label-sm); color: var(--color-text-secondary); cursor: pointer;
+}
+.ds-seg__item:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
+.ds-seg__item[aria-selected="true"] { background: var(--color-surface-primary); color: var(--color-text-emphasis); box-shadow: var(--elevation-1); }
+.ds-seg__item:focus-visible { outline: none; box-shadow: var(--focus-ring-default); }
