@@ -3086,7 +3086,7 @@ function renderMakeScreen(): void {
     for (const w of [[30, 120], [40, 90], [34, 60], [28, 40]]) {
       const r = document.createElement('div');
       r.className = 'tr tr-head';
-      r.innerHTML = `<span style="width:22px"></span><span class="tr-skel" style="width:${w[0]}px"></span><span class="tr-skel" style="width:${w[1]}px;margin-left:12px"></span><span class="grow"></span><span class="tr-skel" style="width:28px;height:16px;border-radius:8px"></span>`;
+      r.innerHTML = `<span style="width:22px"></span><span class="tr-skel" style="width:${w[0]}px"></span><span class="tr-skel" style="width:${w[1]}px;margin-left:var(--space-3)"></span><span class="grow"></span><span class="tr-skel" style="width:28px;height:16px;border-radius:var(--radius-medium)"></span>`;
       tree.appendChild(r);
     }
   } else if (showTree && !noteText) {
@@ -3123,21 +3123,21 @@ function renderMakeResults(): void {
   box.replaceChildren();
   const top = document.createElement('div');
   top.className = 'tree-top';
-  top.innerHTML = `<b style="color:var(--text)">${escapeHtml(t('make.partialTitle'))}</b>`;
+  top.innerHTML = `<b style="color:var(--color-text-primary)">${escapeHtml(t('make.partialTitle'))}</b>`;
   box.appendChild(top);
   for (const r of mkResults ?? []) {
     const row = document.createElement('div');
     row.className = 'tr tr-head mk-res';
     const mark = document.createElement('span');
     mark.className = 'tr-car';
-    mark.style.color = r.mark === 'ok' ? 'var(--ok)' : r.mark === 'warn' ? 'var(--warn)' : 'var(--text-2)';
+    mark.style.color = r.mark === 'ok' ? 'var(--color-state-success)' : r.mark === 'warn' ? 'var(--color-state-warning)' : 'var(--color-text-secondary)';
     mark.textContent = r.mark === 'ok' ? '✓' : r.mark === 'warn' ? '⚠' : '—';
     const nm = document.createElement('span');
     nm.className = `tr-name${r.mark === 'off' ? ' muted' : ''}`;
     nm.textContent = t(`wizard.step.${r.id}`);
     const tx = document.createElement('span');
     tx.className = 'tr-cnt';
-    if (r.mark === 'warn') tx.style.color = 'var(--warn)';
+    if (r.mark === 'warn') tx.style.color = 'var(--color-state-warning)';
     tx.textContent = r.text;
     if (r.tip) row.title = r.tip; // 텍스트 스타일 알림 목록(§4.3 "글꼴")
     row.append(mark, nm, tx);

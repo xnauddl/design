@@ -3,7 +3,16 @@
 // Figma UI는 단일 HTML만 로드(외부 <script src> 불가)하므로 JS를 <script>로 주입한다.
 import esbuild from 'esbuild';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { watch as fsWatch } from 'node:fs';
 import path from 'node:path';
+import { tokensToCss } from './design-tokens/to-css.mjs';
+
+// 디자인 토큰(docs/design-system.md §2.2) — 원본 tokens.json을 :root CSS 변수로 바꿔 ui.html의 자리 표시에 넣는다.
+const TOKENS_PATH = 'design-tokens/tokens.json';
+const TOKENS_SLOT = '/* @design-tokens */';
+async function tokenCss() {
+  return tokensToCss(JSON.parse(await readFile(TOKENS_PATH, 'utf8')));
+}
 
 const watch = process.argv.includes('--watch');
 // 개발 빌드 여부 — watch 또는 --dev. __DEV__=true일 때만 개발용 티어 토글이 활성(백도어 차단).
@@ -38,10 +47,11 @@ const uiInlinePlugin = {
       const js = result.outputFiles?.find((f) => f.path.endsWith('.js'));
       if (!js) return;
       const template = await readFile('src/ui.html', 'utf8');
-      const html = template.replace(
-        '<!-- UI_SCRIPT -->',
-        `<script>\n${js.text}\n</script>`,
-      );
+      if (!template.includes(TOKENS_SLOT)) throw new Error(`src/ui.html에 ${TOKENS_SLOT} 자리가 없다`);
+      const css = await tokenCss();
+      const html = template
+        .replace(TOKENS_SLOT, () => css.trimStart())
+        .replace('<!-- UI_SCRIPT -->', () => `<script>\n${js.text}\n</script>`);
       await writeFile(path.join(outdir, 'ui.html'), html);
     });
   },
@@ -76,6 +86,8 @@ const figmaLibCtx = await esbuild.context({
 
 if (watch) {
   await Promise.all([codeCtx.watch(), uiCtx.watch(), pureCtx.watch(), figmaLibCtx.watch()]);
+  // esbuild는 ui.ts 의존만 본다 — 토큰 원본 · ui.html이 바뀌어도 UI를 다시 만든다.
+  for (const f of [TOKENS_PATH, 'src/ui.html']) fsWatch(f, () => uiCtx.rebuild().catch((e) => console.error(e)));
   console.log('watching…');
 } else {
   await Promise.all([codeCtx.rebuild(), uiCtx.rebuild(), pureCtx.rebuild(), figmaLibCtx.rebuild()]);
