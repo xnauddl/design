@@ -7314,10 +7314,10 @@ button.ds-tag { border: 0; cursor: pointer; }
   var mkSentLibSig = "";
   var mkLibSig = (toks) => {
     const libs = libDirectNow();
-    return libs.length ? JSON.stringify(toks.map((tk) => libSameGroups(tk, libs))) : "";
+    return JSON.stringify(toks.map((tk) => libs.length ? libSameGroups(tk, libs) : []));
   };
   function mkLibChanged() {
-    if (activeTab !== "select" || selSub !== "make" || mkRunning || !mkPreviewReq) return;
+    if (activeTab !== "select" || selSub !== "make" || mkRunning || mkResults || mkEditSig || !mkPreviewReq) return;
     if (mkLibSig(mkSendTokens()) !== mkSentLibSig) mkPreviewSoon();
   }
   function mkPreviewSoon() {
@@ -7607,6 +7607,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         onMakeScan(p);
       } else renderMakeScreen();
       focusRow($("makeTree"), `t:${sig}`);
+      mkLibChanged();
     };
     inp.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {

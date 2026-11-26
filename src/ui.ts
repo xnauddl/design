@@ -2744,10 +2744,11 @@ function scheduleMake(): void {
 /** 만들 수 다시 계산(250ms 합침) — 보내는 토큰 = 켠 줄 + 잠긴 직접 만든 변수 줄. */
 /** 만들기 화면 미리보기를 보낼 때의 라이브러리 같은 값 묶음(SC-D46) — 쓰는 변수 결과가 늦게 오거나 바뀌면 다시 보낸다(`mkLibChanged`). */
 let mkSentLibSig = '';
-const mkLibSig = (toks: readonly DraftToken[]): string => { const libs = libDirectNow(); return libs.length ? JSON.stringify(toks.map((tk) => libSameGroups(tk, libs))) : ''; };
-/** 쓰는 변수 결과를 받은 뒤 — 만들기 화면에 있고 실행 중이 아니며 보낸 미리보기의 라이브러리 묶음이 지금과 다르면 다시 보낸다. */
+const mkLibSig = (toks: readonly DraftToken[]): string => { const libs = libDirectNow(); return JSON.stringify(toks.map((tk) => (libs.length ? libSameGroups(tk, libs) : []))); };
+/** 쓰는 변수 결과를 받은 뒤 — 만들기 화면 첫 모습(실행 중 · 결과 · 이름 고치는 중이 아님)이고 보낸 미리보기의 라이브러리 묶음이 지금과 다르면 다시 보낸다.
+    이름 고치기가 끝나면 다시 본다. 줄의 기본 끔(`mkRecalcOffByLib`)은 들어갈 때 · 추출할 때만 정한다(§4.1 상태 5 — 결과가 늦게 와도 다시 정하지 않음). */
 function mkLibChanged(): void {
-  if (activeTab !== 'select' || selSub !== 'make' || mkRunning || !mkPreviewReq) return;
+  if (activeTab !== 'select' || selSub !== 'make' || mkRunning || mkResults || mkEditSig || !mkPreviewReq) return;
   if (mkLibSig(mkSendTokens()) !== mkSentLibSig) mkPreviewSoon();
 }
 function mkPreviewSoon(): void {
@@ -3004,6 +3005,7 @@ function mkEditInput(s: TextStyleSpec): HTMLElement {
     mkEditSig = null;
     if (mkTsPending) { const p = mkTsPending; mkTsPending = null; onMakeScan(p); } else renderMakeScreen();
     focusRow($('makeTree'), `t:${sig}`);
+    mkLibChanged(); // 고치는 동안 미룬 라이브러리 묶음 다시 보내기(SC-D46)
   };
   inp.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); finish(true); }
