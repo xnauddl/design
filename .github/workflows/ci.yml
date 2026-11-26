@@ -43,3 +43,7 @@ jobs:
 
       - name: Verify bind flow
         run: node scripts/verify-bind-flow.mjs
+
+      # 개발용 모음 화면(design-system §6.10) — 30종 · 9종 칸 · 페이지 오류 0 · 560 틀 가로 스크롤 0.
+      - name: Verify DS gallery
+        run: npm run gallery && node scripts/verify-gallery.mjs
