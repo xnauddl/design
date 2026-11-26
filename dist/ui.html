@@ -7311,6 +7311,15 @@ button.ds-tag { border: 0; cursor: pointer; }
       readMake();
     }, AUTO_SCAN_DELAY);
   }
+  var mkSentLibSig = "";
+  var mkLibSig = (toks) => {
+    const libs = libDirectNow();
+    return libs.length ? JSON.stringify(toks.map((tk) => libSameGroups(tk, libs))) : "";
+  };
+  function mkLibChanged() {
+    if (activeTab !== "select" || selSub !== "make" || mkRunning || !mkPreviewReq) return;
+    if (mkLibSig(mkSendTokens()) !== mkSentLibSig) mkPreviewSoon();
+  }
   function mkPreviewSoon() {
     if (mkPreviewTimer) clearTimeout(mkPreviewTimer);
     mkPreviewTimer = setTimeout(() => {
@@ -7332,6 +7341,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     mkPreviewReq = mkNextReq();
     const base = Number($("base").value) || 16;
     opSilent = true;
+    mkSentLibSig = mkLibSig(toks);
     send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base, preview: true, reqId: mkPreviewReq });
     opSilent = false;
     renderMakeScreen();
@@ -7868,6 +7878,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (!steps.length || !baseline) return;
     const ids = baseline.ids.slice();
     const toks = mkSendTokens();
+    const libs = libDirectNow();
     const styles = mkTsOnList().map((s) => {
       const name = mkTsName(s);
       if (name === s.name) return __spreadValues({}, s);
@@ -7898,7 +7909,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       try {
         if (id === "create") {
           const rid = mkNextReq();
-          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
+          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libs), base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
           totals.created = { g: r.created + r.updated, r: (_a3 = r.roles) != null ? _a3 : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
@@ -7933,7 +7944,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           wizBindPending = true;
           try {
             const sendToks = mkSendTokens();
-            const only = onlyItems(sendToks, libDirectNow());
+            const only = onlyItems(sendToks, libs);
             const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
             const r = only.length ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
             const n = (_e = r == null ? void 0 : r.bound) != null ? _e : 0;
@@ -9848,6 +9859,7 @@ ${opts.tip}` : text;
       libVars = msg.libraryVars;
       deletedUse = msg.deleted;
       if (libChanged) libRedraw();
+      mkLibChanged();
     }
     renderSelHome();
     reentry.release();
@@ -12132,10 +12144,13 @@ ${opts.tip}` : text;
     var _a3, _b;
     return (_b = (_a3 = mcLibSplit()) == null ? void 0 : _a3.left) != null ? _b : baseline && usageMap ? libSameSplit(mcPicked(), []).left : mcPicked();
   };
-  var mcSigOf = (toks) => JSON.stringify(toks.map((tk) => {
-    var _a3;
-    return [tk.name, tk.value, (_a3 = tk.alpha) != null ? _a3 : 1];
-  }));
+  var mcSigOf = (toks) => {
+    const libs = libDirectNow();
+    return JSON.stringify(toks.map((tk) => {
+      var _a3;
+      return [tk.name, tk.value, (_a3 = tk.alpha) != null ? _a3 : 1, libs.length ? libSameGroups(tk, libs) : []];
+    }));
+  };
   var mcExtracting = () => mcInFlight && mcPreviewReq === 0;
   var mcState = (name) => {
     var _a3;

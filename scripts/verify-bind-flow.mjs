@@ -4292,6 +4292,19 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   check('30 SC-D46 상태 5 카드 미리보기 — 라이브러리 LS8(GAP)과 같은 값 묶음은 쓰임에서 빠짐(spacing/gap free 0) · 반경 쓰임은 그대로', JSON.stringify(uses) === JSON.stringify([{ name: 'spacing/gap', count: 9, free: 0, keys: [], by: {} }, { name: 'radius/default', count: 4, free: 4, keys: ['CORNER_RADIUS'], by: { CORNER_RADIUS: 4 } }]), JSON.stringify(uses));
   await p.close();
 }
+{
+  // SC-D46 — 쓰는 변수 결과(라이브러리 목록)가 카드 미리보기 뒤에 오면 같은 토큰이라도 다시 보낸다(보내는 쓰임이 라이브러리 묶음에 따라 달라짐)
+  const p = await openLib30({ tier: 'paid', usage: false });
+  const T8 = { name: 'spacing/8', category: 'gap', value: 8, sources: ['itemSpacing', 'topLeftRadius'], count: 5, freeBy: { GAP: 9, CORNER_RADIUS: 4 }, uses: [{ name: 'spacing/gap', count: 9, free: 9, keys: ['GAP'], by: { GAP: 9 } }, { name: 'radius/default', count: 4, free: 4, keys: ['CORNER_RADIUS'], by: { CORNER_RADIUS: 4 } }] };
+  const pv1 = await cardAnswer(p, [T8]);
+  const n1 = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).length;
+  await recv(p, usage30((await sent(p, 'SCAN_USAGE')).at(-1).reqId));
+  await p.waitForTimeout(80);
+  const pvs = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview);
+  const gap = pvs.at(-1)?.tokens.find((tk) => tk.value === 8)?.uses?.[0];
+  check('30 SC-D46 라이브러리 결과가 미리보기 뒤에 옴 → 카드가 다시 보냄 · 새 미리보기의 spacing/gap free 0', pv1?.tokens[0].uses[0].free === 9 && pvs.length === n1 + 1 && gap?.free === 0, JSON.stringify({ before: pv1?.tokens[0].uses[0], n1, n: pvs.length, gap }));
+  await p.close();
+}
 // B.35 — 만들기 연결 단계: 켠 줄만(only) · 기존 텍스트 스타일 · 결과 줄 · 상태 7 free 0 끔
 {
   const setup = async () => {

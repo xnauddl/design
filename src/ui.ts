@@ -2742,6 +2742,14 @@ function scheduleMake(): void {
 }
 
 /** 만들 수 다시 계산(250ms 합침) — 보내는 토큰 = 켠 줄 + 잠긴 직접 만든 변수 줄. */
+/** 만들기 화면 미리보기를 보낼 때의 라이브러리 같은 값 묶음(SC-D46) — 쓰는 변수 결과가 늦게 오거나 바뀌면 다시 보낸다(`mkLibChanged`). */
+let mkSentLibSig = '';
+const mkLibSig = (toks: readonly DraftToken[]): string => { const libs = libDirectNow(); return libs.length ? JSON.stringify(toks.map((tk) => libSameGroups(tk, libs))) : ''; };
+/** 쓰는 변수 결과를 받은 뒤 — 만들기 화면에 있고 실행 중이 아니며 보낸 미리보기의 라이브러리 묶음이 지금과 다르면 다시 보낸다. */
+function mkLibChanged(): void {
+  if (activeTab !== 'select' || selSub !== 'make' || mkRunning || !mkPreviewReq) return;
+  if (mkLibSig(mkSendTokens()) !== mkSentLibSig) mkPreviewSoon();
+}
 function mkPreviewSoon(): void {
   if (mkPreviewTimer) clearTimeout(mkPreviewTimer);
   mkPreviewTimer = setTimeout(() => { mkPreviewTimer = null; mkSendPreview(); }, AUTO_SCAN_DELAY);
@@ -2755,6 +2763,7 @@ function mkSendPreview(): void {
   mkPreviewReq = mkNextReq();
   const base = Number(($('base') as HTMLInputElement).value) || 16;
   opSilent = true;
+  mkSentLibSig = mkLibSig(toks);
   send({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base, preview: true, reqId: mkPreviewReq }); // 라이브러리 같은 값 묶음은 쓰임에서 뺌(SC-D46)
   opSilent = false;
   renderMakeScreen();
@@ -3243,6 +3252,8 @@ async function runMake(): Promise<void> {
   if (!steps.length || !baseline) return;
   const ids = baseline.ids.slice();
   const toks = mkSendTokens();
+  // 라이브러리 목록은 실행 시작 때 한 번 — 만들기 단계(쓰임에서 뺌, SC-D46)와 연결 단계(거름, B.35 ②)가 같은 목록을 쓴다(실행 중 쓰는 변수 결과가 바뀌어도)
+  const libs = libDirectNow();
   // 고친 이름(mkTsNames)은 사용자가 지은 이름 — 크기 단계를 싣지 않는다(역할 변수 = 스타일 이름 전체, ia-v3 §2.12 12.12 N-D2).
   const styles = mkTsOnList().map((s) => {
     const name = mkTsName(s);
@@ -3272,7 +3283,7 @@ async function runMake(): Promise<void> {
       if (id === 'create') {
         const rid = mkNextReq();
         // 무료는 Global만(`globalOnly` — Semantic을 만들지 않는다, F4).
-        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base, reqId: rid, ...(isPaid ? {} : { globalOnly: true }) }, ['CREATE_RESULT'], rid);
+        const r = await wizardRequest({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libs), base, reqId: rid, ...(isPaid ? {} : { globalOnly: true }) }, ['CREATE_RESULT'], rid);
         totals.created = { g: r.created + r.updated, r: r.roles ?? 0, m: r.skippedManual ?? 0 };
         results.push({ id, mark: 'ok', text: t('wizard.seq.createDone', { created: r.created, updated: r.updated }) });
       } else if (id === 'dark') {
@@ -3303,7 +3314,7 @@ async function runMake(): Promise<void> {
         try {
           // ① 켠 줄의 값만 · ② 라이브러리와 같은 값 묶음은 뺌(ia-v4 §4.3 "B.35 뒤 연결 단계")
           const sendToks = mkSendTokens();
-          const only = onlyItems(sendToks, libDirectNow());
+          const only = onlyItems(sendToks, libs);
           // 꺼진 줄(보내지 않은 추출 토큰)의 값 — 끈 값만 남은 0곳을 가린다(B.36). ②로 빼지 않는다.
           const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
           const r = only.length
@@ -5296,6 +5307,7 @@ function onUsageResult(msg: Extract<CodeToUi, { type: 'USAGE_RESULT' }>): void {
     libVars = msg.libraryVars;
     deletedUse = msg.deleted;
     if (libChanged) libRedraw(); // ③ 새 libVars로 변수 목록을 다시(§4.6 "따라가기")
+    mkLibChanged(); // 만들기 화면 미리보기의 쓰임은 라이브러리 묶음을 뺀 것(SC-D46) — 묶음이 바뀌었으면 다시 보낸다
   }
   renderSelHome();
   reentry.release();
@@ -7509,7 +7521,8 @@ function mcLibSplit(): LibSameSplit<DraftToken> | null {
     비어도 빈 자리 0인 토큰(색 스타일만 붙은 칠 등)은 뺀다 — 만들기 화면 처음 모습(`mkRecalcOffByLib`)과 같은 판정(§2.9 SC-D42). */
 const mcShown = (): DraftToken[] => mcLibSplit()?.left ?? (baseline && usageMap ? libSameSplit(mcPicked(), []).left : mcPicked());
 /** 토큰 집합의 표시(이름 · 값 · 투명도) — 미리보기를 다시 보낼지 견준다. */
-const mcSigOf = (toks: readonly DraftToken[]): string => JSON.stringify(toks.map((tk) => [tk.name, tk.value, tk.alpha ?? 1]));
+/** 라이브러리 같은 값 묶음까지 — 보내는 쓰임이 그 묶음을 뺀 것이라(SC-D46) 라이브러리 목록 · 스코프가 바뀌면 다시 보낸다. */
+const mcSigOf = (toks: readonly DraftToken[]): string => { const libs = libDirectNow(); return JSON.stringify(toks.map((tk) => [tk.name, tk.value, tk.alpha ?? 1, libs.length ? libSameGroups(tk, libs) : []])); };
 /** 추출 중인가(같은 기준 다시 읽기 포함) — 미리보기를 기다리는 동안은 아니다. */
 const mcExtracting = (): boolean => mcInFlight && mcPreviewReq === 0;
 /** 줄 상태 — 만든 직후의 토큰은 다시 읽기 전까지 reuse(§4.1 "만든 직후"). */
