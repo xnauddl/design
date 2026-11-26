@@ -65,6 +65,7 @@
 | `--tabs-h` · `--head-top` · `--toolbar-top` · `--toolbar-h` · `--side-top` | `ui.ts`(고정 줄 높이 재기) | 붙어 다니는 줄의 top · 높이 |
 | `--prog` | `ui.ts`(진행 표시) | 진행 비율(%) |
 | `--band-ic` | `ui.html`(안내 띠 규칙) | 띠 앞 아이콘 그림(data URI) |
+| `--tip-x` | `src/ui/components/tooltip.ts`(DS-2) | 툴팁 꼬리의 가로 위치(px) |
 
 ## 3. Design Tokens (최종 값)
 
