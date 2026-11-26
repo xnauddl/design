@@ -64,7 +64,7 @@ const VL_HEAD_X = 8;
 const vlContentX = (level: number, multi: boolean): number => (multi ? 21 + 9 * (level - 1) : 16);
 /** 세로 선 x — 단 k(level k − 1 그릇)의 내용 왼쪽 선(TR-D7). */
 const vlLineX = (k: number): number => 12 + 9 * k;
-const VL_LINE = 'var(--border)';
+const VL_LINE = 'var(--color-border-default)';
 
 interface Flat {
   item: TreeItem;
@@ -224,8 +224,8 @@ function vlDecorate(rows: { row: HTMLElement; anc: string[]; level: number }[], 
     let j = i + 1;
     while (j < rows.length && rows[j].level > 0) j++;
     if (j === i + 1) continue;
-    rows[i + 1].row.style.marginTop = '4px';
-    rows[j - 1].row.style.marginBottom = '16px';
+    rows[i + 1].row.style.marginTop = 'var(--space-1)';
+    rows[j - 1].row.style.marginBottom = 'var(--space-4)';
   }
   if (!multi) return;
   // 세로 선: 줄마다 조상 그릇(단 k)의 선 x에 1px 조각 — 그 그릇의 마지막 보이는 내용 줄만 위 16까지(길이 = 내용 높이 − 16).

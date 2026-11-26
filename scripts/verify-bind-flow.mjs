@@ -740,12 +740,12 @@ const reenter = (p) => p.evaluate(() => {
   check('B2 줄 옅은 칸 — 종류 표시(● · #) 없음(종류는 왼쪽 동그라미 · 표시 — TR-D3)', (await p.$$eval('#bindTree .tr-row .vchip .bv-mark', (e) => e.length)) === 0 && (await p.$$eval('#bindTree .tr-row .vchip .al', (e) => e.length > 0 && e.every((a) => !/[●#T] /.test(a.textContent.replace(/^→ /, ''))))));
   check('B2 목록 treegrid · 접근성 이름 · 머리 줄 = 이름 · 개수 · 스위치만(미리보기 없음)', (await p.getAttribute('#bindTree', 'role')) === 'treegrid' && (await p.getAttribute('#bindTree', 'aria-label')) === '연결할 변수' && (await p.$$eval('#bindTree .tr-head', (e) => e.every((h) => !h.querySelector('.bv-chip, .vchip') && !!h.querySelector('.bv-switch')))));
   // 스위치 — 줄 단위
-  check('TR-D1 트리 머리 줄 — 띠 없음(배경 투명 · .tr-group 없음) · 위 1px 선(첫 머리 0) · 이름 12px 600 --text-2', (await p.$$eval('#bindTree .tr-head', (e) => e.length > 1 && e.every((h, i) => { const cs = getComputedStyle(h); const n = getComputedStyle(h.querySelector('.tr-name')); return !h.classList.contains('tr-group') && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopWidth === (i === 0 ? '0px' : '1px') && n.fontSize === '12px' && n.fontWeight === '600' && n.color === 'rgb(94, 99, 107)'; }))));
+  check('TR-D1 트리 머리 줄 — 띠 없음(배경 투명 · .tr-group 없음) · 위 1px 선(첫 머리 0) · 이름 12px 600 --text-2', (await p.$$eval('#bindTree .tr-head', (e) => e.length > 1 && e.every((h, i) => { const cs = getComputedStyle(h); const n = getComputedStyle(h.querySelector('.tr-name')); return !h.classList.contains('tr-group') && cs.backgroundColor === 'rgba(0, 0, 0, 0)' && cs.borderTopWidth === (i === 0 ? '0px' : '1px') && n.fontSize === '12px' && n.fontWeight === '600' && n.color === 'rgb(85, 85, 85)'; }))));
   await p.hover('#bindTree .tr-row >> nth=0');
   const trHover = await p.$eval('#bindTree .tr-row', (e) => getComputedStyle(e).backgroundColor);
   await p.hover('#bindTree .tr-head >> nth=0');
   const headHover = await p.$eval('#bindTree .tr-head', (e) => getComputedStyle(e).backgroundColor);
-  check('B.12 마우스 올림 띠 — 트리 줄은 --surface-hover · 머리 줄은 그대로(투명 — TR-D1)', trHover === 'rgb(236, 238, 240)' && headHover === 'rgba(0, 0, 0, 0)', `${trHover} / ${headHover}`);
+  check('B.12 마우스 올림 띠 — 트리 줄은 --surface-hover · 머리 줄은 그대로(투명 — TR-D1)', trHover === 'rgb(245, 245, 245)' && headHover === 'rgba(0, 0, 0, 0)', `${trHover} / ${headHover}`);
   await p.mouse.move(0, 0);
   await p.click('#bindTree .tr-row >> nth=1 >> .bv-switch'); // 반경 줄
   check('B2 반경 줄만 끔 → 간격 줄은 켠 채 · [6곳 연결]', JSON.stringify((await bindList(p)).filter(Array.isArray).map((x) => x[2])) === JSON.stringify([true, false, true, true, true]) && (await named(p, '#btnApplyConfirm', '6곳 연결')));
@@ -1204,7 +1204,7 @@ async function saveAndGet(p) {
   check('16 N 배지 툴팁 "color/gray/0을 가리켜요"(TR-P12 — 칩에는 없음) · 배지는 칩 바로 뒤(TR-D9)', inv?.tip === 'color/gray/0을 가리켜요' && inv.chipTip === null && inv.after, JSON.stringify(inv));
   check('16 이미 있는 역할 줄은 "N" 없음', chips.find((x) => x.name === 'spacing/8')?.badge === undefined);
   const badgeStyle = await p.$eval('#bindTree .bv-new', (e) => { const cs = getComputedStyle(e); return [cs.backgroundColor, cs.color, cs.borderTopWidth, cs.fontWeight]; });
-  check('16 "N" 배지 — 채운 바탕(#0a6dbf) · 흰 글자 · 테두리 없음 · 600', JSON.stringify(badgeStyle) === JSON.stringify(['rgb(10, 109, 191)', 'rgb(255, 255, 255)', '0px', '600']), JSON.stringify(badgeStyle));
+  check('16 "N" 배지 — 채운 바탕(#111111) · 흰 글자 · 테두리 없음 · 700(DS-2 Badge text-caption)', JSON.stringify(badgeStyle) === JSON.stringify(['rgb(17, 17, 17)', 'rgb(255, 255, 255)', '0px', '700']), JSON.stringify(badgeStyle));
   await p.click('#btnApplyConfirm');
   const items = (await sent(p, 'APPLY_SELECTED')).at(-1).items;
   check('16 연결 요청 — 새 역할 정보만(바꾸기 · 풀기 없음)', items.some((i) => i.newRole?.name === 'color/text/inverse') && items.every((i) => !('fromVariableId' in i) && !('unbind' in i)), JSON.stringify(items));
@@ -1497,7 +1497,7 @@ async function saveAndGet(p) {
   ] });
   await p.waitForTimeout(30);
   const rows = await p.$$eval('#renameTree .tr', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
-  check('TR-D1 이름 정리 트리 머리 줄 — 띠 없음 · 이름 12px 600 --text-2(맥락 머리 따로 회색 없음 — .muted 없음)', await p.$$eval('#renameTree .tr-head', (e) => e.length > 0 && e.every((h) => !h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgba(0, 0, 0, 0)' && !h.querySelector('.tr-name.muted') && getComputedStyle(h.querySelector('.tr-name')).fontWeight === '600' && getComputedStyle(h.querySelector('.tr-name')).color === 'rgb(94, 99, 107)')));
+  check('TR-D1 이름 정리 트리 머리 줄 — 띠 없음 · 이름 12px 600 --text-2(맥락 머리 따로 회색 없음 — .muted 없음)', await p.$$eval('#renameTree .tr-head', (e) => e.length > 0 && e.every((h) => !h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgba(0, 0, 0, 0)' && !h.querySelector('.tr-name.muted') && getComputedStyle(h.querySelector('.tr-name')).fontWeight === '600' && getComputedStyle(h.querySelector('.tr-name')).color === 'rgb(85, 85, 85)')));
   check('18 소속 트리 — 그대로 조상 머리 "Product card 2개" · 바꿀 줄 · 보존 줄 숨김', rows.length === 3 && rows[0].includes('Product card') && rows[0].includes('2개') && rows[1].includes('Frame 12') && rows[1].includes('card-header') && !rows.some((x) => x.includes('Title')), JSON.stringify(rows));
   check('18 머리 오른쪽 "Product card · 바꿀 이름 2개" · [2개 이름 바꾸기]', (await p.textContent('#subRight')) === 'Product card · 바꿀 이름 2개' && (await p.textContent('#btnRename')) === '2개 이름 바꾸기');
   await p.click('#renameTree [data-tkey="a1"] .bv-switch');
@@ -1712,7 +1712,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
   check('22 목록 행 = 아래 구분선 1px · 모서리 0 · 배경 투명 · 높이 30 · 안쪽 여백 2', row.top === '0px' && row.bottom === '1px' && row.radius === '0px' && row.bg === 'rgba(0, 0, 0, 0)' && row.minH === '30px' && row.pl === '2px', JSON.stringify(row));
   check('22 .results 행 사이 틈 0', (await p.$eval('#colorTable', (e) => getComputedStyle(e).rowGap)) === '0px');
   await p.hover('#colorTable .r-card >> nth=0');
-  check('22 목록 행 마우스 올림 띠 --surface-hover(색 목록)', (await p.$eval('#colorTable .r-card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(236, 238, 240)');
+  check('22 목록 행 마우스 올림 띠 --surface-hover(색 목록)', (await p.$eval('#colorTable .r-card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(245, 245, 245)');
   await p.mouse.move(0, 0);
   await p.click('[data-make-step="token"].step-chip');
   await p.waitForTimeout(60);
@@ -1722,7 +1722,7 @@ const primaries = (p) => p.evaluate(() => document.querySelectorAll('#selCards b
   const trow = await rowShape(p, '#tokenList .r-card');
   check('22 토큰 목록 행 = 아래 구분선 1px · 모서리 0 · 배경 투명 · 높이 30 · 안쪽 여백 2', trow.top === '0px' && trow.bottom === '1px' && trow.radius === '0px' && trow.bg === 'rgba(0, 0, 0, 0)' && trow.minH === '30px' && trow.pl === '2px', JSON.stringify(trow));
   await p.hover('#tokenList .r-card >> nth=0');
-  check('22 목록 행 마우스 올림 띠 --surface-hover(토큰 목록)', (await p.$eval('#tokenList .r-card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(236, 238, 240)');
+  check('22 목록 행 마우스 올림 띠 --surface-hover(토큰 목록)', (await p.$eval('#tokenList .r-card', (e) => getComputedStyle(e).backgroundColor)) === 'rgb(245, 245, 245)');
   await p.mouse.move(0, 0);
   await p.close();
   // 오류 상자(실제 ERROR 흐름 — 이름 정리 [이름 바꾸기]) — 빨강 띠 · 테두리 0 · ⚠ 아이콘
@@ -1902,7 +1902,7 @@ const cardPrimaries = (p, card) => p.$$eval(`${card} button.primary`, (e) => e.f
   await p.click('#btnPalette');
   check('23 [팔레트 생성] 누르면 aria-expanded="true" · 띠 보임 · 포커스 단추 그대로', (await p.getAttribute('#btnPalette', 'aria-expanded')) === 'true' && (await visible(p, '#paletteBand')) && (await p.evaluate(() => document.activeElement?.id)) === 'btnPalette');
   const band = await p.$eval('#paletteBand', (e) => { const s = getComputedStyle(e); return { bg: s.backgroundColor, bw: s.borderTopWidth, hex: getComputedStyle(document.getElementById('brandHex')).backgroundColor, tip: document.getElementById('harmonyLabel').title }; });
-  check('23 띠 = 옅은 배경(--surface-2) · 테두리 0 · 입력 칸은 흰 바탕 · 하모니 label 툴팁', band.bg === 'rgb(244, 245, 246)' && band.bw === '0px' && band.hex === 'rgb(255, 255, 255)' && band.tip === '보조색을 켜면 고를 수 있어요', JSON.stringify(band));
+  check('23 띠 = 옅은 배경(--surface-2) · 테두리 0 · 입력 칸은 흰 바탕 · 하모니 label 툴팁', band.bg === 'rgb(245, 245, 245)' && band.bw === '0px' && band.hex === 'rgb(255, 255, 255)' && band.tip === '보조색을 켜면 고를 수 있어요', JSON.stringify(band));
   const badBand = await nestedCards(p);
   check('23 카드 안 카드 0 — 팔레트 띠를 연 색 단계', badBand.length === 0, badBand.join(' · '));
   await p.click('#btnPaletteRun');
@@ -2393,7 +2393,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   const lk = () => p.evaluate(() => { const b = document.getElementById('btnLicenseLink'); const r = b.getBoundingClientRect(); return { text: b.textContent, title: b.title, dis: b.getAttribute('aria-disabled'), shown: r.width > 0 && r.height > 0 && getComputedStyle(document.getElementById('licenseLinkRow')).display !== 'none' }; });
   const f = await lk();
   const col = await p.evaluate(() => { const cs = getComputedStyle(document.getElementById('btnLicenseLink')); return { c: cs.color, b: cs.backgroundColor }; });
-  check('26 잠긴 주 버튼 모양(B.23) — 글자 --muted · 바탕 --surface-2', col.c === 'rgb(146, 152, 161)' && col.b === 'rgb(244, 245, 246)', JSON.stringify(col));
+  check('26 잠긴 주 버튼 모양(B.23) — 글자 --muted · 바탕 --surface-2', col.c === 'rgb(153, 153, 153)' && col.b === 'rgb(245, 245, 245)', JSON.stringify(col));
   check('26 무료 · 자리표시자 → [유료 구매하기 ↗] 보임 · 잠김 · 툴팁 꼬리', f.shown && f.text === '유료 구매하기 ↗' && f.dis === 'true' && f.title === '결제 페이지를 열어요 — 구독 관리 페이지는 아직 준비 중이에요', JSON.stringify(f));
   await p.evaluate(() => { window.__sent.length = 0; });
   await p.click('#btnLicenseLink', { force: true });
@@ -2439,7 +2439,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   await p.waitForTimeout(40);
   check('27 결과 — 제목은 그린 줄 수(표에 없는 id 뺌) · 요약 · 주의 띠(주황)', (await p.textContent('.modal h3')) === '안 쓰는 변수 2개' && (await p.textContent('.modal .unused-sum')).includes('8,240') && (await p.textContent('.modal .banner.caution')) === '다른 파일에서 쓰는 변수는 확인하지 못해요', await p.textContent('.modal h3'));
   check('27 트리 — 머리 띠 · 처음 모두 끔', (await p.$$eval('.modal .unused-tree .tr-head', (e) => e.length)) === 1 && (await p.$$eval('.modal .unused-tree .tr-row .bv-switch', (e) => e.every((x) => x.getAttribute('aria-checked') === 'false'))));
-  check('27 안 쓰는 변수 트리는 지금 모양 그대로(TR-D12) — .vlike 없음 · 머리 띠(.tr-group · --surface-2) · ▼/▶', await p.$$eval('.modal .unused-tree', (e) => e.length === 1 && !e[0].classList.contains('vlike') && [...e[0].querySelectorAll('.tr-head')].every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(244, 245, 246)' && /[▼▶]/.test(h.querySelector('.tr-car').textContent))));
+  check('27 안 쓰는 변수 트리는 지금 모양 그대로(TR-D12) — .vlike 없음 · 머리 띠(.tr-group · --surface-2) · ▼/▶', await p.$$eval('.modal .unused-tree', (e) => e.length === 1 && !e[0].classList.contains('vlike') && [...e[0].querySelectorAll('.tr-head')].every((h) => h.classList.contains('tr-group') && getComputedStyle(h).backgroundColor === 'rgb(245, 245, 245)' && /[▼▶]/.test(h.querySelector('.tr-car').textContent))));
   check('27 chain 태그', (await p.$$eval('.modal .unused-tree .tr-tag', (e) => e.map((x) => x.textContent))).includes('안 쓰는 변수만 가리킴'));
   check('27 k = 0 → [선택한 0개 지우기] aria-disabled', (await p.getAttribute('.modal [data-unused="delete"]', 'aria-disabled')) === 'true');
   await p.click('.modal .unused-tree .tr-row .bv-switch');
@@ -2527,7 +2527,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
     const rows = await p.$$eval('#makeTree .tr-row', (e) => e.map((r) => ({ k: r.dataset.tkey, dec: r.classList.contains('ts-decimal'), sw: !!r.querySelector('.bv-switch'), txt: r.textContent, aria: r.getAttribute('aria-label'), col: getComputedStyle(r.querySelector('.ts-aa')).color })));
     check('28f Text Style 탭 줄 2개 — 26.67 흐린 줄이 크기 순서 제자리(먼저) · 스위치 없음 · 오른쪽 글',
       rows.length === 2 && rows[0].dec && !rows[0].sw && rows[0].txt.includes('글자 크기가 소수라 만들지 않아요') && rows[0].txt.includes('26.67') && rows[0].txt.includes('4곳') && !rows[0].txt.includes('Layer') && !rows[1].dec && rows[1].sw, JSON.stringify(rows));
-    check('28f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(146, 152, 161)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
+    check('28f 흐린 줄 — Aa · 글 --muted · 접근성 이름 = 값 요약 + 사유', rows[0].col === 'rgb(153, 153, 153)' && rows[0].aria === 'Inter · 26.67 / 36px / 0 · SemiBold · 글자 크기가 소수라 만들지 않아요', JSON.stringify(rows[0]));
     check('28f 처음엔 스타일 꺼짐 — 만들 수에 스타일 없음(B.32)', !(await p.textContent('#makeCount')).includes('스타일'), await p.textContent('#makeCount'));
     await p.click('#makeAllOn');
     await p.waitForTimeout(20);
@@ -2578,7 +2578,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
     await p.waitForTimeout(60);
     const cards = await p.$$eval('#tsList .r-card', (e) => e.map((c) => ({ dec: c.classList.contains('ts-decimal'), inputs: c.querySelectorAll('input').length, del: c.querySelectorAll('.link').length, title: c.querySelector('.r-title')?.textContent, col: getComputedStyle(c.querySelector('.r-title')).color })));
     check('28f #tsList — 흐린 카드가 크기 순서 제자리(가운데) · 이름 입력 · [삭제] 없음 · 회색 사유',
-      cards.length === 3 && cards[1].dec && cards[1].inputs === 0 && cards[1].del === 0 && cards[1].title === '글자 크기가 소수라 만들지 않아요' && cards[1].col === 'rgb(146, 152, 161)' && !cards[0].dec && !cards[2].dec, JSON.stringify(cards));
+      cards.length === 3 && cards[1].dec && cards[1].inputs === 0 && cards[1].del === 0 && cards[1].title === '글자 크기가 소수라 만들지 않아요' && cards[1].col === 'rgb(153, 153, 153)' && !cards[0].dec && !cards[2].dec, JSON.stringify(cards));
     check('28f #tsStatus 수 — 신규 2(흐린 줄은 세지 않음)', (await p.textContent('#tsStatus')).startsWith('신규 2'), await p.textContent('#tsStatus'));
     check('28f [등록] 잠금 없음(만들 스타일 있음)', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) !== 'true');
     // [왼쪽 글자로 이름 채우기] 뒤 — 응답의 decimalRows대로 다시 그림(빠진 줄은 없어짐)
@@ -3138,7 +3138,7 @@ async function backHome30(p, libs) {
   const bg = await rowOf('vbg');
   check('9v 줄 — row 안 gridcell 하나(포커스 · data-key는 gridcell) · 높이 32 · 구분선 없음 · cursor pointer', bg.rowRole === 'row' && bg.rowKey === null && bg.cellRole === 'gridcell' && bg.cells === 1 && bg.h === 32 && bg.cellH === 32 && bg.rowBorder === '0px' && bg.cellBorder === '0px' && bg.cursor === 'pointer', JSON.stringify(bg));
   check('9v 별칭 줄 — 칩 옅은 칸 "→ gray/0" + 짙은 칸 "#FFFFFF" · 칩 높이 20 · 오른쪽 끝 · 이름 남는 폭(이름 끝 + 4 = 칩 시작)', bg.al === '→ gray/0' && bg.vl === '#FFFFFF' && bg.chipH === 20 && bg.chipRight === bg.cellRight && bg.nameRight + 4 === bg.chipLeft, JSON.stringify(bg));
-  check('9v 동그라미 16 · 테두리 1px 검정', bg.sw?.w === 16 && bg.sw.border === '1px rgb(0, 0, 0)', JSON.stringify(bg.sw));
+  check('9v 동그라미 16 · 테두리 1px #111111', bg.sw?.w === 16 && bg.sw.border === '1px rgb(17, 17, 17)', JSON.stringify(bg.sw));
   check('9v 별칭 줄 접근성 이름 "{전체 이름}, {값 글}, → {대상 전체 이름}" · 툴팁 "{전체 이름} / → {대상}"', bg.aria === 'color/background/default, #FFFFFF, → color/gray/0' && bg.title === 'color/background/default / → color/gray/0', `${bg.aria} | ${bg.title}`);
   const lg = await rowOf('vlong');
   check('9v 긴 이름 — 한 줄(nowrap) · 말줄임 · 줄 높이 32 그대로 · 칩 오른쪽 끝', lg.nowrap && lg.ellipsis && lg.clipped && lg.nameH === 16 && lg.h === 32 && lg.chipRight === lg.cellRight && lg.nameRight + 4 === lg.chipLeft, JSON.stringify(lg));
@@ -3204,7 +3204,7 @@ async function backHome30(p, libs) {
   await p.click('.ctx-menu button >> text=색 목록으로 보기').catch(() => {});
   // 사이드바
   const side = await p.$$eval('#varSide .vs-item', (e) => e.map((x) => { const s = getComputedStyle(x); const b = getComputedStyle(x.querySelector('.vs-badge')); return { sel: x.getAttribute('aria-selected') === 'true', h: Math.round(x.getBoundingClientRect().height), bg: s.backgroundColor, fs: s.fontSize, fw: s.fontWeight, badge: b.backgroundColor, badgeFs: b.fontSize, num: getComputedStyle(x.querySelector('.vs-num')).fontSize }; }));
-  check('9v 사이드바 — 항목 28 · 12px · 고른 항목 배경 #ededed · 굵게 · 배지 검정(10px) · 수 11px', side.every((x) => x.h === 28 && x.fs === '12px' && x.badgeFs === '10px' && x.num === '11px') && side.filter((x) => x.sel).every((x) => x.bg === 'rgb(237, 237, 237)' && x.fw === '600' && x.badge === 'rgb(0, 0, 0)') && side.some((x) => x.sel) && side.filter((x) => !x.sel).every((x) => x.fw === '400'), JSON.stringify(side));
+  check('9v 사이드바 — 항목 28 · 12px · 고른 항목 배경 #ECECEC · 굵게 · 배지 #111111(10px) · 수 11px', side.every((x) => x.h === 28 && x.fs === '12px' && x.badgeFs === '10px' && x.num === '11px') && side.filter((x) => x.sel).every((x) => x.bg === 'rgb(236, 236, 236)' && x.fw === '600' && x.badge === 'rgb(17, 17, 17)') && side.some((x) => x.sel) && side.filter((x) => !x.sel).every((x) => x.fw === '400'), JSON.stringify(side));
   // 11px 아래 글자 0(배지 10px만) · 560 가로 스크롤 0
   const small = await p.evaluate(() => {
     const bad = [];
@@ -3405,7 +3405,7 @@ async function backHome30(p, libs) {
   const geo = () => p.evaluate(() => {
     const T = document.getElementById('varTree').getBoundingClientRect();
     const X = (v) => Math.round((v - T.left) * 10) / 10;
-    const border = getComputedStyle(document.documentElement).getPropertyValue('--border').trim();
+    const border = getComputedStyle(document.documentElement).getPropertyValue('--color-border-default').trim();
     const probe = document.createElement('i'); probe.style.background = border; document.body.appendChild(probe); const borderRgb = getComputedStyle(probe).backgroundColor; probe.remove();
     const grps = [...document.querySelectorAll('#varTree .vt-grp')].map((g) => {
       const s = getComputedStyle(g, '::before'); const r = g.getBoundingClientRect();
@@ -3616,7 +3616,7 @@ const trGeo = (p, sel) => p.$eval(sel, (T) => {
     };
   });
   return { rows, w: r(T.getBoundingClientRect().width), vlike: T.classList.contains('vlike'), hscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth || T.scrollWidth > T.clientWidth,
-    text: probe('--text'), text2: probe('--text-2'), muted: probe('--muted'), line: probe('--swatch-line') };
+    text: probe('--color-text-primary'), text2: probe('--color-text-secondary'), muted: probe('--color-text-tertiary'), line: probe('--swatch-border') };
 });
 const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res))));
 {
@@ -3664,7 +3664,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   check('32 종류 표시 — FLOAT "#" · STRING "Aa" · BOOLEAN "✓" · COLOR 동그라미 16 · 테두리 1px --swatch-line', byName('spacing/card/inset')?.ld.t === '#' && byName('opacity/label')?.ld.t === 'Aa' && byName('flag/visible')?.ld.t === '✓' && bd.ld.sw && bd.ld.w === 16 && bd.ld.bw === '1px' && bd.ld.bc === g.line && bd.ld.x === 16, JSON.stringify(typeRows.map((x) => [x.al, x.ld])));
   check('32 투명 색 동그라미 — 바둑판(.ck — TR-P4)', R['trn|color'].ld.ck === true);
   const off = R['cg|gap'];
-  check('32 끈 줄 — 옅은 칸 · 왼쪽 글 --text-2 · 짙은 칸 배경 --surface-2 · 글 --text-2 · opacity 1(TR-D6)', off.off && off.alC === g.text2 && off.ltC === g.text2 && off.vlBg === 'rgb(244, 245, 246)' && off.vlC === g.text2 && off.ld.o === '1', JSON.stringify(off));
+  check('32 끈 줄 — 옅은 칸 · 왼쪽 글 --text-2 · 짙은 칸 배경 --surface-2 · 글 --text-2 · opacity 1(TR-D6)', off.off && off.alC === g.text2 && off.ltC === g.text2 && off.vlBg === 'rgb(245, 245, 245)' && off.vlC === g.text2 && off.ld.o === '1', JSON.stringify(off));
   await p.click('#bindTree [data-tkey="bgd|color"] > .bv-switch');
   await p.mouse.move(1, 1);
   check('32 끈 색 줄 동그라미 흑백(grayscale) · opacity 1', await p.$eval('#bindTree [data-tkey="bgd|color"] .vr-sw', (e) => getComputedStyle(e).filter === 'grayscale(1)' && getComputedStyle(e).opacity === '1'));
@@ -3733,7 +3733,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   g = await trGeo(p, '#makeTree');
   const dec = g.rows.find((x) => x.k.startsWith('td:')), tr = g.rows.find((x) => x.k.startsWith('t:'));
   check('32 Text Style 탭 — 머리 없음 · 줄 x 8 · [Aa] "6곳"(S-2 SC-D43) · 칩 x 96 [→ 이름 | 값 요약] · "있음" 칩 뒤', !g.rows.some((x) => x.head) && tr.ld.x === 8 && tr.ld.t === 'Aa' && tr.ltText === '6곳' && tr.ltW === 56 && tr.chX === 96 && tr.al === '→ Heading/H2' && tr.vl.startsWith('Inter') && tr.tagX === tr.chR + 4, JSON.stringify(tr));
-  check('32 흐린 소수 크기 줄 — 짙은 칸만 · 시작 x 96(TR-P21) · 글 --muted · 짙은 칸 배경 --surface-2', dec.al === null && dec.vlX === 96 && dec.ltC === g.muted && dec.vlBg === 'rgb(244, 245, 246)' && dec.vlC === g.muted, JSON.stringify(dec));
+  check('32 흐린 소수 크기 줄 — 짙은 칸만 · 시작 x 96(TR-P21) · 글 --muted · 짙은 칸 배경 --surface-2', dec.al === null && dec.vlX === 96 && dec.ltC === g.muted && dec.vlBg === 'rgb(245, 245, 245)' && dec.vlC === g.muted, JSON.stringify(dec));
   await p.dblclick('#makeTree [data-tkey^="t:"] .vchip .al');
   await p.waitForTimeout(30);
   const ed = await p.$eval('#makeTree input.tr-edit', (e) => { const tl = e.closest('.tree').getBoundingClientRect().left; const b = e.getBoundingClientRect(); return [Math.round(b.left - tl), Math.round(b.width)]; });
@@ -3845,7 +3845,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await recv(p, { type: 'VARIABLES', vars: [GLOBV, SEMV] });
   check('40 PREREQ_STATE{darkUnfilled: 3} → #darkNotice dark.unfilled · 잠금 없음 · 전제 띠 숨김', (await p.textContent('#darkNotice')) === 'Dark 값이 없는 색 3개 — [다크 만들기]로 채워요' && (await visible(p, '#darkNotice')) && !(await locked(p, '#btnGenDark')) && !(await visible(p, '#darkPrereq')));
   const look = await p.$eval('#darkNotice', (e) => { const c = getComputedStyle(e); const q = getComputedStyle(document.querySelector('.prereq')); return { color: c.color, pc: q.color, bg: c.backgroundColor, border: c.borderTopWidth, radius: c.borderTopLeftRadius, m: c.margin, pm: q.margin, pad: c.padding, ppad: q.padding }; });
-  check('40 알림 띠 모양 — .prereq와 같은 주황 글 · 여백 · 옅은 주황 배경 · 테두리 · 둥근 모서리 없음', look.color === look.pc && look.m === look.pm && look.pad === look.ppad && look.bg === 'rgb(251, 241, 223)' && look.border === '0px' && look.radius === '0px', JSON.stringify(look));
+  check('40 알림 띠 모양 — .prereq와 같은 주황 글 · 여백 · 옅은 주황 배경 · 테두리 · 둥근 모서리 없음', look.color === look.pc && look.m === look.pm && look.pad === look.ppad && look.bg === 'rgb(248, 242, 233)' && look.border === '0px' && look.radius === '0px', JSON.stringify(look));
   check('40 카드 안 카드 0 — 다크 카드', (await nestedCards(p)).length === 0, JSON.stringify(await nestedCards(p)));
   await recv(p, { ...PREREQ, darkOld: true });
   check('40 darkOld → dark.needMigrate', (await p.textContent('#darkNotice')) === '다크가 Semantic 모드에 있어요 — [다크 만들기]를 누르면 Global로 옮겨요');

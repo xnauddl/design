@@ -1,0 +1,43 @@
+/* Input · Textarea · Select · Search Field — design-system §6.2. 기본 요소(text · number · select · textarea)도 같은 모양(§6.9-3). */
+input[type="text"], input[type="number"], input[type="search"], select, textarea, .ds-input {
+  font: var(--text-body); color: var(--color-text-primary);
+  background: var(--color-surface-secondary);
+  border: 1px solid var(--color-border-default); border-radius: var(--radius-small);
+  padding: 0 var(--space-2);
+  transition: background var(--motion-duration-fast) ease, border-color var(--motion-duration-fast) ease, box-shadow var(--motion-duration-fast) ease;
+}
+input[type="text"], input[type="number"], input[type="search"], select, .ds-input { height: var(--size-control-md); }
+input[type="text"]:hover, input[type="number"]:hover, input[type="search"]:hover, select:hover, textarea:hover, .ds-input:hover { border-color: var(--color-border-strong); }
+input[type="text"]:focus, input[type="number"]:focus, input[type="search"]:focus, select:focus, textarea:focus, .ds-input:focus {
+  outline: none; background: var(--color-surface-primary);
+  border-color: var(--color-interactive-focus); box-shadow: var(--focus-ring-field);
+}
+input::placeholder, textarea::placeholder, .ds-input::placeholder { color: var(--color-text-tertiary); }
+.ds-input--sm { height: var(--size-control-sm); }
+.ds-input[aria-invalid="true"], input[aria-invalid="true"] { border-color: var(--color-state-error); }
+input:disabled, select:disabled, textarea:disabled, .ds-input:disabled { color: var(--color-text-tertiary); cursor: default; }
+input:disabled:hover, select:disabled:hover, textarea:disabled:hover, .ds-input:disabled:hover { border-color: var(--color-border-default); }
+
+/* Textarea — 기본 요소는 mono(지금 #semMap) */
+textarea, .ds-textarea { height: auto; min-height: var(--space-6); padding: var(--space-1) var(--space-2); resize: vertical; }
+.ds-textarea { min-height: calc(var(--space-8) + var(--space-8)); }
+textarea, .ds-textarea--mono { font: var(--text-mono); }
+
+/* 라벨 · 도움말 · 묶음 */
+.ds-field { display: flex; flex-direction: column; gap: var(--space-1); }
+.ds-label { font: var(--text-label-sm); color: var(--color-text-secondary); }
+.ds-help { font: var(--text-body-sm); color: var(--color-text-secondary); display: flex; align-items: center; gap: var(--space-1); }
+.ds-help--error { color: var(--color-state-error); }
+
+/* Select — 그릇 + 아이콘(DS-3에서 화면에 씀). 기본 select는 브라우저 화살표 그대로 */
+.ds-select { position: relative; display: inline-flex; align-items: center; }
+.ds-select > select { appearance: none; -webkit-appearance: none; padding-right: calc(var(--space-2) + var(--space-2) + var(--size-icon-sm)); width: 100%; }
+.ds-select > .ds-ic { position: absolute; right: var(--space-2); width: var(--size-icon-sm); height: var(--size-icon-sm); color: var(--color-text-secondary); pointer-events: none; }
+
+/* Search Field */
+.ds-search { position: relative; display: flex; align-items: center; }
+.ds-search > input { width: 100%; padding-left: calc(var(--space-2) + var(--space-2) + var(--size-icon-md)); padding-right: calc(var(--space-1) + var(--size-control-sm)); }
+.ds-search > input::-webkit-search-cancel-button { display: none; }
+.ds-search > .ds-ic { position: absolute; left: var(--space-2); color: var(--color-text-tertiary); pointer-events: none; }
+.ds-search > .ds-icbtn { position: absolute; right: var(--space-0-5); }
+.ds-search--compact > input { height: var(--size-compact); }

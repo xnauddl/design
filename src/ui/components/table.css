@@ -1,0 +1,6 @@
+/* Table — design-system §6.4(새로 — 모음 화면만). */
+.ds-table { width: 100%; border-collapse: collapse; border-radius: 0; font: var(--text-body); }
+.ds-table th { height: var(--size-control-md); padding: 0 var(--space-2); text-align: left; font: var(--text-label-sm); color: var(--color-text-secondary); border-bottom: 1px solid var(--color-border-strong); }
+.ds-table td { height: var(--size-control-lg); padding: 0 var(--space-2); border-bottom: 1px solid var(--color-border-default); color: var(--color-text-primary); }
+.ds-table .ds-table--num, .ds-table td.ds-table__num, .ds-table th.ds-table__num { font: var(--text-mono); text-align: right; }
+.ds-table tr[aria-selected="true"] td { background: var(--color-surface-selected); }

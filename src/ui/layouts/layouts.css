@@ -1,0 +1,24 @@
+/* 공통 Layout System — design-system §5(클래스만 — 지금 화면은 DS-3에서 옮김). */
+.ds-layout { display: flex; flex-direction: column; height: 100vh; background: var(--color-background-primary); }
+.ds-layout__body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 0 var(--space-3); }
+.ds-header { display: flex; align-items: center; gap: var(--space-2); height: var(--size-header); padding: 0 var(--space-3); border-bottom: 1px solid var(--color-border-default); flex: none; }
+.ds-header__brand { display: inline-flex; align-items: center; gap: var(--space-2); font: var(--text-heading-sm); color: var(--color-text-primary); flex: none; }
+.ds-header__scope { flex: 1 1 auto; min-width: 0; font: var(--text-body-sm); color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-navbar { display: flex; gap: var(--space-4); height: var(--size-nav); padding: 0 var(--space-3); border-bottom: 1px solid var(--color-border-default); flex: none; }
+.ds-navbar > .ds-tabs { border-bottom: 0; }
+.ds-page-header { display: flex; align-items: center; gap: var(--space-2); height: var(--size-header); border-bottom: 1px solid var(--color-border-default); flex: none; }
+.ds-page-header__title { flex: 1 1 auto; min-width: 0; margin: 0; font: var(--text-heading); color: var(--color-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-page-header__aside { flex: 0 1 auto; min-width: 0; font: var(--text-body-sm); color: var(--color-text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ds-section + .ds-section { margin-top: var(--space-6); }
+.ds-section__title { margin: 0; font: var(--text-heading-sm); color: var(--color-text-primary); }
+.ds-section__desc { margin: var(--space-0-5) 0 0; font: var(--text-body-sm); color: var(--color-text-secondary); }
+.ds-section__body { margin-top: var(--space-2); }
+.ds-settings { display: flex; flex-direction: column; }
+.ds-settings__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--size-control-md); padding: var(--space-1) 0; }
+.ds-settings__label { font: var(--text-label); color: var(--color-text-primary); }
+.ds-settings__desc { display: block; margin-top: var(--space-0-5); font: var(--text-body-sm); color: var(--color-text-secondary); }
+.ds-result { display: flex; flex-direction: column; gap: var(--space-2); }
+.ds-result__summary { font: var(--text-body); color: var(--color-text-primary); }
+.ds-actionbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); height: var(--size-action-bar); padding: 0 var(--space-3); border-top: 1px solid var(--color-border-default); background: var(--color-background-primary); flex: none; }
+.ds-actionbar__start, .ds-actionbar__end { display: flex; align-items: center; gap: var(--space-2); }
+.ds-actionbar__end { margin-left: auto; }

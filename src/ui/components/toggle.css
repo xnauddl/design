@@ -1,0 +1,17 @@
+/* Toggle — design-system §6.2(클래스만 — 지금 .bv-switch는 DS-3). 트랙 28×16, 누르는 곳 32×24. */
+.ds-toggle {
+  width: calc(var(--size-toggle-w) + var(--space-1)); height: var(--size-control-sm); padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer; flex: none;
+}
+.ds-toggle:hover:not(:disabled):not([aria-disabled="true"]) { background: none; }
+.ds-toggle__track { position: relative; width: var(--size-toggle-w); height: var(--size-toggle-h); border-radius: var(--radius-full); background: var(--color-border-strong); transition: background var(--motion-duration-fast) ease; }
+.ds-toggle__track::after {
+  content: ''; position: absolute; top: var(--space-0-5); left: var(--space-0-5);
+  width: var(--space-3); height: var(--space-3); border-radius: var(--radius-full);
+  background: var(--color-surface-primary); box-shadow: var(--toggle-knob-shadow); transition: left var(--motion-duration-fast) ease;
+}
+.ds-toggle[aria-checked="true"] .ds-toggle__track, .ds-toggle[aria-checked="mixed"] .ds-toggle__track { background: var(--color-primary); }
+.ds-toggle[aria-checked="true"] .ds-toggle__track::after { left: calc(var(--space-3) + var(--space-0-5)); }
+.ds-toggle[aria-checked="mixed"] .ds-toggle__track::after { left: var(--space-2); top: calc(var(--space-1) + var(--space-0-5)); width: var(--space-3); height: var(--space-1); border-radius: var(--radius-xs); box-shadow: none; }
+.ds-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring-default); border-radius: var(--radius-small); }
+.ds-toggle:disabled, .ds-toggle[aria-disabled="true"] { opacity: var(--opacity-disabled); cursor: default; box-shadow: none; }

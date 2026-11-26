@@ -1,0 +1,40 @@
+/* Checkbox · Radio — design-system §6.2. 기본 입력을 그대로 두고 모양만(appearance: none, 입력 자체의 바탕).
+   데이터 URI 안 색은 #FFFFFF(= color-text-on-primary, §8-8 검사). */
+input[type="checkbox"], .ds-check {
+  appearance: none; -webkit-appearance: none; flex: none; margin: 0;
+  width: var(--size-checkbox); height: var(--size-checkbox);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-xs);
+  background: var(--color-surface-primary) center / var(--space-2) no-repeat;
+  vertical-align: middle; cursor: pointer;
+  transition: background-color var(--motion-duration-fast) ease, border-color var(--motion-duration-fast) ease;
+}
+input[type="checkbox"]:checked, .ds-check:checked {
+  background-color: var(--color-interactive-focus); border-color: var(--color-interactive-focus);
+  background-size: 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath vector-effect='non-scaling-stroke' stroke-width='1.5' d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:indeterminate, .ds-check:indeterminate {
+  background-color: var(--color-interactive-focus); border-color: var(--color-interactive-focus);
+  background-size: 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-linecap='round'%3E%3Cpath vector-effect='non-scaling-stroke' stroke-width='1.5' d='M5 12h14'/%3E%3C/svg%3E");
+}
+input[type="checkbox"]:focus-visible, .ds-check:focus-visible { outline: none; box-shadow: var(--focus-ring-default); }
+input[type="checkbox"]:disabled, .ds-check:disabled { opacity: var(--opacity-disabled); cursor: default; }
+/* 잠김 — 투명도 없이(ia-v3 §2.3) */
+input[type="checkbox"][aria-disabled="true"], .ds-check[aria-disabled="true"] { border-color: var(--color-border-default); background-color: var(--color-surface-secondary); cursor: not-allowed; }
+input[type="checkbox"][aria-disabled="true"]:checked, .ds-check[aria-disabled="true"]:checked,
+input[type="checkbox"][aria-disabled="true"]:indeterminate, .ds-check[aria-disabled="true"]:indeterminate { background-color: var(--color-text-tertiary); border-color: var(--color-text-tertiary); }
+.ds-checkline { display: inline-flex; align-items: center; gap: var(--space-1); min-height: var(--size-hit-min); cursor: pointer; color: var(--color-text-secondary); }
+.ds-checkline:has([aria-disabled="true"]) { color: var(--color-text-tertiary); cursor: not-allowed; }
+
+/* Radio */
+.ds-radio {
+  appearance: none; -webkit-appearance: none; flex: none; margin: 0;
+  width: var(--size-checkbox); height: var(--size-checkbox);
+  border: 1px solid var(--color-border-strong); border-radius: var(--radius-full);
+  background: var(--color-surface-primary); cursor: pointer;
+}
+.ds-radio:checked { border: calc(var(--border-width-thick) + var(--border-width-thick)) solid var(--color-interactive-focus); }
+.ds-radio:focus-visible { outline: none; box-shadow: var(--focus-ring-default); }
+.ds-radio:disabled { opacity: var(--opacity-disabled); cursor: default; }
+.ds-radiogroup { display: flex; flex-direction: column; gap: var(--space-1); border: 0; margin: 0; padding: 0; }

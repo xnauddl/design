@@ -1,0 +1,13 @@
+/* Step Indicator — design-system §6.3(새로 — 지금 .steps는 DS-3). */
+.ds-steps { display: flex; align-items: center; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.ds-step { display: inline-flex; align-items: center; gap: var(--space-1); font: var(--text-label-sm); color: var(--color-text-tertiary); }
+.ds-step + .ds-step::before { content: ''; width: var(--space-5); height: 1px; background: var(--color-border-strong); margin-right: var(--space-1); }
+.ds-step__dot {
+  width: var(--space-4); height: var(--space-4); border-radius: var(--radius-full); border: 1px solid var(--color-border-strong);
+  display: inline-flex; align-items: center; justify-content: center; font: var(--text-caption);
+}
+.ds-step[aria-current="step"] { color: var(--color-text-emphasis); }
+.ds-step[aria-current="step"] .ds-step__dot { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-text-on-primary); }
+.ds-step--done { color: var(--color-text-secondary); }
+.ds-step--done .ds-step__dot { background: var(--color-surface-selected); border-color: var(--color-surface-selected); color: var(--color-text-primary); }
+.ds-step--done .ds-step__dot .ds-ic { width: var(--size-icon-sm); height: var(--size-icon-sm); }

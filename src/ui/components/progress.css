@@ -1,0 +1,12 @@
+/* Progress Indicator — 막대 · 돌기 · 단계 수, design-system §6.4(클래스만). */
+.ds-progress { height: var(--space-1); border-radius: var(--radius-full); background: var(--color-surface-secondary); overflow: hidden; }
+.ds-progress__fill { height: 100%; width: 0; border-radius: var(--radius-full); background: var(--color-primary); transition: width var(--motion-duration-fast) ease; }
+.ds-progress--error .ds-progress__fill { background: var(--color-state-error); }
+.ds-progress__count { font: var(--text-body-sm); color: var(--color-text-secondary); }
+.ds-spinner {
+  display: inline-block; width: var(--size-icon-md); height: var(--size-icon-md); box-sizing: border-box;
+  border: var(--border-width-thick) solid var(--color-surface-selected); border-top-color: var(--color-primary); border-radius: var(--radius-full);
+  animation: ds-spin var(--motion-duration-spin) linear infinite;
+}
+.ds-spinner--sm { width: var(--size-icon-sm); height: var(--size-icon-sm); }
+@media (prefers-reduced-motion: reduce) { .ds-spinner, .ds-btn[aria-busy="true"]::after { animation-duration: calc(var(--motion-duration-spin) + var(--motion-duration-spin) + var(--motion-duration-spin)); } }
