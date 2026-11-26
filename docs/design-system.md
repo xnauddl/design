@@ -55,6 +55,7 @@
 - **참조:** `$value` 안에 `{그룹.키}`(예: `{global.neutral-800}` · `{color.background-primary}`). 빌드가 `var(--그룹-키)`로 바꾼다(값을 복사하지 않음 — 개발자 도구에서 사슬이 보인다).
 - **빌드:** `build.mjs`가 원본을 읽어 `:root { … }` CSS를 만들고 `src/ui.html` `<style>` 안의 자리 표시 `/* @design-tokens */`에 넣어 `dist/ui.html`을 만든다. `:root`의 `color-scheme: light`는 `ui.html`에 그대로 남긴다. watch 모드는 `tokens.json`이 바뀌어도 다시 빌드한다.
 - Figma 변수 이름(`/` 나눔)은 DS-D4 때 정한다.
+- **Figma 변수 컬렉션 이름에 접두사를 붙이지 않는다**(사용자 결정 — `DS · ` 삭제): Global 층은 `Global`, Semantic 층은 `Semantic`. 플러그인이 만드는 컬렉션 이름(`src/lib/tiers.ts` `CANONICAL_NAME`)과 같다. 정밀 시안 파일의 `DS · Global` · `DS · Semantic`은 2026-11-26에 `Global` · `Semantic`으로 바꿨다.
 
 ### 2.3 런타임 변수 (토큰이 아님)
 
