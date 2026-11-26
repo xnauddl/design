@@ -77,6 +77,8 @@ export interface DraftToken {
     bg?: 'chroma' | 'dark' | 'light';
     /** 이 쓰임의 빈 자리가 있는 용도 묶음 키(`freeBy`의 키) — 만들기의 재사용이 쓰임 × 묶음마다 가족을 본다(ia-v4 §2.9 S2-P8 · SC-D41). 없으면 옛 응답. */
     keys?: string[];
+    /** 이 쓰임의 빈 자리 수(`count`는 붙은 자리도 셈) — 색 밝기 이름 · 쓰임 역할은 빈 자리로 정한다(ia-v4 §2.9 SC-D45). 없으면 옛 응답(`count`로). */
+    free?: number;
   }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;

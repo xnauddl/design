@@ -32,7 +32,7 @@ export function mergeSameNameTokens(tokens: readonly DraftToken[]): DraftToken[]
   for (const t of tokens) {
     const prev = byName.get(t.name);
     if (!prev) {
-      const copy: DraftToken = { ...t, sources: [...t.sources], ...(t.uses ? { uses: t.uses.map((u) => ({ ...u })) } : {}), ...(t.freeBy ? { freeBy: { ...t.freeBy } } : {}) };
+      const copy: DraftToken = { ...t, sources: [...t.sources], ...(t.uses ? { uses: t.uses.map((u) => ({ ...u, ...(u.keys ? { keys: [...u.keys] } : {}) })) } : {}), ...(t.freeBy ? { freeBy: { ...t.freeBy } } : {}) };
       byName.set(t.name, copy);
       out.push(copy);
       continue;
@@ -44,8 +44,12 @@ export function mergeSameNameTokens(tokens: readonly DraftToken[]): DraftToken[]
       const uses = (prev.uses ??= []);
       for (const u of t.uses) {
         const same = uses.find((x) => x.name === u.name && x.bg === u.bg);
-        if (same) same.count += u.count;
-        else uses.push({ ...u });
+        if (same) {
+          same.count += u.count;
+          // 빈 자리 수 · 빈 자리가 있는 묶음(SC-D41 · SC-D45)도 합친다
+          if (u.free != null) same.free = (same.free ?? 0) + u.free;
+          for (const k of u.keys ?? []) if (!(same.keys ??= []).includes(k)) same.keys.push(k);
+        } else uses.push({ ...u, ...(u.keys ? { keys: [...u.keys] } : {}) });
       }
     }
     if (t.count != null) prev.count = Math.max(prev.count ?? 0, t.count);

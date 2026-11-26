@@ -5668,10 +5668,10 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
   const { tokens } = extractFromSelection([card]);
   const by = (name) => tokens.find((x) => x.name === name);
   // 주인(card)을 쓰지 않는다(ia-v3 §2.12 12.12 N-D1 — 전에는 spacing/card/gap · spacing/card/padding)
-  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, keys: ['GAP'] }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
-  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, keys: ['GAP'] }]);
-  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, keys: ['ALL_FILLS|FRAME_FILL'] }]);
-  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', keys: ['ALL_FILLS|TEXT_FILL'] }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
+  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, free: 1, keys: ['GAP'] }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
+  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, free: 4, keys: ['GAP'] }]);
+  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, free: 1, keys: ['ALL_FILLS|FRAME_FILL'] }]);
+  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'] }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
 });
 
 /* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
@@ -5756,7 +5756,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   card.parent = root;
   const { tokens } = extractFromSelection([root]);
   const white = tokens.find((x) => x.name === 'color/ffffff');
-  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', keys: ['ALL_FILLS|TEXT_FILL'] }, { name: 'color/text', count: 1, bg: 'light', keys: ['ALL_FILLS|TEXT_FILL'] }]);
+  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', free: 1, keys: ['ALL_FILLS|TEXT_FILL'] }, { name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'] }]);
   await createTokens(tokens, 16);
   await createUsageRoles(tokens);
   const inv = findVar(figma, 'Semantic', 'color/text/inverse');
@@ -7801,7 +7801,7 @@ test('A.21 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주�
   assert.equal(r.newRoles, 1);
   assert.equal(card._bound.itemSpacing, button._bound.itemSpacing);
   const uses = extractFromSelection([card, button]).tokens.find((t) => t.name === 'spacing/16').uses;
-  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, keys: ['GAP'] }]);
+  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, free: 2, keys: ['GAP'] }]);
 });
 
 test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {
@@ -9907,4 +9907,18 @@ test('S-2 SC-D41 만들기 재사용 — 같은 묶음의 쓰임이 둘이면 �
   assert.deepEqual([card.m, card.n, card.p], [1, 2, 8]);
   assert.deepEqual([make.g, make.p], [2, 8]);
   assert.equal(make.state('radius/8')?.state, 'new');
+});
+
+test('S-2 SC-D45 밝기 · 쓰임 역할은 빈 자리로 — 테두리 #222222(별칭이 덮음)가 3곳은 이미 붙고 1곳만 비면 기준색은 빈 자리가 많은 #444444: 만들기 · 연결 같은 이름 · 안 쓰는 Semantic 없음', async () => {
+  const figma = installFigma();
+  const ink = mkVar(figma, 'ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#222222'), a: 1 }, 'Brand');
+  const lineInk = s2Alias(figma, 'line/ink', ink, ['ALL_SCOPES'], 'Brand');
+  const line = (id, hex, v) => s2Frame(id, { strokes: s2Fill(hex).map((p) => (v ? { ...p, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: v.id } } } : p)), strokeWeight: 1 });
+  const sel = [line('b1', '#222222', lineInk), line('b2', '#222222', lineInk), line('b3', '#222222', lineInk), line('b4', '#222222'), line('c1', '#444444'), line('c2', '#444444')];
+  const make = await s2MakeOf(sel, false);
+  assert.deepEqual([make.g, make.r], [2, 2]); // Semantic = stroke-width/default · color/border/default
+  const run = await s2Run(sel, false);
+  // 고치기 전: 만들기는 붙은 #222 3곳까지 세어 기준색 #222 → #444를 subtle로 지었고(안 쓰임), 연결은 빈 자리로 default를 또 만들었다(Semantic 3개)
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['color/border/default', 'stroke-width/default']);
+  assert.deepEqual(sel.map((n) => varName(figma, n.strokes[0].boundVariables?.color?.id)), ['line/ink', 'line/ink', 'line/ink', 'line/ink', 'color/border/default', 'color/border/default']);
 });

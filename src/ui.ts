@@ -7558,8 +7558,8 @@ function mcTakes(msg: CodeToUi): boolean {
       // 추출 · 미리보기 실패 — 카드 자리만 찾기 실패 모습. 찾기 결과 · 남긴 카드의 기억은 지우지 않는다(F-D3).
       mcInFlight = false;
       const extractFailed = rid === mcExtractReq && mcPreviewReq === 0;
-      // 남은 값이 0으로 확정된 뒤의 미리보기 실패(상태 5 — 거르기 전 고른 토큰 모두로 보낸 미리보기)는 무시한다(§4.1 상태 5 "실패" ②).
-      if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && mcLibSplit() && !mcShown().length) {
+      // 남은 값이 0으로 확정된 뒤의 미리보기 실패(상태 5 — 거르기 전 고른 토큰 모두로 보낸 미리보기 · SC-D42 뒤 상태 6에서 빈 자리 0인 값만 남음)는 무시한다(§4.1 상태 5 "실패" ②).
+      if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && !mcShown().length) {
         mcPrevFor = mcFor;
         mcPrevSig = mcSigOf([]);
         renderSelHome();

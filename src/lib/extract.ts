@@ -135,6 +135,8 @@ function add(
     if (u) u.count++;
     else uses.push((u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 }));
     // 이 쓰임의 빈 자리가 있는 용도 묶음(만들기의 재사용이 쓰임 × 묶음마다 가족 판정 — ia-v4 §2.9 S2-P8 · SC-D41)
+    // 빈 자리 수(free)는 색 밝기 이름의 입력이다 — 연결 찾기가 연결 안 된 자리만 보는 것과 같게(SC-D45)
+    if (place) u.free = (u.free ?? 0) + Math.max(0, place.free);
     if (place && place.free > 0 && !(u.keys ??= []).includes(place.key)) u.keys.push(place.key);
   }
 }

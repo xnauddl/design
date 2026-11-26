@@ -473,6 +473,9 @@ function semanticIndex(cols: readonly VariableCollection[], vars: readonly Varia
   return { existing, semByName };
 }
 
+/** 쓰임의 곳 수 — 빈 자리 수를 실은 토큰(S-2 뒤 추출)은 빈 자리 수, 옛 토큰은 `count`(붙은 자리 포함). 밝기 이름 · 쓰임 역할의 입력(SC-D45). */
+const usePlaces = (t: DraftToken, u: NonNullable<DraftToken['uses']>[number]): number => ((t.uses ?? []).some((x) => x.free != null) ? u.free ?? 0 : u.count);
+
 /** 색 쓰임 밝기 찾기 키 — (쓰임, 색 값 · 배경 종류 · 투명도). */
 const colorBaseKey = (use: string, hex: string, bg: BgKind | undefined, alpha: number | undefined): string => `${use}\u0000${colorSlotKey(String(hex).toLowerCase(), bg, alpha)}`;
 
@@ -486,8 +489,10 @@ function colorBasesOf(withUses: readonly DraftToken[], existing: ReadonlyMap<str
   for (const t of withUses) {
     for (const u of t.uses ?? []) {
       if (!u.name.startsWith('color/')) continue;
+      const n = usePlaces(t, u);
+      if (!(n > 0)) continue; // 자리가 모두 붙은 쓰임 — 연결 찾기에도 그 자리는 없다(SC-D45)
       const arr = colorUses.get(u.name) ?? [];
-      arr.push({ token: t, count: u.count, bg: u.bg });
+      arr.push({ token: t, count: n, bg: u.bg });
       colorUses.set(u.name, arr);
     }
   }
@@ -544,11 +549,14 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
   const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
   for (const t of withUses) {
     for (const u of t.uses ?? []) {
+      // 자리가 모두 붙은 쓰임은 역할을 만들지 않는다 — 붙일 자리가 없어 안 쓰는 Semantic이 된다(SC-D45). 곳 수 = 빈 자리 수.
+      const n = usePlaces(t, u);
+      if (!(n > 0)) continue;
       if (u.name.startsWith('color/')) {
         const arr = colorUses.get(u.name) ?? [];
-        arr.push({ token: t, count: u.count, bg: u.bg });
+        arr.push({ token: t, count: n, bg: u.bg });
         colorUses.set(u.name, arr);
-      } else reqs.push({ base: u.name, value: valueKey(t.value), count: u.count, token: t });
+      } else reqs.push({ base: u.name, value: valueKey(t.value), count: n, token: t });
     }
   }
   for (const [use, list] of colorUses) {

@@ -3867,13 +3867,13 @@ button.ds-tag { border: 0; cursor: pointer; }
     return state2 === false;
   }
   function mergeSameNameTokens(tokens2) {
-    var _a3, _b, _c, _d, _e;
+    var _a3, _b, _c, _d, _e, _f, _g, _h;
     const out = [];
     const byName = /* @__PURE__ */ new Map();
     for (const t2 of tokens2) {
       const prev = byName.get(t2.name);
       if (!prev) {
-        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
+        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {})) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
         byName.set(t2.name, copy);
         out.push(copy);
         continue;
@@ -3884,14 +3884,17 @@ button.ds-tag { border: 0; cursor: pointer; }
         const uses = (_b = prev.uses) != null ? _b : prev.uses = [];
         for (const u of t2.uses) {
           const same = uses.find((x) => x.name === u.name && x.bg === u.bg);
-          if (same) same.count += u.count;
-          else uses.push(__spreadValues({}, u));
+          if (same) {
+            same.count += u.count;
+            if (u.free != null) same.free = ((_c = same.free) != null ? _c : 0) + u.free;
+            for (const k of (_d = u.keys) != null ? _d : []) if (!((_e = same.keys) != null ? _e : same.keys = []).includes(k)) same.keys.push(k);
+          } else uses.push(__spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {}));
         }
       }
-      if (t2.count != null) prev.count = Math.max((_c = prev.count) != null ? _c : 0, t2.count);
+      if (t2.count != null) prev.count = Math.max((_f = prev.count) != null ? _f : 0, t2.count);
       if (t2.freeBy) {
-        const fb = (_d = prev.freeBy) != null ? _d : prev.freeBy = {};
-        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_e = fb[k]) != null ? _e : 0) + n;
+        const fb = (_g = prev.freeBy) != null ? _g : prev.freeBy = {};
+        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_h = fb[k]) != null ? _h : 0) + n;
       }
     }
     return out;
@@ -12157,7 +12160,7 @@ ${opts.tip}` : text;
       if (rid === mcExtractReq || rid === mcPreviewReq) {
         mcInFlight = false;
         const extractFailed = rid === mcExtractReq && mcPreviewReq === 0;
-        if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && mcLibSplit() && !mcShown().length) {
+        if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && !mcShown().length) {
           mcPrevFor = mcFor;
           mcPrevSig = mcSigOf([]);
           renderSelHome();

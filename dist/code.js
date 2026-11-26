@@ -3694,7 +3694,7 @@
   var fieldPlace = (acc, node, field, places = 1) => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) && !followsMain(acc, node, field) ? places : 0 });
   var followsMain = (acc, node, field, index) => !!acc.curMain && sameAsMain(node, acc.curMain, field, index);
   function add(acc, token, source, nodeId, use, bg, place) {
-    var _a, _b, _c, _d, _e;
+    var _a, _b, _c, _d, _e, _f;
     const k = keyOf(token.category, token.value, token.unit, token.alpha);
     let existing = acc.map.get(k);
     if (existing) {
@@ -3714,7 +3714,8 @@
       let u = uses.find((x) => x.name === use && x.bg === bg);
       if (u) u.count++;
       else uses.push(u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
-      if (place && place.free > 0 && !((_e = u.keys) != null ? _e : u.keys = []).includes(place.key)) u.keys.push(place.key);
+      if (place) u.free = ((_e = u.free) != null ? _e : 0) + Math.max(0, place.free);
+      if (place && place.free > 0 && !((_f = u.keys) != null ? _f : u.keys = []).includes(place.key)) u.keys.push(place.key);
     }
   }
   function backgroundOf(node) {
@@ -5250,6 +5251,10 @@
     }
     return { existing, semByName };
   }
+  var usePlaces = (t2, u) => {
+    var _a, _b;
+    return ((_a = t2.uses) != null ? _a : []).some((x) => x.free != null) ? (_b = u.free) != null ? _b : 0 : u.count;
+  };
   var colorBaseKey = (use, hex, bg, alpha) => `${use}\0${colorSlotKey(String(hex).toLowerCase(), bg, alpha)}`;
   function colorBasesOf(withUses, existing) {
     var _a, _b, _c, _d;
@@ -5257,8 +5262,10 @@
     for (const t2 of withUses) {
       for (const u of (_a = t2.uses) != null ? _a : []) {
         if (!u.name.startsWith("color/")) continue;
+        const n = usePlaces(t2, u);
+        if (!(n > 0)) continue;
         const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
-        arr.push({ token: t2, count: u.count, bg: u.bg });
+        arr.push({ token: t2, count: n, bg: u.bg });
         colorUses.set(u.name, arr);
       }
     }
@@ -5310,11 +5317,13 @@
     const colorUses = /* @__PURE__ */ new Map();
     for (const t2 of withUses) {
       for (const u of (_a = t2.uses) != null ? _a : []) {
+        const n = usePlaces(t2, u);
+        if (!(n > 0)) continue;
         if (u.name.startsWith("color/")) {
           const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
-          arr.push({ token: t2, count: u.count, bg: u.bg });
+          arr.push({ token: t2, count: n, bg: u.bg });
           colorUses.set(u.name, arr);
-        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
+        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: n, token: t2 });
       }
     }
     for (const [use, list] of colorUses) {
