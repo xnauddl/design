@@ -1725,7 +1725,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
     - 대상이 **다른 로컬 컬렉션**이면 그 컬렉션에서 이름이 N인 모드, 없으면 그 컬렉션의 기본 모드. 지금 `modeIdFor`의 "고른 모드 이름 → 없으면 기본" 규칙에서 고른 모드 이름 자리에 열의 모드 이름을 넣은 것이다.
     - 8단계 따라가는 동안 N을 그대로 넘긴다.
     - 라이브러리 대상은 지금처럼 `libVars`의 기본 값이다.
-    - 상세 팝업의 넷 — `edSwatch` 견본 · "값으로 적기" 줄의 미리보기 글 · 고르개 후보 값 미리보기(`valHtml` — 그 앞에서 후보의 **기본 모드 칸**을 고름) · "값으로 적기"가 적는 값(`edWriteValue`) — 은 모두 `resolveEditValue`(대상의 기본 모드)이고 그대로다. **칸 편집 창에서는 이 넷 모두 이 규칙(그 열의 모드 이름 → 없으면 기본, 8단계 · 라이브러리는 `libVars` 기본 값 — 표와 같음)을 쓴다.** 후보 미리보기는 후보의 칸도 이 규칙으로 고른다(후보가 같은 컬렉션이면 그 열의 모드). 그래서 Dark 열에서 "값으로 적기"의 미리보기 · 적히는 값이 모두 대상의 Dark 값이다. 코드: `resolveEditValue`에 모드 이름을 받는 갈래를 더하고, 후보 칸 고르기도 그 갈래를 쓴다.
+    - 상세 팝업의 넷 — `edSwatch` 견본 · "값으로 적기" 줄의 미리보기 글 · 고르개 후보 값 미리보기(`valHtml` — 그 앞에서 후보의 **기본 모드 칸**을 고름) · "값으로 적기"가 적는 값(`edWriteValue`) — 은 모두 `resolveEditValue`(대상의 기본 모드)이고 그대로다. **칸 편집 창에서는 이 넷 모두 이 규칙(그 열의 모드 이름 → 없으면 기본, 8단계 · 라이브러리는 `libVars` 기본 값 — 표와 같음)을 쓴다.** 후보 미리보기는 후보의 칸도 이 규칙으로 고른다(후보가 같은 컬렉션이면 그 열의 모드). 그래서 Dark 열에서 "값으로 적기"의 미리보기 · 적히는 값이 모두 대상의 Dark 값이다. 코드: 표의 `resolveCell`(로컬 8단계 · 라이브러리 `libVars`)에 모드 이름을 받는 갈래를 더해 칸 편집 창의 넷이 그것을 쓴다(`resolveEditValue`는 로컬 5단계 · 라이브러리 null이라 쓰지 않음 — 상세는 그대로 `resolveEditValue`). 후보 칸 고르기도 그 갈래를 쓴다.
   - **값 칸 — 별칭 숨김(VF-D2):** 칸이 칩 전체를 못 담으면 옅은 칸(별칭)을 숨기고 짙은 칸만 보인다.
     - 표 칸에서는 옅은 칸의 최대 폭(V-D5 180)과 말줄임을 쓰지 않는다 — 별칭은 다 보이거나 숨기거나 둘 중 하나다.
     - 판정: 옅은 칸 · 짙은 칸의 **자르지 않은 폭**(`scrollWidth`)의 합 > 칸 안쪽 폭 − 색 점 · 사이(16)이면 옅은 칸을 숨긴다. 그려진 뒤, 그리고 열 폭이 바뀔 때(창 크기 · 세로 스크롤 막대가 생기거나 없어져 W가 392 ↔ 377로 바뀜 — 목록 폭 `ResizeObserver`) 다시 잰다.
@@ -1777,23 +1777,22 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
   - **창 안 키:**
     - Enter: 값 글 칸(hex · 숫자 · 글자)에서는 저장(아래). 고르개 검색 칸에서는 지금처럼 아무것도 하지 않는다. 단추([▾] · 별칭 알약 · 스위치)에서는 그 단추의 동작이다.
     - 참거짓 스위치를 바꾸면 그대로 저장한다(누름 · Space · Enter 모두 — 참거짓은 바꾸는 것이 곧 저장).
-    - 고르개 후보 목록에서 별칭 대상을 고르면 그대로 저장한다. "값으로 적기"는 색 · 숫자 · 글자면 글 칸에 값을 옮기기만 한다(저장 없음 — 고친 뒤 Enter). **참거짓이면 글 칸이 없으므로 그 값으로 바로 저장한다**(별칭만 떼어 같은 값을 적음). 따라갈 값이 없으면(대상 삭제됨 · 라이브러리 값 없음 · 단계 넘음 — 미리보기 "—") 참거짓의 "값으로 적기" 줄은 `aria-disabled`(누르면 아무것도 안 함 — 스위치로 값을 고르면 별칭이 떼어지며 저장된다). 색 · 숫자 · 글자는 지금 상세처럼 빈 글 칸 + `needValue`.
+    - 고르개 후보 목록에서 별칭 대상을 고르면 그대로 저장한다. "값으로 적기"는 색 · 숫자 · 글자면 글 칸에 값을 옮기기만 한다(저장 없음 — 고친 뒤 Enter). **참거짓이면 글 칸이 없으므로 그 값으로 바로 저장한다**(별칭만 떼어 같은 값을 적음). 따라갈 값이 없으면(대상 삭제됨 · 라이브러리 값 없음 · 단계 넘음 — 미리보기 "—") 어느 타입이든 저장하지 않고 상세처럼 값 모드로만 바꾼다 — 색 · 숫자 · 글자는 빈 글 칸, 참거짓은 스위치(거짓)를 보이고 `needValue`(알림 줄 `edit.errNeedValue`). 그 뒤 글 칸 Enter · 스위치 바꿈이 저장이다(별칭이 떼어짐).
     - Esc: 고르개가 열려 있으면 고르개만 닫고 포커스는 그 [▾]로 간다(지금 상세와 같음). 아니면 고치지 않고 창을 닫고 포커스는 그 값 칸으로 간다.
   - **저장:** Enter · 스위치 바꿈 · 고르개 고름 · 바깥 누름(아래)에서.
     - 값이 처음과 같으면 그냥 닫는다.
     - 입력 오류(`edit.errColor` · `edit.errNumber` · `edit.errNeedValue`)면 Enter는 창 안 알림 줄을 보이고 창을 지킨다. 바깥 누름이면 고친 것을 버리고 닫는다(Figma처럼 되돌림).
     - 그 밖이면 `UPDATE_VARIABLE{reqId, id, values: {[modeId]: 값}, base: {name, values: {[modeId]: 그 칸의 처음 값}}}`(지금 상세 [저장]과 같은 메시지 — 한 모드만)를 보내고 **창을 바로 닫는다**. 포커스는 Enter · 스위치 · 고르개면 그 값 칸이다(바깥 누름은 아래).
-    - 저장은 쓰기 작업이다(§4.11a ⑤ — 상세와 같은 `setUpdSaving(reqId)` · 잠금 사유 `op.updateVar` · 풀리는 때도 상세와 같음: 응답 · 시간 초과 `EDIT_TIMEOUT`). 그동안 다른 쓰기(연결 · 다른 칸 편집 열기 · 상세 [저장] · 새 변수 · 복제 · 삭제)는 지금 규칙대로 잠긴다.
-    - 보낸 저장은 창 상태 `cellEd`와 따로 둔다(`cellSave` — reqId · 변수 id · 모드 id · 보낸 값). 창이 닫힌 뒤에도 남고 한 번에 하나다.
-    - **`cellSave`가 남은 동안은 쓰기 잠금이다** — `writeLockReason`이 `cellSave`가 있으면 `op.updateVar`를 돌려준다(성공 응답에서 `onVariableUpdated`가 `clearUpdSaving`을 불러도, 표를 받을 때까지 잠금이 이어짐 — 상세가 `ed.saving.awaitingTable`로 [저장]을 막는 것과 같은 뜻). 그래서 그동안 칸 편집 창은 열리지 않고(잠금 Toast), 옛 값을 `base`로 잡는 일이 없다.
-    - `cellSave`를 지우는 때: 성공 → 그 뒤 `VAR_TABLE`을 **받을 때**(표가 직전과 같아 그리지 않고 돌아가는 때도 — 상세 `edOnVarTable`처럼) · 실패 · 충돌 → 응답 때 · `ERROR` · 시간 초과 → 그때(reqId는 `edDeadReqs`에 넣음). 시간 초과는 `cellSave` 자기 타이머(`EDIT_TIMEOUT`)로 잰다(`setUpdSaving` 타이머는 잠금만 품).
-    - **저장 중 칸 모습:** 보낸 때부터 `cellSave`를 지울 때까지 그 칸은 **보낸 값**으로 그린다(색 점 · 칩 — 별칭이면 대상을 위 "따라가기 모드"로) + "저장 중" 모습(내용 opacity `opacity-disabled` · `aria-busy="true"`). 그사이 다른 이유로 온 `VAR_TABLE`(창 다시 들어옴 등)도 그 칸만은 보낸 값으로 그린다. 실패 · 충돌 · ERROR · 시간 초과면 받아 둔 표의 값(실패 · 충돌은 처음 값)으로 돌아간다.
+    - 저장은 쓰기 작업이다(§4.11a ⑤ — 상세와 같은 `setUpdSaving(reqId)` · 잠금 글 `bind.waitOp{op: op.updateVar}`). 잠금이 풀리는 때도 상세와 같다 — 응답 때(`onVariableUpdated` · `ERROR`의 `clearUpdSaving`) 또는 시간 초과(`EDIT_TIMEOUT` — `setUpdSaving` 타이머). 그동안 다른 쓰기(연결 · 다른 칸 편집 열기 · 상세 [저장] · 새 변수 · 복제 · 삭제 · 대기 잠금 단추 `renderWaitLocks`)는 지금 규칙대로 잠긴다. 잠금 칸은 이것 하나다(따로 잠금 갈래를 더하지 않음).
+    - 보낸 저장은 창 상태 `cellEd`와 따로 둔다(`cellSave` — reqId · 변수 id · 모드 id · 보낸 값). 창이 닫힌 뒤에도 남고, 쓰기 잠금이라 한 번에 하나다. **지우는 때는 잠금이 풀리는 때와 같다** — 응답(성공 · 실패 · 충돌 · 지워짐) · `ERROR` · 시간 초과(이때 reqId는 `edDeadReqs`에 넣음). 시간 초과 Toast는 `cellSave` 자기 타이머(`EDIT_TIMEOUT`)로 띄운다.
+    - **저장 중 칸 모습:** `cellSave`가 있는 동안 그 칸은 **보낸 값**으로 그린다(색 점 · 칩 — 별칭이면 대상을 위 "따라가기 모드"로) + "저장 중" 모습(내용 opacity `opacity-disabled` · `aria-busy="true"`). 그사이 다른 이유로 온 `VAR_TABLE`도 그 칸만은 보낸 값으로 그린다. `cellSave`를 지우면 그 칸을 다시 그린다(같은 표라 표 전체를 다시 그리지 않는 때도 그 칸은 그림).
+    - **성공 = 받아 둔 표를 고쳐 바로 끝냄 (제안):** 성공 응답(`VARIABLE_UPDATED` ok)이 오면 받아 둔 표(`vmVars`)의 그 변수 · 그 모드 칸을 보낸 값으로 고치고, `cellSave`를 지워 그 칸을 보통 모습으로 다시 그린 뒤, `readScreen('work')`로 표를 다시 읽는다(code.ts `updateVariable`은 표를 보내지 않음 — 상세와 같음). Figma에 저장된 값이 곧 보낸 값이므로, 표를 기다리지 않아도 다음 칸 편집의 처음 값 · `base`가 맞다 — 표를 기다리는 동안 잠그는 규칙(상세의 `awaitingTable`)은 칸 편집에는 두지 않는다. 다시 읽은 표가 오면 평소처럼 그린다(최소화 중이라 읽지 않아도 칸은 이미 맞음 — 펼칠 때 지금 규칙대로 읽음). Toast 없음.
     - 응답은 reqId로 갈린다 — `edDeadReqs`(늦은 응답) → `cellSave.reqId` → 상세 `ed.saving` 순(`onVariableUpdated` · `ERROR{op:'UPDATE_VARIABLE'}`).
-    - 결과:
-      - 성공(`VARIABLE_UPDATED` ok) → UI가 `readScreen('work')`로 표를 다시 읽는다(code.ts `updateVariable`은 표를 보내지 않음 — 상세와 같음). Toast 없음.
-      - 실패(`VARIABLE_UPDATED` 실패) → 칸을 처음 값으로 되돌리고 error Toast "{전체 이름} · {모드 이름} 값을 저장하지 못했어요"(새 키 `list.cellSaveFailed` — `{name}` · `{mode}`). Figma 사유(`err.message`)가 있으면 "{전체 이름} · {모드 이름} 값을 저장하지 못했어요 — {사유}"(새 키 `list.cellSaveFailedWhy` — `{reason}` 자리. Toast는 자르지 않고 줄바꿈 — S3-D15). 충돌(base가 달라 밖에서 바뀜)이면 "다른 곳에서 바뀌어 저장하지 않았어요"(새 키 `list.cellConflict`), 지워짐(상세의 `deleted` 갈래)이면 "그 변수가 지워져 저장하지 않았어요"(새 키 `list.cellDeleted`) — 둘 다 표를 다시 읽는다.
-      - `ERROR{op:'UPDATE_VARIABLE'}` · 시간 초과 → warning Toast "저장됐는지 알 수 없어요 · 표를 확인해 주세요"(새 키 `list.cellMaybe`) — 지금 상세가 둘 다 `edMaybeSaved`로 다루는 것과 같다. 표를 다시 읽는다.
-      - 시간 초과 뒤 늦게 온 응답: 상세의 `edDeadReqs`와 같은 집합에 넣어 두었다가, 바뀐 것이 있으면 표를 다시 읽는다(Toast 없음). 그때 열려 있는 다른 칸 편집 창은 건드리지 않는다.
+    - 실패 결과(그 칸은 받아 둔 표의 값으로 돌아감):
+      - 실패(`VARIABLE_UPDATED` 실패) → error Toast "{전체 이름} · {모드 이름} 값을 저장하지 못했어요"(새 키 `list.cellSaveFailed` — `{name}` · `{mode}`). Figma 사유(`err.message`)가 있으면 "{전체 이름} · {모드 이름} 값을 저장하지 못했어요 — {사유}"(새 키 `list.cellSaveFailedWhy` — `{reason}` 자리. Toast는 자르지 않고 줄바꿈 — S3-D15).
+      - 충돌(code.ts `conflict` — base가 달라 밖에서 바뀜) → error Toast "{전체 이름} · {모드 이름} — 다른 곳에서 바뀌어 저장하지 않았어요"(새 키 `list.cellConflict`). 지워짐(code.ts `deleted`) → "{전체 이름} — 변수가 지워져 저장하지 않았어요"(새 키 `list.cellDeleted`). 둘 다 표를 다시 읽는다.
+      - `ERROR{op:'UPDATE_VARIABLE'}` · 시간 초과 → warning Toast "{전체 이름} · {모드 이름} — 저장됐는지 알 수 없어요 · 표를 확인해 주세요"(새 키 `list.cellMaybe`) — 지금 상세가 둘 다 `edMaybeSaved`로 다루는 것과 같다. 표를 다시 읽는다.
+      - 시간 초과 뒤 늦게 온 응답: `edDeadReqs`에서 받아, 바뀐 것이 있으면 표를 다시 읽는다(Toast 없음 — 상세와 같음). 그때 열려 있는 다른 칸 편집 창은 건드리지 않는다.
   - **바깥 누름:**
     - 창 밖을 누르면 위 "저장"을 한 뒤 닫는다.
     - 그 누름은 **먹는다**(첫 누름은 창만 닫음 — 저장 중 연결이 잠금 Toast로 막히지 않게). 포커스는 그 값 칸이다.
@@ -3583,7 +3582,7 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 - [ ] `src/ui.ts`: `renderSidebar` → 트리(컬렉션 + "모든 변수" + 그룹 단 · `sideOpen` 펼친 키 · `grpFilter` 마디 단위 거름 · 누름 · ▸ · 키보드) · `renderVarList` → 표(열 · 열 폭 최소 92 · 머리 `translateX` 맞춤 · 경로 머리 · 검색 중 컬렉션마다 grid · 칩 별칭 숨김 `scrollWidth` 판정 · 칸 툴팁 · 칸 접근성 이름) · 따라가기 모드(열 모드 이름 → 기본) · 칸 조작(이름 칸 연결 · 값 칸 편집 · F2 · Enter 상세 · Space 연결) · 칸 편집 창(`edRenderField` · `edPicker` · `edPlacePicker`를 `ed`에서 떼어 함께 씀 · `cellEd` · reqId 응답 갈래 · 쓰기 잠금 · 저장 중 칸 · Toast · 바깥 누름 먹음 · 열린 동안 닫는 일 · 다시 그리기 미룸) · `gridKey` 칸 이동(검색 중 표 넘어) · `revealVar` · `varJump` 되돌리기 · [변수 보기] "모든 변수" · `firstVarInListOrder` 표 순서 · 포커스 지키기(열) · 없어지는 것 지움
 - [ ] 아이콘: Lucide `link`를 `gen-icons`로 더함(design-system §6.6)
 - [ ] i18n: 더함 `list.allVars` · `list.colName` · `list.modeDefaultTag` · `list.cellTip` · `list.cellHint` · `list.cellEdAria` · `list.cellSaveFailed` · `list.cellSaveFailedWhy` · `list.cellConflict` · `list.cellDeleted` · `list.cellMaybe`, 글 바꿈 `list.sideAria`, 지움 `list.modeDefault` · `list.modeTip` · `list.colorGrid` · `list.colorList` · `list.menuExpandAll` · `list.menuCollapseAll`(다른 쓰임 확인)
-- [ ] test: `test/pure.test.mjs`의 `pillOrder` · `paletteTree` 검사 고침, 그룹 거름(마디 단위) · 열 폭 · 따라가기 모드(표 · `resolveEditValue` 모드 갈래 · 후보 칸 고르기) 단위 검사 더함
-- [ ] verify: 변수 탭 블록 다시 씀(알약 · 격자 · 모드 고르개 · 단 머리 · `dsl.colorView` 검사 → 표 · 칸 · 트리 검사). 더할 것: 칸 편집 저장(`UPDATE_VARIABLE` 한 모드 · base) · Enter 저장 / 글 칸 오류 · Esc(고르개 먼저) · 스위치 바로 저장 · 바깥 누름 먹음 · 다른 값 칸 · 저장 중 잠금(성공 응답 뒤 표 받을 때까지) · 저장 중 칸이 보낸 값 · 성공 뒤 `readScreen` · 실패 · 충돌 · 지워짐 · ERROR · 시간 초과 Toast · 늦은 응답 · 참거짓 "값으로 적기" 바로 저장 · 열 모드 "값으로 적기" 미리보기 · 열린 동안 탭 바꿈 · 최소화 · 스크롤 닫힘 · 다시 그리기 미룸, F2 · Enter 상세 · Space 연결, 이름 칸 클릭 연결, 4모드 가로 스크롤 · 이름 칸 고정 · 열 머리 sticky와 가로 맞춤, 칩 별칭 숨김, 다른 컬렉션 별칭의 열 모드 값, 검색 중 표(표 넘어 ↑ ↓), 사이드바 트리 키보드 · 그룹 거름 · ▸ 펴기만, [변수 보기] 모든 변수, 560 가로 스크롤 0(표 바깥)
+- [ ] test: `test/pure.test.mjs`의 `pillOrder` · `paletteTree` 검사 고침, 그룹 거름(마디 단위) · 열 폭 · 따라가기 모드(표 · `resolveCell` 모드 갈래 · 후보 칸 고르기) 단위 검사 더함
+- [ ] verify: 변수 탭 블록 다시 씀(알약 · 격자 · 모드 고르개 · 단 머리 · `dsl.colorView` 검사 → 표 · 칸 · 트리 검사). 더할 것: 칸 편집 저장(`UPDATE_VARIABLE` 한 모드 · base) · Enter 저장 / 글 칸 오류 · Esc(고르개 먼저) · 스위치 바로 저장 · 바깥 누름 먹음 · 다른 값 칸 · 저장 중 잠금(응답까지 — 대기 잠금 단추 포함) · 저장 중 칸이 보낸 값(그사이 온 표에도) · 성공 때 받아 둔 표 고침 · 바로 다시 열어 저장해도 충돌 없음 · 성공 뒤 `readScreen` · 저장 중 최소화 · 실패 · 충돌 · 지워짐 · ERROR · 시간 초과 Toast · 늦은 응답 · 참거짓 "값으로 적기" 바로 저장 · 따라갈 값 없는 "값으로 적기"(값 모드 + `needValue`, 저장 없음) · 열 모드 "값으로 적기" 미리보기 · 열린 동안 탭 바꿈 · 최소화 · 스크롤 닫힘 · 다시 그리기 미룸, F2 · Enter 상세 · Space 연결, 이름 칸 클릭 연결, 4모드 가로 스크롤 · 이름 칸 고정 · 열 머리 sticky와 가로 맞춤, 칩 별칭 숨김, 다른 컬렉션 별칭의 열 모드 값, 검색 중 표(표 넘어 ↑ ↓), 사이드바 트리 키보드 · 그룹 거름 · ▸ 펴기만, [변수 보기] 모든 변수, 560 가로 스크롤 0(표 바깥)
 - [ ] design-system(§6 Table · Tree 행 — 변수 탭 표 · 사이드바 트리) · §2.8 표 줄 구분선 예외(VF-P4)
 - [ ] 4검사 · `dist/` · 스크린샷 대조 · 실기 확인(사용자)
