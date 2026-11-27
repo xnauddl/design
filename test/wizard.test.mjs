@@ -135,3 +135,11 @@ test('S-2 makeDoneText · makeCreatedText — g = 0이면 만들기 부분을 �
   // 직접 만든 변수라 건너뛴 수는 만들기 부분이 빠져도 남는다
   assert.equal(makeDoneText({ created: { g: 0, r: 0, m: 1 }, bound: 1 }, paid), '1곳에 연결했어요 · 직접 만든 변수라 건너뜀 1');
 });
+
+test('makeDoneText — Global에서 바꾼 자리는 머리 문장 바로 뒤 · 나머지 부분 맨 앞(다크 앞) "Global 연결 {k}곳은 Semantic으로 바꿨어요" (ia-v4 §2.9a — SC-D58)', () => {
+  assert.equal(
+    makeDoneText({ created: { g: 2, r: 1, m: 0 }, bound: 5, swapped: 3, darkFilled: 2 }, { isPaid: true, linkOff: false }),
+    'Global 2개 · Semantic 1개를 만들고 5곳에 연결했어요 · Global 연결 3곳은 Semantic으로 바꿨어요 · 다크 2개',
+  );
+  assert.equal(makeDoneText({ bound: 4, swapped: 0 }, { isPaid: true, linkOff: false }), makeDoneText({ bound: 4 }, { isPaid: true, linkOff: false }), 'k = 0이면 없음');
+});

@@ -368,6 +368,8 @@
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "{n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "bind.swappedTail": " \xB7 Global \uC5F0\uACB0 {k}\uACF3\uC740 Semantic\uC73C\uB85C \uBC14\uAFE8\uC5B4\uC694",
+    // ia-v4 §2.9a(SC-D58)
     "v4.tsPlaces": "Text Style {t}\uACF3",
     "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
     "v4.reread": "\uB2E4\uC2DC \uC77D\uAE30",
@@ -472,6 +474,8 @@
     "make.cancelledUpTo": "\uCDE8\uC18C\uD588\uC5B4\uC694 \xB7 {step}\uAE4C\uC9C0 \uB410\uC5B4\uC694",
     "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.done.semOnly": "Semantic {r}\uAC1C",
+    "make.done.swapped": "Global \uC5F0\uACB0 {k}\uACF3\uC740 Semantic\uC73C\uB85C \uBC14\uAFE8\uC5B4\uC694",
+    // ia-v4 §2.9a(SC-D58) — 다 됨 글 나머지 맨 앞
     "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
     "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
@@ -2437,6 +2441,66 @@
   function stateReason(s) {
     return s === "bound" ? "already-bound" : s === "deleted" ? "deleted-var" : null;
   }
+  function sameVarValue(a, b) {
+    var _a, _b;
+    if (a == null || b == null) return false;
+    if (typeof a === "number" && typeof b === "number") return sameNumber(a, b);
+    if (typeof a === "string" && typeof b === "string") return a === b;
+    if (isRGB(a) && isRGB(b)) return valueKeyOf("color", rgbToHex(a), roundAlpha((_a = a.a) != null ? _a : 1)) === valueKeyOf("color", rgbToHex(b), roundAlpha((_b = b.a) != null ? _b : 1));
+    return false;
+  }
+  function soleAliasId(list) {
+    const aliases = list.filter(isAlias);
+    if (!aliases.length || aliases.some((a) => !isLiveAlias(a))) return void 0;
+    const ids = new Set(aliases.map((a) => a.id));
+    return ids.size === 1 ? [...ids][0] : void 0;
+  }
+  function colorAliases(x, node, field, index) {
+    var _a, _b;
+    const own = (_a = x.boundVariables) == null ? void 0 : _a.color;
+    const arr = (_b = node.boundVariables) == null ? void 0 : _b[field];
+    return [own, Array.isArray(arr) ? arr[index] : void 0];
+  }
+  function fieldAliases(node, field) {
+    const bv = node.boundVariables;
+    const entry = bv == null ? void 0 : bv[field];
+    if (entry) return Array.isArray(entry) ? entry : [entry];
+    if (field === "strokeWeight") return STROKE_SIDE_FIELDS.map((f) => bv == null ? void 0 : bv[f]);
+    return [];
+  }
+  function textAliases(node, field) {
+    const getRange = node.getRangeBoundVariable;
+    const len = node.characters.length;
+    if (len > 0 && typeof getRange === "function") {
+      const full = getRange.call(node, 0, len, field);
+      return full && full !== figma.mixed ? [full] : [];
+    }
+    return fieldAliases(node, field);
+  }
+  function swapSource(ctx, list) {
+    if (ctx.noNewRoles || !ctx.index.swapIds.size) return void 0;
+    const id = soleAliasId(list);
+    return id && ctx.index.swapIds.has(id) ? ctx.index.byId.get(id) : void 0;
+  }
+  function pushSwap(ctx, from, base, kind) {
+    var _a, _b;
+    if (kind === "color") {
+      if (!from.colorHex) {
+        note(ctx.res, "already-bound", base.node, ctx.preview, base.field);
+        return;
+      }
+      const alpha = (_a = from.colorAlpha) != null ? _a : 1;
+      ctx.slots.push(__spreadProps(__spreadValues(__spreadProps(__spreadValues({}, base), { kind, value: colorKey(from.colorHex, alpha), display: from.colorHex }), alpha !== 1 ? { alpha } : {}), { noMatchReason: "already-bound", fromId: from.variable.id }));
+      return;
+    }
+    const v = kind === "num" ? from.num : (_b = from.num) != null ? _b : from.str;
+    const bad = typeof v === "number" && (isFrac(v) || (kind === "num" ? round2(v) <= 0 : base.field === "lineHeight" && v <= 0 || base.field === "letterSpacing" && v === 0));
+    if (v == null || bad) {
+      note(ctx.res, "already-bound", base.node, ctx.preview, base.field);
+      return;
+    }
+    ctx.slots.push(__spreadProps(__spreadValues({}, base), { kind, value: v, display: String(v), noMatchReason: "already-bound", fromId: from.variable.id }));
+  }
   function aspectLocked(n) {
     const x = n;
     if ("targetAspectRatio" in x) return x.targetAspectRatio != null;
@@ -2637,7 +2701,7 @@
       const off = (_a = opts.off) != null ? _a : [];
       let offN = 0;
       ctx.slots = ctx.slots.filter((s) => {
-        if (onlyMatch(only, s)) return true;
+        if (s.fromId || onlyMatch(only, s)) return true;
         if (off.length && onlyMatch(off, s)) offN++;
         return false;
       });
@@ -2648,7 +2712,7 @@
       const known = /* @__PURE__ */ new Map();
       for (const s of ctx.slots) known.set(s.node.id, s.node);
       const r = await bindSelectedItems(
-        preview.candidates.map((c) => __spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), c.scopeAdd ? { scopeAdd: c.scopeAdd } : {})),
+        preview.candidates.map((c) => __spreadValues(__spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole }, c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}), c.fromId ? { fromId: c.fromId } : {})),
         {},
         known
         // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
@@ -2657,6 +2721,7 @@
       res.skipped += r.skipped;
       for (const [k, v] of Object.entries(r.reasons)) res.reasons[k] = ((_c = res.reasons[k]) != null ? _c : 0) + v;
       res.newRoles = r.newRoles;
+      if (r.swapped) res.swapped = r.swapped;
       if (r.mainsBound.length) res.mainsBound = r.mainsBound;
       for (const c of preview.candidates) {
         const id = c.newRole ? r.createdIds[c.newRole.name] : void 0;
@@ -2761,7 +2826,9 @@
       entries.push(e);
     }
     const infos = entries.map((e) => e.info);
-    return { entries, infos, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])), radiusKeys: userRadiusKeys(infos) };
+    const gcol = ownedCollection(read.cols, "global");
+    const swapIds = new Set(gcol ? entries.filter((e) => e.variable.variableCollectionId === gcol.id).map((e) => e.variable.id) : []);
+    return { entries, infos, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])), radiusKeys: userRadiusKeys(infos), swapIds };
   }
   function readFlag(v, key) {
     const fn = v.getPluginData;
@@ -2832,7 +2899,7 @@
     }, usage ? { usage } : {}), s.kind === "num" && group && typeof s.value === "number" ? { tokenName: numberTokenName(group, round2(s.value)) } : {}), s.kind === "text" ? { textGroup: s.usage.split("/")[0] } : {}), s.noMatchReason === "no-match" && s.kind !== "text" ? { make: __spreadValues({ kind, value: s.kind === "color" ? s.display : round2(s.value) }, s.alpha != null ? { alpha: s.alpha } : {}) } : {});
   }
   function resolveSlots(ctx) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
     const { res, preview } = ctx;
     const infos = ctx.index.infos;
     const emit = (s, e, scopeAdd) => {
@@ -2841,15 +2908,21 @@
       if (scopeAdd) c.scopeAdd = scopeAdd;
       preview.candidates.push(c);
     };
+    const rawOfEntry = (e) => {
+      var _a2;
+      return (_a2 = e.info.rawId) != null ? _a2 : e.variable.id;
+    };
     const colorBase = /* @__PURE__ */ new Map();
     const byUse = /* @__PURE__ */ new Map();
+    const swapByUse = /* @__PURE__ */ new Map();
     for (const s of ctx.slots) {
       if (s.kind !== "color") continue;
-      const arr = byUse.get(s.usage);
+      const m = s.fromId ? swapByUse : byUse;
+      const arr = m.get(s.usage);
       if (arr) arr.push(s);
-      else byUse.set(s.usage, [s]);
+      else m.set(s.usage, [s]);
     }
-    for (const [use, list] of byUse) {
+    const countsOf = (list) => {
       const counts = /* @__PURE__ */ new Map();
       for (const sl of list) {
         const k = colorSlotKey(sl.display, sl.bg, sl.alpha);
@@ -2857,10 +2930,27 @@
         if (c) c.count++;
         else counts.set(k, __spreadValues({ hex: sl.display, count: 1, bg: sl.bg }, sl.alpha != null ? { alpha: sl.alpha } : {}));
       }
+      return counts;
+    };
+    for (const use of /* @__PURE__ */ new Set([...byUse.keys(), ...swapByUse.keys()])) {
+      const list = (_a = byUse.get(use)) != null ? _a : [];
+      const swaps = (_b = swapByUse.get(use)) != null ? _b : [];
       const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
+      const counts = countsOf(list);
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
       const refHex = colorRoleRef([...counts.values()], def == null ? void 0 : def.colorHex, use);
-      for (const sl of list) colorBase.set(sl, __spreadValues({ base: `color/${use}/${(_a = bases.get(colorSlotKey(sl.display, sl.bg, sl.alpha))) != null ? _a : "default"}` }, refHex ? { refHex } : {}));
+      for (const sl of list) colorBase.set(sl, __spreadValues({ base: `color/${use}/${(_c = bases.get(colorSlotKey(sl.display, sl.bg, sl.alpha))) != null ? _c : "default"}` }, refHex ? { refHex } : {}));
+      const rest = swaps.filter((sl) => !bases.has(colorSlotKey(sl.display, sl.bg, sl.alpha)));
+      for (const sl of swaps) {
+        const b = bases.get(colorSlotKey(sl.display, sl.bg, sl.alpha));
+        if (b) colorBase.set(sl, __spreadValues({ base: `color/${use}/${b}` }, refHex ? { refHex } : {}));
+      }
+      if (rest.length) {
+        const all = [...countsOf([...list, ...swaps]).values()];
+        const bases2 = colorRoleBases(all, def == null ? void 0 : def.colorHex, use);
+        const ref2 = colorRoleRef(all, def == null ? void 0 : def.colorHex, use);
+        for (const sl of rest) colorBase.set(sl, __spreadValues({ base: `color/${use}/${(_d = bases2.get(colorSlotKey(sl.display, sl.bg, sl.alpha))) != null ? _d : "default"}` }, ref2 ? { refHex: ref2 } : {}));
+      }
     }
     const split = splitPlaces(ctx.slots.map((s) => {
       var _a2;
@@ -2870,18 +2960,32 @@
     for (const { place, pick } of split.link) pickOf.set(place.slot, pick);
     if (split.make.length) res.make = split.make;
     const pending = [];
+    const pendOf = (s, g, scopeAdd, rawOf) => {
+      var _a2;
+      const cb = colorBase.get(s);
+      pending.push(__spreadValues(__spreadValues(__spreadValues({ slot: s, base: s.kind === "color" ? (_a2 = cb == null ? void 0 : cb.base) != null ? _a2 : `color/${s.usage}/default` : s.usage, global: g }, (cb == null ? void 0 : cb.refHex) ? { refHex: cb.refHex } : {}), scopeAdd ? { scopeAdd } : {}), rawOf ? { rawOf } : {}));
+    };
     for (const s of ctx.slots) {
       const pick = pickOf.get(s);
+      if (s.fromId) {
+        const from = ctx.index.byId.get(s.fromId);
+        const fromRaw = rawOfEntry(from);
+        const pe = pick ? ctx.index.byId.get(pick.variable.id) : void 0;
+        if (!pick || !pe || pick.alias && pick.variable.id === s.fromId) note(res, "already-bound", s.node, preview, s.field);
+        else if (rawOfEntry(pe) === fromRaw) {
+          if (pick.alias) emit(s, pe, pick.scopeAdd);
+          else pendOf(s, pe, pick.scopeAdd);
+        } else if (scopeOk(from.scopes, s.allowed)) pendOf(s, from, void 0, fromRaw);
+        else note(res, "already-bound", s.node, preview, s.field);
+        continue;
+      }
       if (!pick) {
         if (s.noMatchReason !== DROP) skip(res, s.noMatchReason, s.node, preview, s.field);
         continue;
       }
       const e = ctx.index.byId.get(pick.variable.id);
       if (pick.alias || ctx.noNewRoles) emit(s, e, pick.scopeAdd);
-      else {
-        const cb = colorBase.get(s);
-        pending.push(__spreadValues(__spreadValues({ slot: s, base: s.kind === "color" ? (_b = cb == null ? void 0 : cb.base) != null ? _b : `color/${s.usage}/default` : s.usage, global: e }, (cb == null ? void 0 : cb.refHex) ? { refHex: cb.refHex } : {}), pick.scopeAdd ? { scopeAdd: pick.scopeAdd } : {}));
-      }
+      else pendOf(s, e, pick.scopeAdd);
     }
     if (!pending.length) return;
     const names = assignNames(
@@ -2889,26 +2993,56 @@
       ctx.index.semNames,
       { reuse: false }
     );
+    const nameOf = (p) => {
+      var _a2;
+      return (_a2 = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _a2 : p.base;
+    };
+    const fallbackName = /* @__PURE__ */ new Map();
+    if (pending.some((p) => p.rawOf)) {
+      const rawsOf = /* @__PURE__ */ new Map();
+      for (const p of pending) {
+        const n = nameOf(p);
+        const r = (_e = p.rawOf) != null ? _e : rawOfEntry(p.global);
+        const set = rawsOf.get(n);
+        if (set) set.add(r);
+        else rawsOf.set(n, /* @__PURE__ */ new Set([r]));
+      }
+      const used = /* @__PURE__ */ new Set([...ctx.index.semNames.keys(), ...rawsOf.keys()]);
+      const moved = /* @__PURE__ */ new Map();
+      for (const p of pending) {
+        if (!p.rawOf) continue;
+        const n = nameOf(p);
+        if (((_g = (_f = rawsOf.get(n)) == null ? void 0 : _f.size) != null ? _g : 0) < 2) continue;
+        const k = `${n}\0${p.rawOf}`;
+        let nn = moved.get(k);
+        if (!nn) {
+          for (let i = 2; used.has(nn = `${n}-${i}`); i++) ;
+          used.add(nn);
+          moved.set(k, nn);
+        }
+        fallbackName.set(p, nn);
+      }
+    }
     const scopesOfRole = /* @__PURE__ */ new Map();
     for (const p of pending) {
-      const name = (_c = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _c : p.base;
+      const name = (_h = fallbackName.get(p)) != null ? _h : nameOf(p);
       const g = p.global;
       let scopes = scopesOfRole.get(name);
       if (!scopes) {
-        scopes = (_d = scopeForSemanticRole(name)) != null ? _d : g.scopes;
+        scopes = (_i = scopeForSemanticRole(name)) != null ? _i : g.scopes;
         scopesOfRole.set(name, scopes);
       }
       res.bound++;
-      preview.candidates.push(__spreadValues(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), g.type)), {
+      preview.candidates.push(__spreadValues(__spreadValues(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), g.type)), {
         // 타입 = 가리킬 원시값(TR-18)
         // 가리킬 원시값은 그 자리가 고른 것이다 — 용도 예외의 용도는 이 변수에 더한다(다른 자리의 사용자 변수에 더하지 않게).
-        newRole: { name, globalId: g.variable.id, scopes },
+        newRole: __spreadValues({ name, globalId: g.variable.id, scopes }, p.rawOf ? { rawOf: p.rawOf } : {}),
         newRoleGlobalName: g.variable.name
-      }), p.scopeAdd ? { scopeAdd: p.scopeAdd } : {}));
+      }), p.scopeAdd ? { scopeAdd: p.scopeAdd } : {}), p.slot.fromId ? { fromId: p.slot.fromId } : {}));
     }
   }
   function candOf(s, variableId, variableName, tier, variableValue, variableAlpha, resolvedType) {
-    return __spreadValues(__spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+    return __spreadValues(__spreadValues(__spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
     }, s.index != null ? { index: s.index } : {}), {
@@ -2918,7 +3052,7 @@
       variableName,
       tier,
       variableValue
-    }), resolvedType ? { resolvedType } : {}), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), s.pillFrom != null ? { pillFrom: s.pillFrom } : {});
+    }), resolvedType ? { resolvedType } : {}), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), s.pillFrom != null ? { pillFrom: s.pillFrom } : {}), s.fromId ? { fromId: s.fromId } : {});
   }
   function entryAlpha(e) {
     return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;
@@ -3003,9 +3137,23 @@
       const allowed = key === "fills" ? fillScopesFor(node.type) : STROKE_SCOPES;
       let use;
       let bg = null;
+      const useBg = () => {
+        use != null ? use : use = colorUse(node.type, key, isInsideIconFrame(node));
+        if (bg === null) {
+          const bgHex = use === "text" || use === "icon" || use === "border" ? backgroundOf(node) : void 0;
+          bg = bgHex ? bgKindOf(bgHex) : void 0;
+        }
+      };
       paints2.forEach((p, i) => {
         if (p.type !== "SOLID") return;
         if (p.visible === false) return;
+        const from = swapSource(ctx, colorAliases(p, node, key, i));
+        if (from) {
+          if (itemAlpha(p) === 0) return;
+          useBg();
+          pushSwap(ctx, from, __spreadValues({ node, field: key, index: i, allowed, usage: use }, bg ? { bg } : {}), "color");
+          return;
+        }
         const st = stateReason(colorState(p, node, key, i));
         if (st) {
           note(res, st, node, preview, key);
@@ -3014,11 +3162,7 @@
         const alpha = itemAlpha(p);
         if (alpha === 0) return;
         const hex = rgbToHex(p.color);
-        use != null ? use : use = colorUse(node.type, key, isInsideIconFrame(node));
-        if (bg === null) {
-          const bgHex = use === "text" || use === "icon" || use === "border" ? backgroundOf(node) : void 0;
-          bg = bgHex ? bgKindOf(bgHex) : void 0;
-        }
+        useBg();
         ctx.slots.push(__spreadProps(__spreadValues(__spreadProps(__spreadValues({ node, field: key, index: i, kind: "color", value: colorKey(hex, alpha), display: hex }, alpha !== 1 ? { alpha } : {}), { allowed, usage: use }), bg ? { bg } : {}), { noMatchReason: "no-match" }));
       });
     }
@@ -3108,6 +3252,11 @@
     const sideValues = sides.map((sd) => Number(node[sd]) || 0);
     const one = (field, v) => {
       if (!(v > 0)) return;
+      const from = swapSource(ctx, fieldAliases(node, field));
+      if (from) {
+        pushSwap(ctx, from, { node, field, allowed: numAllowed(field), usage: strokeName(field, sideValues) }, "num");
+        return;
+      }
       const st = stateReason(nodeFieldState(node, field));
       if (st) {
         note(res, st, node, preview, field);
@@ -3137,6 +3286,11 @@
     effects.forEach((e, i) => {
       if (e.type !== "DROP_SHADOW" && e.type !== "INNER_SHADOW") return;
       if (e.visible === false) return;
+      const from = swapSource(ctx, colorAliases(e, node, "effects", i));
+      if (from) {
+        if (itemAlpha(e) !== 0) pushSwap(ctx, from, { node, field: "effects", index: i, allowed: EFFECT_SCOPES, usage: "shadow" }, "color");
+        return;
+      }
       const st = stateReason(colorState(e, node, "effects", i));
       if (st) {
         note(res, st, node, preview, "effects");
@@ -3173,6 +3327,11 @@
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") tryBindText(ctx, node, "letterSpacing", node.letterSpacing.value);
     if (node.characters.length === 0) return;
     const fam = node.fontName.family;
+    const from = swapSource(ctx, textAliases(node, "fontFamily"));
+    if (from) {
+      pushSwap(ctx, from, { node, field: "fontFamily", allowed: ["FONT_FAMILY"], usage: textUsageName("fontFamily") }, "text");
+      return;
+    }
     const st = stateReason(textFieldState(node, "fontFamily"));
     if (st) {
       note(res, st, node, preview, "fontFamily");
@@ -3190,6 +3349,11 @@
       skip(res, "empty-text", node, preview, field);
       return;
     }
+    const from = swapSource(ctx, textAliases(node, field));
+    if (from) {
+      pushSwap(ctx, from, { node, field, allowed: [FIELD_SCOPE[field]], usage: textUsageName(field) }, "text");
+      return;
+    }
     const st = stateReason(textFieldState(node, field));
     if (st) {
       note(res, st, node, preview, field);
@@ -3199,6 +3363,11 @@
   }
   function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match", pillFrom) {
     const allowed = numAllowed(field);
+    const from = swapSource(ctx, fieldAliases(node, field));
+    if (from) {
+      pushSwap(ctx, from, { node, field, allowed, usage }, "num");
+      return;
+    }
     const st = stateReason(nodeFieldState(node, field));
     if (st) {
       note(ctx.res, st, node, ctx.preview, field);
@@ -3220,6 +3389,7 @@
       }
     };
     const mainsBound = /* @__PURE__ */ new Set();
+    let swapped = 0;
     const created = /* @__PURE__ */ new Map();
     const createdIds = {};
     const ensureRole = async (spec, global) => {
@@ -3274,6 +3444,8 @@
           continue;
         }
         const { value } = vv;
+        const fromV = it.fromId ? await variableOf(it.fromId) : null;
+        const sameAsFrom = () => !!fromV && sameVarValue(fromV.value, value);
         const scopesOf = () => {
           var _a2;
           return it.newRole ? it.newRole.scopes : (_a2 = vv.variable.scopes) != null ? _a2 : ["ALL_SCOPES"];
@@ -3295,7 +3467,8 @@
               fail("changed", node, key);
               continue;
             }
-            const st2 = stateReason(colorState(x, node, key, i));
+            const swap2 = !!it.fromId && soleAliasId(colorAliases(x, node, key, i)) === it.fromId;
+            const st2 = swap2 ? null : stateReason(colorState(x, node, key, i));
             if (st2) {
               fail(st2, node, key);
               continue;
@@ -3304,7 +3477,8 @@
             const alpha = itemAlpha(x);
             const allowed = key === "fills" ? fillScopesFor(node.type) : key === "strokes" ? STROKE_SCOPES : EFFECT_SCOPES;
             const scopeAdd = it.scopeAdd ? it.scopeAdd : void 0;
-            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || valueKeyOf("color", rgbToHex(value), roundAlpha(value.a)) !== valueKeyOf("color", hex, alpha) || !(scopeAdd && !it.newRole) && !scopeOk(scopesOf(), allowed)) {
+            const valueOk = swap2 ? sameAsFrom() : !!value && isRGB(value) && valueKeyOf("color", rgbToHex(value), roundAlpha(value.a)) === valueKeyOf("color", hex, alpha);
+            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || !valueOk || !(scopeAdd && !it.newRole) && !scopeOk(scopesOf(), allowed)) {
               fail("changed", node, key);
               continue;
             }
@@ -3318,8 +3492,9 @@
             if (w) {
               w.arr = arr;
               w.fields++;
+              if (swap2) w.swaps++;
               if (it.mainId) w.mains.push(it.mainId);
-            } else m.set(key, { arr, fields: 1, mains: it.mainId ? [it.mainId] : [] });
+            } else m.set(key, { arr, fields: 1, mains: it.mainId ? [it.mainId] : [], swaps: swap2 ? 1 : 0 });
             continue;
           }
           if (TEXT_RANGE_FIELDS.includes(it.field)) {
@@ -3332,18 +3507,20 @@
               fail("styled", node, field);
               continue;
             }
-            const st2 = stateReason(textFieldState(node, field));
+            const swap2 = !!it.fromId && soleAliasId(textAliases(node, field)) === it.fromId;
+            const st2 = swap2 ? null : stateReason(textFieldState(node, field));
             if (st2) {
               fail(st2, node, field);
               continue;
             }
-            if (node.characters.length === 0 || node.fontName === figma.mixed || !textValueEqual(node, field, value)) {
+            if (node.characters.length === 0 || node.fontName === figma.mixed || !(swap2 ? sameAsFrom() : textValueEqual(node, field, value))) {
               fail("changed", node, field);
               continue;
             }
             await figma.loadFontAsync(node.fontName);
             node.setRangeBoundVariable(0, node.characters.length, field, await target());
             res.bound++;
+            if (swap2) swapped++;
             if (it.mainId) mainsBound.add(it.mainId);
             (_e = hooks.onBound) == null ? void 0 : _e.call(hooks, res.bound);
             continue;
@@ -3368,7 +3545,8 @@
               continue;
             }
           }
-          const st = stateReason(nodeFieldState(node, it.field));
+          const swap = !!it.fromId && soleAliasId(fieldAliases(node, it.field)) === it.fromId;
+          const st = swap ? null : stateReason(nodeFieldState(node, it.field));
           if (st) {
             fail(st, node, it.field);
             continue;
@@ -3379,7 +3557,7 @@
             return it.pillFrom != null && typeof cur === "number" && typeof value === "number" && sameNumber(value, PILL_RADIUS) && sameNumber(cur, it.pillFrom) && isPillRadius(cur, width, height);
           };
           const pill = it.pillFrom != null;
-          if (pill ? !pillOk() : typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
+          if (swap ? !sameAsFrom() : pill ? !pillOk() : typeof cur !== "number" || typeof value !== "number" || !sameNumber(cur, value)) {
             fail("changed", node, it.field);
             continue;
           }
@@ -3388,6 +3566,7 @@
           if (pill) node[it.field] = PILL_RADIUS;
           node.setBoundVariable(it.field, tv);
           res.bound++;
+          if (swap) swapped++;
           if (it.mainId) mainsBound.add(it.mainId);
           (_f = hooks.onBound) == null ? void 0 : _f.call(hooks, res.bound);
         } catch (e) {
@@ -3399,6 +3578,7 @@
           try {
             node[key] = w.arr;
             res.bound += w.fields;
+            swapped += w.swaps;
             for (const id of w.mains) mainsBound.add(id);
             (_g = hooks.onBound) == null ? void 0 : _g.call(hooks, res.bound);
           } catch (e) {
@@ -3412,7 +3592,7 @@
       if (hooks.yieldToEvents) await hooks.yieldToEvents();
     }
     const skips = capSkipsByReason(preview.skips, SKIP_PREVIEW_CAP);
-    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds, mainsBound: [...mainsBound] };
+    return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, swapped, createdIds, mainsBound: [...mainsBound] };
   }
   async function createRole(spec, global) {
     var _a, _b, _c;
@@ -3431,8 +3611,10 @@
       return sc.includes("ALL_SCOPES") || spec.scopes.every((x) => sc.includes(x));
     };
     const same = all.filter((v2) => {
+      var _a2;
       if (v2.variableCollectionId !== col.id || !re.test(v2.name) || v2.resolvedType !== global.resolvedType || !covers(v2)) return false;
       const i = read.infoById.get(v2.id);
+      if (spec.rawOf && i && ((_a2 = i.rawId) != null ? _a2 : v2.id) !== spec.rawOf) return false;
       return !!i && key != null && i.hops > 0 && i.key === key && !i.mirror;
     }).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
     if (same) return same;
@@ -8830,7 +9012,7 @@
               },
               __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest((await withLocalMains(sel)).roots) } : {}), isPaid() ? {} : { noNewRoles: true }), msg.only && !msg.preview ? { only: msg.only } : {}), msg.only && ((_a = msg.off) == null ? void 0 : _a.length) && !msg.preview ? { off: msg.off } : {})
             );
-            post(__spreadValues(__spreadValues(__spreadValues({
+            post(__spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues({
               type: "APPLY_RESULT",
               bound: r.bound,
               skipped: r.skipped,
@@ -8847,9 +9029,11 @@
               // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"(미리보기에서 쓴다)
               reqId: msg.reqId,
               // UI가 낡은 응답을 가려낸다
-              newRoles: r.newRoles,
+              newRoles: r.newRoles
+            }, r.swapped ? { swapped: r.swapped } : {}), {
+              // Global에서 바꾼 자리 수(ia-v4 §2.9a)
               counts: r.counts
-            }, r.mains ? { mains: r.mains } : {}), r.mainsBound ? { mainsBound: r.mainsBound } : {}), r.make ? { make: r.make } : {}));
+            }), r.mains ? { mains: r.mains } : {}), r.mainsBound ? { mainsBound: r.mainsBound } : {}), r.make ? { make: r.make } : {}));
             if (!msg.preview) {
               commitUndo(figma);
               selfSelect = true;
@@ -8955,7 +9139,7 @@
                 if (m && !mainsBound.includes(m)) mainsBound.push(m);
               }
             }
-            post(__spreadValues(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), mainsBound.length ? { mainsBound } : {}));
+            post(__spreadValues(__spreadValues(__spreadValues({ type: "APPLY_RESULT", bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles }, r.swapped ? { swapped: r.swapped } : {}), ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), mainsBound.length ? { mainsBound } : {}));
             if (r.bound || r.newRoles || (ts == null ? void 0 : ts.applied)) {
               commitUndo(figma);
               committed = true;

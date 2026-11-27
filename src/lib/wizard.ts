@@ -52,6 +52,8 @@ export interface MakeTotals {
   /** 텍스트 스타일: s = created + updated, a = 붙인 글자 수, missing = 알림 목록(§4.3 "글꼴"). */
   styles?: { s: number; a: number; missing?: string[] };
   bound?: number;
+  /** 연결 단계에서 Global에서 바꾼 자리 수(ia-v4 §2.9a — APPLY_RESULT.swapped). */
+  swapped?: number;
   /** 연결 단계가 붙인 기존 텍스트 스타일 글자 수(ia-v4 §4.3 B.35 ④). */
   tsBound?: number;
   renamed?: number;
@@ -79,7 +81,8 @@ export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOf
   if (made && places) parts.push(t('make.done.sentCreateBind', { c: made, b: places }));
   else if (made) parts.push(t('make.done.sentCreate', { c: made }));
   else if (places) parts.push(t('make.done.sentBind', { b: places }));
-  // 나머지 부분(순서 그대로) — 다크 · 텍스트 스타일 · 알림 · 연결 0곳 · 이름 정리 · 직접 만든 변수 건너뜀 · 연결 안 함
+  // 나머지 부분(순서 그대로) — Global에서 바꿈(§2.9a) · 다크 · 텍스트 스타일 · 알림 · 연결 0곳 · 이름 정리 · 직접 만든 변수 건너뜀 · 연결 안 함
+  if (totals.swapped) parts.push(t('make.done.swapped', { k: totals.swapped }));
   if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
   if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
   if (totals.styles?.missing?.length) parts.push(t('make.done.missing', { k: totals.styles.missing.length })); // 텍스트 스타일 바로 뒤(§4.3 "글꼴")

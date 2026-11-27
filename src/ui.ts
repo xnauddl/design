@@ -1448,7 +1448,7 @@ $('btnApplyConfirm').addEventListener('click', () => {
   const eff = bindTsOnly() ? [] : effCandidates();
   const items = eff
     .filter((c) => bindChecked.has(candKey(c)))
-    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), ...(c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}) }));
+    .map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, ...(c.newRole ? { newRole: c.newRole } : {}), ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), ...(c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}), ...(c.fromId ? { fromId: c.fromId } : {}) }));
   const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => ({ styleId: r.styleId, nodeIds: r.nodeIds, ...(r.mainIds?.some(Boolean) ? { mainIds: r.mainIds } : {}) }));
   if (!items.length && !textStyles.length) return;
   startLink({ items, textStyles });
@@ -2052,7 +2052,8 @@ window.onmessage = (event: MessageEvent) => {
         clearBindPreview();
         setStatus('applyStatus', '', '');
         if (activeTab === 'select' && selSub === 'bind') showSelSub('home');
-        notify(t('v4.linked', { n }) + (m ? t('v4.linkedSkipped', { m }) : ''), 'success');
+        // Global에서 바꾼 자리(ia-v4 §2.9a — SC-D58): "{n}곳 연결" 바로 뒤 · 건너뜀 앞
+        notify(t('v4.linked', { n }) + (msg.swapped ? t('bind.swappedTail', { k: msg.swapped }) : '') + (m ? t('v4.linkedSkipped', { m }) : ''), 'success');
         selFindFor = null;
       }
       if (linkEnded) onBindLinkingChanged();
@@ -3390,6 +3391,7 @@ async function runMake(): Promise<void> {
           const n = r?.bound ?? 0;
           if (r) {
             totals.bound = r.bound;
+            if (r.swapped) totals.swapped = r.swapped; // Global에서 바꾼 자리(ia-v4 §2.9a — 다 됨 글 나머지 맨 앞)
             mkMainsDone.push(...(r.mainsBound ?? []));
           }
           // ④ 기존 텍스트 스타일도 붙인다 — 실패해도 단계를 실패로 보지 않는다(변수 결과는 남김)

@@ -488,7 +488,7 @@
 
 계기: 무료로 만들고 연결한 파일(무료 연결은 플러그인 Global에 바로 붙인다 — F6)이 유료가 되어도, 이미 붙은 자리는 "이미 연결됨"이라 Semantic으로 바뀌지 않았다(2026-11-06 결정 B — ia-v3 §2.12 12.8). 이 절은 그 결정을 **플러그인 Global이 붙은 자리**에 한해 뒤집는다. 사용자 컬렉션 변수 · Semantic · 지워진 변수가 붙은 자리는 12.8 그대로다.
 
-- **바꿀 자리(SC-D53):** 유료 찾기 · 연결(`bindSelection` — 선택 탭 찾기 · 연결 화면 [연결] · 만들기 실행의 연결 단계 모두)에서, 한 자리에 붙은 **살아 있는 별칭이 모두 같은 변수**이고 그 변수가 **플러그인 Global 컬렉션**(표시로 찾는 `ownedCollection(cols, 'global')` — 이름이 아니라 표시)에 있으면 바꿀 자리다(`fromId` = 그 변수). "모두 같은"은 자리마다:
+- **바꿀 자리(SC-D53):** 유료 찾기 · 연결(`bindSelection` — 선택 탭 찾기 · 연결 화면 [연결] · 만들기 실행의 연결 단계 모두)에서, 한 자리에 붙은 **살아 있는 별칭이 모두 같은 변수**이고 그 변수가 **플러그인 Global 컬렉션**(`ownedCollection(cols, 'global')` — 표시 `dsl.owned`가 `global`인 컬렉션, 없으면 표시 없는 이름 `Global` 컬렉션을 이어받은 것 — §2.13 13.2)에 있으면 바꿀 자리다(`fromId` = 그 변수). "모두 같은"은 자리마다:
   - 칠하기 · 선 색 · 그림자 색: paint · effect 자신의 `boundVariables.color`와 노드 배열(`boundVariables.fills|strokes|effects[i]`) 가운데 있는 것이 모두 그 변수(`colorState`가 보는 두 곳).
   - 선 두께: `strokeWeight` 하나로 볼 때는 붙은 기록(`strokeWeight` 또는 방향별 넷 `strokeTopWeight` …) 모두가 그 변수. 방향별 두께로 볼 때는 그 방향 하나.
   - 글자 속성(`fontSize` · `lineHeight` · `letterSpacing` · `fontFamily`): `getRangeBoundVariable(0, 글자 수, 속성)`이 그 변수의 별칭(일부 구간 · 구간마다 다르면(`mixed`) 이미 연결됨 그대로). 그 API가 없는 환경은 `boundVariables[속성]`의 별칭이 모두 같을 때.
