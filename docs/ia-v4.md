@@ -3272,11 +3272,15 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 계기: 도구 탭(S-6)을 다섯 PR로 나눈 첫째. 모양 변화 없음(잠기는 때 · Esc만 바뀜) — 시안 없음.
 
 - [x] 명세 검토(코드 대조) 중대 결함 0 — 3회차(2026-11-27, 1회차 중대 6 · 사소 9 → 2회차 중대 1 · 사소 3 → 3회차 중대 0 · 사소 2 반영)
-- [ ] ① `reqId` — UI `opSent` 맨 앞에서 붙임(마법사 · 조용한 읽기 · OPS 밖 포함) · `wizardRequest` 모든 단계 `reqId` · 마법사 리스너는 자기 `reqId`의 거절 · 오류만 단계 실패 · `code.ts` 요청에 답하는 모든 메시지에 `reqId`(빠진 답 목록 §4.11a ①) · 밀려난 찾기에 `APPLY_RESULT{preview, cancelled, reqId}` · `messages.ts` 타입
-- [ ] ② `requirePaid(feature, reqId?)` · `requireTextStyles(reqId?)` → `PREMIUM_REQUIRED{feature, reqId}` · `makeTakes`의 거절 · 오류 처리(후보 읽기 거절 = 후보 0개 · Toast 없음, 오류 = "읽는 중" 끝 + error Toast)
-- [ ] ③ `opPending` 항목에 `reqId` · `opReceived`는 거절 · 오류 · 결과를 그 `reqId` 항목만 끝냄 · `opPending.clear()` 갈래 없앰 · `reqId` 없는 거절 · 오류만 `console.warn` · `if (wizardRunning) return`을 `reqId` 갈래 뒤로
-- [ ] ④ 조용한 reqId 묶음(`silentReqs`) · 메인 처리기에서 묶음에 있으면 빼고 `opReceived`를 건너뜀 → `makeTakes` · `mcTakes` → 받지 않으면 메인 처리기 아래로
-- [ ] ⑤ `WAIT_LINK_IDS`는 `otherWriteOp()`로 · `CREATE_TOKENS{preview}`는 쓰기 아님 · 결과 화면 [닫기]는 잠금 없음(`mkResults`) · `renderMakeFoot` → `renderWaitLocks` · [다시 시도]는 쓰기면 `writeLockReason()` 먼저 · `updSaving{reqId, timer}`(팝업과 따로 — `VARIABLE_UPDATED` · `ERROR` · 10초에서 내림) · `otherWriteOp()`가 "고치기"(`op.updateVar`) · [저장] 잠금 = `writeLockReason()`(자기 저장 뺌 — `edChrome` · `edSave` · `edLockedSave`) · `renderWaitLocks` → 팝업 열려 있으면 `edChrome`
-- [ ] ⑥ Esc — 글자 칸(`type` 없음 포함) · `textarea` · `contenteditable`만 그 칸 몫, 체크박스 · 라디오 · 색 피커 · 닫힌 고르개에서는 돌아감
-- [ ] 단위 테스트(`code.ts` 응답 `reqId` · 거절 `reqId`) · verify: 다른 작업의 `PREMIUM_REQUIRED{reqId}` · `ERROR{reqId}`가 진행 중인 작업을 끝내지 않음 · 조용한 `CREATE_RESULT{reqId}`가 같은 종류 OPS 작업을 끝내지 않음 · 만들기 실행 중 다른 요청의 `ERROR`가 실행을 실패시키지 않음 · 밀려난 찾기 뒤 `opBusy()` 거짓 · 후보 읽기 거절 → 후보 0개 · 저장 중 최소화해도 다른 쓰기 잠김 유지 · 만들기 화면 실행 중 다른 쓰기 버튼 잠김 · [저장] 중 다른 쓰기 잠김 · 체크박스 포커스에서 Esc로 돌아감 · 글자 칸에서는 Esc가 칸 몫
-- [ ] 4검사 · `dist/` · 실기 확인(사용자): 평소 흐름(연결 · 만들기 · 이름 정리 · 변수 탭 클릭 연결 · 새 변수 · 저장)이 그대로인지
+- [x] ① `reqId` — UI `opSent` 맨 앞에서 붙임(마법사 · 조용한 읽기 · OPS 밖 포함) · `wizardRequest` 모든 단계 `reqId` · 마법사 리스너는 자기 `reqId`의 거절 · 오류만 단계 실패 · `code.ts` 요청에 답하는 모든 메시지에 `reqId`(빠진 답 목록 §4.11a ①) · 밀려난 찾기에 `APPLY_RESULT{preview, cancelled, reqId}` · `messages.ts` 타입
+- [x] ② `requirePaid(feature, reqId?)` · `requireTextStyles(reqId?)` → `PREMIUM_REQUIRED{feature, reqId}` · `makeTakes`의 거절 · 오류 처리(후보 읽기 거절 = 후보 0개 · Toast 없음, 오류 = "읽는 중" 끝 + error Toast)
+- [x] ③ `opPending` 항목에 `reqId` · `opReceived`는 거절 · 오류 · 결과를 그 `reqId` 항목만 끝냄 · `opPending.clear()` 갈래 없앰 · `reqId` 없는 거절 · 오류만 `console.warn` · `if (wizardRunning) return`을 `reqId` 갈래 뒤로
+- [x] ④ 조용한 reqId 묶음(`silentReqs`) · 메인 처리기에서 묶음에 있으면 빼고 `opReceived`를 건너뜀 → `makeTakes` · `mcTakes` → 받지 않으면 메인 처리기 아래로
+- [x] ⑤ `WAIT_LINK_IDS`는 `otherWriteOp()`로 · `CREATE_TOKENS{preview}`는 쓰기 아님 · 결과 화면 [닫기]는 잠금 없음(`mkResults`) · `renderMakeFoot` → `renderWaitLocks` · [다시 시도]는 쓰기면 `writeLockReason()` 먼저 · `updSaving{reqId, timer}`(팝업과 따로 — `VARIABLE_UPDATED` · `ERROR` · 10초에서 내림) · `otherWriteOp()`가 "고치기"(`op.updateVar`) · [저장] 잠금 = `writeLockReason()`(자기 저장 뺌 — `edChrome` · `edSave` · `edLockedSave`) · `renderWaitLocks` → 팝업 열려 있으면 `edChrome`
+- [x] ⑥ Esc — 글자 칸(`type` 없음 포함) · `textarea` · `contenteditable`만 그 칸 몫, 체크박스 · 라디오 · 색 피커 · 닫힌 고르개에서는 돌아감
+- [x] 단위 테스트(`code.ts` 응답 `reqId` · 거절 `reqId`) · verify: 다른 작업의 `PREMIUM_REQUIRED{reqId}` · `ERROR{reqId}`가 진행 중인 작업을 끝내지 않음 · 조용한 `CREATE_RESULT{reqId}`가 같은 종류 OPS 작업을 끝내지 않음 · 만들기 실행 중 다른 요청의 `ERROR`가 실행을 실패시키지 않음 · 밀려난 찾기 뒤 `opBusy()` 거짓 · 후보 읽기 거절 → 후보 0개 · 저장 중 최소화해도 다른 쓰기 잠김 유지 · 만들기 화면 실행 중 다른 쓰기 버튼 잠김 · [저장] 중 다른 쓰기 잠김 · 체크박스 포커스에서 Esc로 돌아감 · 글자 칸에서는 Esc가 칸 몫
+- [x] 4검사 · `dist/`(tsc · test 717 · i18n · verify-bind-flow 776 · verify-gallery)
+- [ ] 실기 확인(사용자): 평소 흐름(연결 · 만들기 · 이름 정리 · 변수 탭 클릭 연결 · 새 변수 · 저장)이 그대로인지
+
+- 구현 메모(S-6a PR): ① 메시지 타입은 `UiToCode` · `CodeToUi` 전체에 `& { reqId?: number }`(요소마다 적지 않음). ② `code.ts`는 `rid(msg)` 도우미로 응답에 싣는다. ③ verify 단위 검사 가운데 "만들기 실행 중 다른 요청의 오류" · "밀려난 찾기 뒤 opBusy 거짓" · "후보 읽기 거절 → 후보 0개"는 화면 검사로 만들기 무거워 코드 갈래 검토로 갈음했다(마법사 리스너 `reqId` 대조 · `code.ts` 밀려난 찾기 답 · `onMakeReadFail`). ④ 저장 중 최소화 검사는 팝업 뒤라 포인터로 [—]을 누를 수 없어 `click()`으로 최소화 경로만 본다.
+

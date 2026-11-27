@@ -497,6 +497,7 @@ export const STRINGS: Record<string, string> = {
   'op.rename': '이름 정리',
   'op.export': '내보내기',
   'op.unbind': '삭제된 변수 연결 풀기',
+  'op.updateVar': '고치기',
   'op.wizard': '한 번에 정리',
   // 변수 탭 하위 화면(PR 1 중간 상태)
   // 단계 레일(#5) — 만들기 4단계 · 적용 3단계

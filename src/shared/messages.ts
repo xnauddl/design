@@ -192,7 +192,8 @@ export interface VarUpdateError {
 }
 
 /** UI → code 요청. */
-export type UiToCode =
+/** UI → code 요청. 모든 요청은 reqId를 싣는다(ia-v4 §4.11a ① — UI `opSent`가 없으면 붙임). */
+export type UiToCode = (
   | { type: 'EXTRACT'; nodeIds?: string[]; reqId?: number } // reqId: 만들기 화면 요청 번호(결과에 그대로 돌려줌, IA v4 §4.3) · nodeIds: 목록 기준(IA v4 §2.5), 없으면 지금 선택
   | { type: 'CREATE_TOKENS'; tokens: DraftToken[]; base: number; preview?: boolean; replacePalette?: boolean; reqId?: number; globalOnly?: boolean } // preview: UX1 미리보기(쓰기 없음) · replacePalette: 이전 팔레트 색 정리 · globalOnly: Global만(Semantic을 만들지 않음 — 무료도 됨, IA v4 §4.3 무료 규칙)
   // reqId: 연결 카드 요청 번호 — 결과에 그대로 돌려줘 UI가 낡은 응답(선택이 바뀐 뒤 도착한 것)을 버린다.
@@ -249,10 +250,12 @@ export type UiToCode =
   | { type: 'GET_VARIABLES' } // 3계층 변수 목록(다크 테마 생성의 컬렉션·모드 선택용)
   // 모드 id는 선택 — 생략하면 themeApply가 Light를 고르고 Dark가 없으면 addMode('Dark')로 만든다.
   // 다크 만들기 — 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7). migrate: 옛 구조 옮기기 확인을 받았을 때만 참.
-  | { type: 'GENERATE_DARK_MODE'; migrate?: boolean };
+  | { type: 'GENERATE_DARK_MODE'; migrate?: boolean }
+) & { reqId?: number };
 
 /** code → UI 응답. */
-export type CodeToUi =
+/** code → UI 응답. 요청에 답하는 메시지는 그 요청의 reqId를 돌려준다(ia-v4 §4.11a ①). */
+export type CodeToUi = (
   | { type: 'UI_SIZE'; mode: 'default' | 'mini' } // 지금 창 크기(최소화 여부)
   | { type: 'EXTRACT_RESULT'; tokens: DraftToken[]; warnings: string[]; selection: number; reqId?: number }
   // UX5: 실시간 선택 동기화 — 선택 수·하위 요소 수·바인딩 후보 수(capped: 스캔 상한 도달).
@@ -338,7 +341,8 @@ export type CodeToUi =
       error?: string;
     }
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }
-  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'paid' | 'deleted' }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 유료(무료의 플러그인 Semantic 컬렉션 — §4.9 F2) · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
+  | { type: 'ERROR'; message: string; op?: string; reqId?: number; code?: 'name' | 'paid' | 'deleted' }
+) & { reqId?: number }; // op: 실패한 UiToCode 종류(상태 라우팅용), code: 새 변수 · 복제의 이름 거절 · 유료(무료의 플러그인 Semantic 컬렉션 — §4.9 F2) · 지워짐 // op: 실패한 UiToCode 종류(상태 라우팅용)
 
 /** code → UI 안전 전송. */
 export function post(msg: CodeToUi): void {
