@@ -6558,7 +6558,7 @@ test('code.ts — CREATE_TOKENS 미리보기: 쓰임 있는 토큰은 값 다른
   assert.equal(cr.roleRows.find((r) => r.token === 'color/00ff00').global, 'color/00ff00-2');
 });
 
-test('code.ts — SCAN_TEXT_STYLES: reqId 스캔은 기준 nodeIds를 읽고 lastTextSamples를 덮어쓰지 않는다 · existing은 두 스캔 모두', async () => {
+test('code.ts — SCAN_TEXT_STYLES: make 스캔(만들기 화면)은 기준 nodeIds를 읽고 lastTextSamples를 덮어쓰지 않는다 · existing은 두 스캔 모두 (B.46)', async () => {
   const figma = installFigma();
   const p = await loadPlugin(figma);
   await createSemanticTextStyles([TITLE]);
@@ -6571,15 +6571,29 @@ test('code.ts — SCAN_TEXT_STYLES: reqId 스캔은 기준 nodeIds를 읽고 las
   assert.deepEqual(c.styles.map((s) => s.fontSize), [16]);
   assert.equal(c.reqId, undefined);
   assert.deepEqual(c.existing, [{ name: 'title', sig: '24|36|0|Inter|Regular' }], 'reqId 없는 스캔도 existing을 싣는다(기본 램프 예약 — docs/text-style-krds.md §6)');
-  out = await p.send({ type: 'SCAN_TEXT_STYLES', nodeIds: ['big'], reqId: 3 });
+  out = await p.send({ type: 'SCAN_TEXT_STYLES', nodeIds: ['big'], reqId: 3, make: true });
   c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
   assert.equal(c.reqId, 3);
   assert.deepEqual(c.styles.map((s) => s.fontSize), [40]);
   assert.deepEqual(c.existing, [{ name: 'title', sig: '24|36|0|Inter|Regular' }]);
-  // 「왼쪽 글자로 이름 채우기」는 reqId 없는 마지막 스캔(16px)을 쓴다
+  // 「왼쪽 글자로 이름 채우기」는 make가 아닌 마지막 스캔(16px)을 쓴다
   out = await p.send({ type: 'NAME_TEXT_STYLES_BY_ROW' });
   c = ofType(out, 'TEXT_STYLE_CANDIDATES')[0];
   assert.deepEqual(c.styles.map((s) => s.fontSize), [16]);
+});
+
+test('code.ts — SCAN_TEXT_STYLES: S-6a 뒤 reqId만 실린 타이포 [스캔]도 표본을 덮는다(make 없음 — 「왼쪽 글자로 이름 채우기」가 그 표본을 씀, B.46)', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const small = tsText('small', 16);
+  const big = tsText('big', 40, { parent: { type: 'PAGE' } });
+  figma.currentPage.selection = [small];
+  registerNodes(figma, [small, big]);
+  await p.send({ type: 'SCAN_TEXT_STYLES', reqId: 7 }); // 타이포 화면 [스캔] — opSent가 reqId를 붙인다
+  await p.send({ type: 'SCAN_TEXT_STYLES', nodeIds: ['big'], reqId: 8, make: true }); // 만들기 화면 후보 읽기
+  const out = await p.send({ type: 'NAME_TEXT_STYLES_BY_ROW', reqId: 9 });
+  assert.deepEqual(ofType(out, 'ERROR'), [], 'reqId 스캔 뒤에도 표본이 있다(needScan 오류 없음)');
+  assert.deepEqual(ofType(out, 'TEXT_STYLE_CANDIDATES')[0].styles.map((s) => s.fontSize), [16]);
 });
 
 test('code.ts — CREATE_TEXT_STYLES applyTo: 등록 + 방금 스타일만 붙임 · applied/applySkipped/applyReasons · reqId · ⌘Z 한 번', async () => {

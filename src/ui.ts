@@ -2674,7 +2674,12 @@ let mkTsReading = false;
 const mkTsOn = new Set<string>(); // sig
 const mkTsNames = new Map<string, string>(); // sig → 고친 이름
 let mkEditSig: string | null = null;
-let mkTsPending: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }> | null = null;
+/** 이름을 고치는 동안 미룬 후보 응답 — 보낸 때의 기준 · reqId와 함께(풀 때 다시 대조 — ia-v4 §4.11a ② · B.46). */
+let mkTsPending: { msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>; rid: number; base: string } | null = null;
+/** 추출 · 후보 읽기를 보낸 때의 목록 기준(reqId → baseKey) — 응답 때 지금 기준과 다르면 버린다(§4.11a ② "기준 대조" · B.46). */
+const mkReqBase = new Map<number, string>();
+/** 마지막 미리보기가 ERROR로 끝남 — "세는 중…" 자리에 "세지 못했어요"(§4.3 "만들 수" · `make.countFail`). `mkSendPreview`가 지운다. */
+let mkPreviewFailed = false;
 /** 이 화면이 보낸 요청 reqId — 메인 처리기는 이 응답을 건드리지 않는다. */
 const mkOwned = new Set<number>();
 let mkReadTimer: ReturnType<typeof setTimeout> | null = null;
@@ -2737,13 +2742,15 @@ function readMake(user = false): void {
   if (!user && baseline.scanned > BIG_SELECTION) { renderMakeScreen(); return; }
   if (opBusy() || wizardRunning) return;
   mkExtractReq = mkNextReq();
+  mkReqBase.set(mkExtractReq, baseKey());
   mkReading = true;
   opSilent = true;
   send({ type: 'EXTRACT', nodeIds: baseline.ids, reqId: mkExtractReq });
   if (isPaid) {
     mkScanReq = mkNextReq();
+    mkReqBase.set(mkScanReq, baseKey());
     mkTsReading = true;
-    send({ type: 'SCAN_TEXT_STYLES', nodeIds: baseline.ids, reqId: mkScanReq });
+    send({ type: 'SCAN_TEXT_STYLES', nodeIds: baseline.ids, reqId: mkScanReq, make: true });
   }
   opSilent = false;
   renderMakeScreen();
@@ -2770,6 +2777,7 @@ function mkPreviewSoon(): void {
 function mkSendPreview(): void {
   const toks = mkSendTokens();
   mkPreview = null;
+  mkPreviewFailed = false;
   if (!toks.length) { mkRoleRows = []; mkPreviewReq = 0; renderMakeScreen(); return; }
   mkPreviewTagsOnly = !mkGlobalsOn().length;
   if (mkPreviewTagsOnly) mkRoleRows = [];
@@ -2786,11 +2794,33 @@ function mkSendPreview(): void {
 function makeTakes(msg: CodeToUi): boolean {
   const rid = (msg as { reqId?: number }).reqId;
   if (rid == null || !mkOwned.has(rid)) return false;
+  // 기준 대조(§4.11a ② · B.46) — 보낸 때의 목록 기준이 지금과 다르면 결과 · 오류 · 거절을 모두 버리고 읽기 표시만 내린다.
+  const sentFor = mkReqBase.get(rid);
+  mkReqBase.delete(rid);
+  if ((rid === mkExtractReq || rid === mkScanReq) && sentFor !== undefined && sentFor !== baseKey()) { onMakeReadStale(rid === mkScanReq); return true; }
   if (msg.type === 'PREMIUM_REQUIRED' || msg.type === 'ERROR') { onMakeReadFail(msg, rid); return true; }
   if (msg.type === 'EXTRACT_RESULT' && rid === mkExtractReq) onMakeExtract(msg);
   else if (msg.type === 'CREATE_RESULT' && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
-  else if (msg.type === 'TEXT_STYLE_CANDIDATES' && rid === mkScanReq) onMakeScan(msg);
+  else if (msg.type === 'TEXT_STYLE_CANDIDATES' && rid === mkScanReq) onMakeScan(msg, sentFor);
   return true; // 실행 단계 응답은 wizardRequest가 받는다
+}
+
+/**
+ * 보낸 뒤 목록 기준이 바뀐 읽기의 응답(§4.11a ② · B.46) — 값 · 후보 · Toast 없이 그 읽기의 표시만 내린다. 한 번에 보낸 읽기가
+ * 모두 끝나면(무료는 추출만) 지금 기준으로 한 번 다시 읽고 그린다 — 다른 작업 중이라 못 읽으면 옛 값 없이(뼈대 · 큰 선택이면 [읽기]).
+ */
+function onMakeReadStale(scan: boolean): void {
+  if (scan) { mkScanReq = 0; mkTsReading = false; mkTsPending = null; }
+  else { mkExtractReq = 0; mkReading = false; }
+  if (mkReading || mkTsReading) return; // 짝 읽기를 기다린다(그것도 옛 기준이라 버려진 뒤 다시 읽는다)
+  readMake();
+  renderMakeScreen();
+}
+/** 이름 고치기가 끝나 미룬 후보 응답을 푼다(§4.11a ② · B.46) — 지금 읽기가 아니면 버리기만, 기준이 바뀌었으면 위 버림 규칙. */
+function resumeMakeScan(p: NonNullable<typeof mkTsPending>): void {
+  if (p.rid !== mkScanReq) { renderMakeScreen(); return; } // 고치는 사이 새 읽기를 보냄 — 새 읽기의 "읽는 중"은 그대로
+  if (p.base !== baseKey()) { onMakeReadStale(true); return; }
+  onMakeScan(p.msg);
 }
 
 /** 만들기 화면 조용한 읽기의 거절 · 오류(ia-v4 §4.11a ② · T-P28). 실행 단계 응답은 마법사가 받으므로 여기서는 읽기 셋만. */
@@ -2806,6 +2836,8 @@ function onMakeReadFail(msg: Extract<CodeToUi, { type: 'ERROR' | 'PREMIUM_REQUIR
     say();
     renderMakeScreen();
   } else if (rid === mkPreviewReq) {
+    // "세는 중…" 자리에 "세지 못했어요"(§4.3 "만들 수" · B.46) — 태그만 받는 미리보기(켠 Global 0개)는 그리지 않는다(①이 앞선다).
+    if (!mkPreviewTagsOnly) mkPreviewFailed = true;
     say();
     renderMakeScreen();
   }
@@ -2843,8 +2875,8 @@ function onMakePreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void 
   }
   renderMakeScreen();
 }
-function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>): void {
-  if (mkEditSig) { mkTsPending = msg; return; } // 고치는 동안은 칸을 닫을 때까지 미룬다
+function onMakeScan(msg: Extract<CodeToUi, { type: 'TEXT_STYLE_CANDIDATES' }>, sentFor?: string): void {
+  if (mkEditSig) { mkTsPending = { msg, rid: mkScanReq, base: sentFor ?? baseKey() }; return; } // 고치는 동안은 칸을 닫을 때까지 미룬다(풀 때 기준 · reqId 대조)
   mkTsReading = false;
   mkTs = msg.styles;
   mkTsDecimal = msg.decimalRows ?? [];
@@ -2905,10 +2937,10 @@ function mkTabsVisible(): MkTab[] {
   if (isPaid && (mkTs.length || mkTsDecimal.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
   return out;
 }
-/** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · zero r = 0 · rows. */
-function mkSemState(): 'none' | 'counting' | 'zero' | 'rows' {
+/** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · failed 미리보기 ERROR(make.countFail — B.46) · zero r = 0 · rows. */
+function mkSemState(): 'none' | 'counting' | 'failed' | 'zero' | 'rows' {
   if (!mkGlobalsOn().length) return 'none';
-  if (mkPreview == null) return 'counting';
+  if (mkPreview == null) return mkPreviewFailed ? 'failed' : 'counting';
   return mkRoleRows.length ? 'rows' : 'zero';
 }
 const mkTabName = (tab: MkTab): string => (tab === 'global' ? 'Global' : tab === 'semantic' ? 'Semantic' : KIND_HEAD.textStyle);
@@ -3004,7 +3036,7 @@ function renderMakeTabs(vis: readonly MkTab[]): void {
     b.setAttribute('aria-selected', String(sel));
     b.tabIndex = sel ? 0 : -1;
     const n = tab === 'global' ? String(mkTokens.length)
-      : tab === 'semantic' ? (sem === 'counting' ? '…' : String(sem === 'rows' ? mkRoleRows.length : 0))
+      : tab === 'semantic' ? (sem === 'counting' || sem === 'failed' ? '…' : String(sem === 'rows' ? mkRoleRows.length : 0))
       : mkTsFor === baseKey() ? String(mkTs.length) : '…';
     b.querySelector<HTMLElement>('.n')!.textContent = n;
     const dot = b.querySelector<HTMLElement>('.mk-dot');
@@ -3034,7 +3066,7 @@ function mkEditInput(s: TextStyleSpec): HTMLElement {
     const v = inp.value.trim();
     if (save && v) { if (v === s.name) mkTsNames.delete(sig); else mkTsNames.set(sig, v); }
     mkEditSig = null;
-    if (mkTsPending) { const p = mkTsPending; mkTsPending = null; onMakeScan(p); } else renderMakeScreen();
+    if (mkTsPending) { const p = mkTsPending; mkTsPending = null; resumeMakeScan(p); } else renderMakeScreen();
     focusRow($('makeTree'), `t:${sig}`);
     mkLibChanged(); // 고치는 동안 미룬 라이브러리 묶음 다시 보내기(SC-D46)
   };
@@ -3143,6 +3175,7 @@ function renderMakeScreen(): void {
     const st = mkSemState();
     if (st === 'none') noteText = t('make.semNone');
     else if (st === 'counting') noteText = t('make.counting');
+    else if (st === 'failed') noteText = t('make.countFail');
     else if (st === 'zero') noteText = t('make.semZero');
   } else if (showTree && tab === 'ts' && mkTsFor !== baseKey()) noteText = t('make.counting');
   note.hidden = !noteText;
@@ -3250,7 +3283,7 @@ function renderMakeFoot(showResults: boolean): void {
   const tsTail = tsOn ? t('make.countStyles', { t: tsOn }) : '';
   let count = '';
   // 무료 만들 수는 "Global {g}개"(Semantic은 만들지 않아 세지 않는다 — F4).
-  if (gOn) count = mkPreview ? (isPaid ? t('make.countGR', { g: mkPreview.g, r: mkPreview.r }) : t('make.globalN', { g: mkPreview.g })) + (mkPreview.m ? t('create.sumManual', { n: mkPreview.m }) : '') : t('make.counting');
+  if (gOn) count = mkPreview ? (isPaid ? t('make.countGR', { g: mkPreview.g, r: mkPreview.r }) : t('make.globalN', { g: mkPreview.g })) + (mkPreview.m ? t('create.sumManual', { n: mkPreview.m }) : '') : t(mkPreviewFailed ? 'make.countFail' : 'make.counting');
   $('makeCount').textContent = count ? count + tsTail : tsTail.replace(/^ · /, '');
   $('makeCount').title = $('makeCount').textContent ?? '';
   // 버튼 표(ia-v4 §2.9 "만들기 화면 버튼" 2–10 — 위에서부터 먼저 맞는 줄). g = 미리보기 created + updated, p = 켠 줄의 빈 자리 수 합 + t.
