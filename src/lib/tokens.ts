@@ -71,7 +71,17 @@ export interface DraftToken {
    * 쓰임 목록(§2.12 12.10) — 숫자는 쓰임 이름(`spacing/card/gap`), 색은 `color/{쓰임}`. 곳 수와 함께.
    * 토큰을 적용할 때 코드가 이 쓰임마다 Semantic 역할을 만든다(createUsageRoles).
    */
-  uses?: { name: string; count: number; bg?: 'chroma' | 'dark' | 'light' }[];
+  uses?: {
+    name: string;
+    count: number;
+    bg?: 'chroma' | 'dark' | 'light';
+    /** 이 쓰임의 빈 자리가 있는 용도 묶음 키(`freeBy`의 키) — 만들기의 재사용이 쓰임 × 묶음마다 가족을 본다(ia-v4 §2.9 S2-P8 · SC-D41). 없으면 옛 응답. */
+    keys?: string[];
+    /** 이 쓰임의 빈 자리 수(`count`는 붙은 자리도 셈) — 색 밝기 이름 · 쓰임 역할은 빈 자리로 정한다(ia-v4 §2.9 SC-D45). 없으면 옛 응답(`count`로). */
+    free?: number;
+    /** 묶음 키별 빈 자리 수 — UI가 만들기로 보내기 전에 라이브러리 같은 값 묶음(연결 단계가 붙이지 않는 묶음)의 몫을 뺀다(SC-D46). */
+    by?: Record<string, number>;
+  }[];
   /** 색상: 6자리 hex(#rrggbb). 그 외: 숫자 또는 fontFamily 문자열. */
   value: string | number;
   /** 색상 투명도(소수 둘째 자리) — 1이면 없음. 값 키는 colorKey(value, alpha). */

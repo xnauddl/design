@@ -3,7 +3,8 @@
    - 속성(field) → 종류. 카드 1 · 연결 화면 · ④가 같은 표를 쓴다.
    - 카드 1의 m · k · s · n: 찾기 결과(자리 단위)로 센다.
    ============================================================ */
-import { colorKey } from './tokens';
+import { valueKeyOf, tokenable } from './sameValue'; // 값 키 · 추출이 토큰을 내는 자리(IA v4 §2.9)
+import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes';
 
 /** §4.1 "속성 → 종류" 순서. 텍스트 스타일은 B.2에서 더한다. */
 export const SEL_KINDS = ['gap', 'radius', 'size', 'stroke', 'opacity', 'color', 'text'] as const;
@@ -28,10 +29,8 @@ export function fieldKind(field: string | undefined): SelKind {
   return 'other';
 }
 
-/** k = 변수가 없는 값(§4.1). */
+/** 후보가 없고 만들 수 있는 값의 사유(§2.9 S2-P7 — 카드의 n · q는 `make` 목록에서 낸다. 이 사유 수에는 글자 자리도 든다). */
 export const NO_VAR_REASONS: readonly string[] = ['no-match'];
-/** u = 용도 맞출 값(§4.1 — 같은 값 플러그인 Global의 용도만 꺼진 색 자리, 만들기가 용도를 더해 연결). 건너뛴 곳 목록에는 줄이 없다. */
-export const SCOPE_ADD_REASONS: readonly string[] = ['scope-add'];
 /** s = 손볼 곳(§4.1) — 디자인을 고치면 연결할 수 있게 되는 자리 단위 사유만. */
 export const FIX_SKIP_REASONS: readonly string[] = ['fraction', 'size-fraction', 'deleted-var'];
 /** 그대로 둬도 되는 자리 단위 사유(§4.2) — s에 넣지 않고 건너뛴 곳 목록에만. 이 순서가 목록 줄 순서. */
@@ -82,47 +81,111 @@ export function skipRowCounts(
 /** 사유 × 종류별 자리 수(APPLY_RESULT.counts). */
 export type ReasonCounts = Record<string, Partial<Record<SelKind, number>>>;
 
+/** 새로 만들 값 하나(`APPLY_RESULT.make` — §2.9 S2-P7). */
+export interface MakeItem {
+  kind: string;
+  value: string | number;
+  alpha?: number;
+  by: Record<string, number>;
+}
+
 export interface CardCounts {
-  /** 연결할 수 있는 곳. */
+  /** 연결할 곳(자리 — 같은 값 변수가 있음). */
   m: number;
-  /** 변수가 없는 값. */
-  k: number;
-  /** 용도 맞출 값(§4.1 u). */
-  u: number;
-  /** 자리 단위 건너뜀. */
+  /** 자리 단위 건너뜀(손볼 곳). */
   s: number;
-  /** m + k + u. */
+  /** 새로 만들 값의 수(값 단위 — 글자 종류 제외, 라이브러리 같은 값 묶음만 남은 값 제외). */
   n: number;
-  /** 종류별 연결할 곳 수(m만 — 합 = m, 연결 화면 종류 머리 수와 같다. SEL_KINDS 순서, 0은 뺌). k는 noVarByKind. */
+  /** 그 값들의 자리 수(라이브러리 같은 값 묶음 제외). */
+  q: number;
+  /** 종류별 연결할 곳 수(합 = m, 연결 화면 종류 머리 수와 같다. SEL_KINDS 순서, 0은 뺌). */
   byKind: { kind: SelKind; n: number }[];
-  /** 종류별 변수가 없는 값(④ 둘째 줄). */
-  noVarByKind: { kind: SelKind; n: number }[];
 }
 
 const sumKinds = (r: Partial<Record<SelKind, number>> | undefined): number => Object.values(r ?? {}).reduce((a, b) => a + (b ?? 0), 0);
 
-/** 카드 1 숫자 — candidates = 미리보기 후보의 속성 목록, counts = 사유 × 종류. */
-export function cardCounts(candidateFields: readonly string[], counts: ReasonCounts | undefined): CardCounts {
+/**
+ * 카드 1 숫자(§2.9 S2-P7) — candidates = 미리보기 후보의 속성 목록(m), counts = 사유 × 종류(s), make = 새로 만들 값 목록(n · q).
+ * libs(직접 쓰는 라이브러리 변수)가 있으면 같은 값 · 그 묶음 용도를 받는 라이브러리 변수가 있는 묶음은 q에서 빼고,
+ * 묶음이 하나도 남지 않는 값은 n에서 뺀다(`libSameGroups` — 만들기 실행이 그 자리를 붙이지 않는 것과 맞춘다).
+ */
+export function cardCounts(candidateFields: readonly string[], counts: ReasonCounts | undefined, make: readonly MakeItem[] = [], libs: readonly LibSameVar[] = []): CardCounts {
   const byKind = new Map<SelKind, number>();
-  const noVar = new Map<SelKind, number>();
-  const add = (map: Map<SelKind, number>, k: SelKind, n: number): void => { map.set(k, (map.get(k) ?? 0) + n); };
-  for (const f of candidateFields) add(byKind, fieldKind(f), 1);
-  let k = 0;
-  for (const r of NO_VAR_REASONS) {
-    for (const [kind, n] of Object.entries(counts?.[r] ?? {})) {
-      if (!n) continue;
-      k += n;
-      add(noVar, kind as SelKind, n);
-    }
-  }
-  let u = 0;
-  for (const r of SCOPE_ADD_REASONS) u += sumKinds(counts?.[r]);
+  for (const f of candidateFields) byKind.set(fieldKind(f), (byKind.get(fieldKind(f)) ?? 0) + 1);
   let s = 0;
   for (const r of FIX_SKIP_REASONS) s += sumKinds(counts?.[r]);
+  let n = 0;
+  let q = 0;
+  for (const mv of make) {
+    if (mv.kind === 'text') continue; // 글자 종류는 세지 않는다(찾기가 싣지 않지만 한 번 더 막는다)
+    const lib = libs.length ? new Set(libSameGroups(makeToken(mv), libs)) : null;
+    let left = 0;
+    for (const [g, places] of Object.entries(mv.by)) if (places > 0 && !lib?.has(g)) left += places;
+    if (left > 0) {
+      n++;
+      q += left;
+    }
+  }
   const order = (map: Map<SelKind, number>): { kind: SelKind; n: number }[] =>
     [...SEL_KINDS, 'other' as const].map((kind) => ({ kind, n: map.get(kind) ?? 0 })).filter((x) => x.n > 0);
-  const m = candidateFields.length;
-  return { m, k, u, s, n: m + k + u, byKind: order(byKind), noVarByKind: order(noVar) };
+  return { m: candidateFields.length, s, n, q, byKind: order(byKind) };
+}
+
+/** 새로 만들 값 · 연결할 곳을 라이브러리 같은 값 판정에 넘기는 모양(토큰의 필요한 부분). */
+const makeToken = (mv: { kind: string; value: string | number; alpha?: number; by: Record<string, number> }): LibSameToken => ({
+  name: '',
+  category: mv.kind === 'color' ? 'color' : mv.kind,
+  value: mv.value,
+  ...(mv.alpha != null ? { alpha: mv.alpha } : {}),
+  freeBy: mv.by,
+});
+
+/** 연결할 곳 하나(`BindCandidate`의 필요한 부분). */
+export interface LinkPlace {
+  nodeId: string;
+  field: string;
+  currentValue: string;
+  currentAlpha?: number;
+  /** 9999로 붙이는 알약 자리(찾을 때 읽은 원래 값) — 자리의 값은 9999다. */
+  pillFrom?: number;
+}
+
+/** 자리의 허용 용도 묶음 키(연결 찾기 자리의 `allowed.join('|')` — 칠은 레이어 종류를 따른다). */
+export function placeGroupKey(field: string, nodeType: string): string {
+  if (field === 'fills') return fillScopesFor(nodeType).join('|');
+  if (field === 'strokes') return STROKE_SCOPES.join('|');
+  if (field === 'effects') return EFFECT_SCOPES.join('|');
+  if (field === 'fontFamily') return 'FONT_FAMILY';
+  return FIELD_SCOPE[field] ?? 'ALL_SCOPES';
+}
+
+/**
+ * 카드 p의 "연결할 곳" 몫(§2.9 S2-P7) — 만들기를 실행하면 붙는 연결할 곳: 글자 종류가 아닌 변수 자리 가운데
+ * 라이브러리 같은 값 묶음의 자리와 추출이 토큰을 내지 않는 자리(`!tokenable` — 소수 값 · 0 이하 값)를 뺀 수.
+ * 자리의 값은 판정 뒤의 값이다 — 9999로 붙이는 알약 자리는 9999, 그 밖은 `currentValue`. 제목 m은 이 뺄셈을 하지 않는다.
+ */
+export function linkPlacesForMake(cands: readonly LinkPlace[], nodeTypeOf: (nodeId: string) => string | undefined, libs: readonly LibSameVar[] = []): number {
+  let p = 0;
+  const libMemo = new Map<string, boolean>();
+  for (const c of cands) {
+    const kind = fieldKind(c.field);
+    if (kind === 'text' || kind === 'other') continue;
+    const isColor = kind === 'color';
+    const value: string | number = isColor ? c.currentValue : c.pillFrom != null ? 9999 : Number(c.currentValue);
+    if (!tokenable(kind, value)) continue;
+    if (libs.length) {
+      const g = placeGroupKey(c.field, nodeTypeOf(c.nodeId) ?? '');
+      const mk = `${kind}\u0000${value}\u0000${c.currentAlpha ?? 1}\u0000${g}`;
+      let same = libMemo.get(mk);
+      if (same === undefined) {
+        same = libSameGroups(makeToken({ kind, value, ...(c.currentAlpha != null ? { alpha: c.currentAlpha } : {}), by: { [g]: 1 } }), libs).length > 0;
+        libMemo.set(mk, same);
+      }
+      if (same) continue;
+    }
+    p++;
+  }
+  return p;
 }
 
 /* ---------- 상태 5 만들기 카드 — 라이브러리와 같은 값(IA v4 §4.1 "만들기 카드 — 상태 5") ---------- */
@@ -154,17 +217,17 @@ export interface LibSameSplit<T> {
 }
 
 const COLOR_CATS = new Set(['color', 'effectColor']);
-/** 값이 같은가 — 색 ↔ COLOR(colorKey), 숫자 ↔ FLOAT(소수 둘째 자리 — sameLiteral과 같은 판정). 별칭 · 값 없음 · 그 밖 타입은 비교하지 않는다. */
+/** 값이 같은가 — 색 ↔ COLOR, 숫자 ↔ FLOAT(값 키 `valueKeyOf` — IA v4 §2.9 S2-P2). 별칭 · 값 없음 · 그 밖 타입은 비교하지 않는다. */
 function libValueSame(tk: LibSameToken, v: LibSameVar): boolean {
   const val = v.value;
   if (!val || val.kind === 'alias') return false;
   if (COLOR_CATS.has(tk.category)) {
     if (v.type !== 'COLOR' || val.kind !== 'color' || typeof val.hex !== 'string' || typeof tk.value !== 'string') return false;
-    return colorKey(tk.value, tk.alpha) === colorKey(val.hex, val.alpha); // hex 대소문자 무시 · 투명도 소수 둘째 자리(없으면 1)
+    return valueKeyOf('color', tk.value, tk.alpha) === valueKeyOf('color', val.hex, val.alpha); // hex 대소문자 무시 · 투명도 소수 둘째 자리(없으면 1)
   }
   if (typeof tk.value !== 'number' || v.type !== 'FLOAT' || val.kind !== 'number') return false;
   const x = Number(val.text);
-  return Number.isFinite(x) && Math.round(x * 100) === Math.round(tk.value * 100);
+  return Number.isFinite(x) && valueKeyOf('num', x) === valueKeyOf('num', tk.value);
 }
 /** 스코프가 그 묶음을 받는가 — `ALL_SCOPES`면 통과(bind.ts scopeOk). 변수 scopes가 없으면(옛 응답) 통과 · 묶음 키가 ''이면(freeBy 없음) 통과. */
 function libScopeOk(v: LibSameVar, key: string): boolean {
@@ -199,6 +262,26 @@ export function tokenGroups(tk: LibSameToken): string[] {
 /** 같은 값 · 그 묶음 스코프를 받는 라이브러리 변수가 있는 묶음 키(§4.3 B.35 ② — libSameSplit과 같은 판정). */
 export function libSameGroups(tk: LibSameToken, libs: readonly LibSameVar[]): string[] {
   return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
+}
+
+/**
+ * 만들기로 보낼 토큰에서 라이브러리 같은 값 묶음의 몫을 쓰임에서 뺀다(ia-v4 §2.9 SC-D46) — 연결 단계가 그 묶음을 붙이지 않으므로(`onlyItems`)
+ * 밝기 이름 · 쓰임 역할 · 재사용 판정(`uses[].free` · `keys`)도 그 자리를 세지 않는다. `freeBy`는 그대로(줄 숫자 · p는 따로 뺀다). 묶음별 수가 없는 옛 토큰은 그대로.
+ */
+export function withoutLibGroups<T extends LibSameToken & { uses?: { free?: number; keys?: string[]; by?: Record<string, number> }[] }>(tokens: readonly T[], libs: readonly LibSameVar[]): T[] {
+  if (!libs.length) return [...tokens];
+  return tokens.map((tk) => {
+    const lib = libSameGroups(tk, libs);
+    if (!lib.length || !tk.uses?.some((u) => u.by)) return tk;
+    const uses = tk.uses.map((u) => {
+      if (!u.by) return u;
+      const by: Record<string, number> = {};
+      let cut = 0;
+      for (const [k, n] of Object.entries(u.by)) if (lib.includes(k)) cut += n; else by[k] = n;
+      return { ...u, by, free: Math.max(0, (u.free ?? 0) - cut), keys: (u.keys ?? []).filter((k) => !lib.includes(k)) };
+    });
+    return { ...tk, uses };
+  });
 }
 
 /** 만들기 연결 단계의 거름 항목(§4.3 B.35 ①②) — 묶음에서 라이브러리 같은 값 묶음을 빼고, 묶음이 0개인 토큰은 뺀다. */

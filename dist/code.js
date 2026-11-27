@@ -131,7 +131,6 @@
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
-    "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
@@ -287,7 +286,6 @@
     "bind.switchAria": "{name} \uC5F0\uACB0",
     // 연결 후 결과 카드
     "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
-    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC73C\uB85C \uC4F8 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694",
     "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
     "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
     "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
@@ -334,16 +332,15 @@
     "v4.libSame": "\uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0 \uAC19\uC740 \uAC12 {k}\uACF3 \u2014 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
     // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
-    "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
-    "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
+    "v4.find0": "\uC5F0\uACB0\uD560 \uACF3",
+    "v4.linkPlaces": "\uC5F0\uACB0\uD560 \uACF3 {m}\uACF3",
+    "v4.makeValues": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {n}\uAC1C",
+    "v4.makeLinkN": "{n}\uAC1C \uB9CC\uB4E4\uACE0 {p}\uACF3 \uC5F0\uACB0 \u2192",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678 \u2014 \uC778\uC2A4\uD134\uC2A4\uC758 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD3EC\uD568",
     "v4.mainsLine": "\uC120\uD0DD \uBC16 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD574\uC694",
     "v4.mainsMore": "\uC678 {n}\uAC1C",
     "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
-    "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
-    "v4.scopePlaces": "\uC6A9\uB3C4 \uB9DE\uCD9C \uAC12 {u}\uACF3",
-    "v4.scopePlacesTip": "\uAC19\uC740 \uAC12\uC758 \uBCC0\uC218\uAC00 \uC788\uC9C0\uB9CC \uC774 \uC790\uB9AC \uC6A9\uB3C4\uAC00 \uAEBC\uC838 \uC788\uC5B4\uC694 \u2014 [\uBCC0\uC218 \uB9CC\uB4E4\uAE30]\uAC00 \uC6A9\uB3C4\uB97C \uB354\uD574 \uC5F0\uACB0\uD574\uC694",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.viewVars": "\uBCC0\uC218 \uBCF4\uAE30",
@@ -413,6 +410,7 @@
     // 선택 탭 만들기 카드(IA v4 §4.1 "만들기 카드" — 상태 6)
     "mkc.subFree": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \uBCC0\uC218\uB97C \uB9CC\uB4E4\uC5B4\uC694 \xB7 \uAC1C\uC218 \uC81C\uD55C\uC740 \uC5C6\uC5B4\uC694",
     "mkc.subPaid": "\uCC3E\uC740 \uAC12\uC73C\uB85C Global \xB7 Semantic \uBCC0\uC218\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD574\uC694",
+    "mkc.link": "{o}\uACF3 \uC5F0\uACB0 \u2192",
     "mkc.label": "{name}\uC5D0\uC11C \uB9CE\uC774 \uC4F4 \uAC12",
     "mkc.titleLib": "\uBCC0\uC218\uAC00 \uC548 \uBD99\uC740 \uAC12 {n}\uACF3",
     // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
@@ -434,6 +432,9 @@
     "common.paidTag": "\uC720\uB8CC",
     "make.run": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.runN": "\uBCC0\uC218 {g}\uAC1C \uB9CC\uB4E4\uAE30",
+    "make.runLinkN": "{g}\uAC1C \uB9CC\uB4E4\uACE0 {p}\uACF3 \uC5F0\uACB0",
+    "make.needLink": "\uB9CC\uB4E4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBC14\uB85C \uC5F0\uACB0\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "make.nothing": "\uB9CC\uB4E4 \uBCC0\uC218\uB3C4 \uC5F0\uACB0\uD560 \uACF3\uB3C4 \uC5C6\uC5B4\uC694",
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
@@ -444,8 +445,6 @@
     "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
     "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
     "make.tagReuseTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uADF8\uAC83\uC744 \uC368\uC694",
-    "make.tagReuseScope": "\uC788\uB294 \uBCC0\uC218 \xB7 \uC6A9\uB3C4 \uB354\uD568",
-    "make.tagReuseScopeTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0, \uC774 \uC790\uB9AC \uC6A9\uB3C4\uB97C \uB354\uD574 \uC368\uC694",
     "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
     "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
     "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
@@ -470,6 +469,7 @@
     "make.cancelled": "\uCDE8\uC18C\uD588\uC5B4\uC694",
     "make.cancelledUpTo": "\uCDE8\uC18C\uD588\uC5B4\uC694 \xB7 {step}\uAE4C\uC9C0 \uB410\uC5B4\uC694",
     "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
+    "make.done.semOnly": "Semantic {r}\uAC1C",
     "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
     "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
@@ -1312,8 +1312,8 @@
     const short = Math.min(width, height);
     return v > 0 && Number.isFinite(short) && v >= short / 2;
   }
-  function pillCorners(values, width, height) {
-    return values.map((v) => isPillRadius(v, width, height) ? PILL_RADIUS : v);
+  function pillCorners(values, width, height, keep) {
+    return values.map((v) => isPillRadius(v, width, height) && !(keep == null ? void 0 : keep.has(String(Math.round(v * 100) / 100))) ? PILL_RADIUS : v);
   }
   var near = (a, b) => Math.abs(a - b) < 5e-3;
   function paddingProp(field, p) {
@@ -1715,8 +1715,11 @@
   }
   var OLD_LADDER = /^(spacing|radius|size|stroke-width)\/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$/;
   var OLD_COLOR = /* @__PURE__ */ new Set(["color/background/default", "color/text/default", "color/border/default", "color/background/brand"]);
-  function isOldPluginName(name) {
-    return OLD_LADDER.test(name) || OLD_COLOR.has(name);
+  function isOldLadderName(name) {
+    return OLD_LADDER.test(name);
+  }
+  function isOldColorName(name) {
+    return OLD_COLOR.has(name);
   }
   function valueKey(v) {
     return typeof v === "number" ? String(Math.round(v * 100) / 100) : v.toLowerCase();
@@ -1813,6 +1816,139 @@
     var _a, _b;
     const o = ownedCollections(cols);
     return new Set([(_a = o.global) == null ? void 0 : _a.id, (_b = o.semantic) == null ? void 0 : _b.id].filter((x) => !!x));
+  }
+  function pluginGlobalNames(cols, vars) {
+    var _a;
+    const gId = (_a = ownedCollections(cols).global) == null ? void 0 : _a.id;
+    return new Set(gId ? vars.filter((v) => v.variableCollectionId === gId).map((v) => v.name) : []);
+  }
+
+  // src/lib/sameValue.ts
+  var round2 = (n) => Math.round(n * 100) / 100;
+  function sameNumber(a, b) {
+    return round2(a) === round2(b);
+  }
+  function valueKeyOf(kind, value, alpha) {
+    if (kind === "color") {
+      const s = String(value);
+      return s.includes("@") ? s.toLowerCase() : colorKey(s, alpha);
+    }
+    if (kind === "num") return String(round2(Number(value)));
+    return String(value);
+  }
+  function scopeFitsPlace(scopes, allowed) {
+    return scopes.includes("ALL_SCOPES") || allowed.some((s) => scopes.includes(s));
+  }
+  var isRole = (v) => v.hops > 0 && (v.autoRole || isOldColorName(v.name));
+  var droppedAlias = (v) => v.hops > 0 && (v.mirror || !v.autoRole && isOldLadderName(v.name));
+  var cmpName = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  var cmpSameName = (a, b) => Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
+  function candidateOrder(a, b) {
+    return Number(b.hops > 0) - Number(a.hops > 0) || a.hops - b.hops || cmpName(a.name, b.name) || cmpSameName(a, b);
+  }
+  function candidatePool(place, vars) {
+    const aliases = [];
+    const raws = [];
+    const roles = [];
+    for (const v of vars) {
+      if (v.key == null || v.key !== place.key || v.type !== place.type) continue;
+      if (!scopeFitsPlace(v.scopes, place.allowed)) continue;
+      if (v.hops === 0) raws.push(v);
+      else if (droppedAlias(v)) continue;
+      else if (isRole(v)) roles.push(v);
+      else if (!place.textGroup || v.name.startsWith(`${place.textGroup}/`)) aliases.push(v);
+    }
+    return { aliases, raws, roles };
+  }
+  function pickCandidate(place, vars) {
+    const pool = candidatePool(place, vars);
+    let role;
+    if (pool.roles.length) {
+      if (place.textGroup) {
+        role = pool.roles.filter((v) => v.name.startsWith(`${place.textGroup}/`)).sort((a, b) => cmpName(a.name, b.name) || cmpSameName(a, b))[0];
+      } else if (place.roleOk) {
+        const ok = place.roleOk;
+        role = pool.roles.filter((v) => ok(v.name)).sort((a, b) => cmpName(a.name, b.name) || cmpSameName(a, b))[0];
+      } else if (place.usage) {
+        const re = familyRe(place.usage, nameKindOf(place.usage, place.key));
+        const ord = byFamilyOrder(place.usage);
+        role = pool.roles.filter((v) => re.test(v.name)).sort((a, b) => ord(a.name, b.name) || cmpSameName(a, b))[0];
+      }
+    }
+    const all = [...pool.aliases, ...pool.raws, ...role ? [role] : []].sort(candidateOrder);
+    if (all.length) return { variable: all[0], alias: all[0].hops > 0 };
+    if (place.type !== "COLOR" && !(place.type === "FLOAT" && place.tokenName && !place.textGroup)) return null;
+    const ex = vars.filter((v) => v.collection === "pluginGlobal" && v.hops === 0 && v.key === place.key && v.type === place.type && (place.type === "COLOR" || v.name === place.tokenName)).sort((a, b) => cmpName(a.name, b.name) || cmpSameName(a, b))[0];
+    return ex ? { variable: ex, alias: false, scopeAdd: place.allowed[0] } : null;
+  }
+  function splitPlaces(places, vars) {
+    var _a, _b, _c, _d;
+    const link = [];
+    const made = [];
+    const none = [];
+    const byValue = /* @__PURE__ */ new Map();
+    const memo = /* @__PURE__ */ new Map();
+    for (const p of places) {
+      const mk = p.roleOk ? "" : `${p.type}\0${p.key}\0${p.allowed.join("|")}\0${(_a = p.usage) != null ? _a : ""}\0${(_b = p.tokenName) != null ? _b : ""}\0${(_c = p.textGroup) != null ? _c : ""}`;
+      let pick = mk ? memo.get(mk) : void 0;
+      if (pick === void 0) {
+        pick = pickCandidate(p, vars);
+        if (mk) memo.set(mk, pick);
+      }
+      if (pick) {
+        link.push({ place: p, pick });
+        continue;
+      }
+      if (!p.make) {
+        none.push(p);
+        continue;
+      }
+      made.push(p);
+      const k = `${p.make.kind}\0${p.key}`;
+      let mv = byValue.get(k);
+      if (!mv) {
+        mv = __spreadProps(__spreadValues({ kind: p.make.kind, value: p.make.value }, p.make.alpha != null && p.make.alpha < 1 ? { alpha: p.make.alpha } : {}), { by: {} });
+        byValue.set(k, mv);
+      }
+      const g = p.allowed.join("|");
+      mv.by[g] = ((_d = mv.by[g]) != null ? _d : 0) + 1;
+    }
+    return { link, make: [...byValue.values()], made, none };
+  }
+  function tokenReuse(groups, vars) {
+    if (!groups.length) return null;
+    const out = [];
+    for (const g of groups) {
+      const p = pickCandidate(g, vars);
+      if (!p) return null;
+      out.push(p);
+    }
+    return out;
+  }
+  function userRadiusKeys(vars) {
+    const out = /* @__PURE__ */ new Set();
+    for (const v of vars) {
+      if (v.collection === "pluginGlobal" || v.autoRole || v.type !== "FLOAT" || v.key == null) continue;
+      if (v.scopes.includes("ALL_SCOPES") || !v.scopes.includes("CORNER_RADIUS")) continue;
+      if (droppedAlias(v)) continue;
+      out.add(v.key);
+    }
+    return out;
+  }
+  function tokenable(kind, value) {
+    if (kind === "color" || kind === "opacity") return true;
+    const v = round2(Number(value));
+    return v > 0 && Number.isInteger(v);
+  }
+  function aliasCovers(vars, q) {
+    let re;
+    return vars.some((v) => {
+      if (v.hops === 0 || v.key !== q.key || v.type !== q.type || droppedAlias(v)) return false;
+      if (!v.scopes.includes("ALL_SCOPES") && !q.need.every((s) => v.scopes.includes(s))) return false;
+      if (!isRole(v)) return true;
+      re != null ? re : re = familyRe(q.base, nameKindOf(q.base, q.key));
+      return re.test(v.name);
+    });
   }
 
   // src/lib/scopes.ts
@@ -2152,12 +2288,24 @@
     if (TEXT.has(field)) return "text";
     return "other";
   }
+  var TEXT_GROUP2 = { fontSize: "FONT_SIZE", lineHeight: "LINE_HEIGHT", letterSpacing: "LETTER_SPACING", fontFamily: "FONT_FAMILY" };
+  var KIND_GROUPS = {
+    color: ["ALL_FILLS|TEXT_FILL", "ALL_FILLS|FRAME_FILL", "ALL_FILLS|SHAPE_FILL", "STROKE_COLOR"],
+    effectColor: ["EFFECT_COLOR"],
+    gap: ["GAP"],
+    radius: ["CORNER_RADIUS"],
+    size: ["WIDTH_HEIGHT"],
+    strokeWidth: ["STROKE_FLOAT"],
+    opacity: ["OPACITY"]
+  };
+  function tokenGroups(tk) {
+    var _a;
+    if (tk.freeBy) return Object.entries(tk.freeBy).filter(([, n]) => n > 0).map(([k]) => k);
+    const g = TEXT_GROUP2[tk.category];
+    return g ? [g] : [...(_a = KIND_GROUPS[tk.category]) != null ? _a : []];
+  }
 
   // src/lib/bind.ts
-  var round2 = (n) => Math.round(n * 100) / 100;
-  function sameNumber(a, b) {
-    return round2(a) === round2(b);
-  }
   var SKIP_PREVIEW_CAP = 200;
   function capSkipsByReason(skips, cap) {
     if (skips.length <= cap) return skips;
@@ -2415,12 +2563,12 @@
   }
   function onlyMatch(only, s) {
     const key = s.allowed.join("|");
-    const v = slotValue(s);
+    const v = slotKey(s);
     return only.some((it) => {
       if (!it.groups.includes(key)) return false;
-      if (s.kind === "color") return typeof it.value === "string" && colorKey(it.value, it.alpha) === v;
-      if (typeof v === "number") return typeof it.value === "number" && sameNumber(it.value, v);
-      return it.value === v;
+      if (s.kind === "color") return typeof it.value === "string" && valueKeyOf("color", it.value, it.alpha) === v;
+      if (typeof s.value === "number") return typeof it.value === "number" && valueKeyOf("num", it.value) === v;
+      return it.value === s.value;
     });
   }
   function dsRoleOwner(node) {
@@ -2515,15 +2663,68 @@
     (_e = hooks.onProgress) == null ? void 0 : _e.call(hooks, prog.done, prog.total);
     return res;
   }
-  async function buildIndex() {
+  function keyOfValue(type, val) {
+    if (val == null) return null;
+    if (type === "COLOR") return isRGB(val) ? valueKeyOf("color", rgbToHex(val), roundAlpha(val.a)) : null;
+    if (type === "FLOAT") return typeof val === "number" ? valueKeyOf("num", val) : null;
+    if (type === "STRING") return typeof val === "string" ? valueKeyOf("text", val) : null;
+    return null;
+  }
+  async function readVarInfos() {
     var _a, _b, _c, _d;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
     const vars = await figma.variables.getLocalVariablesAsync();
-    const tierOf = collectionTiers(cols, vars);
-    const owned = ownedIds(cols);
+    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
     const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-    const globalNames = new Set(vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name));
+    const owned = ownedCollections(cols);
+    const gId = (_a = owned.global) == null ? void 0 : _a.id;
+    const sId = (_b = owned.semantic) == null ? void 0 : _b.id;
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const globalNames = pluginGlobalNames(cols, vars);
+    const infos = [];
+    const valueOf = /* @__PURE__ */ new Map();
+    for (const v of vars) {
+      let cur = v;
+      let hops = 0;
+      let val;
+      let rawId;
+      for (let i = 0; i < 12 && cur; i++) {
+        const mode = modeOf.get(cur.variableCollectionId);
+        const x = mode ? cur.valuesByMode[mode] : void 0;
+        if (isAlias(x)) {
+          cur = byId.get(x.id);
+          hops++;
+        } else {
+          val = x;
+          rawId = cur.id;
+          break;
+        }
+      }
+      const key = keyOfValue(v.resolvedType, val);
+      if (val != null) valueOf.set(v.id, val);
+      const collection = v.variableCollectionId === gId ? "pluginGlobal" : v.variableCollectionId === sId ? "pluginSemantic" : "user";
+      infos.push(__spreadValues({
+        id: v.id,
+        name: v.name,
+        type: v.resolvedType,
+        key,
+        scopes: (_c = v.scopes) != null ? _c : ["ALL_SCOPES"],
+        hops,
+        collection,
+        autoRole: readFlag(v, AUTO_ROLE_KEY),
+        manual: collection === "pluginGlobal" && readFlag(v, MANUAL_KEY),
+        // 거울(12.7) — 플러그인 Global 컬렉션 밖의 별칭 변수가 플러그인 Global 컬렉션의 변수와 이름이 같음(ia-v4 §2.9 S2-P4 "뺀다")
+        mirror: hops > 0 && collection !== "pluginGlobal" && globalNames.has(v.name),
+        user: collection === "user",
+        colIdx: (_d = colIdx.get(v.variableCollectionId)) != null ? _d : 0
+      }, key != null && rawId ? { rawId } : {}));
+    }
+    return { cols, vars, infos, byId, infoById: new Map(infos.map((i) => [i.id, i])), valueOf };
+  }
+  async function buildIndex() {
+    var _a, _b;
+    const read = await readVarInfos();
+    const tierOf = collectionTiers(read.cols, read.vars);
     const entries = [];
     const semNames = /* @__PURE__ */ new Map();
     const addSem = (name, key) => {
@@ -2531,26 +2732,13 @@
       if (!arr) semNames.set(name, key ? [key] : []);
       else if (key && !arr.includes(key)) arr.push(key);
     };
-    for (const v of vars) {
+    for (const info of read.infos) {
+      const v = read.byId.get(info.id);
       const tier = (_a = tierOf.get(v.variableCollectionId)) != null ? _a : 0;
-      if (tier < 1) continue;
-      const val = await resolveValue(v, modeOf);
       if (tier === 2) addSem(v.name, "");
-      if (val == null) continue;
-      const raw = v.valuesByMode[(_b = modeOf.get(v.variableCollectionId)) != null ? _b : ""];
-      const direct = !(raw && typeof raw === "object" && "type" in raw && raw.type === "VARIABLE_ALIAS");
-      const e = {
-        variable: v,
-        tier,
-        type: v.resolvedType,
-        scopes: (_c = v.scopes) != null ? _c : ["ALL_SCOPES"],
-        user: !owned.has(v.variableCollectionId),
-        colIdx: (_d = colIdx.get(v.variableCollectionId)) != null ? _d : 0,
-        direct
-      };
-      if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
-      if (tier === 2 && readAutoRole(v)) e.auto = true;
-      if (tier === 1 && readFlag(v, MANUAL_KEY)) e.manual = true;
+      const val = read.valueOf.get(v.id);
+      if (info.key == null || val == null) continue;
+      const e = { variable: v, info, tier, type: v.resolvedType, scopes: (_b = v.scopes) != null ? _b : ["ALL_SCOPES"] };
       if (v.resolvedType === "COLOR" && isRGB(val)) {
         e.colorHex = rgbToHex(val);
         e.colorAlpha = roundAlpha(val.a);
@@ -2560,21 +2748,13 @@
       if (tier === 2) addSem(v.name, entryKey(e));
       entries.push(e);
     }
-    entries.sort((a, b) => b.tier - a.tier);
-    return { entries, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])) };
+    const infos = entries.map((e) => e.info);
+    return { entries, infos, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])), radiusKeys: userRadiusKeys(infos) };
   }
   function readFlag(v, key) {
     const fn = v.getPluginData;
     try {
       return typeof fn === "function" && fn.call(v, key) === "1";
-    } catch (e) {
-      return false;
-    }
-  }
-  function readAutoRole(v) {
-    const fn = v.getPluginData;
-    try {
-      return typeof fn === "function" && fn.call(v, AUTO_ROLE_KEY) === "1";
     } catch (e) {
       return false;
     }
@@ -2623,143 +2803,99 @@
   }
   var DROP = "drop";
   var isFrac = (v) => Math.abs(v - Math.round(v)) >= 5e-3;
-  var numReason = (v, dropAtOrBelowZero = true) => dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? "fraction" : "no-match";
-  function sameValueEntries(ctx, s, value = s.value, anyScope = false) {
-    return ctx.index.entries.filter((e) => {
-      if (!anyScope && !scopeOk(e.scopes, s.allowed)) return false;
-      if (s.kind === "color") return e.colorKey === value;
-      if (typeof value === "number") return e.num != null && sameNumber(e.num, value);
-      return e.str != null && e.str === value;
-    });
-  }
-  var byName = (a, b) => a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
-  var byUserThenName = (a, b) => Number(b.user) - Number(a.user) || byName(a, b);
-  var firstInFamily = (list, base) => {
-    const ord = byFamilyOrder(base);
-    return [...list].sort((a, b) => ord(a.variable.name, b.variable.name) || Number(b.user) - Number(a.user) || a.colIdx - b.colIdx)[0];
-  };
-  function pickDesigned(cands, kind) {
-    var _a;
-    const comp = cands.find((e) => e.tier === 3);
-    if (comp) return comp;
-    if (kind === "text") return null;
-    return (_a = cands.filter((e) => e.tier === 2 && !e.auto && !e.mirror && !isOldPluginName(e.variable.name)).sort(byName)[0]) != null ? _a : null;
+  var numReason = (v) => round2(v) <= 0 ? DROP : isFrac(v) ? "fraction" : "no-match";
+  var byName = (a, b) => a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.info.user) - Number(a.info.user) || a.info.colIdx - b.info.colIdx;
+  var slotKey = (s) => valueKeyOf(s.kind === "color" ? "color" : typeof s.value === "number" ? "num" : "text", s.value);
+  var TOKEN_GROUP = { gap: "spacing", radius: "radius", size: "size", stroke: "stroke-width", opacity: "opacity" };
+  function placeOf(s, colorBase) {
+    const kind = fieldKind(s.field);
+    const type = s.kind === "color" ? "COLOR" : typeof s.value === "number" ? "FLOAT" : "STRING";
+    const group = TOKEN_GROUP[kind];
+    const usage = s.kind === "color" ? colorBase : s.usage;
+    return __spreadValues(__spreadValues(__spreadValues(__spreadValues({
+      slot: s,
+      type,
+      key: slotKey(s),
+      allowed: s.allowed
+    }, usage ? { usage } : {}), s.kind === "num" && group && typeof s.value === "number" ? { tokenName: numberTokenName(group, round2(s.value)) } : {}), s.kind === "text" ? { textGroup: s.usage.split("/")[0] } : {}), s.noMatchReason === "no-match" && s.kind !== "text" ? { make: __spreadValues({ kind, value: s.kind === "color" ? s.display : round2(s.value) }, s.alpha != null ? { alpha: s.alpha } : {}) } : {});
   }
   function resolveSlots(ctx) {
-    var _a, _b, _c;
+    var _a, _b, _c, _d;
     const { res, preview } = ctx;
-    const pending = [];
-    const colorLeft = [];
-    const emit = (s, e, viaPill = false, scopeAdd) => {
+    const infos = ctx.index.infos;
+    const emit = (s, e, scopeAdd) => {
       res.bound++;
-      const c = candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type);
+      const c = candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), e.type);
       if (scopeAdd) c.scopeAdd = scopeAdd;
       preview.candidates.push(c);
     };
-    const globalFor = (cands) => {
-      var _a2;
-      return (_a2 = cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0]) != null ? _a2 : null;
-    };
-    for (const s of ctx.slots) {
-      const cands = sameValueEntries(ctx, s);
-      const d = pickDesigned(cands, s.kind);
-      if (d) {
-        emit(s, d);
-        continue;
-      }
-      if (s.kind === "color") {
-        colorLeft.push({ slot: s, cands });
-        continue;
-      }
-      const viaPill = s.pill != null;
-      const cands2 = viaPill ? sameValueEntries(ctx, s, s.pill) : cands;
-      const group = s.usage.split("/")[0];
-      const two = s.kind === "text" ? cands2.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0] : firstInFamily(cands2.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(slotValue(s)))).test(e.variable.name)), s.usage);
-      if (two) {
-        emit(s, two, viaPill);
-        continue;
-      }
-      pending.push({ slot: s, base: s.usage, global: globalFor(cands2) });
-    }
+    const colorBase = /* @__PURE__ */ new Map();
     const byUse = /* @__PURE__ */ new Map();
-    for (const x of colorLeft) {
-      const arr = byUse.get(x.slot.usage);
-      if (arr) arr.push(x);
-      else byUse.set(x.slot.usage, [x]);
+    for (const s of ctx.slots) {
+      if (s.kind !== "color") continue;
+      const arr = byUse.get(s.usage);
+      if (arr) arr.push(s);
+      else byUse.set(s.usage, [s]);
     }
     for (const [use, list] of byUse) {
       const counts = /* @__PURE__ */ new Map();
-      for (const x of list) {
-        const k = colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha);
+      for (const sl of list) {
+        const k = colorSlotKey(sl.display, sl.bg, sl.alpha);
         const c = counts.get(k);
         if (c) c.count++;
-        else counts.set(k, __spreadValues({ hex: x.slot.display, count: 1, bg: x.slot.bg }, x.slot.alpha != null ? { alpha: x.slot.alpha } : {}));
+        else counts.set(k, __spreadValues({ hex: sl.display, count: 1, bg: sl.bg }, sl.alpha != null ? { alpha: sl.alpha } : {}));
       }
       const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
       const bases = colorRoleBases([...counts.values()], def == null ? void 0 : def.colorHex, use);
       const refHex = colorRoleRef([...counts.values()], def == null ? void 0 : def.colorHex, use);
-      for (const x of list) {
-        const base = `color/${use}/${(_a = bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha))) != null ? _a : "default"}`;
-        const fam = familyRe(base, nameKindOf(base, valueKey(x.slot.value)));
-        const two = firstInFamily(x.cands.filter((e) => e.tier === 2 && !e.mirror && fam.test(e.variable.name)), base);
-        if (two) {
-          emit(x.slot, two);
-          continue;
-        }
-        pending.push({ slot: x.slot, base, global: globalFor(x.cands), refHex });
+      for (const sl of list) colorBase.set(sl, __spreadValues({ base: `color/${use}/${(_a = bases.get(colorSlotKey(sl.display, sl.bg, sl.alpha))) != null ? _a : "default"}` }, refHex ? { refHex } : {}));
+    }
+    const split = splitPlaces(ctx.slots.map((s) => {
+      var _a2;
+      return placeOf(s, (_a2 = colorBase.get(s)) == null ? void 0 : _a2.base);
+    }), infos);
+    const pickOf = /* @__PURE__ */ new Map();
+    for (const { place, pick } of split.link) pickOf.set(place.slot, pick);
+    if (split.make.length) res.make = split.make;
+    const pending = [];
+    for (const s of ctx.slots) {
+      const pick = pickOf.get(s);
+      if (!pick) {
+        if (s.noMatchReason !== DROP) skip(res, s.noMatchReason, s.node, preview, s.field);
+        continue;
+      }
+      const e = ctx.index.byId.get(pick.variable.id);
+      if (pick.alias || ctx.noNewRoles) emit(s, e, pick.scopeAdd);
+      else {
+        const cb = colorBase.get(s);
+        pending.push(__spreadValues(__spreadValues({ slot: s, base: s.kind === "color" ? (_b = cb == null ? void 0 : cb.base) != null ? _b : `color/${s.usage}/default` : s.usage, global: e }, (cb == null ? void 0 : cb.refHex) ? { refHex: cb.refHex } : {}), pick.scopeAdd ? { scopeAdd: pick.scopeAdd } : {}));
       }
     }
-    const ownedSame = (s) => s.kind === "color" && s.noMatchReason === "no-match" ? sameValueEntries(ctx, s, s.value, true).filter((e) => e.tier === 1 && e.direct && !e.user).sort(byUserThenName) : [];
-    const addScope = /* @__PURE__ */ new Map();
-    const live = pending.filter((p) => {
-      if (p.global) return true;
-      const own = ownedSame(p.slot);
-      if (own.length) {
-        const pick = ctx.noNewRoles ? own.find((e) => !e.manual) : void 0;
-        if (pick) {
-          p.global = pick;
-          addScope.set(p, p.slot.allowed[0]);
-          return true;
-        }
-        skip(res, "scope-add", p.slot.node, preview, p.slot.field);
-        return false;
-      }
-      if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
-      return false;
-    });
-    if (ctx.noNewRoles) {
-      for (const p of live) emit(p.slot, p.global, p.slot.pill != null, addScope.get(p));
-      return;
-    }
+    if (!pending.length) return;
     const names = assignNames(
-      live.map((p) => __spreadValues({ base: p.base, value: valueKey(slotValue(p.slot)), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
+      pending.map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
       ctx.index.semNames,
       { reuse: false }
     );
-    const roleOf = /* @__PURE__ */ new Map();
-    for (const p of live) {
-      const name = (_b = names.get(`${p.base}\0${valueKey(slotValue(p.slot))}`)) != null ? _b : p.base;
-      let spec = roleOf.get(name);
-      if (!spec) {
-        const g2 = p.global;
-        const scopes = (_c = scopeForSemanticRole(name)) != null ? _c : g2.scopes;
-        spec = { name, globalId: g2.variable.id, scopes, globalName: g2.variable.name };
-        roleOf.set(name, spec);
+    const scopesOfRole = /* @__PURE__ */ new Map();
+    for (const p of pending) {
+      const name = (_c = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _c : p.base;
+      const g = p.global;
+      let scopes = scopesOfRole.get(name);
+      if (!scopes) {
+        scopes = (_d = scopeForSemanticRole(name)) != null ? _d : g.scopes;
+        scopesOfRole.set(name, scopes);
       }
       res.bound++;
-      const g = p.global;
-      preview.candidates.push(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null, g.type)), {
-        // 타입 = 가리킬 Global(TR-18)
-        newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
-        newRoleGlobalName: spec.globalName
-      }));
+      preview.candidates.push(__spreadValues(__spreadProps(__spreadValues({}, candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), g.type)), {
+        // 타입 = 가리킬 원시값(TR-18)
+        // 가리킬 원시값은 그 자리가 고른 것이다 — 용도 예외의 용도는 이 변수에 더한다(다른 자리의 사용자 변수에 더하지 않게).
+        newRole: { name, globalId: g.variable.id, scopes },
+        newRoleGlobalName: g.variable.name
+      }), p.scopeAdd ? { scopeAdd: p.scopeAdd } : {}));
     }
   }
-  var slotValue = (s) => {
-    var _a;
-    return (_a = s.pill) != null ? _a : s.value;
-  };
-  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha, viaPill = false, resolvedType) {
+  function candOf(s, variableId, variableName, tier, variableValue, variableAlpha, resolvedType) {
     return __spreadValues(__spreadValues(__spreadValues(__spreadValues(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
       nodeId: s.node.id,
       field: s.field
@@ -2770,7 +2906,7 @@
       variableName,
       tier,
       variableValue
-    }), resolvedType ? { resolvedType } : {}), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), viaPill && typeof s.value === "number" ? { pillFrom: s.value } : {});
+    }), resolvedType ? { resolvedType } : {}), variableAlpha != null ? { variableAlpha } : {}), s.mainId ? { mainId: s.mainId } : {}), s.pillFrom != null ? { pillFrom: s.pillFrom } : {});
   }
   function entryAlpha(e) {
     return e.colorAlpha != null && e.colorAlpha !== 1 ? e.colorAlpha : void 0;
@@ -2936,9 +3072,12 @@
     const values = corners.map((c) => r !== figma.mixed && typeof r === "number" ? r : Number(node[c]) || 0);
     if (r !== figma.mixed && !(typeof r === "number" && r > 0)) return;
     const { width, height } = node;
-    const named = pillCorners(values, width, height);
+    const named = pillCorners(values, width, height, ctx.index.radiusKeys);
     corners.forEach((c, i) => {
-      if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, named), numReason(values[i]), named[i] !== values[i] ? PILL_RADIUS : void 0);
+      if (!(values[i] > 0)) return;
+      const pill = named[i] !== values[i];
+      if (pill) tryBind(ctx, node, c, PILL_RADIUS, radiusName(c, named), "no-match", values[i]);
+      else tryBind(ctx, node, c, values[i], radiusName(c, named), numReason(values[i]));
     });
   }
   function bindOpacity(node, ctx) {
@@ -3046,14 +3185,14 @@
     }
     ctx.slots.push({ node, field, kind: "text", value, display: String(value), allowed: [FIELD_SCOPE[field]], usage: textUsageName(field), noMatchReason: reason });
   }
-  function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match", pill) {
+  function tryBind(ctx, node, field, value, usage, noMatchReason = "no-match", pillFrom) {
     const allowed = numAllowed(field);
     const st = stateReason(nodeFieldState(node, field));
     if (st) {
       note(ctx.res, st, node, ctx.preview, field);
       return;
     }
-    ctx.slots.push(__spreadValues({ node, field, kind: "num", value, display: String(value), allowed, usage, noMatchReason }, pill != null ? { pill } : {}));
+    ctx.slots.push(__spreadValues({ node, field, kind: "num", value, display: String(pillFrom != null ? pillFrom : value), allowed, usage, noMatchReason }, pillFrom != null ? { pillFrom } : {}));
   }
   var LINK_CHUNK = 300;
   async function bindSelectedItems(items, hooks = {}, known) {
@@ -3152,8 +3291,8 @@
             const hex = rgbToHex(x.color);
             const alpha = itemAlpha(x);
             const allowed = key === "fills" ? fillScopesFor(node.type) : key === "strokes" ? STROKE_SCOPES : EFFECT_SCOPES;
-            const scopeAdd = !it.newRole && it.scopeAdd ? it.scopeAdd : void 0;
-            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha(value.a) !== alpha || !scopeAdd && !scopeOk(scopesOf(), allowed)) {
+            const scopeAdd = it.scopeAdd ? it.scopeAdd : void 0;
+            if (alpha === 0 || vv.variable.resolvedType !== "COLOR" || !value || !isRGB(value) || valueKeyOf("color", rgbToHex(value), roundAlpha(value.a)) !== valueKeyOf("color", hex, alpha) || !(scopeAdd && !it.newRole) && !scopeOk(scopesOf(), allowed)) {
               fail("changed", node, key);
               continue;
             }
@@ -3232,6 +3371,7 @@
             fail("changed", node, it.field);
             continue;
           }
+          if (it.scopeAdd) addVariableScope(vv.variable, it.scopeAdd);
           const tv = await target();
           if (pill) node[it.field] = PILL_RADIUS;
           node.setBoundVariable(it.field, tv);
@@ -3263,29 +3403,26 @@
     return { bound: res.bound, skipped: res.skipped, reasons: res.reasons, skips, newRoles: created.size, createdIds, mainsBound: [...mainsBound] };
   }
   async function createRole(spec, global) {
-    var _a;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const all = await figma.variables.getLocalVariablesAsync();
+    var _a, _b, _c;
+    const read = await readVarInfos();
+    const { cols, vars: all } = read;
     const tiers = collectionTiers(cols, all);
     const col = ensureOwnedCollection(cols, "semantic");
     const semCols = new Map(cols.filter((c) => tiers.get(c.id) === 2).map((c) => [c.id, c]));
     semCols.set(col.id, col);
     const inCol = all.filter((v2) => semCols.has(v2.variableCollectionId));
-    const pointsAtGlobal = (v2) => {
-      var _a2;
-      return v2.resolvedType === global.resolvedType && ((_a2 = semCols.get(v2.variableCollectionId)) != null ? _a2 : col).modes.every((m) => {
-        const val = v2.valuesByMode[m.modeId];
-        return !!val && typeof val === "object" && val.type === "VARIABLE_ALIAS" && val.id === global.id;
-      });
-    };
     const re = new RegExp(`^${spec.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:-\\d+)?$`);
-    const globalNames = new Set(all.filter((v2) => tiers.get(v2.variableCollectionId) === 1).map((v2) => v2.name));
+    const key = (_b = (_a = read.infoById.get(global.id)) == null ? void 0 : _a.key) != null ? _b : null;
     const covers = (v2) => {
       var _a2;
       const sc = (_a2 = v2.scopes) != null ? _a2 : [];
       return sc.includes("ALL_SCOPES") || spec.scopes.every((x) => sc.includes(x));
     };
-    const same = inCol.filter((v2) => re.test(v2.name) && pointsAtGlobal(v2) && covers(v2) && !globalNames.has(v2.name)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
+    const same = all.filter((v2) => {
+      if (v2.variableCollectionId !== col.id || !re.test(v2.name) || v2.resolvedType !== global.resolvedType || !covers(v2)) return false;
+      const i = read.infoById.get(v2.id);
+      return !!i && key != null && i.hops > 0 && i.key === key && !i.mirror;
+    }).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
     if (same) return same;
     const names = new Set(inCol.map((v2) => v2.name));
     let name = spec.name;
@@ -3295,7 +3432,7 @@
     const scopes = scopesForType(spec.scopes, global.resolvedType);
     if (scopes.length) v.scopes = scopes;
     try {
-      (_a = v.setPluginData) == null ? void 0 : _a.call(v, AUTO_ROLE_KEY, "1");
+      (_c = v.setPluginData) == null ? void 0 : _c.call(v, AUTO_ROLE_KEY, "1");
     } catch (e) {
     }
     return v;
@@ -3527,6 +3664,11 @@
     if (!ok) acc.skipped.add(SKIP_FRACTION);
     return ok;
   }
+  function tokenOk(acc, kind, raw) {
+    if (tokenable(kind, raw)) return true;
+    if (round(raw) > 0) acc.skipped.add(SKIP_FRACTION);
+    return false;
+  }
   function keyOf(category, value, unit, alpha) {
     return `${category}|${value}|${unit != null ? unit : ""}|${alpha != null ? alpha : 1}`;
   }
@@ -3535,9 +3677,10 @@
   }
   var scopeKey = (allowed) => allowed.join("|");
   var isFree = (st) => st === "none";
-  var fieldPlace = (node, field, places = 1) => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) ? places : 0 });
+  var fieldPlace = (acc, node, field, places = 1) => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) && !followsMain(acc, node, field) ? places : 0 });
+  var followsMain = (acc, node, field, index) => !!acc.curMain && sameAsMain(node, acc.curMain, field, index);
   function add(acc, token, source, nodeId, use, bg, place) {
-    var _a, _b, _c, _d;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const k = keyOf(token.category, token.value, token.unit, token.alpha);
     let existing = acc.map.get(k);
     if (existing) {
@@ -3554,9 +3697,15 @@
     }
     if (use) {
       const uses = (_d = existing.uses) != null ? _d : existing.uses = [];
-      const u = uses.find((x) => x.name === use && x.bg === bg);
+      let u = uses.find((x) => x.name === use && x.bg === bg);
       if (u) u.count++;
-      else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+      else uses.push(u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+      if (place) u.free = ((_e = u.free) != null ? _e : 0) + Math.max(0, place.free);
+      if (place && place.free > 0) {
+        if (!((_f = u.keys) != null ? _f : u.keys = []).includes(place.key)) u.keys.push(place.key);
+        const by = (_g = u.by) != null ? _g : u.by = {};
+        by[place.key] = ((_h = by[place.key]) != null ? _h : 0) + place.free;
+      }
     }
   }
   function backgroundOf(node) {
@@ -3580,6 +3729,8 @@
     const nodeId = node.id;
     if (paints2 === figma.mixed || !Array.isArray(paints2)) return;
     const key = scopeKey(source === "fill" ? fillScopesFor(node.type) : STROKE_SCOPES);
+    const field = source === "fill" ? "fills" : "strokes";
+    const styled = hasStyleId(node, source === "fill" ? "fillStyleId" : "strokeStyleId");
     for (let i = 0; i < paints2.length; i++) {
       const p = paints2[i];
       if (p.visible === false) continue;
@@ -3592,28 +3743,34 @@
       const hex = rgbToHex(p.color);
       const cu = colorUse(node.type, source === "fill" ? "fills" : "strokes", isInsideIconFrame(node));
       const bgHex = cu === "text" || cu === "icon" || cu === "border" ? backgroundOf(node) : void 0;
-      const free = isFree(colorState(p, node, source === "fill" ? "fills" : "strokes", i)) ? 1 : 0;
+      const free = !styled && isFree(colorState(p, node, field, i)) && !followsMain(acc, node, field, i) ? 1 : 0;
       add(acc, colorToken("color", hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : void 0, { key, free });
     }
   }
   function collectText(acc, node) {
+    var _a;
+    const open = node.fontName !== figma.mixed && node.characters.length > 0 && !hasStyleId(node, "textStyleId") && !((_a = acc.textStyleNode) == null ? void 0 : _a.call(acc, node));
+    const place = (field) => ({
+      key: field === "fontFamily" ? "FONT_FAMILY" : FIELD_SCOPE[field],
+      free: open && isFree(textFieldState(node, field)) ? 1 : 0
+    });
     if (node.fontSize !== figma.mixed) {
       const v = round(node.fontSize);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize", node.id);
+      if (onScale(acc, v)) add(acc, { name: numberTokenName("font-size", v), category: "fontSize", value: v }, "fontSize", node.id, void 0, void 0, place("fontSize"));
     }
     if (node.fontName !== figma.mixed) {
       const fam = node.fontName.family;
-      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily", node.id);
+      add(acc, { name: `font-family/${fam}`, category: "fontFamily", value: fam }, "fontFamily", node.id, void 0, void 0, place("fontFamily"));
     }
     if (node.lineHeight !== figma.mixed && node.lineHeight.unit === "PIXELS") {
       const v = round(node.lineHeight.value);
       const unit = "px";
-      if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight", node.id);
+      if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName("line-height", v), category: "lineHeight", value: v, unit }, "lineHeight", node.id, void 0, void 0, place("lineHeight"));
     }
     if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === "PIXELS") {
       const v = round(node.letterSpacing.value);
       const unit = "px";
-      if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing", node.id);
+      if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName("letter-spacing", v), category: "letterSpacing", value: v, unit }, "letterSpacing", node.id, void 0, void 0, place("letterSpacing"));
     }
   }
   function gapSkip(node, field) {
@@ -3640,9 +3797,9 @@
       if (typeof node.counterAxisSpacing === "number" && !gapSkip(node, "counterAxisSpacing")) gaps.push([node.counterAxisSpacing, simpleNumericName("counterAxisSpacing"), "counterAxisSpacing"]);
     }
     for (const [g, use, field] of gaps) {
-      if (typeof g === "number" && g > 0) {
+      if (typeof g === "number" && tokenOk(acc, "gap", g)) {
         const v = round(g);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap", node.id, use, void 0, fieldPlace(node, field));
+        add(acc, { name: numberTokenName("spacing", v), category: "gap", value: v }, "gap", node.id, use, void 0, fieldPlace(acc, node, field));
       }
     }
   }
@@ -3730,11 +3887,11 @@
     let lockedTaken = false;
     const addSize = (v, field) => {
       const rv = round(v);
-      if (!(rv > 0 && Number.isInteger(rv))) return;
+      if (!tokenable("size", v)) return;
       let place;
-      if (!locked) place = fieldPlace(node, field);
+      if (!locked) place = fieldPlace(acc, node, field);
       else {
-        place = { key: scopeKey(numAllowed(field)), free: !lockedTaken && isFree(lockedSizeState(node).state) ? 1 : 0 };
+        place = { key: scopeKey(numAllowed(field)), free: !lockedTaken && isFree(lockedSizeState(node).state) && !followsMain(acc, node, field) ? 1 : 0 };
         lockedTaken = true;
       }
       add(acc, { name: numberTokenName("size", rv), category: "size", value: rv }, "size", node.id, `size/${isIconSelf(node) ? "icon" : "avatar"}`, void 0, place);
@@ -3749,13 +3906,13 @@
     if (r !== figma.mixed && typeof r !== "number") return;
     const values = corners.map((c) => r !== figma.mixed ? r : Number(node[c]) || 0);
     const { width, height } = node;
-    const named = pillCorners(values, width, height);
+    const named = pillCorners(values, width, height, acc.radiusKeys);
     const list = r === figma.mixed ? corners.map((c, i) => [c, named[i]]) : [[corners[0], named[0]]];
     for (const [c, rv] of list) {
-      if (rv > 0) {
+      if (tokenOk(acc, "radius", rv)) {
         const v = round(rv);
-        const place = r === figma.mixed ? fieldPlace(node, c) : { key: scopeKey(numAllowed(c)), free: corners.filter((cc) => isFree(nodeFieldState(node, cc))).length };
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id, radiusName(c, named), void 0, place);
+        const place = r === figma.mixed ? fieldPlace(acc, node, c) : { key: scopeKey(numAllowed(c)), free: corners.filter((cc) => isFree(nodeFieldState(node, cc)) && !followsMain(acc, node, cc)).length };
+        add(acc, { name: numberTokenName("radius", v), category: "radius", value: v }, "radius", node.id, radiusName(c, named), void 0, place);
       }
     }
   }
@@ -3770,9 +3927,9 @@
     if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
     else if (typeof w === "number") widths.push(["strokeWeight", w]);
     for (const [field, wv] of widths) {
-      if (wv > 0) {
+      if (tokenOk(acc, "stroke", wv)) {
         const v = round(wv);
-        if (onScale(acc, v)) add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id, strokeName(field, sideValues), void 0, fieldPlace(node, field));
+        add(acc, { name: numberTokenName("stroke-width", v), category: "strokeWidth", value: v }, "strokeWidth", node.id, strokeName(field, sideValues), void 0, fieldPlace(acc, node, field));
       }
     }
   }
@@ -3781,12 +3938,13 @@
     const o = node.opacity;
     if (typeof o !== "number" || o >= 1 || o <= 0) return;
     const v = round(o);
-    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id, simpleNumericName("opacity"), void 0, fieldPlace(node, "opacity"));
+    add(acc, { name: numberTokenName("opacity", v), category: "opacity", value: v }, "opacity", node.id, simpleNumericName("opacity"), void 0, fieldPlace(acc, node, "opacity"));
   }
   function collectEffects(acc, node) {
     var _a;
     if (!("effects" in node)) return;
     const effects = node.effects;
+    const styled = hasStyleId(node, "effectStyleId");
     for (let i = 0; i < effects.length; i++) {
       const e = effects[i];
       if (e.visible === false) continue;
@@ -3794,7 +3952,7 @@
         const alpha = roundAlpha(e.color.a);
         if (alpha === 0) continue;
         const hex = rgbToHex(e.color);
-        const free = isFree(colorState(e, node, "effects", i)) ? 1 : 0;
+        const free = !styled && isFree(colorState(e, node, "effects", i)) && !followsMain(acc, node, "effects", i) ? 1 : 0;
         add(acc, colorToken("effectColor", hex, alpha), "effectColor", node.id, "color/shadow", void 0, { key: scopeKey(EFFECT_SCOPES), free });
         for (const [g, val] of [
           ["shadow-blur", e.radius],
@@ -3812,11 +3970,12 @@
     }
   }
   function walk2(acc, node) {
-    var _a;
+    var _a, _b;
     if (node.visible === false) {
       acc.skipped.add(SKIP_HIDDEN);
       return;
     }
+    acc.curMain = node.type === "INSTANCE" ? (_a = acc.mainOf) == null ? void 0 : _a.get(node.id) : void 0;
     if ("fills" in node) collectPaints(acc, node, node.fills, "fill");
     if ("strokes" in node) collectPaints(acc, node, node.strokes, "stroke");
     if (node.type === "TEXT") collectText(acc, node);
@@ -3829,7 +3988,7 @@
     collectOpacity(acc, node);
     collectEffects(acc, node);
     if (node.type === "INSTANCE") {
-      if ("children" in node && node.children.length && !((_a = acc.covered) == null ? void 0 : _a.has(node.id))) acc.skipped.add(SKIP_INSTANCE);
+      if ("children" in node && node.children.length && !((_b = acc.covered) == null ? void 0 : _b.has(node.id))) acc.skipped.add(SKIP_INSTANCE);
       return;
     }
     if ("children" in node) for (const child of node.children) walk2(acc, child);
@@ -3842,8 +4001,8 @@
     }
     return true;
   }
-  function extractFromSelection(selection2, coveredInstances) {
-    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), covered: coveredInstances };
+  function extractFromSelection(selection2, coveredInstances, opts = {}) {
+    const acc = { map: /* @__PURE__ */ new Map(), warnings: /* @__PURE__ */ new Set(), lastNode: /* @__PURE__ */ new Map(), skipped: /* @__PURE__ */ new Set(), covered: coveredInstances, radiusKeys: opts.userRadiusKeys, mainOf: opts.mainOf, textStyleNode: opts.textStyleNode };
     for (const node of selection2) {
       if (!isEffectivelyVisible2(node)) {
         acc.skipped.add(SKIP_HIDDEN);
@@ -4784,34 +4943,53 @@
     return typeof raw === "number" && Math.round(raw * 100) === Math.round(Number(lit) * 100);
   }
   async function pickReusable(tokens, base) {
+    var _a, _b, _c, _d;
     const out = /* @__PURE__ */ new Map();
     const withUses = tokens.filter((t2) => {
-      var _a;
-      return (_a = t2.uses) == null ? void 0 : _a.length;
+      var _a2;
+      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
     });
     if (!withUses.length) return out;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
-    const tiers = collectionTiers(cols, vars);
-    const owned = ownedIds(cols);
-    const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-    const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-    const userGlobals = vars.filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId)).sort((a, b) => {
-      var _a, _b;
-      return ((_a = colIdx.get(a.variableCollectionId)) != null ? _a : 0) - ((_b = colIdx.get(b.variableCollectionId)) != null ? _b : 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
-    });
-    for (const t2 of withUses) {
-      const type = resolvedTypeForToken(t2);
-      const lit = literalOf(t2, type, base);
-      const allowed = scopesForType(scopesForSources(t2.sources), type);
-      const hit = userGlobals.find((v) => {
-        var _a;
-        if (v.resolvedType !== type) return false;
-        const sc = (_a = v.scopes) != null ? _a : [];
-        if (!sc.includes("ALL_SCOPES") && !allowed.some((x) => sc.includes(x))) return false;
-        return sameLiteral(directValue(v, modeOf), lit, type);
-      });
-      if (hit) out.set(t2.name, hit);
+    const read = await readVarInfos();
+    const infos = read.infos.filter((i) => i.key != null);
+    const { bases } = colorBasesOf(withUses, semanticIndex(await figma.variables.getLocalVariableCollectionsAsync(), await figma.variables.getLocalVariablesAsync()).existing);
+    const byName3 = /* @__PURE__ */ new Map();
+    for (const t2 of withUses) byName3.set(t2.name, [...(_a = byName3.get(t2.name)) != null ? _a : [], t2]);
+    for (const [name, list] of byName3) {
+      const places = [];
+      for (const t2 of list) {
+        const type = resolvedTypeForToken(t2);
+        const lit = literalOf(t2, type, base);
+        const key = type === "FLOAT" ? valueKeyOf("num", Number(lit)) : String(lit);
+        const family = (u) => {
+          var _a2;
+          return u.name.startsWith("color/") ? (_a2 = bases.get(colorBaseKey(u.name, String(t2.value), u.bg, t2.alpha))) != null ? _a2 : `${u.name}/default` : u.name;
+        };
+        const okFor = (f) => (n) => familyRe(f, nameKindOf(f, key)).test(n);
+        const tokenName = type === "FLOAT" ? { tokenName: t2.name } : {};
+        const uses = (_b = t2.uses) != null ? _b : [];
+        if (uses.some((u) => u.keys)) {
+          const seen = /* @__PURE__ */ new Set();
+          for (const u of uses) {
+            const f = family(u);
+            for (const g of (_c = u.keys) != null ? _c : []) {
+              if (seen.has(`${f}\0${g}`)) continue;
+              seen.add(`${f}\0${g}`);
+              places.push(__spreadValues({ type, key, allowed: g.split("|"), roleOk: okFor(f) }, tokenName));
+            }
+          }
+        } else {
+          const fams = uses.map(family);
+          const roleOk = (n) => fams.some((f) => okFor(f)(n));
+          for (const g of tokenGroups(t2)) places.push(__spreadValues({ type, key, allowed: g.split("|"), roleOk }, tokenName));
+        }
+      }
+      const picks = tokenReuse(places, infos);
+      if (!picks) continue;
+      const first = read.byId.get(picks[0].variable.id);
+      if (!first) continue;
+      const adds = [...new Set(picks.filter((p) => p.scopeAdd).map((p) => read.byId.get(p.variable.id)).filter((v) => !!v))];
+      out.set(name, { variable: first, rawId: (_d = picks[0].variable.rawId) != null ? _d : first.id, adds });
     }
     return out;
   }
@@ -4884,9 +5062,14 @@
     const summary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: /* @__PURE__ */ new Map(), skippedManual: 0, skippedManualNames: /* @__PURE__ */ new Set(), finalName: /* @__PURE__ */ new Map() };
     const reuseMap = readReuseMap();
     const toCreate = tokens.filter((t2) => !reuse.has(t2.name));
-    for (const [name, v] of reuse) {
-      summary.globalOf.set(name, v.id);
-      reuseMap[name] = v.id;
+    for (const [name, r] of reuse) {
+      summary.globalOf.set(name, r.rawId);
+      reuseMap[name] = r.rawId;
+      for (const v of r.adds) {
+        const type = v.resolvedType;
+        const scopes = scopesForType(scopesForSources(tokens.filter((t2) => t2.name === name).flatMap((t2) => t2.sources)), type);
+        v.scopes = mergeScopes(v.scopes, scopes, type);
+      }
     }
     if (toCreate.length) {
       const globalCol = ensureOwnedCollection(await figma.variables.getLocalVariableCollectionsAsync(), "global");
@@ -4953,7 +5136,7 @@
     return summary;
   }
   async function previewCreateTokens(tokens, base) {
-    var _a, _b, _c;
+    var _a, _b;
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const gId = (_b = (_a = ownedCollection(cols, "global")) == null ? void 0 : _a.id) != null ? _b : "#G";
     const reuse = await pickReusable(tokens, base);
@@ -4985,8 +5168,8 @@
     for (const t2 of tokens) {
       const r = reuse.get(t2.name);
       if (r) {
-        summary.globalOf.set(t2.name, r.id);
-        setState(t2.name, { state: "reuse", varName: r.name });
+        summary.globalOf.set(t2.name, r.rawId);
+        setState(t2.name, { state: "reuse", varName: r.variable.name });
         continue;
       }
       const nm = named.get(t2.name);
@@ -4995,11 +5178,7 @@
         if (nm.reuse) {
           const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
           if (v) summary.globalOf.set(t2.name, v.id);
-          const type = resolvedTypeForToken(t2);
-          const need = scopesForType(scopesForSources(t2.sources), type);
-          const cur = (_c = v == null ? void 0 : v.scopes) != null ? _c : [];
-          const scopeAdd = !!v && !cur.includes("ALL_SCOPES") && need.some((x) => !cur.includes(x) && !(cur.includes("ALL_FILLS") && ["FRAME_FILL", "SHAPE_FILL", "TEXT_FILL"].includes(x)));
-          setState(t2.name, scopeAdd ? { state: "reuse", varName: nm.name, scopeAdd: true } : { state: "reuse", varName: nm.name });
+          setState(t2.name, { state: "reuse", varName: nm.name });
           continue;
         }
         setState(t2.name, nm.name !== t2.name ? { state: "new", varName: nm.name } : { state: "new" });
@@ -5025,15 +5204,8 @@
     }
     return summary;
   }
-  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
-    const withUses = tokens.filter((t2) => {
-      var _a2;
-      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
-    });
-    if (!withUses.length) return 0;
-    const cols = await figma.variables.getLocalVariableCollectionsAsync();
-    const vars = await figma.variables.getLocalVariablesAsync();
+  function semanticIndex(cols, vars) {
+    var _a;
     const tiers = collectionTiers(cols, vars);
     const owned = ownedIds(cols);
     const byId = new Map(vars.map((v) => [v.id, v]));
@@ -5048,7 +5220,7 @@
       }
       return void 0;
     };
-    const keyOfValue = (val) => {
+    const keyOfValue2 = (val) => {
       if (val == null) return "";
       if (typeof val === "object" && "r" in val) return colorKey(rgbToHex(val), val.a);
       return typeof val === "number" || typeof val === "string" ? valueKey(val) : "";
@@ -5061,13 +5233,55 @@
     const existing = /* @__PURE__ */ new Map();
     const semByName = /* @__PURE__ */ new Map();
     for (const v of vars.filter((x) => tiers.get(x.variableCollectionId) === 2).sort((a, b) => rank(a.variableCollectionId) - rank(b.variableCollectionId))) {
-      const k = keyOfValue(resolve(v));
+      const k = keyOfValue2(resolve(v));
       const arr = existing.get(v.name);
       if (!arr) existing.set(v.name, k ? [k] : []);
       else if (k && !arr.includes(k)) arr.push(k);
       semByName.set(v.name, [...(_a = semByName.get(v.name)) != null ? _a : [], { key: k, v }]);
     }
-    const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+    return { existing, semByName };
+  }
+  var usePlaces = (t2, u) => {
+    var _a, _b;
+    return ((_a = t2.uses) != null ? _a : []).some((x) => x.free != null) ? (_b = u.free) != null ? _b : 0 : u.count;
+  };
+  var colorBaseKey = (use, hex, bg, alpha) => `${use}\0${colorSlotKey(String(hex).toLowerCase(), bg, alpha)}`;
+  function colorBasesOf(withUses, existing) {
+    var _a, _b, _c, _d;
+    const colorUses = /* @__PURE__ */ new Map();
+    for (const t2 of withUses) {
+      for (const u of (_a = t2.uses) != null ? _a : []) {
+        if (!u.name.startsWith("color/")) continue;
+        const n = usePlaces(t2, u);
+        if (!(n > 0)) continue;
+        const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
+        arr.push({ token: t2, count: n, bg: u.bg });
+        colorUses.set(u.name, arr);
+      }
+    }
+    const bases = /* @__PURE__ */ new Map();
+    const refs = /* @__PURE__ */ new Map();
+    for (const [use, list] of colorUses) {
+      const defKey = (_c = existing.get(`${use}/default`)) == null ? void 0 : _c[0];
+      const input = list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha }));
+      const b = colorRoleBases(input, defKey || void 0, use.slice("color/".length));
+      refs.set(use, colorRoleRef(input, defKey || void 0, use.slice("color/".length)));
+      for (const x of list) bases.set(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha), `${use}/${(_d = b.get(colorSlotKey(String(x.token.value).toLowerCase(), x.bg, x.token.alpha))) != null ? _d : "default"}`);
+    }
+    return { bases, refs };
+  }
+  async function createUsageRoles(tokens, preview = false, globalOf, rowsOut, finalName) {
+    var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+    const withUses = tokens.filter((t2) => {
+      var _a2;
+      return (_a2 = t2.uses) == null ? void 0 : _a2.length;
+    });
+    if (!withUses.length) return 0;
+    const cols = await figma.variables.getLocalVariableCollectionsAsync();
+    const vars = await figma.variables.getLocalVariablesAsync();
+    const byId = new Map(vars.map((v) => [v.id, v]));
+    const { existing, semByName } = semanticIndex(cols, vars);
+    const globalNames = pluginGlobalNames(cols, vars);
     const canReuse = (name, value, base) => {
       var _a2;
       if (globalNames.has(name)) return false;
@@ -5089,47 +5303,42 @@
       return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : void 0;
     };
     const reqs = [];
+    const { bases, refs } = colorBasesOf(withUses, existing);
     const colorUses = /* @__PURE__ */ new Map();
     for (const t2 of withUses) {
-      for (const u of (_b = t2.uses) != null ? _b : []) {
+      for (const u of (_a = t2.uses) != null ? _a : []) {
+        const n = usePlaces(t2, u);
+        if (!(n > 0)) continue;
         if (u.name.startsWith("color/")) {
-          const arr = (_c = colorUses.get(u.name)) != null ? _c : [];
-          arr.push({ token: t2, count: u.count, bg: u.bg });
+          const arr = (_b = colorUses.get(u.name)) != null ? _b : [];
+          arr.push({ token: t2, count: n, bg: u.bg });
           colorUses.set(u.name, arr);
-        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: u.count, token: t2 });
+        } else reqs.push({ base: u.name, value: valueKey(t2.value), count: n, token: t2 });
       }
     }
     for (const [use, list] of colorUses) {
-      const defKey = (_d = existing.get(`${use}/default`)) == null ? void 0 : _d[0];
-      const bases = colorRoleBases(
-        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-        defKey || void 0,
-        // 색 값 키여도 colorRoleBases가 hex만 본다
-        use.slice("color/".length)
-      );
-      const refHex = colorRoleRef(
-        list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-        defKey || void 0,
-        use.slice("color/".length)
-        // 쓰임별 기준값(12.12 N-D4)
-      );
+      const refHex = refs.get(use);
       for (const x of list) {
-        const hex = String(x.token.value).toLowerCase();
-        reqs.push(__spreadValues({ base: `${use}/${(_e = bases.get(colorSlotKey(hex, x.bg, x.token.alpha))) != null ? _e : "default"}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
+        reqs.push(__spreadValues({ base: (_c = bases.get(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha))) != null ? _c : `${use}/default`, value: colorKey(String(x.token.value).toLowerCase(), x.token.alpha), count: x.count, token: x.token }, refHex ? { refHex } : {}));
       }
     }
     const names = assignNames(reqs, existing, { canReuse });
+    const infos = (await readVarInfos()).infos;
     const toMake = /* @__PURE__ */ new Map();
     for (const r of reqs) {
-      const name = (_f = names.get(`${r.base}\0${r.value}`)) != null ? _f : r.base;
+      const name = (_d = names.get(`${r.base}\0${r.value}`)) != null ? _d : r.base;
       if (existing.has(name) || toMake.has(name)) continue;
+      const type = resolvedTypeForToken(r.token);
+      const need = (_g = (_f = scopeForSemanticRole(name)) != null ? _f : (_e = globalFor(r.token)) == null ? void 0 : _e.scopes) != null ? _g : scopesForType(scopesForSources(r.token.sources), type);
+      const key = type === "COLOR" ? colorKey(String(r.token.value), r.token.alpha) : type === "FLOAT" ? valueKeyOf("num", Number(r.token.value)) : String(r.token.value);
+      if (aliasCovers(infos, { type, key, need, base: r.base })) continue;
       toMake.set(name, r.token);
     }
     if (preview) {
       if (rowsOut) {
         for (const [name, t2] of toMake) {
           const id = globalOf == null ? void 0 : globalOf.get(t2.name);
-          rowsOut.push({ name, global: id && ((_g = byId.get(id)) == null ? void 0 : _g.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
+          rowsOut.push({ name, global: id && ((_h = byId.get(id)) == null ? void 0 : _h.name) || (finalName == null ? void 0 : finalName.get(t2.name)) || t2.name, token: t2.name });
         }
       }
       return toMake.size;
@@ -5142,9 +5351,9 @@
       if (!g) continue;
       const v = figma.variables.createVariable(name, col, g.resolvedType);
       for (const m of col.modes) v.setValueForMode(m.modeId, figma.variables.createVariableAlias(g));
-      v.scopes = scopesForType((_h = scopeForSemanticRole(name)) != null ? _h : g.scopes, g.resolvedType);
+      v.scopes = scopesForType((_i = scopeForSemanticRole(name)) != null ? _i : g.scopes, g.resolvedType);
       try {
-        (_i = v.setPluginData) == null ? void 0 : _i.call(v, AUTO_ROLE_KEY, "1");
+        (_j = v.setPluginData) == null ? void 0 : _j.call(v, AUTO_ROLE_KEY, "1");
       } catch (e) {
       }
       made++;
@@ -5518,7 +5727,7 @@
       else if (k && !arr.includes(k)) arr.push(k);
       byName3.set(v.name, [...(_a = byName3.get(v.name)) != null ? _a : [], { key: k, v }]);
     }
-    const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+    const globalNames = pluginGlobalNames(cols, vars);
     return { cols, existing, byName: byName3, globalNames };
   }
   async function placeTextRoleVars(reqs, globalOf) {
@@ -6167,6 +6376,8 @@
     });
   }
   async function textStyleCandidateTest(roots = []) {
+    const hasText = roots.some((r) => r.type === "TEXT" || (typeof r.findAllWithCriteria === "function" ? r.findAllWithCriteria({ types: ["TEXT"] }).length > 0 : "children" in r));
+    if (roots.length && !hasText) return () => false;
     const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
     return (t2) => !insideInstance(t2) && typeof textStyleFor(t2, styleByKey) !== "string";
   }
@@ -8175,13 +8386,12 @@
       }).map((c) => c.id));
       const globals = vars.filter((v) => globalIds.has(v.variableCollectionId));
       const hasGlobal = globals.length > 0;
-      const hasBindable = vars.some((v) => bindableIds.has(v.variableCollectionId));
       const { darkUnfilled, darkOld, darkOldManual } = darkPrereq(cols, vars);
       const tierVarList = vars.filter((v) => bindableIds.has(v.variableCollectionId));
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasGlobal, hasBindable, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+      post({ type: "PREREQ_STATE", hasGlobal, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
     } catch (e) {
     }
   }
@@ -8471,7 +8681,11 @@
         case "EXTRACT": {
           const sel = await resolveRoots(msg.nodeIds);
           const wm = await withLocalMains(sel);
-          const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys()));
+          const { tokens, warnings } = extractFromSelection(wm.roots, new Set(wm.mains.mainOf.keys()), {
+            userRadiusKeys: userRadiusKeys((await readVarInfos()).infos),
+            mainOf: wm.mains.mainOf,
+            textStyleNode: await textStyleCandidateTest(wm.roots)
+          });
           post(__spreadValues({ type: "EXTRACT_RESULT", tokens, warnings, selection: sel.length }, msg.reqId != null ? { reqId: msg.reqId } : {}));
           break;
         }
@@ -8529,7 +8743,7 @@
               },
               __spreadValues(__spreadValues(__spreadValues(__spreadValues({}, msg.skipTextStyleNodes && !msg.preview ? { skipTextStyleNode: await textStyleCandidateTest((await withLocalMains(sel)).roots) } : {}), isPaid() ? {} : { noNewRoles: true }), msg.only && !msg.preview ? { only: msg.only } : {}), msg.only && ((_a = msg.off) == null ? void 0 : _a.length) && !msg.preview ? { off: msg.off } : {})
             );
-            post(__spreadValues(__spreadValues({
+            post(__spreadValues(__spreadValues(__spreadValues({
               type: "APPLY_RESULT",
               bound: r.bound,
               skipped: r.skipped,
@@ -8548,7 +8762,7 @@
               // UI가 낡은 응답을 가려낸다
               newRoles: r.newRoles,
               counts: r.counts
-            }, r.mains ? { mains: r.mains } : {}), r.mainsBound ? { mainsBound: r.mainsBound } : {}));
+            }, r.mains ? { mains: r.mains } : {}), r.mainsBound ? { mainsBound: r.mainsBound } : {}), r.make ? { make: r.make } : {}));
             if (!msg.preview) {
               commitUndo(figma);
               selfSelect = true;

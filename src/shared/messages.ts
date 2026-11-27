@@ -104,7 +104,7 @@ export interface BindCandidate {
   mainId?: string;
   /** 9999로 붙이는 알약 반경 자리면 찾을 때 읽은 원래 값(ia-v3 §2.12 12.12 N-D5) — 연결 직전 다시 확인에 쓴다. */
   pillFrom?: number;
-  /** 무료 용도 더함(ia-v4 §2.3-7) — 붙이기 바로 전에 이 용도를 그 플러그인 Global에 더한다(용도 다시 확인은 건너뜀). */
+  /** 용도 예외(ia-v4 §2.9 S2-P3 — 유료 · 무료) — 붙이기 바로 전에 이 용도를 그 플러그인 Global(새 역할이면 가리킬 Global)에 더한다. */
   scopeAdd?: string;
 }
 
@@ -164,8 +164,6 @@ export type TextStyleApplySkipReason = 'hasStyle' | 'instance' | 'ambiguous';
 export interface TokenState {
   state: 'new' | 'update' | 'reuse' | 'manual';
   varName?: string;
-  /** reuse 가운데 실행 때 그 Global에 용도를 더하는 것(ia-v4 §4.3 "있는 변수 · 용도 더함"). */
-  scopeAdd?: boolean;
 }
 
 /** 만들기 미리보기의 Semantic 줄(IA v4 §4.3) — 역할 이름 · 가리킬 Global 이름 · 그 역할을 만든 토큰 이름. */
@@ -269,7 +267,7 @@ export type CodeToUi =
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10). tokenStates · roleRows: 미리보기만(IA v4 §4.3 — roleRows.length = roles).
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number; reqId?: number; tokenStates?: Record<string, TokenState>; roleRows?: RoleRow[] }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number; mains?: MainUnitInfo[]; mainsBound?: string[] } // mains: 함께 걸은 선택 밖 메인 단위 · mainsBound: 실제로 붙인 메인 단위 id(ia-v3 §2.11 11번). candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number; mains?: MainUnitInfo[]; mainsBound?: string[]; make?: { kind: string; value: string | number; alpha?: number; by: Record<string, number> }[] } // mains: 함께 걸은 선택 밖 메인 단위 · mainsBound: 실제로 붙인 메인 단위 id(ia-v3 §2.11 11번). candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link' | 'unused' | 'unused-delete'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩), 'unused' · 'unused-delete' = 안 쓰는 변수 읽기 · 다시 확인(페이지 단위, total 0 = 불러오는 중)
   | { type: 'UNUSED_VARS'; reqId: number; items: { id: string; kind: 'none' | 'chain' }[]; pages: number; layers: number; cancelled?: true }
   | { type: 'VARIABLES_DELETED'; reqId: number; deleted: number; skipped: number; failed: number; cancelled?: true }
@@ -284,11 +282,10 @@ export type CodeToUi =
   | { type: 'TEXT_STYLES_RESULT'; created: number; updated: number; bound: number; missing: string[]; notes: string[]; reqId?: number; applied?: number; applySkipped?: number; applyReasons?: Record<TextStyleApplySkipReason, number>; mainsApplied?: string[] } // Phase C (notes=경고 아닌 알림)
   | { type: 'TEXT_STYLES_PREVIEW'; reqId: number; rows: { styleId: string; name: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; skipReasons: Record<TextStyleSkipReason, number> }
   | { type: 'COLLECTIONS'; collections: CollectionInfo[] }
-  // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능) · 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능).
+  // #11: 단계 전제 — Global 변수 존재(시맨틱 매핑 가능). 연결할 변수가 있는가는 로컬 변수 수(tierVars + otherVars)로 본다(ia-v4 §2.9 S2-P9).
   | {
       type: 'PREREQ_STATE';
       hasGlobal: boolean;
-      hasBindable: boolean;
       /** 계층(Global·Semantic·Component) 안의 변수 수 · 그중 색 — '이미 변수 N개' 안내용. */
       tierVars?: number;
       tierColorVars?: number;

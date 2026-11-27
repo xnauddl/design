@@ -27,5 +27,7 @@ export * from './bindGroups';
 export * from './varTable';
 export * from './treeState';
 export * from './selCards';
+export * from './sameValue';
 export * from './varKind';
 export * from './krdsType';
+export { pillCorners, isPillRadius } from './usageRoles'; // 알약 판정(sameValue.ts의 판정 집합을 받는다 — ia-v4 §2.9 S2-P2)

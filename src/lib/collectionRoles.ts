@@ -80,3 +80,12 @@ export function ownedIds(cols: readonly VariableCollection[]): Set<string> {
   const o = ownedCollections(cols);
   return new Set([o.global?.id, o.semantic?.id].filter((x): x is string => !!x));
 }
+
+/**
+ * 플러그인 Global 컬렉션의 변수 이름 — 거울 판정(ia-v3 12.7 · ia-v4 §2.9 S2-P4 "뺀다"): 플러그인 Global 컬렉션 밖의 별칭 변수가
+ * 이 이름과 같으면 거울이다. 찾기(`bind.ts` readVarInfos) · `createRole` · `createUsageRoles` · `readSemanticIndex`가 같은 정의를 쓴다.
+ */
+export function pluginGlobalNames(cols: readonly VariableCollection[], vars: readonly Variable[]): Set<string> {
+  const gId = ownedCollections(cols).global?.id;
+  return new Set(gId ? vars.filter((v) => v.variableCollectionId === gId).map((v) => v.name) : []);
+}
