@@ -844,18 +844,18 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
         if (!requirePaid('textStyles', msg.reqId)) break;
         // 이름은 언제나 KRDS 규칙(heading/large… — docs/text-style-krds.md) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
-        // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
-        // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
+        // nodeIds: 목록 기준(없으면 지금 선택). make 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
+        // 쓸 표본(lastTextSamples)을 덮어쓰지 않는다(IA v4 §4.3 — S-6a 뒤 reqId는 모든 요청에 실려 make로 가린다, §4.11a ① · B.46).
         // ① 후보 읽기 — 인스턴스의 메인 컴포넌트 안 글자도 표본으로(ia-v3 §2.11 11번)
         const scanRoots = (await withLocalMains(await resolveRoots(msg.nodeIds))).roots;
         const { samples, warnings, nodeById } = await scanTextStyles(scanRoots);
-        if (msg.reqId == null) lastTextSamples = samples;
+        if (!msg.make) lastTextSamples = samples;
         const existing = await scanExistingTextStyles();
         // 앵커 없는 소수 크기 군집은 이름 짓기에서 빼 흐린 줄로(§2.11 11번 "글자 크기도 정수만")
         const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
-        // 만들기 탭(reqId) — 원격 스타일과 같은 묶음은 후보에서 뺀다(IA v4 §4.2 B.40 RT-D5). 타이포 화면 스캔은 그대로.
+        // 만들기 탭(make) — 원격 스타일과 같은 묶음은 후보에서 뺀다(IA v4 §4.2 B.40 RT-D5). 타이포 화면 스캔은 그대로.
         const anchorOf = anchorOfFor(existing);
-        const kept = msg.reqId != null && nodeById ? await dropRemoteClusters(rest, nodeById, scanRoots, (c) => anchorOf(c) !== undefined) : rest;
+        const kept = msg.make && nodeById ? await dropRemoteClusters(rest, nodeById, scanRoots, (c) => anchorOf(c) !== undefined) : rest;
         const styles = nameTextStyles(kept, existing);
         // existing은 reqId 없는 스캔에도 싣는다 — 기본 램프(rampToSpecs)의 예약 이름(docs/text-style-krds.md §6).
         const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));

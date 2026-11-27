@@ -425,6 +425,7 @@ export const STRINGS: Record<string, string> = {
   'make.runStyles': '스타일 {t}개 만들기',
   'make.needOn': '만들 값을 켜 주세요',
   'make.counting': '세는 중…',
+  'make.countFail': '세지 못했어요', // 만들 수 미리보기 실패(ia-v4 §4.3 "만들 수" · B.46)
   'make.countGR': 'Global {g}개 · Semantic {r}개',
   'make.countStyles': ' · 스타일 {t}개',
   'make.layers': 'Layer {n}',
