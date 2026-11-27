@@ -91,12 +91,11 @@ import {
   t,
   scopesForTypeList,
   hexToOklch,
-  darkValueForLight,
-  isDarkGlobalName,
-  DARK_L_MIN,
-  DARK_L_MAX,
-  darkGrayCurve,
-  contrastRatio,
+  darkStepFor,
+  lightStepOf,
+  scaleStepColor,
+  stepRefL,
+  classifyColor,
 
   isIntegerSize,
   splitDecimalClusters,
@@ -1735,72 +1734,48 @@ test('scopesForTypeList — 타입별 유효 스코프 노출', () => {
   assert.ok(!float.includes('TEXT_FILL'));
 });
 
-test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
-  // 흰색 → 어두운 색(L 낮아짐), 검정 → 밝은 색(L 높아짐)
-  const fromWhite = hexToOklch(darkValueForLight('#ffffff'));
-  const fromBlack = hexToOklch(darkValueForLight('#000000'));
-  assert.ok(fromWhite.l < 0.5, `흰색 반전 L=${fromWhite.l}`);
-  assert.ok(fromBlack.l > 0.5, `검정 반전 L=${fromBlack.l}`);
-  // 유효 hex 반환
-  assert.match(darkValueForLight('#2563eb'), /^#[0-9a-f]{6}$/);
-  // hue 보존(유채색) — 파랑 계열 유지
-  const lightH = hexToOklch('#2563eb').h;
-  const darkH = hexToOklch(darkValueForLight('#2563eb')).h;
-  assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
+test('DK-2 darkStepFor — 역할별 규칙 1–6 경계(ia-v3 13.7 D-T2)', () => {
+  const g = (use, step, extra = {}) => darkStepFor({ use, alpha: 1, achromatic: true, step, ...extra });
+  const c = (use, step) => darkStepFor({ use, alpha: 1, achromatic: false, step });
+  // 1 그림자 · 반투명
+  assert.equal(g('shadow', 900), null);
+  assert.equal(g('background', 0, { alpha: 0.5 }), null);
+  // 2 회색 배경 — 대칭에서 가운데로 한 자리
+  assert.deepEqual([0, 50, 100, 500, 900, 1000].map((s) => g('background', s)), [950, 900, 800, 500, 200, 50]);
+  // 3 회색 그 밖(inverse 포함 — 같은 쓰임 규칙)
+  assert.deepEqual([0, 200, 600, 900, 1000].map((s) => g('text', s)), [950, 800, 400, 100, 50]);
+  assert.equal(g(undefined, 900), 100, '모르는 쓰임은 규칙 3');
+  // 4 연한 강조색 · 5 짙은 끝 · 6 강조색
+  assert.deepEqual([50, 100, 200].map((s) => c('background', s)), [900, 800, 700]);
+  assert.equal(c('text', 100), 800, '연한 강조색은 쓰임과 상관없이');
+  assert.deepEqual([800, 900, 950].map((s) => c('text', s)), [200, 100, 50]);
+  assert.deepEqual([300, 400, 500, 600, 700].map((s) => c('background', s)), [300, 300, 400, 400, 500]);
 });
 
-test('DK-1 Dark 값 공식 — 명세 예 11개(ia-v3 13.7 "Dark 값 공식")', () => {
-  const ex = {
-    '#3B82F6': '#609dff', '#EF4444': '#ff6963', '#22C55E': '#39d36b', '#FBBF24': '#fcc027', '#FACC15': '#facc15',
-    '#67E8F9': '#0099a8', '#EFF6FF': '#1e2125', '#1E3A8A': '#85aaff', '#101828': '#c7cedc', '#FFFFFF': '#121212', '#000000': '#f5f5f5',
-  };
-  for (const [light, dark] of Object.entries(ex)) assert.equal(darkValueForLight(light), dark, light);
+test('DK-2 lightStepOf — 세 마디 단계 이름 · 꼴만 맞는 이름(분류 단계) · 그 밖(분류 계열 · 단계) · 유채색은 값으로', () => {
+  assert.deepEqual(lightStepOf('color/gray/900', '#171717'), { family: 'gray', step: 900, achromatic: true });
+  assert.equal(lightStepOf('color/gray/900', '#101828').achromatic, false, '푸른 회색(C 0.034)은 값으로 유채색');
+  assert.deepEqual(lightStepOf('color/blue-2/500', '#3366ff'), { family: 'blue-2', step: 500, achromatic: false });
+  assert.equal(lightStepOf('color/gray/0', '#ffffff').step, 0);
+  const mid = lightStepOf('color/indigo/500-2', '#5576ee');
+  assert.equal(mid.family, 'indigo');
+  assert.equal(mid.step, classifyColor('#5576ee').step);
+  const flat = lightStepOf('color/0066ff', '#0066ff');
+  assert.equal(flat.family, classifyColor('#0066ff').family);
+  assert.equal(lightStepOf('color/neutral/500', '#737373').achromatic, true, '이름이 gray가 아니어도 값이 무채색이면 회색');
 });
 
-test('DK-1 회색 곡선 darkGrayCurve — L이 커지면 엄격히 작아짐(21점) · 흰색 0.18 · 검정 0.97', () => {
-  let prev = Infinity;
-  for (let i = 0; i <= 20; i++) {
-    const n = darkGrayCurve(i / 20);
-    assert.ok(n < prev, `L ${i / 20}: ${n} ≥ ${prev}`);
-    prev = n;
-  }
-  assert.ok(Math.abs(darkGrayCurve(1) - DARK_L_MIN) < 1e-9);
-  assert.ok(Math.abs(darkGrayCurve(0) - DARK_L_MAX) < 1e-9);
-  assert.ok(!Number.isNaN(darkGrayCurve(1.0000001)), 'L > 1이어도 NaN 아님');
+test('DK-2 scaleStepColor — L = 단계 기준 L · 유채색은 기준 H 유지 · 회색은 채도 0.02 이하', () => {
+  const blue = scaleStepColor(100, [{ step: 600, hex: '#1570ef', name: 'color/blue/600' }]);
+  const o = hexToOklch(blue);
+  assert.ok(Math.abs(o.l - stepRefL(100)) < 0.01, `L ${o.l}`);
+  assert.ok(Math.abs(o.h - hexToOklch('#1570ef').h) < 8, `H ${o.h}`);
+  const gray = hexToOklch(scaleStepColor(500, [{ step: 900, hex: '#171717', name: 'g' }, { step: 600, hex: '#52525b', name: 'h' }]));
+  assert.ok(gray.c <= 0.0205, `C ${gray.c}`);
+  assert.ok(Math.abs(gray.l - stepRefL(500)) < 0.01);
+  assert.equal(scaleStepColor(500, []).length, 7, '기준이 없으면 무채색');
 });
 
-test('DK-1 강조색 대비 ≥ 4.5 — Dark 배경(흰색의 Dark 값) 위', () => {
-  const bg = hexToRgb(darkValueForLight('#FFFFFF'));
-  for (const h of ['#3B82F6', '#EF4444', '#22C55E', '#FBBF24', '#FACC15']) {
-    const cr = contrastRatio(hexToRgb(darkValueForLight(h)), bg);
-    assert.ok(cr >= 4.5, `${h} 대비 ${cr.toFixed(2)}`);
-  }
-});
-
-test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 않는다', () => {
-  // 단순 1-L이면 L>0.94 구간이 sRGB에서 전부 #000000이 되어 surface/surface-2가 한 색이 된다.
-  // 대역 압축 후에는 회색 램프 전체가 서로 다른 색으로 남아야 한다.
-  const ramp = ['#ffffff', '#f8f9fa', '#e9ecef', '#dee2e6', '#ced4da', '#adb5bd', '#6c757d', '#495057', '#343a40', '#212529', '#000000'];
-  const darks = ramp.map(darkValueForLight);
-  assert.equal(new Set(darks).size, ramp.length, `붕괴: ${darks.join(' ')}`);
-  assert.ok(!darks.includes('#000000'), `순수 검정 표면 생성: ${darks.join(' ')}`);
-  // 라이트가 어두워질수록 다크는 밝아진다(반전) — 순서 뒤집힘 없이 단조.
-  const ls = darks.map((h) => hexToOklch(h).l);
-  for (let i = 1; i < ls.length; i++) {
-    assert.ok(ls[i] > ls[i - 1], `단조 위반 ${ramp[i - 1]}→${ramp[i]}: ${ls[i - 1]} → ${ls[i]}`);
-  }
-  // 결과 L은 다크 대역 안(게멋 클램프는 c만 줄이므로 L은 그대로).
-  // 여유 0.005는 hex 8비트 양자화 왕복 오차(예: L 0.97 → #f5f5f5 → 0.97015) 몫.
-  const eps = 0.005;
-  for (const l of ls) assert.ok(l >= DARK_L_MIN - eps && l <= DARK_L_MAX + eps, `대역 이탈 L=${l}`);
-});
-
-test('isDarkGlobalName — 옛 dark/ 복사본 이름(채우기 · 수에서 건너뜀 — ia-v3 13.7)', () => {
-  assert.equal(isDarkGlobalName('dark/color/blue/500'), true);
-  assert.equal(isDarkGlobalName('color/blue/500'), false);
-});
-
-/* ---------- IA v3: 창 크기(400×510 고정 + 최소화 140×104) ---------- */
 test('normalizeUiSize — mini만 최소화, 예전 large·{h}·깨진 값은 전부 기본', async () => {
   const { normalizeUiSize, uiHeight, uiWidth, UI_WIDTH, UI_HEIGHT } = await import('../dist/pure.mjs');
   assert.equal(normalizeUiSize('mini'), 'mini');

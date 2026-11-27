@@ -1657,7 +1657,7 @@ button.ds-tag { border: 0; cursor: pointer; }
 
     <div class="step" id="darkCard" data-make-step="theme">
       <h2><span data-i18n="dark.title">다크 모드</span> <span class="muted lock" id="darkLock"></span></h2>
-      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="연한 배경 · 짙은 글자 색은 밝기를 뒤집고, 강조색은 밝기를 지켜 조금 밝게 해요. 회색은 푸른 기를 줄여요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.">Global 색을 다크에 맞게 바꿔 Dark 칸에 채워요</div>
+      <div class="hint" data-i18n="dark.hint" data-i18n-title="dark.hintTip" title="Global은 모드 없는 팔레트 하나예요. 배경은 어두운 스텝, 글자는 밝은 스텝, 강조색은 한두 스텝 밝은 스텝을 가리키고, 필요한 계열은 50–950 스텝을 채워요. 플러그인 Semantic만 연결하고, 직접 만든 변수 · 직접 고친 Dark 연결은 그대로 둬요.">Semantic마다 Dark에서 쓸 Global 스텝을 연결해요</div>
       <!-- 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7 D-T1) — 고르개 없음. -->
       <div class="toolbar">
         <button id="btnGenDark" class="primary ds-btn--primary" data-i18n="dark.genBtn">다크 만들기</button>
@@ -1854,8 +1854,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     // 마법사
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.hint": "Global \uC0C9\uC744 \uB2E4\uD06C\uC5D0 \uB9DE\uAC8C \uBC14\uAFD4 Dark \uCE78\uC5D0 \uCC44\uC6CC\uC694",
-    "dark.hintTip": "\uC5F0\uD55C \uBC30\uACBD \xB7 \uC9D9\uC740 \uAE00\uC790 \uC0C9\uC740 \uBC1D\uAE30\uB97C \uB4A4\uC9D1\uACE0, \uAC15\uC870\uC0C9\uC740 \uBC1D\uAE30\uB97C \uC9C0\uCF1C \uC870\uAE08 \uBC1D\uAC8C \uD574\uC694. \uD68C\uC0C9\uC740 \uD478\uB978 \uAE30\uB97C \uC904\uC5EC\uC694. \uD50C\uB7EC\uADF8\uC778 Global\uC758 \uC0C9\uB9CC \uCC44\uC6B0\uACE0, \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218 \xB7 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 \xB7 \uC9C1\uC811 \uACE0\uCE5C Dark \uCE78\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
+    "dark.hint": "Semantic\uB9C8\uB2E4 Dark\uC5D0\uC11C \uC4F8 Global \uC2A4\uD15D\uC744 \uC5F0\uACB0\uD574\uC694",
+    "dark.hintTip": "Global\uC740 \uBAA8\uB4DC \uC5C6\uB294 \uD314\uB808\uD2B8 \uD558\uB098\uC608\uC694. \uBC30\uACBD\uC740 \uC5B4\uB450\uC6B4 \uC2A4\uD15D, \uAE00\uC790\uB294 \uBC1D\uC740 \uC2A4\uD15D, \uAC15\uC870\uC0C9\uC740 \uD55C\uB450 \uC2A4\uD15D \uBC1D\uC740 \uC2A4\uD15D\uC744 \uAC00\uB9AC\uD0A4\uACE0, \uD544\uC694\uD55C \uACC4\uC5F4\uC740 50\u2013950 \uC2A4\uD15D\uC744 \uCC44\uC6CC\uC694. \uD50C\uB7EC\uADF8\uC778 Semantic\uB9CC \uC5F0\uACB0\uD558\uACE0, \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218 \xB7 \uC9C1\uC811 \uACE0\uCE5C Dark \uC5F0\uACB0\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
@@ -1894,13 +1894,14 @@ button.ds-tag { border: 0; cursor: pointer; }
     // 마법사 시퀀서 단계 결과
     "wizard.seq.stoppedPrev": "\uC774\uC804 \uB2E8\uACC4 \uC911\uB2E8\uC73C\uB85C \uAC74\uB108\uB700",
     "wizard.seq.createDone": "\uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
-    "wizard.seq.dark": "\uB2E4\uD06C \uAC12 {filled}\uAC1C \uCC44\uC6C0",
+    "wizard.seq.dark": "\uB2E4\uD06C \uC5F0\uACB0 {filled}\uAC1C",
+    "wizard.seq.darkScale": " \xB7 \uC2A4\uD15D {g}\uAC1C \uB9CC\uB4E6",
     "wizard.seq.darkModeCreated": " \xB7 \uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00",
-    "wizard.seq.darkKept": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uC0C9 {n}\uAC1C\uB294 \uADF8\uB300\uB85C",
-    "wizard.seq.darkUpToDate": "Dark \uCE78\uC774 \uBAA8\uB450 \uCC44\uC6CC\uC838 \uC788\uC74C",
+    "wizard.seq.darkKept": " \xB7 \uC9C1\uC811 \uACE0\uCE5C Semantic {n}\uAC1C\uB294 \uADF8\uB300\uB85C",
+    "wizard.seq.darkUpToDate": "Dark \uC5F0\uACB0\uC774 \uBAA8\uB450 \uB418\uC5B4 \uC788\uC74C",
     "wizard.seq.darkMigrate": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACA8\uC57C \uD574\uC694 \u2014 \uD14C\uB9C8 \uD654\uBA74\uC5D0\uC11C [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB20C\uB7EC \uC8FC\uC138\uC694",
-    "wizard.seq.darkNoTarget": "\uD50C\uB7EC\uADF8\uC778 Global\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
-    "wizard.seq.darkNothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC74C \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC5D0 \uAC12\uC744 \uB123\uC740 \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
+    "wizard.seq.darkNoTarget": "\uD50C\uB7EC\uADF8\uC778 Semantic\uC774 \uC5C6\uC5B4 \uAC74\uB108\uB700 \u2014 \uBA3C\uC800 \uD1A0\uD070\uC744 \uB9CC\uB4DC\uC138\uC694",
+    "wizard.seq.darkNothing": "\uC5F0\uACB0\uD560 Semantic\uC774 \uC5C6\uC74C \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 Semantic \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
     "wizard.seq.textStyles": "\uC2A4\uD0C0\uC77C \uC0DD\uC131 {created} \xB7 \uAC31\uC2E0 {updated}",
     "wizard.seq.textStylesLinked": " \xB7 \uAE00\uC790 {a}\uAC1C\uC5D0 \uC5F0\uACB0",
     "wizard.seq.textStylesMissing": " \xB7 \uC54C\uB9BC {k}\uAC1C",
@@ -2509,31 +2510,28 @@ button.ds-tag { border: 0; cursor: pointer; }
     "semantic.needGlobal": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C Global \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
     "dark.prereqLoading": "\uBCC0\uC218 \uBAA9\uB85D\uC744 \uBD88\uB7EC\uC624\uB294 \uC911\u2026",
     "dark.prereqNoVars": "\uBA3C\uC800 \uD1A0\uD070 \uB9CC\uB4E4\uAE30\uC5D0\uC11C \uBCC0\uC218\uB97C \uB9CC\uB4DC\uC138\uC694.",
-    "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uAC12\uC744 \uCC44\uC6B0\uB294 \uC911\u2026",
+    "dark.running": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uB9CC\uB4E4\uACE0 \uC5F0\uACB0\uD558\uB294 \uC911\u2026",
     "dark.modeAddedShort": "\uB2E4\uD06C \uBAA8\uB4DC \uCD94\uAC00 \xB7 ",
     // 다크 결과 · 띠 · 옮기기(ia-v3 13.7 D-T1 · A.25 — 임시 문구, UX 라이팅 단계에서 확정)
-    "dark.doneFill": "{modePart}Global \uC0C9 {n}\uAC1C\uC758 Dark \uCE78\uC744 \uCC44\uC6E0\uC5B4\uC694{keptPart}",
-    "dark.keptPart": " \xB7 \uC9C1\uC811 \uACE0\uCE5C \uC0C9 {k}\uAC1C\uB294 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
-    "dark.upToDate": "Dark \uCE78\uC774 \uBAA8\uB450 \uCC44\uC6CC\uC838 \uC788\uC5B4\uC694{keptPart}",
-    "dark.nothing": "\uCC44\uC6B8 \uC0C9\uC774 \uC5C6\uC5B4\uC694 \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC5D0 \uAC12\uC744 \uB123\uC740 \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
-    "dark.unfilled": "Dark \uAC12\uC774 \uC5C6\uB294 \uC0C9 {n}\uAC1C \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB85C \uCC44\uC6CC\uC694",
-    "dark.needMigrate": "\uB2E4\uD06C\uAC00 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB204\uB974\uBA74 Global\uB85C \uC62E\uACA8\uC694",
-    "dark.needMigrateManual": "\uB2E4\uD06C\uAC00 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 Semantic \uBAA8\uB4DC\uAC00 3\uAC1C \uC774\uC0C1\uC774\uB77C \uC62E\uAE38 \uC218 \uC5C6\uC5B4\uC694. \uD53C\uADF8\uB9C8\uC5D0\uC11C \uBAA8\uB4DC\uB97C 2\uAC1C\uB85C \uC904\uC5EC \uC8FC\uC138\uC694",
+    "dark.doneFill": "{modePart}Semantic {n}\uAC1C\uC758 Dark\uB97C \uC5F0\uACB0\uD588\uC5B4\uC694{scalePart}{keptPart}",
+    "dark.scalePart": " \xB7 Global \uC2A4\uD15D {g}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "dark.keptPart": " \xB7 \uC9C1\uC811 \uACE0\uCE5C Semantic {k}\uAC1C\uB294 \uADF8\uB300\uB85C \uB480\uC5B4\uC694",
+    "dark.upToDate": "Dark \uC5F0\uACB0\uC774 \uBAA8\uB450 \uB418\uC5B4 \uC788\uC5B4\uC694{scalePart}{keptPart}",
+    "dark.nothing": "\uC5F0\uACB0\uD560 Semantic\uC774 \uC5C6\uC5B4\uC694 \u2014 \uD50C\uB7EC\uADF8\uC778 Global\uC744 \uAC00\uB9AC\uD0A4\uB294 Semantic \uC0C9 \uBCC0\uC218\uAC00 \uD544\uC694\uD574\uC694",
+    "dark.unfilled": "Dark \uC5F0\uACB0\uC774 \uC5C6\uB294 Semantic {n}\uAC1C \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB85C \uC5F0\uACB0\uD574\uC694",
+    "dark.needMigrate": "Dark\uAC00 Global \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694 \u2014 [\uB2E4\uD06C \uB9CC\uB4E4\uAE30]\uB97C \uB204\uB974\uBA74 Semantic\uC73C\uB85C \uC62E\uACA8\uC694",
     "dark.migrateTitle": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uAE38\uAE4C\uC694?",
-    "dark.migrateBody": "\uC9C0\uAE08 \uB2E4\uD06C\uB294 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694. Global \uC0C9\uC758 Dark \uCE78\uC73C\uB85C \uC62E\uAE30\uACE0, Semantic\uC758 {mode} \uBAA8\uB4DC\uC640 \uC4F0\uC9C0 \uC54A\uAC8C \uB41C dark/ \uC0C9 {n}\uAC1C\uB97C \uC9C0\uC6CC\uC694. \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
-    "dark.migrateBodyNoDel": "\uC9C0\uAE08 \uB2E4\uD06C\uB294 Semantic \uBAA8\uB4DC\uC5D0 \uC788\uC5B4\uC694. Global \uC0C9\uC758 Dark \uCE78\uC73C\uB85C \uC62E\uAE30\uACE0, Semantic\uC758 {mode} \uBAA8\uB4DC\uB97C \uC9C0\uC6CC\uC694. \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
+    "dark.migrateBody": "Global\uC740 \uBAA8\uB4DC \uC5C6\uB294 \uD314\uB808\uD2B8\uB85C \uB450\uACE0, Dark\uB294 Semantic \uBAA8\uB4DC\uC5D0\uC11C Global \uC2A4\uD15D\uC744 \uAC00\uB9AC\uD0A4\uAC8C \uC62E\uACA8\uC694. \uC9C1\uC811 \uACE0\uCE5C Dark \uC0C9\uC740 \uAC19\uC740 \uAC12\uC758 \uC2A4\uD15D\uC744 \uAC00\uB9AC\uD0A4\uACE0(\uC5C6\uC73C\uBA74 \uC2A4\uD15D\uC744 \uB9CC\uB4E4\uC5B4\uC694), Global\uC758 Dark \uBAA8\uB4DC\uB294 \uC9C0\uC6CC\uC694.",
+    "dark.migrateLayers": " Global\uC5D0 \uBC14\uB85C \uC5F0\uACB0\uB41C \uB808\uC774\uC5B4\uB294 Dark\uC5D0\uC11C \uBC14\uB00C\uC9C0 \uC54A\uAC8C \uB3FC\uC694(\uC720\uB8CC [\uC5F0\uACB0]\uB85C Semantic\uC73C\uB85C \uBC14\uAFC0 \uC218 \uC788\uC5B4\uC694).",
+    "dark.migrateLost": " \uC62E\uAE38 Semantic\uC774 \uC5C6\uB294 Global\uC758 \uC9C1\uC811 \uACE0\uCE5C Dark \uAC12 {x}\uAC1C\uB294 \uC9C0\uC6CC\uC838\uC694.",
+    "dark.migrateUndo": " \u2318Z \uD55C \uBC88\uC73C\uB85C \uB418\uB3CC\uB9B4 \uC218 \uC788\uC5B4\uC694.",
     "dark.migrateGo": "\uC62E\uAE30\uACE0 \uB2E4\uD06C \uB9CC\uB4E4\uAE30",
-    "dark.migrated": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACBC\uC5B4\uC694(\uC62E\uAE34 \uC0C9 {a}\uAC1C{splitPart}{failPart}) \xB7 ",
-    "dark.migratedSplit": " \xB7 \uAC12\uC774 \uAC08\uB9B0 \uC0C9 {b}\uAC1C",
-    "dark.migratedFail": " \xB7 \uC62E\uAE30\uC9C0 \uBABB\uD55C \uC5ED\uD560 {c}\uAC1C",
-    "dark.migratedSplitTip": "\uAC12\uC774 \uAC08\uB9B0 \uC0C9 \u2014 \uAC00\uC7A5 \uB9CE\uC774 \uC4F4 \uAC12\uC73C\uB85C \uC62E\uACBC\uC5B4\uC694:",
-    "dark.migratedFailTip": "\uC62E\uAE30\uC9C0 \uBABB\uD55C \uC5ED\uD560 \u2014 Dark\uC5D0\uC11C \uBC14\uB00C\uC9C0 \uC54A\uC544\uC694:",
-    "dark.migratedDelTip": "\uC9C0\uC6B4 dark/ \uC0C9 {n}\uAC1C",
-    "dark.errMigrateModes": "Semantic\uC5D0 \uBAA8\uB4DC\uAC00 3\uAC1C \uC774\uC0C1\uC774\uB77C \uC62E\uAE30\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uBAA8\uB4DC\uB97C 2\uAC1C\uB85C \uC904\uC778 \uB4A4 \uB2E4\uC2DC \uB20C\uB7EC \uC8FC\uC138\uC694",
+    "dark.migrated": "\uB2E4\uD06C \uAD6C\uC870\uB97C \uC62E\uACBC\uC5B4\uC694(\uC62E\uAE34 Semantic {a}\uAC1C{addedPart}) \xB7 ",
+    "dark.migratedAdded": " \xB7 \uB9CC\uB4E0 \uC2A4\uD15D {g}\uAC1C",
     "dark.errNoCol": "\uCEEC\uB809\uC158\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC5B4\uC694.",
     "dark.errAddMode": "\uB2E4\uD06C \uBAA8\uB4DC\uB97C \uCD94\uAC00\uD558\uC9C0 \uBABB\uD588\uC5B4\uC694 \u2014 {why}",
     "dark.errAddModePlan": "\uD50C\uB79C\uC5D0\uC11C \uBAA8\uB4DC\uB97C \uB354 \uB9CC\uB4E4 \uC218 \uC5C6\uC744 \uC218 \uC788\uC5B4\uC694.",
-    "dark.errSameMode": "Global \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC774 Dark\uC608\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC744 Light \uB4F1\uC73C\uB85C \uBC14\uAFD4 \uC8FC\uC138\uC694",
+    "dark.errSameMode": "Semantic \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC774 Dark\uC608\uC694 \u2014 \uD53C\uADF8\uB9C8\uC5D0\uC11C \uAE30\uBCF8 \uBAA8\uB4DC \uC774\uB984\uC744 Light \uB4F1\uC73C\uB85C \uBC14\uAFD4 \uC8FC\uC138\uC694",
     // 만들기 › 타이포(텍스트 스타일)
     "textStyle.rowDelete": "\uC0AD\uC81C",
     "textStyle.scanSummary": "\uC2E0\uADDC {a} \xB7 \uB4F1\uB85D\uB428 {b}",
@@ -5189,7 +5187,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     return out;
   }
   function hasDarkTarget(vars) {
-    return vars.some((v) => v.owned === "global");
+    return vars.some((v) => v.owned === "semantic");
   }
   function makeDoneText(totals, opts) {
     var _a3, _b, _c, _d;
@@ -5224,26 +5222,18 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   function darkResultText(r) {
     const keptPart = r.kept > 0 ? t("dark.keptPart", { k: r.kept }) : "";
+    const scalePart = r.scaleAdded ? t("dark.scalePart", { g: r.scaleAdded }) : "";
     let cls = "ok";
     let body;
     if (r.targets === 0) {
       body = t("dark.nothing");
       cls = "warn";
-    } else if (r.filled === 0) body = t("dark.upToDate", { keptPart });
-    else body = t("dark.doneFill", { modePart: r.modeCreated ? t("dark.modeAddedShort") : "", n: r.filled, keptPart });
+    } else if (r.filled === 0) body = t("dark.upToDate", { scalePart, keptPart });
+    else body = t("dark.doneFill", { modePart: r.modeCreated ? t("dark.modeAddedShort") : "", n: r.filled, scalePart, keptPart });
     const m = r.migrated;
     if (!m) return { text: body, cls };
-    const head = t("dark.migrated", {
-      a: m.moved,
-      splitPart: m.split > 0 ? t("dark.migratedSplit", { b: m.split }) : "",
-      failPart: m.failed > 0 ? t("dark.migratedFail", { c: m.failed }) : ""
-    });
-    if (m.failed > 0) cls = "warn";
-    const groups = [];
-    if (m.splitNames.length) groups.push([t("dark.migratedSplitTip"), ...m.splitNames].join("\n"));
-    if (m.failedNames.length) groups.push([t("dark.migratedFailTip"), ...m.failedNames].join("\n"));
-    if (m.removedDark > 0) groups.push(t("dark.migratedDelTip", { n: m.removedDark }));
-    return __spreadValues({ text: head + body, cls }, groups.length ? { tip: groups.join("\n\n") } : {});
+    const head = t("dark.migrated", { a: m.moved, addedPart: m.added > 0 ? t("dark.migratedAdded", { g: m.added }) : "" });
+    return { text: head + body, cls };
   }
 
   // src/ui.ts
@@ -5279,7 +5269,6 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   var darkUnfilled = 0;
   var darkOld = false;
-  var darkOldManual = false;
   var lastSelCount = 0;
   var createFrom = "tokens";
   var semStatusTarget = "colorStatus";
@@ -6629,8 +6618,8 @@ button.ds-tag { border: 0; cursor: pointer; }
   var varsLoaded = false;
   function refreshDarkPrereq() {
     var _a3;
-    const hasGlobalCol = allVars.some((v) => v.owned === "global");
-    const ok = varsLoaded && hasGlobalCol;
+    const hasSemanticCol = allVars.some((v) => v.owned === "semantic");
+    const ok = varsLoaded && hasSemanticCol;
     const notice = $("darkPrereq");
     const gotoCreate = $("darkPrereqGotoCreate");
     notice.style.display = ok ? "none" : "";
@@ -6652,7 +6641,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     const prereqShown = $("darkPrereq").style.display !== "none";
     let text = "";
     if (!prereqShown) {
-      if (darkOld) text = darkOldManual ? t("dark.needMigrateManual") : t("dark.needMigrate");
+      if (darkOld) text = t("dark.needMigrate");
       else if (darkUnfilled > 0) text = t("dark.unfilled", { n: darkUnfilled });
     }
     el2.textContent = text;
@@ -6666,7 +6655,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   function openDarkMigrate(need) {
     const body = document.createElement("div");
     const para = document.createElement("p");
-    para.textContent = need.removeDark > 0 ? t("dark.migrateBody", { mode: need.mode, n: need.removeDark }) : t("dark.migrateBodyNoDel", { mode: need.mode });
+    para.textContent = t("dark.migrateBody") + t("dark.migrateLayers") + (need.lost > 0 ? t("dark.migrateLost", { x: need.lost }) : "") + t("dark.migrateUndo");
     body.appendChild(para);
     const btn = $("btnGenDark");
     let going = false;
@@ -6722,7 +6711,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     const silent = msg.reqId != null && silentReqs.delete(msg.reqId);
@@ -6992,7 +6981,6 @@ button.ds-tag { border: 0; cursor: pointer; }
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
         darkUnfilled = (_q = msg.darkUnfilled) != null ? _q : 0;
         darkOld = (_r = msg.darkOld) != null ? _r : false;
-        darkOldManual = (_s = msg.darkOldManual) != null ? _s : false;
         updateGates();
         break;
       case "LICENSE_STATUS": {
@@ -7002,7 +6990,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_t = msg.noteKind) != null ? _t : "ok");
+          setStatus("licenseStatus", msg.note, (_s = msg.noteKind) != null ? _s : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -7018,7 +7006,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         }
         saveExportFile(msg.content, msg.format);
         const saved = t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" });
-        const tail = exportStatusTail((_u = msg.clashes) != null ? _u : [], (_v = msg.globalDupes) != null ? _v : [], msg.globalDupesFrom);
+        const tail = exportStatusTail((_t = msg.clashes) != null ? _t : [], (_u = msg.globalDupes) != null ? _u : [], msg.globalDupesFrom);
         setStatus("exportStatus", tail ? `${saved} ${tail}` : saved, tail ? "warn" : "ok");
         break;
       }
@@ -8239,6 +8227,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           else {
             const r = await wizardRequest({ type: "GENERATE_DARK_MODE" }, ["DARK_MODE_RESULT"]);
             const keptPart = r.kept ? t("wizard.seq.darkKept", { n: r.kept }) : "";
+            const scalePart = r.scaleAdded ? t("wizard.seq.darkScale", { g: r.scaleAdded }) : "";
             if (r.error) {
               results.push({ id, mark: "warn", text: r.error });
               stay = true;
@@ -8248,10 +8237,10 @@ button.ds-tag { border: 0; cursor: pointer; }
             } else if (!r.targets) {
               results.push({ id, mark: "warn", text: t("wizard.seq.darkNothing") });
               stay = true;
-            } else if (!r.filled) results.push({ id, mark: "ok", text: t("wizard.seq.darkUpToDate") + keptPart });
+            } else if (!r.filled) results.push({ id, mark: "ok", text: t("wizard.seq.darkUpToDate") + scalePart + keptPart });
             else {
               totals.darkFilled = r.filled;
-              results.push({ id, mark: "ok", text: t("wizard.seq.dark", { filled: r.filled }) + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + keptPart });
+              results.push({ id, mark: "ok", text: t("wizard.seq.dark", { filled: r.filled }) + scalePart + (r.modeCreated ? t("wizard.seq.darkModeCreated") : "") + keptPart });
             }
           }
         } else if (id === "textStyles") {

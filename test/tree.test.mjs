@@ -60,8 +60,7 @@ test('buildRenameTree — 바꿀 줄과 그 조상만, 이름 그대로인 조�
 });
 
 test('용어 — 화면 문구에 Semantic 변수 뜻의 "역할"이 남지 않음(§2.4, 텍스트 스타일 이름의 역할은 예외)', () => {
-  // dark.migratedFail · dark.migratedFailTip은 ia-v3 A.25 키 표 글 그대로(임시 문구 — UX 라이팅 PR에서 확정, A.25 구현 메모).
-  const allowed = new Set(['textStyle.noteLhPx', 'textStyle.noteLsPx', 'dark.migratedFail', 'dark.migratedFailTip']);
+  const allowed = new Set(['textStyle.noteLhPx', 'textStyle.noteLsPx']);
   const left = Object.entries(STRINGS).filter(([k, v]) => typeof v === 'string' && v.includes('역할') && !allowed.has(k)).map(([k]) => k);
   assert.deepEqual(left, []);
 });

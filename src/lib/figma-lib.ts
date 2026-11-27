@@ -38,8 +38,8 @@ export { assignNames, bgKindOf, byFamilyOrder, colorRoleBases, colorRoleRef, col
 export type { BindResult } from './bind';
 export { renameSelection, writeRole, writeRoleFromName, stripRootPrefix, nameHintRole } from './rename';
 export type { RenameOutcome } from './rename';
-export { generateDarkMode, ensureDarkMode, findModeByName, oldDarkMode, countDarkUnfilled, darkPrereq, readDarkFill, hex8, darkChangedBeforeError, DARK_MODE_NAME, DARK_FILL_KEY } from './themeApply';
-export type { DarkMigrated, DarkFillEntry, DarkFillRecord } from './themeApply';
+export { generateDarkMode, ensureDarkMode, findModeByName, globalDarkMode, countDarkUnfilled, darkPrereq, readDarkFill, readDarkPick, hex8, darkChangedBeforeError, DARK_MODE_NAME, DARK_FILL_KEY, DARK_PICK_KEY } from './themeApply';
+export type { DarkMigrated, DarkFillEntry, DarkFillRecord, DarkPickEntry, DarkPickRecord } from './themeApply';
 export type { DarkModeResult } from './themeApply';
 export { applyVariableToNodes, SKIP_REASONS } from './applyVar';
 export type { ApplyVarResult, SkipReason } from './applyVar';
