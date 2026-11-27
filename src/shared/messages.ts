@@ -63,6 +63,8 @@ export interface RenameNode {
   parentId: string | null;
   /** 리네임 후 이름. 존재 시 영향 노드(체크 가능). */
   after?: string;
+  /** 사람이 지은 이름이라 이름을 지키고 역할만 기록하는 노드(ia-v4 §4.4 "S-2b 이름 보존") — 적용 때 `dsKept`를 기록한다(SC-D51). */
+  kept?: boolean;
   /** 이름을 지킨 이유(#7b). 있으면 대상이 아니라는 뜻 — 미리보기에서 흐린 행으로 보인다.
    *  없고 after도 없으면 '역할이 지금 이름과 같아 바꿀 게 없는' 평범한 맥락 노드다. */
   keep?: KeepReason;
@@ -222,7 +224,7 @@ export type UiToCode =
   | { type: 'RENAME'; apply: boolean; maxDepth: number; nodeIds?: string[]; reqId?: number }
   | { type: 'UNBIND_DELETED'; reqId: number; nodeIds?: string[] } // 삭제된 변수 연결 풀기(IA v4 §4.1 카드 3)
   // role: 미리보기가 판정한 역할 — 적용 시 `dsRole`로 남긴다(이름 정리 · 텍스트 스타일 label 판정이 읽는다).
-  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
+  | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string; kept?: boolean }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
   | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
