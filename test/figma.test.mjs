@@ -5671,6 +5671,17 @@ test('S-3a 다크 모드 보존 — 기본 값이 같은 다른 원시값(사용
   assert.equal(Object.values(roleOf(fresh).valuesByMode)[0].id, u.id);
 });
 
+test('S-3a 소수 값도 바꾼다 — 소수 간격(10.5)에 붙은 플러그인 Global은 후보(fromId) · 0 이하만 이미 연결됨 (구현 검토 중대 1)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/10.5', category: 'gap', sources: ['gap'], value: 10.5 }], 16);
+  const g = figma._state.variables.find((v) => Object.values(v.valuesByMode)[0] === 10.5);
+  assert.ok(g, '소수 간격 Global');
+  const a = s3aFrame('a', 10.5, s3aBound(g.id));
+  const dry = await bindSelection([a], false);
+  assert.equal(dry.candidates.length, 1);
+  assert.equal(dry.candidates[0].fromId, g.id);
+});
+
 test('S-3a 바꾸지 않는 자리 — 사용자 컬렉션 변수 · Semantic에 붙은 자리는 이미 연결됨 그대로', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'spacing/52', category: 'gap', sources: ['gap'], value: 52 }], 16);

@@ -3309,7 +3309,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       const isColor = kind === "color";
       const value = isColor ? c.currentValue : c.pillFrom != null ? 9999 : Number(c.currentValue);
       if (!tokenable(kind, value)) continue;
-      if (libs.length) {
+      if (libs.length && !c.fromId) {
         const g = placeGroupKey(c.field, (_a3 = nodeTypeOf(c.nodeId)) != null ? _a3 : "");
         const mk = `${kind}\0${value}\0${(_b = c.currentAlpha) != null ? _b : 1}\0${g}`;
         let same = libMemo.get(mk);
@@ -8267,7 +8267,8 @@ button.ds-tag { border: 0; cursor: pointer; }
             const sendToks = mkSendTokens();
             const only = onlyItems(sendToks, libs);
             const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
-            const r = only.length ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
+            const sent = only.length || isPaid ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
+            const r = sent && (only.length || sent.bound > 0) ? sent : null;
             const n = (_e = r == null ? void 0 : r.bound) != null ? _e : 0;
             if (r) {
               totals.bound = r.bound;

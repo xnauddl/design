@@ -3385,9 +3385,12 @@ async function runMake(): Promise<void> {
           const only = onlyItems(sendToks, libs);
           // 꺼진 줄(보내지 않은 추출 토큰)의 값 — 끈 값만 남은 0곳을 가린다(B.36). ②로 빼지 않는다.
           const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
-          const r = only.length
+          // 켠 값이 없으면 변수 연결은 건너뛴다(④는 돈다) — 단 유료는 Global에서 바꿀 자리를 위해 빈 거름(`only: []` — 바꿀 자리만 지남)으로
+          // 보내고, 바꾼 것이 없으면 보내지 않은 것과 같게 본다(ia-v4 §2.9a — SC-D54).
+          const sent = only.length || isPaid
             ? await wizardRequest({ type: 'APPLY', preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only, ...(off.length ? { off } : {}) }, ['APPLY_RESULT'], wizBindReq)
-            : null; // 켠 값이 없으면 변수 연결은 건너뛴다(④는 돈다)
+            : null;
+          const r = sent && (only.length || sent.bound > 0) ? sent : null;
           const n = r?.bound ?? 0;
           if (r) {
             totals.bound = r.bound;

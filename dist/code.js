@@ -2464,9 +2464,8 @@
   function fieldAliases(node, field) {
     const bv = node.boundVariables;
     const entry = bv == null ? void 0 : bv[field];
-    if (entry) return Array.isArray(entry) ? entry : [entry];
-    if (field === "strokeWeight") return STROKE_SIDE_FIELDS.map((f) => bv == null ? void 0 : bv[f]);
-    return [];
+    const own = entry ? Array.isArray(entry) ? entry : [entry] : [];
+    return field === "strokeWeight" ? [...own, ...STROKE_SIDE_FIELDS.map((f) => bv == null ? void 0 : bv[f])] : own;
   }
   function textAliases(node, field) {
     const getRange = node.getRangeBoundVariable;
@@ -2494,7 +2493,8 @@
       return;
     }
     const v = kind === "num" ? from.num : (_b = from.num) != null ? _b : from.str;
-    const bad = typeof v === "number" && (isFrac(v) || (kind === "num" ? round2(v) <= 0 : base.field === "lineHeight" && v <= 0 || base.field === "letterSpacing" && v === 0));
+    const stroke = /^stroke(Top|Right|Bottom|Left)?Weight$/.test(base.field);
+    const bad = typeof v === "number" && (kind === "num" ? round2(v) <= 0 || stroke && isFrac(v) : base.field === "lineHeight" && v <= 0 || base.field === "letterSpacing" && v === 0);
     if (v == null || bad) {
       note(ctx.res, "already-bound", base.node, ctx.preview, base.field);
       return;
@@ -2899,7 +2899,7 @@
     }, usage ? { usage } : {}), s.kind === "num" && group && typeof s.value === "number" ? { tokenName: numberTokenName(group, round2(s.value)) } : {}), s.kind === "text" ? { textGroup: s.usage.split("/")[0] } : {}), s.noMatchReason === "no-match" && s.kind !== "text" ? { make: __spreadValues({ kind, value: s.kind === "color" ? s.display : round2(s.value) }, s.alpha != null ? { alpha: s.alpha } : {}) } : {});
   }
   function resolveSlots(ctx) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _i;
+    var _a, _b, _c, _d, _e, _f, _g;
     const { res, preview } = ctx;
     const infos = ctx.index.infos;
     const emit = (s, e, scopeAdd) => {
@@ -2988,31 +2988,30 @@
       else pendOf(s, e, pick.scopeAdd);
     }
     if (!pending.length) return;
-    const names = assignNames(
-      pending.map((p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {})),
-      ctx.index.semNames,
-      { reuse: false }
-    );
+    const reqOf = (p) => __spreadValues({ base: p.base, value: valueKey(p.slot.value), count: 1 }, p.refHex ? { refHex: p.refHex } : {});
+    const keyOfP = (p) => `${p.base}\0${valueKey(p.slot.value)}`;
+    const names = assignNames(pending.filter((p) => !p.slot.fromId).map(reqOf), ctx.index.semNames, { reuse: false });
+    const swapRest = pending.filter((p) => p.slot.fromId && !names.has(keyOfP(p)));
+    if (swapRest.length) {
+      const taken = new Map([...ctx.index.semNames].map(([n, v]) => [n, v]));
+      for (const [k, n] of names) taken.set(n, [...(_e = taken.get(n)) != null ? _e : [], k.split("\0")[1]]);
+      for (const [k, n] of assignNames(swapRest.map(reqOf), taken, { reuse: false })) names.set(k, n);
+    }
     const nameOf = (p) => {
       var _a2;
-      return (_a2 = names.get(`${p.base}\0${valueKey(p.slot.value)}`)) != null ? _a2 : p.base;
+      return (_a2 = names.get(keyOfP(p))) != null ? _a2 : p.base;
     };
     const fallbackName = /* @__PURE__ */ new Map();
     if (pending.some((p) => p.rawOf)) {
-      const rawsOf = /* @__PURE__ */ new Map();
-      for (const p of pending) {
-        const n = nameOf(p);
-        const r = (_e = p.rawOf) != null ? _e : rawOfEntry(p.global);
-        const set = rawsOf.get(n);
-        if (set) set.add(r);
-        else rawsOf.set(n, /* @__PURE__ */ new Set([r]));
-      }
-      const used = /* @__PURE__ */ new Set([...ctx.index.semNames.keys(), ...rawsOf.keys()]);
+      const owner = /* @__PURE__ */ new Map();
+      for (const p of pending) if (!p.rawOf && !owner.has(nameOf(p))) owner.set(nameOf(p), rawOfEntry(p.global));
+      for (const p of pending) if (p.rawOf && !owner.has(nameOf(p))) owner.set(nameOf(p), p.rawOf);
+      const used = /* @__PURE__ */ new Set([...ctx.index.semNames.keys(), ...pending.map(nameOf)]);
       const moved = /* @__PURE__ */ new Map();
       for (const p of pending) {
         if (!p.rawOf) continue;
         const n = nameOf(p);
-        if (((_g = (_f = rawsOf.get(n)) == null ? void 0 : _f.size) != null ? _g : 0) < 2) continue;
+        if (owner.get(n) === p.rawOf) continue;
         const k = `${n}\0${p.rawOf}`;
         let nn = moved.get(k);
         if (!nn) {
@@ -3025,11 +3024,11 @@
     }
     const scopesOfRole = /* @__PURE__ */ new Map();
     for (const p of pending) {
-      const name = (_h = fallbackName.get(p)) != null ? _h : nameOf(p);
+      const name = (_f = fallbackName.get(p)) != null ? _f : nameOf(p);
       const g = p.global;
       let scopes = scopesOfRole.get(name);
       if (!scopes) {
-        scopes = (_i = scopeForSemanticRole(name)) != null ? _i : g.scopes;
+        scopes = (_g = scopeForSemanticRole(name)) != null ? _g : g.scopes;
         scopesOfRole.set(name, scopes);
       }
       res.bound++;

@@ -33,6 +33,7 @@ import {
   textUsageName,
   valueKey,
   type BgKind,
+  type NameRequest,
   type ColorUse as ColorUseName,
   type Padding,
 } from './usageRoles'; // 쓰임 이름 역할(§2.12)
@@ -344,9 +345,9 @@ function colorAliases(x: Paint | Effect, node: SceneNode, field: 'fills' | 'stro
 function fieldAliases(node: SceneNode, field: string): unknown[] {
   const bv = (node as unknown as { boundVariables?: Record<string, unknown> }).boundVariables;
   const entry = bv?.[field];
-  if (entry) return Array.isArray(entry) ? entry : [entry];
-  if (field === 'strokeWeight') return STROKE_SIDE_FIELDS.map((f) => bv?.[f]);
-  return [];
+  const own = entry ? (Array.isArray(entry) ? entry : [entry]) : [];
+  // 선 두께는 하나로 볼 때 방향별 넷의 기록도 모두(§2.9a "기록 모두")
+  return field === 'strokeWeight' ? [...own, ...STROKE_SIDE_FIELDS.map((f) => bv?.[f])] : own;
 }
 /** 글자 속성의 별칭 — 전 구간 조회가 그 변수 하나일 때만(일부 구간 · 구간마다 다르면 빈 목록). */
 function textAliases(node: TextNode, field: VariableBindableTextField): unknown[] {
@@ -373,7 +374,9 @@ function pushSwap(ctx: Ctx, from: VarEntry, base: Omit<Slot, 'kind' | 'value' | 
     return;
   }
   const v = kind === 'num' ? from.num : from.num ?? from.str;
-  const bad = typeof v === 'number' && (isFrac(v) || (kind === 'num' ? round2(v) <= 0 : (base.field === 'lineHeight' && v <= 0) || (base.field === 'letterSpacing' && v === 0)));
+  // 만들기가 뽑지 않는 값만 거른다(0 이하 · 행간 0 이하 · 자간 0) — 소수는 선 두께만(정수만 붙이는 규칙, §2.11). 투명도 · 소수 간격도 바꾼다.
+  const stroke = /^stroke(Top|Right|Bottom|Left)?Weight$/.test(base.field);
+  const bad = typeof v === 'number' && (kind === 'num' ? round2(v) <= 0 || (stroke && isFrac(v)) : (base.field === 'lineHeight' && v <= 0) || (base.field === 'letterSpacing' && v === 0));
   if (v == null || bad) { note(ctx.res, 'already-bound', base.node, ctx.preview, base.field); return; }
   ctx.slots.push({ ...base, kind, value: v, display: String(v), noMatchReason: 'already-bound', fromId: from.variable.id });
 }
@@ -1101,29 +1104,31 @@ function resolveSlots(ctx: Ctx): void {
 
   // 유료 — 원시값 변수는 그것을 가리키는 새 역할로 감싼다(S2-P6). 이름 번호는 한꺼번에(곳 수 순).
   // 재사용은 후보 고르기가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
-  const names = assignNames(
-    pending.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
-    ctx.index.semNames,
-    { reuse: false },
-  );
-  const nameOf = (p: Pending): string => names.get(`${p.base}\u0000${valueKey(p.slot.value)}`) ?? p.base;
+  // 이름은 연결 안 된 자리 요청만으로 먼저 짓는다(곳 수 · 기준색이 바꿀 자리에 흔들리지 않게 — §2.9a). 바꿀 자리는 같은 밑이름 · 값의
+  // 이름이 있으면 그것을 나눠 쓰고(원시값이 다르면 아래에서 꼬리), 없으면 이미 지은 이름을 피해 따로 짓는다.
+  const reqOf = (p: Pending): NameRequest => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) });
+  const keyOfP = (p: Pending): string => `${p.base}\u0000${valueKey(p.slot.value)}`;
+  const names = assignNames(pending.filter((p) => !p.slot.fromId).map(reqOf), ctx.index.semNames, { reuse: false });
+  const swapRest = pending.filter((p) => p.slot.fromId && !names.has(keyOfP(p)));
+  if (swapRest.length) {
+    const taken = new Map<string, readonly string[]>([...ctx.index.semNames].map(([n, v]) => [n, v]));
+    for (const [k, n] of names) taken.set(n, [...(taken.get(n) ?? []), k.split('\u0000')[1]]);
+    for (const [k, n] of assignNames(swapRest.map(reqOf), taken, { reuse: false })) names.set(k, n);
+  }
+  const nameOf = (p: Pending): string => names.get(keyOfP(p)) ?? p.base;
   // 폴백 자리(§2.9a)의 이름이 원시값이 다른 같은 이름의 새 역할 요청과 겹치면 그 폴백 자리만 다음 꼬리로(이미 있는 이름 · 이번 이름 모두 피함).
   const fallbackName = new Map<Pending, string>();
   if (pending.some((p) => p.rawOf)) {
-    const rawsOf = new Map<string, Set<string>>();
-    for (const p of pending) {
-      const n = nameOf(p);
-      const r = p.rawOf ?? rawOfEntry(p.global);
-      const set = rawsOf.get(n);
-      if (set) set.add(r);
-      else rawsOf.set(n, new Set([r]));
-    }
-    const used = new Set<string>([...ctx.index.semNames.keys(), ...rawsOf.keys()]);
+    // 이름마다 주인 원시값 = 폴백 아닌 첫 요청의 원시값(없으면 첫 폴백의 것) — 주인과 원시값이 다른 폴백만 옮긴다.
+    const owner = new Map<string, string>();
+    for (const p of pending) if (!p.rawOf && !owner.has(nameOf(p))) owner.set(nameOf(p), rawOfEntry(p.global));
+    for (const p of pending) if (p.rawOf && !owner.has(nameOf(p))) owner.set(nameOf(p), p.rawOf);
+    const used = new Set<string>([...ctx.index.semNames.keys(), ...pending.map(nameOf)]);
     const moved = new Map<string, string>(); // `${이름}\u0000${원시값}` → 새 이름(같은 원시값의 폴백끼리 나눠 씀)
     for (const p of pending) {
       if (!p.rawOf) continue;
       const n = nameOf(p);
-      if ((rawsOf.get(n)?.size ?? 0) < 2) continue;
+      if (owner.get(n) === p.rawOf) continue;
       const k = `${n}\u0000${p.rawOf}`;
       let nn = moved.get(k);
       if (!nn) {
