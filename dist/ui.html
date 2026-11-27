@@ -548,18 +548,33 @@ button.ds-tag { border: 0; cursor: pointer; }
 .ds-chip__alias { color: var(--chip-alias-text); }
 .ds-chip__value { background: var(--chip-value-bg); color: var(--chip-value-text); }
 /* src/ui/components/toast.css */
-/* Toast — design-system §6.5(새로 — 상태 줄 대신은 DS-3b). 한 번에 하나. */
-.ds-toast {
-  position: fixed; left: var(--space-3); right: var(--space-3); bottom: var(--space-3); z-index: var(--z-tooltip);
-  display: flex; align-items: center; gap: var(--space-2); margin: 0 auto; max-width: max-content;
-  padding: var(--space-2) var(--space-3); border-radius: var(--radius-large); box-shadow: var(--elevation-2);
-  background: var(--color-surface-inverse); color: var(--color-text-inverse); font: var(--text-body-sm);
+/* Toast — design-system §6.5 · ia-v4 §4.1b "결과 알림 — Toast 하나"(DS-3b · S3-P4 · S3-D14–S3-D17). 한 번에 하나.
+   담는 곳 #toastHost는 늘 있고 창 아래 가운데에 고정 — 아래 띄움은 --toast-bottom(ui.ts가 아래 고정 줄을 보고 정함). */
+.ds-toast-host {
+  position: fixed; left: var(--space-3); right: var(--space-3); bottom: var(--toast-bottom, var(--space-3)); z-index: var(--z-tooltip);
+  pointer-events: none;
 }
-.ds-toast__text { flex: 1 1 auto; min-width: 0; }
-.ds-toast__action { color: inherit; font-weight: var(--font-weight-semibold); }
-.ds-toast > .ds-icbtn { color: var(--color-text-inverse); }
-.ds-toast > .ds-icbtn:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-inverse); }
-.ds-toast[hidden] { display: none; }
+.ds-toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-small); box-shadow: var(--elevation-2);
+  background: var(--color-state-info-subtle); color: var(--color-text-primary);
+  font: var(--font-weight-regular) var(--font-size-md)/var(--line-height-md) var(--font-family-sans);
+}
+.ds-toast--success { background: var(--color-state-success-subtle); }
+.ds-toast--warning { background: var(--color-state-warning-subtle); }
+.ds-toast--error { background: var(--color-state-error-subtle); }
+.ds-toast > .ds-ic { flex: none; width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-state-info); }
+.ds-toast--success > .ds-ic { color: var(--color-state-success); }
+.ds-toast--warning > .ds-ic { color: var(--color-state-warning); }
+.ds-toast--error > .ds-ic { color: var(--color-state-error); }
+/* 글은 자르지 않는다 — 줄 수 제한 없이 줄바꿈(S3-D15). */
+.ds-toast__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ds-toast__action.ds-btn--link { flex: none; color: inherit; font: inherit; font-weight: var(--font-weight-semibold); line-height: var(--line-height-md); }
+.ds-toast__action.ds-btn--link:hover:not(:disabled):not([aria-disabled="true"]) { color: inherit; }
+/* 닫기 — 보이는 아이콘 16, 누르는 자리 24(위아래 −4px로 한 줄 높이 32를 지킴). 마우스를 올려도 바탕 없음. */
+.ds-toast > .ds-icbtn { flex: none; margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0; color: var(--color-text-secondary); }
+.ds-toast > .ds-icbtn:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
 /* src/ui/components/toggle.css */
 /* Toggle — design-system §6.2(클래스만 — 지금 .bv-switch는 DS-3). 트랙 28×16, 누르는 곳 32×24. */
 .ds-toggle {
@@ -620,7 +635,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     [hidden] { display: none !important; }
     body {
       font: var(--font-weight-regular) var(--font-size-md)/var(--line-height-normal) var(--font-family-sans);
-      margin: 0; padding: var(--space-3) var(--space-3) var(--space-10); /* 아래 36 = 공통 상태 줄(24) + 여백 */
+      margin: 0; padding: var(--space-3) var(--space-3) calc(var(--space-3) + var(--foot-h, 0px) + var(--toast-space-body, 0px)); /* 아래 여백 + 보이는 아래 고정 줄 높이 + Toast가 떠 있는 동안 비우는 높이(ia-v4 §4.1b "자리") */
       color: var(--color-text-primary); background: var(--color-background-primary);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -669,7 +684,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     .step.collapsed .step-body { display: none; }
 
     /* ── 버튼 ── 모양 · 상태는 src/ui/components/button.css(design-system §6.1 · §6.9). 여기는 자리만. */
-    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다(버튼 밖 요소도). */
+    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 Toast로 사유(DS-3b). opacity는 쓰지 않는다(버튼 밖 요소도). */
     [aria-disabled="true"] { color: var(--color-text-tertiary); cursor: not-allowed; box-shadow: none; }
     label.inline:has(input[aria-disabled="true"]) { color: var(--color-text-tertiary); cursor: not-allowed; }
 
@@ -760,7 +775,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: var(--space-10) var(--space-2); text-align: center; }
     /* IA v4 §4.2 연결 화면 */
-    .sub-foot { position: sticky; bottom: 24px; display: flex; align-items: center; gap: var(--space-2); min-height: 52px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: var(--space-2); }
+    .sub-foot { display: flex; align-items: center; gap: var(--space-2); min-height: 52px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); }
 
     /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
     .steps { display: grid; gap: var(--space-1); margin: 0 0 var(--space-3); }
@@ -1218,7 +1233,10 @@ button.ds-tag { border: 0; cursor: pointer; }
     .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: none; font: var(--font-weight-semibold) var(--font-size-xs)/var(--line-height-xs) var(--font-family-sans); color: var(--color-text-secondary); cursor: help; flex: 0 0 auto; }
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
-    .make-foot { position: sticky; bottom: 24px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: var(--space-2); padding: var(--space-2) 0 var(--space-2); z-index: var(--z-sticky); }
+    .make-foot { background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); padding-top: var(--space-2); padding-bottom: var(--space-2); z-index: var(--z-sticky); }
+    /* 아래 고정 줄은 창 바닥 · 가로 전체(design-system §5 Bottom Action Bar · ia-v4 §4.1b S3-D10 — DS-3b 실기 뒤): 카드 안에 있어도 창에 고정한다.
+       내용이 짧아도 줄은 창 바닥에 있고, 본문 아래에는 줄 높이(--foot-h)만큼 여백을 둔다. 글은 카드 안 글과 같은 세로선에서 시작한다. */
+    .sub-foot, .make-foot { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding-left: var(--space-6); padding-right: var(--space-6); z-index: var(--z-sticky); }
     /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
     .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }
     .make-opts { display: flex; align-items: center; gap: var(--space-0-5); height: var(--size-compact); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; }
@@ -1280,7 +1298,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       background: linear-gradient(to right, transparent 127px, var(--color-border-default) 127px 128px, transparent 128px) no-repeat; }
     .vl-side {
       width: 128px; flex: 0 0 128px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
-      max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--color-border-default);
+      max-height: calc(100vh - var(--side-top, 75px) - var(--toast-space-side, 0px)); overflow-y: auto; border-right: 1px solid var(--color-border-default);
       padding: var(--space-1) var(--space-1); background: var(--color-surface-primary);
     }
     .vs-item { display: flex; align-items: center; gap: var(--nav-item-gap); height: 28px; min-height: 28px; padding: 0 var(--space-2); border-radius: var(--radius-small); color: var(--color-text-primary); cursor: pointer; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); }
@@ -1376,18 +1394,6 @@ button.ds-tag { border: 0; cursor: pointer; }
 
     /* ── 하위 화면 돌아가기 링크 ── */
     .back-link { display: inline-block; margin: 0 0 var(--space-3); padding: var(--space-1) 0; min-height: 24px; }
-
-    /* ── 공통 상태 줄(§4.1) — 창 맨 아래 고정, 높이 24, 한 줄 말줄임. 끝 버튼은 말줄임 밖. ── */
-    .status-line {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-fixed); height: 24px;
-      display: flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-3);
-      background: var(--color-surface-secondary); border-top: 1px solid var(--color-border-default);
-      font-size: var(--font-size-sm); color: var(--color-text-secondary);
-    }
-    .status-line .sl-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .status-line .sl-action { flex: 0 0 auto; font-size: var(--font-size-sm); min-height: 20px; }
-    .status-line.ok .sl-text { color: var(--color-state-success); }
-    .status-line.warn .sl-text { color: var(--color-state-warning); }
 
     /* ── 최소화(§4.9) — 창 140×104(Tokens Studio처럼 작은 사각형). 펼친 내용은 숨기고 가운데 펼치기 버튼만. ── */
     body.is-mini { padding: 0; overflow: hidden; }
@@ -1743,12 +1749,6 @@ button.ds-tag { border: 0; cursor: pointer; }
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
-  <!-- 공통 상태 줄(§4.1) — 창 맨 아래 고정, 모든 탭 공통. 알림은 여기서만 한다. 버튼은 말줄임 밖. -->
-  <div class="status-line" id="statusLine" aria-live="polite">
-    <span class="sl-text" id="statusText"></span>
-    <button class="link sl-action ds-btn--link" id="statusAction" type="button" hidden></button>
-  </div>
-
   <!-- 최소화 상태(§4.9) — 창 140×104, 가운데 펼치기 버튼(↙↗)만. 누르면 펼친다. -->
   <div class="mini" id="miniView" hidden>
     <button class="mini-mark" id="btnExpand" type="button" data-i18n-aria-label="ui.expand" aria-label="펼치기">
@@ -1781,6 +1781,9 @@ button.ds-tag { border: 0; cursor: pointer; }
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
   <div id="overlayRoot"></div>
+
+  <!-- 결과 알림 Toast(ia-v4 §4.1b — DS-3b) — 늘 있는 담는 곳. body 바로 아래 · #overlayRoot 밖이라 최소화 중 숨김 규칙에 든다. -->
+  <div class="ds-toast-host" id="toastHost" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <script>
 "use strict";
@@ -2146,7 +2149,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     "bind.skippedPlacesChip": "\uAC74\uB108\uB6F4 \uACF3",
     "bind.skipSelectBtn": "\uC120\uD0DD \u203A",
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
-    "v4.linked": "\u{1F517} {n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
+    "v4.linked": "{n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
     "v4.tsPlaces": "Text Style {t}\uACF3",
     "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
@@ -2254,10 +2257,18 @@ button.ds-tag { border: 0; cursor: pointer; }
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
     "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
     "make.done.stylesLinked": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C(\uAE00\uC790 {a}\uAC1C)",
-    "make.done.bind": "{n}\uACF3 \uC5F0\uACB0",
     "make.done.rename": "\uC774\uB984 {c}\uAC1C \uC815\uB9AC",
     "make.done.manual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uAC74\uB108\uB700 {m}",
     "make.done.notLinked": "\uC5F0\uACB0\uC740 \uC544\uC9C1 \uC548 \uD588\uC5B4\uC694",
+    "make.done.madeG": "Global \uBCC0\uC218 {g}\uAC1C",
+    "make.done.madeR": "Semantic \uBCC0\uC218 {r}\uAC1C",
+    "make.done.places": "{n}\uACF3",
+    "make.done.placesTs": "{n}\uACF3 \xB7 Text Style {t}\uACF3",
+    "make.done.placesTsOnly": "Text Style {t}\uACF3",
+    "make.done.noPlace": "\uBCC0\uC218\uB97C \uC5F0\uACB0\uD55C \uACF3\uC740 \uC5C6\uC5B4\uC694",
+    "make.done.sentCreateBind": "{c}\uB97C \uB9CC\uB4E4\uACE0 {b}\uC5D0 \uC5F0\uACB0\uD588\uC5B4\uC694",
+    "make.done.sentCreate": "{c}\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694",
+    "make.done.sentBind": "{b}\uC5D0 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "common.view": "\uBCF4\uAE30",
     "textStyle.linkNow": "\uB808\uC774\uC5B4\uC5D0 \uBC14\uB85C \uC5F0\uACB0",
     "textStyle.linkNeedScan": "\uB808\uC774\uC5B4\uB97C \uC120\uD0DD\uD558\uACE0 \uC2A4\uCE94\uD558\uBA74 \uBC14\uB85C \uBD99\uC77C \uC218 \uC788\uC5B4\uC694",
@@ -4854,6 +4865,182 @@ button.ds-tag { border: 0; cursor: pointer; }
     return svg;
   }
 
+  // src/ui/components/dom.ts
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+  var sizeCls = (base, size) => size && size !== "md" ? ` ${base}--${size}` : "";
+
+  // src/ui/components/button.ts
+  var variantCls = (v) => v && v !== "secondary" ? ` ds-btn--${v}` : "";
+  function button(o) {
+    const b = el("button", `ds-btn${variantCls(o.variant)}${sizeCls("ds-btn", o.size)}`);
+    b.type = "button";
+    if (o.icon) b.appendChild(icon(o.icon, o.size === "sm" ? "sm" : "md"));
+    b.appendChild(el("span", "ds-btn__label", o.label));
+    if (o.iconEnd) b.appendChild(icon(o.iconEnd, o.size === "sm" ? "sm" : "md"));
+    let busy = false;
+    if (o.onClick) b.addEventListener("click", (e) => {
+      if (!busy && b.getAttribute("aria-disabled") !== "true") o.onClick(e);
+    });
+    return {
+      el: b,
+      setLoading(on) {
+        busy = on;
+        if (on) b.setAttribute("aria-busy", "true");
+        else b.removeAttribute("aria-busy");
+      },
+      setDisabled(on) {
+        b.disabled = on;
+      },
+      setLocked(reason) {
+        if (reason) {
+          b.setAttribute("aria-disabled", "true");
+          b.title = reason;
+        } else {
+          b.removeAttribute("aria-disabled");
+          b.removeAttribute("title");
+        }
+      }
+    };
+  }
+  function iconButton(o) {
+    var _a3;
+    const v = (_a3 = o.variant) != null ? _a3 : "ghost";
+    const b = el("button", `ds-btn ds-icbtn${v === "ghost" ? " ds-btn--ghost" : ""}${sizeCls("ds-btn", o.size)}`);
+    b.type = "button";
+    b.setAttribute("aria-label", o.label);
+    b.dataset.tip = o.label;
+    b.appendChild(icon(o.icon));
+    if (o.onClick) b.addEventListener("click", o.onClick);
+    return b;
+  }
+
+  // src/ui/components/alert.ts
+  var TONE_ICON = { info: "info", success: "circle-check", warning: "triangle-alert", error: "circle-alert" };
+
+  // src/ui/components/toast.ts
+  var LIFE_MS = 4e3;
+  var current = null;
+  var prevReturn = null;
+  function currentToast() {
+    return current;
+  }
+  function toastHost() {
+    let h = document.getElementById("toastHost");
+    if (!h) {
+      h = el("div", "ds-toast-host");
+      h.id = "toastHost";
+      h.setAttribute("role", "status");
+      h.setAttribute("aria-live", "polite");
+      h.setAttribute("aria-atomic", "true");
+      document.body.appendChild(h);
+    }
+    return h;
+  }
+  var focusLost = () => {
+    const a = document.activeElement;
+    return !a || a === document.body || !a.isConnected;
+  };
+  function toast(o) {
+    var _a3, _b, _c, _d;
+    const prev = current;
+    const prevHadFocus = !!prev && prev.root.contains(document.activeElement);
+    let returnTo = prevHadFocus ? prevReturn : null;
+    prev == null ? void 0 : prev.dismiss();
+    const host = toastHost();
+    host.setAttribute("aria-live", o.tone === "error" ? "assertive" : "polite");
+    const root = el("div", `ds-toast ds-toast--${o.tone}`);
+    root.appendChild(icon(TONE_ICON[o.tone]));
+    const text = el("span", "ds-toast__text", o.text);
+    if (o.tip) text.title = o.tip;
+    root.appendChild(text);
+    let timer = 0;
+    let hovered = false;
+    let focused = false;
+    const sticky = (_a3 = o.sticky) != null ? _a3 : !!o.action;
+    const stop = () => {
+      window.clearTimeout(timer);
+      timer = 0;
+    };
+    const arm = () => {
+      stop();
+      if (!sticky && !hovered && !focused) timer = window.setTimeout(() => api.close(), LIFE_MS);
+    };
+    const dismiss = () => {
+      const had = root.contains(document.activeElement);
+      stop();
+      root.remove();
+      if (current === api) current = null;
+      return had;
+    };
+    const restore = (had) => {
+      var _a4, _b2;
+      if (!had || !focusLost()) return;
+      const back = returnTo && returnTo.isConnected ? returnTo : (_b2 = (_a4 = o.fallbackFocus) == null ? void 0 : _a4.call(o)) != null ? _b2 : null;
+      back == null ? void 0 : back.focus();
+    };
+    const api = {
+      root,
+      sticky,
+      dismiss,
+      close() {
+        var _a4;
+        const had = dismiss();
+        restore(had);
+        (_a4 = o.onChange) == null ? void 0 : _a4.call(o, null);
+      }
+    };
+    if (o.action) {
+      const a = button({ label: o.action.label, variant: "link", onClick: () => {
+        var _a4;
+        const had = dismiss();
+        o.action.onClick();
+        restore(had);
+        (_a4 = o.onChange) == null ? void 0 : _a4.call(o, null);
+      } }).el;
+      a.classList.add("ds-toast__action");
+      root.appendChild(a);
+    }
+    root.appendChild(iconButton({ icon: "x", label: o.closeLabel, size: "sm", onClick: () => api.close() }));
+    root.addEventListener("pointerenter", () => {
+      hovered = true;
+      stop();
+    });
+    root.addEventListener("pointerleave", () => {
+      hovered = false;
+      arm();
+    });
+    root.addEventListener("focusin", (e) => {
+      const from = e.relatedTarget;
+      if (!focused && from && !root.contains(from)) {
+        returnTo = from;
+        prevReturn = from;
+      }
+      focused = true;
+      stop();
+    });
+    root.addEventListener("focusout", (e) => {
+      const to = e.relatedTarget;
+      if (to && root.contains(to)) return;
+      focused = false;
+      arm();
+    });
+    host.appendChild(root);
+    current = api;
+    prevReturn = returnTo;
+    if (prevHadFocus) {
+      const back = returnTo && returnTo.isConnected ? returnTo : (_c = (_b = o.fallbackFocus) == null ? void 0 : _b.call(o)) != null ? _c : null;
+      if (focusLost()) back == null ? void 0 : back.focus();
+    }
+    arm();
+    (_d = o.onChange) == null ? void 0 : _d.call(o, root);
+    return api;
+  }
+
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -4965,15 +5152,15 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
 
   // src/lib/a11y.ts
-  function nextTabIndex(key, current, count) {
+  function nextTabIndex(key, current2, count) {
     if (count <= 0) return -1;
     switch (key) {
       case "ArrowRight":
       case "ArrowDown":
-        return (current + 1) % count;
+        return (current2 + 1) % count;
       case "ArrowLeft":
       case "ArrowUp":
-        return (current - 1 + count) % count;
+        return (current2 - 1 + count) % count;
       case "Home":
         return 0;
       case "End":
@@ -4998,19 +5185,27 @@ button.ds-tag { border: 0; cursor: pointer; }
     return vars.some((v) => v.owned === "global");
   }
   function makeDoneText(totals, opts) {
-    var _a3, _b, _c;
+    var _a3, _b, _c, _d;
+    const c = totals.created;
+    let made = "";
+    if (c) {
+      if (c.g > 0) made = opts.isPaid && c.r > 0 ? t("make.done.create", { g: c.g, r: c.r }) : t("make.done.madeG", { g: c.g });
+      else if (opts.isPaid && c.r > 0) made = t("make.done.madeR", { r: c.r });
+    }
+    const n = (_a3 = totals.bound) != null ? _a3 : 0;
+    const tsB = (_b = totals.tsBound) != null ? _b : 0;
+    const places = n > 0 ? tsB > 0 ? t("make.done.placesTs", { n, t: tsB }) : t("make.done.places", { n }) : tsB > 0 ? t("make.done.placesTsOnly", { t: tsB }) : "";
+    const noPlace = !places && totals.bound != null;
     const parts = [];
-    const createdText = totals.created ? makeCreatedText(totals.created, opts.isPaid) : "";
-    if (createdText) parts.push(createdText);
+    if (made && places) parts.push(t("make.done.sentCreateBind", { c: made, b: places }));
+    else if (made) parts.push(t("make.done.sentCreate", { c: made }));
+    else if (places) parts.push(t("make.done.sentBind", { b: places }));
     if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
     if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
-    if ((_b = (_a3 = totals.styles) == null ? void 0 : _a3.missing) == null ? void 0 : _b.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
-    const tsB = (_c = totals.tsBound) != null ? _c : 0;
-    if (totals.bound && totals.bound > 0) parts.push(t("make.done.bind", { n: totals.bound }) + (tsB ? t("wizard.seq.bindTs", { t: tsB }) : ""));
-    else if (tsB) parts.push(t("wizard.seq.bindTsOnly", { t: tsB }));
-    else if (totals.bound != null) parts.push(t("make.done.bind", { n: totals.bound }));
+    if ((_d = (_c = totals.styles) == null ? void 0 : _c.missing) == null ? void 0 : _d.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
+    if (noPlace) parts.push(t("make.done.noPlace"));
     if (totals.renamed != null) parts.push(t("make.done.rename", { c: totals.renamed }));
-    if (totals.created && totals.created.m > 0) parts.push(t("make.done.manual", { m: totals.created.m }));
+    if (c && c.m > 0) parts.push(t("make.done.manual", { m: c.m }));
     if (opts.linkOff) parts.push(t("make.done.notLinked"));
     return parts.join(" \xB7 ");
   }
@@ -5283,8 +5478,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     all.indeterminate = sel > 0 && sel < others.length;
     const nothing = others.length > 0 && sel === 0 && !tokens.some((t2) => t2.category === "color");
     for (const id of ["btnCreate", "btnCreateApply"]) {
-      const el = $(id);
-      el.disabled = nothing;
+      const el2 = $(id);
+      el2.disabled = nothing;
     }
   }
   var brandColor = $("brand");
@@ -5682,34 +5877,34 @@ button.ds-tag { border: 0; cursor: pointer; }
     const row = document.createElement("div");
     row.className = "ts-edit";
     const sep = (ch) => {
-      const el = document.createElement("span");
-      el.className = "ts-sep";
-      el.textContent = ch;
-      return el;
+      const el2 = document.createElement("span");
+      el2.className = "ts-sep";
+      el2.textContent = ch;
+      return el2;
     };
     const text = (cls, width, value, title, set) => {
-      const el = document.createElement("input");
-      el.type = "text";
-      el.className = cls;
-      el.value = value;
-      el.title = title;
-      if (width) el.style.width = width;
-      el.addEventListener("input", () => set(el.value));
-      return el;
+      const el2 = document.createElement("input");
+      el2.type = "text";
+      el2.className = cls;
+      el2.value = value;
+      el2.title = title;
+      if (width) el2.style.width = width;
+      el2.addEventListener("input", () => set(el2.value));
+      return el2;
     };
     const num = (width, value, title, min, set) => {
-      const el = document.createElement("input");
-      el.type = "number";
-      el.step = "any";
-      if (min) el.min = min;
-      el.value = String(value);
-      el.title = title;
-      el.style.width = width;
-      el.addEventListener("input", () => {
-        const v = Number(el.value);
-        if (el.value !== "" && isFinite(v)) set(v);
+      const el2 = document.createElement("input");
+      el2.type = "number";
+      el2.step = "any";
+      if (min) el2.min = min;
+      el2.value = String(value);
+      el2.title = title;
+      el2.style.width = width;
+      el2.addEventListener("input", () => {
+        const v = Number(el2.value);
+        if (el2.value !== "" && isFinite(v)) set(v);
       });
-      return el;
+      return el2;
     };
     row.appendChild(text("ts-family", "", s.family, t("ts.family"), (v) => s.family = v));
     row.appendChild(sep("\xB7"));
@@ -5830,7 +6025,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   function openUnused(opener) {
     const lock = writeLockReason();
     if (lock) {
-      showStatusLine(lock, { cls: "warn" });
+      notify(lock, "warning");
       return;
     }
     unusedItems = [];
@@ -6102,7 +6297,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
     const tail = (msg.skipped ? t("unused.skippedTail", { s: msg.skipped }) : "") + (msg.failed ? t("unused.failedTail", { f: msg.failed }) : "");
     const text = (msg.deleted ? t("unused.deleted", { d: msg.deleted }) : t("unused.deletedNone")) + tail;
-    showStatusLine(text, { cls: msg.failed ? "warn" : msg.deleted ? "ok" : "", tip: msg.skipped ? t("unused.skippedTip") : void 0 });
+    notify(text, msg.failed ? msg.deleted ? "warning" : "error" : msg.deleted ? "success" : "info", msg.skipped ? { tip: t("unused.skippedTip") } : {});
   }
   function onUnusedError(msg) {
     if (msg.op !== "SCAN_UNUSED_VARS" && msg.op !== "DELETE_VARIABLES") return false;
@@ -6112,7 +6307,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       unusedRender();
       return true;
     }
-    if (msg.op === "DELETE_VARIABLES" && !isMini) showStatusLine(t("unused.deleteFail"), { cls: "warn", tip: explainError(msg.message).message });
+    if (msg.op === "DELETE_VARIABLES" && !isMini) notify(t("unused.deleteFail"), "error", { tip: explainError(msg.message).message });
     return true;
   }
   $("btnTextStyles").addEventListener("click", () => {
@@ -6347,9 +6542,9 @@ button.ds-tag { border: 0; cursor: pointer; }
   ];
   function updateGates() {
     for (const id of PAID_FIELDS) {
-      const el = $(id);
-      setLock(el, isPaid ? null : "paid");
-      setLockTitle(el, !isPaid);
+      const el2 = $(id);
+      setLock(el2, isPaid ? null : "paid");
+      setLockTitle(el2, !isPaid);
     }
     for (const id of ["darkLock", "semLock", "tsLock"]) {
       $(id).textContent = isPaid ? "" : PAID_LOCK;
@@ -6361,25 +6556,25 @@ button.ds-tag { border: 0; cursor: pointer; }
     renderBindPrereq();
     updateEmptyLocks();
   }
-  var baseLocked = (el) => !!el.dataset.baseLock;
-  function setEmptyLock(el, msg) {
-    if (el.dataset.baseLock === "paid") return;
-    setLock(el, msg ? "prereq" : null, msg != null ? msg : "");
+  var baseLocked = (el2) => !!el2.dataset.baseLock;
+  function setEmptyLock(el2, msg) {
+    if (el2.dataset.baseLock === "paid") return;
+    setLock(el2, msg ? "prereq" : null, msg != null ? msg : "");
   }
   function setCardPrimary(all, order) {
     var _a3;
-    const pick = (_a3 = order.find((el) => !baseLocked(el))) != null ? _a3 : null;
+    const pick = (_a3 = order.find((el2) => !baseLocked(el2))) != null ? _a3 : null;
     const card = all[0] ? cardOf(all[0]) : null;
     const held = !!retryIn(card);
-    for (const el of all) {
+    for (const el2 of all) {
       if (held) {
-        el.classList.remove("primary", "ds-btn--primary");
-        if (el === pick) el.dataset.primaryHeld = "1";
-        else delete el.dataset.primaryHeld;
+        el2.classList.remove("primary", "ds-btn--primary");
+        if (el2 === pick) el2.dataset.primaryHeld = "1";
+        else delete el2.dataset.primaryHeld;
       } else {
-        el.classList.toggle("primary", el === pick);
-        el.classList.toggle("ds-btn--primary", el === pick);
-        delete el.dataset.primaryHeld;
+        el2.classList.toggle("primary", el2 === pick);
+        el2.classList.toggle("ds-btn--primary", el2 === pick);
+        delete el2.dataset.primaryHeld;
       }
     }
   }
@@ -6391,19 +6586,19 @@ button.ds-tag { border: 0; cursor: pointer; }
     setEmptyLock(colorVars, colorsVisible() ? null : t("color.needColors"));
     setCardPrimary([extract, colorVars], baseLocked(colorVars) ? [extract] : [colorVars, extract]);
   }
-  function setLockTitle(el, locked) {
+  function setLockTitle(el2, locked) {
     var _a3;
-    if (el.dataset.baseTip === void 0) el.dataset.baseTip = (_a3 = el.getAttribute("title")) != null ? _a3 : "";
-    const base = el.dataset.baseTip;
+    if (el2.dataset.baseTip === void 0) el2.dataset.baseTip = (_a3 = el2.getAttribute("title")) != null ? _a3 : "";
+    const base = el2.dataset.baseTip;
     const note = t("lock.tipSuffix");
-    el.setAttribute("title", locked ? base ? `${base} \xB7 ${note}` : note : base);
-    reapplyWaitTip(el);
+    el2.setAttribute("title", locked ? base ? `${base} \xB7 ${note}` : note : base);
+    reapplyWaitTip(el2);
   }
-  function reapplyWaitTip(el) {
+  function reapplyWaitTip(el2) {
     var _a3;
-    if (!el.dataset.wait) return;
-    delete el.dataset.waitTail;
-    setWait(el, el.dataset.wait, (_a3 = el.dataset.waitTarget) != null ? _a3 : "");
+    if (!el2.dataset.wait) return;
+    delete el2.dataset.waitTail;
+    setWait(el2, el2.dataset.wait, (_a3 = el2.dataset.waitTarget) != null ? _a3 : "");
   }
   function setPrereq(btnId, noticeId, okRaw, msg) {
     const ok = okRaw || !prereqKnown;
@@ -6441,15 +6636,15 @@ button.ds-tag { border: 0; cursor: pointer; }
     renderDarkNotice();
   }
   function renderDarkNotice() {
-    const el = $("darkNotice");
+    const el2 = $("darkNotice");
     const prereqShown = $("darkPrereq").style.display !== "none";
     let text = "";
     if (!prereqShown) {
       if (darkOld) text = darkOldManual ? t("dark.needMigrateManual") : t("dark.needMigrate");
       else if (darkUnfilled > 0) text = t("dark.unfilled", { n: darkUnfilled });
     }
-    el.textContent = text;
-    el.hidden = !text;
+    el2.textContent = text;
+    el2.hidden = !text;
   }
   $("btnGenDark").addEventListener("click", () => {
     setStatus("darkStatus", t("dark.running"), "");
@@ -6629,7 +6824,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           bindTsPending = false;
           selFindInFlight = false;
           setStatus("applyStatus", t("v4.readCancelled"), "warn");
-          showStatusLine(t("v4.readCancelled"), { cls: "warn", action: { label: t("v4.reread"), run: () => readSelFind(true, true) } });
+          notify(t("v4.readCancelled"), "warning", { action: { label: t("v4.reread"), run: () => readSelFind(true, true) } });
         } else if (msg.preview) {
           const prev = bindCandidates;
           const prevChecked = new Set(bindChecked);
@@ -6644,7 +6839,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           if (silent) {
             const r = carryRowChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
-            if (bindSilentCarry && (r.added || r.removed)) showStatusLine(t("bind.candChanged", { a: r.added, b: r.removed }));
+            if (bindSilentCarry && (r.added || r.removed)) notify(t("bind.candChanged", { a: r.added, b: r.removed }), "info");
           } else {
             bindSkipsOpen = false;
             for (const c of bindCandidates) bindChecked.add(candKey(c));
@@ -6658,7 +6853,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           clearBindPreview();
           setStatus("applyStatus", "", "");
           if (activeTab === "select" && selSub === "bind") showSelSub("home");
-          showStatusLine(t("v4.linked", { n }) + (m ? t("v4.linkedSkipped", { m }) : ""), { cls: "ok" });
+          notify(t("v4.linked", { n }) + (m ? t("v4.linkedSkipped", { m }) : ""), "success");
           selFindFor = null;
         }
         if (linkEnded) onBindLinkingChanged();
@@ -6703,9 +6898,9 @@ button.ds-tag { border: 0; cursor: pointer; }
         break;
       case "SELECT_RESULT":
         if (selectStatusTarget === "list") {
-          if (msg.capped) showStatusLine(t("select.capped", { found: msg.found, requested: msg.requested }), { cls: "warn" });
-          else if (!msg.found) showStatusLine(t("select.none"), { cls: "warn" });
-          else if (msg.found < msg.requested) showStatusLine(t("select.partial", { found: msg.found, missing: msg.requested - msg.found }), { cls: "warn" });
+          if (msg.capped) notify(t("select.capped", { found: msg.found, requested: msg.requested }), "warning");
+          else if (!msg.found) notify(t("select.none"), "warning");
+          else if (msg.found < msg.requested) notify(t("select.partial", { found: msg.found, missing: msg.requested - msg.found }), "warning");
           break;
         }
         if (msg.capped) {
@@ -6910,7 +7105,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         }
         if (fromWizard) break;
         if (statusId === STATUS_LINE) {
-          showStatusLine(explainError(msg.message).message, { cls: "warn", tip: msg.message });
+          notify(explainError(msg.message).message, "error", { tip: msg.message });
           break;
         }
         showError(statusId, explainError(msg.message), msg.op);
@@ -6948,9 +7143,9 @@ button.ds-tag { border: 0; cursor: pointer; }
     GET_LICENSE: "licenseStatus"
   };
   var RETRY_CLS = "retry-btn";
-  function cardOf(el) {
+  function cardOf(el2) {
     var _a3, _b;
-    return (_b = (_a3 = el.closest(".step, .modal")) != null ? _a3 : el.closest(".tool-panel")) != null ? _b : el.parentElement;
+    return (_b = (_a3 = el2.closest(".step, .modal")) != null ? _a3 : el2.closest(".tool-panel")) != null ? _b : el2.parentElement;
   }
   function retryIn(card) {
     var _a3;
@@ -6981,12 +7176,12 @@ button.ds-tag { border: 0; cursor: pointer; }
     const next = (_a3 = cardPrimary(card)) != null ? _a3 : !$("subHead").hidden && (card == null ? void 0 : card.closest("#tab-select")) ? $("btnSubBack") : null;
     next == null ? void 0 : next.focus({ preventScroll: true });
   }
-  function dropErrorBox(el) {
-    if (!el.querySelector(".ux.danger")) return;
-    const retry = el.querySelector(`.${RETRY_CLS}`);
+  function dropErrorBox(el2) {
+    if (!el2.querySelector(".ux.danger")) return;
+    const retry = el2.querySelector(`.${RETRY_CLS}`);
     const hadFocus = !!retry && document.activeElement === retry;
-    el.replaceChildren();
-    const card = cardOf(el);
+    el2.replaceChildren();
+    const card = cardOf(el2);
     if (card && !retryIn(card)) releasePrimaries(card);
     updateEmptyLocks();
     if (hadFocus) focusAfterRetryGone(card);
@@ -7018,11 +7213,11 @@ button.ds-tag { border: 0; cursor: pointer; }
     return { box, retry };
   }
   function showError(id, f, op) {
-    const el = $(id);
-    dropErrorBox(el);
-    el.className = "status";
-    el.innerHTML = "";
-    if (id === "licenseStatus") el.removeAttribute("title");
+    const el2 = $(id);
+    dropErrorBox(el2);
+    el2.className = "status";
+    el2.innerHTML = "";
+    if (id === "licenseStatus") el2.removeAttribute("title");
     const linkRetry = op === "APPLY_SELECTED" ? lastLinkItems : null;
     const retry = linkRetry ? null : op && lastSentMsg && op !== lastSentMsg.type ? null : lastSentMsg;
     const onRetry = f.retryable && (linkRetry || retry) ? () => {
@@ -7039,8 +7234,8 @@ button.ds-tag { border: 0; cursor: pointer; }
       send(retry);
     } : null;
     const { box, retry: retryBtn } = errorBox(f, onRetry);
-    el.appendChild(box);
-    const card = cardOf(el);
+    el2.appendChild(box);
+    const card = cardOf(el2);
     if (retryBtn && card) holdPrimaries(card, retryBtn);
   }
   var renameNodes = [];
@@ -7186,7 +7381,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       renameNodes = [];
       renameFor = null;
       if (activeTab === "select" && selSub === "rename") showSelSub("home");
-      showStatusLine(t("rename.doneStatus", { k: msg.changes.length }), { cls: "ok" });
+      notify(t("rename.doneStatus", { k: msg.changes.length }), "success");
       return;
     }
     if (msg.reqId == null || msg.reqId !== renameReq || msg.applied) return;
@@ -8070,7 +8265,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       results.sort((a, b) => MAKE_STEP_ORDER.indexOf(a.id) - MAKE_STEP_ORDER.indexOf(b.id));
       mkResults = results;
       mkResultsCreated = !!totals.created;
-      if (!(activeTab === "select" && selSub === "make")) showStatusLine(t("make.partialStatus"), { cls: "warn", action: { label: t("common.view"), run: () => {
+      if (!(activeTab === "select" && selSub === "make")) notify(t("make.partialStatus"), "warning", { action: { label: t("common.view"), run: () => {
         showTab("select");
         showSelSub("make");
       } } });
@@ -8084,7 +8279,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       if (activeTab === "select") selFallbackFocus(true).focus();
     }
     const doneTip = (_o = (_n = totals.styles) == null ? void 0 : _n.missing) == null ? void 0 : _o.join("\n");
-    showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
+    notify(makeDoneText(totals, { isPaid, linkOff }), "success", __spreadValues(__spreadValues({}, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");
     } } } : {}));
@@ -8283,12 +8478,12 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
     return l;
   }
-  function putTypeMark(el, type, size = "md") {
+  function putTypeMark(el2, type, size = "md") {
     if (type === "FLOAT") {
-      el.textContent = "";
-      el.dataset.mk = "hash";
-      el.appendChild(icon("hash", size));
-    } else el.textContent = varTypeMark(type);
+      el2.textContent = "";
+      el2.dataset.mk = "hash";
+      el2.appendChild(icon("hash", size));
+    } else el2.textContent = varTypeMark(type);
   }
   function trLeadAa() {
     const aa = document.createElement("span");
@@ -8328,10 +8523,10 @@ button.ds-tag { border: 0; cursor: pointer; }
   function tipTruncatedNames(root) {
     requestAnimationFrame(() => {
       var _a3, _b, _c;
-      for (const el of Array.from(root.querySelectorAll(".tr-lt, .vchip .al, .vchip .vl"))) {
-        if (el.dataset.tipFixed) continue;
-        if (el.scrollWidth > el.clientWidth + 1) el.title = el.classList.contains("al") ? (_b = (_a3 = el.lastChild) == null ? void 0 : _a3.textContent) != null ? _b : "" : (_c = el.textContent) != null ? _c : "";
-        else el.removeAttribute("title");
+      for (const el2 of Array.from(root.querySelectorAll(".tr-lt, .vchip .al, .vchip .vl"))) {
+        if (el2.dataset.tipFixed) continue;
+        if (el2.scrollWidth > el2.clientWidth + 1) el2.title = el2.classList.contains("al") ? (_b = (_a3 = el2.lastChild) == null ? void 0 : _a3.textContent) != null ? _b : "" : (_c = el2.textContent) != null ? _c : "";
+        else el2.removeAttribute("title");
       }
     });
   }
@@ -8510,7 +8705,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     const to = e.relatedTarget;
     if (to instanceof Node && !e.currentTarget.contains(to)) lastBindFocus = null;
   });
-  var goneEl = (el) => !el.isConnected || el.closest("[hidden]") != null;
+  var goneEl = (el2) => !el2.isConnected || el2.closest("[hidden]") != null;
   function restoreBindFocus() {
     var _a3, _b;
     const was = lastBindFocus;
@@ -8685,12 +8880,12 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (curSel) renderBindChrome();
   }
   function setStatus(id, text, cls, tip) {
-    const el = $(id);
-    dropErrorBox(el);
-    el.textContent = text;
-    el.className = `status ${cls}`;
-    if (tip) el.title = tip;
-    else el.removeAttribute("title");
+    const el2 = $(id);
+    dropErrorBox(el2);
+    el2.textContent = text;
+    el2.className = `status ${cls}`;
+    if (tip) el2.title = tip;
+    else el2.removeAttribute("title");
   }
   function escapeHtml(s) {
     return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
@@ -8763,26 +8958,26 @@ button.ds-tag { border: 0; cursor: pointer; }
     tip.classList.add("show");
   }
   function applyButtonTips() {
-    document.querySelectorAll("[data-tip]").forEach((el) => {
+    document.querySelectorAll("[data-tip]").forEach((el2) => {
       const show = () => {
-        const text = el.getAttribute("data-tip");
-        if (text) placeUiTip(el, text);
+        const text = el2.getAttribute("data-tip");
+        if (text) placeUiTip(el2, text);
       };
-      el.addEventListener("mouseenter", show);
-      el.addEventListener("focus", show);
-      el.addEventListener("mouseleave", hideUiTip);
-      el.addEventListener("blur", hideUiTip);
+      el2.addEventListener("mouseenter", show);
+      el2.addEventListener("focus", show);
+      el2.addEventListener("mouseleave", hideUiTip);
+      el2.addEventListener("blur", hideUiTip);
     });
     window.addEventListener("scroll", hideUiTip, true);
   }
   function applyStaticI18n(root = document) {
-    root.querySelectorAll("[data-i18n]").forEach((el) => {
-      const key = el.dataset.i18n;
-      if (hasString(key)) el.textContent = t(key);
+    root.querySelectorAll("[data-i18n]").forEach((el2) => {
+      const key = el2.dataset.i18n;
+      if (hasString(key)) el2.textContent = t(key);
     });
-    root.querySelectorAll("[data-i18n-html]").forEach((el) => {
-      const key = el.dataset.i18nHtml;
-      if (hasString(key)) el.innerHTML = t(key);
+    root.querySelectorAll("[data-i18n-html]").forEach((el2) => {
+      const key = el2.dataset.i18nHtml;
+      if (hasString(key)) el2.innerHTML = t(key);
     });
     for (const [form, attr] of [
       ["title", "title"],
@@ -8791,61 +8986,64 @@ button.ds-tag { border: 0; cursor: pointer; }
       ["tip", "data-tip"]
       // 커스텀 툴팁(applyButtonTips가 호버 때 읽는다)
     ]) {
-      root.querySelectorAll(`[data-i18n-${form}]`).forEach((el) => {
-        const key = el.getAttribute(`data-i18n-${form}`);
-        if (hasString(key)) el.setAttribute(attr, t(key));
+      root.querySelectorAll(`[data-i18n-${form}]`).forEach((el2) => {
+        const key = el2.getAttribute(`data-i18n-${form}`);
+        if (hasString(key)) el2.setAttribute(attr, t(key));
       });
     }
   }
-  var statusTimer = null;
-  var statusSticky = false;
-  function showStatusLine(text, opts = {}) {
+  function notify(text, tone, o = {}) {
+    toast(__spreadProps(__spreadValues(__spreadProps(__spreadValues({
+      tone,
+      text
+    }, o.tip ? { tip: o.tip } : {}), {
+      closeLabel: t("common.close")
+    }), o.action ? { action: { label: o.action.label, onClick: o.action.run } } : {}), {
+      fallbackFocus: () => document.querySelector('.tab-section.active[role="tabpanel"]'),
+      onChange: () => judgeToastSpace()
+    }));
+  }
+  function visibleFoot() {
+    for (const id of ["bindFoot", "renameFoot", "makeFoot"]) {
+      const f = $(id);
+      if (f.getClientRects().length && f.getBoundingClientRect().height > 0) return f;
+    }
+    return null;
+  }
+  var cssPx = (name) => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+  function judgeToastSpace() {
     var _a3;
-    if (opts.background && statusSticky) return;
-    const line = $("statusLine");
-    const txt = $("statusText");
-    const btn = $("statusAction");
-    if (statusTimer) {
-      clearTimeout(statusTimer);
-      statusTimer = null;
+    const st = document.documentElement.style;
+    const root = (_a3 = currentToast()) == null ? void 0 : _a3.root;
+    for (const v of ["--toast-space-body", "--toast-space-side"]) st.setProperty(v, "0px");
+    if (root && root.isConnected) {
+      const h = root.offsetHeight + cssPx("--space-3");
+      st.setProperty("--toast-space-body", `${h}px`);
+      st.setProperty("--toast-space-side", `${h}px`);
     }
-    txt.textContent = text;
-    txt.title = opts.tip ? `${text}
-${opts.tip}` : text;
-    line.className = `status-line ${(_a3 = opts.cls) != null ? _a3 : ""}`.trim();
-    if (opts.action) {
-      btn.textContent = opts.action.label;
-      btn.onclick = () => {
-        const a = opts.action;
-        clearStatusLine();
-        a.run();
-      };
-      btn.hidden = false;
-      statusSticky = true;
-    } else {
-      btn.hidden = true;
-      btn.onclick = null;
-      statusSticky = false;
-      if (text) statusTimer = setTimeout(clearStatusLine, 4e3);
-    }
+    placeToast();
   }
-  function clearStatusLine() {
-    if (statusTimer) {
-      clearTimeout(statusTimer);
-      statusTimer = null;
+  function placeToast() {
+    var _a3;
+    const st = document.documentElement.style;
+    const root = (_a3 = currentToast()) == null ? void 0 : _a3.root;
+    const s3 = cssPx("--space-3");
+    const foot = root ? visibleFoot() : null;
+    let bottom = s3;
+    if (root && foot) {
+      const r = foot.getBoundingClientRect();
+      if (r.bottom > window.innerHeight - (root.offsetHeight + 2 * s3)) bottom = Math.max(s3, window.innerHeight - r.top + s3);
     }
-    statusSticky = false;
-    $("statusText").textContent = "";
-    $("statusText").title = "";
-    const btn = $("statusAction");
-    btn.hidden = true;
-    btn.onclick = null;
-    $("statusLine").className = "status-line";
+    st.setProperty("--toast-bottom", `${Math.round(bottom)}px`);
   }
+  window.addEventListener("scroll", placeToast, { passive: true });
+  window.addEventListener("resize", placeToast);
+  new ResizeObserver(placeToast).observe(document.body);
   function dismissStickyOnAction(e) {
-    if (!statusSticky) return;
+    const cur = currentToast();
+    if (!cur || !cur.sticky) return;
     const target = e.target;
-    if (target && target.closest("#statusAction")) return;
+    if (target && target.closest("#toastHost, #btnMinimize, #btnExpand")) return;
     if (e.type === "keydown") {
       const k = e.key;
       if (k === "Tab" || k.startsWith("Arrow") || k === "Shift" || k === "Home" || k === "End" || k === "PageUp" || k === "PageDown" || k === "Escape") return;
@@ -8854,82 +9052,82 @@ ${opts.tip}` : text;
       const altText = k.length === 1 && ke.altKey && !ke.metaKey;
       if (k !== "Enter" && !altText && (ke.ctrlKey || ke.metaKey || ke.altKey)) return;
     }
-    clearStatusLine();
+    cur.close();
   }
   document.addEventListener("pointerdown", dismissStickyOnAction, true);
   document.addEventListener("keydown", dismissStickyOnAction, true);
   function showPaidReason() {
-    showStatusLine(t("status.paid"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+    notify(t("status.paid"), "warning", { action: { label: t("status.paidAction"), run: goToLicense } });
   }
   function goToLicense() {
     showTab("settings");
     $("licenseKey").focus({ preventScroll: true });
     requestAnimationFrame(() => $("licenseKey").scrollIntoView({ block: "center" }));
   }
-  function setLock(el, reason, prereqMsg = "") {
+  function setLock(el2, reason, prereqMsg = "") {
     if (reason) {
-      el.dataset.baseLock = reason;
-      if (reason === "prereq") el.dataset.baseLockMsg = prereqMsg;
-      else delete el.dataset.baseLockMsg;
+      el2.dataset.baseLock = reason;
+      if (reason === "prereq") el2.dataset.baseLockMsg = prereqMsg;
+      else delete el2.dataset.baseLockMsg;
     } else {
-      delete el.dataset.baseLock;
-      delete el.dataset.baseLockMsg;
+      delete el2.dataset.baseLock;
+      delete el2.dataset.baseLockMsg;
     }
-    applyLock(el);
+    applyLock(el2);
   }
-  function applyLock(el) {
-    const base = el.dataset.baseLock;
-    const wait = el.dataset.wait;
+  function applyLock(el2) {
+    const base = el2.dataset.baseLock;
+    const wait = el2.dataset.wait;
     const reason = base === "paid" ? "paid" : wait ? "prereq" : base;
     if (reason) {
-      el.setAttribute("aria-disabled", "true");
-      el.dataset.lock = reason;
-      if (reason === "prereq") el.dataset.lockMsg = wait || el.dataset.baseLockMsg || "";
-      else delete el.dataset.lockMsg;
+      el2.setAttribute("aria-disabled", "true");
+      el2.dataset.lock = reason;
+      if (reason === "prereq") el2.dataset.lockMsg = wait || el2.dataset.baseLockMsg || "";
+      else delete el2.dataset.lockMsg;
     } else {
-      el.removeAttribute("aria-disabled");
-      delete el.dataset.lock;
-      delete el.dataset.lockMsg;
+      el2.removeAttribute("aria-disabled");
+      delete el2.dataset.lock;
+      delete el2.dataset.lockMsg;
     }
   }
-  function setWait(el, msg, target = "") {
+  function setWait(el2, msg, target = "") {
     var _a3, _b;
-    const attr = el.hasAttribute("data-tip") ? "data-tip" : "title";
-    let tip = (_a3 = el.getAttribute(attr)) != null ? _a3 : "";
-    const prevTail = (_b = el.dataset.waitTail) != null ? _b : "";
+    const attr = el2.hasAttribute("data-tip") ? "data-tip" : "title";
+    let tip = (_a3 = el2.getAttribute(attr)) != null ? _a3 : "";
+    const prevTail = (_b = el2.dataset.waitTail) != null ? _b : "";
     if (prevTail && tip.endsWith(prevTail)) tip = tip.slice(0, tip.length - prevTail.length);
     if (msg) {
       const tail = tip ? ` \xB7 ${msg}` : msg;
-      el.setAttribute(attr, tip + tail);
-      el.dataset.waitTail = tail;
-      el.dataset.wait = msg;
-      if (target) el.dataset.waitTarget = target;
-      else delete el.dataset.waitTarget;
+      el2.setAttribute(attr, tip + tail);
+      el2.dataset.waitTail = tail;
+      el2.dataset.wait = msg;
+      if (target) el2.dataset.waitTarget = target;
+      else delete el2.dataset.waitTarget;
     } else {
       if (prevTail) {
-        if (tip) el.setAttribute(attr, tip);
-        else el.removeAttribute(attr);
+        if (tip) el2.setAttribute(attr, tip);
+        else el2.removeAttribute(attr);
       }
-      delete el.dataset.waitTail;
-      delete el.dataset.wait;
-      delete el.dataset.waitTarget;
+      delete el2.dataset.waitTail;
+      delete el2.dataset.wait;
+      delete el2.dataset.waitTarget;
     }
-    applyLock(el);
+    applyLock(el2);
   }
-  function isLocked(el) {
-    return el.getAttribute("aria-disabled") === "true";
+  function isLocked(el2) {
+    return el2.getAttribute("aria-disabled") === "true";
   }
   function onLockedActivate(e) {
     var _a3;
-    const el = (_a3 = e.target) == null ? void 0 : _a3.closest('[aria-disabled="true"]');
-    if (!el) return;
+    const el2 = (_a3 = e.target) == null ? void 0 : _a3.closest('[aria-disabled="true"]');
+    if (!el2) return;
     if (e.type === "mousedown") {
-      if (el.tagName === "SELECT") e.preventDefault();
+      if (el2.tagName === "SELECT") e.preventDefault();
       return;
     }
     if (e.type === "keydown") {
       const k = e.key;
-      if (el.tagName === "SELECT" && k !== "Tab" && k !== "Escape" && k !== "Enter" && k !== " ") {
+      if (el2.tagName === "SELECT" && k !== "Tab" && k !== "Escape" && k !== "Enter" && k !== " ") {
         e.preventDefault();
         return;
       }
@@ -8938,11 +9136,11 @@ ${opts.tip}` : text;
     e.preventDefault();
     e.stopImmediatePropagation();
     if (e.type === "click" || e.type === "keydown") {
-      if (el.dataset.lock === "paid" && el.dataset.paidMsg) showStatusLine(el.dataset.paidMsg, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
-      else if (el.dataset.lock === "paid") showPaidReason();
-      else if (el.dataset.lock === "edit") edLockedSave();
-      else if (el.dataset.wait && el.dataset.waitTarget) setStatus(el.dataset.waitTarget, el.dataset.wait, "warn");
-      else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: "warn" });
+      if (el2.dataset.lock === "paid" && el2.dataset.paidMsg) notify(el2.dataset.paidMsg, "warning", { action: { label: t("status.paidAction"), run: goToLicense } });
+      else if (el2.dataset.lock === "paid") showPaidReason();
+      else if (el2.dataset.lock === "edit") edLockedSave();
+      else if (el2.dataset.wait && el2.dataset.waitTarget) setStatus(el2.dataset.waitTarget, el2.dataset.wait, "warn");
+      else if (el2.dataset.lockMsg) notify(el2.dataset.lockMsg, "warning");
     }
   }
   document.addEventListener("click", onLockedActivate, true);
@@ -8951,7 +9149,7 @@ ${opts.tip}` : text;
   var isMini = false;
   var miniFailure = null;
   var miniOkTimer = null;
-  function setMini(on, notify = true) {
+  function setMini(on, tellCode = true) {
     if (on === isMini) return;
     isMini = on;
     if (on) {
@@ -8962,7 +9160,7 @@ ${opts.tip}` : text;
     }
     document.body.classList.toggle("is-mini", on);
     $("miniView").hidden = !on;
-    if (notify) send({ type: "SET_UI_SIZE", mode: on ? "mini" : "default" });
+    if (tellCode) send({ type: "SET_UI_SIZE", mode: on ? "mini" : "default" });
     if (on) {
       renderMiniMark();
       $("btnExpand").focus();
@@ -8975,7 +9173,7 @@ ${opts.tip}` : text;
       miniOkTimer = null;
     }
     $("miniBadge").hidden = true;
-    if (fail) showStatusLine(t("status.failed", { op: fail.label }), { cls: "warn", action: { label: t("status.view"), run: fail.go } });
+    if (fail) notify(t("status.failed", { op: fail.label }), "error", { action: { label: t("status.view"), run: fail.go } });
     syncStickyOffsets();
     $("btnMinimize").focus();
     readScreen("expand");
@@ -9278,6 +9476,7 @@ ${opts.tip}` : text;
       readScreen("enter");
     }
     renderSelHome();
+    if (currentToast()) judgeToastSpace();
   }
   function showSelSub(sub, opener) {
     var _a3, _b;
@@ -9292,7 +9491,7 @@ ${opts.tip}` : text;
     $("varMake").style.display = sub === "pick" ? "" : "none";
     $("makeScreen").style.display = sub === "make" ? "" : "none";
     if (sub === "bind" || sub === "rename") showStep("apply", sub);
-    else for (const el of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el.style.display = "none";
+    else for (const el2 of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el2.style.display = "none";
     if (sub === "pick") showMakeStep(curMakeStep);
     renderSubHead();
     syncStickyOffsets();
@@ -9384,6 +9583,7 @@ ${opts.tip}` : text;
       }
     }
     showSelSub("home");
+    if (currentToast()) judgeToastSpace();
     const key = subOpener == null ? void 0 : subOpener.dataset.k;
     const byKey = key ? $("selCards").querySelector(`[data-k="${CSS.escape(key)}"]`) : null;
     const target = byKey != null ? byKey : subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : null;
@@ -9392,10 +9592,13 @@ ${opts.tip}` : text;
   $("btnSubBack").addEventListener("click", subBack);
   function syncFootShadow() {
     const doc = document.documentElement;
+    const foot = visibleFoot();
+    const fh = `${foot ? Math.round(foot.getBoundingClientRect().height) : 0}px`;
+    if (doc.style.getPropertyValue("--foot-h") !== fh) doc.style.setProperty("--foot-h", fh);
     const over = window.scrollY + window.innerHeight < doc.scrollHeight - 1;
     for (const id of ["bindFoot", "renameFoot", "makeFoot"]) {
-      const el = $(id);
-      el.toggleAttribute("data-overlapped", over && !!el.offsetParent);
+      const el2 = $(id);
+      el2.toggleAttribute("data-overlapped", over && el2 === foot);
     }
   }
   window.addEventListener("scroll", syncFootShadow, { passive: true });
@@ -9403,12 +9606,12 @@ ${opts.tip}` : text;
   new ResizeObserver(syncFootShadow).observe(document.body);
   document.addEventListener("click", (e) => {
     var _a3;
-    const el = (_a3 = e.target) == null ? void 0 : _a3.closest("[data-go-sub]");
-    if (!el) return;
-    const sub = el.dataset.goSub;
+    const el2 = (_a3 = e.target) == null ? void 0 : _a3.closest("[data-go-sub]");
+    if (!el2) return;
+    const sub = el2.dataset.goSub;
     if (!["home", "bind", "rename", "make", "pick"].includes(sub)) return;
     showTab("select");
-    showSelSub(sub, el);
+    showSelSub(sub, el2);
   });
   $("btnSettings").addEventListener("click", () => {
     showTab("settings");
@@ -9442,7 +9645,7 @@ ${opts.tip}` : text;
   function showMakeScreen(opener) {
     var _a3;
     if (!((_a3 = baseline != null ? baseline : curSel) == null ? void 0 : _a3.count)) {
-      showStatusLine(t("status.noSelection"), { cls: "warn" });
+      notify(t("status.noSelection"), "warning");
       return;
     }
     showTab("select");
@@ -9480,9 +9683,9 @@ ${opts.tip}` : text;
     var _a3;
     const key = attr === "make" ? "data-make-step" : "data-apply-step";
     const rail = attr === "make" ? $("makeRail") : null;
-    for (const el of Array.from(document.querySelectorAll(`.step[${key}]`))) {
-      if (el.dataset.alwaysHidden !== void 0) continue;
-      el.style.display = el.getAttribute(key) === step ? "" : "none";
+    for (const el2 of Array.from(document.querySelectorAll(`.step[${key}]`))) {
+      if (el2.dataset.alwaysHidden !== void 0) continue;
+      el2.style.display = el2.getAttribute(key) === step ? "" : "none";
     }
     for (const b of Array.from((_a3 = rail == null ? void 0 : rail.querySelectorAll(".step-chip")) != null ? _a3 : [])) {
       const on = b.getAttribute(key) === step;
@@ -9524,7 +9727,7 @@ ${opts.tip}` : text;
   }
   showMakeStep("color");
   showStep("apply", "bind");
-  for (const el of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el.style.display = "none";
+  for (const el2 of Array.from(document.querySelectorAll(".step[data-apply-step]"))) el2.style.display = "none";
   for (const b of Array.from(document.querySelectorAll("[data-next-make]"))) {
     b.addEventListener("click", () => showMakeStep(b.dataset.nextMake));
   }
@@ -10060,9 +10263,9 @@ ${opts.tip}` : text;
     if (want && target && (focusSideKey || hadFocus)) target.focus({ preventScroll: true });
     focusSideKey = null;
   }
-  function sideKey(ev, el, pick) {
+  function sideKey(ev, el2, pick) {
     const items = Array.from($("varSide").querySelectorAll(".vs-item"));
-    const i = items.indexOf(el);
+    const i = items.indexOf(el2);
     const go = (j) => {
       const target = items[Math.max(0, Math.min(items.length - 1, j))];
       if (!target) return;
@@ -10153,22 +10356,22 @@ ${opts.tip}` : text;
     }
     return `${v.name}, ${varValueText(cell)}`;
   }
-  function paintSwatch(el, cell) {
+  function paintSwatch(el2, cell) {
     const r = cell ? resolveCell(cell) : null;
     if (!r || r.kind !== "color") {
-      el.style.background = "transparent";
+      el2.style.background = "transparent";
       return;
     }
     const pct = r.alpha != null ? alphaPct(r.alpha) : 100;
     if (pct >= 100) {
-      el.style.background = r.hex;
+      el2.style.background = r.hex;
       return;
     }
-    el.classList.add("ck");
+    el2.classList.add("ck");
     const i = document.createElement("i");
     i.style.background = r.hex;
     i.style.opacity = String(r.alpha);
-    el.appendChild(i);
+    el2.appendChild(i);
   }
   var lastRightCols = [];
   var grpCollapsed = /* @__PURE__ */ new Set();
@@ -10305,8 +10508,8 @@ ${opts.tip}` : text;
     }
     return void 0;
   }
-  function headOf(el) {
-    const grp = el.classList.contains("vt-group") ? el.parentElement : el.closest(".vt-grp");
+  function headOf(el2) {
+    const grp = el2.classList.contains("vt-group") ? el2.parentElement : el2.closest(".vt-grp");
     if (!grp || !grp.classList.contains("vt-grp") || grp.classList.contains("top")) return void 0;
     const h = grp.previousElementSibling;
     return (h == null ? void 0 : h.classList.contains("vt-group")) ? h : void 0;
@@ -10448,23 +10651,23 @@ ${opts.tip}` : text;
     row.appendChild(d);
     return row;
   }
-  function wireItem(el, v) {
-    el.addEventListener("click", (e) => {
+  function wireItem(el2, v) {
+    el2.addEventListener("click", (e) => {
       var _a3;
-      focusKey = (_a3 = el.dataset.key) != null ? _a3 : null;
+      focusKey = (_a3 = el2.dataset.key) != null ? _a3 : null;
       gridItems().forEach((x) => x.tabIndex = -1);
-      el.tabIndex = 0;
+      el2.tabIndex = 0;
       if (e.detail > 1) return;
       applyVar(v);
     });
-    el.addEventListener("contextmenu", (e) => {
+    el2.addEventListener("contextmenu", (e) => {
       e.preventDefault();
-      openVarMenuFor(v, el, e.clientX, e.clientY);
+      openVarMenuFor(v, el2, e.clientX, e.clientY);
     });
-    el.addEventListener("keydown", (ev) => {
+    el2.addEventListener("keydown", (ev) => {
       if (ev.key === "Enter") {
         ev.preventDefault();
-        openDetail({ local: v }, el);
+        openDetail({ local: v }, el2);
         return;
       }
       if (ev.key === " ") {
@@ -10474,25 +10677,25 @@ ${opts.tip}` : text;
       }
       if (ev.key === "ContextMenu" || ev.key === "F10" && ev.shiftKey) {
         ev.preventDefault();
-        openVarMenuFor(v, el);
+        openVarMenuFor(v, el2);
         return;
       }
-      gridKey(ev, el);
+      gridKey(ev, el2);
     });
-    el.addEventListener("focus", () => {
-      if (el.matches(":focus-visible")) showItemTip(el);
+    el2.addEventListener("focus", () => {
+      if (el2.matches(":focus-visible")) showItemTip(el2);
     });
-    el.addEventListener("blur", hideItemTip);
+    el2.addEventListener("blur", hideItemTip);
   }
   var itemTip = null;
-  function showItemTip(el) {
+  function showItemTip(el2) {
     hideItemTip();
     const tip = document.createElement("div");
     tip.className = "vt-tip";
     tip.setAttribute("aria-hidden", "true");
-    tip.textContent = el.title;
+    tip.textContent = el2.title;
     $("overlayRoot").appendChild(tip);
-    const r = el.getBoundingClientRect();
+    const r = el2.getBoundingClientRect();
     const w = tip.offsetWidth;
     tip.style.left = `${Math.max(4, Math.min(r.left, window.innerWidth - w - 4))}px`;
     tip.style.top = `${r.bottom + 4 + tip.offsetHeight > window.innerHeight - 24 ? r.top - tip.offsetHeight - 4 : r.bottom + 4}px`;
@@ -10502,7 +10705,7 @@ ${opts.tip}` : text;
     itemTip == null ? void 0 : itemTip.remove();
     itemTip = null;
   }
-  function gridKey(ev, el) {
+  function gridKey(ev, el2) {
     const all = gridItems();
     const lineOf = (x) => {
       var _a3;
@@ -10525,7 +10728,7 @@ ${opts.tip}` : text;
     const toLine = (j) => {
       const l = lines[Math.max(0, Math.min(lines.length - 1, j))];
       if (!l) return;
-      const cx = el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2;
+      const cx = el2.getBoundingClientRect().left + el2.getBoundingClientRect().width / 2;
       const items = itemsIn(l);
       let best = items[0];
       let bd = Infinity;
@@ -10539,16 +10742,16 @@ ${opts.tip}` : text;
       }
       go(best);
     };
-    const li = lines.indexOf(lineOf(el));
-    const inLine = itemsIn(lineOf(el));
-    const ii = inLine.indexOf(el);
+    const li = lines.indexOf(lineOf(el2));
+    const inLine = itemsIn(lineOf(el2));
+    const ii = inLine.indexOf(el2);
     const k = ev.key;
     if (k === "ArrowDown") toLine(li + 1);
     else if (k === "ArrowUp") toLine(li - 1);
     else if (k === "ArrowRight" && ii >= 0 && inLine.length > 1) go(inLine[Math.min(inLine.length - 1, ii + 1)]);
     else if (k === "ArrowLeft" && ii > 0) go(inLine[ii - 1]);
-    else if (k === "ArrowLeft" && ii === 0 && !el.classList.contains("vt-group") && headOf(el)) go(headOf(el));
-    else if (k === "ArrowLeft" && ii === 0 && inLine.length > 1) go(el);
+    else if (k === "ArrowLeft" && ii === 0 && !el2.classList.contains("vt-group") && headOf(el2)) go(headOf(el2));
+    else if (k === "ArrowLeft" && ii === 0 && inLine.length > 1) go(el2);
     else if (k === "Home") go(all[0]);
     else if (k === "End") go(all[all.length - 1]);
     else if (k === "PageDown") toLine(li + 10);
@@ -10566,15 +10769,15 @@ ${opts.tip}` : text;
   function applyVar(v, target) {
     const lock = writeLockReason();
     if (lock) {
-      showStatusLine(lock, { cls: "warn" });
+      notify(lock, "warning");
       return;
     }
     if (!curSel.count) {
-      showStatusLine(t("status.noSelection"), { cls: "warn" });
+      notify(t("status.noSelection"), "warning");
       return;
     }
     if (!target && varKind(v) === "other") {
-      showStatusLine(t("apply.otherKind"), { cls: "warn" });
+      notify(t("apply.otherKind"), "warning");
       return;
     }
     applyVarReq = ++bindReqSeq;
@@ -10584,16 +10787,16 @@ ${opts.tip}` : text;
     if (msg.reqId !== applyVarReq) return;
     const tip = Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => `${t("apply.reason." + k)} ${n}`).join(" \xB7 ");
     if (!msg.applied) {
-      showStatusLine(t("apply.none", { name: msg.name }), { cls: "warn", tip });
+      notify(t("apply.none", { name: msg.name }), "warning", { tip });
       return;
     }
-    showStatusLine(t("apply.done", { n: msg.applied, name: msg.name }) + (msg.skipped ? t("apply.skipped", { m: msg.skipped }) : "") + t("apply.undo"), { cls: msg.skipped ? "warn" : "ok", tip });
+    notify(t("apply.done", { n: msg.applied, name: msg.name }) + (msg.skipped ? t("apply.skipped", { m: msg.skipped }) : "") + t("apply.undo"), msg.skipped ? "warning" : "success", { tip });
   }
-  function openVarMenuFor(v, el, x, y) {
+  function openVarMenuFor(v, el2, x, y) {
     var _a3, _b;
-    const r = el.getBoundingClientRect();
-    focusKey = (_a3 = el.dataset.key) != null ? _a3 : null;
-    el.classList.add("menu-open");
+    const r = el2.getBoundingClientRect();
+    focusKey = (_a3 = el2.dataset.key) != null ? _a3 : null;
+    el2.classList.add("menu-open");
     const kind = varKind(v);
     const targets = (_b = APPLY_TARGETS[kind]) != null ? _b : [];
     const items = [];
@@ -10605,11 +10808,11 @@ ${opts.tip}` : text;
       items.push({ label: t("apply.elsewhere"), submenu: sub, disabled: !curSel.count, note: curSel.count ? void 0 : t("status.noSelection"), onSelect: () => {
       } });
     }
-    items.push({ label: t("vm.detail"), onSelect: () => openDetail({ local: v }, el), focusElsewhere: true });
+    items.push({ label: t("vm.detail"), onSelect: () => openDetail({ local: v }, el2), focusElsewhere: true });
     const lock = dupPaidReason(v);
     items.push({ label: t("vm.duplicate"), disabled: !!lock, note: lock != null ? lock : void 0, onSelect: () => duplicateVar(v) });
-    items.push({ label: t("vm.delete"), separatorBefore: true, onSelect: () => confirmDeleteVar(v, el), focusElsewhere: true });
-    openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, el, () => el.classList.remove("menu-open"));
+    items.push({ label: t("vm.delete"), separatorBefore: true, onSelect: () => confirmDeleteVar(v, el2), focusElsewhere: true });
+    openMenu(x != null ? x : r.left + 24, y != null ? y : r.bottom, items, el2, () => el2.classList.remove("menu-open"));
   }
   function clearSearch(render = true) {
     query = "";
@@ -10626,11 +10829,11 @@ ${opts.tip}` : text;
     var _a3, _b, _c;
     const items = gridItems();
     const hit = items.find((x) => x.dataset.key === `v:${id}`);
-    const el = (_b = (_a3 = hit != null ? hit : foldAnchor(`v:${id}`, items)) != null ? _a3 : items[0]) != null ? _b : $("varSearch");
+    const el2 = (_b = (_a3 = hit != null ? hit : foldAnchor(`v:${id}`, items)) != null ? _a3 : items[0]) != null ? _b : $("varSearch");
     items.forEach((x) => x.tabIndex = -1);
-    el.tabIndex = 0;
-    focusKey = (_c = el.dataset.key) != null ? _c : null;
-    return { el, present: !!hit };
+    el2.tabIndex = 0;
+    focusKey = (_c = el2.dataset.key) != null ? _c : null;
+    return { el: el2, present: !!hit };
   }
   var detailVarId = null;
   function usesBlock(id) {
@@ -11082,8 +11285,8 @@ ${opts.tip}` : text;
   function edPicker(f) {
     const e = ed;
     const pk = e.picker;
-    const el = document.createElement("div");
-    el.className = "ed-picker";
+    const el2 = document.createElement("div");
+    el2.className = "ed-picker";
     const search = document.createElement("input");
     search.type = "text";
     search.className = "ed-psearch";
@@ -11221,19 +11424,19 @@ ${opts.tip}` : text;
         (_a3 = opts[0]) == null ? void 0 : _a3.focus();
       }
     });
-    el.addEventListener("keydown", (ev) => {
+    el2.addEventListener("keydown", (ev) => {
       if (ev.key !== "Escape") return;
       ev.preventDefault();
       ev.stopPropagation();
       edClosePicker(true);
     });
     render();
-    el.append(search, body, link);
-    return el;
+    el2.append(search, body, link);
+    return el2;
   }
   var PICKER_MAX = 240;
   var PICKER_MIN = 124;
-  function edPlacePicker(f, el) {
+  function edPlacePicker(f, el2) {
     const field = f.dd.querySelector(".ed-field");
     const scroller = f.dd.closest(".m-scroll");
     if (!field || !scroller) return;
@@ -11249,17 +11452,17 @@ ${opts.tip}` : text;
       up = above > below;
       h = Math.max(PICKER_MIN, Math.min(PICKER_MAX, up ? above : below));
     }
-    el.style.maxHeight = `${h}px`;
+    el2.style.maxHeight = `${h}px`;
     if (up) {
-      el.style.bottom = `${f.dd.offsetHeight - field.offsetTop + 2}px`;
-      el.style.top = "auto";
+      el2.style.bottom = `${f.dd.offsetHeight - field.offsetTop + 2}px`;
+      el2.style.top = "auto";
     } else {
-      el.style.top = `${field.offsetTop + field.offsetHeight + 2}px`;
-      el.style.bottom = "auto";
+      el2.style.top = `${field.offsetTop + field.offsetHeight + 2}px`;
+      el2.style.bottom = "auto";
     }
-    el.classList.toggle("up", up);
-    const er = el.getBoundingClientRect();
-    if (er.top < sr.top || er.bottom > sr.bottom) el.scrollIntoView({ block: "nearest" });
+    el2.classList.toggle("up", up);
+    const er = el2.getBoundingClientRect();
+    if (er.top < sr.top || er.bottom > sr.bottom) el2.scrollIntoView({ block: "nearest" });
   }
   function edResetField(f, base, type) {
     f.base = base;
@@ -11515,8 +11718,8 @@ ${opts.tip}` : text;
     const { el: target, present } = focusAfterDetail(e.v.id);
     if (e.appliedAny) {
       const name = (_b = (_a3 = vmVars.find((x) => x.id === e.v.id)) == null ? void 0 : _a3.name) != null ? _b : e.v.name;
-      if (e.lastPartial) showStatusLine(present ? t("edit.partial") : t("edit.closedPartialMissing", { name }), { cls: "warn" });
-      else if (!present) showStatusLine(t("edit.closedMissing", { name }));
+      if (e.lastPartial) notify(present ? t("edit.partial") : t("edit.closedPartialMissing", { name }), "warning");
+      else if (!present) notify(t("edit.closedMissing", { name }), "info");
     }
     return target;
   }
@@ -11702,7 +11905,7 @@ ${opts.tip}` : text;
   function varJump(id) {
     const v = vmVars.find((x) => x.id === id);
     if (!v) {
-      showStatusLine(t("list.libVar"));
+      notify(t("list.libVar"), "info");
       return;
     }
     const undo = { sel: sideSel, userPick: sideUserPick, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey };
@@ -11721,7 +11924,7 @@ ${opts.tip}` : text;
       item.scrollIntoView({ block: "center" });
       item.focus({ preventScroll: true });
     }
-    showStatusLine(t("list.jumped", { name: v.name }), {
+    notify(t("list.jumped", { name: v.name }), "info", {
       action: {
         label: t("list.undo"),
         run: () => {
@@ -11835,14 +12038,14 @@ ${opts.tip}` : text;
       item.focus({ preventScroll: true });
     }
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    for (const el of items) {
-      const k = el.dataset.key;
+    for (const el2 of items) {
+      const k = el2.dataset.key;
       if (!(k == null ? void 0 : k.startsWith("v:")) || !ids.has(k.slice(2))) continue;
       if (((_a3 = vmVars.find((x) => x.id === k.slice(2))) == null ? void 0 : _a3.collectionId) !== first.collectionId) continue;
-      el.classList.remove("hl-flash");
-      void el.offsetWidth;
-      el.classList.add("hl-flash");
-      el.addEventListener("animationend", () => el.classList.remove("hl-flash"), { once: true });
+      el2.classList.remove("hl-flash");
+      void el2.offsetWidth;
+      el2.classList.add("hl-flash");
+      el2.addEventListener("animationend", () => el2.classList.remove("hl-flash"), { once: true });
     }
   }
   function revealVar(v) {
@@ -11910,18 +12113,18 @@ ${opts.tip}` : text;
     afterTable = { focus: `v:${msg.id}`, pick: true };
     e.create.opener = null;
     closeModal();
-    showStatusLine(t("newVar.created"), { cls: "ok" });
+    notify(t("newVar.created"), "success");
   }
   var dupReq = 0;
   function duplicateVar(v) {
     const paid = dupPaidReason(v);
     if (paid) {
-      showStatusLine(paid, { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
+      notify(paid, "warning", { action: { label: t("status.paidAction"), run: goToLicense } });
       return;
     }
     const lock = writeLockReason();
     if (lock) {
-      showStatusLine(lock, { cls: "warn" });
+      notify(lock, "warning");
       return;
     }
     dupReq = ++bindReqSeq;
@@ -11932,18 +12135,18 @@ ${opts.tip}` : text;
     afterTable = { openDetail: msg.newId };
   }
   var delReq = 0;
-  function confirmDeleteVar(v, el) {
+  function confirmDeleteVar(v, el2) {
     var _a3;
     const lock = writeLockReason();
     if (lock) {
-      showStatusLine(lock, { cls: "warn" });
+      notify(lock, "warning");
       return;
     }
     const m = vmVars.filter((x) => x.id !== v.id && Object.values(x.values).some((c) => (c == null ? void 0 : c.kind) === "alias" && c.aliasId === v.id)).length;
     const cut = v.name.lastIndexOf("/");
     const gKey = `${v.collectionId}|${cut < 0 ? "" : v.name.slice(0, cut)}`;
     const items = gridItems();
-    const i = items.indexOf(el);
+    const i = items.indexOf(el2);
     const sameGroup = (x) => {
       const id = x == null ? void 0 : x.dataset.id;
       const o = id ? vmVars.find((y) => y.id === id) : void 0;
@@ -11972,11 +12175,11 @@ ${opts.tip}` : text;
       closeModal();
     });
     del.classList.add("danger", "ds-btn--danger");
-    openModal(title, body, [cancel, del], () => el, void 0, { focus: cancel });
+    openModal(title, body, [cancel, del], () => el2, void 0, { focus: cancel });
   }
   function onVariableDeleted(msg) {
     if (msg.reqId !== delReq) return;
-    showStatusLine(t("del.done"), { cls: "ok" });
+    notify(t("del.done"), "success");
   }
   function onVarOpError(msg) {
     const e = ed;
@@ -11998,17 +12201,17 @@ ${opts.tip}` : text;
       return true;
     }
     if (msg.op === "DUPLICATE_VARIABLE" && msg.reqId === dupReq) {
-      if (msg.code === "paid") showStatusLine(t("paid.semantic"), { cls: "warn", action: { label: t("status.paidAction"), run: goToLicense } });
-      else showStatusLine(msg.code === "deleted" ? t("edit.deleted") : t("newVar.dupFailed"), { cls: "warn", tip: msg.message });
+      if (msg.code === "paid") notify(t("paid.semantic"), "warning", { action: { label: t("status.paidAction"), run: goToLicense } });
+      else notify(msg.code === "deleted" ? t("edit.deleted") : t("newVar.dupFailed"), "error", { tip: msg.message });
       return true;
     }
     if (msg.op === "DELETE_VARIABLE" && msg.reqId === delReq) {
       afterTable = null;
-      showStatusLine(msg.code === "deleted" ? t("edit.deleted") : t("del.failed"), { cls: "warn", tip: msg.message });
+      notify(msg.code === "deleted" ? t("edit.deleted") : t("del.failed"), "error", { tip: msg.message });
       return true;
     }
     if (msg.op === "APPLY_VARIABLE" && msg.reqId === applyVarReq) {
-      showStatusLine(msg.code === "deleted" ? t("edit.deleted") : t("apply.failed"), { cls: "warn", tip: msg.message });
+      notify(msg.code === "deleted" ? t("edit.deleted") : t("apply.failed"), "error", { tip: msg.message });
       return true;
     }
     return false;
@@ -12533,8 +12736,8 @@ ${opts.tip}` : text;
       }
       selHeadEl = h;
     }
-    const put = (el) => {
-      cards.appendChild(el);
+    const put = (el2) => {
+      cards.appendChild(el2);
     };
     const done = () => finishSelFocus(hadFocus, slot);
     const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
@@ -12609,8 +12812,8 @@ ${opts.tip}` : text;
       SEL_TOOLS.insertBefore(make, SEL_TOOLS.firstChild);
       primary = make;
     } else if (linkN > 0) {
-      const go = selBtn(t("v4.linkN", { n: linkN }), (el) => {
-        showSelSub("bind", el);
+      const go = selBtn(t("v4.linkN", { n: linkN }), (el2) => {
+        showSelSub("bind", el2);
       }, true);
       go.dataset.k = "todo-link";
       go.classList.add("ds-btn--lg");
@@ -12684,7 +12887,7 @@ ${opts.tip}` : text;
       return [sp];
     };
     const mainsSub = (card2) => {
-      for (const el of Array.from(card2.querySelectorAll(".s"))) if (el.querySelector("[data-mains]")) el.classList.add("mains");
+      for (const el2 of Array.from(card2.querySelectorAll(".s"))) if (el2.querySelector("[data-mains]")) el2.classList.add("mains");
       return card2;
     };
     const markMains = (els) => {
@@ -12699,9 +12902,9 @@ ${opts.tip}` : text;
     }
     if (m === 0 && n === 0) {
       selTodo.view = true;
-      const v = selLink(t("v4.view"), (el) => {
+      const v = selLink(t("v4.view"), (el2) => {
         bindSkipsOpen = true;
-        showSelSub("bind", el);
+        showSelSub("bind", el2);
         renderBindTree();
       });
       v.dataset.k = "skips";
@@ -12755,9 +12958,8 @@ ${opts.tip}` : text;
     unbindReq = 0;
     let text = t("v4.unbound", { k: msg.unbound });
     if (msg.failed) text += t("v4.unboundFailed", { m: msg.failed });
-    showStatusLine(text, { cls: msg.failed ? "warn" : "ok" });
     const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t("v4.unbindFail." + k)} ${n}`).join(" \xB7 ");
-    if (tip) $("statusText").title = tip;
+    notify(text, msg.failed ? msg.unbound ? "warning" : "error" : "success", tip ? { tip } : {});
     if (document.activeElement === document.body || !((_a3 = document.activeElement) == null ? void 0 : _a3.isConnected)) selFallbackFocus(true).focus();
     queueMicrotask(() => {
       if (!$("selCards").contains(document.activeElement)) selFallbackFocus(true).focus();

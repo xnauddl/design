@@ -58,24 +58,34 @@ export interface MakeTotals {
 }
 
 /**
- * 다 됨 상태 줄 문구(§4.3 실행 상태표 "다 됨"). 한 단계도 하지 않은 부분은 뺀다.
+ * 다 됨 Toast 문구(§4.3 실행 상태표 "다 됨" · ia-v4 §4.1b S3-D16 문장형). 한 단계도 하지 않은 부분은 뺀다.
  * 무료의 만들기 부분은 "Global {g}개"(Semantic 없음 — F4), 바로 연결을 껐으면 끝에 " · 연결은 아직 안 했어요".
  */
 export function makeDoneText(totals: MakeTotals, opts: { isPaid: boolean; linkOff: boolean }): string {
+  // 문장형(ia-v4 §4.1b "만들기 다 됨 글 — 문장형" S3-D16): 머리 문장 하나 + 나머지 부분을 " · "로.
+  // 만든 것 {C} — 무료 g > 0 · 유료 r = 0은 "Global 변수 {g}개", 유료 g · r > 0은 "Global {g}개 · Semantic {r}개", 유료 g = 0 · r > 0은 "Semantic 변수 {r}개".
+  const c = totals.created;
+  let made = '';
+  if (c) {
+    if (c.g > 0) made = opts.isPaid && c.r > 0 ? t('make.done.create', { g: c.g, r: c.r }) : t('make.done.madeG', { g: c.g });
+    else if (opts.isPaid && c.r > 0) made = t('make.done.madeR', { r: c.r });
+  }
+  // 연결한 곳 {B} — n > 0 · t > 0 "{n}곳 · Text Style {t}곳", n > 0 "{n}곳", t > 0 "Text Style {t}곳". 돌렸는데 0 · 0이면 나머지 부분 "변수를 연결한 곳은 없어요".
+  const n = totals.bound ?? 0;
+  const tsB = totals.tsBound ?? 0;
+  const places = n > 0 ? (tsB > 0 ? t('make.done.placesTs', { n, t: tsB }) : t('make.done.places', { n })) : tsB > 0 ? t('make.done.placesTsOnly', { t: tsB }) : '';
+  const noPlace = !places && totals.bound != null;
   const parts: string[] = [];
-  // 만들기 부분 — 만든 것이 없으면(g = 0 · r = 0, 무료 g = 0) 뺀다(ia-v4 §2.9 "결과 문장").
-  const createdText = totals.created ? makeCreatedText(totals.created, opts.isPaid) : '';
-  if (createdText) parts.push(createdText);
+  if (made && places) parts.push(t('make.done.sentCreateBind', { c: made, b: places }));
+  else if (made) parts.push(t('make.done.sentCreate', { c: made }));
+  else if (places) parts.push(t('make.done.sentBind', { b: places }));
+  // 나머지 부분(순서 그대로) — 다크 · 텍스트 스타일 · 알림 · 연결 0곳 · 이름 정리 · 직접 만든 변수 건너뜀 · 연결 안 함
   if (totals.darkFilled != null) parts.push(t('make.done.dark', { k: totals.darkFilled }));
   if (totals.styles) parts.push(totals.styles.a > 0 ? t('make.done.stylesLinked', { s: totals.styles.s, a: totals.styles.a }) : t('make.done.styles', { s: totals.styles.s }));
   if (totals.styles?.missing?.length) parts.push(t('make.done.missing', { k: totals.styles.missing.length })); // 텍스트 스타일 바로 뒤(§4.3 "글꼴")
-  // 연결 부분(B.35): n > 0이면 "{b}곳 연결" + Text Style 꼬리, n = 0 · t > 0(건너뜀 포함)이면 "Text Style {t}곳 연결", 돌려 0 · 0이면 "0곳 연결"
-  const tsB = totals.tsBound ?? 0;
-  if (totals.bound && totals.bound > 0) parts.push(t('make.done.bind', { n: totals.bound }) + (tsB ? t('wizard.seq.bindTs', { t: tsB }) : ''));
-  else if (tsB) parts.push(t('wizard.seq.bindTsOnly', { t: tsB }));
-  else if (totals.bound != null) parts.push(t('make.done.bind', { n: totals.bound }));
+  if (noPlace) parts.push(t('make.done.noPlace'));
   if (totals.renamed != null) parts.push(t('make.done.rename', { c: totals.renamed }));
-  if (totals.created && totals.created.m > 0) parts.push(t('make.done.manual', { m: totals.created.m }));
+  if (c && c.m > 0) parts.push(t('make.done.manual', { m: c.m }));
   if (opts.linkOff) parts.push(t('make.done.notLinked'));
   return parts.join(' · ');
 }
