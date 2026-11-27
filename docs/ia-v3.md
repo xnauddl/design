@@ -562,7 +562,52 @@
       - 결과 수: `create.sumGlobals` "Global {n}개 (생성 {c} / 갱신 {u})"의 {n} · {c} · {u}는 플러그인 Global에 만들거나 갱신한 수다. 재사용한 사용자 Global은 어디에도 세지 않고 문구도 더하지 않는다. [미리보기](`previewCreateTokens`)도 같은 판단으로 센다.
     - **13.7 다른 쓰기 기능 (사용자 결정 — 전부 플러그인 컬렉션 안에서만).**
       - 역할 매핑 표(`createSemanticAliases`): 플러그인 Semantic에 만든다. Global 이름은 Global 계층 전부의 **직접 값 변수**에서 찾는다(별칭 변수는 이름이 같아도 쓰지 않는다 — 13.3, 플러그인 Global 먼저, 같은 이름이면 그것). 이름으로 못 찾으면 `dsl.reuseMap`에서 그 이름이 재사용한 Global을 쓴다(13.6). 그래도 없으면 지금처럼 `missing`.
-      - **다크(`themeApply`) — 결정 D-T1(2026-11-20 사용자 결정 "Global이 테마별로 바뀌는 방식", 다크 구조 PR에서 구현 — A.25).** 이력: 그 PR 전까지 코드는 Dark 모드를 플러그인 Semantic에 더하고 `dark/{이름}` Global 복사본을 만들어 Semantic Dark가 그것을 가리켰다(A.12 "다크" 줄). 아래가 그 PR 뒤의 규칙이다. 사용자 컬렉션의 모드 · 값은 건드리지 않는다(13.7 원칙).
+      - **다크(`themeApply`) — 결정 D-T2(2026-11-27 사용자 결정 DK-D5–DK-D8 "Global은 팔레트 하나, Semantic이 Light · Dark 연결표" — 대략 시안 확인, A.30). D-T1(아래 이력)을 뒤집는다.** 사용자 컬렉션의 모드 · 값은 건드리지 않는다(13.7 원칙).
+        - **구조(DK-D5):** 플러그인 **Global은 모드가 없다**(기본 모드 하나 — 실제 색값의 팔레트, `color/{계열}/{단계}`). **플러그인 Semantic에 Dark 모드**를 더하고, Semantic 색 역할마다 Light(기본 모드) · Dark가 **각각 다른 Global 스텝을 별칭으로** 가리킨다. Dark 전용 색을 Global에 모드로 두지 않고, 스케일에 없는 색이 필요하면 Global에 **스텝으로 더한다**(Dark 컬렉션 복제 없음). 레이어는 Semantic만 가리킨다. 무료(F6)는 레이어를 Global에 바로 붙이므로 Dark에서 바뀌지 않는다(DK-D8 받아들임 — [다크 만들기]는 유료 그대로, 유료로 바꾸면 연결 때 Global → Semantic으로 바꾼다 — ia-v4 §2.9a S-3a).
+        - **모드 정하기:** 대상 = 늘 플러그인 Semantic(`ownedCollection(cols, 'semantic')`). Light(from) = Semantic **기본 모드**. Dark(to) = 기본이 아닌 모드 중 이름이 `Dark`인 모드(`findModeByName`), 없으면 `addMode('Dark')`(`ensureDarkMode`). Semantic 기본 모드 이름이 `Dark`이고 다른 `Dark`가 없으면 `dark.errSameMode`(글: "Semantic 기본 모드 이름이 Dark예요 …")로 거절. 플러그인 Semantic이 없으면 `dark.errNoCol`.
+        - **대상 역할:** 플러그인 Semantic의 색 변수 중 `isManual` 아님 · Light 칸이 **플러그인 Global의 직접 값 색 변수 G를 가리키는 별칭**인 것. 그 밖(Light가 직접 값 · 사용자 Global · 다른 컬렉션 · 별칭 변수 · `isManual`)은 건드리지 않는다(Dark 칸은 지금 값 그대로 — 받아들임).
+        - **Light 스텝 읽기:** G의 이름이 `color/{계열}/{단계}`이고 단계가 50 … 950 · 0 · 1000 중 하나면 그 계열 · 단계. 계열 이름은 둘째 마디 그대로(`blue-2`도 그 자체로 한 계열). 이름이 그 꼴이 아니거나(가운데 단계 450 · `-n` 꼬리 · hex 평면명 등) 단계를 못 읽으면 계열 = 이름의 둘째 마디(꼴이 아니면 `classifyColor(G 값).family`), 단계 = `classifyColor(G 값).step`(gray 0 · 1000 포함).
+        - **Dark 스텝 고르기 — 역할별 규칙(DK-D6).** 단계 목록 `S = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]`(자리 0–10), gray 0은 자리 −1 · 1000은 자리 11. 쓰임 = Semantic 이름 `color/{쓰임}/…`의 둘째 마디. "유채색" = G의 계열이 `gray`가 아님. 위에서부터 처음 맞는 것:
+          | # | 조건 | Dark가 가리킬 것 |
+          |---|---|---|
+          | 1 | 쓰임 `shadow` · 이름 끝 마디 `inverse` · G의 투명도 < 1 | Light와 같은 G(바꾸지 않음) |
+          | 2 | 회색 · 쓰임 `background` | 대칭 자리 `10 − i`에서 가운데(5) 쪽으로 한 자리, 그다음 0–10으로 자름 — gray 0 → 950 · 50 → 900 · 100 → 800 · 900 → 200 |
+          | 3 | 회색 · 그 밖 쓰임(`text` · `icon` · `border` · 모르는 쓰임) | 대칭 자리 `10 − i`를 0–10으로 자름 — 900 → 100 · 600 → 400 · 200 → 800 · 1000 → 50 · 0 → 950 |
+          | 4 | 유채색 · 단계 ≤ 200(연한 강조 배경) | 규칙 2와 같은 자리(같은 계열) — blue/50 → 900 · 100 → 800 |
+          | 5 | 유채색 · 단계 ≥ 800(짙은 끝) | 규칙 3과 같은 자리(같은 계열) — blue/900 → 100 |
+          | 6 | 유채색 · 단계 300–700(강조색) | 단계 ≥ 600이면 두 자리, 아니면 한 자리 밝게(`i − 2` · `i − 1`), 단 300보다 밝게 가지 않음(최소 자리 3) — 600 → 400 · 500 → 400 · 700 → 500 · 300 → 300 |
+          - 고른 자리의 단계를 s′라 하면 Dark = 플러그인 Global의 `color/{계열}/{s′}`(아래 "전체 스케일"이 늘 있게 한다).
+        - **전체 스케일(DK-D7):** 이번 실행에서 Dark가 가리킬 계열(규칙 2–6의 계열)마다, 플러그인 Global에 `color/{계열}/{50 … 950}` 11단계가 **모두** 있게 한다 — 이미 있는 이름(값 · 직접 만든 변수 포함)은 그대로 두고 없는 단계만 만든다(기본 모드 하나에 값). 0 · 1000 · 가운데 단계는 만들지 않는다. 새 단계 값:
+          - 기준(anchor) = 그 계열의 이미 있는 단계 이름 변수 중 직접 값 · 불투명 색(없으면 대상 역할의 G들).
+          - L = `stepRefL(단계)`(이름 짓기 기준 L — 다시 추출해도 같은 단계로 읽히게).
+          - 회색: H = 기준 색 H의 평균(원형 평균), C = 기준 C의 중앙값(0.02를 넘지 않게).
+          - 유채색: H = 기준 중 C가 가장 큰 색의 H, C = 그 C × (1 − 0.6 × |i − i_peak| / 10)(`buildScale`과 같은 감쇠, i_peak = 그 색의 단계 자리).
+          - `clampToGamut` → `#rrggbb`. 새 변수의 용도(scope)는 플러그인 Global 색과 같게(`createTokens` 규칙).
+          - 받아들임: 안 쓰는 단계가 생긴다(계열 넷이면 Global 최대 44개). 팔레트 정리(`prunePaletteColors`)는 이 단계를 쓰이지 않으면 지울 수 있다(사용자가 고른 정리이므로) — 지워진 단계를 Dark가 가리키고 있으면 정리가 이미 지우지 않는다(가리키는 변수가 있음).
+        - **채운 기록:** Semantic 변수의 플러그인 데이터 `dsl.darkPick` = JSON `{ "{to 모드 id}": { "l": Light 칸, "d": Dark 칸, "by": "calc" | "user" } }`. 칸 값은 별칭이면 `alias:{변수 id}`, 색이면 `#RRGGBBAA`(D-T1 `cellKey`와 같은 꼴). 열쇠 모드가 없어진 기록은 버린다.
+        - **칸마다 판정(위에서부터 처음 맞는 것, to 모드 기준 — D-T1 표를 Semantic으로 옮긴 것):** "Dark 칸이 빔" = to 칸 없음 또는 to 모드를 이번 실행에 만들었음. "규칙 값" = 위 역할별 규칙이 고른 `alias:{s′ 변수 id}`.
+          | Dark 칸 · 기록 | 하는 일 | 세는 곳 |
+          |---|---|---|
+          | Dark 칸이 빔 | 규칙 값을 쓰고 기록 `calc` | 연결한 역할 n |
+          | 기록 `user` | 그대로 | 그대로 둔 역할 k |
+          | 기록 `calc`, 지금 Dark ≠ `d` | 그대로 두고 기록을 `user`로(사용자가 고쳤다고 봄) | k |
+          | 기록 `calc`, Dark = `d`, (지금 Light ≠ `l` 또는 `d` ≠ 규칙 값) | 규칙 값을 다시 쓰고 기록 새로 | n |
+          | 기록 `calc`, Dark = `d`, Light = `l`, `d` = 규칙 값 | 쓰지 않음 | 세지 않음 |
+          | 기록 없음, Dark = Light(같은 별칭 — 다크를 만든 뒤 생긴 역할 등) | 규칙 값을 쓰고 기록 `calc` | n |
+          | 기록 없음, Dark ≠ Light | 그대로 두고 기록 `user` | k |
+        - **나중에 만든 역할:** Semantic을 만드는 곳(`createUsageRoles` · 역할 매핑 · 연결의 새 역할 — "모든 모드에 같은 별칭")은 고치지 않는다. Dark 칸이 Light와 같은 별칭이라 다시 누를 때 위 표 "기록 없음, Dark = Light"로 채워진다.
+        - **Dark 연결이 없는 역할 수:** 플러그인 Semantic 모드가 둘 이상일 때만. 대상 역할 중 지금 모드를 열쇠로 한 기록이 ① `user`이거나 ② `calc`이고 Light = `l`인 것이 하나라도 있으면 연결된 역할, 아니면 **Dark 연결이 없는 역할**로 센다(규칙 값과 `d`가 달라진 calc는 연결된 역할로 센다 — 띠는 "없다"를 말하므로). `code.ts` `postPrereq` → `PREREQ_STATE.darkUnfilled`(필드 이름 그대로). 보이는 곳: 다크 화면 띠(ia-v4 §4.11 ②).
+        - **D-T1 파일 옮기기(DK-D8 "확인 후 자동으로 옮기기"):** "D-T1 구조" = 플러그인 Global에 기본이 아닌 `Dark` 모드가 있음. [다크 만들기]에 `migrate`가 없으면 아무것도 쓰지 않고 `needMigrate: { globalMode: "Dark" }`로 답하고, UI는 확인 팝업을 연다(글 아래). 승인(`migrate: true`)하면 한 번의 실행 · ⌘Z 한 번으로:
+          1. **읽기:** 대상 역할마다 그 G의 Global Dark 칸과 기록(`dsl.darkFill`)을 읽는다.
+          2. Semantic Dark 모드 ensure(위 "모드 정하기").
+          3. **사용자 Dark 값 옮기기:** G의 기록이 `user`(또는 기록 없이 Global Dark 칸 ≠ Light 칸)인 역할은 그 Dark 칸을 Semantic Dark로 옮긴다 — 칸이 별칭이면 그 대상을 그대로 가리키고, 색이면 그 값과 `#RRGGBBAA`가 같은 플러그인 Global 변수(기본 모드 값 — G 자신 포함, 이름 오름차순 첫 번째)를 가리킨다. 같은 값이 없으면 그 값으로 Global 스텝을 새로 만들어(이름 `nameColorsByHue([hex], 1, 파일 이름들)` — 12.11 규칙) 가리킨다. 기록 `user`(옮긴 역할 a, 새로 만든 스텝 g에 셈). 같은 G를 가리키는 역할이 여럿이면 모두 같은 대상.
+          4. **Global Dark 모드 지우기:** 플러그인 Global의 그 `Dark` 모드를 `removeMode`. 모든 플러그인 Global 변수의 `dsl.darkFill`을 지운다. Global의 다른 모드(사용자 모드)는 건드리지 않는다.
+          5. 이어서 보통 채우기(위 표 — 3에서 쓴 역할은 건너뜀).
+          - 결과 `migrated = { moved: a, added: g }`. 받아들임: D-T1에서 `calc`였던 Global Dark 값(공식 값)은 옮기지 않고 규칙 스텝으로 바뀐다(색이 달라질 수 있다).
+        - **옛 구조(D-T1 전 — Semantic에 Dark · `dark/…` 복사본) 파일:** 옮기기 없이 그대로 D-T2로 읽는다 — Semantic Dark가 이미 Global 변수(`dark/…`)를 가리키므로 위 표 "기록 없음, Dark ≠ Light"로 `user`(그대로)가 된다. D-T1의 옛 구조 옮기기(①–⑥ · `dark.needMigrate` · `dark.needMigrateManual` · `dark.errMigrateModes`)는 없앤다. 받아들임: `dark/…` 이름 · 옛 공식 색이 남는다(새 규칙을 쓰려면 Semantic Dark 모드를 지우고 다시 누름 — 직접 고친 Dark 연결도 사라진다).
+        - **판정 순서:** 플러그인 Semantic 없음(`dark.errNoCol`) → Semantic 기본 모드 이름이 `Dark`이고 다른 `Dark` 없음(`dark.errSameMode`) → D-T1 구조이고 `migrate` 없으면 `needMigrate` → (쓰기) 모드 ensure → 옮기기 3–4(승인 때) → 전체 스케일 → 칸마다 판정. 새로 만든 모드에 쓴 칸이 0이고 옮긴 것도 0이면 그 모드를 지운다(D-T1과 같음). 대상 역할 0이면 `targets: 0`(`dark.nothing`).
+        - **함께 바뀌는 곳:** `darkPrereq.hasDarkMode` = 플러그인 Semantic 모드 둘 이상 **또는** D-T1 구조(옮기기 전). `darkOld` → D-T1 구조 여부(띠 `dark.needMigrate` 새 글), `darkOldManual`은 늘 거짓(필드는 남김). 만들기 화면 다크 단계(`wizard.ts` `hasDarkTarget`)는 플러그인 Semantic에 대상 역할이 있을 때. 내보내기(§4.4 "모드 블록")는 고치지 않는다 — SEMANTIC 모드 블록이 생기고 GLOBAL은 `:root` 한 블록. DK-1 공식(`darkValueForLight` · `calcDarkValue` · `calcDarkHex8` — A.29)은 쓰는 곳이 없어지므로 지운다(`themeGen.ts`에는 `dark/` 이름 판별만 남김).
+      - **(→ 2026-11-27 D-T2로 바뀜 — 아래는 이력.)** **다크(`themeApply`) — 결정 D-T1(2026-11-20 사용자 결정 "Global이 테마별로 바뀌는 방식", 다크 구조 PR에서 구현 — A.25).** 이력: 그 PR 전까지 코드는 Dark 모드를 플러그인 Semantic에 더하고 `dark/{이름}` Global 복사본을 만들어 Semantic Dark가 그것을 가리켰다(A.12 "다크" 줄). 아래가 그 PR 뒤의 규칙이다. 사용자 컬렉션의 모드 · 값은 건드리지 않는다(13.7 원칙).
         - **구조:** Dark 모드는 **플러그인 Global**에 더한다. 같은 Global 변수가 모드마다 다른 값을 가진다(`color/gray/900` — Light `#101828`, Dark 밝은 색). Semantic은 모드 하나이고 테마와 상관없이 늘 같은 Global을 가리킨다. `dark/…` Global 복사본은 만들지 않는다.
         - **모드 정하기(2026-11-20 사용자 결정 "고르개 완전히 없앰" — 다크 화면에 컬렉션 · 모드 고르개가 없다):** 대상 컬렉션 = 늘 플러그인 Global(`ownedCollection(cols, 'global')`). 라이트 모드(from) = Global **기본 모드**. 다크 모드(to) = 기본이 아닌 모드 중 이름이 `Dark`인 모드(`findModeByName` — 앞뒤 공백 떼고 대소문자 무시), 없으면 `addMode('Dark')`(`ensureDarkMode`). Global 기본 모드의 이름이 `Dark`이면 바꾸지 않고 `dark.errSameMode`(글 바꿈 — "Global 기본 모드 이름이 Dark예요…")로 거절한다(명세에서 정함 — 기본 모드가 라이트 원본이라 같은 이름의 모드를 또 만들 수 없고, 다른 모드를 라이트로 짐작하지 않는다). 다만 기본 모드가 아닌 `Dark`가 따로 있으면 그것을 to로 쓰므로 이 거절은 "Global 모드 이름 `Dark`가 기본 모드뿐"일 때다. **받아들임(고르개를 없앤 결과):** Global에 사용자가 만든 `Dark`가 아닌 둘째 모드(예: `Night`)만 있으면 그 모드는 채우지 않는다 — 수 세기는 모드 둘 이상이라 그 칸을 세어 띠가 뜨지만, [다크 만들기]는 `Dark` 모드를 새로 만들어 채운다(모드 수 한도인 파일이면 `dark.errAddMode`).
         - **채우는 칸:** 플러그인 Global의 색 변수 중 from 칸이 **직접 값**인 것만(별칭 변수 · 직접 만든 변수 §4.9 `isManual` · 이름이 `dark/`로 시작하는 변수(`isDarkGlobalName` — 옮기기 ⑤에서 남은 옛 복사본, "다크의 다크"를 막는다 — 명세에서 정함)는 건너뛴다. 색이 아닌 변수의 Dark 칸은 건드리지 않는다). 쓰는 값 = `darkValueForLight(from 칸)`(아래 "Dark 값 공식" — 투명도는 그대로). 사용자 Global을 가리키는 Semantic은 Dark에서 바뀌지 않는다(받아들임).
@@ -2793,9 +2838,26 @@
 
 ## A.29 Dark 색 공식 PR (2026-11-27 사용자 결정 DK-D1–DK-D4 — 13.7 "Dark 값 공식", B안 · 대략 시안 확인)
 
+- **(2026-11-27 D-T2로 바뀜 — 같은 PR #196에서 A.30이 이어받는다.)** DK-1 공식은 구현(d430733) 뒤 사용자 결정 DK-D5–DK-D8로 쓰는 곳이 없어져 A.30에서 지운다. 아래 체크는 닫지 않고 이력으로 둔다.
+
 - 결정: DK-D1 시작 = S-3a(#195) 병합 뒤 · DK-D2 다시 누르면 플러그인이 채운 칸(`calc`)은 새 공식 값으로 다시 씀(직접 고친 칸 `user`는 그대로) · DK-D3 강조색은 중간 밝기를 지키고 끝만 뒤집음 · DK-D4 밝은 회색 단계는 순서를 지키고 간격만 넓힘 + 회색 푸른 기 줄임.
 - [ ] `themeGen.ts` `darkValueForLight`를 13.7 "Dark 값 공식" 1–5로(회색 곡선 `N` · 무게 `w` · `wₕ` · 짙은 끝/중간/밝은 끝 밝기 · 채도 · 게멋). 회색 곡선은 함수 `darkGrayCurve(L)`로 내보낸다(테스트가 직접 부름). 상수는 이름 붙여 내보낸다(`DARK_L_MIN` 0.18 · `DARK_L_MAX` 0.97 그대로, 새로 곡선 지수 0.7 · 끝 경계 0.40 / 0.85 · 중간 대역 0.55–0.85 · 무게 0.04 / 0.10 · 밝은 끝 무게 0.09 / 0.14 · 채도 줄임 0.4). 틀린 말이 되는 주석을 고친다 — `themeGen.ts` 머리 주석("색상·채도는 보존해… 명암만 뒤집는다") · `darkValueForLight` 주석("hue/chroma는 유지" · "단조 증가라 순서 보존" — 회색에만 맞음) · `themeApply.ts` `writeCalc`의 "밝기만 바꾸고 투명도는 그대로".
 - [ ] `themeApply.ts` 칸마다 판정: 기록 `calc` · Dark 칸 = `d` · from = `f` · from 칸 = `l`이어도 `d` ≠ 지금 공식 값이면 다시 쓰고 n에 셈. "지금 공식 값"은 `writeCalc`가 쓰는 값과 똑같은 계산이어야 한다 — 함수 하나(예: `calcDarkHex8(light)` = `rgbToHex(light)` → `darkValueForLight` → `hexToRgb` + `a: la` → `hex8`)로 나눠 쓰기와 견주기에 함께 쓴다. `countDarkUnfilled`는 바꾸지 않는다(13.7 — 공식이 바뀐 calc 칸은 채운 색). 옮기기 ③의 `user` 칸은 그대로(13.7 받아들임 ⑤).
 - [ ] 단위 테스트: `darkValueForLight` 예 11개(13.7 예 줄 — hex 그대로) · 회색 곡선 `darkGrayCurve`를 L 0 · 0.05 … 1의 21점에서 직접 불러 엄격히 줄어듦(L이 커지면 N이 작아짐) · 강조색 대비 ≥ 4.5(blue/500 · red/500 · green/500 · amber/400 · yellow/400 — 배경 `darkValueForLight('#FFFFFF')`) · 투명도는 공식 밖(채운 칸의 a = from 칸 a). `themeApply`: 옛 공식으로 채운 `calc` 칸(목에서 Dark 칸과 기록 `d`를 **모두** 옛 공식 값으로 — 하나만 다르면 user로 바뀐다) → 다시 누르면 새 값 · n = 그 수 · `user` 칸(직접 고친 칸 · 옮기기 ③ 칸)은 그대로(k) · 새 공식 값과 같은 `calc` 칸은 세지 않음(`upToDate`) · `countDarkUnfilled`가 옛 공식 calc 칸을 세지 않음. 깨지는 기존 테스트는 없다(hex 기대값 #FFFFFF → #121212 · 검정 → #F5F5F5와 pure 테스트의 색상 보존 · 회색 램프 단조 · 대역은 새 공식에서도 같다 — 1회차 검토에서 계산으로 확인) — 새로 더한다.
 - [ ] 화면 문구: 안내 두 줄만 바꾼다(새 공식과 맞게 — 1회차 검토 뒤 명세에서 정함). `dark.hint` "Global 색의 밝기를 뒤집어 Dark 칸에 채워요" → **"Global 색을 다크에 맞게 바꿔 Dark 칸에 채워요"** · `dark.hintTip` "색상 · 채도는 그대로 두고 밝기만 뒤집어요. …" → **"연한 배경 · 짙은 글자 색은 밝기를 뒤집고, 강조색은 밝기를 지켜 조금 밝게 해요. 회색은 푸른 기를 줄여요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요."**(`i18n.ts` · `ui.html`의 정적 `title` · ia-v4 §4.11 ② 와이어 안내 줄 · `scripts/verify-bind-flow.mjs`의 두 글 기대값). 옛 글을 적은 이력 줄(A.25 "글 바꿈" · ia-v4 B.20)에는 "→ A.29"를 붙인다. 구조 · 결과 줄(`dark.doneFill`)은 그대로. 검사 4개 · 스크린샷은 다크 화면 안내 줄 · 결과 줄 한 장.
 - [ ] 실기 확인(사용자, 피그마): ① D-T1 뒤(2026-11-23 이후) Dark를 만든 파일에서 [다크 만들기] → 플러그인이 채운 칸이 새 색으로(강조색이 밝고 선명 · 밝은 회색 단계가 구분됨) · 직접 고친 칸은 그대로 · ⌘Z 한 번에 되돌림 ② 만들기 화면 실행의 다크 단계도 같은 색 ③ 새 파일에서도 같은 색 ④ (있으면) 옛 구조에서 옮긴 파일은 옮긴 칸이 그대로(받아들임 ⑤).
+
+## A.30 다크 D-T2 PR — Global은 팔레트 하나, Semantic이 Light · Dark 연결표 (2026-11-27 사용자 결정 DK-D5–DK-D8 — 13.7 "다크 — D-T2", ia-v4 §4.11 ② D-T2 블록. PR #196 이어서)
+
+- 결정: DK-D5 구조(Global 모드 없음 · Semantic Dark가 Global 스텝을 별칭) · DK-D6 역할별 규칙 · DK-D7 쓰인 계열마다 50–950 전체 스케일 · DK-D8 D-T1 파일은 확인 후 자동 옮기기 · 무료는 Dark 없음(받아들임).
+- [ ] `themeApply.ts` `generateDarkMode(migrate?)` 다시 쓰기: 대상 플러그인 Semantic · 모드 정하기 · 대상 역할 · Light 스텝 읽기 · 역할별 규칙 표(1–6) · 전체 스케일 · `dsl.darkPick` 기록 · 칸마다 판정 표 · 판정 순서 · 새 모드 지우기. 결과 `DarkModeResult = { filled, kept, targets, changed, modeCreated?, scaleAdded?, migrated?: { moved, added }, needMigrate?: { globalMode }, error? }`.
+- [ ] 순수 함수로 나눠 단위 테스트한다: `darkStepFor({ use, inverse, alpha, family, step })` → 단계(규칙 1이면 null) · `lightStepOf(name, hex)` → { family, step } · `scaleStepColor(family, step, anchors)` → hex(새 위치 `src/lib/darkRules.ts`, figma 의존 없음).
+- [ ] D-T1 옮기기 1–5 · `needMigrate` 미리 셈(쓰기 없음) · 옛 구조 옮기기 코드(①–⑥ · `oldDarkMode` 쓰는 판정 · `unusedDarkCopies`)와 `dsl.darkFill` 쓰기 지우기(읽기는 옮기기 1에만).
+- [ ] `countDarkUnfilled` · `darkPrereq`를 13.7 D-T2로(필드 이름 그대로, `darkOldManual` 늘 거짓). `code.ts` `GENERATE_DARK_MODE` 결과 전달(`scaleAdded`) · `postPrereq`.
+- [ ] `wizard.ts` `hasDarkTarget` · `darkResultText`(scalePart · migrated added) · 만들기 화면 다크 단계 글(`ui.ts`).
+- [ ] UI: 전제 띠 조건(플러그인 Semantic 없음) · 팝업 글 · 결과 줄. 글 키는 ia-v4 §4.11 ② D-T2 블록 그대로(지우는 키 포함), `verify:i18n` 통과.
+- [ ] DK-1 코드 지우기: `themeGen.ts`의 공식 · 상수 · `darkGrayCurve`, `themeApply.ts`의 `calcDarkValue` · `calcDarkHex8`, pure 테스트의 DK-1 · darkValueForLight 테스트(지금 공식이 없어지므로 — 다른 테스트로 대신: 스케일 색 · 규칙).
+- [ ] 단위 테스트(`test/figma.test.mjs` 목 · `test/pure.test.mjs`): 규칙 1–6 경계(gray 0 · 50 · 100 · 900 · 1000 배경/글자, blue 50 · 200 · 300 · 500 · 600 · 700 · 800 · 900, inverse · shadow · 반투명) · 처음 누름(Semantic에 Dark 모드 · Global 모드 하나 그대로 · 역할마다 별칭 · 전체 스케일 11단계 · 이미 있는 단계 값 그대로 · `scaleAdded`) · 다시 누름 표 7줄 · 나중에 만든 역할(Dark = Light) 채움 · 사용자 Global을 가리키는 역할은 그대로 · D-T1 옮기기(`needMigrate` 먼저 · 승인 뒤 user 칸 같은 값 스텝 · 없으면 새 스텝 · 별칭 칸 대상 그대로 · Global Dark 모드 없어짐 · `dsl.darkFill` 지움 · calc 칸은 규칙 스텝 · ⌘Z 한 묶음은 code.ts) · 옛 구조 파일은 그대로(k) · `countDarkUnfilled`(모드 하나 0 · 기록 없음 · calc인데 Light 바뀜) · 내보내기 SEMANTIC 모드 블록. 지금 D-T1 다크 테스트는 D-T2 기대값으로 바꾸거나 지운다(옛 구조 옮기기 테스트는 지움).
+- [ ] 검사 4개 · 스크린샷: 다크 화면(안내 · 띠) · 옮기기 팝업 · 결과 줄.
+- [ ] 실기 확인(사용자, 피그마): ① 새 파일 — 유료로 만들기 → [다크 만들기] → Global에 모드 없음 · Semantic에 Dark · 프레임을 Dark 모드로 두면 배경 어둡고 글자 밝고 강조색 한두 스텝 밝음 · 쓰인 계열의 50–950 스텝 ② D-T1로 Dark를 만든 파일 — 팝업 → 옮기기 → Global Dark 모드 없어짐 · 직접 고친 색 유지 · ⌘Z 한 번 ③ 다시 누름 — 바뀐 것 없으면 "모두 되어 있어요" ④ Dark 연결을 직접 바꾼 역할은 다시 눌러도 그대로.
+

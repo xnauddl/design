@@ -2141,6 +2141,22 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 **② 다크 모드**(단독 화면 — 결정 ⑤. 유료)
 
+> **결정 D-T2(2026-11-27 사용자 결정 DK-D5–DK-D8 — ia-v3 13.7 "다크 — D-T2" · A.30. 아래 D-T1 글 · 와이어 · 상태표에서 이 블록과 다른 것은 이 블록을 따른다):** Global은 모드 없는 팔레트, 플러그인 Semantic에 Dark 모드 · 역할마다 Dark가 다른 Global 스텝을 가리킨다. 화면 구조(제목 · 안내 · 알림 띠 · 전제 띠 · 상태 줄 · [다크 만들기] · 옮기기 팝업)는 그대로이고 글 · 조건만 바뀐다.
+> - 글(`i18n.ts` · `ui.html` 정적 글 · `verify-bind-flow` 기대 글):
+>   - `dark.hint` "Semantic 역할마다 Dark에서 쓸 Global 스텝을 연결해요"
+>   - `dark.hintTip` "Global은 모드 없는 팔레트 하나예요. 배경은 어두운 스텝, 글자는 밝은 스텝, 강조색은 한두 스텝 밝은 스텝을 가리키고, 필요한 계열은 50–950 스텝을 채워요. 플러그인 Semantic의 역할만 연결하고, 직접 만든 변수 · 직접 고친 Dark 연결은 그대로 둬요."
+>   - `dark.running` "다크 모드를 만들고 연결하는 중…"
+>   - `dark.doneFill` "{modePart}Semantic 역할 {n}개의 Dark를 연결했어요{scalePart}{keptPart}" · 새 `dark.scalePart` " · Global 스텝 {g}개를 만들었어요"(g > 0일 때만) · `dark.keptPart` " · 직접 고친 역할 {k}개는 그대로 뒀어요" · `dark.upToDate` "Dark 연결이 모두 되어 있어요{scalePart}{keptPart}"
+>   - `dark.nothing` "연결할 역할이 없어요 — 플러그인 Global을 가리키는 Semantic 색 역할이 필요해요"
+>   - `dark.unfilled` "Dark 연결이 없는 역할 {n}개 — [다크 만들기]로 연결해요"
+>   - `dark.needMigrate` "Dark가 Global 모드에 있어요 — [다크 만들기]를 누르면 Semantic으로 옮겨요"
+>   - 팝업 `dark.migrateTitle` "다크 구조를 옮길까요?"(그대로) · `dark.migrateBody` "Global은 모드 없는 팔레트로 두고, Dark는 Semantic 모드에서 Global 스텝을 가리키게 옮겨요. 직접 고친 Dark 색은 같은 값의 스텝을 가리키고(없으면 스텝을 만들어요), Global의 Dark 모드는 지워요. ⌘Z 한 번으로 되돌릴 수 있어요." · `dark.migrateGo` "옮기고 다크 만들기"(그대로)
+>   - `dark.migrated` "다크 구조를 옮겼어요(옮긴 역할 {a}개{addedPart}) · " · 새 `dark.migratedAdded` " · 만든 스텝 {g}개"(g > 0일 때만)
+>   - `dark.errSameMode` "Semantic 기본 모드 이름이 Dark예요 — 피그마에서 기본 모드 이름을 Light 등으로 바꿔 주세요"
+>   - 만들기 화면 다크 단계: `wizard.seq.dark` "다크 연결 {filled}개" · 새 `wizard.seq.darkScale` " · 스텝 {g}개 만듦" · `wizard.seq.darkKept` " · 직접 고친 역할 {n}개는 그대로" · `wizard.seq.darkUpToDate` "Dark 연결이 모두 되어 있음" · `wizard.seq.darkNoTarget` "플러그인 Semantic이 없어 건너뜀 — 먼저 토큰을 만드세요" · `wizard.seq.darkNothing` "연결할 역할이 없음 — 플러그인 Global을 가리키는 Semantic 색 역할이 필요해요"
+>   - 지우는 키: `dark.needMigrateManual` · `dark.migrateBodyNoDel` · `dark.errMigrateModes` · `dark.migratedSplit` · `dark.migratedFail` · `dark.migratedSplitTip` · `dark.migratedFailTip` · `dark.migratedDelTip`(옛 구조 옮기기가 없어짐)
+> - 조건: 전제 띠 "플러그인 Global 없음" → **플러그인 Semantic 없음**(글 `dark.prereqNoVars` 그대로). 알림 띠 `dark.needMigrate`는 D-T1 구조(플러그인 Global에 `Dark` 모드)일 때. 옮기기 결과 줄은 `migrated.added`만 붙이고 툴팁 없음. 결과 줄 `scalePart`는 `DARK_MODE_RESULT.scaleAdded`(새 필드, 만든 Global 스텝 수).
+
 > **결정 D-T1(2026-11-20 사용자 결정 "Global이 테마별로 바뀌는 방식" — 다크 구조 PR(ia-v3 A.25)에서 구현, 도구 탭 구현 전에):** 다크 모드는 **플러그인 Global**에 만든다(같은 Global 변수가 모드마다 다른 값, Semantic은 모드 하나, `dark/…` 복사본 없음 — 규칙은 ia-v3 13.7 "다크"). 다크 구조 PR은 **지금 다크 카드**(값을 직접 고르기 › 테마 `#darkCard` — 단계 칩 · 툴바의 [다크 만들기] · [다음 →] 배치는 그대로)에 아래 글 · 띠 · 팝업 · 대상을 먼저 넣고 **고르개 셋을 없애며**(2026-11-20 사용자 결정 "고르개 완전히 없앰" — 대상 · 모드는 플러그인이 정한다, ia-v3 13.7 "모드 정하기"), 도구 탭 PR이 그것을 이 도구 화면으로 옮긴다(화면을 새로 짜는 일은 도구 탭 PR — ROADMAP §0 8). 아래 와이어 · 글 · 상태는 다크 구조 PR 뒤의 모습이다. 그 PR이 더하는 글은 모두 **임시 문구**(UX 라이팅 단계에서 확정 — 키 표는 ia-v3 A.25). **라이트 · 다크 비교 목록(2026-11-20 사용자 결정 B):** 이 화면에 플러그인 Global 색의 목록(변수 이름 · Light 색 · Dark 색 · 상태 — 채움 / 직접 고친 칸 / 다시 채울 칸)을 둔다. 줄 모양(카드 안 카드 금지 — 구분선 줄) · 자리 · 정렬 · 상태 판정(ia-v3 13.7의 채운 기록 규칙)은 도구 탭 PR 명세에서 정한다.
 
 ```
