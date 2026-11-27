@@ -46,6 +46,9 @@
       /* 카드 그림자 없음(DS-D5 — design-system.md 부록 A.4) */
     }
     .step > * + * { margin-top: var(--space-2); }
+    /* 연결 · 만들기 · 이름 정리 하위 화면은 카드가 아니다(DS-3c S3-D18 — ia-v4 §4.1b "하위 화면 카드 없앰"): 탭 패널 위에 바로.
+       클래스 .step은 화면 전환(showStep) · 오류 상자 C-D14(cardOf)가 찾으므로 남기고 모양만 없앤다. 자식 위 여백은 그대로. */
+    .step.bind-v4 { border: 0; border-radius: 0; padding: 0; margin-bottom: 0; background: none; }
 
     /* ── 카드 헤더(접기 chevron + 타이틀 줄 버튼) — 캐논 패턴 ──
        주 버튼이 타이틀 줄에 있으므로 헤더도 sticky로 고정한다. 아니면 카드 본문(예: 토큰
@@ -616,8 +619,8 @@
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
     .make-foot { background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); padding-top: var(--space-2); padding-bottom: var(--space-2); z-index: var(--z-sticky); }
-    /* 아래 고정 줄은 창 바닥 · 가로 전체(design-system §5 Bottom Action Bar · ia-v4 §4.1b S3-D10 — DS-3b 실기 뒤): 카드 안에 있어도 창에 고정한다.
-       내용이 짧아도 줄은 창 바닥에 있고, 본문 아래에는 줄 높이(--foot-h)만큼 여백을 둔다. 글은 카드 안 글과 같은 세로선에서 시작한다. */
+    /* 아래 고정 줄은 창 바닥 · 가로 전체(design-system §5 Bottom Action Bar · ia-v4 §4.1b S3-D10 — DS-3b 실기 뒤): 화면(.step) 안에 있어도 창에 고정한다.
+       내용이 짧아도 줄은 창 바닥에 있고, 본문 아래에는 줄 높이(--foot-h)만큼 여백을 둔다. 좌우 안쪽 24(DS-3c 뒤에도 그대로 — 2026-11-27 사용자 결정). */
     .sub-foot, .make-foot { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding-left: var(--space-6); padding-right: var(--space-6); z-index: var(--z-sticky); }
     /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
     .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }

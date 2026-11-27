@@ -2217,8 +2217,10 @@ window.onmessage = (event: MessageEvent) => {
         if (msg.noteTip) $('licenseStatus').title = msg.noteTip;
       }
       // Free/Paid 2티어 — 유료면 모든 유료 기능 해금.
+      const tierChanged = isPaid !== msg.unlimited;
       isPaid = msg.unlimited;
       updateGates();
+      if (tierChanged) onMakeTierChange();
       renderLicenseLink(); // 티어가 바뀌면 구매 버튼 글 · 툴팁도(B.21)
       break;
     }
@@ -2376,8 +2378,8 @@ const OP_STATUS: Record<string, string> = {
 };
 
 /* ---------- 오류 상자의 [다시 시도]가 그 카드의 유일한 주 버튼(2026-11-17 사용자 결정 C-D14 — ia-v4 §4.3a-2) ----------
-   공통 오류 상자(빨강 띠)에 [다시 시도]가 있는 동안은 그 카드(상태 자리를 담은 `.step` · `.modal`, 카드가 없는 화면은
-   그 화면 패널)의 다른 버튼에서 `primary`를 떼고(잠긴 버튼 포함) `data-primary-held`로 기억한다. 상자가 사라질 때
+   공통 오류 상자(빨강 띠)에 [다시 시도]가 있는 동안은 그 카드(상태 자리를 담은 `.step` · `.modal` — 연결 · 만들기 · 이름 정리는
+   DS-3c 뒤 카드 모양이 없는 `.step` 화면, 카드가 없는 화면은 그 화면 패널)의 다른 버튼에서 `primary`를 떼고(잠긴 버튼 포함) `data-primary-held`로 기억한다. 상자가 사라질 때
    (같은 상태 자리를 덮는 setStatus · 다음 showError · 내보내기 팝업 닫기) 되돌리고 다시 판정한다. */
 const RETRY_CLS = 'retry-btn';
 /** 상태 자리 · 버튼이 속한 카드. */
@@ -2756,6 +2758,21 @@ function readMake(user = false): void {
   opSilent = false;
   renderMakeScreen();
 }
+/**
+ * 유료 ↔ 무료가 바뀜(DS-3c S3-D19 — ia-v4 §4.1b "유료 ↔ 무료가 바뀌면" 1–4). 만들기 화면의 무료 상자 · 도구 줄 · 스위치 · 탭(🔒 · Text Style)이
+ * 모두 티어에 달려 있으므로 읽은 기준과 오는 중인 읽기를 버리고 다시 읽는다 — 늦게 온 옛 티어 응답은 reqId가 맞지 않아 makeTakes가 버린다.
+ */
+function onMakeTierChange(): void {
+  const was = mkFor === baseKey() || mkReading; // 큰 선택을 [읽기]로 읽는 중이었으면 이어서 읽는다
+  mkFor = null; mkTsFor = null;
+  mkExtractReq = 0; mkScanReq = 0;
+  mkReading = false; mkTsReading = false;
+  mkReqBase.clear(); mkTsPending = null; mkEditSig = null;
+  if (activeTab !== 'select' || selSub !== 'make') return; // 열려 있지 않으면 돌아올 때 readScreen('enter') · 들어올 때 늘 읽음
+  if (mkRunning || mkResults) { renderMakeScreen(); return; }
+  readMake(was);
+  if (!mkReading) renderMakeScreen(); // 다른 작업 중이라 미뤘으면 뼈대(작업이 끝나면 readScreen('work')가 읽음)
+}
 function scheduleMake(): void {
   if (mkReadTimer) clearTimeout(mkReadTimer);
   mkReadTimer = setTimeout(() => { mkReadTimer = null; readMake(); }, AUTO_SCAN_DELAY);
@@ -3039,7 +3056,13 @@ function renderMakeTabs(vis: readonly MkTab[]): void {
     const n = tab === 'global' ? String(mkTokens.length)
       : tab === 'semantic' ? (sem === 'counting' || sem === 'failed' ? '…' : String(sem === 'rows' ? mkRoleRows.length : 0))
       : mkTsFor === baseKey() ? String(mkTs.length) : '…';
-    b.querySelector<HTMLElement>('.n')!.textContent = n;
+    const nEl = b.querySelector<HTMLElement>('.n')!;
+    // 무료면 Semantic 탭 개수 자리는 늘 🔒(응답 전에도 — DS-3c S3-D19). 🔒는 읽지 않고 접근성 이름 "Semantic · 유료", 툴팁 title.
+    const semLock = tab === 'semantic' && !isPaid;
+    nEl.textContent = semLock ? PAID_LOCK : n;
+    if (semLock) nEl.setAttribute('aria-hidden', 'true'); else nEl.removeAttribute('aria-hidden');
+    if (semLock) { b.setAttribute('aria-label', `Semantic · ${t('common.paidTag')}`); b.title = t('make.freeSemTop'); }
+    else if (tab === 'semantic') { b.removeAttribute('aria-label'); b.removeAttribute('title'); }
     const dot = b.querySelector<HTMLElement>('.mk-dot');
     if (dot) {
       dot.hidden = !(conflict && !sel);
