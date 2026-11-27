@@ -2167,6 +2167,7 @@ B.8을 되돌린다(카드 2 펼침 목록은 되살리지 않는다). 줄 번�
 - [다시 시도](`resendRetry`): `opSent`가 붙인 reqId(`opAutoReq`)면 빼고 보냄. 화면이 정한 reqId면 그 화면 함수(`APPLY{preview}` → `runBindPreview` · `RENAME{apply: false}` → `readRename(true)`), 그 밖은 같은 reqId 그대로(`opSent`가 조용한 묶음에서 뺌).
 - 거절 · 오류 갈래 더함: 만들기 카드 만들기의 `PREMIUM_REQUIRED{reqId: mcCreateReq}`(만드는 중 풂 · `showPaidReason`) — 8a 뒤 그 거절이 `mcTakes`로 가 메인 처리기의 유료 사유가 사라지므로. `onMakeReadFail`: 추출 실패가 다른 기준이면 값 줄 0(`mkTokens = []`).
 - 상세 [저장] 잠금은 `edSaveReq` · `edSaveTimer`(10초)로, 팝업이 닫혀도 남음. 다른 쓰기 중 [저장]을 누르면 팝업 알림 줄에 `bind.waitOp`. 새 변수 [만들기]에는 이 잠금을 걸지 않았다(명세는 상세 [저장]만).
+- 만들기 화면 읽기의 기준 대조(#171 코드 검토 중대 1): 사용자 [읽기]가 OPS 작업이 되어 그동안 선택이 바뀌어도 자동 읽기가 `opBusy()`에 막힌다 — 옛 응답이 지금 기준의 값으로 적히지 않게, `readMake`가 보낸 때의 목록 기준을 reqId별로(`mkReqBase`) 들고 응답(결과 · 오류 · 거절)이 올 때 지금 기준과 다르면 버린다(`onMakeReadStale`). 짝 읽기(추출 · 후보)가 모두 끝난 뒤 한 번 다시 읽고, 다른 작업 중이라 못 읽으면 뼈대 · 큰 선택이면 [읽기](자동 읽기가 막힌 때와 같은 모습). verify 8a에 검사 2건.
 - Esc의 글자 칸 = `input`의 `text · search · number · password · email · url · tel` · `textarea` · `contenteditable`(열린 이름 칸 `input.tr-edit` 포함). 설정에는 체크박스가 없어 verify는 닫힌 `select#tier`로 본다.
 - verify 8a: 남의 거절 · 옛 reqId 오류 · 조용한 응답 · [읽기] OPS · 다크 단계 reqId · 쓰기 잠금 양쪽 · [저장] 잠금 · [닫기] 예외 · [다시 시도] 새 reqId · Esc. 스크린샷은 바뀐 모습이 잠금(툴팁 · aria-disabled)뿐이라 verify 검사로 대신했다.
 

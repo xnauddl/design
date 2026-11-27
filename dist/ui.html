@@ -7521,6 +7521,7 @@
     }
     if (opBusy() || wizardRunning) return;
     mkExtractReq = mkNextReq();
+    mkReqBase.set(mkExtractReq, baseKey());
     mkReading = true;
     opSilent = !user;
     opMakeRead = user;
@@ -7528,6 +7529,7 @@
     send({ type: "EXTRACT", nodeIds: baseline.ids, reqId: mkExtractReq });
     if (isPaid) {
       mkScanReq = mkNextReq();
+      mkReqBase.set(mkScanReq, baseKey());
       mkTsReading = true;
       if (user) mkUserReqs.add(mkScanReq);
       send({ type: "SCAN_TEXT_STYLES", nodeIds: baseline.ids, reqId: mkScanReq, make: true });
@@ -7569,10 +7571,18 @@
     renderMakeScreen();
   }
   var mkUserReqs = /* @__PURE__ */ new Set();
+  var mkReqBase = /* @__PURE__ */ new Map();
   function makeTakes(msg) {
     const rid = msg.reqId;
     if (rid == null || !mkOwned.has(rid)) return false;
     if (msg.type === "VARIABLES" || msg.type === "DARK_MODE_RESULT") return false;
+    const sentFor = mkReqBase.get(rid);
+    mkReqBase.delete(rid);
+    if ((rid === mkExtractReq || rid === mkScanReq) && sentFor !== void 0 && sentFor !== baseKey()) {
+      mkUserReqs.delete(rid);
+      onMakeReadStale(rid === mkScanReq);
+      return true;
+    }
     if ((msg.type === "ERROR" || msg.type === "PREMIUM_REQUIRED") && (rid === mkExtractReq || rid === mkScanReq)) {
       onMakeReadFail(msg, rid === mkScanReq);
       return true;
@@ -7582,6 +7592,19 @@
     else if (msg.type === "TEXT_STYLE_CANDIDATES" && rid === mkScanReq) onMakeScan(msg);
     mkUserReqs.delete(rid);
     return true;
+  }
+  function onMakeReadStale(scan) {
+    if (scan) {
+      mkScanReq = 0;
+      mkTsReading = false;
+      mkTsPending = null;
+    } else {
+      mkExtractReq = 0;
+      mkReading = false;
+    }
+    if (mkReading || mkTsReading) return;
+    readMake();
+    if (!mkReading) renderMakeScreen();
   }
   function onMakeReadFail(msg, scan) {
     const user = msg.reqId != null && mkUserReqs.delete(msg.reqId);
