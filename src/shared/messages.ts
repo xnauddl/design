@@ -228,7 +228,8 @@ export type UiToCode = (
   | { type: 'RENAME_APPLY'; items: { id: string; before: string; after: string; role?: string; nameKey?: string; kept?: boolean }[]; reqId?: number } // #7: 미리보기 트리에서 체크한 항목만 직접 적용(WYSIWYG)
   | { type: 'CREATE_SEMANTICS'; map: Record<string, string> }
   // nodeIds: 목록 기준(없으면 지금 선택). reqId가 있으면 만들기 화면의 조용한 후보 읽기 — 응답에 existing을 싣고 lastTextSamples를 덮어쓰지 않는다(IA v4 §4.3).
-  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
+  // make: 만들기 화면의 후보 읽기(S-6a 뒤 모든 요청이 reqId를 실어 따로 표시 — ia-v4 §4.11a ① · B.46). lastTextSamples를 덮지 않고 원격 같은 묶음을 뺀다.
+  | { type: 'SCAN_TEXT_STYLES'; nodeIds?: string[]; reqId?: number; make?: boolean } // Phase C: 선택 텍스트 후보 — 이름은 KRDS 규칙(heading/large…, docs/text-style-krds.md)
   // 스캔 결과에 가로 행 라벨 이름을 덧입힌다. 스캔의 옵션이 아니라 뒤따르는 별도 동작이다
   // (결정 2026-08-06) — 켜고 스캔하는 대신, 결과를 보고 마음에 안 들면 눌러 이름만 다시 매긴다.
   | { type: 'NAME_TEXT_STYLES_BY_ROW' }

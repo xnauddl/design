@@ -438,6 +438,8 @@
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
+    "make.countFail": "\uC138\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    // 만들 수 미리보기 실패(ia-v4 §4.3 "만들 수" · B.46)
     "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.countStyles": " \xB7 \uC2A4\uD0C0\uC77C {t}\uAC1C",
     "make.layers": "Layer {n}",
@@ -9016,11 +9018,11 @@
           if (!requirePaid("textStyles", msg.reqId)) break;
           const scanRoots = (await withLocalMains(await resolveRoots(msg.nodeIds))).roots;
           const { samples, warnings, nodeById } = await scanTextStyles(scanRoots);
-          if (msg.reqId == null) lastTextSamples = samples;
+          if (!msg.make) lastTextSamples = samples;
           const existing = await scanExistingTextStyles();
           const { rest, decimalRows } = splitDecimalClusters(clusterTextStyles(samples), existing);
           const anchorOf = anchorOfFor(existing);
-          const kept = msg.reqId != null && nodeById ? await dropRemoteClusters(rest, nodeById, scanRoots, (c) => anchorOf(c) !== void 0) : rest;
+          const kept = msg.make && nodeById ? await dropRemoteClusters(rest, nodeById, scanRoots, (c) => anchorOf(c) !== void 0) : rest;
           const styles = nameTextStyles(kept, existing);
           const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
           if (msg.reqId != null) {

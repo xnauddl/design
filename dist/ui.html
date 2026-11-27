@@ -2221,6 +2221,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
+    "make.countFail": "\uC138\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    // 만들 수 미리보기 실패(ia-v4 §4.3 "만들 수" · B.46)
     "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.countStyles": " \xB7 \uC2A4\uD0C0\uC77C {t}\uAC1C",
     "make.layers": "Layer {n}",
@@ -7473,6 +7475,8 @@ button.ds-tag { border: 0; cursor: pointer; }
   var mkTsNames = /* @__PURE__ */ new Map();
   var mkEditSig = null;
   var mkTsPending = null;
+  var mkReqBase = /* @__PURE__ */ new Map();
+  var mkPreviewFailed = false;
   var mkOwned = /* @__PURE__ */ new Set();
   var mkReadTimer = null;
   var mkFocusPending = false;
@@ -7544,13 +7548,15 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
     if (opBusy() || wizardRunning) return;
     mkExtractReq = mkNextReq();
+    mkReqBase.set(mkExtractReq, baseKey());
     mkReading = true;
     opSilent = true;
     send({ type: "EXTRACT", nodeIds: baseline.ids, reqId: mkExtractReq });
     if (isPaid) {
       mkScanReq = mkNextReq();
+      mkReqBase.set(mkScanReq, baseKey());
       mkTsReading = true;
-      send({ type: "SCAN_TEXT_STYLES", nodeIds: baseline.ids, reqId: mkScanReq });
+      send({ type: "SCAN_TEXT_STYLES", nodeIds: baseline.ids, reqId: mkScanReq, make: true });
     }
     opSilent = false;
     renderMakeScreen();
@@ -7581,6 +7587,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   function mkSendPreview() {
     const toks = mkSendTokens();
     mkPreview = null;
+    mkPreviewFailed = false;
     if (!toks.length) {
       mkRoleRows = [];
       mkPreviewReq = 0;
@@ -7600,14 +7607,44 @@ button.ds-tag { border: 0; cursor: pointer; }
   function makeTakes(msg) {
     const rid = msg.reqId;
     if (rid == null || !mkOwned.has(rid)) return false;
+    const sentFor = mkReqBase.get(rid);
+    mkReqBase.delete(rid);
+    if ((rid === mkExtractReq || rid === mkScanReq) && sentFor !== void 0 && sentFor !== baseKey()) {
+      onMakeReadStale(rid === mkScanReq);
+      return true;
+    }
     if (msg.type === "PREMIUM_REQUIRED" || msg.type === "ERROR") {
       onMakeReadFail(msg, rid);
       return true;
     }
     if (msg.type === "EXTRACT_RESULT" && rid === mkExtractReq) onMakeExtract(msg);
     else if (msg.type === "CREATE_RESULT" && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
-    else if (msg.type === "TEXT_STYLE_CANDIDATES" && rid === mkScanReq) onMakeScan(msg);
+    else if (msg.type === "TEXT_STYLE_CANDIDATES" && rid === mkScanReq) onMakeScan(msg, sentFor);
     return true;
+  }
+  function onMakeReadStale(scan) {
+    if (scan) {
+      mkScanReq = 0;
+      mkTsReading = false;
+      mkTsPending = null;
+    } else {
+      mkExtractReq = 0;
+      mkReading = false;
+    }
+    if (mkReading || mkTsReading) return;
+    readMake();
+    renderMakeScreen();
+  }
+  function resumeMakeScan(p) {
+    if (p.rid !== mkScanReq) {
+      renderMakeScreen();
+      return;
+    }
+    if (p.base !== baseKey()) {
+      onMakeReadStale(true);
+      return;
+    }
+    onMakeScan(p.msg);
   }
   function onMakeReadFail(msg, rid) {
     const err = msg.type === "ERROR" ? msg : null;
@@ -7622,6 +7659,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       say();
       renderMakeScreen();
     } else if (rid === mkPreviewReq) {
+      if (!mkPreviewTagsOnly) mkPreviewFailed = true;
       say();
       renderMakeScreen();
     }
@@ -7662,10 +7700,10 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
     renderMakeScreen();
   }
-  function onMakeScan(msg) {
+  function onMakeScan(msg, sentFor) {
     var _a3, _b;
     if (mkEditSig) {
-      mkTsPending = msg;
+      mkTsPending = { msg, rid: mkScanReq, base: sentFor != null ? sentFor : baseKey() };
       return;
     }
     mkTsReading = false;
@@ -7720,7 +7758,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   function mkSemState() {
     if (!mkGlobalsOn().length) return "none";
-    if (mkPreview == null) return "counting";
+    if (mkPreview == null) return mkPreviewFailed ? "failed" : "counting";
     return mkRoleRows.length ? "rows" : "zero";
   }
   var mkTabName = (tab) => tab === "global" ? "Global" : tab === "semantic" ? "Semantic" : KIND_HEAD.textStyle;
@@ -7843,7 +7881,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       const sel = tab === mkTab;
       b.setAttribute("aria-selected", String(sel));
       b.tabIndex = sel ? 0 : -1;
-      const n = tab === "global" ? String(mkTokens.length) : tab === "semantic" ? sem === "counting" ? "\u2026" : String(sem === "rows" ? mkRoleRows.length : 0) : mkTsFor === baseKey() ? String(mkTs.length) : "\u2026";
+      const n = tab === "global" ? String(mkTokens.length) : tab === "semantic" ? sem === "counting" || sem === "failed" ? "\u2026" : String(sem === "rows" ? mkRoleRows.length : 0) : mkTsFor === baseKey() ? String(mkTs.length) : "\u2026";
       b.querySelector(".n").textContent = n;
       const dot = b.querySelector(".mk-dot");
       if (dot) {
@@ -7876,7 +7914,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       if (mkTsPending) {
         const p = mkTsPending;
         mkTsPending = null;
-        onMakeScan(p);
+        resumeMakeScan(p);
       } else renderMakeScreen();
       focusRow($("makeTree"), `t:${sig}`);
       mkLibChanged();
@@ -8008,6 +8046,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       const st = mkSemState();
       if (st === "none") noteText = t("make.semNone");
       else if (st === "counting") noteText = t("make.counting");
+      else if (st === "failed") noteText = t("make.countFail");
       else if (st === "zero") noteText = t("make.semZero");
     } else if (showTree && tab === "ts" && mkTsFor !== baseKey()) noteText = t("make.counting");
     note.hidden = !noteText;
@@ -8118,7 +8157,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     const tsOn = mkTsOnList().length;
     const tsTail = tsOn ? t("make.countStyles", { t: tsOn }) : "";
     let count = "";
-    if (gOn) count = mkPreview ? (isPaid ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) : t("make.globalN", { g: mkPreview.g })) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
+    if (gOn) count = mkPreview ? (isPaid ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) : t("make.globalN", { g: mkPreview.g })) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t(mkPreviewFailed ? "make.countFail" : "make.counting");
     $("makeCount").textContent = count ? count + tsTail : tsTail.replace(/^ · /, "");
     $("makeCount").title = (_a3 = $("makeCount").textContent) != null ? _a3 : "";
     const linkOn = $("makeOptLink").checked;

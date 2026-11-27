@@ -4564,6 +4564,78 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await p.close();
 }
 
+/* B.46 S-6a 보충 — 만들기 화면 [읽기] 기준 대조 · 미리보기 실패 "세지 못했어요" */
+{
+  const bigMake = async (ids) => {
+    const p = await open(560, 'select');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, PREREQ);
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await recv(p, { ...sel(10, 0), ids });
+    await goSub(p, 'make');
+    await p.waitForTimeout(40);
+    return p;
+  };
+  const gap = (v) => [{ name: `spacing/${v}`, category: 'gap', value: v, sources: ['itemSpacing'], count: 1 }];
+  // ① 큰 선택 [읽기] 중 다른 큰 선택으로 바꿈 → 옛 응답이 와도 옛 값 없음 · [읽기] 모습(읽는 중 아님)
+  {
+    const p = await bigMake(['b46a']);
+    await p.click('#makeEmpty button');
+    await p.waitForTimeout(20);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    check('B.46 만들기 화면 후보 읽기는 SCAN_TEXT_STYLES{make: true} · reqId', sc?.make === true && typeof sc.reqId === 'number', JSON.stringify(sc));
+    await recv(p, { ...sel(10, 0), ids: ['b46b'] });
+    await p.waitForTimeout(400);
+    const n0 = (await sent(p, 'EXTRACT')).length;
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 10, tokens: gap(777) });
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(60);
+    const tree = await p.textContent('#makeTree');
+    const empty = await p.textContent('#makeEmpty');
+    check('B.46 [읽기] 중 다른 큰 선택 → 옛 응답 버림(옛 값 없음) · [읽기] 모습(읽는 중 아님) · 자동으로 읽지 않음', !tree.includes('777') && (await visible(p, '#makeEmpty button')) && !empty.includes('읽는 중') && (await sent(p, 'EXTRACT')).length === n0, `${tree} / ${empty}`);
+    await p.close();
+  }
+  // ② 큰 선택 [읽기] 중 작은 선택으로 바꾸고 250ms 안에 옛 응답 → 옛 값 없음 · 새 기준으로 다시 읽음
+  {
+    const p = await bigMake(['b46c']);
+    await p.click('#makeEmpty button');
+    await p.waitForTimeout(20);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    const n0 = (await sent(p, 'EXTRACT')).length;
+    await recv(p, { ...sel(1, 0), ids: ['b46d'] });
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 10, tokens: gap(777) });
+    const waitPair = (await sent(p, 'EXTRACT')).length === n0;
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(40);
+    const re = (await sent(p, 'EXTRACT')).at(-1);
+    check('B.46 [읽기] 중 작은 선택 + 옛 응답 → 짝이 끝난 뒤 새 기준으로 한 번 다시 읽음 · 옛 값 없음', waitPair && (await sent(p, 'EXTRACT')).length === n0 + 1 && JSON.stringify(re?.nodeIds) === '["b46d"]' && !(await p.textContent('#makeTree')).includes('777'), JSON.stringify(re));
+    await p.waitForTimeout(400);
+    check('B.46 다시 읽은 뒤 예약된 자동 읽기가 또 보내지 않음', (await sent(p, 'EXTRACT')).length === n0 + 1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: re.reqId, warnings: [], selection: 1, tokens: gap(24) });
+    const sc2 = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc2.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(60);
+    const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+    const tree = await p.textContent('#makeTree');
+    check('B.46 새 기준 응답 → 새 값만', tree.includes('24') && !tree.includes('777'), tree);
+    // ③ 미리보기 ERROR → "세지 못했어요"(만들 수 자리 · Semantic 탭 안) · 탭 "…" · 버튼 열림 · error Toast(S-6a)
+    const counting = await p.textContent('#makeCount');
+    await recv(p, { type: 'ERROR', message: 'preview failed', op: 'CREATE_TOKENS', reqId: pv.reqId });
+    await p.waitForTimeout(40);
+    const count = await p.textContent('#makeCount');
+    const tabs = await tabsOf(p);
+    const runOpen = (await p.getAttribute('#btnMakeRun', 'aria-disabled')) !== 'true';
+    check('B.46 미리보기 ERROR → 만들 수 "세지 못했어요" · Semantic 탭 "…" · 버튼 열림 · error Toast', counting.includes('세는 중') && count === '세지 못했어요' && tabs.some((x) => x.startsWith('Semantic…')) && runOpen && (await toastTone(p)) === 'error', `${counting} / ${count} / ${JSON.stringify(tabs)} / ${runOpen} / ${await toastTone(p)}`);
+    await p.click('#makeTabs [role="tab"] >> text=Semantic');
+    await p.waitForTimeout(30);
+    check('B.46 Semantic 탭 안 "세지 못했어요"', (await p.textContent('#makeTabNote')) === '세지 못했어요', await p.textContent('#makeTabNote'));
+    await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b46-make-countfail.png` : '/dev/null' }).catch(() => {});
+    await p.close();
+  }
+}
+
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);
