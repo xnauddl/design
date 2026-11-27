@@ -6490,6 +6490,30 @@ async function loadPlugin(figma) {
 }
 const ofType = (msgs, type) => msgs.filter((m) => m.type === type);
 
+test('S-6a code.ts — 요청에 답하는 메시지 · 유료 거절에 그 reqId(ia-v4 §4.11a ① ②)', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  let out = await p.send({ type: 'GET_VARIABLES', reqId: 11 });
+  assert.equal(ofType(out, 'VARIABLES')[0].reqId, 11);
+  out = await p.send({ type: 'GET_SETTINGS', reqId: 12 });
+  assert.equal(ofType(out, 'SETTINGS')[0].reqId, 12);
+  out = await p.send({ type: 'GET_LICENSE', reqId: 13 });
+  assert.equal(ofType(out, 'LICENSE_STATUS')[0].reqId, 13);
+  out = await p.send({ type: 'GET_PREREQ', reqId: 14 });
+  assert.equal(ofType(out, 'PREREQ_STATE')[0]?.reqId, 14);
+  figma.ui.resize = () => {};
+  out = await p.send({ type: 'SET_UI_SIZE', mode: 'mini', reqId: 15 });
+  assert.equal(ofType(out, 'UI_SIZE')[0].reqId, 15);
+  out = await p.send({ type: 'GET_COLLECTIONS', reqId: 16 });
+  assert.equal(ofType(out, 'COLLECTIONS')[0].reqId, 16);
+  // 무료 — 유료 거절에도 reqId
+  await p.send({ type: 'SET_LICENSE', tier: 'free' });
+  out = await p.send({ type: 'CREATE_SEMANTICS', map: {}, reqId: 21 });
+  assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0].reqId, 21);
+  out = await p.send({ type: 'GENERATE_DARK_MODE', reqId: 22 });
+  assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0].reqId, 22);
+});
+
 test('code.ts — reqId를 돌려준다: EXTRACT · CREATE_TOKENS(미리보기 · 실제) · RENAME · RENAME_APPLY, 없으면 싣지 않는다', async () => {
   const figma = installFigma();
   const p = await loadPlugin(figma);

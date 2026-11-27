@@ -2293,6 +2293,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     "op.rename": "\uC774\uB984 \uC815\uB9AC",
     "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
     "op.unbind": "\uC0AD\uC81C\uB41C \uBCC0\uC218 \uC5F0\uACB0 \uD480\uAE30",
+    "op.updateVar": "\uACE0\uCE58\uAE30",
     "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     // 변수 탭 하위 화면(PR 1 중간 상태)
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
@@ -6436,23 +6437,27 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (!m) return;
     if (!wizardWaiter) return;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
+      if (m.reqId !== wizardWaiter.reqId) return;
       const w = wizardWaiter;
       wizardWaiter = null;
       if (m.type === "ERROR") wizardErrorMsg = m;
       w.reject(m.type === "PREMIUM_REQUIRED" ? new PaidRequiredError() : new Error(m.message));
       return;
     }
-    if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === void 0 || m.reqId === wizardWaiter.reqId)) {
+    if (wizardWaiter.types.includes(m.type) && m.reqId === wizardWaiter.reqId) {
       const w = wizardWaiter;
       wizardWaiter = null;
       setTimeout(() => w.resolve(m), 0);
     }
   });
   function wizardRequest(msg, expect, reqId) {
+    var _a3;
+    const id = (_a3 = reqId != null ? reqId : msg.reqId) != null ? _a3 : ++bindReqSeq;
+    msg.reqId = id;
     return new Promise((resolve, reject) => {
       wizardWaiter = {
         types: [...expect],
-        reqId,
+        reqId: id,
         resolve: (m) => resolve(m),
         reject
       };
@@ -6713,7 +6718,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
     const msg = event.data.pluginMessage;
     if (!msg) return;
-    opReceived(msg);
+    const silent = msg.reqId != null && silentReqs.delete(msg.reqId);
+    if (!silent) opReceived(msg);
     if (makeTakes(msg)) return;
     if (mcTakes(msg)) return;
     switch (msg.type) {
@@ -6813,7 +6819,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         }
         if (linkEnded) bindSelChangedDuringLink = false;
         hideApplyProgress();
-        const silent = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
+        const silent2 = msg.preview && msg.reqId !== void 0 && msg.reqId === bindSilentReq;
         bindSilentReq = 0;
         if (isMini && msg.preview) bindPreviewMini = true;
         bindSkips = (_a3 = msg.skips) != null ? _a3 : [];
@@ -6836,7 +6842,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           bindVarPending = false;
           bindChecked.clear();
           renderSkipReasons((_g = msg.reasons) != null ? _g : {});
-          if (silent) {
+          if (silent2) {
             const r = carryRowChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
             if (bindSilentCarry && (r.added || r.removed)) notify(t("bind.candChanged", { a: r.added, b: r.removed }), "info");
@@ -7062,6 +7068,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         void deactivateInstance(msg.key, msg.instanceId);
         break;
       case "ERROR": {
+        if (msg.op === "UPDATE_VARIABLE" && msg.reqId != null) clearUpdSaving(msg.reqId);
         if (msg.op === "UPDATE_VARIABLE" || msg.op === "GET_VAR_TABLE") edMaybeSaved();
         if (msg.op === "UPDATE_VARIABLE") break;
         if (msg.op === "SCAN_USAGE" && msg.reqId != null) {
@@ -7227,9 +7234,12 @@ button.ds-tag { border: 0; cursor: pointer; }
         return;
       }
       if (!retry) return;
-      if (bindLinking && ((_a3 = OPS[retry.type]) == null ? void 0 : _a3.write)) {
-        setStatus(id, t("bind.waitLink"), "warn");
-        return;
+      if (((_a3 = OPS[retry.type]) == null ? void 0 : _a3.write) && !(retry.type === "CREATE_TOKENS" && retry.preview)) {
+        const wl = writeLockReason();
+        if (wl) {
+          setStatus(id, wl, "warn");
+          return;
+        }
       }
       send(retry);
     } : null;
@@ -7590,10 +7600,31 @@ button.ds-tag { border: 0; cursor: pointer; }
   function makeTakes(msg) {
     const rid = msg.reqId;
     if (rid == null || !mkOwned.has(rid)) return false;
+    if (msg.type === "PREMIUM_REQUIRED" || msg.type === "ERROR") {
+      onMakeReadFail(msg, rid);
+      return true;
+    }
     if (msg.type === "EXTRACT_RESULT" && rid === mkExtractReq) onMakeExtract(msg);
     else if (msg.type === "CREATE_RESULT" && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
     else if (msg.type === "TEXT_STYLE_CANDIDATES" && rid === mkScanReq) onMakeScan(msg);
     return true;
+  }
+  function onMakeReadFail(msg, rid) {
+    const err = msg.type === "ERROR" ? msg : null;
+    const say = () => {
+      if (err) notify(explainError(err.message).message, "error", { tip: err.message });
+    };
+    if (rid === mkScanReq) {
+      onMakeScan({ type: "TEXT_STYLE_CANDIDATES", styles: [], decimalRows: [], warnings: [], existing: [] });
+      say();
+    } else if (rid === mkExtractReq) {
+      mkReading = false;
+      say();
+      renderMakeScreen();
+    } else if (rid === mkPreviewReq) {
+      say();
+      renderMakeScreen();
+    }
   }
   function onMakeExtract(msg) {
     var _a3;
@@ -8056,6 +8087,10 @@ button.ds-tag { border: 0; cursor: pointer; }
   function renderMakeFoot(showResults) {
     var _a3, _b;
     const run = $("btnMakeRun");
+    if (mkFootClose !== showResults) {
+      mkFootClose = showResults;
+      renderWaitLocks();
+    }
     const opts = $("makeOpts");
     opts.hidden = showResults;
     const dark = $("makeOptDark");
@@ -9267,17 +9302,31 @@ button.ds-tag { border: 0; cursor: pointer; }
     // 만들기 화면 실행(§4.3)
   ];
   var WAIT_CARD_IDS = ["btnApplyConfirm"];
-  function otherWriteOp() {
+  function otherWriteOp(skipReq) {
     if (opWizard || wizardRunning) return t("op.wizard");
     for (const [type, def] of opPending) if (type !== "APPLY_SELECTED" && def.write) return t(def.label);
+    if (updSaving && updSaving.reqId !== skipReq) return t("op.updateVar");
     return null;
   }
-  var VAR_WRITE_OPS = ["APPLY_VARIABLE", "CREATE_VARIABLE", "DUPLICATE_VARIABLE", "DELETE_VARIABLE", "DELETE_VARIABLES"];
+  var updSaving = null;
+  function setUpdSaving(reqId) {
+    if (updSaving) clearTimeout(updSaving.timer);
+    updSaving = { reqId, timer: setTimeout(() => clearUpdSaving(reqId), EDIT_TIMEOUT) };
+    renderWaitLocks();
+  }
+  function clearUpdSaving(reqId) {
+    if (!updSaving || updSaving.reqId !== reqId) return;
+    clearTimeout(updSaving.timer);
+    updSaving = null;
+    renderWaitLocks();
+  }
+  var mkFootClose = false;
   function renderWaitLocks() {
     const link = bindLinking ? t("bind.waitLink") : null;
-    const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
-    const varLock = varOp ? t("bind.waitOp", { op: t(opPending.get(varOp).label) }) : null;
-    for (const id of WAIT_LINK_IDS) setWait($(id), link != null ? link : varLock);
+    const anyWrite = otherWriteOp();
+    const writeLock = link != null ? link : anyWrite ? t("bind.waitOp", { op: anyWrite }) : null;
+    for (const id of WAIT_LINK_IDS) setWait($(id), id === "btnMakeRun" && mkFootClose ? null : writeLock);
+    if (ed) edChrome();
     const other = link ? null : otherWriteOp();
     const wiz = opWizard || wizardRunning ? t("bind.waitOp", { op: t("op.wizard") }) : null;
     for (const id of WAIT_CARD_IDS) {
@@ -9294,11 +9343,21 @@ button.ds-tag { border: 0; cursor: pointer; }
   var opBusy = () => opWizard || opPending.size > 0;
   var opProgress = () => opProg;
   var opSilent = false;
+  var silentReqs = /* @__PURE__ */ new Set();
   function opSent(msg) {
-    if (wizardRunning || opSilent) return;
-    const def = OPS[msg.type];
+    var _a3;
+    if (msg.reqId == null) msg.reqId = ++bindReqSeq;
+    if (wizardRunning || opSilent) {
+      silentReqs.add(msg.reqId);
+      return;
+    }
+    let def = OPS[msg.type];
     if (!def) return;
-    opPending.set(msg.type, def);
+    if (msg.type === "CREATE_TOKENS" && msg.preview) {
+      if ((_a3 = opPending.get("CREATE_TOKENS")) == null ? void 0 : _a3.write) return;
+      def = __spreadProps(__spreadValues({}, def), { write: false });
+    }
+    opPending.set(msg.type, __spreadProps(__spreadValues({}, def), { reqId: msg.reqId }));
     if (msg.type === "APPLY_SELECTED" || msg.type === "APPLY") opProg = null;
     if (isMini) renderMiniMark();
     if (def.write) renderWaitLocks();
@@ -9310,26 +9369,24 @@ button.ds-tag { border: 0; cursor: pointer; }
       if (isMini) renderMiniMark();
       return;
     }
-    if (wizardRunning) return;
+    const rid = m.reqId;
     if (m.type === "ERROR" || m.type === "PREMIUM_REQUIRED") {
-      const op = m.type === "ERROR" ? m.op : void 0;
-      let def;
-      if (op) {
-        def = opPending.get(op);
-        if (!def) return;
-        opPending.delete(op);
-      } else {
-        def = [...opPending.values()][0];
-        if (!def) return;
-        opPending.clear();
+      if (rid == null) {
+        console.warn("[op] rejection or error without reqId \u2014 ending no op", m);
+        return;
       }
+      const op = m.type === "ERROR" ? m.op : void 0;
+      const hit = [...opPending].find(([type, d]) => d.reqId === rid && (!op || op === type));
+      if (!hit) return;
+      opPending.delete(hit[0]);
       opProg = null;
       renderWaitLocks();
-      opFinished(false, def);
+      opFinished(false, hit[1]);
       return;
     }
     for (const [type, def] of opPending) {
       if (!def.results.includes(m.type)) continue;
+      if (rid != null && def.reqId !== rid) continue;
       opPending.delete(type);
       opProg = null;
       if (def.write) renderWaitLocks();
@@ -9623,8 +9680,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   });
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || menuEl || modalEl || e.defaultPrevented) return;
-    const tg = e.target;
-    if (tg.closest("input, textarea, select, [contenteditable]")) return;
+    if (isTextEntry(e.target)) return;
     if (activeTab === "settings") {
       e.preventDefault();
       showTab(settingsReturn);
@@ -9634,6 +9690,12 @@ button.ds-tag { border: 0; cursor: pointer; }
       subBack();
     }
   });
+  function isTextEntry(el2) {
+    if (!el2) return false;
+    if (el2.closest('textarea, [contenteditable=""], [contenteditable="true"]')) return true;
+    if (el2 instanceof HTMLInputElement) return ["text", "number", "search", "email", "url", "password", "tel"].includes(el2.type);
+    return false;
+  }
   var pickFrom = "make";
   function showPick(step, from = "vars") {
     const opener = document.activeElement;
@@ -10761,9 +10823,9 @@ button.ds-tag { border: 0; cursor: pointer; }
     ev.preventDefault();
   }
   var applyVarReq = 0;
-  function writeLockReason() {
+  function writeLockReason(skipReq) {
     if (bindLinking) return t("bind.waitLink");
-    const other = otherWriteOp();
+    const other = otherWriteOp(skipReq);
     return other ? t("bind.waitOp", { op: other }) : null;
   }
   function applyVar(v, target) {
@@ -10972,7 +11034,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     return null;
   }
   function edChrome() {
-    var _a3, _b, _c, _d, _e, _f, _g;
+    var _a3, _b, _c, _d, _e, _f, _g, _h;
     const e = ed;
     if (!e) return;
     const st = edState(e);
@@ -11065,7 +11127,8 @@ button.ds-tag { border: 0; cursor: pointer; }
       e.btnSave.title = t("paid.semantic");
       return;
     }
-    const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
+    const wl = e.create ? bindLinking ? t("bind.waitLink") : null : writeLockReason((_h = e.saving) == null ? void 0 : _h.reqId);
+    const locked = e.create ? !!e.create.reqId || !!wl : saving || !!e.sticky || !st.changed || st.hasErr || !!wl;
     if (locked) {
       e.btnSave.setAttribute("aria-disabled", "true");
       e.btnSave.dataset.lock = "edit";
@@ -11073,7 +11136,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       e.btnSave.removeAttribute("aria-disabled");
       delete e.btnSave.dataset.lock;
     }
-    e.btnSave.title = bindLinking ? t("bind.waitLink") : "";
+    e.btnSave.title = wl != null ? wl : "";
   }
   function edPaidPing(e) {
     const a = e.paidAlert;
@@ -11099,7 +11162,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
     if (!e || e.saving || e.sticky) return;
     const st = edState(e);
-    if (bindLinking) e.event = { text: t("bind.waitLink"), err: false };
+    const wl = writeLockReason();
+    if (wl) e.event = { text: wl, err: false };
     else if (!st.changed) e.event = { text: t("edit.noChange"), err: false };
     else if (st.hasErr) {
       e.event = { text: t("edit.checkInput"), err: true };
@@ -11736,7 +11800,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       return;
     }
     const st = edState(e);
-    if (bindLinking || !st.changed || st.hasErr) {
+    if (writeLockReason() || !st.changed || st.hasErr) {
       edLockedSave();
       return;
     }
@@ -11755,6 +11819,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     e.confirm = false;
     if (e.picker) edClosePicker(false);
     e.timer = setTimeout(() => edMaybeSaved(reqId), EDIT_TIMEOUT);
+    setUpdSaving(reqId);
     const msg = { type: "UPDATE_VARIABLE", reqId, id: e.v.id, base: { name: e.v.name, values: baseValues } };
     if (n.changed) msg.name = n.name;
     if (Object.keys(values).length) msg.values = values;
@@ -11771,6 +11836,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     e.sticky = s;
   }
   function edMaybeSaved(reqId) {
+    if (reqId !== void 0) clearUpdSaving(reqId);
     const e = ed;
     if (!(e == null ? void 0 : e.saving) || reqId !== void 0 && e.saving.reqId !== reqId) return;
     e.dead.add(e.saving.reqId);
@@ -11787,6 +11853,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   function onVariableUpdated(msg) {
     var _a3, _b;
+    clearUpdSaving(msg.reqId);
     const e = ed;
     if (edDeadReqs.has(msg.reqId)) {
       edDeadReqs.delete(msg.reqId);

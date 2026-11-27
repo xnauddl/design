@@ -510,6 +510,7 @@
     "op.rename": "\uC774\uB984 \uC815\uB9AC",
     "op.export": "\uB0B4\uBCF4\uB0B4\uAE30",
     "op.unbind": "\uC0AD\uC81C\uB41C \uBCC0\uC218 \uC5F0\uACB0 \uD480\uAE30",
+    "op.updateVar": "\uACE0\uCE58\uAE30",
     "op.wizard": "\uD55C \uBC88\uC5D0 \uC815\uB9AC",
     // 변수 탭 하위 화면(PR 1 중간 상태)
     // 단계 레일(#5) — 만들기 4단계 · 적용 3단계
@@ -8415,15 +8416,17 @@
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     return ((_a = ownedCollection(cols, "semantic")) == null ? void 0 : _a.id) === collectionId;
   }
-  function requirePaid(feature) {
+  function requirePaid(feature, reqId) {
     if (isPaid()) return true;
-    post({ type: "PREMIUM_REQUIRED", feature });
+    post(__spreadValues({ type: "PREMIUM_REQUIRED", feature }, reqId != null ? { reqId } : {}));
     return false;
   }
-  function postLicense(note2) {
+  function postLicense(note2, reqId) {
     const e = effective();
-    post({
-      type: "LICENSE_STATUS",
+    post(__spreadProps(__spreadValues({
+      type: "LICENSE_STATUS"
+    }, reqId != null ? { reqId } : {}), {
+      // 요청에 답할 때만(ia-v4 §4.11a ①) — 밀어 보내는 알림은 없음
       tier: e.tier,
       unlimited: e.tier === "paid",
       // Free/Paid 2티어 — 유료면 모든 기능 해금
@@ -8433,7 +8436,7 @@
       note: note2 == null ? void 0 : note2.text,
       noteKind: note2 == null ? void 0 : note2.kind,
       noteTip: note2 == null ? void 0 : note2.tip
-    });
+    }));
   }
   async function loadLicense() {
     try {
@@ -8454,7 +8457,7 @@
     } catch (e) {
     }
   }
-  async function postPrereq() {
+  async function postPrereq(reqId) {
     try {
       const cols = await figma.variables.getLocalVariableCollectionsAsync();
       const vars = await figma.variables.getLocalVariablesAsync();
@@ -8471,7 +8474,7 @@
       const tierVars = tierVarList.length;
       const tierColorVars = tierVarList.filter((v) => v.resolvedType === "COLOR").length;
       const otherVars = vars.length - tierVars;
-      post({ type: "PREREQ_STATE", hasGlobal, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+      post(__spreadProps(__spreadValues({ type: "PREREQ_STATE" }, reqId != null ? { reqId } : {}), { hasGlobal, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual }));
     } catch (e) {
     }
   }
@@ -8677,8 +8680,8 @@
     out.sort((a, b) => a.collection.localeCompare(b.collection) || a.name.localeCompare(b.name));
     return out;
   }
-  function requireTextStyles() {
-    return requirePaid("textStyles");
+  function requireTextStyles(reqId) {
+    return requirePaid("textStyles", reqId);
   }
   function kindOf(v) {
     if (v.resolvedType === "COLOR") return "color";
@@ -8754,6 +8757,7 @@
     selfSelect = false;
   }
   figma.on("selectionchange", postSelection);
+  var rid = (m) => m.reqId != null ? { reqId: m.reqId } : {};
   figma.ui.onmessage = async (msg) => {
     var _a, _b, _c, _d;
     try {
@@ -8770,7 +8774,7 @@
           break;
         }
         case "CREATE_TOKENS": {
-          if (!msg.preview && !msg.globalOnly && !requirePaid("tokens")) break;
+          if (!msg.preview && !msg.globalOnly && !requirePaid("tokens", msg.reqId)) break;
           const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
           const roleTokens = s.skippedManual ? msg.tokens.filter((x) => !s.skippedManualNames.has(x.name)) : msg.tokens;
           const roleRows = [];
@@ -8807,6 +8811,7 @@
           const release = await acquireBind();
           if (msg.preview && myTurn !== bindFindTurn) {
             release();
+            post(__spreadValues({ type: "APPLY_RESULT", preview: true, cancelled: true, bound: 0, skipped: 0, reasons: {} }, rid(msg)));
             break;
           }
           bindCancel = false;
@@ -8881,7 +8886,7 @@
             figma.currentPage.selection = pick;
             figma.viewport.scrollAndZoomIntoView(pick);
           }
-          post({ type: "SELECT_RESULT", found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
+          post(__spreadProps(__spreadValues({ type: "SELECT_RESULT" }, rid(msg)), { found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP }));
           break;
         }
         case "CANCEL": {
@@ -8910,7 +8915,7 @@
             figma.currentPage.selection = onPage;
             figma.viewport.scrollAndZoomIntoView(onPage);
           }
-          post({ type: "SELECT_RESULT", found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
+          post(__spreadProps(__spreadValues({ type: "SELECT_RESULT" }, rid(msg)), { found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP }));
           break;
         }
         case "APPLY_SELECTED": {
@@ -9000,15 +9005,15 @@
           break;
         }
         case "CREATE_SEMANTICS": {
-          if (!requirePaid("semantics")) break;
+          if (!requirePaid("semantics", msg.reqId)) break;
           const s = await createSemanticAliases(msg.map);
-          post(__spreadValues({ type: "SEMANTICS_RESULT", created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing }, s.skippedManual ? { skippedManual: s.skippedManual } : {}));
+          post(__spreadValues(__spreadProps(__spreadValues({ type: "SEMANTICS_RESULT" }, rid(msg)), { created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing }), s.skippedManual ? { skippedManual: s.skippedManual } : {}));
           commitUndo(figma);
           await postPrereq();
           break;
         }
         case "SCAN_TEXT_STYLES": {
-          if (!requirePaid("textStyles")) break;
+          if (!requirePaid("textStyles", msg.reqId)) break;
           const scanRoots = (await withLocalMains(await resolveRoots(msg.nodeIds))).roots;
           const { samples, warnings, nodeById } = await scanTextStyles(scanRoots);
           if (msg.reqId == null) lastTextSamples = samples;
@@ -9020,22 +9025,22 @@
           const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
           if (msg.reqId != null) {
             post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
-          } else post({ type: "TEXT_STYLE_CANDIDATES", styles, decimalRows, warnings, existing: existingSigs });
+          } else post(__spreadProps(__spreadValues({ type: "TEXT_STYLE_CANDIDATES" }, rid(msg)), { styles, decimalRows, warnings, existing: existingSigs }));
           break;
         }
         case "NAME_TEXT_STYLES_BY_ROW": {
-          if (!requirePaid("textStyles")) break;
+          if (!requirePaid("textStyles", msg.reqId)) break;
           if (!lastTextSamples.length) {
-            post({ type: "ERROR", message: t("textStyle.needScan"), op: "NAME_TEXT_STYLES_BY_ROW" });
+            post(__spreadProps(__spreadValues({ type: "ERROR" }, rid(msg)), { message: t("textStyle.needScan"), op: "NAME_TEXT_STYLES_BY_ROW" }));
             break;
           }
           const existing = await scanExistingTextStyles();
           const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-          post({ type: "TEXT_STYLE_CANDIDATES", styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
+          post(__spreadProps(__spreadValues({ type: "TEXT_STYLE_CANDIDATES" }, rid(msg)), { styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback }));
           break;
         }
         case "CREATE_TEXT_STYLES": {
-          if (!requireTextStyles()) break;
+          if (!requireTextStyles(msg.reqId)) break;
           const r = await createSemanticTextStyles(msg.styles);
           const wm = msg.applyTo ? await withLocalMains(await resolveRoots(msg.applyTo)) : null;
           const ap = wm ? await applyRegisteredTextStyles(wm.roots, r.styleIds) : null;
@@ -9064,16 +9069,16 @@
         }
         case "GET_COLLECTIONS": {
           const cols = await figma.variables.getLocalVariableCollectionsAsync();
-          post({ type: "COLLECTIONS", collections: cols.map((c) => ({ id: c.id, name: c.name })) });
+          post(__spreadProps(__spreadValues({ type: "COLLECTIONS" }, rid(msg)), { collections: cols.map((c) => ({ id: c.id, name: c.name })) }));
           postSelection();
           break;
         }
         case "GET_PREREQ": {
-          await postPrereq();
+          await postPrereq(msg.reqId);
           break;
         }
         case "GET_LICENSE": {
-          postLicense();
+          postLicense(void 0, msg.reqId);
           break;
         }
         case "SET_LICENSE": {
@@ -9083,7 +9088,7 @@
             await figma.clientStorage.setAsync(DEV_TIER_KEY, devTier);
           } catch (e) {
           }
-          postLicense();
+          postLicense(void 0, msg.reqId);
           break;
         }
         case "LICENSE_VERIFIED": {
@@ -9101,16 +9106,16 @@
               await figma.clientStorage.setAsync(CACHE_KEY, cache);
             } catch (e) {
             }
-            postLicense({ text: t("license.noteApplied"), kind: "ok" });
+            postLicense({ text: t("license.noteApplied"), kind: "ok" }, msg.reqId);
           } else if (msg.result.offline) {
-            postLicense({ text: t(cache ? "license.noteGrace" : "license.noteOffline"), kind: "warn" });
+            postLicense({ text: t(cache ? "license.noteGrace" : "license.noteOffline"), kind: "warn" }, msg.reqId);
           } else {
             const { code, error } = msg.result;
             postLicense({
               text: isVerifyErrCode(code) ? t(`license.err.server.${code}`) : t("license.verifyFailed"),
               kind: "warn",
               tip: error || void 0
-            });
+            }, msg.reqId);
           }
           break;
         }
@@ -9123,7 +9128,7 @@
             await figma.clientStorage.deleteAsync(CACHE_KEY);
           } catch (e) {
           }
-          postLicense({ text: t("license.noteCleared"), kind: "ok" });
+          postLicense({ text: t("license.noteCleared"), kind: "ok" }, msg.reqId);
           break;
         }
         case "OPEN_LICENSE_LINK": {
@@ -9178,11 +9183,11 @@
             base: msg.base
           }, styles, modes);
           const dupes = exportGlobalDupes(inputs);
-          post(__spreadValues({ type: "EXPORT_RESULT", format: msg.format, content, clashes: exportClashes(tokens, modes), globalDupes: dupes.names }, dupes.from !== void 0 ? { globalDupesFrom: dupes.from } : {}));
+          post(__spreadValues(__spreadProps(__spreadValues({ type: "EXPORT_RESULT" }, rid(msg)), { format: msg.format, content, clashes: exportClashes(tokens, modes), globalDupes: dupes.names }), dupes.from !== void 0 ? { globalDupesFrom: dupes.from } : {}));
           break;
         }
         case "GET_VAR_TABLE": {
-          post(__spreadValues({ type: "VAR_TABLE" }, await collectVarTable()));
+          post(__spreadValues(__spreadValues({ type: "VAR_TABLE" }, rid(msg)), await collectVarTable()));
           break;
         }
         case "UPDATE_VARIABLE": {
@@ -9223,7 +9228,7 @@
         case "SET_UI_SIZE": {
           const mode = normalizeUiSize(msg.mode);
           figma.ui.resize(uiWidth(mode), uiHeight(mode));
-          post({ type: "UI_SIZE", mode });
+          post(__spreadProps(__spreadValues({ type: "UI_SIZE" }, rid(msg)), { mode }));
           break;
         }
         case "GET_SETTINGS": {
@@ -9240,7 +9245,7 @@
             }
           } catch (e) {
           }
-          post({ type: "SETTINGS", base: s.base, maxDepth: s.maxDepth, grid: s.grid });
+          post(__spreadProps(__spreadValues({ type: "SETTINGS" }, rid(msg)), { base: s.base, maxDepth: s.maxDepth, grid: s.grid }));
           break;
         }
         case "SET_SETTINGS": {
@@ -9251,11 +9256,11 @@
           break;
         }
         case "GET_VARIABLES": {
-          post({ type: "VARIABLES", vars: await collectVars() });
+          post(__spreadProps(__spreadValues({ type: "VARIABLES" }, rid(msg)), { vars: await collectVars() }));
           break;
         }
         case "GENERATE_DARK_MODE": {
-          if (!requirePaid("tokens")) break;
+          if (!requirePaid("tokens", msg.reqId)) break;
           let res;
           try {
             res = await generateDarkMode(msg.migrate === true);
@@ -9263,17 +9268,17 @@
             if (darkChangedBeforeError(e)) {
               commitUndo(figma);
               await postPrereq();
-              post({ type: "VARIABLES", vars: await collectVars() });
+              post(__spreadProps(__spreadValues({ type: "VARIABLES" }, rid(msg)), { vars: await collectVars() }));
             }
             throw e;
           }
           const _e = res, { changed } = _e, r = __objRest(_e, ["changed"]);
-          post(__spreadValues({ type: "DARK_MODE_RESULT" }, r));
+          post(__spreadValues(__spreadValues({ type: "DARK_MODE_RESULT" }, rid(msg)), r));
           if (changed) {
             commitUndo(figma);
             await postPrereq();
           }
-          if (!r.needMigrate) post({ type: "VARIABLES", vars: await collectVars() });
+          if (!r.needMigrate) post(__spreadProps(__spreadValues({ type: "VARIABLES" }, rid(msg)), { vars: await collectVars() }));
           break;
         }
       }

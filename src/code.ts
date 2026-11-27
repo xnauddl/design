@@ -129,18 +129,19 @@ async function paidSemanticTarget(collectionId: string | undefined): Promise<boo
 }
 
 /** Paid 게이트: 아니면 PREMIUM_REQUIRED 안내 후 false. (미리보기/탐색은 호출 전에 허용) */
-function requirePaid(feature: Feature): boolean {
+function requirePaid(feature: Feature, reqId?: number): boolean {
   if (isPaid()) return true;
-  post({ type: 'PREMIUM_REQUIRED', feature });
+  post({ type: 'PREMIUM_REQUIRED', feature, ...(reqId != null ? { reqId } : {}) }); // 거절도 그 요청의 reqId(ia-v4 §4.11a ②)
   return false;
 }
 
 interface LicenseNote { text: string; kind: 'ok' | 'warn'; tip?: string }
 
-function postLicense(note?: LicenseNote): void {
+function postLicense(note?: LicenseNote, reqId?: number): void {
   const e = effective();
   post({
     type: 'LICENSE_STATUS',
+    ...(reqId != null ? { reqId } : {}), // 요청에 답할 때만(ia-v4 §4.11a ①) — 밀어 보내는 알림은 없음
     tier: e.tier,
     unlimited: e.tier === 'paid', // Free/Paid 2티어 — 유료면 모든 기능 해금
     source: e.source,
@@ -181,7 +182,7 @@ async function loadLicense(): Promise<void> {
  * 바인딩 가능 변수(Semantic/Component) 존재(바인딩 가능). 전제 미충족 카드는
  * UI가 비활성+안내로 가드한다. 토큰/시맨틱 변경 후·시작 시·요청 시 호출.
  */
-async function postPrereq(): Promise<void> {
+async function postPrereq(reqId?: number): Promise<void> {
   try {
     const cols = await figma.variables.getLocalVariableCollectionsAsync();
     const vars = await figma.variables.getLocalVariablesAsync();
@@ -199,7 +200,7 @@ async function postPrereq(): Promise<void> {
     const tierVars = tierVarList.length;
     const tierColorVars = tierVarList.filter((v) => v.resolvedType === 'COLOR').length;
     const otherVars = vars.length - tierVars;
-    post({ type: 'PREREQ_STATE', hasGlobal, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
+    post({ type: 'PREREQ_STATE', ...(reqId != null ? { reqId } : {}), hasGlobal, tierVars, tierColorVars, otherVars, darkUnfilled, darkOld, darkOldManual });
   } catch {
     /* 저장소 접근 실패 시 보고 생략(UI는 마지막 상태 유지) */
   }
@@ -436,8 +437,8 @@ async function collectVars(): Promise<VarInfo[]> {
 }
 
 /** Paid 게이트(텍스트 스타일): 아니면 PREMIUM_REQUIRED 안내 후 false. */
-function requireTextStyles(): boolean {
-  return requirePaid('textStyles');
+function requireTextStyles(reqId?: number): boolean {
+  return requirePaid('textStyles', reqId);
 }
 
 /** 변수 → 내보내기 kind 분류(scope 우선, 이름 폴백 — STRING line-height 등 scope 비어있음 대비). */
@@ -531,6 +532,9 @@ function postSelection(): void {
 }
 figma.on('selectionchange', postSelection);
 
+/** 그 요청의 reqId를 응답에 싣는다(ia-v4 §4.11a ① — 요청에 답하는 모든 메시지). */
+const rid = (m: { reqId?: number }): { reqId?: number } => (m.reqId != null ? { reqId: m.reqId } : {});
+
 figma.ui.onmessage = async (msg: UiToCode) => {
   try {
     switch (msg.type) {
@@ -551,7 +555,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'CREATE_TOKENS': {
         // 실제 변수 생성 중 Semantic까지 만드는 것만 Paid(미리보기는 비파괴 읽기라 허용). globalOnly(무료 규칙 — Global만,
         // `createUsageRoles`를 돌리지 않음)는 무료도 통과한다(IA v4 §4.3 "무료 — 무료 규칙 PR 뒤" · F1 · F4 · F8).
-        if (!msg.preview && !msg.globalOnly && !requirePaid('tokens')) break;
+        if (!msg.preview && !msg.globalOnly && !requirePaid('tokens', msg.reqId)) break;
         // UX1: preview면 변수를 만들지 않고 예정 수만 집계. base는 값 환산에 쓰이므로 양쪽 다 전달.
         const s = msg.preview ? await previewCreateTokens(msg.tokens, msg.base) : await createTokens(msg.tokens, msg.base);
         // 쓰임 역할 — Global을 만든 직후 같은 처리 · 같은 ⌘Z 안에서(§2.12 12.10). 미리보기는 만들 수만 센다.
@@ -600,7 +604,13 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const myTurn = msg.preview ? ++bindFindTurn : bindFindTurn;
         if (!bindLinkRunning) bindCancel = true; // 돌던 찾기를 멈춘다(실제 연결은 멈추지 않는다)
         const release = await acquireBind();
-        if (msg.preview && myTurn !== bindFindTurn) { release(); break; } // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(UI도 reqId로 버림). 실제 연결은 버리지 않는다
+        if (msg.preview && myTurn !== bindFindTurn) {
+          // 기다리는 사이 더 새 요청이 왔다 — 이 찾기는 버린다(실제 연결은 버리지 않는다). 버린 찾기에도 "취소됨"으로 답한다 —
+          // UI는 낡은 reqId라 화면에 쓰지 않고, 작업 추적(opReceived)은 그 reqId 작업을 끝낸다(ia-v4 §4.11a ① "밀려난 찾기에도 답한다").
+          release();
+          post({ type: 'APPLY_RESULT', preview: true, cancelled: true, bound: 0, skipped: 0, reasons: {}, ...rid(msg) });
+          break;
+        }
         bindCancel = false; // UX6: 새 작업 시작 시 취소 플래그 초기화
         bindLinkRunning = !msg.preview;
         try {
@@ -684,7 +694,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           figma.currentPage.selection = pick;
           figma.viewport.scrollAndZoomIntoView(pick);
         }
-        post({ type: 'SELECT_RESULT', found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
+        post({ type: 'SELECT_RESULT', ...rid(msg), found: pick.length, requested: r.nodes.length, capped: r.nodes.length > SELECT_CAP });
         break;
       }
       case 'CANCEL': {
@@ -719,7 +729,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           figma.currentPage.selection = onPage;
           figma.viewport.scrollAndZoomIntoView(onPage);
         }
-        post({ type: 'SELECT_RESULT', found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
+        post({ type: 'SELECT_RESULT', ...rid(msg), found: onPage.length, requested: msg.ids.length, capped: msg.ids.length > SELECT_CAP });
         break;
       }
       case 'APPLY_SELECTED': {
@@ -822,9 +832,9 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'CREATE_SEMANTICS': {
-        if (!requirePaid('semantics')) break;
+        if (!requirePaid('semantics', msg.reqId)) break;
         const s = await createSemanticAliases(msg.map);
-        post({ type: 'SEMANTICS_RESULT', created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
+        post({ type: 'SEMANTICS_RESULT', ...rid(msg), created: s.created, updated: s.updated, aliased: s.aliased, missing: s.missing, ...(s.skippedManual ? { skippedManual: s.skippedManual } : {}) });
         commitUndo(figma); // UX2: 시맨틱 별칭 생성을 단일 Undo로
         await postPrereq(); // #11: 시맨틱 별칭(바인딩 가능 변수) 생성 → 전제 갱신
         break;
@@ -832,7 +842,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       case 'SCAN_TEXT_STYLES': {
         // 스캔(미리보기)도 Paid — 등록이 Paid라 스캔만 열어두면 막다른 길(ROADMAP §5).
         // 마법사의 텍스트 스타일 단계도 Paid 전용이라 Free 마법사는 여기 오지 않는다.
-        if (!requirePaid('textStyles')) break;
+        if (!requirePaid('textStyles', msg.reqId)) break;
         // 이름은 언제나 KRDS 규칙(heading/large… — docs/text-style-krds.md) — 행 라벨은 아래 NAME_TEXT_STYLES_BY_ROW가 덧입힌다.
         // nodeIds: 목록 기준(없으면 지금 선택). reqId 스캔은 만들기 화면의 조용한 후보 읽기 — 「왼쪽 글자로 이름 채우기」가
         // 쓸 표본(lastTextSamples)을 덮어쓰지 않고, 이름 겹침 잠금용 기존 스타일 목록을 싣는다(IA v4 §4.3).
@@ -851,25 +861,25 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         const existingSigs = existing.map((e) => ({ name: e.name, sig: tsSig(e) }));
         if (msg.reqId != null) {
           post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, reqId: msg.reqId, existing: existingSigs });
-        } else post({ type: 'TEXT_STYLE_CANDIDATES', styles, decimalRows, warnings, existing: existingSigs });
+        } else post({ type: 'TEXT_STYLE_CANDIDATES', ...rid(msg), styles, decimalRows, warnings, existing: existingSigs });
         break;
       }
       case 'NAME_TEXT_STYLES_BY_ROW': {
-        if (!requirePaid('textStyles')) break; // 스캔 후속 — 스캔과 같은 등급
+        if (!requirePaid('textStyles', msg.reqId)) break; // 스캔 후속 — 스캔과 같은 등급
         // 방금 스캔한 표본을 그대로 다시 이름 짓는다(캔버스 재탐색 없음) — 사용자가 보고 있는 표와
         // 같은 입력이어야 결과가 예측 가능하다. 등록된 스타일은 그 사이 바뀔 수 있어 새로 읽는다.
         // 빈 후보를 돌려보내면 UI가 '텍스트를 못 찾음'으로 읽고 기본 램프로 표를 덮는다 — 오류로 알린다.
         if (!lastTextSamples.length) {
-          post({ type: 'ERROR', message: t('textStyle.needScan'), op: 'NAME_TEXT_STYLES_BY_ROW' });
+          post({ type: 'ERROR', ...rid(msg), message: t('textStyle.needScan'), op: 'NAME_TEXT_STYLES_BY_ROW' });
           break;
         }
         const existing = await scanExistingTextStyles();
         const r = nameTextStylesWithRowLabels(lastTextSamples, existing);
-        post({ type: 'TEXT_STYLE_CANDIDATES', styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
+        post({ type: 'TEXT_STYLE_CANDIDATES', ...rid(msg), styles: r.styles, decimalRows: r.decimalRows, warnings: [], labeled: r.labeled, fallback: r.fallback });
         break;
       }
       case 'CREATE_TEXT_STYLES': {
-        if (!requireTextStyles()) break;
+        if (!requireTextStyles(msg.reqId)) break;
         const r = await createSemanticTextStyles(msg.styles);
         // 바로 연결(IA v4 §4.3 "타이포 등록") — 방금 등록 · 갱신한 스타일만 그 루트들의 글자에 붙인다. 같은 메시지라 ⌘Z 한 번.
         // ② 바로 연결 — 메인 안 글자에도 붙이고, 붙인 글자의 메인 단위를 mainsApplied로(ia-v3 §2.11 11번)
@@ -902,16 +912,16 @@ figma.ui.onmessage = async (msg: UiToCode) => {
       }
       case 'GET_COLLECTIONS': {
         const cols = await figma.variables.getLocalVariableCollectionsAsync();
-        post({ type: 'COLLECTIONS', collections: cols.map((c) => ({ id: c.id, name: c.name })) });
+        post({ type: 'COLLECTIONS', ...rid(msg), collections: cols.map((c) => ({ id: c.id, name: c.name })) });
         postSelection(); // UI 초기화 시점 — 현재 선택 상태도 함께 전송(UX5).
         break;
       }
       case 'GET_PREREQ': {
-        await postPrereq(); // #11: 단계 전제 상태(시작·탭 전환 시)
+        await postPrereq(msg.reqId); // #11: 단계 전제 상태(시작·탭 전환 시) — 요청에 답할 때만 reqId
         break;
       }
       case 'GET_LICENSE': {
-        postLicense();
+        postLicense(undefined, msg.reqId);
         break;
       }
       case 'SET_LICENSE': {
@@ -922,7 +932,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 저장 실패해도 세션 동안은 적용 */
         }
-        postLicense();
+        postLicense(undefined, msg.reqId);
         break;
       }
       case 'LICENSE_VERIFIED': {
@@ -943,10 +953,10 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           } catch {
             /* 저장 실패해도 세션 동안은 적용 */
           }
-          postLicense({ text: t('license.noteApplied'), kind: 'ok' });
+          postLicense({ text: t('license.noteApplied'), kind: 'ok' }, msg.reqId);
         } else if (msg.result.offline) {
           // 오프라인 — 기존 캐시(grace) 유지, 변경 없음.
-          postLicense({ text: t(cache ? 'license.noteGrace' : 'license.noteOffline'), kind: 'warn' });
+          postLicense({ text: t(cache ? 'license.noteGrace' : 'license.noteOffline'), kind: 'warn' }, msg.reqId);
         } else {
           // 알려진 서버 사유면 해요체 문구, 아니면 한 줄 + 원문 툴팁(결정 5-(b)). 머리말은 붙이지 않는다.
           const { code, error } = msg.result;
@@ -954,7 +964,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             text: isVerifyErrCode(code) ? t(`license.err.server.${code}`) : t('license.verifyFailed'),
             kind: 'warn',
             tip: error || undefined,
-          });
+          }, msg.reqId);
         }
         break;
       }
@@ -969,7 +979,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 무시 */
         }
-        postLicense({ text: t('license.noteCleared'), kind: 'ok' });
+        postLicense({ text: t('license.noteCleared'), kind: 'ok' }, msg.reqId);
         break;
       }
       case 'OPEN_LICENSE_LINK': {
@@ -1033,11 +1043,11 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         }, styles, modes);
         // 같은 이름 Global끼리 — 앞의 것만 냈음을 알린다(ia-v3 §4.4 "같은 이름 Global끼리")
         const dupes = exportGlobalDupes(inputs);
-        post({ type: 'EXPORT_RESULT', format: msg.format, content, clashes: exportClashes(tokens, modes), globalDupes: dupes.names, ...(dupes.from !== undefined ? { globalDupesFrom: dupes.from } : {}) });
+        post({ type: 'EXPORT_RESULT', ...rid(msg), format: msg.format, content, clashes: exportClashes(tokens, modes), globalDupes: dupes.names, ...(dupes.from !== undefined ? { globalDupesFrom: dupes.from } : {}) });
         break;
       }
       case 'GET_VAR_TABLE': {
-        post({ type: 'VAR_TABLE', ...(await collectVarTable()) });
+        post({ type: 'VAR_TABLE', ...rid(msg), ...(await collectVarTable()) });
         break;
       }
       case 'UPDATE_VARIABLE': {
@@ -1080,7 +1090,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 최소화/펼치기만 — 저장하지 않는다.
         const mode = normalizeUiSize(msg.mode);
         figma.ui.resize(uiWidth(mode), uiHeight(mode));
-        post({ type: 'UI_SIZE', mode });
+        post({ type: 'UI_SIZE', ...rid(msg), mode });
         break;
       }
       case 'GET_SETTINGS': {
@@ -1098,7 +1108,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         } catch {
           /* 저장소 접근 실패 → 기본값 */
         }
-        post({ type: 'SETTINGS', base: s.base, maxDepth: s.maxDepth, grid: s.grid });
+        post({ type: 'SETTINGS', ...rid(msg), base: s.base, maxDepth: s.maxDepth, grid: s.grid });
         break;
       }
       case 'SET_SETTINGS': {
@@ -1110,12 +1120,12 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         break;
       }
       case 'GET_VARIABLES': {
-        post({ type: 'VARIABLES', vars: await collectVars() });
+        post({ type: 'VARIABLES', ...rid(msg), vars: await collectVars() });
         break;
       }
       case 'GENERATE_DARK_MODE': {
         // 다크 값을 새로 쓰는 작업이라 토큰 생성과 같은 등급으로 잠근다.
-        if (!requirePaid('tokens')) break;
+        if (!requirePaid('tokens', msg.reqId)) break;
         // 대상 · 모드는 플러그인이 정한다(플러그인 Global · 기본 모드 → Dark — ia-v3 13.7).
         let res;
         try {
@@ -1125,17 +1135,17 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           if (darkChangedBeforeError(e)) {
             commitUndo(figma);
             await postPrereq();
-            post({ type: 'VARIABLES', vars: await collectVars() }); // 성공 때처럼 목록 갱신(모드가 바뀌었을 수 있다)
+            post({ type: 'VARIABLES', ...rid(msg), vars: await collectVars() }); // 성공 때처럼 목록 갱신(모드가 바뀌었을 수 있다)
           }
           throw e;
         }
         const { changed, ...r } = res;
-        post({ type: 'DARK_MODE_RESULT', ...r });
+        post({ type: 'DARK_MODE_RESULT', ...rid(msg), ...r });
         if (changed) {
           commitUndo(figma); // UX2: 옮기기 + 모드 추가 + 채움 전체를 단일 Undo로
           await postPrereq();
         }
-        if (!r.needMigrate) post({ type: 'VARIABLES', vars: await collectVars() }); // 모드가 바뀌었을 수 있으니 목록 갱신
+        if (!r.needMigrate) post({ type: 'VARIABLES', ...rid(msg), vars: await collectVars() }); // 모드가 바뀌었을 수 있으니 목록 갱신
         break;
       }
     }
