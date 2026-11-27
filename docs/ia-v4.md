@@ -1937,8 +1937,9 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 - 만들기 화면의 조용한 읽기가 받는 거절 · 오류(T-P28 — `makeTakes`가 자기 `reqId`면 종류와 상관없이 받아 지금은 처리 없이 삼킨다 — `ui.ts` 2777–2782):
   - `PREMIUM_REQUIRED{reqId: mkScanReq}`(텍스트 스타일 후보 읽기 — 플러그인은 무료로 봄): "읽는 중"을 끝내고(`mkTsReading = false`) **후보 0개**로 본다(Text Style 탭 숨김). Toast는 없다(조용한 읽기 — 유료 안내는 만들기 화면의 무료 상자가 한다).
   - `ERROR{reqId: mkScanReq}`: 같은 처리(후보 0개) + error Toast(`explainError` 글 · 툴팁 원문).
-  - `ERROR{reqId: mkExtractReq}`: "읽는 중"을 끝내고(`mkReading = false`) error Toast(같은 글). 화면은 읽기 전 모습(목록 없음) — 만들기 화면 "읽기 실패" 모습은 지금 없다(만들기 화면 정리 S-6c에서 본다).
-  - `ERROR{reqId: mkPreviewReq}`: 미리보기를 끝내고(그 줄 상태는 예전 값 그대로) error Toast.
+  - `ERROR{reqId: mkExtractReq}`: 읽기 표시를 내리고(`mkReading = false` — 다음 때에 다시 읽을 수 있게) error Toast(같은 글).
+  - `ERROR{reqId: mkPreviewReq}`: 미리보기 표시를 내리고(그 줄 상태는 예전 값 그대로) error Toast.
+  - **받아들임:** 두 오류 뒤 화면 글은 그대로 남는다 — 추출 오류 뒤 실행 버튼 잠금 사유 `v4.reading`("읽는 중" — `mkFor`가 그대로라 `mkReady()`가 거짓), 미리보기 오류 뒤 수 글 `make.counting`("세는 중"). 만들기 화면에 "읽기 실패" 모습이 지금 없어서다 — 만들기 화면 정리(S-6c)에서 본다. 이 PR은 작업이 멈추지 않고(다시 읽기가 막히지 않음) 오류가 Toast로 보이게까지만 한다.
 
 **③ 거절 · 오류는 그 작업만 끝낸다 (T-P29 ③)**
 
@@ -1959,15 +1960,18 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 **⑤ 쓰기 잠금 양쪽 · 상세 [저장]도 쓰기 (T-D8 · T-P26 — 지금 코드 기준)**
 
 - `WAIT_LINK_IDS`(`ui.ts` 4481 — OPS 쓰기 버튼 · `btnMakeRun` · `btnRename`): 지금은 연결 중이거나 **변수 탭 쓰기**(`VAR_WRITE_OPS`)일 때만 잠긴다. → 연결 중이면 `bind.waitLink`, 아니면 **어느 쓰기 작업이든**(`otherWriteOp()` — OPS `write: true` 전부 · 마법사 · 아래 [저장]) 진행 중이면 `bind.waitOp`(op = 그 작업 이름). 사유는 Toast(누를 때 — 지금처럼).
-  - **미리보기는 쓰기가 아니다:** OPS는 요청 종류로 쓰기를 가리므로 `CREATE_TOKENS{preview: true}`(값을 직접 고르기 [미리보기] `btnCreate`)도 쓰기로 센다 — `opSent`가 `preview`인 `CREATE_TOKENS`는 `write: false`로 적는다(그동안 `btnMakeRun` 등이 잠기지 않게).
+  - **미리보기는 쓰기가 아니다:** OPS는 요청 종류로 쓰기를 가리므로 `CREATE_TOKENS{preview: true}`(값을 직접 고르기 [미리보기] `btnCreate`)도 쓰기로 센다 — `opSent`가 `preview`인 `CREATE_TOKENS`는 `write: false`로 적는다(그동안 `btnMakeRun` 등이 잠기지 않게). 같은 열쇠(`CREATE_TOKENS`)에 **진행 중인 쓰기 항목이 있으면 미리보기 항목으로 덮어쓰지 않는다**(미리보기는 OPS에 적지 않고 보낸다 — 쓰기 잠금 · 쓰기 결과의 작업 직후 다시 읽기를 지키게. 값을 직접 고르기는 S-6c에서 없어진다).
   - **예외 — 만들기 화면 결과 화면의 [닫기]:** 같은 `btnMakeRun`이 결과 화면(`mkResults`가 있을 때 — `renderMakeFoot`)에서 [닫기]가 되므로 그 모습일 때는 쓰기 잠금도 연결 중 잠금도 걸지 않는다(닫기는 쓰기가 아님 — 지금은 연결 중이면 [닫기]가 잠긴다). `renderWaitLocks`는 `mkResults`로 판정하고, `renderMakeFoot`이 [닫기] ↔ 실행 버튼을 바꿀 때마다 `renderWaitLocks`를 부른다.
   - 진행 중인 작업 자신의 버튼은 실행 중 숨거나(`btnMakeRun` — [취소]로 바뀜) 목록에 없다([취소] `btnMakeCancel` 등은 잠기지 않는다).
   - 연결 화면 [{o}곳 연결](`WAIT_CARD_IDS`)은 지금도 `otherWriteOp()`로 잠긴다 — 그대로.
 - **오류 상자의 [다시 시도]도 거친다:** `showError`의 [다시 시도](`ui.ts` 2462–2466)는 지금 연결 중만 보고 바로 다시 보낸다. → 다시 보낼 요청이 쓰기(`OPS[type].write` — 미리보기 제외)면 `writeLockReason()`을 먼저 보고, 잠겼으면 보내지 않고 그 상태 자리에 사유(지금 연결 중일 때와 같은 자리 · 모양).
 - **상세 [저장](`UPDATE_VARIABLE`)도 쓰기 작업이다:**
-  - 저장 중 표시는 팝업과 따로 둔다 — 새 `updSaving: { reqId, timer } | null`. 저장을 보낼 때 세우고, 그 `reqId`의 `VARIABLE_UPDATED` · `ERROR` · 10초 시간 초과에서만 내린다(지금 `ed.saving`은 팝업 상태라 최소화 `setMini(true)` → `closeModal()` → `edCleanup`이 `ed = null`로 지우면 아직 도는 저장을 놓친다). 세울 때 · 내릴 때 `renderWaitLocks`를 부른다.
+  - 저장 중 표시는 팝업과 따로 둔다 — 새 `updSaving: { reqId, timer } | null`. 저장을 보낼 때 세우고, 그 `reqId`의 `VARIABLE_UPDATED` · `ERROR` · 시간 초과에서만 내린다(지금 `ed.saving`은 팝업 상태라 최소화 `setMini(true)` → `closeModal()` → `edCleanup`이 `ed = null`로 지우면 아직 도는 저장을 놓친다). 세울 때 · 내릴 때 `renderWaitLocks`를 부른다.
+    - 시간 초과는 지금과 같은 `EDIT_TIMEOUT`이고 팝업의 `edMaybeSaved`에서도 함께 내린다(팝업이 없으면 `updSaving`의 타이머가 내린다).
+    - `VARIABLE_UPDATED` · `ERROR{op: 'UPDATE_VARIABLE'}`에서 내리는 일은 처리기 **맨 앞**에서 한다(`onVariableUpdated`의 `edDeadReqs` · `ed == null`로 먼저 돌아가는 갈래보다 앞).
+    - `VARIABLE_UPDATED`를 받은 뒤 변수 표를 기다리는 동안(`awaitingTable`)은 쓰기 잠금이 이미 풀리고, 팝업만 "저장 중" 모습이다.
   - `otherWriteOp()`는 `updSaving`이 있으면 "고치기"(새 키 `op.updateVar`)를 돌려준다. OPS 표에는 넣지 않는다(진행 테두리 · 실패 [보기]가 없음 — §2.6).
-  - **[저장] 쪽 잠금도 넓힌다**(지금 코드는 연결 중만 — `edChrome` 6234 · `edSave` 6908 · `edLockedSave` 6340, 툴팁 · 알림 줄 `bind.waitLink`뿐 — §4.6 "지금 코드와 다른 곳"): [저장] 잠금 = `writeLockReason()`(연결 중 `bind.waitLink`, 다른 쓰기 중 `bind.waitOp` — 자기 저장(`updSaving`)은 빼고 본다). 툴팁 · 팝업 안 알림 줄도 그 사유. `edSave`도 같은 조건이면 보내지 않는다.
+  - **[저장] 쪽 잠금도 넓힌다**(지금 코드는 연결 중만 — `edChrome` 6234 · `edSave` 6908 · `edLockedSave` 6340, 툴팁 · 알림 줄 `bind.waitLink`뿐 — §4.6 "지금 코드와 다른 곳"): [저장] 잠금 = `writeLockReason(skipReq)`(연결 중 `bind.waitLink`, 다른 쓰기 중 `bind.waitOp`). `writeLockReason` · `otherWriteOp`에 선택 인자 `skipReq?: number`를 더해 `updSaving.reqId === skipReq`일 때만 "고치기"를 뺀다 — 열린 팝업은 **자기 저장의 `reqId`**(`ed.saving?.reqId`)를 넘긴다. 저장 중 최소화로 팝업이 닫힌 뒤 다른 변수의 상세를 열면 앞 저장(`updSaving`)은 그 팝업의 것이 아니므로 [저장]이 잠긴다(`UPDATE_VARIABLE` 두 개가 겹치지 않게). 툴팁 · 팝업 안 알림 줄도 그 사유. `edSave`도 같은 조건이면 보내지 않는다.
   - `renderWaitLocks`는 상세 팝업이 열려 있으면 `edChrome`을 불러 [저장] 잠금을 맞춘다(지금은 `onBindLinkingChanged`만 부른다 — 다른 쓰기가 `ERROR`로 끝나도 [저장]이 잠긴 채 남지 않게).
 - 읽기(`write: false` · 조용한 읽기 · 미리보기)는 잠그지 않는다.
 
