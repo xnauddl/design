@@ -582,8 +582,8 @@
           | 4 | 유채색 · 단계 ≤ 200(연한 강조색 — 쓰임과 상관없이) | 규칙 2와 같은 계산(같은 계열) — blue/50 → 900 · 100 → 800 · 200 → 700 |
           | 5 | 유채색 · 단계 ≥ 800(짙은 끝) | 규칙 3과 같은 계산 — blue/800 → 200 · 900 → 100 |
           | 6 | 유채색 · 단계 300–700(강조색) | i ≥ 6(600 이상)이면 i − 2, 아니면 i − 1, 단 최소 3(300) — 300 → 300 · 500 → 400 · 600 → 400 · 700 → 500 |
-          - 고른 단계 s′의 **규칙 스텝** = 플러그인 Global의 이름 `color/{계열}/{s′}`인 변수. 그 이름의 변수가 있는데 색 변수가 아니면 그 역할은 쓰지 않는다(세지 않음 — 받아들임). 있는 색 변수면 별칭 · 반투명 · `isManual`이어도 그대로 가리킨다.
-        - **전체 스케일(DK-D7):** 이번 실행에서 **쓸 역할**(아래 판정에서 "규칙 값을 쓴다"로 정해진 역할 — 그대로 둘 역할 제외)의 계열마다, 플러그인 Global에 `color/{계열}/{50 … 950}` 11단계가 **모두** 있게 한다 — 이미 있는 이름은 그대로 두고 없는 단계만 만든다(기본 모드 하나에 값 · 용도 `scopes`는 그 계열을 처음 부른 역할의 G와 같게). 0 · 1000 · 가운데 단계 · `-n`은 만들지 않는다. 새 단계 값:
+          - 고른 단계 s′의 **규칙 스텝** = 플러그인 Global의 이름 `color/{계열}/{s′}`인 변수. 그 이름의 변수가 있는데 색 변수가 아니면 그 역할은 **대상 역할에서 뺀다**(쓰지 않고 `targets` · Dark 연결이 없는 역할 수에도 넣지 않음 — 받아들임). 있는 색 변수면 별칭 · 반투명 · `isManual`이어도 그대로 가리킨다.
+        - **전체 스케일(DK-D7):** 이번 실행에서 **쓸 역할**(아래 판정에서 "규칙 값을 쓴다"로 정해진 역할 — 그대로 둘 역할 제외)의 계열마다, 플러그인 Global에 `color/{계열}/{50 … 950}` 11단계가 **모두** 있게 한다 — 이미 있는 이름은 그대로 두고 없는 단계만 만든다(기본 모드 하나에 값 · 용도 `scopes`는 그 계열을 부른 역할 중 R 이름 오름차순 첫째의 G와 같게). 0 · 1000 · 가운데 단계 · `-n`은 만들지 않는다. 새 단계 값:
           - 기준(anchor) = 그 계열의 정수 단계 이름(`color/{계열}/{50 … 950}`) 변수 중 직접 값 · 불투명 색. 없으면 그 계열을 부른 역할들의 G.
           - L = `stepRefL(단계)`(이름 짓기 기준 L — 다시 추출해도 같은 단계로 읽힌다. 계열은 게멋 뒤 채도가 낮으면 gray로 읽힐 수 있다 — 받아들임).
           - 회색 계열(기준이 모두 `achromatic`): H = 기준 H의 C 가중 원형 평균(C < 0.005인 기준은 빼고, 모두 빠지면 C = 0), C = 기준 C의 중앙값(0.02를 넘지 않게).
@@ -601,19 +601,19 @@
           | 기록 `calc`, Dark = `d`, Light = `l`, `d` = 규칙 값 | 쓰지 않음 | 세지 않음 |
           | 기록 없음, Dark = Light(같은 별칭 — 다크를 만든 뒤 생긴 역할 등) | 규칙 값을 쓰고 기록 `calc` | n |
           | 기록 없음, Dark ≠ Light | 그대로 두고 기록 `user` | k |
-        - **실행 순서(쓰기):** ① 표를 이름으로 판정해 쓸 역할 · 그대로 둘 역할을 정한다(쓰지 않음) → ② 쓸 역할의 계열마다 전체 스케일 → ③ 쓸 역할의 Dark 칸에 규칙 스텝 별칭 · 기록 → ④ 그대로 둘 역할 중 기록을 바꿀 것(`calc` → `user` · 기록 없음 → `user`)의 기록만 쓴다. 쓸 역할이 0이면 스케일도 만들지 않는다(옛 구조 파일을 처음 눌러도 스텝이 생기지 않음).
+        - **실행 순서(쓰기):** ① 표를 이름으로 판정해 쓸 역할 · 그대로 둘 역할을 정한다(쓰지 않음) → ② 쓸 역할(규칙 1 역할 제외 — 규칙 값이 Light G라 스텝이 필요 없다)의 계열마다 전체 스케일 → ③ 쓸 역할의 Dark 칸에 규칙 스텝 별칭 · 기록 → ④ 그대로 둘 역할 중 기록을 바꿀 것(`calc` → `user` · 기록 없음 → `user`)의 기록만 쓴다. 쓸 역할이 0이면 스케일도 만들지 않는다(옛 구조 파일을 처음 눌러도 스텝이 생기지 않음).
         - **나중에 만든 역할:** Semantic을 만드는 곳은 새 변수의 **모든 모드에 같은 별칭**을 쓴다 — `createUsageRoles` · 역할 매핑 행 · 연결의 새 역할(지금 그렇게 함)과 **`createSemanticAliases`**(팔레트 · 역할 매핑 경로 — 지금은 기본 모드만, `variables.ts` 709–711 — 새로 만드는 변수는 모든 모드에 쓰도록 고친다. 이미 있는 변수의 값을 바꿀 때는 기본 모드만). 그래야 Dark 칸이 Light와 같은 별칭이 되어 다시 누를 때 위 표 "기록 없음, Dark = Light"로 채워진다(Figma가 새 변수의 Dark 칸을 다른 값으로 채우면 `user`로 굳기 때문).
         - **Dark 연결이 없는 역할 수:** 플러그인 Semantic 모드가 둘 이상일 때만. 대상 역할 중 지금 모드를 열쇠로 한 기록이 ① `user`이거나 ② `calc`이고 Light = `l`인 것이 하나라도 있으면 연결된 역할, 아니면 **Dark 연결이 없는 역할**로 센다(`d`와 규칙 값이 달라진 calc는 연결된 역할 — 띠는 "없다"를 말하므로). 기록 없이 Dark ≠ Light인 역할도 연결된 역할로 센다(다시 눌러도 `user`가 되어 수가 줄지 않으므로). `code.ts` `postPrereq` → `PREREQ_STATE.darkUnfilled`(필드 이름 그대로).
         - **D-T1 파일 옮기기(DK-D8 "확인 후 자동으로 옮기기"):** "D-T1 구조" = 플러그인 Global에 기본이 아닌 `Dark` 모드(`findModeByName`)가 있음 — 이 모드를 GD라 한다. [다크 만들기]에 `migrate`가 없으면 아무것도 쓰지 않고 `needMigrate: { lost: x }`로 답하고(x = 아래 "잃는 값" 수 — 읽기만 해서 센다) UI는 확인 팝업을 연다. 승인(`migrate: true`)하면 한 번의 실행 · ⌘Z 한 번(`commitUndo`)으로:
           1. **읽기:** 플러그인 Global 색 변수 X마다 GD 칸과 `dsl.darkFill[GD]` 기록을 읽는다. X의 **사용자 Dark 값** = 기록 `user` · 기록 `calc`이고 GD 칸 ≠ `d` · 기록 없이 GD 칸 ≠ 기본 칸 중 하나(D-T1 칸마다 판정과 같은 기준). 그 밖은 공식 값으로 보고 옮기지 않는다.
           2. Semantic Dark 모드 ensure(위 "모드 정하기").
-          3. **사용자 Dark 값 옮기기:** 대상 역할 R마다(Light가 G = X) — R의 Semantic Dark 칸이 이미 있고 Light와 다르면(앞선 실행 · D-T1 전 Semantic Dark가 남은 파일) 그대로 두고 기록 `user`(이 단계 끝). 아니면 X에 사용자 Dark 값이 있을 때:
+          3. **사용자 Dark 값 옮기기:** 대상 역할 R마다(Light가 G = X) — 2에서 모드를 **만들지 않았고** R의 Semantic Dark 칸이 이미 있고 Light와 다르면(앞선 실행 · D-T1 전 Semantic Dark가 남은 파일) 그대로 두고 기록 `user`(이 단계 끝 — 2에서 모드를 만들었으면 Figma가 무엇을 넣었든 칸이 빈 것으로 본다, 칸마다 판정 "Dark 칸이 빔"과 같음). 아니면 X에 사용자 Dark 값이 있을 때:
              - GD 칸이 별칭이고 그 대상이 있는 색 변수이며 플러그인 Global의 직접 값 변수면 그 대상을 가리킨다.
              - 그 밖(색 · 다른 대상)은 칸을 색으로 푼다(별칭은 대상 컬렉션 기본 모드로 따라감 — `resolveColor`). 푼 색과 `#RRGGBBAA`가 같은 플러그인 Global 직접 값 색 변수의 **기본 모드 값**이 있으면 그것(X 자신 먼저, 그다음 `isManual` · `dark/` 이름이 아닌 것 이름 오름차순, 없으면 그 밖 이름 오름차순)을 가리킨다. 없으면 그 색으로 Global 스텝을 새로 만들어(이름 `nameColorsByHue([hex], 1, 파일 이름 · 이번 실행에서 만든 이름)`, 용도 = X와 같게) 가리킨다. 풀지 못하면 옮기지 않는다(5에서 규칙 값).
              - 기록 `user`(옮긴 역할 a · 새로 만든 스텝 g에 셈). 같은 X를 가리키는 역할은 모두 같은 대상.
           4. **Global Dark 모드 지우기:** GD를 `removeMode`. 모든 플러그인 Global 변수의 `dsl.darkFill`을 지운다. Global의 다른 모드(사용자 모드)는 건드리지 않는다.
           5. 이어서 보통 실행(위 "실행 순서" — 3에서 기록한 역할은 `user`라 그대로).
-          - **잃는 값(DK-D8 받아들임 · 팝업에 알림):** 사용자 Dark 값이 있는데 어떤 대상 역할의 Light도 가리키지 않는 X의 값은 4에서 사라진다(그 X에 바로 붙은 레이어는 Dark에서 바뀌지 않게 된다). 그 수 = x. D-T1에서 공식 값이던 칸은 옮기지 않고 규칙 스텝으로 바뀐다(색이 달라질 수 있다).
+          - **잃는 값(DK-D8 받아들임 · 팝업에 알림):** 사용자 Dark 값이 있는 X 중 3에서 어떤 역할로도 옮겨지지 않는 것(어떤 대상 역할의 Light도 가리키지 않음 · 가리키는 역할이 모두 3의 첫 갈래로 그대로 둠 · 풀지 못함)의 값은 4에서 사라진다. 그 수 = x(읽기만으로 같은 판정을 해 센다). Global에 바로 붙은 레이어는 x와 상관없이 Dark에서 바뀌지 않게 된다(팝업에 늘 알림). D-T1에서 공식 값이던 칸은 옮기지 않고 규칙 스텝으로 바뀐다(색이 달라질 수 있다).
           - 결과 `migrated = { moved: a, added: g }`. 3 뒤 4 전에 예외로 멈추면 `commitUndo`가 바꾼 것을 한 묶음으로 남기고, 다시 누르면 GD가 남아 다시 팝업 → 3에서 이미 쓴 역할은 "Semantic Dark ≠ Light"로 그대로 둔다.
         - **옛 구조(D-T1 전 — Semantic에 Dark · `dark/…` 복사본) 파일:** 옮기기 없이 그대로 D-T2로 읽는다 — Semantic Dark가 이미 Global 변수(`dark/…`)를 가리키므로 위 표 "기록 없음, Dark ≠ Light"로 `user`(그대로)가 된다. D-T1의 옛 구조 옮기기(①–⑥ · `dark.needMigrateManual` · `dark.errMigrateModes`)는 없앤다. 받아들임: `dark/…` 이름 · 옛 공식 색이 남는다(새 규칙을 쓰려면 Semantic Dark 모드를 지우고 다시 누름 — 직접 고친 Dark 연결도 사라진다).
         - **판정 순서:** 플러그인 Semantic 없음(`dark.errNoCol`) → Semantic 기본 모드 이름이 `Dark`이고 다른 `Dark` 없음(`dark.errSameMode`) → D-T1 구조이고 `migrate` 없으면 `needMigrate` → (쓰기) 모드 ensure → 옮기기 3–4(승인 때) → 실행 순서 ①–④. 새로 만든 모드에 쓴 칸이 0이고 옮긴 것도 0이면 그 모드를 지운다(D-T1과 같음). 대상 역할 0이면 `targets: 0`(`dark.nothing`).
@@ -2861,7 +2861,7 @@
 ## A.30 다크 D-T2 PR — Global은 팔레트 하나, Semantic이 Light · Dark 연결표 (2026-11-27 사용자 결정 DK-D5–DK-D8 — 13.7 "다크 — D-T2", ia-v4 §4.11 ② D-T2 블록. PR #196 이어서)
 
 - 결정: DK-D5 구조(Global 모드 없음 · Semantic Dark가 Global 스텝을 별칭) · DK-D6 역할별 규칙 · DK-D7 쓰인 계열마다 50–950 전체 스케일 · DK-D8 D-T1 파일은 확인 후 자동 옮기기 · Global에 바로 붙은 레이어는 Dark 없음(받아들임 — 팝업에 알림) · DK-D9 유채색은 값으로 판정(명세에서 정함) · DK-D10 inverse도 같은 쓰임 규칙(사용자 결정) · DK-D11 만든 스텝이 정수 이름을 차지해도 받아들임(사용자 결정).
-- [ ] `themeApply.ts` `generateDarkMode(migrate?)` 다시 쓰기: 대상 플러그인 Semantic · 모드 정하기 · 대상 역할 · Light 스텝 읽기 · 역할별 규칙 표(1–6) · 전체 스케일 · `dsl.darkPick` 기록 · 칸마다 판정 표 · 판정 순서 · 새 모드 지우기. 결과 `DarkModeResult = { filled, kept, targets, changed, modeCreated?, scaleAdded?, migrated?: { moved, added }, needMigrate?: { globalMode }, error? }`.
+- [ ] `themeApply.ts` `generateDarkMode(migrate?)` 다시 쓰기: 대상 플러그인 Semantic · 모드 정하기 · 대상 역할 · Light 스텝 읽기 · 역할별 규칙 표(1–6) · 전체 스케일 · `dsl.darkPick` 기록 · 칸마다 판정 표 · 판정 순서 · 새 모드 지우기. 결과 `DarkModeResult = { filled, kept, targets, changed, modeCreated?, scaleAdded?, migrated?: { moved, added }, needMigrate?: { lost }, error? }`.
 - [ ] 순수 함수로 나눠 단위 테스트한다: `darkStepFor({ use, alpha, achromatic, step })` → 단계(규칙 1이면 null) · `lightStepOf(name, hex)` → { family, step } · `scaleStepColor(family, step, anchors)` → hex(새 위치 `src/lib/darkRules.ts`, figma 의존 없음).
 - [ ] D-T1 옮기기 1–5 · `needMigrate: { lost }` 미리 셈(읽기만) · 옛 구조 옮기기 코드(①–⑥ · `oldDarkMode` 쓰는 판정 · `unusedDarkCopies`)와 `dsl.darkFill` 쓰기 지우기(읽기는 옮기기 1에만).
 - [ ] `countDarkUnfilled` · `darkPrereq`를 13.7 D-T2로(필드 이름 그대로, `darkOldManual` 늘 거짓). `code.ts` `GENERATE_DARK_MODE` 결과 전달(`scaleAdded`) · `postPrereq`.

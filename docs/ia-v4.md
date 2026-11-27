@@ -2158,7 +2158,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 > - 조건 · 아래 D-T1 글에서 바뀌는 것(1회차 검토 뒤 — 줄마다 대체):
 >   - 전제 띠: "플러그인 Global 없음" → **플러그인 Semantic 없음**(글 `dark.prereqNoVars` 그대로 — 도구 탭 PR의 계획 글 "먼저 변수 만들기에서 Global 변수를 만들어 주세요"는 "… Semantic 변수를 …"로). T-P10의 전제 판정도 "플러그인 Semantic 있음".
 >   - 알림 띠 `dark.needMigrate` = D-T1 구조(플러그인 Global에 기본이 아닌 `Dark` 모드 — `darkOld`)일 때. `dark.needMigrateManual` 띠 · 상태표 "옛 구조"의 "Semantic 모드 셋 이상" 갈래 · "거절" 줄의 `errMigrateModes`는 없앤다. 거절 `dark.errSameMode`는 Semantic 기본 모드 이름.
->   - 팝업은 `DARK_MODE_RESULT{needMigrate: {lost}}`가 오면 연다(옛 `{removeDark, mode}` · `migrateBodyNoDel` 갈래 없음). 본문 = `dark.migrateBody` + lost > 0이면 새 `dark.migrateLost` " Global에 바로 연결된 레이어는 Dark에서 바뀌지 않게 되고, 역할이 가리키지 않는 Global의 직접 고친 Dark 값 {x}개는 지워져요(유료 [연결]로 Semantic으로 바꿀 수 있어요)."
+>   - 팝업은 `DARK_MODE_RESULT{needMigrate: {lost}}`가 오면 연다(옛 `{removeDark, mode}` · `migrateBodyNoDel` 갈래 없음). 본문 = `dark.migrateBody` + 늘 새 `dark.migrateLayers` " Global에 바로 연결된 레이어는 Dark에서 바뀌지 않게 돼요(유료 [연결]로 Semantic으로 바꿀 수 있어요)." + lost > 0이면 새 `dark.migrateLost` " 옮길 역할이 없는 Global의 직접 고친 Dark 값 {x}개는 지워져요."
 >   - 와이어: 안내 줄 = 새 `dark.hint` · 알림 띠 예 = "Dark 연결이 없는 역할 3개 — [다크 만들기]로 연결해요" · 팝업 본문 = 새 `dark.migrateBody`.
 >   - "옮기기를 한 결과" 줄: `dark.migrated`(옮긴 역할 a · 만든 스텝 g)만 앞에 붙이고, warn · 툴팁 조건은 없다(늘 ok — 결과 글 쪽 규칙을 따름).
 >   - 결과 줄 `scalePart`는 `DARK_MODE_RESULT.scaleAdded`(새 필드, 만든 Global 스텝 수). 만들기 화면 다크 단계 글 차례 = `wizard.seq.dark` → `darkScale`(g > 0) → `darkModeCreated` → `darkKept`, upToDate일 때도 `darkScale`을 붙인다. Toast `make.done.dark` "다크 {k}개"는 그대로(k = 연결한 역할 수).
