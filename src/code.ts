@@ -13,7 +13,7 @@ import { bindSelection, bindSelectedItems, collectLocalMains, countDeleted, coun
 import { userRadiusKeys } from './lib/sameValue';
 import { deleteUnusedVariables, scanUnusedVariables } from './lib/unusedVars'; // 안 쓰는 변수 찾기(docs/unused-vars.md)
 import { collectionTiers, collectionTierInfo, ownedCollection, ownedCollections, ownedIds } from './lib/collectionRoles';
-import { renameSelection, writeRole, writeRoleFromName, writeNameKey } from './lib/rename';
+import { renameSelection, writeRole, writeRoleFromName, writeNameKey, writeKept } from './lib/rename';
 // ResolvedType·ScopeName은 변수 편집기(toValueCell)와 함께 걷혔다 — origin/main은 그 자리를
 // 건드리지 않았으므로 import만 이쪽(삭제본)을 따른다.
 import { rgbToHex, exportColorHex } from './lib/tokens';
@@ -784,7 +784,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
         // 이름과 함께 dsRole도 기록 — 이름 정리 자신과 텍스트 스타일 label 판정(`dsRoleOwner`)이 읽는다.
         const changes: RenameChange[] = [];
         let roleWrites = 0; // 이름은 그대로면서 역할만 새로 기록된 노드 수(undo 묶음 판단용)
-        for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
+        for (const { id, before: expectedBefore, after, role, nameKey, kept } of msg.items) {
           const node = await figma.getNodeByIdAsync(id);
           if (!node || !('name' in node)) continue; // 소실 노드는 graceful skip
           const before = node.name;
@@ -803,6 +803,8 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           }
           // 떼기 전 이름(ia-v4 §4.4) — 있으면 기록, 없으면 지운다. 바뀌었으면 역할 기록처럼 센다(undo 묶음).
           if (writeNameKey(node as SceneNode, nameKey ?? null)) roleWrites++;
+          // 지킨 이름 표시(ia-v4 §4.4 "S-2b 이름 보존" SC-D51) — 사람 이름을 지킨 항목이면 지금 이름을, 아니면 지운다. 바뀌었으면 센다(undo 묶음).
+          if (writeKept(node as SceneNode, kept ? after : null)) roleWrites++;
           // node.name은 위(before !== after)에서 이미 썼다 — origin/main이 여기 둔 대입은
           // 그 줄과 겹쳐서 걷는다.
           if (before === after) continue;

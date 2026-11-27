@@ -2075,6 +2075,7 @@
   var ROLE_VOCAB = [...EMITTED_ROLES, ...RECOGNIZED_ROLES];
   var ROLE_KEY = "dsRole";
   var NAME_KEY = "dsNameKey";
+  var KEPT_KEY = "dsKept";
   function nameKeyFor(name, stored) {
     if (!stored || !name) return void 0;
     return stored.length > name.length + 1 && stored.endsWith("-" + name) ? stored : void 0;
@@ -7129,7 +7130,7 @@
         const sc = decided.keep === "root" ? pickScope(before) : null;
         prefixForChildren = sc && !isScopeRole(sc) ? sc : null;
       }
-      if (!decided.skip && decided.name) {
+      if (!decided.skip && decided.name !== void 0) {
         const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
         if (visible !== decided.name) nameKey = decided.name;
         if (decided.keepKey) nameKey = nameKeyFor(before, readPluginKey(node, NAME_KEY));
@@ -7140,10 +7141,11 @@
         }
         if (opts.apply && decided.role) writeRole(node, decided.role);
         if (opts.apply) writeNameKey(node, nameKey != null ? nameKey : null);
+        if (opts.apply) writeKept(node, decided.kept ? before : null);
         contextForChildren = (_b = decided.ctxName) != null ? _b : decided.passthrough ? ancestorName : decided.name;
         if (decided.passthrough) ctxDepthForChildren = ctxDepth + 1;
       }
-      col.nodes.push(__spreadValues({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role }, nameKey ? { nameKey } : {}));
+      col.nodes.push(__spreadValues(__spreadValues({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role }, nameKey ? { nameKey } : {}), decided.kept ? { kept: true } : {}));
       if ("children" in node && !isSkippedSubtree(node) && !isIconFrameNode(node)) {
         const childDims = decided.passthrough ? parentDims : dims2(node);
         await recurse(node.children, contextForChildren, opts, col, depth + 1, layoutOf(node), node.id, (_c = decided.role) != null ? _c : null, childDims, ctxDepthForChildren, prefixForChildren, node);
@@ -7161,7 +7163,9 @@
       if (!hc) return { skip: true, keep: "root" };
       let hcScope = ancestorName ? pickScope(ancestorName) : null;
       if (hcScope === hc) hcScope = null;
-      return { skip: false, role: hc, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
+      const hcName = layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth });
+      if (await nameKindOf2(node, pos.rootPrefix) === "human") return { skip: false, role: hc, name: node.name, keepName: true, ctxName: hcName, kept: true };
+      return { skip: false, role: hc, name: hcName };
     }
     const token = await primaryToken(node);
     const ctxScope = (_a = ancestorName ? pickScope(ancestorName) : null) != null ? _a : (token == null ? void 0 : token.context) ? pickScope(token.context) : null;
@@ -7169,15 +7173,18 @@
     if (isContainerType(node) && !isIconFrameNode(node)) {
       const h = hintRole(node, pos.rootPrefix);
       if (h && (role === h || HINT_WEAK_ROLES.has(role))) {
-        return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h };
+        return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h, kept: true };
       }
     }
-    if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
+    if (PASSTHROUGH_ROLES.has(role)) return __spreadValues({ skip: false, role, name: node.name, keepName: true, passthrough: true }, await nameKindOf2(node, pos.rootPrefix) === "human" ? { kept: true } : {});
     if (role === "icon" && isIconFrameNode(node) && !isMeaninglessIconName(node, pos.rootPrefix)) {
-      return { skip: false, role, name: node.name, keepName: true };
+      return { skip: false, role, name: node.name, keepName: true, kept: true };
     }
     const scope = ctxScope === role ? null : ctxScope;
     const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
+    if (await nameKindOf2(node, pos.rootPrefix) === "human") {
+      return __spreadValues({ skip: false, role, name: node.name, keepName: true, kept: true }, REFINED_PASSTHROUGH.has(role) ? { passthrough: true } : { ctxName: name });
+    }
     if (REFINED_PASSTHROUGH.has(role)) return { skip: false, role, name, passthrough: true };
     return { skip: false, role, name };
   }
@@ -7209,6 +7216,71 @@
     } catch (e) {
       return false;
     }
+  }
+  function writeKept(node, name) {
+    const n = node;
+    if (typeof n.setPluginData !== "function") return false;
+    try {
+      const cur = typeof n.getPluginData === "function" ? n.getPluginData.call(node, KEPT_KEY) : "";
+      const next = name != null ? name : "";
+      if (cur === next) return false;
+      n.setPluginData.call(node, KEPT_KEY, next);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+  async function boundVariableNames(node) {
+    var _a;
+    const ids = /* @__PURE__ */ new Set();
+    const add2 = (e) => {
+      if (!e) return;
+      if (Array.isArray(e)) for (const a of e) add2(a);
+      else if (typeof e.id === "string") ids.add(e.id);
+    };
+    const bv = node.boundVariables;
+    if (bv && typeof bv === "object") for (const v of Object.values(bv)) add2(v);
+    for (const f of ["fills", "strokes"]) {
+      const ps = node[f];
+      if (Array.isArray(ps)) for (const p of ps) add2((_a = p.boundVariables) == null ? void 0 : _a.color);
+    }
+    const out = [];
+    for (const id of ids) {
+      try {
+        const v = await figma.variables.getVariableByIdAsync(id);
+        if (v) out.push(v.name);
+      } catch (e) {
+      }
+    }
+    return out;
+  }
+  var NON_ASCII = /[^\x00-\x7F]/;
+  var NUM_WORD = /^[\d_]+$/;
+  var EMITTED_SEQS = [...EMITTED_ROLES].map((r) => r.split("-")).sort((a, b) => b.length - a.length);
+  function allEmitted(toks) {
+    if (!toks.length) return false;
+    const ok = (i) => i === toks.length || EMITTED_SEQS.some((seq) => seq.every((w, k) => toks[i + k] === w) && ok(i + seq.length));
+    return ok(0);
+  }
+  async function nameKindOf2(node, rootPrefix) {
+    const name = node.name;
+    if (isDefaultName(name)) return "default";
+    if (NON_ASCII.test(name)) return "human";
+    const toks = kebab(name).split("-").filter(Boolean);
+    if (!toks.length) return "human";
+    const role = readPluginKey(node, ROLE_KEY);
+    const kept = readPluginKey(node, KEPT_KEY);
+    if (role && !(kept && kebab(kept) === toks.join("-"))) {
+      const rt = kebab(role).split("-").filter(Boolean);
+      if (rt.length && toks.length >= rt.length && toks.slice(toks.length - rt.length).join("-") === rt.join("-")) {
+        const head = toks.slice(0, toks.length - rt.length);
+        if (!head.length || head.length === 1 && !NUM_WORD.test(head[0]) || namedByPlugin(name, role, rootPrefix)) return "plugin";
+      }
+    }
+    if (allEmitted(toks)) return "plugin";
+    if (rootPrefix && toks.length > 1 && toks[0] === rootPrefix && allEmitted(toks.slice(1))) return "plugin";
+    if ((await boundVariableNames(node)).some((v) => kebab(v) === toks.join("-"))) return "plugin";
+    return "human";
   }
   function writeRoleFromName(node, name) {
     const toks = kebab(name).split("-").filter(Boolean);
@@ -8905,7 +8977,7 @@
         case "RENAME_APPLY": {
           const changes = [];
           let roleWrites = 0;
-          for (const { id, before: expectedBefore, after, role, nameKey } of msg.items) {
+          for (const { id, before: expectedBefore, after, role, nameKey, kept } of msg.items) {
             const node = await figma.getNodeByIdAsync(id);
             if (!node || !("name" in node)) continue;
             const before = node.name;
@@ -8915,6 +8987,7 @@
               roleWrites++;
             }
             if (writeNameKey(node, nameKey != null ? nameKey : null)) roleWrites++;
+            if (writeKept(node, kept ? after : null)) roleWrites++;
             if (before === after) continue;
             changes.push({ id, before, after });
           }

@@ -2606,7 +2606,7 @@ $('btnRename').addEventListener('click', () => {
   // 이름이 그대로인 노드도 역할은 남긴다(§4.4 — 세지 않음).
   const roleOnly = renameNodes
     .filter((n) => n.after === undefined && (n.role || n.nameKey))
-    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role, ...(n.nameKey ? { nameKey: n.nameKey } : {}) }));
+    .map((n) => ({ id: n.id, before: n.name, after: n.name, role: n.role, ...(n.nameKey ? { nameKey: n.nameKey } : {}), ...(n.kept ? { kept: true } : {}) })); // kept — 사람 이름을 지킨 노드(dsKept, §4.4 S-2b)
   renameApplyReq = ++bindReqSeq;
   send({ type: 'RENAME_APPLY', items: [...items, ...roleOnly], reqId: renameApplyReq });
 });

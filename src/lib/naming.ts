@@ -97,6 +97,8 @@ export const ROLE_KEY = 'dsRole';
  * 떼기 전 이름을 남기는 pluginData 키. 이름 힌트로 이름을 둔 노드의 키 판정(`rename.ts` — `nameKeyFor`)이 읽는다.
  */
 export const NAME_KEY = 'dsNameKey';
+/** 사람이 지은 이름을 지켰을 때 그 이름(ia-v4 §4.4 "S-2b 이름 보존" SC-D51) — 지금 이름과 같으면(`kebab` 비교) 역할 기록과 맞는 이름(ⓐ)으로 보지 않는다. */
+export const KEPT_KEY = 'dsKept';
 
 /** `dsNameKey`가 지금 이름에 맞는 키인가 — `-{지금 이름}`으로 끝나야 한다(대소문자까지 정확, 두 마디 이상). */
 export function nameKeyFor(name: string, stored: string | null | undefined): string | undefined {
