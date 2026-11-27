@@ -2120,15 +2120,19 @@ test('renameSelection — 선택 루트 컨테이너는 사람이 지은 이름�
   assert.equal(node.name, 'OriginalName');
 });
 
-test('renameSelection — 정규화: 사람이 지은 하위 레이어 이름도 역할로 교체(뚜렷한 역할)', async () => {
+test('renameSelection — S-2b: 사람이 지은 하위 레이어 이름은 그대로 · 역할 · 지킨 이름 표시만 기록(ia-v4 §4.4 R2B-P2 · SC-D51)', async () => {
   installFigma();
-  const inner = { type: 'VECTOR', id: 'in', name: 'OriginalName' }; // 사람이 지은 이름
-  // 선택 루트(보존) 아래의 사람이 지은 이름 → 보존하지 않고 역할(VECTOR → icon)로 교체.
+  const inner = withPluginData({ type: 'VECTOR', id: 'in', name: 'OriginalName' }); // 사람이 지은 이름
+  // S-2b 전에는 역할(VECTOR → icon)로 덮어썼다. 이제는 이름을 지키고 역할만 기록한다.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [inner] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
-  const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('in'), 'icon'); // 'OriginalName'을 역할(icon)로 덮어씀
-  assert.equal(inner.name, 'icon');
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(changes.some((c) => c.id === 'in'), false);
+  assert.equal(inner.name, 'OriginalName');
+  const n = nodes.find((x) => x.id === 'in');
+  assert.equal(n.role, 'icon');
+  assert.equal(n.kept, true);
+  assert.equal(inner.getPluginData('dsRole'), 'icon');
+  assert.equal(inner.getPluginData('dsKept'), 'OriginalName');
 });
 
 test('renameSelection — 토큰 신호로 맥락/역할 결정(조상 없음 → 토큰 접두사 폴백, 원시 토큰은 무시)', async () => {
@@ -2238,11 +2242,14 @@ test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch,
   const emptyFrame = { type: 'FRAME', id: 'e', name: 'Frame 3', children: [] };
   // #7b: 대상들을 루트(보존) 아래에 둬 역할 추론을 depth≥1에서 검증.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [swatch, imageFrame, emptyFrame] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('s'), 'swatch'); // 색만 채운 빈 프레임 → swatch
   assert.equal(after.get('im'), 'image'); // 이미지 채움 → image
-  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container(맥락 없이 plain)
+  // 빈 프레임 → 역할 container. S-2b(ia-v4 §4.4 R2B-P2): 구조 폴백은 이름으로 쓰지 않는다 — 이름 그대로 · 역할만 기록
+  assert.equal(after.has('e'), false);
+  assert.equal(nodes.find((n) => n.id === 'e').role, 'container');
+  assert.equal(emptyFrame.name, 'Frame 3');
 });
 
 test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아니라 컨테이너', async () => {
@@ -2257,9 +2264,11 @@ test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아�
   };
   // #7b: card를 루트(보존) 아래에 둬 depth≥1에서 역할 추론 검증.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('card'), 'container'); // 색+자식 다수, 라운드/그림자 없음 → container(plain)
+  // 색+자식 다수, 라운드/그림자 없음 → 역할 container(S-2b: 폴백은 이름 그대로 · 역할만 기록)
+  assert.equal(after.has('card'), false);
+  assert.equal(nodes.find((n) => n.id === 'card').role, 'container');
   assert.equal(after.get('ci'), 'icon'); // 부모가 일반 container → 맥락 접두사 안 붙임
 });
 
@@ -2289,13 +2298,14 @@ test('renameSelection — 멱등: 한 번 정돈한 이름은 재실행에도 �
 
 test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
   installFigma();
-  const node = { type: 'FRAME', id: 'f', name: 'Frame 1', children: [] };
+  // 색만 채운 빈 프레임 → swatch(S-2b 뒤 빈 프레임의 container는 이름으로 쓰지 않으므로 바뀌는 예로 swatch)
+  const node = { type: 'FRAME', id: 'f', name: 'Frame 1', fills: [{ type: 'SOLID', visible: true }], children: [] };
   // #7b: depth0 루트는 보존이므로 대상을 루트 아래에 둔다(루트는 변경에 안 잡힘).
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [node] };
   const { changes, applied } = await renameSelection([root], { apply: false, maxDepth: 3 });
   assert.equal(applied, false);
   assert.equal(changes.length, 1);
-  assert.equal(changes[0].after, 'container');
+  assert.equal(changes[0].after, 'swatch');
   assert.equal(node.name, 'Frame 1'); // 적용 안 함
 });
 
@@ -2416,7 +2426,7 @@ test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 
 test('renameSelection — 영역 추론: [header, 본문] 2분할에서 키 큰 블록은 footer가 아니라 main, 그 자식은 section/footer', async () => {
   installFigma();
   // Flightin QA 파일 형태: 1440x4970 페이지 = header 80px + 본문 4890px(섹션 4 + 진짜 푸터).
-  const sec = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, layoutMode: 'VERTICAL', width: 1440, height: h,
+  const sec = (id, h) => ({ type: 'FRAME', id, name: 'Frame', layoutMode: 'VERTICAL', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: `${id}-v`, name: 'Vector' }] });
   const body = {
     type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4890,
@@ -2465,12 +2475,12 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
       ],
     }],
   };
-  const sec = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, layoutMode: 'VERTICAL', width: 1440, height: h,
+  const sec = (id, h) => ({ type: 'FRAME', id, name: 'Frame', layoutMode: 'VERTICAL', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: `${id}-v`, name: 'Vector' }] });
   const body = { type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4890,
     children: [sec('hero', 700), sec('s2', 900), sec('ft', 312)] };
   const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL', width: 1440, height: 4970, children: [header, body] };
-  const { changes } = await renameSelection([page], { apply: true, maxDepth: 5 });
+  const { changes, nodes } = await renameSelection([page], { apply: true, maxDepth: 5 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('hd'), 'header');
   assert.equal(after.get('logo'), 'header-logo'); // 헤더 첫 자리의 작은 묶음
@@ -2478,7 +2488,9 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
   assert.equal(after.get('act'), 'header-actions'); // 마지막 자리의 텍스트 2개
   // 중첩 컨테이너(ctxDepth 2)의 첫·끝 자리는 logo/actions가 아니라 일반 구조어로 남는다.
   // 가로 오토레이아웃 묶음은 stack-x(ia-v3 §2.12 12.12 N-D6 — 전에는 container)
-  assert.ok(['stack-x', 'wrapper'].includes(after.get('util')), `util → ${after.get('util')}`);
+  // S-2b(ia-v4 §4.4 R2B-P2): 구조 폴백은 이름으로 쓰지 않는다 — 바꿀 줄 없이 역할만 실린다
+  const utilRole = nodes.find((n) => n.id === 'util').role;
+  assert.ok(['stack-x', 'wrapper'].includes(utilRole) && !after.has('util'), `util → ${utilRole} / ${after.get('util')}`);
   // 글자 1개 + 아이콘인 가로 묶음은 글자 버튼(ia-v4 §4.4 A2 — B.24에서 바뀜, 전에는 container/wrapper)
   assert.equal(after.get('sup'), 'header-button');
   assert.equal(after.get('lang'), 'header-button');
@@ -2633,7 +2645,7 @@ test('renameSelection — aside: 납작한 툴바의 작은 자식은 aside 아�
 
 test('renameSelection — HTML 랜드마크 section: 페이지 중간 블록(3개 초과) → section', async () => {
   installFigma();
-  const mk = (id, vid) => ({ type: 'FRAME', id, name: id, children: [{ type: 'VECTOR', id: vid, name: 'Vector' }] });
+  const mk = (id, vid) => ({ type: 'FRAME', id, name: 'Frame', children: [{ type: 'VECTOR', id: vid, name: 'Vector' }] });
   const page = {
     type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL',
     children: [mk('hd', 'v0'), mk('s1', 'v1'), mk('s2', 'v2'), mk('s3', 'v3'), mk('ft', 'v4')],
@@ -2650,7 +2662,7 @@ test('renameSelection — HTML 랜드마크 section: 페이지 중간 블록(3�
 test('renameSelection — HTML 시맨틱 article: 피드(리스트) 안의 카드형 항목 → article', async () => {
   installFigma();
   const card = (id) => ({
-    type: 'FRAME', id, name: 'Frame X', width: 300, height: 120,
+    type: 'FRAME', id, name: 'Frame', width: 300, height: 120,
     cornerRadius: 8, fills: [{ type: 'SOLID', visible: true }],
     children: [
       { type: 'TEXT', id: id + 't', name: 'Title', characters: '제목' },
@@ -2700,7 +2712,7 @@ test('renameSelection — 칩: 작은 알약형 버튼 → chip', async () => {
 test('renameSelection — 리스트: 오토레이아웃+유사 반복 자식 3개↑ → list, 자식 → item', async () => {
   installFigma();
   const mkRow = (id) => ({
-    type: 'FRAME', id, name: 'Frame X', width: 300, height: 48,
+    type: 'FRAME', id, name: 'Frame', width: 300, height: 48,
     children: [{ type: 'TEXT', id: id + 't', name: 't', characters: 'x' }],
   });
   const list = {
@@ -2752,10 +2764,11 @@ test('renameSelection — 스냅샷 토큰 베낌(line-height-150-percent-px)도
   const frame = { type: 'FRAME', id: 'f', name: 'line-height-150-percent-px', children: [] };
   // #7b: depth0 루트는 보존이므로 대상을 루트 아래에 둔다.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [frame] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('f'), 'container'); // percent-px echo → 그대로 두지 않고 container로 정리
-  assert.notEqual(frame.name, 'line-height-150-percent-px');
+  // 역할은 container(토큰 베낌 이름에 끌려가지 않음). S-2b: 구조 폴백은 이름으로 쓰지 않으므로 이름은 그대로 두고 역할만 기록한다
+  assert.equal(after.has('f'), false);
+  assert.equal(nodes.find((n) => n.id === 'f').role, 'container');
 });
 
 test('renameSelection(#7b) — 선택 루트 컨테이너는 기본명이어도 보존, 자식은 정돈(맥락 누수 없음)', async () => {
@@ -3018,7 +3031,7 @@ test('renameSelection — 메인 컴포넌트·컴포넌트 세트·잠긴 서�
 test('renameSelection — 페이지 섹션 스택은 list가 아니라 랜드마크로', async () => {
   installFigma();
   const mk = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
   const page = {
@@ -3046,7 +3059,7 @@ function stackPage(rootName, prefix = '', pd = false) {
     return n;
   };
   const mk = (id, h) => ({
-    type: 'FRAME', id: prefix + id, name: `Frame ${id}`, width: 1440, height: h,
+    type: 'FRAME', id: prefix + id, name: 'Frame', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: prefix + id + 'v', name: 'Vector' }],
   });
   const page = withPd({
@@ -3138,7 +3151,7 @@ test('B.22 ⑧ apply면 뗀 노드에 dsNameKey · 떼지 않은 노드는 없�
 test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음', async () => {
   installFigma();
   const mkCard = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 360, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 360, height: h,
     cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
     children: [
       { type: 'TEXT', id: id + 't', name: 'Title', characters: 'x' },
@@ -3158,7 +3171,7 @@ test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음
 test('renameSelection — 넓은 커버 이미지가 있어도 카드는 field가 아니라 card', async () => {
   installFigma();
   const card = {
-    type: 'FRAME', id: 'card', name: 'Product Card', layoutMode: 'VERTICAL', width: 320, height: 400,
+    type: 'FRAME', id: 'card', name: 'Frame 5', layoutMode: 'VERTICAL', width: 320, height: 400,
     cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
     children: [
       { type: 'TEXT', id: 'tt', name: 'Title', characters: '제품' },
@@ -3174,7 +3187,7 @@ test('renameSelection — 넓은 커버 이미지가 있어도 카드는 field�
 test('renameSelection — 반복 필드 3개인 폼도 field/input 사슬 유지', async () => {
   installFigma();
   const mkField = (id) => ({
-    type: 'FRAME', id, name: `Field ${id}`, layoutMode: 'VERTICAL', width: 400, height: 70,
+    type: 'FRAME', id, name: 'Frame', layoutMode: 'VERTICAL', width: 400, height: 70,
     children: [
       { type: 'TEXT', id: id + 'l', name: 'Label', characters: '라벨' },
       { type: 'RECTANGLE', id: id + 'i', name: 'Rectangle', width: 400, height: 44, strokes: [{ type: 'SOLID', visible: true }] },
@@ -3193,7 +3206,7 @@ test('renameSelection — 반복 필드 3개인 폼도 field/input 사슬 유지
 test('renameSelection — 숨긴 힌트·에러 줄이 있어도 field 유지', async () => {
   installFigma();
   const field = {
-    type: 'FRAME', id: 'field', name: 'Email Field', layoutMode: 'VERTICAL', width: 240, height: 70,
+    type: 'FRAME', id: 'field', name: 'Frame 5', layoutMode: 'VERTICAL', width: 240, height: 70,
     children: [
       { type: 'TEXT', id: 'lb', name: 'Label', characters: '이메일' },
       { type: 'RECTANGLE', id: 'box', name: 'Rectangle 1', width: 240, height: 40, strokes: [{ type: 'SOLID', visible: true }] },
@@ -3211,10 +3224,10 @@ test('renameSelection — 숨긴 힌트·에러 줄이 있어도 field 유지', 
 test('renameSelection — 랜드마크 슬롯은 숨김·TEXT 형제를 세지 않음', async () => {
   installFigma();
   const mk = (id) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 1000, height: 200,
+    type: 'FRAME', id, name: 'Frame', width: 1000, height: 200,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
-  const ghost = { type: 'FRAME', id: 'ghost', name: 'Frame G', visible: false, width: 1000, height: 10, children: [] };
+  const ghost = { type: 'FRAME', id: 'ghost', name: 'Frame', visible: false, width: 1000, height: 10, children: [] };
   const page = {
     type: 'FRAME', id: 'page', name: 'Desktop', width: 1000, height: 900, layoutMode: 'VERTICAL',
     children: [ghost, mk('hd'), mk('mn'), mk('ft'), { type: 'TEXT', id: 'cp', name: 'c', characters: '© 2026' }],
@@ -3250,7 +3263,7 @@ test('renameSelection — 히어로 섹션 안에는 header/footer 랜드마크�
 test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 화면 크기일 때만 랜드마크', async () => {
   installFigma();
   const block = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
   // 'Desktop'은 역할 어휘가 아니고 1440x2400은 페이지 크롬 → 랜드마크 인정.
@@ -3314,7 +3327,7 @@ test('renameSelection — 시트·드로어·무명 좁은 패널에는 header/f
 test('renameSelection — 모바일 Home 화면은 세로 랜드마크 유지', async () => {
   installFigma();
   const block = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 390, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 390, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
   const home = {
@@ -3331,15 +3344,15 @@ test('renameSelection — 모바일 Home 화면은 세로 랜드마크 유지', 
 test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
   installFigma();
   const col = (id, t) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 48,
+    type: 'FRAME', id, name: 'Frame', width: 80, height: 48,
     children: [{ type: 'TEXT', id: id + 't', name: 'n', characters: t }],
   });
   const row = {
-    type: 'FRAME', id: 'row', name: 'Frame R', layoutMode: 'HORIZONTAL', width: 300, height: 48,
+    type: 'FRAME', id: 'row', name: 'Frame', layoutMode: 'HORIZONTAL', width: 300, height: 48,
     children: [col('a', '12'), col('b', '34'), col('c', '56')],
   };
   const card = {
-    type: 'FRAME', id: 'card', name: 'Frame C', width: 320, height: 200, cornerRadius: 12,
+    type: 'FRAME', id: 'card', name: 'Frame', width: 320, height: 200, cornerRadius: 12,
     fills: [{ type: 'SOLID', visible: true }],
     children: [row, { type: 'TEXT', id: 'ct', name: 'Title', characters: 'x' }],
   };
@@ -3353,11 +3366,11 @@ test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
 test('renameSelection — nav의 링크 자식은 nav-item', async () => {
   installFigma();
   const link = (id) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 32,
+    type: 'FRAME', id, name: 'Frame', width: 80, height: 32,
     children: [{ type: 'TEXT', id: id + 't', name: 'l', characters: '링크' }],
   });
   const nav = {
-    type: 'FRAME', id: 'nav', name: 'Frame N', layoutMode: 'HORIZONTAL', width: 600, height: 48,
+    type: 'FRAME', id: 'nav', name: 'Frame', layoutMode: 'HORIZONTAL', width: 600, height: 48,
     children: [link('l1'), link('l2'), link('l3')],
   };
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [nav] };
@@ -3372,11 +3385,11 @@ test('renameSelection — 자식 역할은 부모에게 부여된 역할에서�
   // 카드 크롬이 있어 card로 확정되지만, 구조만 보면 isListLike도 참인 프레임.
   // 구조를 재판정하면 자식이 item이 된다 — 확정 역할(card)에서만 파생해야 한다.
   const row = (id) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 280, height: 48,
+    type: 'FRAME', id, name: 'Frame', width: 280, height: 48,
     children: [{ type: 'TEXT', id: id + 't', name: 't', characters: 'x' }],
   });
   const card = {
-    type: 'FRAME', id: 'card', name: 'Frame C', layoutMode: 'VERTICAL', width: 320, height: 200,
+    type: 'FRAME', id: 'card', name: 'Frame', layoutMode: 'VERTICAL', width: 320, height: 200,
     cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
     children: [row('r1'), row('r2'), row('r3')],
   };
@@ -7670,7 +7683,8 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
 
 test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서가 뒤집혀도 actions는 가장 오른쪽', async () => {
   installFigma();
-  const links = { type: 'FRAME', id: 'links', name: 'top-inner', layoutMode: 'HORIZONTAL', x: 1412, width: 188, height: 24, children: [T('l1', '로그인'), T('l2', '회원가입')] };
+  const links = { type: 'FRAME', id: 'links', name: 'Frame 4', // 실기 이름 top-inner — S-2b 뒤 사람 이름은 그대로라 판정을 보려고 기본명으로
+    layoutMode: 'HORIZONTAL', x: 1412, width: 188, height: 24, children: [T('l1', '로그인'), T('l2', '회원가입')] };
   const logo = { type: 'FRAME', id: 'logo', name: 'Frame 6', x: 320, width: 130, height: 40, children: [V('lv', { width: 120, height: 40 })] };
   const row = { type: 'FRAME', id: 'row', name: 'Frame 5', x: 0, width: 1920, height: 40, children: [links, logo] };
   const header = { type: 'FRAME', id: 'hd', name: 'Frame 2', layoutMode: 'VERTICAL', width: 1920, height: 150, children: [row] };
@@ -7686,7 +7700,8 @@ test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서�
 test('B.24 ⑤ row — 이름표 + 값 나란히 · 좁으면 아님 · 값 글자 3개 이상이면 아님 · 페이지 번호 아님', async () => {
   installFigma();
   const price = { type: 'INSTANCE', id: 'pv', name: '금액', x: 228, y: 0, width: 124, height: 23, children: [T('pvt', '9,999원')] };
-  const row = { type: 'FRAME', id: 'row', name: '구독', width: 352, height: 28, children: [T('lab', '구독', { x: 0, y: 2 }), price] };
+  // 실기 이름 '구독'(S-2b 뒤 사람 이름 그대로) — 판정을 보려고 기본명
+  const row = { type: 'FRAME', id: 'row', name: 'Frame 3', width: 352, height: 28, children: [T('lab', '구독', { x: 0, y: 2 }), price] };
   let r = await inCard(row);
   assert.equal(r.changes.find((c) => c.id === 'row')?.after, 'card-row');
   const narrow = { type: 'FRAME', id: 'nr', name: 'Frame 5', width: 60, height: 28, children: [T('a', '구독', { x: 0, y: 0 }), T('b', '1', { x: 40, y: 0 })] };
@@ -7703,7 +7718,8 @@ test('B.24 ⑤ row — 이름표 + 값 나란히 · 좁으면 아님 · 값 글�
 
 test('B.24 ⑥ text-group — 글자 2개 세로 · 가로 3개(오토레이아웃 · 자유 배치)는 아님', async () => {
   installFigma();
-  const tg = { type: 'FRAME', id: 'tg', name: '상품명', layoutMode: 'VERTICAL', width: 292, height: 42, children: [T('b', 'Vipp'), T('n', '소파')] };
+  // 실기 이름 '상품명'(S-2b 뒤 그대로) — 기본명으로
+  const tg = { type: 'FRAME', id: 'tg', name: 'Frame 3', layoutMode: 'VERTICAL', width: 292, height: 42, children: [T('b', 'Vipp'), T('n', '소파')] };
   let r = await inCard(tg);
   assert.equal(r.changes.find((c) => c.id === 'tg')?.after, 'card-text-group');
   const h3 = { type: 'FRAME', id: 'h3', name: 'menu', layoutMode: 'HORIZONTAL', width: 300, height: 20, children: [T('a', 'A'), T('b2', 'B'), T('c', 'C')] };
@@ -7716,7 +7732,8 @@ test('B.24 ⑥ text-group — 글자 2개 세로 · 가로 3개(오토레이아�
 
 test('B.24 ⑦ media — 사진 + 아이콘 프레임 · 원형 사진만이면 아님', async () => {
   installFigma();
-  const box = { type: 'FRAME', id: 'box', name: 'img_box', width: 292, height: 292, children: [
+  // 실기 이름 img_box(S-2b 뒤 사람 이름 그대로) — 기본명으로
+  const box = { type: 'FRAME', id: 'box', name: 'Frame 3', width: 292, height: 292, children: [
     { type: 'RECTANGLE', id: 'ph', name: 'image 18', width: 292, height: 292, fills: imgFill },
     { type: 'FRAME', id: 'ht', name: 'heart', width: 28, height: 28, children: [V('hv')] }] };
   let r = await inCard(box);
@@ -7937,7 +7954,7 @@ test('A.21 ⑥ 색 기준색 — 배경은 가장 밝은 불투명 무채색, �
 
 test('A.21 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x, 세로 → stack-y, 오토레이아웃 아님 → container, 자식 1 → wrapper · stack-x 루트의 자식은 맥락 없음', async () => {
   installFigma();
-  const box = (id, layoutMode, kids) => ({ type: 'FRAME', id, name: `Frame ${id}`, ...(layoutMode ? { layoutMode } : {}), width: 600, height: 300, children: kids });
+  const box = (id, layoutMode, kids) => ({ type: 'FRAME', id, name: 'Frame', ...(layoutMode ? { layoutMode } : {}), width: 600, height: 300, children: kids });
   const sq = (id, x) => ({ type: 'RECTANGLE', id, name: `Rectangle ${id}`, x, y: 0, width: 200, height: 200, fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 }, visible: true }] });
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', width: 1600, height: 1600, children: [
     box('h', 'HORIZONTAL', [sq('h1', 0), sq('h2', 300)]),
@@ -7946,11 +7963,13 @@ test('A.21 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x,
     box('w', 'HORIZONTAL', [sq('w1', 0)]),
   ] };
   const r = await renameSelection([root], { apply: false, maxDepth: 5 });
-  const a = new Map(r.changes.map((c) => [c.id, c.after]));
-  assert.equal(a.get('h'), 'stack-x');
-  assert.equal(a.get('v'), 'stack-y');
-  assert.equal(a.get('n'), 'container');
-  assert.equal(a.get('w'), 'wrapper');
+  // 역할 판정은 그대로. S-2b(ia-v4 §4.4 R2B-P2): 구조 폴백 넷은 이름으로 쓰지 않는다 — 바꿀 줄이 없고 역할만 실린다
+  const roleOf = new Map(r.nodes.map((n) => [n.id, n.role]));
+  assert.equal(roleOf.get('h'), 'stack-x');
+  assert.equal(roleOf.get('v'), 'stack-y');
+  assert.equal(roleOf.get('n'), 'container');
+  assert.equal(roleOf.get('w'), 'wrapper');
+  assert.equal(r.changes.some((c) => ['h', 'v', 'n', 'w'].includes(c.id)), false);
   // stack-x를 선택 루트로 다시 고르면 자식에게 x 맥락이 가지 않는다
   assert.equal(pickScopePure('stack-x'), null);
   assert.equal(pickScopePure('stack-y-2'), null);
@@ -8143,11 +8162,13 @@ test('B.28 실기 파일 구조 — 힌트 낱말 이름은 그대로 · 역할�
     assert.ok(!after.has(id), `${id} 이름 그대로 — 실제 ${after.get(id)}`);
     assert.equal(role(id), want, id);
   }
-  // 바뀌는 것: 헤더(확실한 판정) · 탭 밑줄 · 힌트 없는 버튼 상자 · 자동 이름 1px 띠
-  assert.equal(after.get('header'), 'header');
-  assert.equal(after.get('underline'), 'tab-indicator');
-  assert.equal(role('underline'), 'indicator');
-  assert.equal(after.get('cart'), 'wrapper');
+  // S-2b(ia-v4 §4.4 R2B-P2 · SC-D51): 사람이 지은 이름(헤더 · 탭 밑줄 · 버튼 상자)은 그대로 두고 역할 · 지킨 이름 표시만 기록.
+  // 바뀌는 것은 자동 이름 1px 띠뿐이다(S-2b 전에는 header · tab-indicator · wrapper로 바꿨다)
+  for (const [id, want] of [['header', 'header'], ['underline', 'indicator'], ['cart', 'wrapper']]) {
+    assert.ok(!after.has(id), `${id} 이름 그대로 — 실제 ${after.get(id)}`);
+    assert.equal(role(id), want, id);
+    assert.equal(byId.get(id).getPluginData('dsKept'), byId.get(id).name, id);
+  }
   assert.match(after.get('strip'), /divider$/);
   assert.equal(role('strip'), 'divider');
   // 미리보기 트리 노드도 역할을 싣는다(판넬 roleOnly 적용이 쓰는 값)
@@ -8186,10 +8207,17 @@ test('B.28 약한 판정 자리에서만 덮기 · 이 플러그인이 지은 �
     assert.ok(!r.changes.some((c) => c.id === 'n'), name);
     assert.equal(n._pd.get('dsRole'), want, name);
   }
-  for (const [name, pd] of [['nav-item', { dsRole: 'item' }], ['nav-link'], ['button-group'], ['btn-wrap'], ['divider-box'], ['nav 항목'], ['카테고리메뉴'], ['배송 경로 안내'],
-    ['tab-list', { dsRole: 'list' }]]) { // 이 플러그인이 지은 tab-list(dsRole list ≠ tabs · A1 ②ⓑ) → 힌트 아님
+  // 힌트가 아닌 이름 — 역할은 구조 판정(text-group). S-2b(ia-v4 §4.4 R2B-P1 · P2): 플러그인 이름(기록과 맞는 nav-item · tab-list)만 바꾸고,
+  // 사람 이름(nav-link · button-group · btn-wrap · divider-box · 한글)은 그대로 두고 역할만 기록한다(S-2b 전에는 모두 card-text-group)
+  for (const [name, pd] of [['nav-item', { dsRole: 'item' }], ['tab-list', { dsRole: 'list' }]]) { // 이 플러그인이 지은 tab-list(dsRole list ≠ tabs · A1 ②ⓑ) → 힌트 아님
     const r = await inCard(tg(name, pd));
     assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group', name);
+  }
+  for (const name of ['nav-link', 'button-group', 'btn-wrap', 'divider-box', 'nav 항목', '카테고리메뉴', '배송 경로 안내']) {
+    const n = tg(name);
+    const r = await inCard(n);
+    assert.ok(!r.changes.some((c) => c.id === 'n'), name);
+    assert.equal(n._pd.get('dsRole'), 'text-group', name);
   }
   // 확실한 판정(card)은 이름을 바꾼다
   const navCard = withPd({ type: 'FRAME', id: 'nc', name: 'nav', cornerRadius: 8, fills: vis, width: 300, height: 200, children: [T('x', 'x'), T('y', 'y')] });
@@ -9921,4 +9949,140 @@ test('S-2 SC-D45 밝기 · 쓰임 역할은 빈 자리로 — 테두리 #222222(
   // 고치기 전: 만들기는 붙은 #222 3곳까지 세어 기준색 #222 → #444를 subtle로 지었고(안 쓰임), 연결은 빈 자리로 default를 또 만들었다(Semantic 3개)
   assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['color/border/default', 'stroke-width/default']);
   assert.deepEqual(sel.map((n) => varName(figma, n.strokes[0].boundVariables?.color?.id)), ['line/ink', 'line/ink', 'line/ink', 'line/ink', 'color/border/default', 'color/border/default']);
+});
+
+/* ---------- S-2b 이름 보존(ia-v4 §4.4 "S-2b 이름 보존" · B.44 — SC-D21 · SC-D47–SC-D52) ---------- */
+const s2bCard = (name, pd = {}, id = 'c') => withPd({ type: 'FRAME', id, name, cornerRadius: 8, fills: vis, width: 300, height: 200, children: [T(id + 'x', 'x'), T(id + 'y', 'y')] }, pd);
+const s2bRun = (node, apply = true) => renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [node] }], { apply, maxDepth: 5 });
+
+test('S-2b R2B-P1 · P2 — 기본명 · 플러그인 이름(ⓑ 역할 낱말로만 · 모양 상관없이)은 바꾸고, 사람 이름은 그대로 · 역할 · 지킨 이름 표시만', async () => {
+  installFigma();
+  for (const name of ['Frame 12', 'Header', 'HEADER', 'card_header', 'cardHeader', 'stack-x', 'nav', 'header-card']) {
+    const n = s2bCard(name);
+    const r = await s2bRun(n);
+    assert.equal(r.changes.find((c) => c.id === 'c')?.after, 'card', name);
+    assert.equal(n._pd.get('dsKept') ?? '', '', `${name} — 바꾼 노드는 지킨 이름 표시 없음`);
+  }
+  // 사람 이름 — 역할 낱말 아닌 낱말(banner · title) · 숫자 낱말 · 한글 · 이모지 · 기록 없는 두 토막
+  for (const name of ['Hero banner', 'Card Title', 'card-2', '상품 카드', '🔥 card', 'promo-card']) {
+    const n = s2bCard(name);
+    const r = await s2bRun(n);
+    assert.ok(!r.changes.some((c) => c.id === 'c'), name);
+    assert.equal(n.name, name);
+    const rn = r.nodes.find((x) => x.id === 'c');
+    assert.equal(rn.role, 'card', name);
+    assert.equal(rn.kept, true, name);
+    assert.equal(n._pd.get('dsRole'), 'card', name);
+    assert.equal(n._pd.get('dsKept'), name, name);
+  }
+});
+
+test('S-2b SC-D50 · SC-D51 — 역할 기록과 맞는 두 토막은 플러그인 이름 · 앞 낱말 숫자는 아님 · 지킨 이름 표시와 같으면(kebab) 아님', async () => {
+  installFigma();
+  let n = s2bCard('promo-card', { dsRole: 'card' });
+  assert.equal((await s2bRun(n)).changes.find((c) => c.id === 'c')?.after, 'card');
+  n = s2bCard('2-card', { dsRole: 'card' });
+  assert.ok(!(await s2bRun(n)).changes.some((c) => c.id === 'c'), '2-card');
+  n = s2bCard('promo-card', { dsRole: 'card', dsKept: 'promo-card' });
+  assert.ok(!(await s2bRun(n)).changes.some((c) => c.id === 'c'), '지킨 이름');
+  n = s2bCard('promo-card', { dsRole: 'card', dsKept: 'Promo Card' });
+  assert.ok(!(await s2bRun(n)).changes.some((c) => c.id === 'c'), '대소문자만 다른 지킨 이름');
+});
+
+test('S-2b 표 14 — 지킨 이름은 두 번째 정리에서도 그대로 · 대소문자만 고쳐도 그대로 · 다른 두 토막으로 고치면 다시 판정해 바꾸고 표시를 지운다', async () => {
+  installFigma();
+  const n = s2bCard('promo-card');
+  let r = await s2bRun(n);
+  assert.ok(!r.changes.some((c) => c.id === 'c'));
+  assert.equal(n._pd.get('dsRole'), 'card');
+  assert.equal(n._pd.get('dsKept'), 'promo-card');
+  r = await s2bRun(n);
+  assert.deepEqual(r.changes.filter((c) => c.id === 'c'), [], '두 번째 정리');
+  n.name = 'Promo Card';
+  r = await s2bRun(n);
+  assert.ok(!r.changes.some((c) => c.id === 'c'), '대소문자만');
+  n.name = 'sale-card';
+  r = await s2bRun(n);
+  assert.equal(r.changes.find((c) => c.id === 'c')?.after, 'card');
+  assert.equal(n.name, 'card');
+  assert.equal(n._pd.get('dsKept'), '');
+});
+
+test('S-2b R2B-P3 — 선택 루트가 고신뢰 card여도 사람 이름이면 그대로 · 역할만, 자식은 바꿨을 때와 같은 맥락(card-icon) · 기본명 루트는 지금처럼 card', async () => {
+  installFigma();
+  const rootOf = (name) => withPd({ type: 'FRAME', id: 'root', name, cornerRadius: 12, fills: vis, width: 300, height: 400, layoutMode: 'VERTICAL',
+    children: [T('t', '제목'), V('v', { width: 24, height: 24 })] });
+  const human = rootOf('Pricing card');
+  let r = await renameSelection([human], { apply: true, maxDepth: 5 });
+  assert.ok(!r.changes.some((c) => c.id === 'root'));
+  assert.equal(human.name, 'Pricing card');
+  const rn = r.nodes.find((x) => x.id === 'root');
+  assert.equal(rn.role, 'card');
+  assert.equal(rn.kept, true);
+  assert.equal(rn.keep, undefined, '보존(root)이 아니라 역할 기록 — 루트 접두사 없음');
+  const childAfterHuman = r.changes.find((c) => c.id === 'v')?.after;
+  const plain = rootOf('Frame 1');
+  r = await renameSelection([plain], { apply: true, maxDepth: 5 });
+  assert.equal(r.changes.find((c) => c.id === 'root')?.after, 'card');
+  assert.equal(r.changes.find((c) => c.id === 'v')?.after, childAfterHuman, '자식 이름은 루트를 바꿨을 때와 같다');
+});
+
+test('S-2b R2B-P4 표 10 — 사람 이름 카드(Pricing panel) 아래 자식은 지금과 같다(card-media · card-image)', async () => {
+  installFigma();
+  const img = { type: 'RECTANGLE', id: 'img', name: 'Rectangle 1', width: 100, height: 100, fills: [{ type: 'IMAGE', visible: true }] };
+  const wrapper = { type: 'FRAME', id: 'wrap', name: 'Frame 8', children: [img] };
+  const card = withPd({ type: 'FRAME', id: 'card', name: 'Pricing panel', cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [wrapper, { type: 'TEXT', id: 'tt', name: 'Title', characters: 'x' }] });
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.has('card'), false);
+  assert.equal(nodes.find((n) => n.id === 'card').role, 'card');
+  assert.equal(after.get('wrap'), 'card-media');
+  assert.equal(after.get('img'), 'card-image');
+});
+
+test('S-2b 구조 폴백 — 기본명 · 플러그인 이름 · 사람 이름 모두 이름 그대로, 지킨 이름 표시는 사람 이름만', async () => {
+  installFigma();
+  for (const [name, kept] of [['Frame 7', false], ['container', false], ['Layout box', true]]) {
+    const n = withPd({ type: 'FRAME', id: 'e', name, children: [] });
+    const r = await s2bRun(n);
+    assert.ok(!r.changes.some((c) => c.id === 'e'), name);
+    assert.equal(r.nodes.find((x) => x.id === 'e').role, 'container', name);
+    assert.equal(r.nodes.find((x) => x.id === 'e').kept ?? false, kept, name);
+    assert.equal(n._pd.get('dsKept') ?? '', kept ? name : '', name);
+  }
+});
+
+test('S-2b ⓑ 루트 접두사 — 루트 이름에서 온 접두사 한 낱말 + 역할 낱말(dsl-card)은 플러그인 이름', async () => {
+  installFigma();
+  const c = s2bCard('dsl-card');
+  const root = { type: 'FRAME', id: 'root', name: 'Flightin website (DSL 실기)', width: 800, height: 800, children: [c] };
+  const r = await renameSelection([root], { apply: false, maxDepth: 5 });
+  assert.equal(r.nodes.find((x) => x.id === 'root').keep, 'root');
+  assert.equal(r.changes.find((x) => x.id === 'c')?.after, 'card');
+});
+
+test('S-2b SC-D52 — 붙은 변수 이름과 같은 이름(예전 토큰 경로 베낌)은 플러그인 이름 · 붙은 변수와 다른 비슷한 이름은 사람 이름', async () => {
+  const figma = installFigma();
+  const glob = figma.variables.createVariableCollection('Global');
+  const v = figma.variables.createVariable('brand/card-bg', glob, 'COLOR');
+  const mk = (name) => withPd({ type: 'FRAME', id: 'c', name, cornerRadius: 8, fills: [{ type: 'SOLID', visible: true, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: v.id } } }],
+    width: 300, height: 200, children: [T('cx', 'x'), T('cy', 'y')] });
+  assert.equal((await s2bRun(mk('brand-card-bg'))).changes.find((c) => c.id === 'c')?.after, 'card');
+  assert.ok(!(await s2bRun(mk('brand-card-bg-2'))).changes.some((c) => c.id === 'c'));
+});
+
+test('S-2b code.ts RENAME_APPLY — kept 항목은 dsKept를 기록하고, 없으면 지우며 바뀌면 roleWrites로 센다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const fr = withPd({ type: 'FRAME', id: 'h', name: 'Hero banner', visible: true, fills: [], children: [], parent: { type: 'PAGE' } });
+  registerNodes(figma, [fr]);
+  await p.send({ type: 'RENAME_APPLY', items: [{ id: 'h', before: 'Hero banner', after: 'Hero banner', role: 'section', kept: true }], reqId: 1 });
+  assert.equal(fr.name, 'Hero banner');
+  assert.equal(fr._pd.get('dsRole'), 'section');
+  assert.equal(fr._pd.get('dsKept'), 'Hero banner');
+  await p.send({ type: 'RENAME_APPLY', items: [{ id: 'h', before: 'Hero banner', after: 'section', role: 'section' }], reqId: 2 });
+  assert.equal(fr.name, 'section');
+  assert.equal(fr._pd.get('dsKept'), '');
 });

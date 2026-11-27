@@ -1512,6 +1512,41 @@ async function saveAndGet(p) {
   await p.close();
 }
 
+/* ---------- 18b S-2b 이름 보존(ia-v4 §4.4 "S-2b 이름 보존" · B.44) — 지킨 노드는 머리 줄 · 바꿀 수만 줄어듦 · roleOnly에 kept ---------- */
+{
+  const p = await open(560, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 0), ids: ['r0'], firstName: 'Landing' });
+  await p.click('#btnGoRename');
+  await p.waitForTimeout(30);
+  const rq = (await sent(p, 'RENAME')).at(-1);
+  // 정밀 시안 docs/qa/s2b-mock/s2b-mock-1.png 오른쪽과 같은 장면
+  await recv(p, { type: 'RENAME_RESULT', reqId: rq.reqId, applied: false, changes: [], nodes: [
+    { id: 'r0', name: 'Landing', type: 'FRAME', depth: 0, parentId: null, keep: 'root' },
+    { id: 'h', name: 'Hero banner', type: 'FRAME', depth: 1, parentId: 'r0', role: 'section', kept: true },
+    { id: 'h1', name: 'Frame 3', type: 'FRAME', depth: 2, parentId: 'h', after: 'text-group', role: 'text-group' },
+    { id: 'h2', name: 'Rectangle 4', type: 'RECTANGLE', depth: 2, parentId: 'h', after: 'image', role: 'image' },
+    { id: 'f', name: 'Frame 7', type: 'FRAME', depth: 1, parentId: 'r0', role: 'container' },
+    { id: 'c', name: 'Pricing panel', type: 'FRAME', depth: 1, parentId: 'r0', role: 'card', kept: true },
+    { id: 'c1', name: 'Frame 8', type: 'FRAME', depth: 2, parentId: 'c', after: 'card-media', role: 'media' },
+    { id: 'c2', name: 'Rectangle 1', type: 'RECTANGLE', depth: 3, parentId: 'c1', after: 'card-image', role: 'image' },
+    { id: 'b', name: 'Frame 12', type: 'FRAME', depth: 1, parentId: 'r0', after: 'card', role: 'card' },
+  ] });
+  await p.waitForTimeout(60);
+  if (process.env.SHOT_DIR) await p.screenshot({ path: `${process.env.SHOT_DIR}/s2b-after.png` });
+  const heads = await p.$$eval('#renameTree .tr-head', (e) => e.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+  check('18b S-2b 지킨 노드(사람 이름)는 바뀌는 자식이 있으면 머리 줄 — "Hero banner 2개" · "Pricing panel 2개" · 폴백 Frame 7은 안 보임',
+    heads.some((x) => x.includes('Hero banner') && x.includes('2개')) && heads.some((x) => x.includes('Pricing panel') && x.includes('2개')) && !(await p.textContent('#renameTree')).includes('Frame 7'), JSON.stringify(heads));
+  check('18b S-2b 머리 꼬리 "Landing · 바꿀 이름 5개" · [5개 이름 바꾸기]', (await p.textContent('#subRight')) === 'Landing · 바꿀 이름 5개' && (await p.textContent('#btnRename')) === '5개 이름 바꾸기', await p.textContent('#subRight'));
+  await p.click('#btnRename');
+  const ap = (await sent(p, 'RENAME_APPLY')).at(-1);
+  const byId = new Map((ap?.items ?? []).map((i) => [i.id, i]));
+  check('18b S-2b 바꾸기 — 지킨 노드는 roleOnly(이름 그대로 · 역할 · kept) · 폴백 노드는 kept 없이 역할만',
+    byId.get('h')?.kept === true && byId.get('h')?.after === 'Hero banner' && byId.get('h')?.role === 'section' && byId.get('c')?.kept === true && byId.get('f')?.role === 'container' && byId.get('f')?.kept === undefined && byId.get('b')?.after === 'card' && byId.get('b')?.kept === undefined,
+    JSON.stringify(ap?.items));
+  await p.close();
+}
+
 /* ---------- 19 텍스트 스타일 KRDS(docs/text-style-krds.md §4) — 표시 · 구분선 줄 · [이름 다시 짓기] 없음 ---------- */
 {
   const p = await open(560, 'variables');
