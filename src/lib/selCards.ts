@@ -148,6 +148,8 @@ export interface LinkPlace {
   currentAlpha?: number;
   /** 9999로 붙이는 알약 자리(찾을 때 읽은 원래 값) — 자리의 값은 9999다. */
   pillFrom?: number;
+  /** Global에서 바꿀 자리(ia-v4 §2.9a) — 라이브러리 같은 값 빼기를 하지 않는다(실행 연결이 거름 없이 바꾸므로 — SC-D57). */
+  fromId?: string;
 }
 
 /** 자리의 허용 용도 묶음 키(연결 찾기 자리의 `allowed.join('|')` — 칠은 레이어 종류를 따른다). */
@@ -173,7 +175,7 @@ export function linkPlacesForMake(cands: readonly LinkPlace[], nodeTypeOf: (node
     const isColor = kind === 'color';
     const value: string | number = isColor ? c.currentValue : c.pillFrom != null ? 9999 : Number(c.currentValue);
     if (!tokenable(kind, value)) continue;
-    if (libs.length) {
+    if (libs.length && !c.fromId) {
       const g = placeGroupKey(c.field, nodeTypeOf(c.nodeId) ?? '');
       const mk = `${kind}\u0000${value}\u0000${c.currentAlpha ?? 1}\u0000${g}`;
       let same = libMemo.get(mk);

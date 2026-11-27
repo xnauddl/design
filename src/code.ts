@@ -648,6 +648,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
           skipLayers: r.skipLayers, // 사유별 레이어 수(상한 전) — 건너뛴 곳 목록의 "레이어 {n}개"(미리보기에서 쓴다)
           reqId: msg.reqId, // UI가 낡은 응답을 가려낸다
           newRoles: r.newRoles,
+          ...(r.swapped ? { swapped: r.swapped } : {}), // Global에서 바꾼 자리 수(ia-v4 §2.9a)
           counts: r.counts as Record<string, Record<string, number>> | undefined, // 사유 × 종류(카드 숫자, IA v4 §4.1)
           ...(r.mains ? { mains: r.mains } : {}), // 함께 걸은 선택 밖 메인 컴포넌트 단위(ia-v3 §2.11 11번)
           ...(r.mainsBound ? { mainsBound: r.mainsBound } : {}),
@@ -762,7 +763,7 @@ figma.ui.onmessage = async (msg: UiToCode) => {
             for (const row of msg.textStyles) row.nodeIds.forEach((id, i) => { const m = row.mainIds?.[i]; if (m) mainOfText.set(id, m); });
             for (const id of ts.appliedIds) { const m = mainOfText.get(id); if (m && !mainsBound.includes(m)) mainsBound.push(m); }
           }
-          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), ...(mainsBound.length ? { mainsBound } : {}) });
+          post({ type: 'APPLY_RESULT', bound: r.bound, skipped: r.skipped, reasons: r.reasons, skips: r.skips, reqId: msg.reqId, newRoles: r.newRoles, ...(r.swapped ? { swapped: r.swapped } : {}), ...(ts ? { textStylesApplied: ts.applied, textStylesSkipped: ts.skipped } : {}), ...(mainsBound.length ? { mainsBound } : {}) });
           // 역할을 하나라도 만들었으면 아무것도 붙이지 못했어도 묶음을 닫는다 — 연결 한 번 = ⌘Z 한 번(§2.12 12.9).
           if (r.bound || r.newRoles || ts?.applied) {
             commitUndo(figma); // UX2: 선택 바인딩 전체(마지막 묶음 뒤 한 번)를 단일 Undo로

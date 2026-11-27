@@ -2151,6 +2151,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     "v4.bindListAria": "\uC5F0\uACB0\uD560 \uBCC0\uC218",
     "v4.linked": "{n}\uACF3 \uC5F0\uACB0 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "v4.linkedSkipped": " \xB7 \uAC74\uB108\uB700 {m}",
+    "bind.swappedTail": " \xB7 Global \uC5F0\uACB0 {k}\uACF3\uC740 Semantic\uC73C\uB85C \uBC14\uAFE8\uC5B4\uC694",
+    // ia-v4 §2.9a(SC-D58)
     "v4.tsPlaces": "Text Style {t}\uACF3",
     "v4.readCancelled": "\uC77D\uAE30\uB97C \uCDE8\uC18C\uD588\uC5B4\uC694",
     "v4.reread": "\uB2E4\uC2DC \uC77D\uAE30",
@@ -2255,6 +2257,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     "make.cancelledUpTo": "\uCDE8\uC18C\uD588\uC5B4\uC694 \xB7 {step}\uAE4C\uC9C0 \uB410\uC5B4\uC694",
     "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.done.semOnly": "Semantic {r}\uAC1C",
+    "make.done.swapped": "Global \uC5F0\uACB0 {k}\uACF3\uC740 Semantic\uC73C\uB85C \uBC14\uAFE8\uC5B4\uC694",
+    // ia-v4 §2.9a(SC-D58) — 다 됨 글 나머지 맨 앞
     "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
     "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
@@ -3305,7 +3309,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       const isColor = kind === "color";
       const value = isColor ? c.currentValue : c.pillFrom != null ? 9999 : Number(c.currentValue);
       if (!tokenable(kind, value)) continue;
-      if (libs.length) {
+      if (libs.length && !c.fromId) {
         const g = placeGroupKey(c.field, (_a3 = nodeTypeOf(c.nodeId)) != null ? _a3 : "");
         const mk = `${kind}\0${value}\0${(_b = c.currentAlpha) != null ? _b : 1}\0${g}`;
         let same = libMemo.get(mk);
@@ -5203,6 +5207,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (made && places) parts.push(t("make.done.sentCreateBind", { c: made, b: places }));
     else if (made) parts.push(t("make.done.sentCreate", { c: made }));
     else if (places) parts.push(t("make.done.sentBind", { b: places }));
+    if (totals.swapped) parts.push(t("make.done.swapped", { k: totals.swapped }));
     if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
     if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
     if ((_d = (_c = totals.styles) == null ? void 0 : _c.missing) == null ? void 0 : _d.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
@@ -6386,7 +6391,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   $("btnApplyConfirm").addEventListener("click", () => {
     const eff = bindTsOnly() ? [] : effCandidates();
-    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}));
+    const items = eff.filter((c) => bindChecked.has(candKey(c))).map((c) => __spreadValues(__spreadValues(__spreadValues(__spreadValues(__spreadValues({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId }, c.newRole ? { newRole: c.newRole } : {}), c.mainId ? { mainId: c.mainId } : {}), c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}), c.fromId ? { fromId: c.fromId } : {}));
     const textStyles = bindTsRows.filter((r) => !bindTsOff.has(r.styleId)).map((r) => {
       var _a3;
       return __spreadValues({ styleId: r.styleId, nodeIds: r.nodeIds }, ((_a3 = r.mainIds) == null ? void 0 : _a3.some(Boolean)) ? { mainIds: r.mainIds } : {});
@@ -6861,7 +6866,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           clearBindPreview();
           setStatus("applyStatus", "", "");
           if (activeTab === "select" && selSub === "bind") showSelSub("home");
-          notify(t("v4.linked", { n }) + (m ? t("v4.linkedSkipped", { m }) : ""), "success");
+          notify(t("v4.linked", { n }) + (msg.swapped ? t("bind.swappedTail", { k: msg.swapped }) : "") + (m ? t("v4.linkedSkipped", { m }) : ""), "success");
           selFindFor = null;
         }
         if (linkEnded) onBindLinkingChanged();
@@ -8262,10 +8267,12 @@ button.ds-tag { border: 0; cursor: pointer; }
             const sendToks = mkSendTokens();
             const only = onlyItems(sendToks, libs);
             const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
-            const r = only.length ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
+            const sent = only.length || isPaid ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
+            const r = sent && (only.length || sent.bound > 0) ? sent : null;
             const n = (_e = r == null ? void 0 : r.bound) != null ? _e : 0;
             if (r) {
               totals.bound = r.bound;
+              if (r.swapped) totals.swapped = r.swapped;
               mkMainsDone.push(...(_f = r.mainsBound) != null ? _f : []);
             }
             let ts = 0;
