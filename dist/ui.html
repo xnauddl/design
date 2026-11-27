@@ -1898,6 +1898,8 @@
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
+    "make.countFail": "\uC138\uC9C0 \uBABB\uD588\uC5B4\uC694",
+    // 만들 수 미리보기 실패(ia-v4 §4.3 "만들 수")
     "make.countGR": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
     "make.countStyles": " \xB7 \uC2A4\uD0C0\uC77C {t}\uAC1C",
     "make.layers": "Layer {n}",
@@ -7126,7 +7128,7 @@
   }
   function resendRetry(m) {
     const rid = m.reqId;
-    if (rid == null || opAutoReq.has(rid)) {
+    if (rid == null || opAutoMsgs.has(m)) {
       const copy = __spreadValues({}, m);
       delete copy.reqId;
       send(copy);
@@ -7434,6 +7436,7 @@
   var mkStates = {};
   var mkRoleRows = [];
   var mkPreview = null;
+  var mkPreviewFailed = false;
   var mkPreviewReq = 0;
   var mkPreviewTimer = null;
   var mkPreviewTagsOnly = false;
@@ -7555,6 +7558,7 @@
   function mkSendPreview() {
     const toks = mkSendTokens();
     mkPreview = null;
+    mkPreviewFailed = false;
     if (!toks.length) {
       mkRoleRows = [];
       mkPreviewReq = 0;
@@ -7585,6 +7589,10 @@
     }
     if ((msg.type === "ERROR" || msg.type === "PREMIUM_REQUIRED") && (rid === mkExtractReq || rid === mkScanReq)) {
       onMakeReadFail(msg, rid === mkScanReq);
+      return true;
+    }
+    if (msg.type === "ERROR" && rid === mkPreviewReq) {
+      onMakePreviewFail(msg);
       return true;
     }
     if (msg.type === "EXTRACT_RESULT" && rid === mkExtractReq) onMakeExtract(msg);
@@ -7655,6 +7663,13 @@
     renderMakeScreen();
     mkSendPreview();
   }
+  function onMakePreviewFail(msg) {
+    mkPreviewReq = 0;
+    console.warn("[make] preview failed", msg);
+    if (mkPreviewTagsOnly) return;
+    mkPreviewFailed = true;
+    renderMakeScreen();
+  }
   function onMakePreview(msg) {
     var _a3, _b, _c, _d;
     mkStates = __spreadValues(__spreadValues({}, mkStates), (_a3 = msg.tokenStates) != null ? _a3 : {});
@@ -7706,7 +7721,7 @@
   }
   function mkSemState() {
     if (!mkGlobalsOn().length) return "none";
-    if (mkPreview == null) return "counting";
+    if (mkPreview == null) return mkPreviewFailed ? "failed" : "counting";
     return mkRoleRows.length ? "rows" : "zero";
   }
   var mkTabName = (tab) => tab === "global" ? "Global" : tab === "semantic" ? "Semantic" : KIND_HEAD.textStyle;
@@ -7829,7 +7844,7 @@
       const sel = tab === mkTab;
       b.setAttribute("aria-selected", String(sel));
       b.tabIndex = sel ? 0 : -1;
-      const n = tab === "global" ? String(mkTokens.length) : tab === "semantic" ? sem === "counting" ? "\u2026" : String(sem === "rows" ? mkRoleRows.length : 0) : mkTsFor === baseKey() ? String(mkTs.length) : "\u2026";
+      const n = tab === "global" ? String(mkTokens.length) : tab === "semantic" ? sem === "counting" || sem === "failed" ? "\u2026" : String(sem === "rows" ? mkRoleRows.length : 0) : mkTsFor === baseKey() ? String(mkTs.length) : "\u2026";
       b.querySelector(".n").textContent = n;
       const dot = b.querySelector(".mk-dot");
       if (dot) {
@@ -7993,6 +8008,7 @@
       const st = mkSemState();
       if (st === "none") noteText = t("make.semNone");
       else if (st === "counting") noteText = t("make.counting");
+      else if (st === "failed") noteText = t("make.countFail");
       else if (st === "zero") noteText = t("make.semZero");
     } else if (showTree && tab === "ts" && mkTsFor !== baseKey()) noteText = t("make.counting");
     note.hidden = !noteText;
@@ -8103,7 +8119,7 @@
     const tsOn = mkTsOnList().length;
     const tsTail = tsOn ? t("make.countStyles", { t: tsOn }) : "";
     let count = "";
-    if (gOn) count = mkPreview ? (isPaid ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) : t("make.globalN", { g: mkPreview.g })) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
+    if (gOn) count = mkPreview ? (isPaid ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) : t("make.globalN", { g: mkPreview.g })) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t(mkPreviewFailed ? "make.countFail" : "make.counting");
     $("makeCount").textContent = count ? count + tsTail : tsTail.replace(/^ · /, "");
     $("makeCount").title = (_a3 = $("makeCount").textContent) != null ? _a3 : "";
     run.textContent = gOn ? mkPreview ? t("make.runN", { g: mkPreview.g }) : t("make.run") : tsOn ? t("make.runStyles", { t: tsOn }) : t("make.run");
@@ -9338,7 +9354,13 @@ ${opts.tip}` : text;
   };
   var opPending = /* @__PURE__ */ new Map();
   var opQuiet = /* @__PURE__ */ new Set();
-  var opAutoReq = /* @__PURE__ */ new Set();
+  var OP_QUIET_MAX = 256;
+  function opQuietAdd(id) {
+    opQuiet.delete(id);
+    opQuiet.add(id);
+    if (opQuiet.size > OP_QUIET_MAX) opQuiet.delete(opQuiet.values().next().value);
+  }
+  var opAutoMsgs = /* @__PURE__ */ new WeakSet();
   var opWizard = false;
   var WAIT_LINK_IDS = [
     "btnCreate",
@@ -9411,10 +9433,10 @@ ${opts.tip}` : text;
   function opSent(msg) {
     if (msg.reqId == null) {
       msg.reqId = ++bindReqSeq;
-      opAutoReq.add(msg.reqId);
+      opAutoMsgs.add(msg);
     }
     if (wizardRunning || opSilent) {
-      opQuiet.add(msg.reqId);
+      opQuietAdd(msg.reqId);
       return;
     }
     opQuiet.delete(msg.reqId);
@@ -9458,8 +9480,9 @@ ${opts.tip}` : text;
       opFinished(false, def);
       return;
     }
-    for (const [type, { def }] of opPending) {
+    for (const [type, { def, reqId }] of opPending) {
       if (!def.results.includes(m.type)) continue;
+      if (m.reqId != null && m.reqId !== reqId) continue;
       opPending.delete(type);
       opProg = null;
       if (def.write) renderWaitLocks();

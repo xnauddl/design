@@ -3042,7 +3042,7 @@ function showError(id: string, f: FriendlyError, op?: string): void {
  */
 function resendRetry(m: UiToCode): void {
   const rid = m.reqId;
-  if (rid == null || opAutoReq.has(rid)) {
+  if (rid == null || opAutoMsgs.has(m)) {
     const copy = { ...m };
     delete copy.reqId;
     send(copy);
@@ -3368,6 +3368,8 @@ let mkStates: Record<string, TokenState> = {};
 let mkRoleRows: RoleRow[] = [];
 /** 만들 수(미리보기 응답) — null = 아직(세는 중) 또는 보내지 않음. */
 let mkPreview: { g: number; r: number; m: number } | null = null;
+/** 마지막 미리보기가 `ERROR`로 끝남 — "세는 중…" 자리에 "세지 못했어요"(§4.3 "만들 수" · `make.countFail`). 새로 보낼 때 지운다. */
+let mkPreviewFailed = false;
 let mkPreviewReq = 0;
 let mkPreviewTimer: ReturnType<typeof setTimeout> | null = null;
 /** 마지막 미리보기가 켠 Global 0개(잠긴 줄만)였다 — 응답은 태그에만 쓴다. */
@@ -3480,6 +3482,7 @@ function mkPreviewSoon(): void {
 function mkSendPreview(): void {
   const toks = mkSendTokens();
   mkPreview = null;
+  mkPreviewFailed = false;
   if (!toks.length) { mkRoleRows = []; mkPreviewReq = 0; renderMakeScreen(); return; }
   mkPreviewTagsOnly = !mkGlobalsOn().length;
   if (mkPreviewTagsOnly) mkRoleRows = [];
@@ -3513,6 +3516,7 @@ function makeTakes(msg: CodeToUi): boolean {
     return true;
   }
   if ((msg.type === 'ERROR' || msg.type === 'PREMIUM_REQUIRED') && (rid === mkExtractReq || rid === mkScanReq)) { onMakeReadFail(msg, rid === mkScanReq); return true; }
+  if (msg.type === 'ERROR' && rid === mkPreviewReq) { onMakePreviewFail(msg); return true; }
   if (msg.type === 'EXTRACT_RESULT' && rid === mkExtractReq) onMakeExtract(msg);
   else if (msg.type === 'CREATE_RESULT' && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
   else if (msg.type === 'TEXT_STYLE_CANDIDATES' && rid === mkScanReq) onMakeScan(msg);
@@ -3577,6 +3581,14 @@ function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void
   renderMakeScreen();
   mkSendPreview();
 }
+/** 만들 수 미리보기 실패(§4.3 "만들 수") — "세지 못했어요". 태그만 받는 미리보기(켠 Global 0개)는 그리지 않는다(①이 앞선다). 조용한 읽기라 콘솔만. */
+function onMakePreviewFail(msg: Extract<CodeToUi, { type: 'ERROR' }>): void {
+  mkPreviewReq = 0;
+  console.warn('[make] preview failed', msg);
+  if (mkPreviewTagsOnly) return;
+  mkPreviewFailed = true;
+  renderMakeScreen();
+}
 function onMakePreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
   mkStates = { ...mkStates, ...(msg.tokenStates ?? {}) };
   // 잠금이 풀려도(manual이 아니게 됨) mkOn은 쓰지 않는다 — 잠기기 전 켬 값 그대로(§4.3 "직접 만든 변수" · B.32).
@@ -3627,10 +3639,10 @@ function mkTabsVisible(): MkTab[] {
   if (isPaid && (mkTs.length || mkTsDecimal.length || (mkTsReading && mkTsFor !== baseKey()))) out.push('ts');
   return out;
 }
-/** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · zero r = 0 · rows. */
-function mkSemState(): 'none' | 'counting' | 'zero' | 'rows' {
+/** Semantic 탭 모습(§4.3 ①~③) — none 켠 Global 0개 · counting 응답 전 · failed 미리보기 ERROR(make.countFail) · zero r = 0 · rows. */
+function mkSemState(): 'none' | 'counting' | 'failed' | 'zero' | 'rows' {
   if (!mkGlobalsOn().length) return 'none';
-  if (mkPreview == null) return 'counting';
+  if (mkPreview == null) return mkPreviewFailed ? 'failed' : 'counting';
   return mkRoleRows.length ? 'rows' : 'zero';
 }
 const mkTabName = (tab: MkTab): string => (tab === 'global' ? 'Global' : tab === 'semantic' ? 'Semantic' : KIND_HEAD.textStyle);
@@ -3726,7 +3738,7 @@ function renderMakeTabs(vis: readonly MkTab[]): void {
     b.setAttribute('aria-selected', String(sel));
     b.tabIndex = sel ? 0 : -1;
     const n = tab === 'global' ? String(mkTokens.length)
-      : tab === 'semantic' ? (sem === 'counting' ? '…' : String(sem === 'rows' ? mkRoleRows.length : 0))
+      : tab === 'semantic' ? (sem === 'counting' || sem === 'failed' ? '…' : String(sem === 'rows' ? mkRoleRows.length : 0))
       : mkTsFor === baseKey() ? String(mkTs.length) : '…';
     b.querySelector<HTMLElement>('.n')!.textContent = n;
     const dot = b.querySelector<HTMLElement>('.mk-dot');
@@ -3864,6 +3876,7 @@ function renderMakeScreen(): void {
     const st = mkSemState();
     if (st === 'none') noteText = t('make.semNone');
     else if (st === 'counting') noteText = t('make.counting');
+    else if (st === 'failed') noteText = t('make.countFail');
     else if (st === 'zero') noteText = t('make.semZero');
   } else if (showTree && tab === 'ts' && mkTsFor !== baseKey()) noteText = t('make.counting');
   note.hidden = !noteText;
@@ -3972,7 +3985,7 @@ function renderMakeFoot(showResults: boolean): void {
   const tsTail = tsOn ? t('make.countStyles', { t: tsOn }) : '';
   let count = '';
   // 무료 만들 수는 "Global {g}개"(Semantic은 만들지 않아 세지 않는다 — F4).
-  if (gOn) count = mkPreview ? (isPaid ? t('make.countGR', { g: mkPreview.g, r: mkPreview.r }) : t('make.globalN', { g: mkPreview.g })) + (mkPreview.m ? t('create.sumManual', { n: mkPreview.m }) : '') : t('make.counting');
+  if (gOn) count = mkPreview ? (isPaid ? t('make.countGR', { g: mkPreview.g, r: mkPreview.r }) : t('make.globalN', { g: mkPreview.g })) + (mkPreview.m ? t('create.sumManual', { n: mkPreview.m }) : '') : t(mkPreviewFailed ? 'make.countFail' : 'make.counting');
   $('makeCount').textContent = count ? count + tsTail : tsTail.replace(/^ · /, '');
   $('makeCount').title = $('makeCount').textContent ?? '';
   run.textContent = gOn ? (mkPreview ? t('make.runN', { g: mkPreview.g }) : t('make.run')) : tsOn ? t('make.runStyles', { t: tsOn }) : t('make.run');
@@ -5331,10 +5344,18 @@ const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
  *  마법사는 단계 요청을 따로 세지 않고 한 작업으로 본다. */
 const opPending = new Map<UiToCode['type'], { def: OpDef; reqId: number }>();
 /** 조용한 reqId 묶음(T-P24 ③ · T-P27) — `opSilent`로 보낸 요청과 마법사 단계(`wizardRunning` 중 보낸 요청)의 reqId.
- *  응답의 reqId가 여기 있으면 메인 처리기가 `opReceived`를 건너뛴다(진행 중인 작업을 일찍 끝내지 않게). */
+ *  응답의 reqId가 여기 있으면 메인 처리기가 `opReceived`를 건너뛴다(진행 중인 작업을 일찍 끝내지 않게).
+ *  최근 `OP_QUIET_MAX`개만 남긴다(B.19a — 응답 때 지우지 않는다: 연결 찾기는 한 reqId로 두 요청을 보내고, 답 없이 버려지는 찾기도 있다). */
 const opQuiet = new Set<number>();
-/** `opSent`가 붙인 reqId(화면이 정하지 않은 것) — 오류 상자의 [다시 시도]는 이것을 빼고 다시 보낸다(새 reqId). */
-const opAutoReq = new Set<number>();
+const OP_QUIET_MAX = 256;
+function opQuietAdd(id: number): void {
+  opQuiet.delete(id); // 다시 넣으면 가장 새것으로
+  opQuiet.add(id);
+  if (opQuiet.size > OP_QUIET_MAX) opQuiet.delete(opQuiet.values().next().value as number);
+}
+/** `opSent`가 reqId를 붙인 메시지(화면이 정하지 않은 것) — 오류 상자의 [다시 시도]는 reqId를 빼고 다시 보낸다(새 reqId).
+ *  메시지 객체로 들고 있어(`lastSentMsg`와 같은 객체) 세션 동안 쌓이지 않는다. */
+const opAutoMsgs = new WeakSet<UiToCode>();
 let opWizard = false;
 
 /* ---------- 연결 중 잠금(§4.6 "연결 중의 다른 일") ----------
@@ -5407,8 +5428,8 @@ const OP_MAKE_SCAN: OpDef = { results: ['TEXT_STYLE_CANDIDATES'], label: 'op.tex
 const OP_CREATE_PREVIEW: OpDef = { ...OPS.CREATE_TOKENS!, write: false };
 function opSent(msg: UiToCode): void {
   // 모든 요청에 reqId(T-P29 ①) — 화면이 정한 것은 그대로, 없으면 같은 순번(bindReqSeq)으로 붙인다(조용한 묶음 id와 겹치지 않게).
-  if (msg.reqId == null) { msg.reqId = ++bindReqSeq; opAutoReq.add(msg.reqId); }
-  if (wizardRunning || opSilent) { opQuiet.add(msg.reqId); return; } // 마법사 단계 요청은 마법사 한 작업으로 센다
+  if (msg.reqId == null) { msg.reqId = ++bindReqSeq; opAutoMsgs.add(msg); }
+  if (wizardRunning || opSilent) { opQuietAdd(msg.reqId); return; } // 마법사 단계 요청은 마법사 한 작업으로 센다
   opQuiet.delete(msg.reqId); // [다시 시도]가 화면의 reqId로 다시 보냄 — 이제 OPS가 추적한다
   const def = opCardCreate && msg.type === 'CREATE_TOKENS' ? OP_MAKE_CARD
     : opMakeRead && msg.type === 'EXTRACT' ? OP_MAKE_EXTRACT
@@ -5454,8 +5475,10 @@ function opReceived(m: CodeToUi): void {
     opFinished(false, def);
     return;
   }
-  for (const [type, { def }] of opPending) {
+  for (const [type, { def, reqId }] of opPending) {
     if (!def.results.includes(m.type)) continue;
+    // 같은 종류를 돌려주는 다른 요청의 응답은 이 작업을 끝내지 않는다(B.19a — 오류 갈래와 같은 규칙). reqId 없는 응답은 종류로.
+    if (m.reqId != null && m.reqId !== reqId) continue;
     opPending.delete(type);
     opProg = null;
     if (def.write) renderWaitLocks();
