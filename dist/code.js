@@ -7122,7 +7122,7 @@
         const sc = decided.keep === "root" ? pickScope(before) : null;
         prefixForChildren = sc && !isScopeRole(sc) ? sc : null;
       }
-      if (!decided.skip && decided.name) {
+      if (!decided.skip && decided.name !== void 0) {
         const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
         if (visible !== decided.name) nameKey = decided.name;
         if (decided.keepKey) nameKey = nameKeyFor(before, readPluginKey(node, NAME_KEY));
@@ -7165,12 +7165,12 @@
     if (isContainerType(node) && !isIconFrameNode(node)) {
       const h = hintRole(node, pos.rootPrefix);
       if (h && (role === h || HINT_WEAK_ROLES.has(role))) {
-        return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h };
+        return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h, kept: true };
       }
     }
     if (PASSTHROUGH_ROLES.has(role)) return __spreadValues({ skip: false, role, name: node.name, keepName: true, passthrough: true }, await nameKindOf2(node, pos.rootPrefix) === "human" ? { kept: true } : {});
     if (role === "icon" && isIconFrameNode(node) && !isMeaninglessIconName(node, pos.rootPrefix)) {
-      return { skip: false, role, name: node.name, keepName: true };
+      return { skip: false, role, name: node.name, keepName: true, kept: true };
     }
     const scope = ctxScope === role ? null : ctxScope;
     const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
@@ -7260,7 +7260,6 @@
     if (NON_ASCII.test(name)) return "human";
     const toks = kebab(name).split("-").filter(Boolean);
     if (!toks.length) return "human";
-    if ((await boundVariableNames(node)).some((v) => kebab(v) === toks.join("-"))) return "plugin";
     const role = readPluginKey(node, ROLE_KEY);
     const kept = readPluginKey(node, KEPT_KEY);
     if (role && !(kept && kebab(kept) === toks.join("-"))) {
@@ -7270,9 +7269,9 @@
         if (!head.length || head.length === 1 && !NUM_WORD.test(head[0]) || namedByPlugin(name, role, rootPrefix)) return "plugin";
       }
     }
-    if (toks.some((t2) => NUM_WORD.test(t2))) return "human";
     if (allEmitted(toks)) return "plugin";
     if (rootPrefix && toks.length > 1 && toks[0] === rootPrefix && allEmitted(toks.slice(1))) return "plugin";
+    if ((await boundVariableNames(node)).some((v) => kebab(v) === toks.join("-"))) return "plugin";
     return "human";
   }
   function writeRoleFromName(node, name) {

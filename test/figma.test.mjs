@@ -10021,6 +10021,7 @@ test('S-2b R2B-P3 — 선택 루트가 고신뢰 card여도 사람 이름이면 
   assert.equal(rn.kept, true);
   assert.equal(rn.keep, undefined, '보존(root)이 아니라 역할 기록 — 루트 접두사 없음');
   const childAfterHuman = r.changes.find((c) => c.id === 'v')?.after;
+  assert.equal(childAfterHuman, 'card-icon');
   const plain = rootOf('Frame 1');
   r = await renameSelection([plain], { apply: true, maxDepth: 5 });
   assert.equal(r.changes.find((c) => c.id === 'root')?.after, 'card');
@@ -10085,4 +10086,49 @@ test('S-2b code.ts RENAME_APPLY — kept 항목은 dsKept를 기록하고, 없�
   await p.send({ type: 'RENAME_APPLY', items: [{ id: 'h', before: 'Hero banner', after: 'section', role: 'section' }], reqId: 2 });
   assert.equal(fr.name, 'section');
   assert.equal(fr._pd.get('dsKept'), '');
+  // 이름 · 역할이 그대로이고 지킨 이름 표시만 새로 쓰는 항목도 ⌘Z 묶음을 닫는다(roleWrites — 다음 작업의 undo에 섞이지 않게)
+  const fr2 = withPd({ type: 'FRAME', id: 'k', name: 'Promo', visible: true, fills: [], children: [], parent: { type: 'PAGE' } }, { dsRole: 'card' });
+  registerNodes(figma, [fr2]);
+  const before = figma._undo ?? 0;
+  await p.send({ type: 'RENAME_APPLY', items: [{ id: 'k', before: 'Promo', after: 'Promo', role: 'card', kept: true }], reqId: 3 });
+  assert.equal(fr2._pd.get('dsKept'), 'Promo');
+  assert.equal(figma._undo ?? 0, before + 1, 'dsKept만 바뀌어도 commitUndo');
+});
+
+test('S-2b 더 — 하이픈 역할 ⓑ(Text Group) · 표 6 예전 이름(card-wrapper) · 세 토막(card-header-icon) · ⓐ 두 토막(dialog-text-group · brand-background) · 힌트 낱말로 끝나는 이름(dialog-button)은 힌트', async () => {
+  installFigma();
+  const tgOf = (name, pd) => withPd({ type: 'FRAME', id: 'n', name, width: 200, height: 60, children: [T('a', 'A', { y: 0 }), T('b', 'B', { y: 30 })] }, pd);
+  for (const name of ['Text Group', 'card-wrapper', 'card-header-icon']) {
+    const r = await inCard(tgOf(name));
+    assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group', name);
+  }
+  // ⓐ — 기록과 맞는 두 토막(앞 낱말은 역할 낱말이 아님)
+  let r = await inCard(tgOf('dialog-text-group', { dsRole: 'text-group' }));
+  assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group');
+  r = await inCard(tgOf('dialog-text-group'));
+  assert.ok(!r.changes.some((c) => c.id === 'n'), '기록이 없으면 사람 이름');
+  const bg = withPd({ type: 'RECTANGLE', id: 'bg', name: 'brand-background', width: 300, height: 400, fills: vis }, { dsRole: 'background' });
+  r = await inCard(bg);
+  assert.ok(r.changes.some((c) => c.id === 'bg'), 'brand-background(기록 background) — 다시 정리');
+  // 힌트 낱말 button으로 끝나는 이름 — B.28 조건이면 힌트가 먼저(이름 그대로 · 역할 button · 지킨 이름 표시)
+  const db = tgOf('dialog-button');
+  r = await inCard(db);
+  assert.ok(!r.changes.some((c) => c.id === 'n'));
+  assert.equal(db._pd.get('dsRole'), 'button');
+  assert.equal(db._pd.get('dsKept'), 'dialog-button');
+});
+
+test('S-2b 빈 이름(기본명) + 구조 폴백 — 역할 기록 · 맥락 통과는 그대로(자식 이름에 card 맥락)', async () => {
+  installFigma();
+  const sq = { type: 'RECTANGLE', id: 'sq', name: 'Rectangle 1', x: 0, y: 0, width: 200, height: 200, fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 }, visible: true }] };
+  const blank = withPd({ type: 'FRAME', id: 'w', name: '', layoutMode: 'HORIZONTAL', width: 600, height: 300, children: [sq] }); // 자식 1 → wrapper(A.21 ⑦)
+  const card = { type: 'FRAME', id: 'card', name: 'Frame 1', cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }], width: 700, height: 500,
+    children: [blank, { type: 'TEXT', id: 'tt', name: 'Title', characters: 'x' }] };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', width: 1600, height: 1600, children: [card] };
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 5 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(nodes.find((n) => n.id === 'w').role, 'wrapper');
+  assert.equal(after.has('w'), false, '폴백은 이름으로 쓰지 않는다');
+  assert.equal(blank._pd.get('dsRole'), 'wrapper', '빈 이름 노드도 적용 때 역할 기록');
+  assert.match(after.get('sq') ?? '', /^card-/, `맥락 통과 — ${after.get('sq')}`);
 });

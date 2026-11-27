@@ -153,7 +153,8 @@ async function recurse(
       prefixForChildren = sc && !isScopeRole(sc) ? sc : null;
     }
 
-    if (!decided.skip && decided.name) {
+    // 빈 이름('' — 기본명)을 지킨 노드도 이 블록을 타야 역할 기록 · 맥락 통과가 된다(S-2b — 이름이 아니라 undefined로 가른다)
+    if (!decided.skip && decided.name !== undefined) {
       // 보이는 이름 = 판정 이름에서 루트 접두사를 뗀 것. 판정 이름은 그대로 맥락으로 쓴다(역할 · 토큰 맥락이 지금과 같게).
       // 아이콘 모양 이름을 그대로 두는 경우(A1)는 접두사를 떼지 않는다.
       const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
@@ -246,7 +247,7 @@ async function decide(
   if (isContainerType(node) && !isIconFrameNode(node)) {
     const h = hintRole(node, pos.rootPrefix);
     if (h && (role === h || HINT_WEAK_ROLES.has(role))) {
-      return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h };
+      return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h, kept: true }; // 힌트 이름도 사람 이름 — 지킨 이름 표시(S-2b SC-D51)
     }
   }
   // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
@@ -255,7 +256,7 @@ async function decide(
   if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: node.name, keepName: true, passthrough: true, ...((await nameKindOf(node, pos.rootPrefix)) === 'human' ? { kept: true } : {}) };
   // 아이콘 프레임은 모양 이름 그대로 — 뜻 없는 이름일 때만 맥락 + icon(ia-v4 §4.4 A1).
   if (role === 'icon' && isIconFrameNode(node) && !isMeaninglessIconName(node, pos.rootPrefix)) {
-    return { skip: false, role, name: node.name, keepName: true };
+    return { skip: false, role, name: node.name, keepName: true, kept: true }; // 아이콘 모양 이름도 사람 이름 — 지킨 이름 표시(S-2b SC-D51)
   }
   const scope = ctxScope === role ? null : ctxScope; // 맥락==역할이면 중복 제거(button-button 방지)
   const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
@@ -382,8 +383,6 @@ async function nameKindOf(node: SceneNode, rootPrefix: string | null): Promise<'
   if (NON_ASCII.test(name)) return 'human';
   const toks = kebab(name).split('-').filter(Boolean);
   if (!toks.length) return 'human';
-  // ⓒ 예전 버전이 붙은 변수 경로를 베낀 이름(`color/121210` → `color-121210`) — 그 레이어에 붙은 변수 이름과 같으면 플러그인 이름(SC-D52)
-  if ((await boundVariableNames(node)).some((v) => kebab(v) === toks.join('-'))) return 'plugin';
   const role = readPluginKey(node, ROLE_KEY);
   const kept = readPluginKey(node, KEPT_KEY);
   if (role && !(kept && kebab(kept) === toks.join('-'))) {
@@ -393,9 +392,11 @@ async function nameKindOf(node: SceneNode, rootPrefix: string | null): Promise<'
       if (!head.length || (head.length === 1 && !NUM_WORD.test(head[0])) || namedByPlugin(name, role, rootPrefix)) return 'plugin';
     }
   }
-  if (toks.some((t) => NUM_WORD.test(t))) return 'human';
   if (allEmitted(toks)) return 'plugin';
   if (rootPrefix && toks.length > 1 && toks[0] === rootPrefix && allEmitted(toks.slice(1))) return 'plugin';
+  // ⓒ 예전 버전이 붙은 변수 경로를 베낀 이름(`color/121210` → `color-121210`) — 그 레이어에 붙은 변수 이름과 같으면 플러그인 이름(SC-D52).
+  // 변수 읽기가 드니 동기 판정(ⓐ · ⓑ) 뒤, 사람 이름으로 떨어지기 직전에만 본다(숫자 낱말이 든 베낌 이름도 여기서 잡힌다).
+  if ((await boundVariableNames(node)).some((v) => kebab(v) === toks.join('-'))) return 'plugin';
   return 'human';
 }
 
