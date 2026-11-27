@@ -4564,6 +4564,57 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
     check('8a 오류 상자 [다시 시도] → 새 reqId로 다시 보냄', typeof e1.reqId === 'number' && typeof e2?.reqId === 'number' && e2.reqId !== e1.reqId && e2.format === e1.format, `${e1.reqId} → ${e2?.reqId}`);
     await p.close();
   }
+  // H — #171 코드 검토 사소 ①②: OPS 결과도 reqId로 가림 · 만들기 화면 미리보기 실패 "세지 못했어요"
+  {
+    const p = await open(560, 'variables');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, PREREQ);
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await p.waitForTimeout(200);
+    await p.click('#btnVarMore');
+    await p.click('.ctx-menu button >> text=코드로 내보내기…');
+    await p.waitForTimeout(40);
+    await p.click('#btnExport');
+    const e1 = (await sent(p, 'EXPORT')).at(-1);
+    await p.click('.modal .modal-close, .modal button >> text=닫기').catch(() => {});
+    await p.click('#btnMinimize').catch(() => {});
+    await p.waitForTimeout(30);
+    const busy0 = await isBusy(p);
+    await recv(p, { type: 'EXPORT_RESULT', reqId: e1.reqId + 1000, format: e1.format, content: '', clashes: [] });
+    await p.waitForTimeout(30);
+    const busy1 = await isBusy(p);
+    await recv(p, { type: 'EXPORT_RESULT', reqId: e1.reqId, format: e1.format, content: '', clashes: [] });
+    await p.waitForTimeout(30);
+    check('8a OPS 결과 reqId — 다른 reqId의 같은 종류 결과는 작업을 끝내지 않음 · 자기 reqId면 끝남', busy0 && busy1 && !(await isBusy(p)), `${busy0} ${busy1} ${await isBusy(p)}`);
+    await p.close();
+  }
+  {
+    const p = await open(560, 'select');
+    await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+    await recv(p, { ...PREREQ, hasBindable: true, tierVars: 3, otherVars: 0 });
+    await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+    await recv(p, { ...sel(1, 0), ids: ['pv8a'] });
+    await goSub(p, 'make');
+    await p.waitForTimeout(400);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 1 }] });
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    if (sc) await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(40);
+    const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+    const counting = await p.textContent('#makeCount');
+    await recv(p, { type: 'ERROR', message: 'preview failed', op: 'CREATE_TOKENS', reqId: pv.reqId });
+    await p.waitForTimeout(40);
+    const count = await p.textContent('#makeCount');
+    const tabs = await tabsOf(p);
+    const runOpen = (await p.getAttribute('#btnMakeRun', 'aria-disabled')) !== 'true';
+    check('8a 만들기 화면 미리보기 ERROR → 만들 수 "세지 못했어요" · Semantic 탭 "…" · 버튼 열림 · 공통 상태 줄 없음', counting.includes('세는 중') && count === '세지 못했어요' && tabs.some((x) => x.startsWith('Semantic…')) && runOpen && !(await p.textContent('#statusText')), `${counting} / ${count} / ${JSON.stringify(tabs)} / ${runOpen}`);
+    await p.click('#makeTabs [role="tab"] >> text=Semantic');
+    await p.waitForTimeout(30);
+    check('8a Semantic 탭 안 "세지 못했어요"', (await p.textContent('#makeTabNote')) === '세지 못했어요', await p.textContent('#makeTabNote'));
+    await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/8a-make-countfail.png` : '/dev/null' }).catch(() => {});
+    await p.close();
+  }
   // G — Esc는 글자 칸에서만 막는다(T-D7)
   {
     const p = await open(560, 'select');
