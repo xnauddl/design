@@ -1960,14 +1960,14 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 **⑤ 쓰기 잠금 양쪽 · 상세 [저장]도 쓰기 (T-D8 · T-P26 — 지금 코드 기준)**
 
 - `WAIT_LINK_IDS`(`ui.ts` 4481 — OPS 쓰기 버튼 · `btnMakeRun` · `btnRename`): 지금은 연결 중이거나 **변수 탭 쓰기**(`VAR_WRITE_OPS`)일 때만 잠긴다. → 연결 중이면 `bind.waitLink`, 아니면 **어느 쓰기 작업이든**(`otherWriteOp()` — OPS `write: true` 전부 · 마법사 · 아래 [저장]) 진행 중이면 `bind.waitOp`(op = 그 작업 이름). 사유는 Toast(누를 때 — 지금처럼).
-  - **미리보기는 쓰기가 아니다:** OPS는 요청 종류로 쓰기를 가리므로 `CREATE_TOKENS{preview: true}`(값을 직접 고르기 [미리보기] `btnCreate`)도 쓰기로 센다 — `opSent`가 `preview`인 `CREATE_TOKENS`는 `write: false`로 적는다(그동안 `btnMakeRun` 등이 잠기지 않게). 같은 열쇠(`CREATE_TOKENS`)에 **진행 중인 쓰기 항목이 있으면 미리보기 항목으로 덮어쓰지 않는다**(미리보기는 OPS에 적지 않고 보낸다 — 쓰기 잠금 · 쓰기 결과의 작업 직후 다시 읽기를 지키게. 값을 직접 고르기는 S-6c에서 없어진다).
+  - **미리보기는 쓰기가 아니다:** OPS는 요청 종류로 쓰기를 가리므로 `CREATE_TOKENS{preview: true}`(값을 직접 고르기 [미리보기] `btnCreate`)도 쓰기로 센다 — `opSent`가 `preview`인 `CREATE_TOKENS`는 `write: false`로 적는다(그동안 `btnMakeRun` 등이 잠기지 않게). 같은 열쇠(`CREATE_TOKENS`)에 **진행 중인 쓰기 항목이 있을 때만** 미리보기는 OPS에 적지 않고 보낸다(쓰기 항목을 덮어쓰지 않음 — 쓰기 잠금 · 쓰기 결과의 작업 직후 다시 읽기를 지키게). 없으면 `write: false` 항목으로 적는다. 값을 직접 고르기는 S-6c에서 없어진다.
   - **예외 — 만들기 화면 결과 화면의 [닫기]:** 같은 `btnMakeRun`이 결과 화면(`mkResults`가 있을 때 — `renderMakeFoot`)에서 [닫기]가 되므로 그 모습일 때는 쓰기 잠금도 연결 중 잠금도 걸지 않는다(닫기는 쓰기가 아님 — 지금은 연결 중이면 [닫기]가 잠긴다). `renderWaitLocks`는 `mkResults`로 판정하고, `renderMakeFoot`이 [닫기] ↔ 실행 버튼을 바꿀 때마다 `renderWaitLocks`를 부른다.
   - 진행 중인 작업 자신의 버튼은 실행 중 숨거나(`btnMakeRun` — [취소]로 바뀜) 목록에 없다([취소] `btnMakeCancel` 등은 잠기지 않는다).
   - 연결 화면 [{o}곳 연결](`WAIT_CARD_IDS`)은 지금도 `otherWriteOp()`로 잠긴다 — 그대로.
 - **오류 상자의 [다시 시도]도 거친다:** `showError`의 [다시 시도](`ui.ts` 2462–2466)는 지금 연결 중만 보고 바로 다시 보낸다. → 다시 보낼 요청이 쓰기(`OPS[type].write` — 미리보기 제외)면 `writeLockReason()`을 먼저 보고, 잠겼으면 보내지 않고 그 상태 자리에 사유(지금 연결 중일 때와 같은 자리 · 모양).
 - **상세 [저장](`UPDATE_VARIABLE`)도 쓰기 작업이다:**
   - 저장 중 표시는 팝업과 따로 둔다 — 새 `updSaving: { reqId, timer } | null`. 저장을 보낼 때 세우고, 그 `reqId`의 `VARIABLE_UPDATED` · `ERROR` · 시간 초과에서만 내린다(지금 `ed.saving`은 팝업 상태라 최소화 `setMini(true)` → `closeModal()` → `edCleanup`이 `ed = null`로 지우면 아직 도는 저장을 놓친다). 세울 때 · 내릴 때 `renderWaitLocks`를 부른다.
-    - 시간 초과는 지금과 같은 `EDIT_TIMEOUT`이고 팝업의 `edMaybeSaved`에서도 함께 내린다(팝업이 없으면 `updSaving`의 타이머가 내린다).
+    - 시간 초과는 지금과 같은 `EDIT_TIMEOUT`이고 팝업의 시간 초과에서도 함께 내린다(팝업이 없으면 `updSaving`의 타이머가 내린다). `edMaybeSaved`가 `updSaving`을 내리는 것은 **번호가 `updSaving.reqId`와 맞을 때 · 시간 초과일 때뿐**이다 — 메인 `ERROR` 처리기는 `GET_VAR_TABLE` 오류에도 번호 없이 `edMaybeSaved()`를 부르므로(`ui.ts` 2295) 번호 없는 부름으로는 내리지 않는다.
     - `VARIABLE_UPDATED` · `ERROR{op: 'UPDATE_VARIABLE'}`에서 내리는 일은 처리기 **맨 앞**에서 한다(`onVariableUpdated`의 `edDeadReqs` · `ed == null`로 먼저 돌아가는 갈래보다 앞).
     - `VARIABLE_UPDATED`를 받은 뒤 변수 표를 기다리는 동안(`awaitingTable`)은 쓰기 잠금이 이미 풀리고, 팝업만 "저장 중" 모습이다.
   - `otherWriteOp()`는 `updSaving`이 있으면 "고치기"(새 키 `op.updateVar`)를 돌려준다. OPS 표에는 넣지 않는다(진행 테두리 · 실패 [보기]가 없음 — §2.6).
@@ -3271,7 +3271,7 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 
 계기: 도구 탭(S-6)을 다섯 PR로 나눈 첫째. 모양 변화 없음(잠기는 때 · Esc만 바뀜) — 시안 없음.
 
-- [ ] 명세 검토(코드 대조) 중대 결함 0
+- [x] 명세 검토(코드 대조) 중대 결함 0 — 3회차(2026-11-27, 1회차 중대 6 · 사소 9 → 2회차 중대 1 · 사소 3 → 3회차 중대 0 · 사소 2 반영)
 - [ ] ① `reqId` — UI `opSent` 맨 앞에서 붙임(마법사 · 조용한 읽기 · OPS 밖 포함) · `wizardRequest` 모든 단계 `reqId` · 마법사 리스너는 자기 `reqId`의 거절 · 오류만 단계 실패 · `code.ts` 요청에 답하는 모든 메시지에 `reqId`(빠진 답 목록 §4.11a ①) · 밀려난 찾기에 `APPLY_RESULT{preview, cancelled, reqId}` · `messages.ts` 타입
 - [ ] ② `requirePaid(feature, reqId?)` · `requireTextStyles(reqId?)` → `PREMIUM_REQUIRED{feature, reqId}` · `makeTakes`의 거절 · 오류 처리(후보 읽기 거절 = 후보 0개 · Toast 없음, 오류 = "읽는 중" 끝 + error Toast)
 - [ ] ③ `opPending` 항목에 `reqId` · `opReceived`는 거절 · 오류 · 결과를 그 `reqId` 항목만 끝냄 · `opPending.clear()` 갈래 없앰 · `reqId` 없는 거절 · 오류만 `console.warn` · `if (wizardRunning) return`을 `reqId` 갈래 뒤로
