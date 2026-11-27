@@ -2144,7 +2144,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 > **결정 D-T2(2026-11-27 사용자 결정 DK-D5–DK-D8 — ia-v3 13.7 "다크 — D-T2" · A.30. 아래 D-T1 글 · 와이어 · 상태표에서 이 블록과 다른 것은 이 블록을 따른다):** Global은 모드 없는 팔레트, 플러그인 Semantic에 Dark 모드 · 역할마다 Dark가 다른 Global 스텝을 가리킨다. 화면 구조(제목 · 안내 · 알림 띠 · 전제 띠 · 상태 줄 · [다크 만들기] · 옮기기 팝업)는 그대로이고 글 · 조건만 바뀐다.
 > - 글(`i18n.ts` · `ui.html` 정적 글 · `verify-bind-flow` 기대 글 — §2.4 용어에 따라 Semantic 변수는 "역할"이 아니라 "Semantic"으로, 구현 때 고침):
 >   - `dark.hint` "Semantic마다 Dark에서 쓸 Global 스텝을 연결해요"
->   - `dark.hintTip` "Global은 모드 없는 팔레트 하나예요. 배경은 어두운 스텝, 글자는 밝은 스텝, 강조색은 한두 스텝 밝은 스텝을 가리키고, 필요한 계열은 50–950 스텝을 채워요. 플러그인 Semantic만 연결하고, 직접 만든 변수 · 직접 고친 Dark 연결은 그대로 둬요."
+>   - `dark.hintTip` "Global은 모드 없는 팔레트 하나예요. Dark에서 밝은 배경은 어두운 서피스, 짙은 배경은 조금 밝은 짙은 색, 글자 · 테두리는 밝기를 뒤집은 색을 가리키고(강조 배경 · inverse는 그대로), 필요한 계열은 50–950 스텝을 채워요. 플러그인 Semantic만 연결하고, 직접 만든 변수 · 직접 고친 Dark 연결은 그대로 둬요."(재정의 2 — ia-v3 A.31)
 >   - `dark.running` "다크 모드를 만들고 연결하는 중…"
 >   - `dark.doneFill` "{modePart}Semantic {n}개의 Dark를 연결했어요{scalePart}{keptPart}" · 새 `dark.scalePart` " · Global 스텝 {g}개를 만들었어요"(g > 0일 때만) · `dark.keptPart` " · 직접 고친 Semantic {k}개는 그대로 뒀어요" · `dark.upToDate` "Dark 연결이 모두 되어 있어요{scalePart}{keptPart}"
 >   - `dark.nothing` "연결할 Semantic이 없어요 — 플러그인 Global을 가리키는 Semantic 색 변수가 필요해요"
