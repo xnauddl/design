@@ -886,12 +886,12 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 | tone | 언제 | 바탕 · 앞 아이콘(상태색) | 지금 상태 줄 |
 |---|---|---|---|
 | success | 작업 결과(다 됨) | `color-state-success-subtle` · `circle-check` | `ok` |
-| error | 작업 실패 — `ERROR`를 받았거나 "…하지 못했어요" · "{작업} 실패" | `color-state-error-subtle` · `circle-alert` | `warn` 가운데 실패 |
-| warning | 잠금 · 막힌 클릭의 사유, 일부만 된 결과(건너뜀 · 일부 실패 · 일부 저장), 취소 | `color-state-warning-subtle` · `triangle-alert` | `warn`의 나머지 |
+| error | 작업이 되지 않은 실패 — `ERROR`를 받았거나 하나도 하지 못함("…하지 못했어요" · 최소화 중 "{작업} 실패") | `color-state-error-subtle` · `circle-alert` | `warn` 가운데 실패 |
+| warning | 잠금 · 막힌 클릭의 사유, 일부만 된 결과(맞지 않아 건너뜀 · 일부 단계 실패 · 일부 저장 · 일부 못 지움), 대상이 없어 하지 않음(붙일 곳 없음 · 선택할 레이어 없음), 취소 | `color-state-warning-subtle` · `triangle-alert` | `warn`의 나머지 |
 | info | 안내 — 실패도 결과도 아닌 알림(후보 바뀜 · 라이브러리 변수 · 옮김 · 목록에 안 보임 · 지운 것 없음) | `color-state-info-subtle` · `info` | `''`(색 없음) |
 
 - 글자는 tone과 상관없이 늘 `color-text-primary`다(S3-P4). 색만으로 tone을 가르지 않도록 아이콘을 함께 둔다(design-system §1-6).
-- 한 자리라도 결과에 따라 tone이 갈리면 표의 조건을 따른다. 예: 안 쓰는 변수 지우기에서 지운 수 > 0 · 못 지움 > 0이면 warning, 지운 수 0 · 못 지움 > 0이면 error.
+- **자리마다의 tone은 아래 37곳 표가 정한다**(위 표는 새 자리를 더할 때의 기준). 한 자리라도 결과에 따라 tone이 갈리면 표의 조건을 따른다. 예: 안 쓰는 변수 지우기에서 지운 수 > 0 · 못 지움 > 0이면 warning, 지운 수 0 · 못 지움 > 0이면 error.
 
 **부르는 곳 37곳 — tone · 동작 · 남는 시간 (S3-D14)**
 
@@ -902,16 +902,16 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 | # | 자리(`ui.ts`) | 글(키) | tone | 동작 | 남는 시간 | 툴팁 |
 |---|---|---|---|---|---|---|
 | 1 | 안 쓰는 변수 찾기 열기 막힘 `openUnused` 1107 | `writeLockReason()`(`bind.waitLink` · `bind.waitOp`) | warning | — | 4초 | — |
-| 2 | 안 쓰는 변수 지운 결과 `onVariablesDeleted` 1343 | `unused.deleted` / `unused.deletedNone` + `unused.skippedTail` · `unused.failedTail` | 못 지움 0: 지운 수 > 0 success · 0 info / 못 지움 > 0: 지운 수 > 0 warning · 0 error | — | 4초 | 건너뜀 > 0이면 `unused.skippedTip` |
+| 2 | 안 쓰는 변수 지운 결과 `onVariablesDeleted` 1343 | `unused.deleted` / `unused.deletedNone` + `unused.skippedTail` · `unused.failedTail` | 못 지움 0: 지운 수 > 0 success · 0 info / 못 지움 > 0: 지운 수 > 0 warning · 0 error(건너뜀은 tone에 넣지 않는다 — 읽은 뒤 쓰이기 시작했거나 이미 지워진 것이라 실패가 아님, 지금 코드와 같음) | — | 4초 | 건너뜀 > 0이면 `unused.skippedTip` |
 | 3 | 안 쓰는 변수 지우기 실패(팝업이 닫힌 뒤 · 최소화 아님) `onUnusedError` 1354 | `unused.deleteFail` | error | — | 4초 | `explainError` 글 |
 | 4 | 찾기 취소 2015 | `v4.readCancelled` | warning | [다시 읽기](`v4.reread` → `readSelFind(true, true)`) | 남음 | — |
 | 5 | 조용한 다시 찾기로 후보가 바뀜 2032 | `bind.candChanged` | info | — | 4초 | — |
-| 6 | 연결 다 됨 2047 | `v4.linked` + `v4.linkedSkipped` | success(건너뜀이 있어도 — 손볼 곳은 카드 1 ✓ 둘째 줄이 맡음, 지금과 같음) | — | 4초 | — |
+| 6 | 연결 다 됨 2047 | `v4.linked`(글 앞 "🔗 "를 뺀다 — Toast 앞 아이콘과 겹침) + `v4.linkedSkipped` | success(건너뜀이 있어도 — 손볼 곳은 카드 1 ✓ 둘째 줄이 맡음, 지금과 같음) | — | 4초 | — |
 | 7–9 | 변수 탭 레이어 선택 결과 2090–2092 | `select.capped` · `select.none` · `select.partial` | warning | — | 4초 | — |
 | 10 | 상태 자리가 없는 작업의 `ERROR`(`OP_STATUS`가 공통인 것 — 삭제된 변수 연결 풀기 · 변수 탭 레이어 선택 · 표에 없는 작업) 2332 | `explainError(…).message` | error | — | 4초 | Figma 원문 `msg.message` |
 | 11 | 이름 바꾸기 다 됨 2583 | `rename.doneStatus` | success | — | 4초 | — |
 | 12 | 만들기 일부 실패 · 건너뜀(만들기 화면 밖) 3405 | `make.partialStatus` | warning | [보기](`common.view` → 만들기 화면) | 남음 | — |
-| 13 | 만들기 다 됨 3415 | 문장형 다 됨 글(아래 S3-D16) | success | "바로 연결"을 껐으면 [연결하기 →](`wizard.toBind` → 연결 화면), 아니면 없음 | 껐으면 남음 · 아니면 4초 | 텍스트 스타일 알림 목록(`styles.missing` 한 줄에 하나) |
+| 13 | 만들기 다 됨 3415 | 문장형 다 됨 글(아래 S3-D16) | success | "바로 연결"을 껐으면 [연결하기 →](`wizard.toBind` → 연결 화면), 아니면 없음 | 껐으면 남음 · 아니면 4초 | 텍스트 스타일 알림 목록(`styles.missing` 한 줄에 하나 — 지금 코드. §4.3 "다 됨"의 빈 줄 + notes는 코드에 없다 — 이 PR 범위 밖 코드 작은 차이) |
 | 14 | 유료 잠금 사유 `showPaidReason` 4262 | `status.paid` | warning | [라이선스 →](`status.paidAction` → 설정) | 남음 | — |
 | 15 | 잠긴 컨트롤 — 유료(따로 글) `onLockedActivate` 4350 | `data-paid-msg` | warning | [라이선스 →] | 남음 | — |
 | 16 | 잠긴 컨트롤 — 전제 사유 4354 | `data-lock-msg` | warning | — | 4초 | — |
@@ -937,7 +937,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 **Toast 모양 (S3-P4 · S3-D15 · S3-D17 — Figma B5)**
 
 - **바탕 · 테두리:** 위 tone 표의 바탕. 테두리는 없다. `radius-small` · `elevation-2`.
-- **크기:** 너비 = 창 − 2 × `space-3`(560 창에서 536). 안쪽 여백 `space-2` `space-3`, 요소 사이 `space-2`. 한 줄 높이 32 = 아이콘 16 · 글 줄 16(`text-body-sm` 글자 12, 줄 높이 `line-height-md` 16).
+- **크기:** 너비 = 창 − 2 × `space-3`(560 창에서 536). 안쪽 여백 `space-2` `space-3`, 요소 사이 `space-2`. 한 줄 높이 32 = 아이콘 16 · 글 줄 16. 글은 `font-size-md` 12 · `line-height-md` 16 · `font-weight-regular`(`text-body-sm`(11/1.4)이 아님 — 한 줄 16에 맞추려 토큰을 따로 적는다, 정밀 시안에서 확인).
 - **앞 아이콘:** `size-icon-md` 16, 상태색 `color-state-*`.
 - **글:** `color-text-primary`.
 - **동작 링크:** 같은 색 · 밑줄 · `font-weight-semibold`. 줄어들지 않는다(`flex: none`).
@@ -952,10 +952,14 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 **자리**
 
 - **기본 자리:** 창 아래 가운데. 아래 띄움(`--toast-bottom`)은 아래와 같다.
-  - 지금 화면에 아래 고정 줄(`.sub-foot` · `.make-foot` — 보이는 것)이 있으면 그 줄 높이 + `space-3`이다. 실행 버튼을 가리지 않는다.
+  - 지금 화면에 **보이는 아래 고정 줄**(`.sub-foot` · `.make-foot`, 도구 탭 PR 뒤 도구 화면의 아래 고정 줄 — 화면 이름이 아니라 "보이는 줄이 있는가"로 정한다)이 있으면 그 줄의 실제 위 끝에서 `space-3` 위다 — `innerHeight − 줄.getBoundingClientRect().top + space-3`. 끝까지 스크롤해 줄이 본문 아래 여백 위에 서도 틈이 `space-3`이다. 실행 버튼을 가리지 않는다.
   - 없으면 `space-3`이다.
-- **다시 정하는 때:** Toast를 띄울 때 · 탭이나 하위 화면이 바뀔 때(`showTab` · `showSelSub`) · 아래 고정 줄 크기가 바뀔 때(DS-3a `syncFootShadow`의 `ResizeObserver`가 이미 그 줄을 본다).
-- **아래 고정 줄이 없는 화면**(선택 탭 첫 화면 · 변수 탭 · 설정): Toast가 떠 있는 동안 본문 아래 여백을 Toast 높이 + 2 × `space-3`로 늘린다. 끝까지 스크롤하면 마지막 카드의 할 일 줄 · 마지막 목록 줄이 Toast 위로 올라온다. Toast가 사라지면 되돌린다.
+- **다시 정하는 때:** Toast를 띄울 때 · 탭이나 하위 화면이 바뀔 때(`showTab` · `showSelSub`) · 스크롤 · 크기가 바뀔 때(`document.body`를 보는 `ResizeObserver` — DS-3a `syncFootShadow`가 쓰는 것과 같은 때).
+- **가리지 않게 비우는 자리** — Toast가 떠 있는 동안만, 비우는 높이 h = Toast 높이 + `space-3`:
+  - 보이는 아래 고정 줄이 없는 화면(선택 탭 첫 화면 · 변수 탭 · 설정 · 값을 직접 고르기 등): 본문 아래 여백을 `space-3` + h로 늘린다. 끝까지 스크롤하면 마지막 카드의 할 일 줄 · 마지막 목록 줄이 Toast 위로 올라온다.
+  - 보이는 아래 고정 줄이 있는 화면: 그 줄의 위 바깥 여백(`margin-top` — 지금 `space-2`)을 `space-2` + h로 늘린다. 끝까지 스크롤하면 줄 바로 위 마지막 목록 줄이 Toast 위로 올라온다(본문 아래 여백은 늘리지 않는다 — 늘리면 줄 밑에 빈 틈이 생김).
+  - 변수 탭 사이드바(안에서만 스크롤): `max-height`에서 h를 더 뺀다. 사이드바 끝 항목이 Toast에 가리지 않는다.
+  - Toast가 사라지면 셋 모두 되돌린다.
 - **정리:**
   - `.sub-foot` · `.make-foot`의 `bottom: 24px`(상태 줄 몫)을 0으로 바꾼다.
   - `body` 아래 여백 `space-10`(상태 줄 24 + 여백)을 `space-3`으로 바꾼다.
@@ -973,8 +977,8 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
   2. 닫기를 누름
   3. 다른 조작 — `dismissStickyOnAction`(지금 `ui.ts` 4241) 규칙 그대로다.
      - 문서 어디서든 `pointerdown`이면 사라진다. 탭을 누르는 것도 여기에 든다.
-     - `keydown`은 실행 · 글자 입력일 때만 사라진다. Enter와 Option · AltGr로 친 글자는 든다. Tab · 화살표 · Shift · Home · End · PageUp · PageDown · Esc · 단독 ⌘ · Ctrl · Alt · 조합 단축키는 들지 않는다.
-- **Toast 안의 클릭 · 키는 다른 조작으로 세지 않는다.** 지금은 `#statusAction`만 뺐는데, 이를 Toast 전체로 넓힌다 — 닫기 · 글 선택이 Toast를 먼저 지우지 않게.
+     - `keydown`은 아래 키를 **뺀 모든 키**에서 사라진다(Space · Backspace · 글자 · F키 등 포함). 빼는 키: Tab · 화살표 · Shift · Home · End · PageUp · PageDown · Esc · 단독 Control · Meta · Alt · AltGraph · ⌘ · Ctrl · Alt와 함께 누른 키(단 Enter와 Option · AltGr로 친 글자는 뺀 목록에 들지 않아 사라진다).
+- **다른 조작으로 세지 않는 곳:** Toast 안의 클릭 · 키(지금은 `#statusAction`만 뺐는데 Toast 전체로 넓힌다 — 닫기 · 글 선택이 Toast를 먼저 지우지 않게), 그리고 **[—] 최소화(`#btnMinimize`) · 펼치기(`#btnExpand`)**(새 예외 — 지금 코드는 이 두 버튼의 `pointerdown` · Enter로 남은 알림을 지워 아래 "최소화"가 일어나지 않는다).
 - **캔버스 선택이 바뀌어도 지우지 않는다** — 지금 코드와 같다. 코드 주석의 "캔버스 선택 변경"은 실제로 없는 동작이라 주석을 고친다. 이 절의 옛 글 "선택 바뀜"은 이것으로 바로잡는다.
 - **Esc는 Toast를 닫지 않는다.** Esc는 ← 돌아가기 몫이다(§2.1).
 
@@ -988,14 +992,13 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 **접근성 · 포커스**
 
-- **담는 곳 하나 `#toastHost`:** 늘 있고 `role="status"` · `aria-live="polite"` · `aria-atomic="true"`다. Toast는 이 안에 넣는다.
+- **담는 곳 하나 `#toastHost`:** 늘 있고 `role="status"` · `aria-live="polite"` · `aria-atomic="true"`다. Toast는 이 안에 넣는다. 자리는 `body` 바로 아래 · `#overlayRoot` 밖(뒤)이다 — 그래야 `body.is-mini > :not(#miniView):not(#overlayRoot)` 숨김 규칙에 든다.
   - 지금 상태 줄처럼 늘 있는 라이브 영역이다. 새로 만든 영역은 화면 읽기 프로그램이 읽지 않는 경우가 있는데, 그 문제를 피한다.
   - error tone은 넣기 바로 전에 `aria-live="assertive"`, 그 밖은 `polite`로 둔다.
   - `toast()`(design-system §6.5)는 몸통에 붙이던 것을 이 담는 곳에 넣도록 고친다.
 - **포커스 순서:** Toast는 맨 끝이다(동작 → 닫기). §4.1b "포커스"의 "Toast의 동작 · 닫기"와 같다.
 - **Toast가 떠도 포커스는 옮기지 않는다.**
-- **닫기로 사라지면:** 포커스는 Toast에 들어오기 전에 있던 요소로 간다(아직 문서에 있으면). 그 요소가 없으면 지금 탭 패널로 간다.
-- **동작을 누르면:** 포커스는 그 동작이 정한 곳으로 간다(화면 이동이면 그 화면의 "포커스").
+- **포커스가 Toast 안에 있는 채 Toast가 사라지면**(닫기 · 동작 · 새 Toast가 바꿈 — 어느 까닭이든): 동작이 포커스를 옮겼으면 그대로 둔다(화면 이동이면 그 화면의 "포커스"). 옮기지 않았으면(포커스가 사라진 Toast나 `body`에 남음 — 예 4번 [다시 읽기]의 `readSelFind`) Toast에 들어오기 전에 있던 요소로 간다(아직 문서에 있으면). 그 요소가 없으면 지금 탭 패널로 간다.
 
 **만들기 다 됨 글 — 문장형 (S3-D16)**
 
@@ -1005,7 +1008,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 - 무료 g > 0, 또는 유료 g > 0 · r = 0: "Global 변수 {g}개" — 새 키 `make.done.madeG`. 지금 유료 r = 0은 "Global {g}개 · Semantic 0개"였는데 이것을 바꾼다.
 - 유료 g > 0 · r > 0: "Global {g}개 · Semantic {r}개" — `make.done.create` 그대로.
-- 유료 g = 0 · r > 0: "Semantic 변수 {r}개" — 새 키 `make.done.madeR`. `make.done.semOnly`는 취소됨 괄호(`makeCreatedText`)가 계속 쓴다.
+- 유료 g = 0 · r > 0: "Semantic 변수 {r}개" — 새 키 `make.done.madeR`. `make.done.semOnly`는 취소됨 괄호(`makeCreatedText`)가 계속 쓴다. 취소됨 괄호(§4.3 "취소됨" — 만들기 화면 안 경고 줄)는 이 PR에서 바꾸지 않는다 — 문장 머리가 없는 괄호 속 명사형이라 "Global {g}개 · Semantic 0개"도 그대로 둔다(범위 밖).
 - 그 밖(g = 0 · r = 0, 무료 g = 0): 없음.
 
 **연결한 곳 {B}** — 연결 단계. n = `bound`, t = `tsBound`.
@@ -1013,7 +1016,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 - n > 0 · t > 0: "{n}곳 · Text Style {t}곳" — 새 키 `make.done.placesTs`.
 - n > 0 · t = 0: "{n}곳" — 새 키 `make.done.places`.
 - n = 0(또는 없음) · t > 0: "Text Style {t}곳" — 새 키 `make.done.placesTsOnly`.
-- 연결 단계를 돌렸는데 n = 0 · t = 0: {B}는 없다. 나머지 부분에 "연결한 곳은 없어요"를 넣는다 — 새 키 `make.done.noPlace`, 지금 "0곳 연결"을 바꿈.
+- 연결 단계를 돌렸는데 n = 0 · t = 0: {B}는 없다. 나머지 부분에 "변수를 연결한 곳은 없어요"를 넣는다 — 새 키 `make.done.noPlace`, 지금 "0곳 연결"을 바꿈("변수를" — 텍스트 스타일 단계가 글자에 스타일을 붙였어도 어긋나게 읽히지 않게).
 - 연결 단계를 하지 않음(끔 · 건너뜀): 없음.
 
 **머리 문장**
@@ -1029,7 +1032,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 1. 다크 {k}개
 2. 텍스트 스타일 {s}개(글자 {a}개)
 3. 알림 {k}개
-4. 연결한 곳은 없어요
+4. 변수를 연결한 곳은 없어요
 5. 이름 {c}개 정리
 6. 직접 만든 변수라 건너뜀 {m}
 7. 연결은 아직 안 했어요 — "바로 연결"을 껐을 때. 이때 동작 [연결하기 →]가 붙는다.
@@ -1043,17 +1046,17 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 | 유료 Semantic만 만듦 | Semantic 변수 4개를 만들고 12곳에 연결했어요 |
 | 텍스트 스타일 글자도 연결 | Global 1개 · Semantic 1개를 만들고 15곳 · Text Style 9곳에 연결했어요 |
 | 변수 연결 0 · 텍스트 스타일만 연결 | Global 1개 · Semantic 1개를 만들고 Text Style 9곳에 연결했어요 |
-| 연결 0곳 | Global 1개 · Semantic 1개를 만들었어요 · 연결한 곳은 없어요 |
+| 연결 0곳 | Global 1개 · Semantic 1개를 만들었어요 · 변수를 연결한 곳은 없어요 |
 | 바로 연결 끔 | Global 변수 5개를 만들었어요 · 연결은 아직 안 했어요 + [연결하기 →] |
 | 만든 것 없이 연결 · 이름 | 4곳에 연결했어요 · 이름 2개 정리 |
-| 다크 · 알림 · 건너뜀까지 | Global 24개 · Semantic 18개를 만들었어요 · 다크 5개 · 텍스트 스타일 3개(글자 18개) · 연결한 곳은 없어요 · 이름 6개 정리 · 직접 만든 변수라 건너뜀 2 |
+| 다크 · 알림 · 건너뜀까지 | Global 24개 · Semantic 18개를 만들었어요 · 다크 5개 · 텍스트 스타일 3개(글자 18개) · 알림 1개 · 변수를 연결한 곳은 없어요 · 이름 6개 정리 · 직접 만든 변수라 건너뜀 2 |
 | 텍스트 스타일만 · 바로 연결 끔 | 텍스트 스타일 3개 · 연결은 아직 안 했어요 |
 
-- 560 창에서 Toast 글 폭은 약 460px이다. 12px 한글로 한 줄 약 38자, 두 줄 약 76자가 들어간다(추정 — 구현 스크린샷으로 확인). 위 표의 가장 긴 글(약 85자)은 둘째 줄 끝이 말줄임되고, 전체 글은 툴팁으로 본다.
+- 560 창에서 Toast 글 폭은 약 460px이다. 12px 한글로 한 줄 약 38자, 두 줄 약 76자가 들어간다(추정 — 구현 스크린샷으로 확인). 위 표의 가장 긴 글(약 95자)은 둘째 줄 끝이 말줄임되고, 전체 글은 툴팁으로 본다.
 
 **만들기 실행이 다 되면** (§4.3 상태표 "다 됨")
 
-- 첫 화면으로 간다(지금과 같음).
+- 선택 탭의 하위 화면이 만들기 화면이었으면 첫 화면으로 간다(다른 하위 화면 · 다른 탭 · 설정이면 그대로 — 지금과 같음, §4.3).
 - 결과 Toast를 띄운다 — success, 위 문장형 글.
   - "바로 연결"을 켰으면 동작이 없고 4초 뒤 사라진다.
   - 껐으면 [연결하기 →](지금 `wizard.toBind`)가 붙고, 누르거나 닫거나 다른 조작이 있을 때까지 남는다.
@@ -1090,7 +1093,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 #### 덮는 곳 (DS-3a · DS-3b 전까지 지금 코드로 읽음)
 
-§2.5 [기준 바꾸기] 글과 대체 포커스 괄호 · §2.6 상태 줄 · §2.7 TR-D3 줄 앞 `#` · §4.1 머리 줄 · 상태표 2 · 4(카드 2 자리) · 5(만든 뒤의 카드 2) · 카드 1 `.acts` 버튼 · ✓ 카드 `--ok-subtle` · 카드 2 · 만들기 카드(F3 · F-D1–F-D16 가운데 카드 만들기 · 남긴 카드) · 할 일 줄 · 할 일 버튼 강약 · 포커스 순서 · §4.2 · §4.7의 대체 포커스 "할 일 [변수 만들기]" · §4.3 "입구 셋" · 다 됨의 상태 줄 · §4.6 쓰기 잠금의 카드 버튼 · "라이브러리 수는 카드 2 둘째 줄" · §4.11 상태표의 상태 줄. §2.9 "화면별 문구" 표의 "만들기 카드 유료 · 주 버튼" 줄과 "무료 카드의 버튼 · 줄마다 [＋ 만들기]는 그대로"(DS-3a 뒤 — 버튼은 카드에 두지 않고 무료 · 유료 모두 할 일 줄 첫 칸 [{n}개 만들고 {p}곳 연결 →], S3-D13). **DS-3b(B.43)가 덮는 곳:** 이 문서 전체의 "공통 상태 줄"과 그 색(`ok` · `warn`) · 창 바닥 24px 자리 · `.sub-foot` · `.make-foot`의 `bottom: 24px` · §4.3 상태표 "다 됨"의 만들기 · 연결 부분 명사형 글("Global {g}개 · Semantic {r}개 · {n}곳 연결" · "0곳 연결") · §4.11 표의 "공통 상태 줄에도"(→ Toast, 도구 화면 안 상태 줄은 그대로).
+§2.5 [기준 바꾸기] 글과 대체 포커스 괄호 · §2.6 상태 줄 · §2.7 TR-D3 줄 앞 `#` · §4.1 머리 줄 · 상태표 2 · 4(카드 2 자리) · 5(만든 뒤의 카드 2) · 카드 1 `.acts` 버튼 · ✓ 카드 `--ok-subtle` · 카드 2 · 만들기 카드(F3 · F-D1–F-D16 가운데 카드 만들기 · 남긴 카드) · 할 일 줄 · 할 일 버튼 강약 · 포커스 순서 · §4.2 · §4.7의 대체 포커스 "할 일 [변수 만들기]" · §4.3 "입구 셋" · 다 됨의 상태 줄 · §4.6 쓰기 잠금의 카드 버튼 · "라이브러리 수는 카드 2 둘째 줄" · §4.11 상태표의 상태 줄. §2.9 "화면별 문구" 표의 "만들기 카드 유료 · 주 버튼" 줄과 "무료 카드의 버튼 · 줄마다 [＋ 만들기]는 그대로"(DS-3a 뒤 — 버튼은 카드에 두지 않고 무료 · 유료 모두 할 일 줄 첫 칸 [{n}개 만들고 {p}곳 연결 →], S3-D13). **DS-3b(B.43)가 덮는 곳:** 이 문서 전체의 "공통 상태 줄"과 그 색(`ok` · `warn`) · 창 바닥 24px 자리 · `.sub-foot` · `.make-foot`의 `bottom: 24px` · §4.3 상태표 "다 됨"의 만들기 · 연결 부분 명사형 글("Global {g}개 · Semantic {r}개 · {n}곳 연결" · "0곳 연결") · §4.11 표의 "공통 상태 줄에도"(→ Toast, 도구 화면 안 상태 줄은 그대로) · §4.6 · §4.8 · §4.9의 "상태 줄은 팝업 뒤에 가려진다 / 팝업 뒤라 쓰지 않는다"는 근거(DS-3b 뒤 Toast는 팝업 위 — 팝업 안 알림 줄을 쓰는 동작은 그대로, 근거만 "팝업 안에서 바로 보이게"로 읽는다).
 
 ### 4.2 연결 화면 (⑦)
 
@@ -3105,6 +3108,9 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 - [ ] `src/ui.html`: `.status-line` 규칙 · `#statusLine` 지움, `#toastHost` 더함, `.sub-foot` · `.make-foot` `bottom: 0`, `body` 아래 여백 `space-10` → `space-3`, 사이드바 `max-height`의 `− 24px` 뺌, `body.is-mini`에서 Toast 숨김 확인
 - [ ] `src/lib/wizard.ts` `makeDoneText` 문장형(S3-D16) — 새 키 `make.done.madeG` · `madeR` · `places` · `placesTs` · `placesTsOnly` · `noPlace` · `sentCreateBind` · `sentCreate` · `sentBind`, `make.done.bind` 지움(`wizard.seq.bindTs*`는 남은 쓰임 확인), `test/wizard.test.mjs` 기대 글 바꿈(§4.1b 예 표 10줄)
 - [ ] 만들기 다 됨 → 첫 화면 + success Toast(동작 없음 4초 · 바로 연결 끔이면 [연결하기 →] 남음)
-- [ ] verify: `#statusLine` 0 · 37곳 가운데 대표(연결 다 됨 success · 찾기 취소 warning [다시 읽기] 남음 · 잠금 사유 warning 4초 · 오류 error · 최소화 실패 error [보기]) 글 · tone · 남는 시간 · 닫기 · 2줄 말줄임 + `title` · `role="status"` · error `assertive` · 최소화 중 숨김 · 펼칠 때 남은 Toast · 하위 화면에서 아래 고정 줄과 겹치지 않음 · 첫 화면 끝까지 스크롤하면 할 일 줄이 Toast 위 · Toast 안 클릭은 Toast를 지우지 않음 · 560에서 가로 스크롤 0. 지금 `#statusText` 검사는 모두 Toast 글로 옮김
+- [ ] `v4.linked` 글 앞 "🔗 " 뺌 · `make.done.noPlace` "변수를 연결한 곳은 없어요"
+- [ ] `dismissStickyOnAction` 예외에 `#btnMinimize` · `#btnExpand` · Toast 전체, `--toast-bottom`은 보이는 아래 고정 줄의 실제 위 끝 기준(스크롤 때도), 비우는 자리 셋(본문 아래 · 아래 고정 줄 위 · 사이드바 `max-height`)
+- [ ] design-system §3 radius 표의 `radius-large` 쓰임에서 Toast 뺌 · `src/gallery/gallery.ts` Toast 줄(meta · 네 tone 예 · 2줄 예)
+- [ ] verify: `#statusLine` 0 · 37곳 가운데 대표(연결 다 됨 success · 찾기 취소 warning [다시 읽기] 남음 · 잠금 사유 warning 4초 · 오류 error · 최소화 실패 error [보기]) 글 · tone · 남는 시간 · 닫기 · 2줄 말줄임 + `title` · `role="status"` · error `assertive` · 최소화 중 숨김 · 펼칠 때 남은 Toast · 하위 화면에서 아래 고정 줄과 겹치지 않음 · 첫 화면 끝까지 스크롤하면 할 일 줄이 Toast 위 · Toast 안 클릭은 Toast를 지우지 않음 · [—] · 펼치기가 남은 Toast를 지우지 않음 · 하위 화면 끝까지 스크롤하면 마지막 목록 줄이 Toast 위 · 포커스가 든 Toast가 사라지면 들어오기 전 요소로 · 560에서 가로 스크롤 0. 지금 `#statusText` 검사는 모두 Toast 글로 옮김
 - [ ] 4검사 · `dist/` · 실제 화면 스크린샷 대조(B5)
 - [ ] 실기 확인(사용자, 피그마): 만들기 실행 → 첫 화면 결과 Toast / 연결 화면에서 연결 → 첫 화면으로 와서 창 아래 Toast / 만들기 화면 안 잠금 사유 → 아래 고정 줄 위 Toast / 잠긴 버튼 클릭 → warning / 최소화 중 실패 → 펼치면 [보기]
