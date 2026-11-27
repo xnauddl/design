@@ -193,7 +193,7 @@ const nestedCards = (p) => p.evaluate(() => {
   };
   const bad = [];
   for (const card of document.querySelectorAll('.step, .sel-card, .modal')) {
-    if (!card.getClientRects().length) continue;
+    if (!card.getClientRects().length || card.matches('.step.bind-v4')) continue; // 하위 화면 셋은 카드가 아니다(DS-3c S3-D18)
     for (const e of card.querySelectorAll('*')) {
       if (!e.getClientRects().length || e.closest(EX)) continue;
       if (isCard(e)) bad.push(`${e.tagName.toLowerCase()}.${[...e.classList].join('.')}#${e.id}`);
@@ -548,7 +548,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 for (const w of [560]) {
   const p = await open(w);
   const r = await p.evaluate(() => ({ h: Math.round(document.querySelector('.tabs').getBoundingClientRect().height), hs: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  check(`9 ${w}px 탭 바 한 줄·가로 스크롤 없음`, r.h <= 40 && !r.hs, `높이 ${r.h}px`);
+  check(`9 ${w}px 탭 바 한 줄(띠 44 — S3-D20)·가로 스크롤 없음`, r.h <= 44 && !r.hs, `높이 ${r.h}px`);
   await p.close();
 }
 
@@ -4664,6 +4664,91 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   const toastT = await toastText(p);
   check('B.47 연결 Toast — "{n}곳 연결 · ⌘Z로 되돌리기" 바로 뒤 · 건너뜀 앞에 "Global 연결 2곳은 Semantic으로 바꿨어요"', toastT === '2곳 연결 · ⌘Z로 되돌리기 · Global 연결 2곳은 Semantic으로 바꿨어요 · 건너뜀 1', toastT);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b47-link-toast.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
+// ── DS-3c(ia-v4 B.48) — 하위 화면 카드 없앰(S3-D18) · 무료 Semantic 🔒(S3-D19) · 유료 ↔ 무료 바뀜 다시 읽기 ──
+{
+  const box = (p, q) => p.evaluate((q) => { const e = document.querySelector(q); const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return { bw: parseFloat(s.borderTopWidth), pad: parseFloat(s.paddingLeft), rad: parseFloat(s.borderTopLeftRadius), l: Math.round(r.left), r: Math.round(r.right) }; }, q);
+  const semTab = (p) => p.evaluate(() => { const b = document.getElementById('makeTab-semantic'); const n = b.querySelector('.n'); return { txt: b.textContent, aria: b.getAttribute('aria-label'), title: b.getAttribute('title'), hid: n.getAttribute('aria-hidden') }; });
+  const MK = [{ name: 'spacing/16', category: 'gap', value: 16, sources: ['itemSpacing'], count: 2, freeBy: { GAP: 4 } }, { name: 'color/101828', category: 'color', value: '#101828', sources: ['fills'], count: 3, freeBy: { 'ALL_FILLS|FRAME_FILL': 6 } }];
+  const ROLE = [{ name: 'spacing/card/gap', global: 'spacing/16', token: 'spacing/16' }];
+  const STY = [{ name: 'body/medium', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular', count: 2, nodeIds: ['t1'] }];
+  const answerMake = async (p, paid) => {
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 1, tokens: MK });
+    if (paid) await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: (await sent(p, 'SCAN_TEXT_STYLES')).at(-1).reqId, warnings: [], existing: [], styles: STY });
+    await p.waitForTimeout(30);
+    const pv = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+    await recv(p, { type: 'CREATE_RESULT', reqId: pv.reqId, preview: true, created: 2, updated: 0, summary: '', roles: 1, skippedManual: 0, tokenStates: {}, roleRows: ROLE });
+    await p.waitForTimeout(40);
+  };
+  // 무료 만들기 화면
+  const p = await open(560, 'select');
+  await recv(p, { ...PREREQ, tierVars: 3, otherVars: 0 });
+  await recv(p, { ...sel(1, 0), ids: ['d3c'] });
+  await goSub(p, 'make');
+  await p.waitForTimeout(40);
+  const mk = await box(p, '#makeScreen');
+  check('DS-3c 만들기 화면 카드 아님 — 테두리 0 · 안쪽 여백 0 · 둥근 모서리 0 · 좌우 12–548(머리 줄과 같은 선)', mk.bw === 0 && mk.pad === 0 && mk.rad === 0 && mk.l === 12 && mk.r === 548, JSON.stringify(mk));
+  // 추출만 오고 미리보기 응답 전(유료라면 "…") — 무료는 그때도 🔒
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: (await sent(p, 'EXTRACT')).at(-1).reqId, warnings: [], selection: 1, tokens: MK });
+  await p.waitForTimeout(40);
+  let st = await semTab(p);
+  check('DS-3c 무료 Semantic 탭 — 미리보기 응답 전에도 🔒 · 접근성 이름 "Semantic · 유료" · title make.freeSemTop · 🔒 aria-hidden', st.txt === 'Semantic🔒' && st.aria === 'Semantic · 유료' && st.title === '🔒 Semantic은 유료예요' && st.hid === 'true', JSON.stringify(st));
+  const pv0 = (await sent(p, 'CREATE_TOKENS')).filter((m) => m.preview).at(-1);
+  await recv(p, { type: 'CREATE_RESULT', reqId: pv0.reqId, preview: true, created: 2, updated: 0, summary: '', roles: 1, skippedManual: 0, tokenStates: {}, roleRows: ROLE });
+  await p.waitForTimeout(40);
+  st = await semTab(p);
+  check('DS-3c 무료 Semantic 탭 — 미리보기 뒤에도 🔒(수 1 대신)', st.txt === 'Semantic🔒', JSON.stringify(st));
+  const foot = await p.evaluate(() => parseFloat(getComputedStyle(document.getElementById('makeFoot')).paddingLeft));
+  check('DS-3c 아래 고정 줄 좌우 안쪽 24 그대로(사용자 결정)', foot === 24, String(foot));
+  const tb = await p.evaluate(() => { const e = document.querySelector('.tabs'); const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return { t: Math.round(r.top), l: Math.round(r.left), r: Math.round(r.right), h: Math.round(r.height), bt: parseFloat(s.borderTopWidth), bb: parseFloat(s.borderBottomWidth), rad: parseFloat(s.borderTopLeftRadius), iw: document.documentElement.clientWidth }; });
+  check('DS-3c S3-D20 맨 위 탭 줄 띠 — 위 0 · 좌우 창 안쪽 폭 전체 · 높이 44 · 아래 선 1 · 위 선 0 · 둥근 모서리 0', tb.t === 0 && tb.l === 0 && tb.r === tb.iw && tb.h === 44 && tb.bb === 1 && tb.bt === 0 && tb.rad === 0, JSON.stringify(tb));
+  check('DS-3c 카드 안 카드 0 · 560 가로 스크롤 0', (await nestedCards(p)).length === 0 && (await p.evaluate(() => document.documentElement.scrollWidth)) <= 560, JSON.stringify(await nestedCards(p)));
+  // 무료 → 유료(만들기 화면에서): 다시 읽음 · Text Style 후보 읽기 · 수
+  const exN = (await sent(p, 'EXTRACT')).length;
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await p.waitForTimeout(30);
+  check('DS-3c 무료 → 유료(만들기 화면) — EXTRACT · SCAN_TEXT_STYLES 다시 보냄', (await sent(p, 'EXTRACT')).length === exN + 1 && (await sent(p, 'SCAN_TEXT_STYLES')).length === 1, `${(await sent(p, 'EXTRACT')).length} / ${(await sent(p, 'SCAN_TEXT_STYLES')).length}`);
+  await answerMake(p, true);
+  st = await semTab(p);
+  check('DS-3c 유료 — Semantic 탭 수 · aria-label · title 지움 · Text Style 탭 생김', st.txt === 'Semantic1' && st.aria === null && st.title === null && st.hid === null && (await tabsOf(p)).includes('Text Style1'), `${JSON.stringify(st)} ${JSON.stringify(await tabsOf(p))}`);
+  // 유료 → 무료: 🔒 · Text Style 탭 없어짐
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'free', unlimited: false, source: 'dev' });
+  await p.waitForTimeout(30);
+  await answerMake(p, false);
+  check('DS-3c 유료 → 무료 — Semantic 🔒 · Text Style 탭 없음', JSON.stringify(await tabsOf(p)) === JSON.stringify(['Global2*', 'Semantic🔒']), JSON.stringify(await tabsOf(p)));
+  // 추출이 오는 중에 설정 탭에서 유료로 바꾸고, 늦은 옛 응답이 온 뒤 돌아옴 → 다시 읽음(mkFor가 되살아나지 않음)
+  await recv(p, { ...sel(1, 0), ids: ['d3c2'] });
+  await p.waitForTimeout(400);
+  const oldEx = (await sent(p, 'EXTRACT')).at(-1);
+  await p.click('#btnSettings');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { type: 'EXTRACT_RESULT', reqId: oldEx.reqId, warnings: [], selection: 1, tokens: MK });
+  const exM = (await sent(p, 'EXTRACT')).length;
+  await p.click('#tabbtn-select');
+  await p.waitForTimeout(40);
+  check('DS-3c 설정 탭에서 유료로 바꾸고 돌아옴(늦은 옛 추출 응답 뒤) — 다시 읽음 · Text Style 후보도', (await sent(p, 'EXTRACT')).length === exM + 1 && (await sent(p, 'SCAN_TEXT_STYLES')).length === 2, `${(await sent(p, 'EXTRACT')).length - exM} / ${(await sent(p, 'SCAN_TEXT_STYLES')).length}`);
+  // 설정 카드는 그대로 카드
+  await p.click('#btnSettings');
+  const sc = await box(p, '#pluginSettingsCard');
+  check('DS-3c 설정 카드는 그대로 카드(테두리 1)', sc.bw === 1 && sc.rad > 0, JSON.stringify(sc));
+  await p.close();
+}
+{
+  // 연결 · 이름 정리 화면도 카드 아님
+  const p = await open(560, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 0), ids: ['d3r'] });
+  await goSub(p, 'bind');
+  await p.waitForTimeout(40);
+  const b = await p.evaluate(() => { const e = document.querySelector('.step.bind-v4[data-apply-step="bind"]'); const s = getComputedStyle(e); return [parseFloat(s.borderTopWidth), parseFloat(s.paddingLeft), Math.round(e.getBoundingClientRect().left)]; });
+  check('DS-3c 연결 화면 카드 아님 — 테두리 0 · 안쪽 여백 0 · 왼쪽 12', JSON.stringify(b) === '[0,0,12]', JSON.stringify(b));
+  await p.evaluate(() => document.querySelector('.sub-head .back, #btnBack, [data-sub-back]')?.click());
+  await goSub(p, 'rename');
+  await p.waitForTimeout(40);
+  const r = await p.evaluate(() => { const e = document.querySelector('.step.bind-v4[data-apply-step="rename"]'); const s = getComputedStyle(e); return [parseFloat(s.borderTopWidth), parseFloat(s.paddingLeft), Math.round(e.getBoundingClientRect().left)]; });
+  check('DS-3c 이름 정리 화면 카드 아님 — 테두리 0 · 안쪽 여백 0 · 왼쪽 12', JSON.stringify(r) === '[0,0,12]', JSON.stringify(r));
   await p.close();
 }
 await browser.close();

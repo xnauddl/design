@@ -46,6 +46,9 @@
       /* 카드 그림자 없음(DS-D5 — design-system.md 부록 A.4) */
     }
     .step > * + * { margin-top: var(--space-2); }
+    /* 연결 · 만들기 · 이름 정리 하위 화면은 카드가 아니다(DS-3c S3-D18 — ia-v4 §4.1b "하위 화면 카드 없앰"): 탭 패널 위에 바로.
+       클래스 .step은 화면 전환(showStep) · 오류 상자 C-D14(cardOf)가 찾으므로 남기고 모양만 없앤다. 자식 위 여백은 그대로. */
+    .step.bind-v4 { border: 0; border-radius: 0; padding: 0; margin-bottom: 0; background: none; }
 
     /* ── 카드 헤더(접기 chevron + 타이틀 줄 버튼) — 캐논 패턴 ──
        주 버튼이 타이틀 줄에 있으므로 헤더도 sticky로 고정한다. 아니면 카드 본문(예: 토큰
@@ -53,7 +56,7 @@
        --head-top(= 두 바의 실제 높이)은 ui.ts가 측정해 넣는다. z-index는 두 바(3·2)보다 아래. */
     .step-head {
       display: flex; align-items: center; gap: var(--space-2); cursor: pointer; user-select: none;
-      position: sticky; top: var(--head-top, 71px); z-index: var(--z-raised);
+      position: sticky; top: var(--head-top, 44px); z-index: var(--z-raised);
       background: var(--color-surface-primary); padding-bottom: var(--space-2);
     }
     .step-head + .step-body { margin-top: 0; } /* 헤더 padding-bottom이 간격을 대신 — 본문이 비쳐 보이는 틈 방지 */
@@ -84,11 +87,12 @@
     label.inline { display: inline-flex; gap: var(--space-1); align-items: center; color: var(--color-text-secondary); }
     .status { margin-top: var(--space-1); min-height: 15px; color: var(--color-text-secondary); }
 
-    /* ── 탭바 (세그먼트 컨트롤) ── */
+    /* ── 탭바 — 창 위 · 좌우에 붙은 띠(ia-v4 §4.1b S3-D20 — Figma Tabs bar): 본문 좌우 · 위 여백 12를 음수 바깥 여백으로 덮는다 ── */
     .tabs {
       display: flex; gap: var(--space-1); align-items: center; position: sticky; top: 0; z-index: var(--z-sticky-top);
-      background: var(--color-surface-secondary); border: 1px solid var(--color-border-default);
-      padding: var(--space-0-5); min-height: var(--size-nav); border-radius: var(--radius-medium); margin: 0 0 var(--space-3);
+      background: var(--color-surface-secondary); border: 0; border-bottom: 1px solid var(--color-border-default);
+      padding: 0 var(--space-3); min-height: var(--size-tabs-bar); border-radius: 0;
+      margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-3);
     }
     .tab-list { display: flex; gap: var(--space-1); flex: 1 1 auto; min-width: 0; }
     /* [—] 최소화 — 24×24 이상(§2.10). */
@@ -251,7 +255,7 @@
     .toolbar {
       display: flex; flex-wrap: wrap; gap: var(--space-1); align-items: center;
       padding-bottom: var(--space-2); border-bottom: 1px solid var(--color-border-default);
-      position: sticky; top: var(--toolbar-top, 95px); z-index: var(--z-raised); background: var(--color-surface-primary);
+      position: sticky; top: var(--toolbar-top, 70px); z-index: var(--z-raised); background: var(--color-surface-primary);
     }
     .toolbar .grow { flex: 1 1 auto; } /* 주 버튼을 오른쪽 끝으로 미는 공백 */
     /* 아래에 목록이 없는 카드(내보내기)는 구분선을 긋지 않는다 — 가를 것이 없다. */
@@ -616,8 +620,8 @@
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
     .make-foot { background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); padding-top: var(--space-2); padding-bottom: var(--space-2); z-index: var(--z-sticky); }
-    /* 아래 고정 줄은 창 바닥 · 가로 전체(design-system §5 Bottom Action Bar · ia-v4 §4.1b S3-D10 — DS-3b 실기 뒤): 카드 안에 있어도 창에 고정한다.
-       내용이 짧아도 줄은 창 바닥에 있고, 본문 아래에는 줄 높이(--foot-h)만큼 여백을 둔다. 글은 카드 안 글과 같은 세로선에서 시작한다. */
+    /* 아래 고정 줄은 창 바닥 · 가로 전체(design-system §5 Bottom Action Bar · ia-v4 §4.1b S3-D10 — DS-3b 실기 뒤): 화면(.step) 안에 있어도 창에 고정한다.
+       내용이 짧아도 줄은 창 바닥에 있고, 본문 아래에는 줄 높이(--foot-h)만큼 여백을 둔다. 좌우 안쪽 24(DS-3c 뒤에도 그대로 — 2026-11-27 사용자 결정). */
     .sub-foot, .make-foot { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding-left: var(--space-6); padding-right: var(--space-6); z-index: var(--z-sticky); }
     /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
     .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }
@@ -674,13 +678,13 @@
     .vt-group .lbl { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
     .vt-group .more-unused { flex: 0 0 auto; min-height: 24px; font-size: var(--font-size-sm); }
     /* ── 변수 목록 결정 B(§4.4): 머리줄 고정 · 사이드바(128px, 고정 + 따로 스크롤) · 오른쪽 목록 머리 고정 ── */
-    #varList .list-head { position: sticky; top: var(--tabs-h, 41px); z-index: var(--z-sticky-top); background: var(--color-background-primary); padding: var(--space-0-5) 0 var(--space-1); margin: 0; }
+    #varList .list-head { position: sticky; top: var(--tabs-h, 44px); z-index: var(--z-sticky-top); background: var(--color-background-primary); padding: var(--space-0-5) 0 var(--space-1); margin: 0; }
     .vl-split { display: flex; align-items: flex-start; border-top: 1px solid var(--color-border-default);
       /* 사이드바 아래까지 경계선(ia-v4 §4.6 B.41 VO-D2) — 사이드바 border-right와 같은 x 127px */
       background: linear-gradient(to right, transparent 127px, var(--color-border-default) 127px 128px, transparent 128px) no-repeat; }
     .vl-side {
-      width: 128px; flex: 0 0 128px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
-      max-height: calc(100vh - var(--side-top, 75px) - var(--toast-space-side, 0px)); overflow-y: auto; border-right: 1px solid var(--color-border-default);
+      width: 128px; flex: 0 0 128px; position: sticky; top: var(--side-top, 78px); align-self: flex-start;
+      max-height: calc(100vh - var(--side-top, 78px) - var(--toast-space-side, 0px)); overflow-y: auto; border-right: 1px solid var(--color-border-default);
       padding: var(--space-1) var(--space-1); background: var(--color-surface-primary);
     }
     .vs-item { display: flex; align-items: center; gap: var(--nav-item-gap); height: 28px; min-height: 28px; padding: 0 var(--space-2); border-radius: var(--radius-small); color: var(--color-text-primary); cursor: pointer; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); }
@@ -698,7 +702,7 @@
     .vs-item[aria-selected="true"] .vs-badge { background: var(--nav-selected-badge-bg); color: var(--color-text-inverse); }
     .vs-sep { height: 1px; background: var(--color-border-default); margin: var(--space-1) var(--space-1); }
     .vl-main { flex: 1 1 auto; min-width: 0; }
-    .vl-head { position: sticky; top: var(--side-top, 75px); z-index: var(--z-sticky); display: flex; align-items: center; gap: var(--space-1); height: 32px; padding: 0 var(--space-1) 0 var(--space-2); background: var(--color-surface-primary); border-bottom: 1px solid var(--color-border-default); }
+    .vl-head { position: sticky; top: var(--side-top, 78px); z-index: var(--z-sticky); display: flex; align-items: center; gap: var(--space-1); height: 32px; padding: 0 var(--space-1) 0 var(--space-2); background: var(--color-surface-primary); border-bottom: 1px solid var(--color-border-default); }
     .vl-title { font-weight: var(--font-weight-bold); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; outline: none; }
     .vl-head .search-box:not([hidden]) { position: absolute; inset: 3px 4px; display: flex; gap: var(--space-1); align-items: center; background: var(--color-surface-primary); }
     .vl-head .search-box input { flex: 1 1 auto; min-width: 0; }
