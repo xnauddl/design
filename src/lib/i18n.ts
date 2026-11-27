@@ -356,6 +356,7 @@ export const STRINGS: Record<string, string> = {
   'v4.bindListAria': '연결할 변수',
   'v4.linked': '{n}곳 연결 · ⌘Z로 되돌리기',
   'v4.linkedSkipped': ' · 건너뜀 {m}',
+  'bind.swappedTail': ' · Global 연결 {k}곳은 Semantic으로 바꿨어요', // ia-v4 §2.9a(SC-D58)
   'v4.tsPlaces': 'Text Style {t}곳',
   'v4.readCancelled': '읽기를 취소했어요',
   'v4.reread': '다시 읽기',
@@ -458,6 +459,7 @@ export const STRINGS: Record<string, string> = {
   'make.cancelledUpTo': '취소했어요 · {step}까지 됐어요',
   'make.done.create': 'Global {g}개 · Semantic {r}개',
   'make.done.semOnly': 'Semantic {r}개',
+  'make.done.swapped': 'Global 연결 {k}곳은 Semantic으로 바꿨어요', // ia-v4 §2.9a(SC-D58) — 다 됨 글 나머지 맨 앞
   'make.done.dark': '다크 {k}개',
   'make.done.styles': '텍스트 스타일 {s}개',
   'make.done.missing': '알림 {k}개',

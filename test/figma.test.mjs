@@ -961,7 +961,7 @@ test('bindSelection — 이미 붙은 Semantic 역할은 같은 값의 상위 ti
   assert.equal(res.reasons['already-bound'], 1);
 });
 
-test('bindSelection — Global이 붙은 칠하기도 이미 연결됨 — 같은 값의 Component가 있어도 바꾸지 않는다(§2.12 12.8 결정 B)', async () => {
+test('bindSelection — 플러그인 Global이 붙은 칠하기는 유료에서 바꾼다(S-3a — 12.8 결정 B를 뒤집음) — 같은 값의 사용자 변수가 먼저 뽑혀도 그 Global을 가리키는 Semantic(ia-v4 §2.9a)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'color/0066ff', category: 'color', sources: ['fill'], value: '#0066ff' }], 16);
   const g = findVar(figma, 'Global', 'color/0066ff');
@@ -974,11 +974,15 @@ test('bindSelection — Global이 붙은 칠하기도 이미 연결됨 — 같�
     fills: [{ type: 'SOLID', color: { r: 0, g: 0.4, b: 1 }, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: g.id } } }],
   };
   const dry = await bindSelection([node], false);
-  assert.equal(dry.candidates.length, 0);
-  assert.equal(dry.reasons['already-bound'], 1);
+  assert.equal(dry.candidates.length, 1);
+  assert.equal(dry.candidates[0].fromId, g.id);
+  assert.equal(dry.candidates[0].newRole.globalId, g.id, '사용자 변수(button/bg)가 아니라 붙어 있던 Global — 다크 모드 값 보존');
+  assert.ok(!dry.reasons['already-bound']);
   const res = await bindSelection([node]);
-  assert.equal(res.bound, 0);
-  assert.equal(node.fills[0].boundVariables.color.id, g.id);
+  assert.equal(res.bound, 1);
+  assert.equal(res.swapped, 1);
+  const role = figma._state.variables.find((v) => v.id === node.fills[0].boundVariables.color.id);
+  assert.equal(Object.values(role.valuesByMode)[0].id, g.id);
 });
 
 test('bindSelection — 노드 레벨 fills 바인딩만 있어도 이미 바인딩으로 보호', async () => {
@@ -5610,6 +5614,111 @@ test('무료 자동 연결은 새 Semantic을 만들지 않는다 — 맞는 Sem
   assert.equal(dry2.candidates[0].variableId, v.id);
 });
 
+/* ---- S-3a Global에서 바꾸기(ia-v4 §2.9a · B.47 — SC-D53–SC-D58) ---- */
+const s3aFrame = (id, gap, extra = {}) => ({
+  type: 'FRAME', id, name: id, fills: [], layoutMode: 'VERTICAL', itemSpacing: gap, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
+  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', boundVariables: {},
+  setBoundVariable(field, v) { this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; },
+  ...extra,
+});
+const s3aBound = (id) => ({ boundVariables: { itemSpacing: { type: 'VARIABLE_ALIAS', id } } });
+test('S-3a 유료 찾기 — 플러그인 Global에만 붙은 숫자 자리는 후보(fromId) · 연결 뒤 그 Global을 가리키는 Semantic · swapped · 다시 찾으면 후보 없음 · 무료는 그대로', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/52', category: 'gap', sources: ['gap'], value: 52 }], 16);
+  const g52 = findVar(figma, 'Global', 'spacing/52');
+  const a = s3aFrame('a', 52, s3aBound(g52.id));
+  const dryFree = await bindSelection([a], false, {}, { noNewRoles: true });
+  assert.equal(dryFree.candidates.length, 0, '무료는 바꾸지 않는다');
+  const dry = await bindSelection([a], false);
+  assert.equal(dry.candidates.length, 1);
+  const c = dry.candidates[0];
+  assert.equal(c.fromId, g52.id);
+  assert.equal(c.newRole.name, 'spacing/gap');
+  assert.equal(c.newRole.globalId, g52.id);
+  assert.equal(c.newRole.rawOf, undefined, '고른 원시값이 그 Global이면 폴백이 아니다');
+  assert.ok(!dry.make?.length, '새로 만들 값에 넣지 않는다');
+  const r = await bindSelection([a]);
+  assert.equal(r.bound, 1);
+  assert.equal(r.swapped, 1);
+  const sem = findVar(figma, 'Semantic', 'spacing/gap');
+  assert.equal(a.boundVariables.itemSpacing.id, sem.id);
+  assert.equal(Object.values(sem.valuesByMode)[0].id, g52.id, '그 Global을 가리킨다');
+  const dry2 = await bindSelection([a], false);
+  assert.equal(dry2.candidates.length, 0, 'Semantic에 붙은 자리는 다시 바꾸지 않는다');
+});
+
+test('S-3a 다크 모드 보존 — 기본 값이 같은 다른 원시값(사용자 변수)이 먼저 뽑혀도 붙어 있던 Global을 가리키는 새 Semantic(rawOf) · 원시값이 다르면 다른 이름', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/52', category: 'gap', sources: ['gap'], value: 52 }], 16);
+  const g52 = findVar(figma, 'Global', 'spacing/52');
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const u = figma.variables.createVariable('a-space-52', prim, 'FLOAT'); // 이름이 앞서 원시값 후보에서 먼저 뽑힌다
+  u.setValueForMode(prim.defaultModeId, 52);
+  u.scopes = ['GAP'];
+  const fresh = s3aFrame('fresh', 52); // 연결 안 된 자리 — 사용자 변수를 가리키는 새 역할
+  const a = s3aFrame('a', 52, s3aBound(g52.id));
+  const dry = await bindSelection([fresh, a], false);
+  const ca = dry.candidates.find((x) => x.nodeId === 'a');
+  const cf = dry.candidates.find((x) => x.nodeId === 'fresh');
+  assert.equal(cf.newRole.globalId, u.id, '연결 안 된 자리는 지금 규칙 그대로');
+  assert.equal(ca.newRole.globalId, g52.id, '바꿀 자리는 붙어 있던 Global을 가리킨다');
+  assert.equal(ca.newRole.rawOf, g52.id);
+  assert.notEqual(ca.variableName, cf.variableName, '원시값이 다르면 다른 이름(꼬리)');
+  const r = await bindSelection([fresh, a]);
+  assert.equal(r.swapped, 1);
+  const roleOf = (n) => figma._state.variables.find((v) => v.id === n.boundVariables.itemSpacing.id);
+  assert.equal(Object.values(roleOf(a).valuesByMode)[0].id, g52.id);
+  assert.equal(Object.values(roleOf(fresh).valuesByMode)[0].id, u.id);
+});
+
+test('S-3a 소수 값도 바꾼다 — 소수 간격(10.5)에 붙은 플러그인 Global은 후보(fromId) · 0 이하만 이미 연결됨 (구현 검토 중대 1)', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/10.5', category: 'gap', sources: ['gap'], value: 10.5 }], 16);
+  const g = figma._state.variables.find((v) => Object.values(v.valuesByMode)[0] === 10.5);
+  assert.ok(g, '소수 간격 Global');
+  const a = s3aFrame('a', 10.5, s3aBound(g.id));
+  const dry = await bindSelection([a], false);
+  assert.equal(dry.candidates.length, 1);
+  assert.equal(dry.candidates[0].fromId, g.id);
+});
+
+test('S-3a 바꾸지 않는 자리 — 사용자 컬렉션 변수 · Semantic에 붙은 자리는 이미 연결됨 그대로', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/52', category: 'gap', sources: ['gap'], value: 52 }], 16);
+  const g52 = findVar(figma, 'Global', 'spacing/52');
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const u = figma.variables.createVariable('space-52', prim, 'FLOAT');
+  u.setValueForMode(prim.defaultModeId, 52);
+  u.scopes = ['GAP'];
+  const role = designerRole(figma, 'spacing/gap', g52);
+  const x = s3aFrame('x', 52, s3aBound(u.id));
+  const y = s3aFrame('y', 52, s3aBound(role.id));
+  const dry = await bindSelection([x, y], false);
+  assert.equal(dry.candidates.length, 0);
+  assert.equal(dry.reasons['already-bound'], 2);
+});
+
+test('S-3a 연결 직전 다시 확인 — 바꿀 자리에 그 사이 다른 변수가 붙으면 already-bound · 그대로면 바꾸고 swapped', async () => {
+  const figma = installFigma();
+  await createTokens([{ name: 'spacing/52', category: 'gap', sources: ['gap'], value: 52 }], 16);
+  const g52 = findVar(figma, 'Global', 'spacing/52');
+  const prim = figma.variables.createVariableCollection('Primitives');
+  const other = figma.variables.createVariable('other-52', prim, 'FLOAT');
+  other.setValueForMode(prim.defaultModeId, 52);
+  const a = s3aFrame('a', 52, s3aBound(g52.id));
+  const b = s3aFrame('b', 52, s3aBound(g52.id));
+  registerNodes(figma, [a, b]);
+  const dry = await bindSelection([a, b], false);
+  const items = dry.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, variableId: c.variableId, newRole: c.newRole, fromId: c.fromId }));
+  assert.equal(items.length, 2);
+  b.boundVariables.itemSpacing = { type: 'VARIABLE_ALIAS', id: other.id }; // 그 사이 다른 변수
+  const r = await bindSelectedItems(items);
+  assert.equal(r.bound, 1);
+  assert.equal(r.swapped, 1);
+  assert.equal(r.reasons['already-bound'], 1);
+  assert.equal(b.boundVariables.itemSpacing.id, other.id);
+});
+
 test('새 역할 — 곳 수 많은 값이 기본 이름, 나머지는 크기 꼬리(12.5), 모든 모드에 별칭, 역할을 만들면 다시 쓴다', async () => {
   const figma = installFigma();
   await createTokens(
@@ -5795,7 +5904,7 @@ test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형의 별칭도 후�
   assert.ok(dry.candidates[0].newRole);
 });
 
-test('이미 붙은 연결(12.8 결정 B) — 아이콘의 HUG 축에 붙은 Global은 hug-fill, FIXED 축에 붙은 Global은 이미 연결됨', async () => {
+test('아이콘 크기에 붙은 플러그인 Global — HUG 축은 hug-fill, FIXED 축은 유료에서 바꿀 자리(S-3a — 12.8 결정 B를 뒤집음, ia-v4 §2.9a)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'size/24', category: 'size', sources: ['size'], value: 24 }], 16);
   const g = findVar(figma, 'Global', 'size/24');
@@ -5808,9 +5917,12 @@ test('이미 붙은 연결(12.8 결정 B) — 아이콘의 HUG 축에 붙은 Glo
   const row = { type: 'FRAME', id: 'row', name: 'row', fills: [], layoutMode: 'HORIZONTAL', itemSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, children: [icon], setBoundVariable() {} };
   icon.parent = row;
   const dry = await bindSelection([row], false);
-  assert.equal(dry.candidates.filter((c) => c.nodeId === 'icon').length, 0);
+  const ic = dry.candidates.filter((c) => c.nodeId === 'icon');
+  assert.equal(ic.length, 1);
+  assert.equal(ic[0].field, 'width');
+  assert.equal(ic[0].fromId, g.id);
   assert.ok(dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'hug-fill'));
-  assert.ok(dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'already-bound'));
+  assert.ok(!dry.skips.some((x) => x.nodeId === 'icon' && x.reason === 'already-bound'));
 });
 
 test('planExistingTextStyles · applyTextStyleRows — 스타일 줄 미리보기(쓰지 않음) · 켠 줄만 연결 · 그 사이 스타일이 붙으면 건너뜀', async () => {

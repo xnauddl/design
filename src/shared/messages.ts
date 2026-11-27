@@ -108,6 +108,8 @@ export interface BindCandidate {
   pillFrom?: number;
   /** 용도 예외(ia-v4 §2.9 S2-P3 — 유료 · 무료) — 붙이기 바로 전에 이 용도를 그 플러그인 Global(새 역할이면 가리킬 Global)에 더한다. */
   scopeAdd?: string;
+  /** Global에서 바꾸기(ia-v4 §2.9a — S-3a): 이 자리에 붙어 있던 플러그인 Global id. 연결 직전 "지금도 그 변수에만 붙음"을 다시 본다. */
+  fromId?: string;
 }
 
 /** 함께 연결하는 선택 밖 메인 컴포넌트 단위(세트는 하나 — ia-v3 §2.11 11번). */
@@ -122,6 +124,8 @@ export interface NewRoleRef {
   name: string;
   globalId: string;
   scopes: string[];
+  /** Global에서 바꾸기 폴백(ia-v4 §2.9a): 같은 이름 · 같은 값의 기존 역할은 이 원시값을 가리킬 때만 다시 쓴다(다크 모드 값 보존). */
+  rawOf?: string;
 }
 
 /**
@@ -201,7 +205,7 @@ export type UiToCode = (
   // skipTextStyleNodes: 로컬 텍스트 스타일 후보가 있는 글자의 글자 자리(fontSize · lineHeight · letterSpacing · fontFamily)는 붙이지 않는다(만들기 실행의 연결 — IA v4 §4.3).
   | { type: 'APPLY'; preview?: boolean; reqId?: number; nodeIds?: string[]; skipTextStyleNodes?: boolean; only?: { value: string | number; alpha?: number; groups: string[] }[]; off?: { value: string | number; alpha?: number; groups: string[] }[] } // preview: UX1 dry-run(바인딩 없음)
   | { type: 'PREVIEW_TEXT_STYLES'; reqId: number; nodeIds?: string[] } // 기존 스타일 연결 미리보기(IA v4 §4.2) — 쓰지 않는다
-  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string; pillFrom?: number; scopeAdd?: string }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
+  | { type: 'APPLY_SELECTED'; items: { nodeId: string; field: string; index?: number; variableId: string; newRole?: NewRoleRef; mainId?: string; pillFrom?: number; scopeAdd?: string; fromId?: string }[]; textStyles?: { styleId: string; nodeIds: string[]; mainIds?: (string | null)[] }[]; reqId?: number } // #6: 체크한 후보만 연결 — 연결 직전 자리마다 다시 확인해 바뀐 곳은 건너뛴다(§4.6)
   | { type: 'SELECT_NODES'; ids: string[] } // 스킵 사유 → 해당 레이어를 캔버스에서 선택·이동(읽기 전용)
   | { type: 'GET_VAR_TABLE' } // 변수 관리: 로컬 변수 전부(모드별 값·별칭 이름·용도·설명)
   // 변수 고치기(§4.4 고치기, PR 3.5) — 고친 것만. base = 팝업을 열 때(또는 마지막 저장 응답 뒤)의 이름과 고친 모드의 칸(값 없음은 null).
@@ -273,7 +277,7 @@ export type CodeToUi = (
   | { type: 'SELECT_RESULT'; found: number; requested: number; capped?: boolean } // 사유 칩 → 레이어 선택 결과(사라진 레이어·상한 안내)
   // roles: 새로 만든(미리보기는 만들) 쓰임 역할 수(§2.12 12.10). tokenStates · roleRows: 미리보기만(IA v4 §4.3 — roleRows.length = roles).
   | { type: 'CREATE_RESULT'; created: number; updated: number; summary: string; preview?: boolean; roles?: number; skippedManual?: number; reqId?: number; tokenStates?: Record<string, TokenState>; roleRows?: RoleRow[] }
-  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number; mains?: MainUnitInfo[]; mainsBound?: string[]; make?: { kind: string; value: string | number; alpha?: number; by: Record<string, number> }[] } // mains: 함께 걸은 선택 밖 메인 단위 · mainsBound: 실제로 붙인 메인 단위 id(ia-v3 §2.11 11번). candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
+  | { type: 'APPLY_RESULT'; bound: number; skipped: number; reasons: Record<string, number>; newRoles?: number; preview?: boolean; cancelled?: boolean; candidates?: BindCandidate[]; nodes?: BindNode[]; skips?: BindSkip[]; skipLayers?: Record<string, number>; reqId?: number; counts?: Record<string, Record<string, number>>; textStylesApplied?: number; textStylesSkipped?: number; mains?: MainUnitInfo[]; mainsBound?: string[]; make?: { kind: string; value: string | number; alpha?: number; by: Record<string, number> }[]; swapped?: number } // swapped: Global에서 바꾼 자리 수(실제 연결만 — ia-v4 §2.9a) · mains: 함께 걸은 선택 밖 메인 단위 · mainsBound: 실제로 붙인 메인 단위 id(ia-v3 §2.11 11번). candidates/nodes: 미리보기 트리(#6·#13), skips: 사유별 레이어(상한까지). APPLY_SELECTED 결과면 skipped/reasons/skips = 연결 직전 다시 확인에서 건너뛴 자리('already-bound'·'deleted-var'·'styled'·'changed'·'error', 속성 단위)
   | { type: 'PROGRESS'; op: 'bind' | 'link' | 'unused' | 'unused-delete'; done: number; total: number } // UX6: 진행률. 'bind' = 찾기(APPLY), 'link' = 연결(APPLY_SELECTED, 300곳씩), 'unused' · 'unused-delete' = 안 쓰는 변수 읽기 · 다시 확인(페이지 단위, total 0 = 불러오는 중)
   | { type: 'UNUSED_VARS'; reqId: number; items: { id: string; kind: 'none' | 'chain' }[]; pages: number; layers: number; cancelled?: true }
   | { type: 'VARIABLES_DELETED'; reqId: number; deleted: number; skipped: number; failed: number; cancelled?: true }

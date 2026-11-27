@@ -4636,6 +4636,36 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   }
 }
 
+/* B.47 S-3a Global에서 바꾸기 — 카드 1 "연결할 곳"에 바꿀 자리 · APPLY_SELECTED fromId · 연결 Toast 꼬리 · 만들기 다 됨 글 */
+{
+  const p = await open(560, 'select');
+  await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'dev' });
+  await recv(p, { ...PREREQ, tierVars: 5, otherVars: 0 });
+  await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
+  await recv(p, { ...sel(1, 0), scanned: 40, ids: ['s3a'] });
+  await p.waitForTimeout(450);
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  await recv(p, usageResult((await sent(p, 'SCAN_USAGE')).at(-1).reqId, {}));
+  // 모두 플러그인 Global에 붙은 선택 — 바꿀 자리 2곳(후보에 fromId)
+  const swapCand = (i) => cand(`w${i}`, 'itemSpacing', 'new:spacing/gap', 'spacing/gap', '52', { variableValue: '52', resolvedType: 'FLOAT', fromId: 'g52', newRole: { name: 'spacing/gap', globalId: 'g52', scopes: ['GAP'] } });
+  const wNodes = [1, 2].map((i) => ({ id: `w${i}`, name: `w${i}`, type: 'FRAME', depth: 0, parentId: null }));
+  await recv(p, { ...preview(ap.reqId), candidates: [swapCand(1), swapCand(2)], bound: 2, nodes: wNodes, reasons: {} });
+  await recv(p, tsPrev(ap.reqId));
+  await p.waitForTimeout(80);
+  const title = await p.locator('#selCards .sel-card >> nth=0').locator('.t').textContent();
+  check('B.47 카드 1 — 바꿀 자리도 "연결할 곳 2곳" · [2곳 연결]', title === '연결할 곳 2곳' && (await p.textContent('[data-k="todo-link"]')) === '2곳 연결', `${title} / ${await p.textContent('[data-k="todo-link"]')}`);
+  await p.click('[data-k="todo-link"]');
+  await p.waitForTimeout(60);
+  await p.click('#btnApplyConfirm');
+  const as = (await sent(p, 'APPLY_SELECTED')).at(-1);
+  check('B.47 연결 — APPLY_SELECTED 항목에 fromId', as?.items?.length === 2 && as.items.every((it) => it.fromId === 'g52'), JSON.stringify(as?.items?.[0]));
+  await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 2, skipped: 1, reasons: { changed: 1 }, skips: [], newRoles: 1, swapped: 2 });
+  await p.waitForTimeout(450);
+  const toastT = await toastText(p);
+  check('B.47 연결 Toast — "{n}곳 연결 · ⌘Z로 되돌리기" 바로 뒤 · 건너뜀 앞에 "Global 연결 2곳은 Semantic으로 바꿨어요"', toastT === '2곳 연결 · ⌘Z로 되돌리기 · Global 연결 2곳은 Semantic으로 바꿨어요 · 건너뜀 1', toastT);
+  await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b47-link-toast.png` : '/dev/null' }).catch(() => {});
+  await p.close();
+}
 await browser.close();
 if (fails.length) {
   console.error(`\n✗ ${fails.length}건 실패`);
