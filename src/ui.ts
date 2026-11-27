@@ -17,6 +17,7 @@ import { exportHasTokens, exportStatusTail, cssVarName, type ExportFormat } from
 import { pillOrder, leafName, lastTwo, varValueText, varTypeMark, orderCollections, tierBadge, tierWhyText, sidebarCollections, paletteGroups, paletteTree, flattenPaletteTree, varAncestorKeys, sideSelKey, normalizeVarName, nameError, groupMove, cssRename, sameCell, colorText, parseColorInput, parseNumberInput, cellInputText, resolveEditValue, aliasCandidates, type SideSel, type VarCell, type VarCollection, type VarRow, type LibraryVar, type EditValue, type PaletteNode } from './lib/varTable';
 import { varKind, APPLY_TARGETS, targetAllowed, scopeFits, scopesForNew, type ApplyTarget } from './lib/varKind';
 import { createReentryScheduler } from './lib/reread';
+import { icon } from './ui/icons';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
@@ -1432,7 +1433,6 @@ function bindFindSettle(): void {
   bindPreviewed = true;
   selFindFor = bindPreviewSel ? bindPreviewSel.join(',') : null;
   selFindInFlight = false;
-  mcNoLinkUntilFind = false; // 다시 읽은 찾기 결과 — 만든 뒤 카드의 [{o}곳 연결 →]가 생긴다(F-D14 · F-D7)
   renderBindTree();
   // 텍스트 스타일만 모습에서 후보가 없으면 첫 화면으로(§4.2 상태표).
   if (activeTab === 'select' && selSub === 'bind' && bindTsOnly() && !bindTsRows.length) showSelSub('home');
@@ -3409,7 +3409,8 @@ async function runMake(): Promise<void> {
   }
   // 다 됨 — 하위 화면을 첫 화면으로(탭은 바꾸지 않음) + 상태 줄.
   const linkOff = !link;
-  if (selSub === 'make') showSelSub('home');
+  // 포커스는 할 일 줄 첫 칸(§4.1b — 다시 읽어 ✓가 되면 같은 칸의 [변수 보기], 키 todo-make로 남음)
+  if (selSub === 'make') { showSelSub('home'); if (activeTab === 'select') selFallbackFocus(true).focus(); }
   const doneTip = totals.styles?.missing?.join('\n'); // 텍스트 스타일 알림 목록(§4.3 "글꼴")
   showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(doneTip ? { tip: doneTip } : {}), ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
 }
@@ -3634,9 +3635,14 @@ function trLead(type: TrType, hex?: string, alpha?: number): HTMLElement {
     paintSwatch(l, { kind: 'color', hex, ...(alpha != null && alpha < 1 ? { alpha } : {}) });
   } else {
     l.className = 'tr-lead vr-mk';
-    l.textContent = varTypeMark(type === 'COLOR' ? 'FLOAT' : type);
+    putTypeMark(l, type === 'COLOR' ? 'FLOAT' : type);
   }
   return l;
+}
+/** 색 아닌 줄의 종류 표시 — 숫자는 `hash` 아이콘(DS-3a S3-D11), 글자 · 참거짓은 글자(Aa · ✓). */
+function putTypeMark(el: HTMLElement, type: 'FLOAT' | 'STRING' | 'BOOLEAN', size: 'sm' | 'md' = 'md'): void {
+  if (type === 'FLOAT') { el.textContent = ''; el.dataset.mk = 'hash'; el.appendChild(icon('hash', size)); }
+  else el.textContent = varTypeMark(type);
 }
 /** 텍스트 스타일 줄 앞 "Aa"(.ts-aa — 칸 폭 16 그대로). */
 function trLeadAa(): HTMLElement {
@@ -4480,7 +4486,6 @@ function renderWaitLocks(): void {
   const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
   const varLock = varOp ? t('bind.waitOp', { op: t(opPending.get(varOp)!.label) }) : null;
   for (const id of WAIT_LINK_IDS) setWait($(id), link ?? varLock);
-  if (activeTab === 'select' && selSub === 'home' && (mcKeep() || mcNeed())) renderSelHome(); // 만들기 카드의 쓰기 잠금(§4.1)
   const other = link ? null : otherWriteOp();
   const wiz = opWizard || wizardRunning ? t('bind.waitOp', { op: t('op.wizard') }) : null;
   for (const id of WAIT_CARD_IDS) {
@@ -4501,12 +4506,9 @@ const opProgress = (): number | null => opProg;
 
 /** 조용한 다시 계산(복귀 때 미리보기) — 진행 테두리 대상이 아니다(§4.9). */
 let opSilent = false;
-/** 선택 탭 만들기 카드의 만들기(`CREATE_TOKENS`) — 작업 이름 "변수 만들기", [보기]는 선택 탭 첫 화면(§4.1 · §2.6). */
-let opCardCreate = false;
-const OP_MAKE_CARD: OpDef = { results: ['CREATE_RESULT'], label: 'op.makeCard', go: () => { showTab('select'); showSelSub('home'); }, write: true };
 function opSent(msg: UiToCode): void {
   if (wizardRunning || opSilent) return; // 마법사 단계 요청은 마법사 한 작업으로 센다
-  const def = opCardCreate && msg.type === 'CREATE_TOKENS' ? OP_MAKE_CARD : OPS[msg.type];
+  const def = OPS[msg.type];
   if (!def) return;
   opPending.set(msg.type, def);
   if (msg.type === 'APPLY_SELECTED' || msg.type === 'APPLY') opProg = null;
@@ -4794,10 +4796,25 @@ function subBack(): void {
     if (pickFrom === 'vars') { showTab('variables'); return; }
   }
   showSelSub('home');
-  const target = subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : $('selCards').querySelector<HTMLElement>('button');
-  (target ?? $('btnGoMake')).focus();
+  // 연 버튼(할 일 줄은 다시 그려져도 같은 동작 키 — 연결 todo-link · 만들기 todo-make · 이름 정리 todo-rename), 없으면 할 일 줄 첫 칸(§4.1b).
+  const key = subOpener?.dataset.k;
+  const byKey = key ? $('selCards').querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`) : null;
+  const target = byKey ?? (subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : null);
+  (target ?? selFallbackFocus(true)).focus();
 }
 $('btnSubBack').addEventListener('click', subBack);
+/** 하위 화면 아래 고정 줄(§4.1b S3-D10) — 그 아래로 내용이 깔릴 때만 data-overlapped(→ elevation-sticky). 스크롤 · 크기 바뀜 때 다시 정한다. */
+function syncFootShadow(): void {
+  const doc = document.documentElement;
+  const over = window.scrollY + window.innerHeight < doc.scrollHeight - 1;
+  for (const id of ['bindFoot', 'renameFoot', 'makeFoot']) {
+    const el = $(id);
+    el.toggleAttribute('data-overlapped', over && !!el.offsetParent);
+  }
+}
+window.addEventListener('scroll', syncFootShadow, { passive: true });
+window.addEventListener('resize', syncFootShadow);
+new ResizeObserver(syncFootShadow).observe(document.body);
 // [data-go-sub] — 선택 탭 하위 화면으로 가는 링크(위임). 카드 버튼과 같은 이동.
 document.addEventListener('click', (e) => {
   const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('[data-go-sub]');
@@ -4846,7 +4863,11 @@ TABS.forEach((tb, i) => {
     $(`tabbtn-${target}`).focus();
   });
 });
-$('btnGoMake').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showMakeScreen(e.currentTarget as HTMLElement); });
+$('btnGoMake').addEventListener('click', (e) => {
+  if (!(baseline ?? curSel).count) return;
+  if ((e.currentTarget as HTMLElement).dataset.mode === 'view') { viewSelVars(); return; } // ✓ 모습 — [변수 보기](S3-D9)
+  showMakeScreen(e.currentTarget as HTMLElement);
+});
 $('btnGoRename').addEventListener('click', (e) => { if (!(baseline ?? curSel).count) return; showSelSub('rename', e.currentTarget as HTMLElement); });
 $('btnVarEmptyMake').addEventListener('click', (e) => { if (!curSel.count) return; showMakeScreen(e.currentTarget as HTMLElement); });
 
@@ -5233,8 +5254,6 @@ function setBaseline(b: SelInfo | null): void {
   const keyChanged = baseKey() !== prevKey;
   updateEmptyLocks();
   renderMakeNoSel();
-  // 만들기 카드의 기억은 목록 기준이 바뀌면 지운다(§4.1 "끝나는 때" ①).
-  if (mcMemo && (!b || mcMemo.base !== b.ids.join(','))) { mcMemo = null; mcJust.clear(); }
   if (mcFor !== baseKey()) mcInFlight = false; // 앞 기준의 카드 읽기는 버린다(응답은 기준으로 걸러진다)
   selFindInFlight = false; // 앞 기준의 찾기는 버린다(응답은 reqId로 걸러진다)
   renderSelBase();
@@ -5383,7 +5402,7 @@ function renderSelBase(): void {
 /** [기준 바꾸기](§2.5) — 지금 선택을 기준으로 삼고 읽는다. 버튼이 사라지면 카드 영역 첫 버튼(없으면 [변수 만들기])으로. */
 function doRebase(): void {
   rebaseToCurrent();
-  ($('selCards').querySelector<HTMLElement>('button') ?? $('btnGoMake')).focus();
+  selFallbackFocus().focus();
 }
 
 /* ---------- 칩 줄 ---------- */
@@ -5801,7 +5820,7 @@ function varRowEl(v: VarRow, global: boolean, level: number): HTMLElement {
   const lead = document.createElement('span');
   lead.setAttribute('aria-hidden', 'true');
   if (v.type === 'COLOR') { lead.className = 'vr-sw'; paintSwatch(lead, cell); }
-  else { lead.className = 'vr-mk'; lead.textContent = varTypeMark(v.type); }
+  else { lead.className = 'vr-mk'; putTypeMark(lead, v.type); }
   const nm = document.createElement('span');
   nm.className = 'nm';
   const tx = document.createElement('span');
@@ -7096,6 +7115,7 @@ function newVarCollection(): VarCollection | undefined {
 /** 표가 온 뒤 할 일(새 변수 · 복제 · 삭제 뒤) — 그 항목으로 포커스 · 상세 열기. pick = 그 컬렉션을 직접 고름으로(새 변수 · 복제 — §4.9 F9). */
 let afterTable: { focus?: string; openDetail?: string; pick?: boolean } | null = null;
 function runAfterTable(): void {
+  if (viewVarsPending) { viewSelVars(); return; } // [변수 보기]를 누른 뒤 온 첫 표(§4.1b)
   const job = afterTable;
   if (!job) return;
   if (job.openDetail) {
@@ -7121,6 +7141,49 @@ function runAfterTable(): void {
       item.scrollIntoView({ block: 'nearest' });
       item.focus({ preventScroll: true });
     }
+  }
+}
+/** [변수 보기](§4.1b S3-D9) — 표가 아직 없으면 표가 온 뒤 같은 일을 한다. */
+let viewVarsPending = false;
+/** 변수 탭 목록 순서로 ids 가운데 첫 변수 — 컬렉션 순서(orderCollections) · 경로 마디 순서 · Global은 숫자 알약 다음 색 줄(renderVarList와 같음). */
+function firstVarInListOrder(ids: ReadonlySet<string>): VarRow | undefined {
+  for (const c of orderCollections(vmCols)) {
+    if (!vmVars.some((v) => v.collectionId === c.id && ids.has(v.id))) continue;
+    for (const n of flattenPaletteTree(paletteTree(vmCols, vmVars, c.id))) {
+      const rows = c.tier === 1 ? [...pillOrder(n.rows.filter((v) => v.type !== 'COLOR'), currentModeCell), ...n.rows.filter((v) => v.type === 'COLOR')] : n.rows;
+      const hit = rows.find((v) => ids.has(v.id));
+      if (hit) return hit;
+    }
+  }
+  return undefined;
+}
+/** [변수 보기] — 변수 탭으로 바꾸고, 이 선택(목록 기준)에 직접 연결된 로컬 변수 가운데 목록 순서로 첫 변수를 보이게 · 포커스.
+ *  그 컬렉션의 보이는 연결 줄 모두를 color-state-success-subtle → motion-duration-highlight에 걸쳐 원래 바탕으로(배지 없음).
+ *  쓰는 변수 결과가 없거나 연결된 로컬 변수가 없으면 탭만 바꾼다. prefers-reduced-motion이면 강조 없이 포커스만. */
+function viewSelVars(): void {
+  if (!vmTableKnown) { viewVarsPending = true; showTab('variables'); return; }
+  viewVarsPending = false;
+  const ids = new Set(usageMap ? vmVars.filter((v) => (usageMap!.get(v.id)?.places ?? 0) > 0).map((v) => v.id) : []);
+  const first = firstVarInListOrder(ids);
+  if (!first) { showTab('variables'); return; }
+  revealVar(first);
+  const items = gridItems();
+  const item = items.find((x) => x.dataset.key === `v:${first.id}`);
+  if (item) {
+    for (const x of items) x.tabIndex = -1;
+    item.tabIndex = 0;
+    item.scrollIntoView({ block: 'nearest' });
+    item.focus({ preventScroll: true });
+  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  for (const el of items) {
+    const k = el.dataset.key;
+    if (!k?.startsWith('v:') || !ids.has(k.slice(2))) continue;
+    if (vmVars.find((x) => x.id === k.slice(2))?.collectionId !== first.collectionId) continue;
+    el.classList.remove('hl-flash');
+    void el.offsetWidth; // 다시 누르면 처음부터
+    el.classList.add('hl-flash');
+    el.addEventListener('animationend', () => el.classList.remove('hl-flash'), { once: true });
   }
 }
 /** 그 변수의 컬렉션 · 그룹을 보이게(검색은 지움). */
@@ -7476,11 +7539,10 @@ let mcTokens: DraftToken[] = [];
 let mcFor: string | null = null;
 let mcPrevFor: string | null = null;
 let mcStates: Record<string, TokenState> = {};
+/** 카드 미리보기의 새로 만듦 수(유료 첫 칸 [{n}개 만들고 {p}곳 연결 →]의 n — §2.9). */
 let mcG = 0;
-let mcR: number | null = null;
 let mcExtractReq = 0;
 let mcPreviewReq = 0;
-let mcCreateReq = 0;
 /** 추출 · 미리보기를 기다린다(조용한 읽기 — OPS 밖, 진행 테두리 없음). */
 let mcInFlight = false;
 let mcSendBase = '';
@@ -7494,20 +7556,6 @@ let mcFailedFor: string | null = null;
 /** 마지막으로 미리보기를 보낸 토큰 집합(이름 · 값)과, 그 응답을 받은 집합 — 지금 보여 줄 집합과 다르면 다시 보낸다(§4.1 "만들기 카드 — 상태 5"). */
 let mcSendSig = '';
 let mcPrevSig = '';
-/** 카드가 아는 법(§4.1 "만든 뒤 카드를 남기는 때") — 성공한 만들기의 기준 · 보낸 토큰 이름(UI 메모리만). */
-let mcMemo: { base: string; names: Set<string> } | null = null;
-/** 보낸 만들기(받을 때 기준이 다르면 기억하지 않는다). */
-let mcCreating: { base: string; names: string[] } | null = null;
-/** 만든 직후 — 다시 읽기의 미리보기 전까지 "✓ 만듦"으로 세는 토큰. */
-const mcJust = new Set<string>();
-/** 만든 직후 — 다시 읽은 찾기 결과가 오기 전에는 [{o}곳 연결 →]를 그리지 않는다(F-D14 · F-D7). */
-let mcNoLinkUntilFind = false;
-/** 같은 기준에서 마지막으로 센 o(다시 읽는 동안 예전 o를 둔 채 잠근다 — F-D14). */
-let mcLastO: { base: string; o: number } | null = null;
-/** 다시 그린 뒤 옮길 포커스(만든 직후 — 다음 [＋ 만들기] → 주 버튼 → [{o}곳 연결 →]). */
-let mcFocusNext: string | null = null;
-/** 일반 규칙으로 옮긴 포커스의 키 — 그 자리에 그대로 있는 동안 [{o}곳 연결 →]가 생기면 그리로(F-D7). */
-let mcLinkFocusFrom: string | null = null;
 const mcOwned = new Set<number>();
 const mcNextReq = (): number => { const id = ++bindReqSeq; mcOwned.add(id); return id; };
 /** 고른 토큰 — 만들기 화면 Global 탭의 기본으로 켜지는 것(글자 종류 제외 — §4.3 "기본"). */
@@ -7527,23 +7575,12 @@ const mcShown = (): DraftToken[] => mcLibSplit()?.left ?? (baseline && usageMap 
 const mcSigOf = (toks: readonly DraftToken[]): string => { const libs = libDirectNow(); return JSON.stringify(toks.map((tk) => [tk.name, tk.value, tk.alpha ?? 1, libs.length ? libSameGroups(tk, libs) : []])); };
 /** 추출 중인가(같은 기준 다시 읽기 포함) — 미리보기를 기다리는 동안은 아니다. */
 const mcExtracting = (): boolean => mcInFlight && mcPreviewReq === 0;
-/** 줄 상태 — 만든 직후의 토큰은 다시 읽기 전까지 reuse(§4.1 "만든 직후"). */
-const mcState = (name: string): TokenState['state'] | undefined => (mcJust.has(name) ? 'reuse' : mcStates[name]?.state);
-const mcRemembered = (name: string): boolean => !!mcMemo && mcMemo.base === baseKey() && (mcMemo.names.has(name) || mcJust.has(name));
-/** c = 기억한 토큰 가운데 지금 reuse인 수(F-D2 · F-D8). */
-const mcMadeCount = (): number => mcTokens.filter((tk) => mcRemembered(tk.name) && mcState(tk.name) === 'reuse').length;
-/** 무료 g = 고른 토큰 가운데 new인 수. */
-const mcNewTokens = (): DraftToken[] => mcShown().filter((tk) => mcState(tk.name) === 'new');
-/** 남기는 조건(§4.1) — 무료 · 같은 기준 · 기억한 토큰 하나 이상이 reuse(c ≥ 1). */
-function mcKeep(): boolean {
-  if (isPaid || !mcMemo || !baseline || mcMemo.base !== baseKey()) return false;
-  return mcMadeCount() >= 1;
-}
-/** 카드 읽기가 필요한가 — 로컬 변수 0개(상태 5 · 6을 가리기 전) 또는 남긴 카드. */
+/** 줄 상태(미리보기 응답). */
+const mcState = (name: string): TokenState['state'] | undefined => mcStates[name]?.state;
+/** 카드 읽기가 필요한가 — 로컬 변수 0개(상태 5 · 6을 가리기 전). 만들기 카드는 미리보기만이라 남기지 않는다(DS-3a S3-D6). */
 function mcNeed(): boolean {
   if (!baseline) return false;
-  const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
-  return localZero || (!isPaid && !!mcMemo && mcMemo.base === baseKey());
+  return vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
 }
 /** 카드 읽기 — 추출(+ 결과가 오면 미리보기). 카드 1 찾기와 같은 때 · 같은 규칙(조용한 읽기 · 300개 규칙 — §4.1 "읽기"). */
 function mcRead(user = false): void {
@@ -7567,7 +7604,6 @@ function mcTakes(msg: CodeToUi): boolean {
   if (rid == null || !mcOwned.has(rid)) return false;
   if (msg.type === 'EXTRACT_RESULT' && rid === mcExtractReq) onMcExtract(msg);
   else if (msg.type === 'CREATE_RESULT' && msg.preview && rid === mcPreviewReq) onMcPreview(msg);
-  else if (msg.type === 'CREATE_RESULT' && !msg.preview && rid === mcCreateReq) onMcCreated(msg);
   else if (msg.type === 'ERROR') {
     if (rid === mcExtractReq || rid === mcPreviewReq) {
       // 추출 · 미리보기 실패 — 카드 자리만 찾기 실패 모습. 찾기 결과 · 남긴 카드의 기억은 지우지 않는다(F-D3).
@@ -7585,12 +7621,6 @@ function mcTakes(msg: CodeToUi): boolean {
         if (extractFailed) mcFor = null; // 이 기준의 추출 결과가 없다 — 같은 값 줄 없음 · 다시 읽는 중 카드는 제목 없이(상태 5 "실패" ①)
       }
       renderSelHome();
-    } else if (rid === mcCreateReq) {
-      // 만들기 실패 — 기억하지 않고 줄 · 숫자는 그대로, 공통 상태 줄 "변수 만들기 실패 · [보기]"(최소화가 아닐 때도).
-      mcCreateReq = 0;
-      mcCreating = null;
-      showStatusLine(t('status.failed', { op: t('op.makeCard') }), { cls: 'warn', tip: msg.message, action: { label: t('common.view'), run: () => { showTab('select'); showSelSub('home'); } } });
-      renderSelHome();
     }
   }
   return true;
@@ -7604,8 +7634,6 @@ function onMcExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
   const shown = mcShown();
   if (!shown.length) { // 추출 0개 · 고른 토큰 0개 · (상태 5) 남은 값 0개 — 미리보기 없음
     mcStates = {};
-    mcR = 0;
-    mcG = 0;
     mcPrevFor = mcFor;
     mcPrevSig = mcSigOf([]);
     mcInFlight = false;
@@ -7623,7 +7651,6 @@ function mcSendPreview(toks: DraftToken[]): void {
   mcSendBase = baseKey();
   mcPreviewReq = mcNextReq();
   opSilent = true;
-  // 무료도 globalOnly 없이 — r(roles)이 유료 주 버튼 · 무료 🔒 줄에 쓰인다(§4.3 "무료 — 무료 규칙 PR 뒤").
   send({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base: Number(($('base') as HTMLInputElement).value) || 16, preview: true, reqId: mcPreviewReq });
   opSilent = false;
 }
@@ -7638,7 +7665,7 @@ function mcResync(): boolean {
   const shown = mcShown();
   const sig = mcSigOf(shown);
   if (sig === mcPrevSig) return false;
-  if (!shown.length) { mcPrevSig = sig; mcG = 0; mcR = 0; return false; }
+  if (!shown.length) { mcPrevSig = sig; return false; }
   mcSendPreview(shown);
   return true;
 }
@@ -7647,67 +7674,32 @@ function onMcPreview(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
   if (mcSendBase !== baseKey()) return;
   mcPrevSig = mcSendSig;
   mcStates = msg.tokenStates ?? {};
-  mcG = msg.created + msg.updated;
-  mcR = msg.roles ?? 0;
   mcPrevFor = mcFor;
   mcFailedFor = null;
-  mcJust.clear();
-  // 끝나는 때 ② — 기억한 토큰이 하나도 reuse가 아니게 됨(⌘Z · 삭제 · 값이나 이름을 고침).
-  if (mcMemo && mcMemo.base === baseKey() && mcMadeCount() === 0) mcMemo = null;
-  renderSelHome();
-}
-/** 카드의 만들기 — new 토큰만 `globalOnly`로(OPS write · ⌘Z 한 번 — 작업 이름 "변수 만들기", [보기]는 선택 탭 첫 화면). */
-function mcCreate(toks: DraftToken[]): void {
-  if (!baseline || !toks.length) return;
-  mcCreateReq = mcNextReq();
-  mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
-  opCardCreate = true;
-  send({ type: 'CREATE_TOKENS', tokens: withoutLibGroups(toks, libDirectNow()), base: Number(($('base') as HTMLInputElement).value) || 16, reqId: mcCreateReq, globalOnly: true });
-  opCardCreate = false;
-  renderSelHome();
-}
-function onMcCreated(msg: Extract<CodeToUi, { type: 'CREATE_RESULT' }>): void {
-  mcCreateReq = 0;
-  const sent = mcCreating;
-  mcCreating = null;
-  showStatusLine(t('mkc.created', { n: msg.created }), { cls: 'ok' });
-  if (!sent || sent.base !== baseKey()) { renderSelHome(); return; } // 보낼 때와 기준이 다르면 기억하지 않는다
-  if (mcMemo && mcMemo.base === sent.base) for (const n of sent.names) mcMemo.names.add(n);
-  else mcMemo = { base: sent.base, names: new Set(sent.names) };
-  // 바로 "✓ 만듦"은 skippedManual 0일 때만 — 1 이상이면 다시 읽기의 미리보기로 정한다.
-  if (!msg.skippedManual) for (const n of sent.names) mcJust.add(n);
-  mcNoLinkUntilFind = true;
-  // 포커스 — 다음 new 줄의 [＋ 만들기] → 주 버튼 → "만든 뒤" 모습이면 [{o}곳 연결 →](없으면 일반 규칙 — F-D7).
-  const act = document.activeElement as HTMLElement | null;
-  if (act && $('selCards').contains(act)) {
-    const rows = mcRows();
-    const from = rows.findIndex((tk) => sent.names.includes(tk.name));
-    const next = rows.slice(from + 1).find((tk) => mcState(tk.name) === 'new') ?? rows.find((tk) => mcState(tk.name) === 'new');
-    mcFocusNext = next ? `mk:${next.name}` : mcNewTokens().length ? 'mkAll' : 'mkLink';
-  }
+  mcG = msg.created + msg.updated;
   renderSelHome();
 }
 /** 보이는 값 줄 — 보여 줄 토큰(거르면 남은 값)을 레이어 수 많은 순(같으면 추출 순서)으로 최대 4개. */
 function mcRows(): DraftToken[] {
   return mcShown().map((tk, i) => ({ tk, i })).sort((a, b) => (b.tk.count ?? 0) - (a.tk.count ?? 0) || a.i - b.i).slice(0, 4).map((x) => x.tk);
 }
-/** 카드 버튼의 쓰기 잠금 · 읽기 잠금(쓰기 잠금 사유가 먼저 — §4.6). */
-function mcWriteLock(): string | null {
-  if (bindLinking) return t('bind.waitLink');
-  const other = otherWriteOp();
-  return other ? t('bind.waitOp', { op: other }) : null;
-}
 /**
- * 만들기 카드 — 상태 6(keep = 남긴 카드: 상태 7의 카드 1 자리).
- * lib = 상태 5(라이브러리 변수를 쓸 때 — §4.1 "만들기 카드 — 상태 5"): 제목 "변수가 안 붙은 값 {n}곳" · 텍스트 스타일 줄은 안내 카드에 ·
- * 추출 0개 · 고른 토큰 0개 모습 없음(부르는 쪽이 남은 값 ≥ 1일 때만 부른다). n = null이면 이 기준의 추출 결과가 없음(추출 실패).
+ * 만들기 카드 — 상태 6 · 상태 5(lib — 안내 카드 아래, 제목 "변수가 안 붙은 값 {n}곳", 텍스트 스타일 줄은 안내 카드에).
+ * 미리보기만(DS-3a S3-D6): 많이 쓴 값 최대 4줄 + "외 {k}개 — 만들기 화면에서 모두 보고 골라요". 입구는 할 일 [변수 만들기] 하나.
+ * n = null이면 이 기준의 추출 결과가 없음(추출 실패).
  */
-function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n: number | null }): void {
+function renderMakeCard(put: (el: HTMLElement) => void, lib?: { n: number | null }): void {
   const base = baseKey();
-  const c = keep ? mcMadeCount() : 0;
-  const title = keep ? t('mkc.titleMade', { c }) : lib ? (lib.n != null ? t('mkc.titleLib', { n: lib.n }) : t('v4.reading')) : t('v4.noVarsFile');
+  const title = lib ? (lib.n != null ? t('mkc.titleLib', { n: lib.n }) : t('v4.reading')) : t('v4.noVarsFile');
   const findHere = selFindFor === base && !selFindInFlight;
-  // 추출 · 미리보기 실패(F-D3) — 카드 자리만 "선택을 읽지 못했어요 · [다시 읽기]". 거기서 시작한 다시 읽기는 읽는 중 카드(F-D13).
+  // 텍스트 스타일만 연결하기(§4.1) — 상태 6은 카드 본문에 "Text Style {t}곳", [{t}곳 연결]은 할 일 줄 첫 칸(S3-D2). 상태 5는 안내 카드에.
+  const tsText = (into: (content: (string | Node)[]) => void): void => {
+    const n = bindPreviewed && findHere && !lib ? tsAllNodes().size : 0;
+    if (!n) return;
+    into([t('v4.tsPlaces', { t: n })]);
+    selTodo.link = n;
+  };
+  // 추출 · 미리보기 실패(F-D3) — 카드 자리만 "선택을 읽지 못했어요 · [다시 읽기]"(카드 안 유일한 버튼). 거기서 시작한 다시 읽기는 읽는 중 카드(F-D13).
   if (mcFailedFor === base) {
     if (mcInFlight) { put(lib && lib.n == null ? selCard({ title }) : selCard({ title, subs: [t('v4.reading')] })); return; }
     const rd = selBtn(t('v4.reread'), () => {
@@ -7717,17 +7709,18 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n
       renderSelHome();
     });
     rd.dataset.k = 'mkReread';
-    put(selCard({ title: t('mkc.readFailed'), actions: [rd] }));
+    const subs: (string | Node)[] = [];
+    tsText((c) => subs.push(...c)); // 실패면 찾기 결과만으로 정한다(§4.1b "주 버튼을 정하는 때")
+    put(selCard({ title: t('mkc.readFailed'), subs, actions: [rd] }));
+    selTodo.mcDone = true;
     return;
   }
   // 보여 줄 집합이 마지막으로 미리보기한 집합과 다르면 다시 보낸다(§4.1 상태 5 "미리보기 · 만들기 토큰") — 그동안 읽는 중.
   const resending = mcResync();
   const ready = mcFor === base && mcPrevFor === base && !resending;
-  // 기억이 없는 카드는 결과 전 · 같은 기준을 조용히 다시 읽는 동안 제목 + "선택을 읽는 중…"만(라벨 · 값 줄 · 버튼 · 🔒 줄 없음).
-  if (!keep && (!ready || mcInFlight)) { put(selCard({ title, subs: [t('v4.reading')] })); return; }
-  const reading = mcInFlight; // 남긴 카드 다시 읽기 · 다시 보낸 미리보기 — 예전 줄 · 숫자를 둔 채 버튼만 잠근다(F-D14)
-  const writeLock = mcWriteLock() ?? (mcCreateReq ? t('bind.waitOp', { op: t('op.makeCard') }) : null);
-  const lockBtn = (b: HTMLButtonElement): HTMLButtonElement => { setWait(b, writeLock ?? (reading ? t('v4.reading') : null)); return b; };
+  // 결과 전 · 같은 기준을 조용히 다시 읽는 동안 제목 + "선택을 읽는 중…"만.
+  if (!ready || mcInFlight) { put(selCard({ title, subs: [t('v4.reading')] })); return; }
+  selTodo.mcDone = true;
   const card = document.createElement('div');
   card.className = 'sel-card mk';
   const tt = document.createElement('div');
@@ -7735,55 +7728,19 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n
   tt.textContent = title;
   card.appendChild(tt);
   const sub = (content: (string | Node)[]): void => { const d = document.createElement('div'); d.className = 's'; d.append(...content); card.appendChild(d); };
-  const tsLine = (hasMain: boolean): void => {
-    // 텍스트 스타일만 연결하기(§4.1) — 카드 맨 아래. 만들기 · 연결 버튼이 있으면 보조, 없으면 주 버튼. 다시 읽는 동안 뺀다.
-    const n = bindPreviewed && findHere ? tsAllNodes().size : 0;
-    if (!n || reading || lib) return; // 상태 5는 텍스트 스타일 줄을 안내 카드에 둔다(한 화면에 같은 줄은 한 번)
-    const row = document.createElement('div');
-    row.className = 'mk-ts';
-    const l = document.createElement('span');
-    l.textContent = t('v4.tsPlaces', { t: n });
-    const g = document.createElement('span');
-    g.className = 'grow';
-    const b = selBtn(t('v4.linkN', { n }), (el) => { showSelSub('bind', el); }, !hasMain);
-    b.dataset.k = 'tsLink';
-    row.append(l, g, b);
-    card.appendChild(row);
-  };
-  const more = (k: number): HTMLButtonElement => { const b = selLink(t('mkc.more', { k }), (el) => showSelSub('make', el)); b.dataset.k = 'mkMore'; return b; };
-  const lic = (): HTMLButtonElement => { const b = selLink(t('status.paidAction'), () => goToLicense()); b.dataset.k = 'mkLic'; return b; };
-  const lockLine = (text: string): void => {
-    const d = document.createElement('div');
-    d.className = 'mk-lock';
-    const s1 = document.createElement('span');
-    s1.textContent = `${text} ·`;
-    d.append(s1, lic());
-    card.appendChild(d);
-  };
-  const foot = (left: HTMLElement | null, right: HTMLElement | null): void => {
-    const d = document.createElement('div');
-    d.className = 'mk-foot';
-    const g = document.createElement('span');
-    g.className = 'grow';
-    if (left) d.appendChild(left);
-    d.appendChild(g);
-    if (right) d.appendChild(right);
-    card.appendChild(d);
-  };
-  // 추출 0개 · 고른 토큰 0개 — 라벨 · 값 줄 · 버튼 · 🔒 줄 없이(무료 · 유료 같음). 보여 줄 토큰은 거르면 남은 값(상태 5 · 거르는 남긴 카드).
+  const tsLine = (): void => tsText((c) => { const d = document.createElement('div'); d.className = 'mk-ts'; d.append(...c); card.appendChild(d); });
+  // 추출 0개 · 고른 토큰 0개 — 라벨 · 값 줄 없이. 보여 줄 토큰은 거르면 남은 값(상태 5).
   const picked = mcShown();
-  if (!mcTokens.length) { sub([t('make.zero')]); tsLine(false); put(card); return; }
-  if (!picked.length) { sub([`${t('mkc.noDefault')} · `, more(mcTokens.length)]); tsLine(false); put(card); return; }
-  const newToks = mcNewTokens();
-  const g = isPaid ? mcG : newToks.length;
-  const r = mcR ?? 0;
-  const after = !isPaid && keep && g === 0; // 만든 뒤 모습
-  sub([isPaid ? t('mkc.subPaid') : after ? t('mkc.subAfter') : t('mkc.subFree')]);
+  if (!mcTokens.length) { sub([t('make.zero')]); tsLine(); put(card); return; }
+  if (!picked.length) { sub([t('mkc.noDefault')]); tsLine(); put(card); return; }
+  sub([isPaid ? t('mkc.subPaid') : t('mkc.subFree')]);
   const lab = document.createElement('div');
   lab.className = 'mk-lab';
   lab.textContent = t('mkc.label', { name: baseLabel() });
   card.appendChild(lab);
   const rows = mcRows();
+  // 줄 상태 칸(이미 있음 · 값이 다름 · 직접 만듦)은 그런 줄이 하나라도 있을 때만 — 새로 만들 줄뿐이면 오른쪽 빈 칸을 두지 않는다
+  const tagged = !isPaid && rows.some((tk) => { const st = mcState(tk.name); return st === 'reuse' || st === 'update' || st === 'manual'; });
   for (const tk of rows) {
     const row = document.createElement('div');
     row.className = 'mk-row';
@@ -7791,7 +7748,7 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n
     const sw = document.createElement('span');
     sw.className = isColor ? 'sw' : 'sw n';
     if (isColor) { sw.style.background = tk.value as string; if (tk.alpha != null && tk.alpha < 1) sw.style.opacity = String(tk.alpha); }
-    else sw.textContent = '#';
+    else putTypeMark(sw, 'FLOAT', 'sm');
     sw.setAttribute('aria-hidden', 'true');
     const v = document.createElement('span');
     v.className = 'v';
@@ -7806,108 +7763,79 @@ function renderMakeCard(put: (el: HTMLElement) => void, keep: boolean, lib?: { n
     cnt.className = 'c';
     cnt.textContent = t('tree.places', { n: tokenFree(tk) }); // 그 값의 빈 자리 수(§2.9 — 무료 · 유료 카드 모두)
     row.append(sw, v, nm, cnt);
-    if (!isPaid) {
+    if (tagged) {
+      // 줄 상태 표시(이미 있음 · 값이 다름 · 직접 만듦) — 새로 만들 줄은 빈 칸(줄 [＋ 만들기]는 없앰 — S3-D6)
       const state = mcState(tk.name);
-      if (state === 'new') {
-        const b = lockBtn(selBtn(t('mkc.make'), () => mcCreate([tk])));
-        b.classList.add('ds-btn--sm');
-        b.dataset.k = `mk:${tk.name}`;
-        b.setAttribute('aria-label', t('mkc.makeAria', { name }));
-        row.appendChild(b);
-      } else {
-        const s = document.createElement('span');
-        s.className = 'st';
-        if (state === 'reuse' && mcRemembered(tk.name)) { s.classList.add('ok'); s.textContent = t('mkc.made'); }
-        else if (state === 'reuse') s.appendChild(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
-        else if (state === 'update') s.appendChild(mkTag(t('make.tagHas'), t('make.tagHasTip')));
-        else if (state === 'manual') s.appendChild(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
-        row.appendChild(s);
-      }
+      const s = document.createElement('span');
+      s.className = 'st';
+      if (state === 'reuse') s.appendChild(mkTag(t('make.tagReuse'), t('make.tagReuseTip')));
+      else if (state === 'update') s.appendChild(mkTag(t('make.tagHas'), t('make.tagHasTip')));
+      else if (state === 'manual') s.appendChild(mkTag(t('make.tagManual'), t('make.tagManualTip'), true));
+      row.appendChild(s);
     }
     card.appendChild(row);
   }
   const k = picked.length - rows.length;
-  if (isPaid) {
-    // [{n}개 만들고 {p}곳 연결 →] — 카드 1과 같은 글(§2.9). n = 이 카드 미리보기의 새로 만듦 수, p = 보여 줄 토큰의 빈 자리 수 합
-    // (라이브러리 같은 값 묶음 뺌) + t(지금 기준의 찾기 결과가 있으면). 만들기 화면 처음 모습의 버튼과 같은 식이다.
-    const libs = libDirectNow();
-    const p = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + linkTsPlaces();
-    // g = 0(변수 0개로 알고 있는 사이 밖에서 같은 값 변수가 생긴 경합)이면 만들기 화면 버튼 표 8번처럼 [{p}곳 연결 →](§2.9 SC-D44)
-    const go = selBtn(g > 0 ? t('v4.makeLinkN', { n: g, p }) : t('mkc.link', { o: p }), (el) => showSelSub('make', el), true);
-    go.dataset.k = 'mkGo';
-    foot(k > 0 ? more(k) : null, go);
-    tsLine(true);
-    put(card);
-    return;
-  }
-  if (!after) {
-    const all = lockBtn(selBtn(t('mkc.makeAll', { g }), () => mcCreate(mcNewTokens()), true));
-    all.dataset.k = 'mkAll';
-    foot(k > 0 ? more(k) : null, all);
-    lockLine(r > 0 ? t('mkc.lockFull', { r }) : t('mkc.lockNoSem'));
-    tsLine(true);
-    put(card);
-    return;
-  }
-  // 만든 뒤 — 🔒 Semantic {r}개(r = 0이면 없음) · 주 버튼 [{o}곳 연결 →](o = 다시 읽은 카드 1 찾기 결과의 m).
-  if (r > 0) lockLine(t('mkc.lockAfter', { r }));
-  if (findHere && !mcNoLinkUntilFind) mcLastO = { base, o: bindCardCounts().m };
-  const o = mcNoLinkUntilFind ? 0 : findHere ? mcLastO?.o ?? 0 : mcLastO?.base === base && (selFindInFlight || reading) ? mcLastO.o : 0;
-  let link: HTMLButtonElement | null = null;
-  if (o > 0) {
-    link = selBtn(t('mkc.link', { o }), (el) => showSelSub('bind', el), true);
-    link.dataset.k = 'mkLink';
-    if (!findHere || reading) setWait(link, t('v4.reading')); // 같은 기준을 다시 읽는 동안 예전 o를 둔 채 잠금
-    foot(null, link);
-  }
-  tsLine(!!link);
+  if (k > 0) { const d = document.createElement('div'); d.className = 'mk-more'; d.textContent = t('mkc.moreNote', { k }); card.appendChild(d); }
+  // 할 일 줄 첫 칸(§4.1b S3-D13) — [{n}개 만들고 {p}곳 연결 →](카드 1 · 만들기 화면과 같은 글 — §2.9). n = 무료는 고른 토큰 가운데 new 수,
+  // 유료는 이 카드 미리보기의 새로 만듦 수. p = 보여 줄 토큰의 빈 자리 수 합(라이브러리 같은 값 묶음 뺌) + t. n = 0이면 [{p}곳 연결 →](§2.9 SC-D44).
+  const g = isPaid ? mcG : picked.filter((tk) => mcState(tk.name) === 'new').length;
+  const libs = libDirectNow();
+  const pp = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + linkTsPlaces();
+  selTodo.makeGo = g > 0 ? t('v4.makeLinkN', { n: g, p: pp }) : pp > 0 ? t('mkc.link', { o: pp }) : null;
+  tsLine();
   put(card);
 }
 
+/** 할 일 줄(§4.1b S3-D1 · S3-D2) — renderSelHome이 그리는 동안 모으고, finishSelFocus가 맨 위 카드 마지막 줄로 그린다.
+ *  link = [{n}곳 연결]의 n(카드 1 m · 텍스트 스타일 t — 0이면 없음) · makeGo = 첫 칸 만들기 입구의 글([{n}개 만들고 {p}곳 연결 →] — 있으면 [변수 만들기] 대신, S3-D13) · view = ✓ 모습([변수 보기]) ·
+ *  wait = 상태 5 · 6(찾기 + 만들기 카드의 추출 · 미리보기가 모두 온 뒤 정함) · mcDone = 만들기 카드 결과(실패 · 미리보기 없음 포함)가 옴. */
+const selTodo: { link: number; makeGo: string | null; view: boolean; wait: boolean; mcDone: boolean } = { link: 0, makeGo: null, view: false, wait: false, mcDone: false };
+/** 맨 위 카드 머리(선택 이름 · [다시 읽기]) — renderSelHome이 만들고 finishSelFocus가 맨 위 카드 첫 줄로 넣는다. */
+let selHeadEl: HTMLElement | null = null;
+const SEL_TOOLS = $('selTools');
+
 function renderSelHome(): void {
   if (activeTab !== 'select' || selSub !== 'home' || !curSel) return;
-  const head = $('selHead');
   const cards = $('selCards');
-  // 카드 영역 안 버튼에 포커스가 있었으면 그 data-k를 기억 — 없는 버튼(data-k 없음)은 ''로(대체 규칙만 탄다).
-  let hadFocus = cards.contains(document.activeElement) ? (document.activeElement as HTMLElement).dataset.k ?? '' : null;
-  // 만든 직후 · 만든 뒤 모습으로 바뀔 때의 포커스(§4.1 만들기 카드 "포커스" — F-D7).
-  if (mcFocusNext && hadFocus !== null) { hadFocus = mcFocusNext; }
-  if (hadFocus === null && mcLinkFocusFrom === 'btnGoMake' && document.activeElement === $('btnGoMake')) hadFocus = 'btnGoMake';
-  mcFocusNext = null;
-  if (mcMemo && isPaid) { mcMemo = null; mcJust.clear(); } // 유료가 됨 — 남기지 않는다(끝나는 때 ③)
-  clearMount(head);
+  // 카드 영역 안 버튼에 포커스가 있었으면 그 data-k와 할 일 줄 칸 번호를 기억 — 없는 버튼(data-k 없음)은 ''로(대체 규칙만 탄다).
+  const act = document.activeElement as HTMLElement | null;
+  const hadFocus = act && cards.contains(act) ? act.dataset.k ?? '' : null;
+  const slot = act && SEL_TOOLS.contains(act) ? Array.from(SEL_TOOLS.querySelectorAll('button')).indexOf(act as HTMLButtonElement) : -1;
+  $('selHome').appendChild(SEL_TOOLS); // 카드를 지우기 전에 할 일 줄을 빼 둔다(늘 있는 요소 — 맨 위 카드로 다시 옮긴다)
   clearMount(cards);
+  Object.assign(selTodo, { link: 0, makeGo: null, view: false, wait: false, mcDone: false });
   const noSel = !baseline;
-  // 할 일(§4.1) — 목록 기준이 없으면 잠금.
+  // 할 일 — 목록 기준이 없으면 잠금.
   for (const id of ['btnGoMake', 'btnGoRename']) setLock($(id), (baseline ?? curSel).count ? null : 'prereq', t('status.noSelection'));
-  // 머리 줄
+  // 머리(S3-D3) — 선택 이름 · 기준이 지금 선택과 다르면 [다시 읽기](S3-D4)
+  selHeadEl = null;
   if (baseline) {
+    const h = document.createElement('div');
+    h.className = 'sel-card-head';
     const b = document.createElement('b');
     b.textContent = baseLabel();
     b.title = baseLabel();
-    head.append(b);
+    h.append(b);
     if (baseDiffers()) {
-      const diff = document.createElement('span');
-      diff.className = 'sel-diff';
-      diff.append(t('v4.baseDiff') + ' · ');
       const rb = selLink(t('list.rebase'), () => doRebase());
       rb.dataset.k = 'rebase';
-      diff.appendChild(rb);
-      head.appendChild(diff);
+      const tip = curSel.count ? t('v4.rebaseTip') : t('v4.rebaseTipEmpty');
+      rb.setAttribute('aria-label', tip);
+      rb.title = tip;
+      h.appendChild(rb);
     }
+    selHeadEl = h;
   }
   const put = (el: HTMLElement): void => { cards.appendChild(el); };
+  const done = (): void => finishSelFocus(hadFocus, slot);
   const localZero = vmTableKnown ? localVarCount() === 0 : prereqKnown && prereqLocalVars === 0;
   // 1 첫 정보 전
-  if (!vmTableKnown && !prereqKnown) { put(selCard({ title: t('v4.loading') })); return finishSelFocus(hadFocus); }
-  // 2 선택 없음
+  if (!vmTableKnown && !prereqKnown) { put(selCard({ title: t('v4.loading') })); return done(); }
+  // 2 선택 없음 — 그 글을 제목으로 하는 카드 하나 + 할 일 줄(§4.1b)
   if (noSel) {
-    const d = document.createElement('div');
-    d.className = 'sel-empty';
-    d.textContent = t('v4.noSel');
-    if (localZero) { const sd = document.createElement('div'); sd.className = 'sub'; sd.textContent = t('v4.noVarsFile'); d.appendChild(sd); }
-    put(d);
-    return finishSelFocus(hadFocus);
+    put(selCard({ title: t('v4.noSel'), subs: localZero ? [t('v4.noVarsFile')] : [] }));
+    return done();
   }
   // 3 큰 선택, 아직 안 읽음
   const findReady = selFindFor === baseKey() && !selFindInFlight;
@@ -7915,88 +7843,118 @@ function renderSelHome(): void {
   if (baseline!.scanned > BIG_SELECTION && !findReady && !usageReady && !selFindInFlight) {
     const rd = selBtn(t('list.read'), () => { requestManagerUsage('user'); readSelFind(true, true); mcRead(true); });
     rd.dataset.k = 'read';
-    const c = selCard({ title: t('list.big'), actions: [rd] });
-    put(c);
-    return finishSelFocus(hadFocus);
+    put(selCard({ title: t('list.big'), actions: [rd] }));
+    return done();
   }
   const counts = findReady ? bindCardCounts() : null;
   const reading = (): HTMLElement => selCard({ title: t('v4.reading') });
   // 5 · 6 로컬 변수 0개 — 쓰는 변수 결과가 온 뒤 가린다(오기 전에는 4 읽는 중).
   if (localZero) {
     mcKick(); // 만들기 카드 읽기는 쓰는 변수 결과를 기다리지 않는다(§4.1 "읽기")
-    if (!usageReady) { put(reading()); return finishSelFocus(hadFocus); }
+    if (!usageReady) { put(reading()); return done(); }
+    selTodo.wait = true;
     const libDirect = libDirectNow();
     if (libDirect.length) {
-      // 상태 5(§4.1 "만들기 카드 — 상태 5") — 안내 카드(같은 값 줄 → 텍스트 스타일 줄) → 남은 값 ≥ 1이면 만들기 카드 → 쓰는 변수 → 카드 3.
+      // 상태 5 — 안내 카드(같은 값 줄 → 텍스트 스타일 줄) → 남은 값 ≥ 1이면 만들기 카드 → 카드 3.
       const base = baseKey();
       const split = mcFor === base ? mcLibSplit() : null; // 이 기준의 추출 결과가 오기 전에는 판정하지 않는다
-      // 만들기 카드 자리: 추출 · 미리보기 실패 모습(남은 값을 모르거나 ≥ 1), 아니면 남은 값 ≥ 1일 때만. 추출 결과 전에는 없음.
       const makeShown = mcFailedFor === base ? !split || split.left.length > 0 : !!split && split.left.length > 0;
+      // 만들기 카드가 없으면(남은 값 0) 추출 · 미리보기는 끝난 것이다 — 미리보기를 보내지 않음(§4.1b "주 버튼을 정하는 때").
+      if (!makeShown && split && !mcInFlight) selTodo.mcDone = true;
+      if (mcFailedFor === base && !mcInFlight) selTodo.mcDone = true;
       const subs: (string | Node)[] = [];
-      const actions: HTMLElement[] = [];
-      // 같은 값 줄 — 추출 결과가 온 뒤 · 같은 기준을 다시 추출하는 동안은 뺀다.
       if (split && split.L > 0 && !mcExtracting()) subs.push(t('v4.libSame', { k: split.L }));
-      // 텍스트 스타일 줄 — 찾기만 실패하면 뺀다(안내 카드는 그대로, 상태 5 "실패" ③). 만들기 카드가 보이면 [{t}곳 연결]은 보조.
-      if (!bindFindFailed) tsOnlyExtra(subs, actions, makeShown);
-      put(selCard({ title: t('v4.libOnly'), subs, actions }));
-      if (makeShown) renderMakeCard(put, false, { n: split ? split.n : null });
-      renderUsesCard(put);
+      // 텍스트 스타일 줄 — 찾기만 실패하면 뺀다(상태 5 "실패" ③).
+      if (!bindFindFailed) tsOnlyExtra(subs);
+      put(selCard({ title: t('v4.libOnly'), subs }));
+      if (makeShown) renderMakeCard(put, { n: split ? split.n : null });
     } else {
-      // 상태 6 — 만들기 카드(§4.1, 무료 규칙 F3). 할 일 [변수 만들기]는 상태 6에서 늘 보조.
-      renderMakeCard(put, mcKeep());
+      // 상태 6 — 만들기 카드(미리보기만)가 맨 위 카드.
+      renderMakeCard(put);
     }
     renderDeletedCard(put);
-    return finishSelFocus(hadFocus);
+    return done();
   }
-  // 7 카드들 — 만든 뒤 남긴 카드면 카드 1 자리가 만들기 카드(§4.1 "만든 뒤 카드를 남기는 때").
-  if (mcKeep()) renderMakeCard(put, true);
-  else renderFindCard(put, counts);
-  renderUsesCard(put);
+  // 7 카드들
+  renderFindCard(put, counts);
   renderDeletedCard(put);
-  finishSelFocus(hadFocus);
+  done();
 }
-/** 할 일 [변수 만들기]는 늘 보조다(§4.1 · §2.9 — 할 일이 있는 카드에는 주 버튼이 늘 있다: [{n}개 만들고 {p}곳 연결 →] · [{m}곳 연결] · 만들기 카드의 버튼). */
-function updateMakeEmphasis(): void {
-  $('btnGoMake').classList.remove('primary', 'ds-btn--primary');
+/** 할 일 줄을 맨 위 카드 마지막 줄로(§4.1b) — 첫 칸이 늘 주 버튼 자리(S3-D2). 머리는 맨 위 카드 첫 줄로(S3-D3). */
+function buildSelTop(): void {
+  const top = $('selCards').querySelector<HTMLElement>(':scope > .sel-card');
+  const make = $('btnGoMake') as HTMLButtonElement;
+  const rename = $('btnGoRename') as HTMLButtonElement;
+  SEL_TOOLS.querySelector('[data-k="todo-link"]')?.remove();
+  // 상태 5 · 6은 찾기와 만들기 카드의 추출 · 미리보기가 모두 온 뒤 정한다 — 실패도 온 것(§4.1b).
+  const findArrived = !selFindInFlight && (selFindFor === baseKey() || bindFindFailed);
+  const settled = !selTodo.wait || (findArrived && selTodo.mcDone);
+  const linkN = settled ? selTodo.link : 0;
+  const view = selTodo.view;
+  // 만들기가 주인 모습(카드 1 n > 0 · 만들기 카드 보여 줄 토큰 ≥ 1)이면 [변수 만들기] 칸이 [{n}개 만들고 {p}곳 연결 →]가 된다(같은 만들기 입구 — S3-D13).
+  const makeGo = settled && baseline ? selTodo.makeGo : null;
+  make.textContent = view ? t('v4.viewVars') : makeGo ?? t('make.title');
+  make.title = make.textContent;
+  make.dataset.mode = view ? 'view' : 'make';
+  rename.title = rename.textContent ?? '';
+  let primary: HTMLButtonElement | null = null;
+  if (makeGo) {
+    SEL_TOOLS.insertBefore(make, SEL_TOOLS.firstChild);
+    primary = make;
+  } else if (linkN > 0) {
+    const go = selBtn(t('v4.linkN', { n: linkN }), (el) => { showSelSub('bind', el); }, true);
+    go.dataset.k = 'todo-link';
+    go.classList.add('ds-btn--lg');
+    go.title = go.textContent ?? '';
+    SEL_TOOLS.insertBefore(go, make);
+    primary = go;
+  } else if (view) primary = make;
+  for (const b of [make, rename]) { const on = b === primary; b.classList.toggle('primary', on); b.classList.toggle('ds-btn--primary', on); }
+  if (!top) return;
+  top.classList.add('top');
+  // 본문(제목 · 둘째 줄 · 상태 버튼)을 한 묶음으로 — 머리 · 본문 · 할 일 줄 사이 space-4(카드 lg — §4.1b "카드 치수")
+  const body = document.createElement('div');
+  body.className = 'sel-body';
+  body.append(...Array.from(top.childNodes));
+  top.append(body);
+  if (selHeadEl) top.prepend(selHeadEl);
+  top.appendChild(SEL_TOOLS);
 }
-/** 다시 그린 뒤 포커스(§4.1 할 일) — 같은 버튼, 없으면 카드 영역 첫 버튼, 그것도 없으면 할 일 [변수 만들기].
-    없어진 것이 [연결 풀기]면 바로 [변수 만들기]. 버튼 강약은 포커스와 상관없이 늘 먼저 정한다. */
-function finishSelFocus(key: string | null): void {
-  updateMakeEmphasis();
-  if (key === null) { mcLinkFocusFrom = null; return; }
+/** 대체 포커스(§4.1b "포커스") — 카드 영역 위에서 첫 버튼(머리 [다시 읽기] 제외), 끝 자리는 할 일 줄 첫 칸. */
+function selFallbackFocus(skipCards = false): HTMLElement {
+  const first = SEL_TOOLS.querySelector<HTMLElement>('button') ?? $('btnGoMake');
+  if (skipCards) return first;
+  return $('selCards').querySelector<HTMLElement>('button:not([data-k="rebase"])') ?? first;
+}
+/** 다시 그린 뒤 포커스(§4.1b) — 같은 data-k(할 일 줄은 동작 키 todo-link · todo-make · todo-rename), 할 일 줄에서 같은 키가 없으면
+ *  같은 칸 번호(줄었으면 마지막 칸), 그 밖에는 대체 포커스. 없어진 것이 [연결 풀기]면 바로 할 일 줄 첫 칸. */
+function finishSelFocus(key: string | null, slot = -1): void {
+  buildSelTop();
+  if (key === null) return;
   const cards = $('selCards');
-  // F-D7 — 만든 직후 일반 규칙으로 옮긴 포커스가 그 자리에 있는 동안 [{o}곳 연결 →]가 생기면 그리로.
-  const link = cards.querySelector<HTMLElement>('[data-k="mkLink"]');
-  if (mcLinkFocusFrom !== null) {
-    if (link && key === mcLinkFocusFrom) key = 'mkLink';
-    if (link || key !== mcLinkFocusFrom) mcLinkFocusFrom = null;
-  }
-  const same = key === 'btnGoMake' ? $('btnGoMake') : key ? cards.querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`) : null;
-  const target = same ?? (key === 'unbind' ? null : cards.querySelector<HTMLElement>('button')) ?? $('btnGoMake');
-  if (key === 'mkLink' && !same) mcLinkFocusFrom = target.dataset.k ?? target.id ?? ''; // 아직 없음 — 일반 규칙으로, 생기면 옮긴다
-  target.focus({ preventScroll: true });
+  const same = key ? cards.querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`) : null;
+  let target = same;
+  if (!target && slot >= 0) { const bs = Array.from(SEL_TOOLS.querySelectorAll<HTMLElement>('button')); target = bs[Math.min(slot, bs.length - 1)] ?? null; }
+  (target ?? selFallbackFocus(key === 'unbind')).focus({ preventScroll: true });
 }
 /** 로컬 변수 0개인데 이 기준의 카드 읽기가 없으면 시작한다(쓰는 변수 결과를 기다리지 않는다 — §4.1 "읽기"). */
 function mcKick(): void {
   if (!baseline || mcInFlight || mcFor === baseKey() || mcFailedFor === baseKey() || (baseline.scanned > BIG_SELECTION && mcDeferUserFor !== baseKey())) return;
   queueMicrotask(() => { if (!mcInFlight && mcFor !== baseKey()) { mcRead(); if (mcInFlight) renderSelHome(); } });
 }
-/** 텍스트 스타일만 연결하기(§4.1) — 5 · 6번 카드 안에 "텍스트 스타일 {t}곳" + [{t}곳 연결]. */
-function tsOnlyExtra(subs: (string | Node)[], actions: HTMLElement[], secondary = false): void {
+/** 텍스트 스타일만 연결하기(§4.1) — 상태 5 안내 카드 안에 "Text Style {t}곳", [{t}곳 연결]은 할 일 줄 첫 칸(§4.1b S3-D2). */
+function tsOnlyExtra(subs: (string | Node)[]): void {
   const n = bindPreviewed && selFindFor === baseKey() ? tsAllNodes().size : 0;
   if (!n) return;
   subs.push(t('v4.tsPlaces', { t: n }));
-  // secondary — 상태 5에서 만들기 카드가 보이면(읽는 중 · 실패 모습 포함) 보조: 주 버튼은 만들기 카드의 만들기 버튼(§4.1 상태 5).
-  const b = selBtn(t('v4.linkN', { n }), (el) => { showSelSub('bind', el); }, !actions.length && !secondary);
-  b.dataset.k = 'tsLink';
-  actions.push(b);
+  selTodo.link = n;
 }
 /** 연결 · 만들기 실행이 끝날 때 붙인 메인 단위를 기억한다(§4.1 결정 B) — 0이면 지운다. */
 function rememberMainsBound(ids: readonly string[], base: string | null = baseline ? baseKey() : null): void {
   const uniq = [...new Set(ids)];
   lastMainsBound = uniq.length && base ? { base, ids: uniq } : null;
 }
-/** 카드 1 — 연결할 곳 · 새로 만들 값(§4.1 · §2.9 "화면별 문구"). */
+/** 카드 1 — 연결할 곳 · 새로 만들 값(§4.1 · §2.9 "화면별 문구"). 주 버튼은 할 일 줄 첫 칸(§4.1b S3-D13). */
 function renderFindCard(put: (el: HTMLElement) => void, counts: BindCardCounts | null): void {
   if (!counts) {
     put(selCard({ title: t('v4.find0'), subs: [t('v4.reading')] }));
@@ -8017,17 +7975,23 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: BindCardCounts |
     return card;
   };
   const markMains = (els: HTMLElement[]): HTMLElement[] => { for (const e of els) e.dataset.mains = '1'; return els; };
-  // m = n = 0 — 후보 없는 글자 자리만 남아도 이 모습이다(따로 표시하지 않는다, SC-D32 ⑥).
+  // m = n = 0 — 후보 없는 글자 자리만 남아도 이 모습이다(SC-D32 ⑥). 할 일 첫 칸 [변수 보기](주 — S3-D9). 카드 바탕은 보통 카드.
   if (m === 0 && n === 0 && s === 0) {
+    selTodo.view = true;
     const mb = markMains(boundMains());
-    put(mainsSub(selCard({ title: t('v4.allBound'), cls: 'ok', subs: mb })));
+    put(mainsSub(selCard({ title: t('v4.allBound'), cls: 'done', subs: mb })));
     return;
   }
   if (m === 0 && n === 0) {
+    selTodo.view = true;
+    // 손볼 곳 [보기]는 둘째 줄 끝 링크(할 일 줄에 넣지 않는다 — §4.1b 표)
     const v = selLink(t('v4.view'), (el) => { bindSkipsOpen = true; showSelSub('bind', el); renderBindTree(); });
     v.dataset.k = 'skips';
+    const fix = document.createElement('span');
+    fix.className = 'fix-line';
+    fix.append(`${t('v4.fixPlaces', { s })} · `, v);
     const mb = markMains(boundMains());
-    put(mainsSub(selCard({ title: t('v4.allLinked'), subs: [...mb, t('v4.fixPlaces', { s })], actions: [v] })));
+    put(mainsSub(selCard({ title: t('v4.allLinked'), cls: 'done', subs: [...mb, fix] })));
     return;
   }
   lastMainsBound = null; // ✓가 아님 — 기억을 지운다(한 번 지우면 그 뒤 ✓가 돼도 보이지 않는다)
@@ -8041,43 +8005,14 @@ function renderFindCard(put: (el: HTMLElement) => void, counts: BindCardCounts |
     sub.textContent = parts.join(' · ');
     subs.push(sub);
   }
-  // 버튼: 새로 만들 값이 있으면 [{n}개 만들고 {p}곳 연결 →](만들기 화면으로 — [{m}곳 연결]은 두지 않는다), 없으면 [{m}곳 연결](연결 화면으로).
-  const actions: HTMLElement[] = [];
-  if (n > 0) {
-    const go = selBtn(t('v4.makeLinkN', { n, p }), (el) => { showSelSub('make', el); }, true);
-    go.dataset.k = 'makeLink';
-    actions.push(go);
-  } else {
-    const go = selBtn(t('v4.linkN', { n: m }), (el) => { showSelSub('bind', el); }, true);
-    go.dataset.k = 'link';
-    actions.push(go);
-  }
+  // 주 버튼은 할 일 줄 첫 칸(§4.1b S3-D13): n > 0 → [{n}개 만들고 {p}곳 연결 →](만들기 화면 — [변수 만들기]는 두지 않음), n = 0 → [{m}곳 연결].
+  if (n > 0) selTodo.makeGo = t('v4.makeLinkN', { n, p });
+  else selTodo.link = m;
   // 메인 컴포넌트 줄(§4.1) — m > 0 · c > 0이면 둘째 줄 아래 회색 줄 + 툴팁(메인 단위 이름 — 페이지).
   const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
   if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
-  const card = mainsSub(selCard({ title, subs, actions }));
+  const card = mainsSub(selCard({ title, subs }));
   (card.querySelector('.t') as HTMLElement).title = t('v4.findTip');
-  put(card);
-}
-/** 카드 2 — 쓰는 변수(직접만, §4.1). */
-function renderUsesCard(put: (el: HTMLElement) => void): void {
-  if (!usageMap) { put(selCard({ title: t('v4.usesTitle0'), subs: [t('v4.reading')] })); return; }
-  const local = vmVars.filter((v) => (usageMap!.get(v.id)?.places ?? 0) > 0);
-  const lib = libVars.filter((l) => (usageMap!.get(l.id)?.places ?? 0) > 0);
-  const n = local.length + lib.length;
-  if (!n) return;
-  const tierN = new Map<string, number>();
-  for (const v of local) {
-    const c = vmCols.find((x) => x.id === v.collectionId);
-    const key = c?.tier === 3 ? 'Component' : c?.tier === 2 ? 'Semantic' : c?.tier === 1 ? 'Global' : t('v4.noTierName');
-    tierN.set(key, (tierN.get(key) ?? 0) + 1);
-  }
-  if (lib.length) tierN.set(t('v4.libName'), lib.length);
-  const order = ['Component', 'Semantic', 'Global', t('v4.noTierName'), t('v4.libName')];
-  const sub = order.filter((k) => tierN.get(k)).map((k) => `${k} ${tierN.get(k)}`).join(' · ');
-  // 안내만 — 버튼 없음(IA v4 §4.1 카드 2 · §4.6 "쓰는 변수 필터 — 없앰").
-  const card = selCard({ title: t('v4.usesN', { n }), subs: [sub] });
-  (card.querySelector('.t') as HTMLElement).title = t('v4.usesTip');
   put(card);
 }
 /** 카드 3 — 삭제된 변수(§4.1) · [선택] · [연결 풀기]. */
@@ -8106,9 +8041,9 @@ function onDeletedUnbound(msg: Extract<CodeToUi, { type: 'DELETED_UNBOUND' }>): 
   showStatusLine(text, { cls: msg.failed ? 'warn' : 'ok' });
   const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t('v4.unbindFail.' + k)} ${n}`).join(' · ');
   if (tip) $('statusText').title = tip;
-  // 카드가 사라지면 포커스는 [변수 만들기](§4.1).
-  if (document.activeElement === document.body || !document.activeElement?.isConnected) $('btnGoMake').focus();
-  queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) $('btnGoMake').focus(); });
+  // 카드가 사라지면 포커스는 할 일 줄 첫 칸(§4.1b "포커스").
+  if (document.activeElement === document.body || !document.activeElement?.isConnected) selFallbackFocus(true).focus();
+  queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) selFallbackFocus(true).focus(); });
 }
 
 /* ---------- 첫 화면 — 변수 탭(IA v3) ----------
