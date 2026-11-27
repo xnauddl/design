@@ -3833,7 +3833,7 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
   await goSub(p, 'pick');
   await p.click('#makeRail [data-make-step="theme"]');
   check('40 다크 카드 — 고르개 없음(#darkCollection · #darkFromMode · #darkToMode 0개)', (await p.$$('#darkCollection, #darkFromMode, #darkToMode')).length === 0 && (await visible(p, '#darkCard')));
-  check('40 안내 글 · 툴팁(dark.hint · dark.hintTip)', (await p.textContent('#darkCard .hint')) === 'Global 색의 밝기를 뒤집어 Dark 칸에 채워요' && (await p.getAttribute('#darkCard .hint', 'title')) === '색상 · 채도는 그대로 두고 밝기만 뒤집어요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.');
+  check('40 안내 글 · 툴팁(dark.hint · dark.hintTip)', (await p.textContent('#darkCard .hint')) === 'Global 색을 다크에 맞게 바꿔 Dark 칸에 채워요' && (await p.getAttribute('#darkCard .hint', 'title')) === '연한 배경 · 짙은 글자 색은 밝기를 뒤집고, 강조색은 밝기를 지켜 조금 밝게 해요. 회색은 푸른 기를 줄여요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.');
   const vi = (id, colId, col, owned, tier, modes) => ({ id, name: `color/${id}`, collectionId: colId, collection: col, tier, owned, modes });
   const SEMV = vi('s1', 's', 'Semantic', 'semantic', 2, [{ modeId: 'l', name: 'Light' }]);
   const SEMV3 = vi('s1', 's', 'Semantic', 'semantic', 2, [{ modeId: 'l', name: 'Light' }, { modeId: 'd', name: 'Dark' }, { modeId: 'b', name: 'Brand' }]);

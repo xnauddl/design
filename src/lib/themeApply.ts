@@ -86,6 +86,18 @@ function cellKey(raw: unknown): string | null {
   if (isVariableAlias(raw)) return `alias:${raw.id}`;
   return hex8(raw);
 }
+/**
+ * from 칸 색 → 쓸 Dark 값(ia-v3 13.7 "Dark 값 공식") — 공식은 색만 바꾸고 투명도는 from 칸 그대로(§2.11 "반투명 색 토큰").
+ * 쓰기(`writeCalc`)와 "지금 공식 값" 견주기(A.29)가 같은 계산을 쓴다.
+ */
+export function calcDarkValue(light: RGB | RGBA): RGBA {
+  const la = typeof (light as RGBA).a === 'number' ? (light as RGBA).a : 1;
+  return { ...hexToRgb(darkValueForLight(rgbToHex(light))), a: la };
+}
+/** 지금 공식 값의 `#RRGGBBAA` — 기록 `d`와 견준다(공식이 바뀐 calc 칸 찾기, 13.7 칸마다 판정). */
+export function calcDarkHex8(light: RGB | RGBA): string {
+  return hex8(calcDarkValue(light))!;
+}
 function rgbaOfHex8(h: string): RGBA {
   const n = parseInt(h.slice(1, 7), 16);
   const a = parseInt(h.slice(7, 9), 16);
@@ -344,10 +356,8 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
     const targets = darkTargets(global, vars, from);
     const fromHexOf = (v: Variable) => hex8(v.valuesByMode[from])!;
     const writeCalc = (v: Variable, rec: DarkFillRecord): void => {
-      const light = v.valuesByMode[from] as RGBA;
-      const la = typeof light.a === 'number' ? light.a : 1;
-      // 밝기만 바꾸고 투명도는 그대로(ia-v3 §2.11 "반투명 색 토큰")
-      v.setValueForMode(to, { ...hexToRgb(darkValueForLight(rgbToHex(light))), a: la });
+      // 공식은 색만 바꾸고 투명도는 그대로(ia-v3 13.7 "Dark 값 공식" · §2.11 "반투명 색 토큰")
+      v.setValueForMode(to, calcDarkValue(v.valuesByMode[from] as RGBA));
       rec[to] = { f: from, l: fromHexOf(v), d: hex8(v.valuesByMode[to]) ?? '', by: 'calc' };
       writeDarkFill(v, rec);
       filled++;
@@ -376,7 +386,8 @@ export async function generateDarkMode(migrate?: boolean): Promise<DarkModeResul
           continue;
         }
         const fStale = !modeIds.has(entry.f) || hex8(v.valuesByMode[entry.f]) !== entry.l || from !== entry.f;
-        if (fStale) writeCalc(v, rec);
+        // 공식이 바뀐 calc 칸(d ≠ 지금 공식 값)도 다시 쓴다(DK-D2 — 13.7 칸마다 판정 · A.29). 수 세기(countDarkUnfilled)는 세지 않는다.
+        if (fStale || entry.d !== calcDarkHex8(v.valuesByMode[from] as RGBA)) writeCalc(v, rec);
         continue;
       }
       // 기록 없음

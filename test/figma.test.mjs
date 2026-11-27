@@ -8855,6 +8855,32 @@ test('다크 D-T1 — darkUnfilled: 기록 없음 · calc인데 f 칸 바뀜 · 
   assert.equal(await f.unfilled(), 2, '열쇠 모드가 없어진 기록뿐');
 });
 
+test('DK-1 다시 누름 — 옛 공식으로 채운 calc 칸은 새 공식 값으로(n) · user 칸(직접 고친 · 옮긴)은 그대로(k) · 새 값과 같은 calc는 세지 않음 · darkUnfilled는 옛 공식 칸을 세지 않음 (ia-v3 13.7 · A.29)', async () => {
+  const f = darkFixture();
+  const blue = f.mkGlobal('color/blue/500', '#3b82f6');
+  const white = f.mkGlobal('color/gray/0', '#ffffff');
+  const mine = f.mkGlobal('color/red/500', '#ef4444');
+  const d = f.global.addMode('Dark');
+  // 옛 공식 값(#0654C4)을 Dark 칸과 기록 d 모두에 — 하나만 다르면 user로 바뀐다
+  blue.setValueForMode(d, hexToRgb('#0654c4'));
+  blue.setPluginData(DARK_FILL_KEY, JSON.stringify({ [d]: { f: f.L, l: '#3B82F6FF', d: '#0654C4FF', by: 'calc' } }));
+  // 흰색은 옛 · 새 공식이 같은 값(#121212) — 세지 않음
+  white.setValueForMode(d, hexToRgb('#121212'));
+  white.setPluginData(DARK_FILL_KEY, JSON.stringify({ [d]: { f: f.L, l: '#FFFFFFFF', d: '#121212FF', by: 'calc' } }));
+  // 옮기기 ③ · 직접 고친 칸 — user는 옛 공식 색이어도 그대로
+  mine.setValueForMode(d, hexToRgb('#ab0018'));
+  mine.setPluginData(DARK_FILL_KEY, JSON.stringify({ [d]: { f: f.L, l: '#EF4444FF', d: '#AB0018FF', by: 'user' } }));
+  assert.equal(await f.unfilled(), 0, '옛 공식 calc 칸은 Dark 값이 있음(띠에 나오지 않음)');
+  const r = await generateDarkMode();
+  assert.deepEqual(r, { filled: 1, kept: 1, targets: 3, changed: true });
+  assert.equal(f.D(blue, d), '#609dff');
+  assert.deepEqual(f.rec(blue)[d], { f: f.L, l: '#3B82F6FF', d: '#609DFFFF', by: 'calc' });
+  assert.equal(f.D(white, d), '#121212');
+  assert.equal(f.D(mine, d), '#ab0018', 'user 칸은 그대로');
+  const r2 = await generateDarkMode();
+  assert.deepEqual(r2, { filled: 0, kept: 1, targets: 3, changed: false }, '다시 누르면 upToDate');
+});
+
 test('다크 D-T1 — createTokens: 새로 만든 변수(색 · 색 아님)는 모든 모드에 같은 값, 이미 있는 변수 값 바꾸기는 기본 모드만(13.7 "나중에 만든 Global")', async () => {
   const f = darkFixture();
   f.global.setPluginData('dsl.owned', 'global');

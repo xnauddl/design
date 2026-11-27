@@ -71,8 +71,8 @@
     // 마법사
     // 다크 테마 생성
     "dark.title": "\uB2E4\uD06C \uBAA8\uB4DC",
-    "dark.hint": "Global \uC0C9\uC758 \uBC1D\uAE30\uB97C \uB4A4\uC9D1\uC5B4 Dark \uCE78\uC5D0 \uCC44\uC6CC\uC694",
-    "dark.hintTip": "\uC0C9\uC0C1 \xB7 \uCC44\uB3C4\uB294 \uADF8\uB300\uB85C \uB450\uACE0 \uBC1D\uAE30\uB9CC \uB4A4\uC9D1\uC5B4\uC694. \uD50C\uB7EC\uADF8\uC778 Global\uC758 \uC0C9\uB9CC \uCC44\uC6B0\uACE0, \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218 \xB7 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 \xB7 \uC9C1\uC811 \uACE0\uCE5C Dark \uCE78\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
+    "dark.hint": "Global \uC0C9\uC744 \uB2E4\uD06C\uC5D0 \uB9DE\uAC8C \uBC14\uAFD4 Dark \uCE78\uC5D0 \uCC44\uC6CC\uC694",
+    "dark.hintTip": "\uC5F0\uD55C \uBC30\uACBD \xB7 \uC9D9\uC740 \uAE00\uC790 \uC0C9\uC740 \uBC1D\uAE30\uB97C \uB4A4\uC9D1\uACE0, \uAC15\uC870\uC0C9\uC740 \uBC1D\uAE30\uB97C \uC9C0\uCF1C \uC870\uAE08 \uBC1D\uAC8C \uD574\uC694. \uD68C\uC0C9\uC740 \uD478\uB978 \uAE30\uB97C \uC904\uC5EC\uC694. \uD50C\uB7EC\uADF8\uC778 Global\uC758 \uC0C9\uB9CC \uCC44\uC6B0\uACE0, \uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218 \xB7 \uB2E4\uB978 \uBCC0\uC218\uB97C \uAC00\uB9AC\uD0A4\uB294 \uBCC0\uC218 \xB7 \uC9C1\uC811 \uACE0\uCE5C Dark \uCE78\uC740 \uADF8\uB300\uB85C \uB46C\uC694.",
     "dark.genBtn": "\uB2E4\uD06C \uB9CC\uB4E4\uAE30",
     // 내보내기
     "export.saved": "{format} \u2014 {file}\uB85C \uC800\uC7A5\uD588\uC5B4\uC694.",
@@ -8144,10 +8144,38 @@
   // src/lib/themeGen.ts
   var DARK_L_MIN = 0.18;
   var DARK_L_MAX = 0.97;
+  var DARK_GRAY_EXP = 0.7;
+  var DARK_END_LOW = 0.4;
+  var DARK_END_HIGH = 0.85;
+  var DARK_MID_MIN = 0.55;
+  var DARK_MID_MAX = 0.85;
+  var DARK_CHROMA_LOW = 0.04;
+  var DARK_CHROMA_HIGH = 0.1;
+  var DARK_BRIGHT_CHROMA_LOW = 0.09;
+  var DARK_BRIGHT_CHROMA_HIGH = 0.14;
+  var DARK_GRAY_DESAT = 0.4;
+  function smoothstep(a, b, x) {
+    const t2 = Math.min(1, Math.max(0, (x - a) / (b - a)));
+    return t2 * t2 * (3 - 2 * t2);
+  }
+  function darkGrayCurve(l) {
+    return DARK_L_MIN + (DARK_L_MAX - DARK_L_MIN) * Math.pow(Math.max(0, 1 - l), DARK_GRAY_EXP);
+  }
+  function darkMid(l) {
+    return DARK_MID_MIN + (l - DARK_END_LOW) * ((DARK_MID_MAX - DARK_MID_MIN) / (DARK_END_HIGH - DARK_END_LOW));
+  }
   function darkValueForLight(hex) {
-    const lch = hexToOklch(hex);
-    const l = DARK_L_MIN + (1 - lch.l) * (DARK_L_MAX - DARK_L_MIN);
-    return oklchToHex(clampToGamut({ l, c: lch.c, h: lch.h }));
+    const { l, c, h } = hexToOklch(hex);
+    const w = smoothstep(DARK_CHROMA_LOW, DARK_CHROMA_HIGH, c);
+    const n = darkGrayCurve(l);
+    let lOut;
+    if (l <= DARK_END_LOW) lOut = n;
+    else if (l >= DARK_END_HIGH) {
+      const wh = smoothstep(DARK_BRIGHT_CHROMA_LOW, DARK_BRIGHT_CHROMA_HIGH, c);
+      lOut = n * (1 - wh) + l * wh;
+    } else lOut = n * (1 - w) + darkMid(l) * w;
+    const cOut = c * (1 - DARK_GRAY_DESAT * (1 - w));
+    return oklchToHex(clampToGamut({ l: lOut, c: cOut, h }));
   }
   var DARK_PREFIX = "dark/";
   function isDarkGlobalName(name) {
@@ -8173,6 +8201,13 @@
   function cellKey(raw) {
     if (isVariableAlias(raw)) return `alias:${raw.id}`;
     return hex8(raw);
+  }
+  function calcDarkValue(light) {
+    const la = typeof light.a === "number" ? light.a : 1;
+    return __spreadProps(__spreadValues({}, hexToRgb(darkValueForLight(rgbToHex(light)))), { a: la });
+  }
+  function calcDarkHex8(light) {
+    return hex8(calcDarkValue(light));
   }
   function rgbaOfHex8(h) {
     const n = parseInt(h.slice(1, 7), 16);
@@ -8381,9 +8416,7 @@
       const fromHexOf = (v) => hex8(v.valuesByMode[from]);
       const writeCalc = (v, rec) => {
         var _a2;
-        const light = v.valuesByMode[from];
-        const la = typeof light.a === "number" ? light.a : 1;
-        v.setValueForMode(to, __spreadProps(__spreadValues({}, hexToRgb(darkValueForLight(rgbToHex(light)))), { a: la }));
+        v.setValueForMode(to, calcDarkValue(v.valuesByMode[from]));
         rec[to] = { f: from, l: fromHexOf(v), d: (_a2 = hex8(v.valuesByMode[to])) != null ? _a2 : "", by: "calc" };
         writeDarkFill(v, rec);
         filled++;
@@ -8412,7 +8445,7 @@
             continue;
           }
           const fStale = !modeIds.has(entry.f) || hex8(v.valuesByMode[entry.f]) !== entry.l || from !== entry.f;
-          if (fStale) writeCalc(v, rec);
+          if (fStale || entry.d !== calcDarkHex8(v.valuesByMode[from])) writeCalc(v, rec);
           continue;
         }
         if (darkNow === fromHexOf(v)) writeCalc(v, rec);

@@ -53,8 +53,8 @@ export const STRINGS: Record<string, string> = {
 
   // 다크 테마 생성
   'dark.title': '다크 모드',
-  'dark.hint': 'Global 색의 밝기를 뒤집어 Dark 칸에 채워요',
-  'dark.hintTip': '색상 · 채도는 그대로 두고 밝기만 뒤집어요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.',
+  'dark.hint': 'Global 색을 다크에 맞게 바꿔 Dark 칸에 채워요',
+  'dark.hintTip': '연한 배경 · 짙은 글자 색은 밝기를 뒤집고, 강조색은 밝기를 지켜 조금 밝게 해요. 회색은 푸른 기를 줄여요. 플러그인 Global의 색만 채우고, 직접 만든 변수 · 다른 변수를 가리키는 변수 · 직접 고친 Dark 칸은 그대로 둬요.',
   'dark.genBtn': '다크 만들기',
   // 내보내기
   'export.saved': '{format} — {file}로 저장했어요.',

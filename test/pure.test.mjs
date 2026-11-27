@@ -95,6 +95,9 @@ import {
   isDarkGlobalName,
   DARK_L_MIN,
   DARK_L_MAX,
+  darkGrayCurve,
+  contrastRatio,
+
   isIntegerSize,
   splitDecimalClusters,
 } from '../dist/pure.mjs';
@@ -1744,6 +1747,34 @@ test('darkValueForLight — OKLCH 명도 반전(밝음↔어두움)', () => {
   const lightH = hexToOklch('#2563eb').h;
   const darkH = hexToOklch(darkValueForLight('#2563eb')).h;
   assert.ok(Math.abs(lightH - darkH) < 15, `hue 보존 ${lightH}→${darkH}`);
+});
+
+test('DK-1 Dark 값 공식 — 명세 예 11개(ia-v3 13.7 "Dark 값 공식")', () => {
+  const ex = {
+    '#3B82F6': '#609dff', '#EF4444': '#ff6963', '#22C55E': '#39d36b', '#FBBF24': '#fcc027', '#FACC15': '#facc15',
+    '#67E8F9': '#0099a8', '#EFF6FF': '#1e2125', '#1E3A8A': '#85aaff', '#101828': '#c7cedc', '#FFFFFF': '#121212', '#000000': '#f5f5f5',
+  };
+  for (const [light, dark] of Object.entries(ex)) assert.equal(darkValueForLight(light), dark, light);
+});
+
+test('DK-1 회색 곡선 darkGrayCurve — L이 커지면 엄격히 작아짐(21점) · 흰색 0.18 · 검정 0.97', () => {
+  let prev = Infinity;
+  for (let i = 0; i <= 20; i++) {
+    const n = darkGrayCurve(i / 20);
+    assert.ok(n < prev, `L ${i / 20}: ${n} ≥ ${prev}`);
+    prev = n;
+  }
+  assert.ok(Math.abs(darkGrayCurve(1) - DARK_L_MIN) < 1e-9);
+  assert.ok(Math.abs(darkGrayCurve(0) - DARK_L_MAX) < 1e-9);
+  assert.ok(!Number.isNaN(darkGrayCurve(1.0000001)), 'L > 1이어도 NaN 아님');
+});
+
+test('DK-1 강조색 대비 ≥ 4.5 — Dark 배경(흰색의 Dark 값) 위', () => {
+  const bg = hexToRgb(darkValueForLight('#FFFFFF'));
+  for (const h of ['#3B82F6', '#EF4444', '#22C55E', '#FBBF24', '#FACC15']) {
+    const cr = contrastRatio(hexToRgb(darkValueForLight(h)), bg);
+    assert.ok(cr >= 4.5, `${h} 대비 ${cr.toFixed(2)}`);
+  }
 });
 
 test('darkValueForLight — 밝은 표면 위계가 검정으로 붕괴하지 않는다', () => {
