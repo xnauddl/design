@@ -1904,7 +1904,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 | PR | 몫 | 화면 변화 |
 |---|---|---|
-| **S-6a 기반**(이 절) | 모든 요청 · 응답에 `reqId` · 거절은 그 작업만 끝냄 · 조용한 응답은 앞에서 받음 · 쓰기 잠금 양쪽 · 상세 [저장]도 쓰기 · Esc는 글자 칸만 | 없음(Esc만 — 아래 ⑥) |
+| **S-6a 기반**(이 절) | 모든 요청 · 응답에 `reqId` · 거절은 그 작업만 끝냄 · 조용한 응답은 앞에서 받음 · 쓰기 잠금 양쪽 · 상세 [저장]도 쓰기 · Esc는 글자 칸만 | 모양 변화 없음 · 잠기는 때(⑤) · Esc(⑥)만 바뀜 |
 | S-6b | [도구] 탭 · 도구 목록 · 도구 화면 공통 틀 · 무료 잠금 안내 · ① 브랜드 팔레트(값을 직접 고르기의 팔레트 띠만 뺌) | 있음 |
 | S-6c | ② 다크 모드 · ③ 텍스트 스타일 · **값을 직접 고르기 통째 삭제** · 입구 정리(＋ 메뉴 · OPS [보기] 도착 · `goToCreate`) · 만들기 화면 큰 선택 [읽기]를 OPS 작업으로(`readMake` `opSilent = !user` — 지금 OPS `EXTRACT`의 도착이 값을 직접 고르기라 이 PR에서 함께) | 있음 |
 | S-6d | 다크 화면 라이트 · 다크 비교 목록(ROADMAP 8 — 2026-11-20 사용자 결정 B) | 있음 |
@@ -1919,49 +1919,62 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 #### S-6a 기반 — 무엇을 하나
 
-화면은 바뀌지 않는다(⑥ Esc 제외). 도구 탭이 들어오면 팔레트 · 다크 · 텍스트 스타일의 쓰기와 조용한 읽기가 지금 작업들과 동시에 돈다 — 그 전에 "어느 응답이 어느 작업의 것인지"를 늘 `reqId`로 가린다(§4.11 T-P24 · T-P27 · T-P28 · T-P29 · T-D8 · T-P26 · T-D7을 지금 코드 기준으로 좁힌 것. 도구 화면 몫(`toolTakes` · 팔레트 세기 미리보기 · 도구 실행 버튼)은 S-6b · S-6c에서).
+모양은 바뀌지 않는다. **잠기는 때**(⑤)와 **Esc**(⑥)만 바뀐다. 도구 탭이 들어오면 팔레트 · 다크 · 텍스트 스타일의 쓰기와 조용한 읽기가 지금 작업들과 동시에 돈다 — 그 전에 "어느 응답이 어느 작업의 것인지"를 늘 `reqId`로 가린다(§4.11 T-P24 · T-P27 · T-P28 · T-P29 · T-D8 · T-P26 · T-D7을 지금 코드 기준으로 좁힌 것. 도구 화면 몫(`toolTakes` · 팔레트 세기 미리보기 · 도구 실행 버튼)은 S-6b · S-6c에서).
 
 **① 모든 요청 · 응답에 `reqId` (T-P29 ①)**
 
-- UI: 보내는 모든 요청(`send`)에 `reqId`를 싣는다. 메시지에 없으면 `opSent`가 **맨 앞에서** 붙인다 — 지금 `opSent`(`ui.ts` 4524)는 `wizardRunning || opSilent`이면 바로 돌아가므로 그 앞에서 붙여, 마법사 단계 · 조용한 읽기 · OPS 밖 요청도 모두 싣게 한다(이미 있으면 그대로 — 화면이 정한 `reqId` · `wizardRequest` 셋째 인자). 번호는 하나의 세는 수(`bindReqSeq`)를 쓴다.
+- UI: 보내는 모든 요청(`send`)에 `reqId`를 싣는다. 메시지에 없으면 `opSent`가 **맨 앞에서** 붙인다 — 지금 `opSent`(`ui.ts` 4524)는 `wizardRunning || opSilent`이면 바로 돌아가므로 그 앞에서 붙여, 마법사 단계 · 조용한 읽기 · OPS 밖 요청도 모두 싣게 한다(이미 있으면 그대로 — 화면이 정한 `reqId` · `wizardRequest` 셋째 인자). 새로 붙이는 번호는 하나의 세는 수(`bindReqSeq`)를 쓴다.
 - 마법사(`wizardRequest` `ui.ts` 1533)는 모든 단계 요청에 `reqId`를 정해 보내고 그 `reqId`로만 응답을 받는다(지금 일부 단계 — 다크 단계의 `GET_VARIABLES` · `GENERATE_DARK_MODE` 등 — 는 없이 기다린다).
-- 플러그인(`code.ts`): **요청에 답하는 모든 메시지**(결과 · `ERROR` · `PREMIUM_REQUIRED`)에 그 요청의 `reqId`를 돌려준다. 지금 빠진 답(2026-11-27 점검 — `post({ type: … })`에 `reqId`가 없는 곳): `PREMIUM_REQUIRED` · `ERROR`(한 곳) · `DARK_MODE_RESULT` · `SEMANTICS_RESULT` · `EXPORT_RESULT` · `VARIABLES` · `COLLECTIONS` · `SELECT_RESULT` · `TEXT_STYLE_CANDIDATES`(두 곳) · `VAR_TABLE`(요청에 답할 때). 구현 때 `post` 부르는 곳을 모두 보고 하나씩 판정한다.
-- 요청에 답하는 것이 아닌 알림은 싣지 않아도 된다: `SELECTION_STATE` · `PROGRESS` · `REQUEST_VERIFY` · `REQUEST_DEACTIVATE` · `UI_SIZE` · `SETTINGS` · 작업 뒤 밀어 보내는 `PREREQ_STATE` · 시작할 때 · 라이선스 바뀜 뒤 밀어 보내는 `LICENSE_STATUS`.
+- **마법사 리스너의 거절 · 오류도 자기 것만**(T-P29 ④ — 옛 T-P24 ④): 지금 마법사 리스너(`ui.ts` 1512–1519)는 `reqId`를 보지 않고 모든 `ERROR` · `PREMIUM_REQUIRED`를 지금 단계의 실패로 친다. → **`reqId`가 그 단계의 것일 때만** 단계 실패로 보고, 아니면 그냥 넘겨 메인 처리기가 처리한다(만들기 실행 중 변수 탭 쓰기 · 다른 읽기의 오류가 실행을 실패시키지 않게).
+- 플러그인(`code.ts`): **요청에 답하는 모든 메시지**(결과 · `ERROR` · `PREMIUM_REQUIRED`)에 그 요청의 `reqId`를 돌려준다. 지금 빠진 답(2026-11-27 점검): `PREMIUM_REQUIRED` · `ERROR`(863 — `NAME_TEXT_STYLES_BY_ROW`) · `DARK_MODE_RESULT` · `SEMANTICS_RESULT` · `EXPORT_RESULT` · `VARIABLES`(`GET_VARIABLES`에 답할 때. `GENERATE_DARK_MODE` 뒤 따라 보내는 `VARIABLES`(1128 · 1138)도 그 요청의 `reqId`) · `COLLECTIONS` · `SELECT_RESULT` · `TEXT_STYLE_CANDIDATES`(두 곳) · `VAR_TABLE`(`GET_VAR_TABLE`에 답할 때) · `PREREQ_STATE`(`GET_PREREQ`에 답할 때 — 909) · `LICENSE_STATUS`(`GET_LICENSE` · `SET_LICENSE` · `LICENSE_VERIFIED` · `CLEAR_LICENSE`에 답할 때) · `SETTINGS`(1101) · `UI_SIZE`(1083). 구현 때 `post` 부르는 곳을 모두 보고 하나씩 판정한다.
+- **밀려난 찾기에도 답한다:** `code.ts` 602는 더 새 찾기가 와서 밀려난 찾기(`preview`)에 아무 답도 보내지 않는다 — `reqId`로만 작업을 끝내면(③) 그 작업이 영영 남아 `opBusy()`가 계속 참이 된다(만들기 화면 · 이름 정리 · 만들기 카드 · 선택 탭 찾기가 막히고 진행 테두리가 멈춤). → 밀려난 찾기는 `APPLY_RESULT{preview: true, cancelled: true, reqId}`로 답한다(UI는 지금처럼 낡은 `reqId`를 버리고, `opReceived`는 그 작업을 끝내되 취소라 ✓ · ⚠가 없다).
+- 요청에 답하는 것이 아닌 알림은 싣지 않아도 된다: `SELECTION_STATE` · `PROGRESS` · `REQUEST_VERIFY` · `REQUEST_DEACTIVATE` · 작업 뒤 밀어 보내는 `PREREQ_STATE` · 시작할 때 · 라이선스 바뀜 뒤 밀어 보내는 `LICENSE_STATUS`.
 - `src/shared/messages.ts`: 요청 · 응답 타입에 `reqId?: number`를 더한다(이미 있는 것은 그대로).
 
 **② 유료 거절에도 `reqId` (T-P29 ② · T-P28)**
 
 - `requirePaid(feature, reqId?)` · `requireTextStyles(reqId?)`(`code.ts` 132 · 439)가 거절을 `PREMIUM_REQUIRED{feature, reqId}`로 보낸다. 부르는 곳은 모두 그 요청의 `reqId`를 넘긴다. (`requireComponents`는 S-1b로 없어졌다.)
+- 만들기 화면의 조용한 읽기가 받는 거절 · 오류(T-P28 — `makeTakes`가 자기 `reqId`면 종류와 상관없이 받아 지금은 처리 없이 삼킨다 — `ui.ts` 2777–2782):
+  - `PREMIUM_REQUIRED{reqId: mkScanReq}`(텍스트 스타일 후보 읽기 — 플러그인은 무료로 봄): "읽는 중"을 끝내고(`mkTsReading = false`) **후보 0개**로 본다(Text Style 탭 숨김). Toast는 없다(조용한 읽기 — 유료 안내는 만들기 화면의 무료 상자가 한다).
+  - `ERROR{reqId: mkScanReq}`: 같은 처리(후보 0개) + error Toast(`explainError` 글 · 툴팁 원문).
+  - `ERROR{reqId: mkExtractReq}`: "읽는 중"을 끝내고(`mkReading = false`) error Toast(같은 글). 화면은 읽기 전 모습(목록 없음) — 만들기 화면 "읽기 실패" 모습은 지금 없다(만들기 화면 정리 S-6c에서 본다).
+  - `ERROR{reqId: mkPreviewReq}`: 미리보기를 끝내고(그 줄 상태는 예전 값 그대로) error Toast.
 
 **③ 거절 · 오류는 그 작업만 끝낸다 (T-P29 ③)**
 
 - `opPending`(`ui.ts` 4474 — 요청 종류가 열쇠인 Map)의 항목에 보낸 `reqId`를 적는다.
-- `opReceived`(4535): `ERROR` · `PREMIUM_REQUIRED`는 **그 `reqId`를 적은 항목만** 끝낸다(`ERROR`는 `op`이 있으면 `op` + `reqId`). 지금처럼 `op`이 없을 때 첫 항목을 끝내고 `opPending.clear()`(4554)를 하는 갈래를 없앤다. 맞는 항목이 없거나 `reqId`가 없으면(이제 생기지 않아야 함) 아무것도 끝내지 않고 `console.warn`에 남긴다.
+- `opReceived`(4535): `ERROR` · `PREMIUM_REQUIRED`는 **그 `reqId`를 적은 항목만** 끝낸다(`ERROR`는 `op`이 있으면 `op` + `reqId`). 지금처럼 `op`이 없을 때 첫 항목을 끝내고 `opPending.clear()`(4554)를 하는 갈래를 없앤다. 맞는 항목이 없으면 아무것도 끝내지 않는다(OPS 밖 요청의 평범한 오류 — 조용한 읽기 · `SCAN_USAGE` · `UPDATE_VARIABLE` 등). `reqId` 자체가 없는 거절 · 오류(이제 생기지 않아야 함)만 `console.warn`에 남긴다.
 - 결과 메시지도 `reqId`가 있으면 그 `reqId`를 적은 항목만 끝낸다(지금은 결과 종류만 본다 — 같은 종류의 조용한 응답이 OPS 작업을 일찍 끝내는 일을 막음). `reqId`가 없는 결과(밀어 보내는 알림)는 지금처럼 종류로만 본다.
-- 그래서 예: 연결 중 만들기 화면 미리보기의 유료 거절이 와도 연결 작업은 끝나지 않는다.
+- `opReceived`의 `if (wizardRunning) return`은 `reqId`로 맞추는 갈래 **뒤**로 옮긴다 — 만들기 실행 전에 시작한 OPS 작업(내보내기 · 사용자 찾기 · 이름 정리 미리보기)의 결과가 실행 중에 와도 그 항목이 끝나게(지금은 끝나지 않는다).
+- 예: 연결 중 만들기 화면 텍스트 스타일 후보 읽기(`SCAN_TEXT_STYLES{reqId}`)의 유료 거절이 와도 연결 작업은 끝나지 않는다.
 
 **④ 조용한 응답은 앞에서 받는다 (T-P27 · T-P24 ③)**
 
 - `opSilent`로 보낸 요청과 마법사 단계 요청의 `reqId`를 "조용한 reqId" 묶음(`silentReqs: Set<number>`)에 모아 둔다(`opSent` 맨 앞 — ①에서 `reqId`를 붙인 바로 뒤).
-- 메인 처리기(`window.onmessage` `ui.ts` 1886)는 응답의 `reqId`가 조용한 묶음에 있으면 **`opReceived`보다 먼저** `makeTakes` · `mcTakes`에 넘기고(받으면 거기서 끝 — `opReceived` · `OP_STATUS` · 다른 처리기에 닿지 않음) 묶음에서 뺀다. 묶음에 없으면 지금처럼 `opReceived` 뒤에 `makeTakes` · `mcTakes`.
-- 지금은 `opReceived`(1888)가 `makeTakes`(1889)보다 앞이라, 만들기 화면 미리보기의 `CREATE_RESULT{reqId}`가 같은 종류를 기다리는 OPS 작업(값을 직접 고르기 [색 변수 만들기] · S-6b 뒤 팔레트 쓰기)을 일찍 끝낼 수 있다(쓰기 잠금 풀림 · 작업 직후 다시 읽기 · ✓).
-- `makeTakes` · `mcTakes`는 같은 응답을 한 번만 처리한다(두 자리에서 불려도).
-- 마법사 단계 응답은 마법사 리스너가 그 `reqId`로 받는다(지금처럼 — `opReceived`는 `wizardRunning`이면 돌아감).
+- 메인 처리기(`window.onmessage` `ui.ts` 1885)는 응답의 `reqId`가 조용한 묶음에 있으면 묶음에서 빼고 **`opReceived`를 부르지 않는다**. 그다음 `makeTakes` · `mcTakes`가 받으면 거기서 끝 — 받지 않으면(조용한 연결 찾기 · 조용한 이름 정리 읽기 · 마법사 단계의 `GET_VARIABLES` · `GENERATE_DARK_MODE` · 마법사 연결 응답 등) 지금처럼 메인 처리기 아래로 진행한다(다크 결과 글 등). 묶음에 없으면 지금처럼 `opReceived` 뒤에 `makeTakes` · `mcTakes`.
+- 지금은 `opReceived`(1887)가 `makeTakes`(1889)보다 앞이라, 만들기 화면 미리보기의 `CREATE_RESULT{reqId}`가 같은 종류를 기다리는 OPS 작업(값을 직접 고르기 [색 변수 만들기] · S-6b 뒤 팔레트 쓰기)을 일찍 끝낼 수 있다(쓰기 잠금 풀림 · 작업 직후 다시 읽기 · ✓).
+- 답이 오지 않는 조용한 요청은 없게 한다(① "밀려난 찾기에도 답한다") — 묶음이 남지 않게.
+- 마법사 단계 응답은 마법사 리스너가 그 `reqId`로 받는다(지금처럼).
 
 **⑤ 쓰기 잠금 양쪽 · 상세 [저장]도 쓰기 (T-D8 · T-P26 — 지금 코드 기준)**
 
-- `WAIT_LINK_IDS`(`ui.ts` 4481 — OPS 쓰기 버튼 · `btnMakeRun` · `btnRename`): 지금은 연결 중이거나 **변수 탭 쓰기**(`VAR_WRITE_OPS`)일 때만 잠긴다. → 연결 중이면 `bind.waitLink`, 아니면 **어느 쓰기 작업이든**(`otherWriteOp()` — OPS `write: true` 전부 · 마법사 · 아래 [저장]) 진행 중이면 `bind.waitOp`(op = 그 작업 이름). 진행 중인 작업 자신의 버튼도 잠긴다(두 번 누름 막음). 사유는 Toast(누를 때).
-  - **예외:** 만들기 화면 결과 화면의 [닫기] — 같은 `btnMakeRun`이 결과 화면에서 [닫기]가 되므로(`renderMakeFoot`) 그 모습일 때는 잠그지 않는다(닫기는 쓰기가 아님). `renderMakeFoot`이 [닫기] ↔ 실행 버튼을 바꿀 때마다 `renderWaitLocks`를 불러 잠금을 다시 맞춘다.
-  - 진행 중인 작업의 [취소](예 `btnMakeCancel`)는 목록에 없으므로 잠기지 않는다.
+- `WAIT_LINK_IDS`(`ui.ts` 4481 — OPS 쓰기 버튼 · `btnMakeRun` · `btnRename`): 지금은 연결 중이거나 **변수 탭 쓰기**(`VAR_WRITE_OPS`)일 때만 잠긴다. → 연결 중이면 `bind.waitLink`, 아니면 **어느 쓰기 작업이든**(`otherWriteOp()` — OPS `write: true` 전부 · 마법사 · 아래 [저장]) 진행 중이면 `bind.waitOp`(op = 그 작업 이름). 사유는 Toast(누를 때 — 지금처럼).
+  - **미리보기는 쓰기가 아니다:** OPS는 요청 종류로 쓰기를 가리므로 `CREATE_TOKENS{preview: true}`(값을 직접 고르기 [미리보기] `btnCreate`)도 쓰기로 센다 — `opSent`가 `preview`인 `CREATE_TOKENS`는 `write: false`로 적는다(그동안 `btnMakeRun` 등이 잠기지 않게).
+  - **예외 — 만들기 화면 결과 화면의 [닫기]:** 같은 `btnMakeRun`이 결과 화면(`mkResults`가 있을 때 — `renderMakeFoot`)에서 [닫기]가 되므로 그 모습일 때는 쓰기 잠금도 연결 중 잠금도 걸지 않는다(닫기는 쓰기가 아님 — 지금은 연결 중이면 [닫기]가 잠긴다). `renderWaitLocks`는 `mkResults`로 판정하고, `renderMakeFoot`이 [닫기] ↔ 실행 버튼을 바꿀 때마다 `renderWaitLocks`를 부른다.
+  - 진행 중인 작업 자신의 버튼은 실행 중 숨거나(`btnMakeRun` — [취소]로 바뀜) 목록에 없다([취소] `btnMakeCancel` 등은 잠기지 않는다).
   - 연결 화면 [{o}곳 연결](`WAIT_CARD_IDS`)은 지금도 `otherWriteOp()`로 잠긴다 — 그대로.
-- **상세 [저장](`UPDATE_VARIABLE`)도 쓰기 작업이다:** 저장이 응답을 기다리는 동안(`ed.saving`) `otherWriteOp()`가 그것을 본다(작업 이름 "고치기" — 새 키 `op.updateVar`). OPS 표에는 넣지 않는다(진행 테두리 · 실패 [보기]가 없음 — §2.6). 저장을 시작할 때와 끝날 때(`edSave` `ui.ts` 6908 · `edEndSaving` 6937 — 성공 · 오류 · 10초 시간 초과 모두) `renderWaitLocks`를 부른다.
-  - 거꾸로 `renderWaitLocks`는 상세 팝업이 열려 있으면 `edChrome`을 불러 [저장] 잠금을 맞춘다(지금은 `onBindLinkingChanged`만 부른다 — 다른 쓰기가 `ERROR`로 끝나도 [저장]이 잠긴 채 남지 않게). 다른 쓰기 중에는 [저장]이 잠긴다(§4.6 E3 그대로).
-- 읽기(`write: false` · 조용한 읽기)는 잠그지 않는다.
+- **오류 상자의 [다시 시도]도 거친다:** `showError`의 [다시 시도](`ui.ts` 2462–2466)는 지금 연결 중만 보고 바로 다시 보낸다. → 다시 보낼 요청이 쓰기(`OPS[type].write` — 미리보기 제외)면 `writeLockReason()`을 먼저 보고, 잠겼으면 보내지 않고 그 상태 자리에 사유(지금 연결 중일 때와 같은 자리 · 모양).
+- **상세 [저장](`UPDATE_VARIABLE`)도 쓰기 작업이다:**
+  - 저장 중 표시는 팝업과 따로 둔다 — 새 `updSaving: { reqId, timer } | null`. 저장을 보낼 때 세우고, 그 `reqId`의 `VARIABLE_UPDATED` · `ERROR` · 10초 시간 초과에서만 내린다(지금 `ed.saving`은 팝업 상태라 최소화 `setMini(true)` → `closeModal()` → `edCleanup`이 `ed = null`로 지우면 아직 도는 저장을 놓친다). 세울 때 · 내릴 때 `renderWaitLocks`를 부른다.
+  - `otherWriteOp()`는 `updSaving`이 있으면 "고치기"(새 키 `op.updateVar`)를 돌려준다. OPS 표에는 넣지 않는다(진행 테두리 · 실패 [보기]가 없음 — §2.6).
+  - **[저장] 쪽 잠금도 넓힌다**(지금 코드는 연결 중만 — `edChrome` 6234 · `edSave` 6908 · `edLockedSave` 6340, 툴팁 · 알림 줄 `bind.waitLink`뿐 — §4.6 "지금 코드와 다른 곳"): [저장] 잠금 = `writeLockReason()`(연결 중 `bind.waitLink`, 다른 쓰기 중 `bind.waitOp` — 자기 저장(`updSaving`)은 빼고 본다). 툴팁 · 팝업 안 알림 줄도 그 사유. `edSave`도 같은 조건이면 보내지 않는다.
+  - `renderWaitLocks`는 상세 팝업이 열려 있으면 `edChrome`을 불러 [저장] 잠금을 맞춘다(지금은 `onBindLinkingChanged`만 부른다 — 다른 쓰기가 `ERROR`로 끝나도 [저장]이 잠긴 채 남지 않게).
+- 읽기(`write: false` · 조용한 읽기 · 미리보기)는 잠그지 않는다.
 
 **⑥ Esc는 글자 칸에서만 그 칸 몫 (T-D7)**
 
 - 지금 하위 화면 Esc 처리기(`ui.ts` 4850)는 `input` · `textarea` · `select` · `[contenteditable]` 어디에 포커스가 있어도 Esc를 무시한다(예: 만들기 화면 "만든 뒤" 체크에 포커스가 있으면 Esc로 돌아가지 않음).
-- → **글자를 넣는 칸만** 빼다: `input`의 글 · 숫자 · 검색 · 이메일 · 주소 · 비밀번호 종류, `textarea`, `contenteditable`, 열린 이름 칸. 체크박스 · 라디오 · 색 피커(`input[type=color]`) · 닫힌 고르개(`select`)에서는 Esc가 하위 화면에서 돌아가거나(←와 같음) 설정을 닫는다. 열린 고르개 목록은 브라우저가 Esc로 닫으므로 그대로.
+- → **글자를 넣는 칸만** 뺀다: `input`의 `type`이 없거나(기본 text) 글 · 숫자 · 검색 · 이메일 · 주소 · 비밀번호 · 전화 종류, `textarea`, `[contenteditable]`. 체크박스 · 라디오 · 색 피커(`input[type=color]`) · 닫힌 고르개(`select`)에서는 Esc가 하위 화면에서 돌아가거나(←와 같음) 설정을 닫는다. 열린 고르개 목록은 브라우저가 Esc로 닫으므로 그대로. 이름 칸 · 메뉴 · 팝업 · 검색 · ⓘ의 Esc는 지금처럼 그 자리가 먼저 받는다(`stopPropagation` · `defaultPrevented` · `menuEl` · `modalEl`).
 
 **받아들인 것**
 
@@ -3252,14 +3265,14 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 
 ### B.45 S-6a 도구 탭 기반 PR (2026-11-27 사용자 결정 T-D9 · §4.11a "S-6a 기반")
 
-계기: 도구 탭(S-6)을 다섯 PR로 나눈 첫째. 화면 변화 없음(Esc만) — 시안 없음.
+계기: 도구 탭(S-6)을 다섯 PR로 나눈 첫째. 모양 변화 없음(잠기는 때 · Esc만 바뀜) — 시안 없음.
 
 - [ ] 명세 검토(코드 대조) 중대 결함 0
-- [ ] ① `reqId` — UI `opSent` 맨 앞에서 붙임(마법사 · 조용한 읽기 · OPS 밖 포함) · `wizardRequest` 모든 단계 `reqId` · `code.ts` 요청에 답하는 모든 메시지에 `reqId`(빠진 답 목록 §4.11a ①) · `messages.ts` 타입
-- [ ] ② `requirePaid(feature, reqId?)` · `requireTextStyles(reqId?)` → `PREMIUM_REQUIRED{feature, reqId}`
-- [ ] ③ `opPending` 항목에 `reqId` · `opReceived`는 거절 · 오류 · 결과를 그 `reqId` 항목만 끝냄 · `opPending.clear()` 갈래 없앰 · 맞는 항목 없으면 `console.warn`
-- [ ] ④ 조용한 reqId 묶음(`silentReqs`) · 메인 처리기에서 묶음에 있으면 `opReceived`보다 먼저 `makeTakes` · `mcTakes` · 같은 응답 한 번만
-- [ ] ⑤ `WAIT_LINK_IDS`는 `otherWriteOp()`로(자기 작업 포함) · 결과 화면 [닫기] 예외 · `renderMakeFoot` → `renderWaitLocks` · 상세 [저장] `ed.saving`을 `otherWriteOp()`가 봄(`op.updateVar` "고치기") · `edSave` · `edEndSaving` → `renderWaitLocks` · `renderWaitLocks` → 팝업 열려 있으면 `edChrome`
-- [ ] ⑥ Esc — 글자 칸 · `textarea` · `contenteditable` · 열린 이름 칸만 그 칸 몫, 체크박스 · 라디오 · 색 피커 · 닫힌 고르개에서는 돌아감
-- [ ] 단위 테스트(`code.ts` 응답 `reqId` · 거절 `reqId`) · verify: 다른 작업의 `PREMIUM_REQUIRED{reqId}` · `ERROR{reqId}`가 진행 중인 작업을 끝내지 않음 · 조용한 `CREATE_RESULT{reqId}`가 같은 종류 OPS 작업을 끝내지 않음 · 만들기 화면 실행 중 다른 쓰기 버튼 잠김 · [저장] 중 다른 쓰기 잠김 · 체크박스 포커스에서 Esc로 돌아감 · 글자 칸에서는 Esc가 칸 몫
+- [ ] ① `reqId` — UI `opSent` 맨 앞에서 붙임(마법사 · 조용한 읽기 · OPS 밖 포함) · `wizardRequest` 모든 단계 `reqId` · 마법사 리스너는 자기 `reqId`의 거절 · 오류만 단계 실패 · `code.ts` 요청에 답하는 모든 메시지에 `reqId`(빠진 답 목록 §4.11a ①) · 밀려난 찾기에 `APPLY_RESULT{preview, cancelled, reqId}` · `messages.ts` 타입
+- [ ] ② `requirePaid(feature, reqId?)` · `requireTextStyles(reqId?)` → `PREMIUM_REQUIRED{feature, reqId}` · `makeTakes`의 거절 · 오류 처리(후보 읽기 거절 = 후보 0개 · Toast 없음, 오류 = "읽는 중" 끝 + error Toast)
+- [ ] ③ `opPending` 항목에 `reqId` · `opReceived`는 거절 · 오류 · 결과를 그 `reqId` 항목만 끝냄 · `opPending.clear()` 갈래 없앰 · `reqId` 없는 거절 · 오류만 `console.warn` · `if (wizardRunning) return`을 `reqId` 갈래 뒤로
+- [ ] ④ 조용한 reqId 묶음(`silentReqs`) · 메인 처리기에서 묶음에 있으면 빼고 `opReceived`를 건너뜀 → `makeTakes` · `mcTakes` → 받지 않으면 메인 처리기 아래로
+- [ ] ⑤ `WAIT_LINK_IDS`는 `otherWriteOp()`로 · `CREATE_TOKENS{preview}`는 쓰기 아님 · 결과 화면 [닫기]는 잠금 없음(`mkResults`) · `renderMakeFoot` → `renderWaitLocks` · [다시 시도]는 쓰기면 `writeLockReason()` 먼저 · `updSaving{reqId, timer}`(팝업과 따로 — `VARIABLE_UPDATED` · `ERROR` · 10초에서 내림) · `otherWriteOp()`가 "고치기"(`op.updateVar`) · [저장] 잠금 = `writeLockReason()`(자기 저장 뺌 — `edChrome` · `edSave` · `edLockedSave`) · `renderWaitLocks` → 팝업 열려 있으면 `edChrome`
+- [ ] ⑥ Esc — 글자 칸(`type` 없음 포함) · `textarea` · `contenteditable`만 그 칸 몫, 체크박스 · 라디오 · 색 피커 · 닫힌 고르개에서는 돌아감
+- [ ] 단위 테스트(`code.ts` 응답 `reqId` · 거절 `reqId`) · verify: 다른 작업의 `PREMIUM_REQUIRED{reqId}` · `ERROR{reqId}`가 진행 중인 작업을 끝내지 않음 · 조용한 `CREATE_RESULT{reqId}`가 같은 종류 OPS 작업을 끝내지 않음 · 만들기 실행 중 다른 요청의 `ERROR`가 실행을 실패시키지 않음 · 밀려난 찾기 뒤 `opBusy()` 거짓 · 후보 읽기 거절 → 후보 0개 · 저장 중 최소화해도 다른 쓰기 잠김 유지 · 만들기 화면 실행 중 다른 쓰기 버튼 잠김 · [저장] 중 다른 쓰기 잠김 · 체크박스 포커스에서 Esc로 돌아감 · 글자 칸에서는 Esc가 칸 몫
 - [ ] 4검사 · `dist/` · 실기 확인(사용자): 평소 흐름(연결 · 만들기 · 이름 정리 · 변수 탭 클릭 연결 · 새 변수 · 저장)이 그대로인지
