@@ -713,7 +713,9 @@ export async function createSemanticAliases(map: Record<string, string>): Promis
       continue;
     }
     const u = upsertVariable(semName, semanticCol, g.resolvedType, idx);
-    u.variable.setValueForMode(sMode, figma.variables.createVariableAlias(g)); // 별칭만
+    // 별칭만 — 새로 만든 변수는 모든 모드에 같은 별칭(Dark 칸이 Light와 같아야 다시 누를 때 채워진다 — ia-v3 13.7 D-T2
+    // "나중에 만든 역할"), 이미 있는 변수의 값을 바꿀 때는 기본 모드만.
+    for (const m of u.created ? semanticCol.modes.map((x) => x.modeId) : [sMode]) u.variable.setValueForMode(m, figma.variables.createVariableAlias(g));
     // 역할 기반, 없으면 원시 상속 — 단 변수 타입에 유효한 스코프만(STRING에 LINE_HEIGHT 등 금지)
     u.variable.scopes = scopesForType(scopeForSemanticRole(semName) ?? (g.scopes as ScopeName[]), g.resolvedType);
     summary[u.created ? 'created' : 'updated']++;

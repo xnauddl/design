@@ -334,15 +334,17 @@ export type CodeToUi = (
   // modeCreated: Dark 모드를 이번에 만들었는가(안내 문구가 달라진다). error: 채우기 전 단계 실패.
   | {
       type: 'DARK_MODE_RESULT';
-      /** 채운 색 n · 그대로 둔 색 k(이번에 옮긴 칸 제외) · 채우는 칸 대상 수(0이면 "채울 색 없음"). */
+      /** 연결한 역할 n · 그대로 둔 역할 k · 대상 역할 수(0이면 "연결할 역할 없음") — ia-v3 13.7 D-T2. */
       filled: number;
       kept: number;
       targets: number;
       modeCreated?: boolean;
-      /** 옛 구조를 옮겼으면 늘 싣는다. */
-      migrated?: { moved: number; split: number; failed: number; splitNames: string[]; failedNames: string[]; removedDark: number };
-      /** 옛 구조인데 확인 전 — 아무것도 바꾸지 않았다(UI가 확인 팝업). */
-      needMigrate?: { removeDark: number; mode: string };
+      /** 전체 스케일로 만든 Global 스텝 수(있을 때만). */
+      scaleAdded?: number;
+      /** D-T1 파일을 옮겼으면 싣는다 — 옮긴 역할 a · 새로 만든 스텝 g. */
+      migrated?: { moved: number; added: number };
+      /** D-T1 파일인데 확인 전 — 아무것도 바꾸지 않았다(UI가 확인 팝업). lost = 사라질 사용자 Dark 값 수. */
+      needMigrate?: { lost: number };
       error?: string;
     }
   | { type: 'DELETED_UNBOUND'; reqId: number; unbound: number; failed: number; failReasons: Record<string, number> }

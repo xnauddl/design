@@ -11,7 +11,7 @@ export * from './entitlements';
 export * from './license';
 export * from './licenseToken';
 export * from './exporters';
-export * from './themeGen';
+export * from './darkRules';
 export * from './componentLike';
 export * from './textStyles';
 export * from './undo';

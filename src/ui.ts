@@ -70,10 +70,9 @@ function requestPrereq(): void {
   // 응답이 끝내 안 오면(플러그인 쪽 오류) 다음 요청이 영영 막히지 않게 풀어 둔다.
   setTimeout(() => { prereqInFlight = false; }, 3000);
 }
-/** Dark 값이 없는 색 수 · 옛 구조(PREREQ_STATE — ia-v3 13.7 D-T1). 필드가 없으면 0 · 거짓. */
+/** Dark 연결이 없는 역할 수 · D-T1 구조(PREREQ_STATE — ia-v3 13.7 D-T2). 필드가 없으면 0 · 거짓. */
 let darkUnfilled = 0;
 let darkOld = false;
-let darkOldManual = false;
 let lastSelCount = 0; // UX5: 마지막으로 받은 선택 수(빈 상태 문구 분기에 사용)
 let createFrom: 'colors' | 'tokens' = 'tokens'; // 마지막 CREATE_TOKENS 호출 출처(결과 상태 라우팅)
 
@@ -1767,12 +1766,12 @@ let allVars: VarInfo[] = [];
 /** GET_VARIABLES 응답을 한 번이라도 받았는지 — 다크 카드가 ‘목록 미로드’와 ‘토큰 없음’을 구분한다. */
 let varsLoaded = false;
 
-// 대상 · 모드는 플러그인이 정한다(플러그인 Global, 기본 모드 → Dark — ia-v3 13.7 D-T1, 2026-11-20 "고르개 완전히 없앰").
-// 카드는 전제(목록을 받았나 · 플러그인 Global이 있나)만 보고, 알림 띠는 PREREQ_STATE의 수 · 옛 구조로 그린다.
-/** 전제 판정 — "읽는 중" · "플러그인 Global 없음" 두 갈래와 버튼 잠금(ia-v4 §4.11 ② 상태표). 그 밖이면 띠 숨김 · 잠금 없음. */
+// 대상 · 모드는 플러그인이 정한다(플러그인 Semantic, 기본 모드 → Dark — ia-v3 13.7 D-T2, 2026-11-20 "고르개 완전히 없앰").
+// 카드는 전제(목록을 받았나 · 플러그인 Semantic이 있나)만 보고, 알림 띠는 PREREQ_STATE의 수 · D-T1 구조로 그린다.
+/** 전제 판정 — "읽는 중" · "플러그인 Semantic 없음" 두 갈래와 버튼 잠금(ia-v4 §4.11 ② D-T2 블록). 그 밖이면 띠 숨김 · 잠금 없음. */
 function refreshDarkPrereq(): void {
-  const hasGlobalCol = allVars.some((v) => v.owned === 'global');
-  const ok = varsLoaded && hasGlobalCol;
+  const hasSemanticCol = allVars.some((v) => v.owned === 'semantic');
+  const ok = varsLoaded && hasSemanticCol;
   // 유료 잠금이 전제보다 먼저(§2.3). 전제 사유는 아래 안내 문구와 같다.
   const notice = $('darkPrereq');
   const gotoCreate = $('darkPrereqGotoCreate') as HTMLButtonElement;
@@ -1792,13 +1791,13 @@ function refreshDarkPrereq(): void {
   renderDarkNotice();
 }
 
-/** 알림 띠 `#darkNotice`(ia-v4 §4.11 ②) — 옛 구조(모드 셋 이상이면 PREREQ_STATE.darkOldManual) · Dark 값이 없는 색. 전제 안내 띠가 보이는 동안은 숨긴다. */
+/** 알림 띠 `#darkNotice`(ia-v4 §4.11 ② D-T2) — D-T1 구조(옮기기 전) · Dark 연결이 없는 역할. 전제 안내 띠가 보이는 동안은 숨긴다. */
 function renderDarkNotice(): void {
   const el = $('darkNotice');
   const prereqShown = $('darkPrereq').style.display !== 'none';
   let text = '';
   if (!prereqShown) {
-    if (darkOld) text = darkOldManual ? t('dark.needMigrateManual') : t('dark.needMigrate');
+    if (darkOld) text = t('dark.needMigrate');
     else if (darkUnfilled > 0) text = t('dark.unfilled', { n: darkUnfilled });
   }
   el.textContent = text;
@@ -1811,12 +1810,13 @@ $('btnGenDark').addEventListener('click', () => {
 });
 
 /** 작은 창에서 받은 옮기기 확인 — 펼칠 때 띄운다. */
-let darkMigrateLater: { removeDark: number; mode: string } | null = null;
+let darkMigrateLater: { lost: number } | null = null;
 /** 옛 구조 옮기기 확인 팝업(ia-v4 §4.11 ②) — 처음 포커스 [취소], Esc = 취소. */
-function openDarkMigrate(need: { removeDark: number; mode: string }): void {
+function openDarkMigrate(need: { lost: number }): void {
   const body = document.createElement('div');
   const para = document.createElement('p');
-  para.textContent = need.removeDark > 0 ? t('dark.migrateBody', { mode: need.mode, n: need.removeDark }) : t('dark.migrateBodyNoDel', { mode: need.mode });
+  // 본문 + 레이어 알림(늘) + 잃는 값(있을 때) + ⌘Z(맨 끝) — ia-v4 §4.11 ② D-T2 블록
+  para.textContent = t('dark.migrateBody') + t('dark.migrateLayers') + (need.lost > 0 ? t('dark.migrateLost', { x: need.lost }) : '') + t('dark.migrateUndo');
   body.appendChild(para);
   const btn = $('btnGenDark');
   let going = false;
@@ -2199,7 +2199,6 @@ window.onmessage = (event: MessageEvent) => {
       if (activeTab === 'select') queueMicrotask(readLayerLibUse); // 로컬 변수 0개가 확인되면 ② 판정용으로 읽는다
       darkUnfilled = msg.darkUnfilled ?? 0;
       darkOld = msg.darkOld ?? false;
-      darkOldManual = msg.darkOldManual ?? false;
       updateGates();
       break;
     case 'LICENSE_STATUS': {
@@ -3384,13 +3383,14 @@ async function runMake(): Promise<void> {
           // 대상 · 모드는 플러그인이 정한다(ia-v3 13.7). 옛 구조면 옮기지 않고 ⚠로 멈춘다(옮기기는 다크 화면에서만).
           const r = await wizardRequest({ type: 'GENERATE_DARK_MODE' }, ['DARK_MODE_RESULT']);
           const keptPart = r.kept ? t('wizard.seq.darkKept', { n: r.kept }) : '';
+          const scalePart = r.scaleAdded ? t('wizard.seq.darkScale', { g: r.scaleAdded }) : '';
           if (r.error) { results.push({ id, mark: 'warn', text: r.error }); stay = true; }
           else if (r.needMigrate) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkMigrate') }); stay = true; }
           else if (!r.targets) { results.push({ id, mark: 'warn', text: t('wizard.seq.darkNothing') }); stay = true; }
-          else if (!r.filled) results.push({ id, mark: 'ok', text: t('wizard.seq.darkUpToDate') + keptPart }); // 다 됨 줄의 다크 부분은 뺀다
+          else if (!r.filled) results.push({ id, mark: 'ok', text: t('wizard.seq.darkUpToDate') + scalePart + keptPart }); // 다 됨 줄의 다크 부분은 뺀다
           else {
             totals.darkFilled = r.filled;
-            results.push({ id, mark: 'ok', text: t('wizard.seq.dark', { filled: r.filled }) + (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') + keptPart });
+            results.push({ id, mark: 'ok', text: t('wizard.seq.dark', { filled: r.filled }) + scalePart + (r.modeCreated ? t('wizard.seq.darkModeCreated') : '') + keptPart });
           }
         }
       } else if (id === 'textStyles') {
