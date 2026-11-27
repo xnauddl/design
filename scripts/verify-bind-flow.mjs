@@ -4489,6 +4489,32 @@ const tipWait = (p) => p.evaluate(() => new Promise((res) => requestAnimationFra
     check('8a [보기] → 만들기 화면', await visible(p, '#makeScreen'));
     await p.close();
   }
+  {
+    // [읽기] 중 선택이 바뀜 — 자동 읽기는 [읽기] 작업에 막히고, 옛 기준의 응답은 버린 뒤 새 기준으로 다시 읽는다(#171 검토 — 옛 값을 지금 기준으로 적지 않음)
+    const p = await big();
+    await p.click('#makeEmpty button');
+    await p.waitForTimeout(20);
+    const ex = (await sent(p, 'EXTRACT')).at(-1);
+    const sc = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    const n0 = (await sent(p, 'EXTRACT')).length;
+    await recv(p, { ...sel(1, 0), ids: ['small8c'] });
+    await p.waitForTimeout(500);
+    const blocked = (await sent(p, 'EXTRACT')).length === n0;
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: ex.reqId, warnings: [], selection: 10, tokens: [{ name: 'spacing/777', category: 'gap', value: 777, sources: ['itemSpacing'], count: 1 }] });
+    await p.waitForTimeout(40);
+    const waitPair = (await sent(p, 'EXTRACT')).length === n0 && !(await p.textContent('#makeTree')).includes('777');
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(40);
+    const re = (await sent(p, 'EXTRACT')).at(-1);
+    check('8a [읽기] 중 선택이 바뀜 → 옛 기준 응답 버림 · 짝 응답 뒤 새 기준으로 다시 읽음 · 옛 값 안 보임', blocked && waitPair && (await sent(p, 'EXTRACT')).length === n0 + 1 && JSON.stringify(re?.nodeIds) === '["small8c"]' && !(await p.textContent('#makeTree')).includes('777'), `${blocked} ${waitPair} ${JSON.stringify(re)}`);
+    await recv(p, { type: 'EXTRACT_RESULT', reqId: re.reqId, warnings: [], selection: 1, tokens: [{ name: 'spacing/24', category: 'gap', value: 24, sources: ['itemSpacing'], count: 1 }] });
+    const sc2 = (await sent(p, 'SCAN_TEXT_STYLES')).at(-1);
+    await recv(p, { type: 'TEXT_STYLE_CANDIDATES', reqId: sc2.reqId, warnings: [], existing: [], styles: [] });
+    await p.waitForTimeout(60);
+    const tree = await p.textContent('#makeTree');
+    check('8a 새 기준 응답 → 새 값만 그림', tree.includes('24') && !tree.includes('777'), tree);
+    await p.close();
+  }
   // E — 만들기 카드 만들기 중 조용한 응답(카드 미리보기 · 추출)이 와도 그 작업 그대로(T-P27)
   {
     const p = await openZero('free');

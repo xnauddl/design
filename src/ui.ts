@@ -3449,6 +3449,7 @@ function readMake(user = false): void {
   if (!user && baseline.scanned > BIG_SELECTION) { renderMakeScreen(); return; }
   if (opBusy() || wizardRunning) return;
   mkExtractReq = mkNextReq();
+  mkReqBase.set(mkExtractReq, baseKey());
   mkReading = true;
   // 사용자가 누른 [읽기]만 OPS 작업(진행 테두리 · ✓ / ⚠ · 실패 [보기] — §2.6 · T-P14), 자동 읽기는 조용히.
   opSilent = !user;
@@ -3457,6 +3458,7 @@ function readMake(user = false): void {
   send({ type: 'EXTRACT', nodeIds: baseline.ids, reqId: mkExtractReq });
   if (isPaid) {
     mkScanReq = mkNextReq();
+    mkReqBase.set(mkScanReq, baseKey());
     mkTsReading = true;
     if (user) mkUserReqs.add(mkScanReq);
     send({ type: 'SCAN_TEXT_STYLES', nodeIds: baseline.ids, reqId: mkScanReq, make: true });
@@ -3491,12 +3493,25 @@ function mkSendPreview(): void {
 
 /** 사용자가 누른 [읽기]의 reqId — 실패 · 거절을 공통 상태 줄에 알린다(자동 읽기는 콘솔만 — B.19a). */
 const mkUserReqs = new Set<number>();
+/**
+ * 추출 · 후보 읽기를 보낸 때의 목록 기준(reqId → baseKey). 응답이 오기 전에 기준이 바뀌었으면 그 응답(결과 · 오류 · 거절)을
+ * 버리고 다시 읽는다 — 사용자 [읽기]가 OPS 작업이라 그동안 자동 읽기가 `opBusy()`에 막히므로, 옛 기준의 값을 지금 기준으로
+ * 적지 않게(B.19a).
+ */
+const mkReqBase = new Map<number, string>();
 /** 이 화면의 응답이면 받고 true(메인 처리기는 건드리지 않는다). */
 function makeTakes(msg: CodeToUi): boolean {
   const rid = msg.reqId;
   if (rid == null || !mkOwned.has(rid)) return false;
   // 마법사 다크 단계의 답 — 메인 처리기가 지금처럼 받는다(allVars · 다크 전제 판정 · darkStatus — B.19a). 마법사는 자기 리스너로 받는다.
   if (msg.type === 'VARIABLES' || msg.type === 'DARK_MODE_RESULT') return false;
+  const sentFor = mkReqBase.get(rid);
+  mkReqBase.delete(rid);
+  if ((rid === mkExtractReq || rid === mkScanReq) && sentFor !== undefined && sentFor !== baseKey()) {
+    mkUserReqs.delete(rid);
+    onMakeReadStale(rid === mkScanReq);
+    return true;
+  }
   if ((msg.type === 'ERROR' || msg.type === 'PREMIUM_REQUIRED') && (rid === mkExtractReq || rid === mkScanReq)) { onMakeReadFail(msg, rid === mkScanReq); return true; }
   if (msg.type === 'EXTRACT_RESULT' && rid === mkExtractReq) onMakeExtract(msg);
   else if (msg.type === 'CREATE_RESULT' && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
@@ -3505,6 +3520,18 @@ function makeTakes(msg: CodeToUi): boolean {
   return true; // 실행 단계 응답은 wizardRequest가 받는다
 }
 
+/**
+ * 보낸 뒤 목록 기준이 바뀐 읽기의 응답 — 버린다. 짝 읽기(추출 · 후보)가 아직 오지 않았으면 그 응답까지 기다렸다가 한 번 다시 읽는다
+ * (사용자 [읽기]면 짝의 OPS 작업이 남아 있는 동안 readMake가 막히므로). 다른 작업 중이라 다시 읽지 못하면 옛 값 없이 그린다
+ * (`mkFor`는 옛 기준 그대로라 뼈대 · 큰 선택이면 [읽기] — 실행 버튼은 `mkReady`가 잠근다. 자동 읽기가 막힌 때와 같은 모습).
+ */
+function onMakeReadStale(scan: boolean): void {
+  if (scan) { mkScanReq = 0; mkTsReading = false; mkTsPending = null; }
+  else { mkExtractReq = 0; mkReading = false; }
+  if (mkReading || mkTsReading) return; // 짝 읽기가 아직 돌고 있다(mkScanReq는 답을 받아도 0으로 돌아가지 않아 읽는 중 표시로 본다)
+  readMake();
+  if (!mkReading) renderMakeScreen();
+}
 /**
  * 만들기 화면 읽기의 오류 · 거절 — 읽는 중을 끄고 다시 그린다. 추출 실패 = 마지막으로 읽은 값 그대로(다른 기준이면 값 줄 0),
  * 스캔 실패 · 거절 = 후보 0개(Text Style 탭 숨김). 사용자 [읽기]면 공통 상태 줄에 warn · 유료 사유, 자동 읽기는 콘솔만.
