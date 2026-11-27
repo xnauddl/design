@@ -635,7 +635,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     [hidden] { display: none !important; }
     body {
       font: var(--font-weight-regular) var(--font-size-md)/var(--line-height-normal) var(--font-family-sans);
-      margin: 0; padding: var(--space-3) var(--space-3) calc(var(--space-3) + var(--toast-space-body, 0px)); /* 아래 여백 + Toast가 떠 있는 동안 비우는 높이(ia-v4 §4.1b "자리") */
+      margin: 0; padding: var(--space-3) var(--space-3) calc(var(--space-3) + var(--foot-h, 0px) + var(--toast-space-body, 0px)); /* 아래 여백 + 보이는 아래 고정 줄 높이 + Toast가 떠 있는 동안 비우는 높이(ia-v4 §4.1b "자리") */
       color: var(--color-text-primary); background: var(--color-background-primary);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -775,7 +775,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: var(--space-10) var(--space-2); text-align: center; }
     /* IA v4 §4.2 연결 화면 */
-    .sub-foot { position: sticky; bottom: 0; display: flex; align-items: center; gap: var(--space-2); min-height: 52px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: calc(var(--space-2) + var(--toast-space-bar, 0px)); }
+    .sub-foot { display: flex; align-items: center; gap: var(--space-2); min-height: 52px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); }
 
     /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
     .steps { display: grid; gap: var(--space-1); margin: 0 0 var(--space-3); }
@@ -1233,7 +1233,10 @@ button.ds-tag { border: 0; cursor: pointer; }
     .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: none; font: var(--font-weight-semibold) var(--font-size-xs)/var(--line-height-xs) var(--font-family-sans); color: var(--color-text-secondary); cursor: help; flex: 0 0 auto; }
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
-    .make-foot { position: sticky; bottom: 0; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: calc(var(--space-2) + var(--toast-space-bar, 0px)); padding: var(--space-2) 0 var(--space-2); z-index: var(--z-sticky); }
+    .make-foot { background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); padding-top: var(--space-2); padding-bottom: var(--space-2); z-index: var(--z-sticky); }
+    /* 아래 고정 줄은 창 바닥 · 가로 전체(design-system §5 Bottom Action Bar · ia-v4 §4.1b S3-D10 — DS-3b 실기 뒤): 카드 안에 있어도 창에 고정한다.
+       내용이 짧아도 줄은 창 바닥에 있고, 본문 아래에는 줄 높이(--foot-h)만큼 여백을 둔다. 글은 카드 안 글과 같은 세로선에서 시작한다. */
+    .sub-foot, .make-foot { position: fixed; left: 0; right: 0; bottom: 0; margin: 0; padding-left: var(--space-6); padding-right: var(--space-6); z-index: var(--z-sticky); }
     /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
     .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }
     .make-opts { display: flex; align-items: center; gap: var(--space-0-5); height: var(--size-compact); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; }
@@ -9003,7 +9006,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   function visibleFoot() {
     for (const id of ["bindFoot", "renameFoot", "makeFoot"]) {
       const f = $(id);
-      if (f.offsetParent && f.getClientRects().length) return f;
+      if (f.getClientRects().length && f.getBoundingClientRect().height > 0) return f;
     }
     return null;
   }
@@ -9012,12 +9015,10 @@ button.ds-tag { border: 0; cursor: pointer; }
     var _a3;
     const st = document.documentElement.style;
     const root = (_a3 = currentToast()) == null ? void 0 : _a3.root;
-    for (const v of ["--toast-space-body", "--toast-space-bar", "--toast-space-side"]) st.setProperty(v, "0px");
+    for (const v of ["--toast-space-body", "--toast-space-side"]) st.setProperty(v, "0px");
     if (root && root.isConnected) {
       const h = root.offsetHeight + cssPx("--space-3");
-      const foot = visibleFoot();
-      if (!foot) st.setProperty("--toast-space-body", `${h}px`);
-      else if (document.documentElement.scrollHeight > window.innerHeight) st.setProperty("--toast-space-bar", `${h}px`);
+      st.setProperty("--toast-space-body", `${h}px`);
       st.setProperty("--toast-space-side", `${h}px`);
     }
     placeToast();
@@ -9591,10 +9592,13 @@ button.ds-tag { border: 0; cursor: pointer; }
   $("btnSubBack").addEventListener("click", subBack);
   function syncFootShadow() {
     const doc = document.documentElement;
+    const foot = visibleFoot();
+    const fh = `${foot ? Math.round(foot.getBoundingClientRect().height) : 0}px`;
+    if (doc.style.getPropertyValue("--foot-h") !== fh) doc.style.setProperty("--foot-h", fh);
     const over = window.scrollY + window.innerHeight < doc.scrollHeight - 1;
     for (const id of ["bindFoot", "renameFoot", "makeFoot"]) {
       const el2 = $(id);
-      el2.toggleAttribute("data-overlapped", over && !!el2.offsetParent);
+      el2.toggleAttribute("data-overlapped", over && el2 === foot);
     }
   }
   window.addEventListener("scroll", syncFootShadow, { passive: true });

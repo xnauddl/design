@@ -24,7 +24,7 @@ for (const f of dsFiles.filter((f) => f.endsWith('.ts'))) ts[f] = read(f);
 const dsHtml = Object.fromEntries(dsFiles.filter((f) => f.endsWith('.html')).map((f) => [f, read(f)]));
 
 /** §2.3 런타임 변수 — 토큰이 아님. */
-const RUNTIME = new Set(['--tabs-h', '--head-top', '--toolbar-top', '--toolbar-h', '--side-top', '--prog', '--band-ic', '--tip-x', '--toast-bottom', '--toast-space-body', '--toast-space-bar', '--toast-space-side']);
+const RUNTIME = new Set(['--tabs-h', '--head-top', '--toolbar-top', '--toolbar-h', '--side-top', '--prog', '--band-ic', '--tip-x', '--toast-bottom', '--toast-space-body', '--foot-h', '--toast-space-side']);
 
 /** CSS 선언 [{prop, value, where}] — :root 묶음(자리 표시 · color-scheme)은 뺀다. */
 function declsOf(text, where) {

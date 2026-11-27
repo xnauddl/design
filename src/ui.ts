@@ -4217,7 +4217,7 @@ function notify(text: string, tone: NotifyTone, o: { action?: StatusAction; tip?
 }
 /** 지금 화면의 보이는 아래 고정 줄(연결 · 이름 정리 `.sub-foot` · 만들기 `.make-foot`). */
 function visibleFoot(): HTMLElement | null {
-  for (const id of ['bindFoot', 'renameFoot', 'makeFoot']) { const f = $(id); if (f.offsetParent && f.getClientRects().length) return f; }
+  for (const id of ['bindFoot', 'renameFoot', 'makeFoot']) { const f = $(id); if (f.getClientRects().length && f.getBoundingClientRect().height > 0) return f; } // 창에 고정된 줄은 offsetParent가 늘 null — 크기로 본다
   return null;
 }
 const cssPx = (name: string): number => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
@@ -4225,12 +4225,11 @@ const cssPx = (name: string): number => parseFloat(getComputedStyle(document.doc
 function judgeToastSpace(): void {
   const st = document.documentElement.style;
   const root = currentToast()?.root;
-  for (const v of ['--toast-space-body', '--toast-space-bar', '--toast-space-side']) st.setProperty(v, '0px');
+  for (const v of ['--toast-space-body', '--toast-space-side']) st.setProperty(v, '0px');
   if (root && root.isConnected) {
+    // 아래 고정 줄은 창 바닥에 고정이라(S3-D10) 줄이 있어도 없어도 본문 아래 여백만 늘린다 — 줄은 움직이지 않는다.
     const h = root.offsetHeight + cssPx('--space-3');
-    const foot = visibleFoot();
-    if (!foot) st.setProperty('--toast-space-body', `${h}px`);
-    else if (document.documentElement.scrollHeight > window.innerHeight) st.setProperty('--toast-space-bar', `${h}px`); // 스크롤될 때만 — 짧은 화면은 줄을 움직이지 않는다
+    st.setProperty('--toast-space-body', `${h}px`);
     st.setProperty('--toast-space-side', `${h}px`);
   }
   placeToast();
@@ -4824,10 +4823,14 @@ $('btnSubBack').addEventListener('click', subBack);
 /** 하위 화면 아래 고정 줄(§4.1b S3-D10) — 그 아래로 내용이 깔릴 때만 data-overlapped(→ elevation-sticky). 스크롤 · 크기 바뀜 때 다시 정한다. */
 function syncFootShadow(): void {
   const doc = document.documentElement;
+  // 창 바닥에 고정된 줄의 높이만큼 본문 아래 여백(--foot-h) — 마지막 줄이 줄 밑에 숨지 않게.
+  const foot = visibleFoot();
+  const fh = `${foot ? Math.round(foot.getBoundingClientRect().height) : 0}px`;
+  if (doc.style.getPropertyValue('--foot-h') !== fh) doc.style.setProperty('--foot-h', fh);
   const over = window.scrollY + window.innerHeight < doc.scrollHeight - 1;
   for (const id of ['bindFoot', 'renameFoot', 'makeFoot']) {
     const el = $(id);
-    el.toggleAttribute('data-overlapped', over && !!el.offsetParent);
+    el.toggleAttribute('data-overlapped', over && el === foot);
   }
 }
 window.addEventListener('scroll', syncFootShadow, { passive: true });

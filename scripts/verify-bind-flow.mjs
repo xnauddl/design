@@ -717,9 +717,9 @@ const reenter = (p) => p.evaluate(() => {
   const tp = await p.evaluate(() => {
     const bar = document.getElementById('bindFoot').getBoundingClientRect();
     const t = document.querySelector('#toastHost .ds-toast').getBoundingClientRect();
-    return { barTop: Math.round(bar.top), toastBottom: Math.round(t.bottom), toastH: Math.round(t.height), space: getComputedStyle(document.documentElement).getPropertyValue('--toast-space-bar').trim(), mt: getComputedStyle(document.getElementById('bindFoot')).marginTop };
+    return { barTop: Math.round(bar.top), barH: Math.round(bar.height), barL: Math.round(bar.left), barR: Math.round(bar.right), barB: Math.round(bar.bottom), toastBottom: Math.round(t.bottom), toastH: Math.round(t.height), pad: getComputedStyle(document.body).paddingBottom };
   });
-  check('DS-3b 하위 화면(스크롤됨) — Toast가 아래 고정 줄 위 12 · 줄 위 여백 = 8 + Toast 높이 + 12', Math.abs(tp.barTop - 12 - tp.toastBottom) <= 1 && tp.space === `${tp.toastH + 12}px` && tp.mt === `${8 + tp.toastH + 12}px`, JSON.stringify(tp));
+  check('DS-3b 하위 화면 — 아래 고정 줄은 창 바닥 · 가로 전체(0–560) · Toast는 그 위 12 · 본문 아래 여백 = 12 + 줄 높이 + Toast 높이 + 12', tp.barL === 0 && tp.barR === 560 && tp.barB === 510 && Math.abs(tp.barTop - 12 - tp.toastBottom) <= 1 && tp.pad === `${12 + tp.barH + tp.toastH + 12}px`, JSON.stringify(tp));
   await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await p.waitForTimeout(80);
   const te = await p.evaluate(() => {
@@ -4465,7 +4465,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
   await p.waitForTimeout(60);
   const after = await p.evaluate(() => { const t = document.querySelector('#toastHost .ds-toast').getBoundingClientRect(); return { top: Math.round(document.getElementById('bindFoot').getBoundingClientRect().top), toastBottomGap: Math.round(innerHeight - t.bottom), toastTop: Math.round(t.top), barBottom: Math.round(document.getElementById('bindFoot').getBoundingClientRect().bottom) }; });
-  check('DS-3b 짧은 하위 화면 — Toast가 떠도 아래 고정 줄이 움직이지 않음 · 줄을 가리지 않음', !before.scrolls && before.top === after.top && (after.toastTop >= after.barBottom || after.toastBottomGap > 12), JSON.stringify({ before, after }));
+  check('DS-3b 짧은 하위 화면 — 아래 고정 줄도 창 바닥(510) · Toast가 떠도 움직이지 않음 · Toast는 줄 위', !before.scrolls && before.top === after.top && after.barBottom === 510 && after.toastBottomGap > 12, JSON.stringify({ before, after }));
   await p.close();
 }
 

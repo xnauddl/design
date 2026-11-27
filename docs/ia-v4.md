@@ -953,18 +953,16 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 **자리**
 
 - **기본 자리:** 창 아래 가운데. 아래 띄움(`--toast-bottom`)은 아래와 같다.
-  - 지금 화면에 **보이는 아래 고정 줄**(`.sub-foot` · `.make-foot`, 도구 탭 PR 뒤 도구 화면의 아래 고정 줄 — 화면 이름이 아니라 "보이는 줄이 있는가"로 정한다)이 **Toast 자리(창 바닥에서 Toast 높이 + 2 × `space-3` 안)와 겹치면** 그 줄의 실제 위 끝에서 `space-3` 위다 — `innerHeight − 줄.getBoundingClientRect().top + space-3`. 끝까지 스크롤해 줄이 본문 아래 여백 위에 서도 틈이 `space-3`이다. 실행 버튼을 가리지 않는다.
-  - 내용이 짧아 줄이 창 가운데쯤에 떠 있어 Toast 자리와 겹치지 않으면 창 아래 `space-3`이다(줄 위로 따라 올라가지 않는다 — "창 아래 가운데" 그대로).
+  - 지금 화면에 **보이는 아래 고정 줄**(`.sub-foot` · `.make-foot`, 도구 탭 PR 뒤 도구 화면의 아래 고정 줄 — 화면 이름이 아니라 "보이는 줄이 있는가"로 정한다)이 있으면 그 줄의 위 끝에서 `space-3` 위다 — `innerHeight − 줄.getBoundingClientRect().top + space-3`. 줄은 늘 창 바닥에 고정이라(아래 "하위 화면 아래 고정 줄" — 2026-11-27 실기 뒤) Toast는 늘 줄 바로 위에 뜨고 실행 버튼을 가리지 않는다. 판정은 크기로 한다(창에 고정된 요소는 `offsetParent`가 늘 null).
   - 없으면 `space-3`이다.
-- **다시 정하는 때:** Toast를 띄울 때 · 탭이나 하위 화면이 바뀔 때(`showTab` · `showSelSub`) · 스크롤 · 크기가 바뀔 때(`document.body`를 보는 `ResizeObserver` — DS-3a `syncFootShadow`가 쓰는 것과 같은 때).
+- **다시 정하는 때:** Toast를 띄울 때 · 탭이나 하위 화면이 바뀔 때(`showTab` · `showSelSub`) · 스크롤 · 크기가 바뀔 때(`document.body`를 보는 `ResizeObserver`).
 - **가리지 않게 비우는 자리** — Toast가 떠 있는 동안만, 비우는 높이 h = Toast 높이 + `space-3`:
-  - 보이는 아래 고정 줄이 없는 화면(선택 탭 첫 화면 · 변수 탭 · 설정 · 값을 직접 고르기 등): 본문 아래 여백을 `space-3` + h로 늘린다. 끝까지 스크롤하면 마지막 카드의 할 일 줄 · 마지막 목록 줄이 Toast 위로 올라온다.
-  - 보이는 아래 고정 줄이 있는 화면: **문서가 창보다 길어 스크롤될 때만**(`document.documentElement.scrollHeight > innerHeight` — 줄이 창 바닥에 붙어 있는 때) 그 줄의 위 바깥 여백(`margin-top` — 지금 `space-2`)을 `space-2` + h로 늘린다. 짧은 화면에서는 늘리지 않는다 — 늘리면 Toast가 뜨고 질 때마다 줄(실행 버튼)이 h만큼 내려갔다 올라온다(예: 잠긴 버튼을 누른 순간 그 버튼이 포인터 밑에서 움직임). 판정은 Toast를 띄울 때와 **탭 · 하위 화면이 바뀔 때**(`showTab` · `showSelSub` — 앞 화면에서 늘린 여백은 되돌리고 새 화면에서 다시 판정) 한다. 같은 화면 안에서는 떠 있는 동안 늘린 여백 때문에 스크롤이 생겨도 다시 하지 않는다. **받아들임:** 문서가 창보다 짧아 스크롤은 없는데 줄이 Toast 자리와 겹치는 경계(줄 아래 끝이 창 바닥에서 약 56–72px 안)에서는 Toast가 줄 위에 떠 줄 바로 위 마지막 목록 줄을 잠시 가릴 수 있다 — 동작 없는 Toast는 4초 · 닫기로 치울 수 있고, 줄(실행 버튼)이 움직이지 않는 쪽을 택한다. 끝까지 스크롤하면 줄 바로 위 마지막 목록 줄이 Toast 위로 올라온다(본문 아래 여백은 늘리지 않는다 — 늘리면 줄 밑에 빈 틈이 생김).
+  - 본문 아래 여백을 h만큼 더 늘린다(아래 고정 줄이 있는 화면도 같다 — 줄이 창에 고정이라 줄은 움직이지 않는다). 끝까지 스크롤하면 마지막 카드의 할 일 줄 · 마지막 목록 줄이 Toast 위로 올라온다.
   - 변수 탭 사이드바(안에서만 스크롤): `max-height`에서 h를 더 뺀다. 사이드바 끝 항목이 Toast에 가리지 않는다.
-  - Toast가 사라지면 셋 모두 되돌린다.
+  - Toast가 사라지면 둘 다 되돌린다.
 - **정리:**
-  - `.sub-foot` · `.make-foot`의 `bottom: 24px`(상태 줄 몫)을 0으로 바꾼다.
-  - `body` 아래 여백 `space-10`(상태 줄 24 + 여백)을 `space-3`으로 바꾼다.
+  - 상태 줄 몫인 `.sub-foot` · `.make-foot`의 `bottom: 24px`을 없앤다(줄은 창 바닥에 고정 — 아래 "하위 화면 아래 고정 줄").
+  - `body` 아래 여백 `space-10`(상태 줄 24 + 여백)을 `space-3` + 보이는 아래 고정 줄 높이(`--foot-h`) + Toast 몫으로 바꾼다.
   - 변수 탭 사이드바 `max-height`에서 `− 24px`(상태 줄 몫)을 뺀다.
 - **팝업이 열려 있으면:** Toast는 팝업 위에 뜬다(`z-tooltip` 60 > `z-modal` 40). 지금 상태 줄은 팝업 뒤(`z-fixed`)에 가려졌다.
   - 팝업 안 알림 줄을 쓰는 곳(새 변수 · 상세 [저장] · 복사됨)은 그대로다. 이 곳들은 Toast를 부르지 않는다.
@@ -1071,7 +1069,7 @@ S-2가 카드 1을 m(연결할 곳) · n(새로 만들 값 **개수**) · p(만�
 
 #### 하위 화면 아래 고정 줄 (S3-D10)
 
-- 연결 · 만들기 · 이름 정리 화면의 아래 고정 줄(`.sub-foot` · `.make-foot` — design-system §5 Bottom Action Bar)은 그대로 둔다. 선택 탭 첫 화면에는 없다(S3-D1).
+- 연결 · 만들기 · 이름 정리 화면의 아래 고정 줄(`.sub-foot` · `.make-foot` — design-system §5 Bottom Action Bar)은 둔다. **창 바닥 · 가로 전체(0–560)에 고정한다**(2026-11-27 사용자 결정 — DS-3b 실기에서 "프레임이 잘린 것처럼 보인다, 가로가 전체 영역이어야 한다": 카드 안 `position: sticky`라 좌우가 카드 안쪽에서 끊기고, 상태 줄이 빠진 뒤 줄 밑에 카드 아래 · 본문 여백이 남았다). `position: fixed; left: 0; right: 0; bottom: 0`(카드 안에 있어도), 좌우 안쪽 `space-6`(글이 카드 안 글과 같은 세로선), 내용이 짧아도 창 바닥. 본문 아래 여백은 그 줄 높이(`--foot-h` — `syncFootShadow`가 잼)만큼 늘려 마지막 줄이 줄 밑에 숨지 않게 한다. 카드는 내용만큼 닫힌 모양(아래 테두리 · 둥근 모서리)으로 줄 위에 남는다. 선택 탭 첫 화면에는 없다(S3-D1).
 - 위 1px 선은 늘, **그 아래로 내용이 깔릴 때만**(스크롤 컨테이너의 `scrollTop + clientHeight < scrollHeight − 1`) 옅은 그림자 `elevation-sticky`(design-system §3.5)를 더한다. 상태는 속성 `data-overlapped`(design-system §6.0 "상태는 속성으로")로 두고, 스크롤 · 크기 바뀜(`ResizeObserver`) 때 다시 정한다.
 
 #### 트리 줄의 종류 표시 (S3-D11)
@@ -3111,10 +3109,11 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 - [x] `src/lib/wizard.ts` `makeDoneText` 문장형(S3-D16) — 새 키 `make.done.madeG` · `madeR` · `places` · `placesTs` · `placesTsOnly` · `noPlace` · `sentCreateBind` · `sentCreate` · `sentBind`, `make.done.bind` 지움(`wizard.seq.bindTs*`는 남은 쓰임 확인), `test/wizard.test.mjs` 기대 글 바꿈(§4.1b 예 표 10줄)
 - [x] 만들기 다 됨 → 첫 화면 + success Toast(동작 없음 4초 · 바로 연결 끔이면 [연결하기 →] 남음)
 - [x] `v4.linked` 글 앞 "🔗 " 뺌 · `make.done.noPlace` "변수를 연결한 곳은 없어요"
-- [x] `dismissStickyOnAction` 예외에 `#btnMinimize` · `#btnExpand` · Toast 전체, `--toast-bottom`은 보이는 아래 고정 줄이 Toast 자리와 겹칠 때만 그 줄의 실제 위 끝 + `space-3`(스크롤 때도 다시 잼), 비우는 자리 셋(본문 아래 · 아래 고정 줄 위 — 스크롤될 때만 · 사이드바 `max-height`) · `toast()` 시간 멈춤을 "포인터 위 또는 포커스 안"으로
+- [x] `dismissStickyOnAction` 예외에 `#btnMinimize` · `#btnExpand` · Toast 전체, `--toast-bottom`은 보이는 아래 고정 줄이 Toast 자리와 겹칠 때만 그 줄의 실제 위 끝 + `space-3`(스크롤 때도 다시 잼), 비우는 자리(본문 아래 · 사이드바 `max-height` — 실기 뒤 아래 고정 줄을 창 바닥에 고정해 "줄 위 여백"은 없앰) · `toast()` 시간 멈춤을 "포인터 위 또는 포커스 안"으로
 - [x] design-system §3 radius 표의 `radius-large` 쓰임에서 Toast 뺌 · `src/gallery/gallery.ts` Toast 줄(meta · 네 tone 예 · 긴 글 예)
 - [x] verify: `#statusLine` 0 · 37곳 가운데 대표(연결 다 됨 success · 찾기 취소 warning [다시 읽기] 남음 · 잠금 사유 warning 4초 · 오류 error · 최소화 실패 error [보기]) 글 · tone · 남는 시간 · 닫기 · 긴 글이 잘리지 않음(높이 = 줄 수 × 16 + 16 · `scrollHeight` = `clientHeight`) · 툴팁은 tip이 있을 때만 `title` · `role="status"` · error `assertive` · 최소화 중 숨김 · 펼칠 때 남은 Toast · 하위 화면에서 아래 고정 줄과 겹치지 않음 · 첫 화면 끝까지 스크롤하면 할 일 줄이 Toast 위 · Toast 안 클릭은 Toast를 지우지 않음 · [—] · 펼치기가 남은 Toast를 지우지 않음 · 하위 화면 끝까지 스크롤하면 마지막 목록 줄이 Toast 위 · 포커스가 든 Toast가 사라지면 들어오기 전 요소로 · 560에서 가로 스크롤 0. 지금 `#statusText` 검사는 모두 Toast 글로 옮김(811줄 연결 다 됨 기대 글은 "🔗 " 없이 · 1340줄 `!startsWith('🔗')`는 🔗를 빼면 늘 참이라 "연결 화면 글이 아님"을 다른 방법(예 연결 화면 `#applyStatus` 글과 다름 · Toast tone)으로) · 짧은 하위 화면에서 Toast가 떠도 아래 고정 줄이 움직이지 않음
 - [x] 4검사 · `dist/` · 실제 화면 스크린샷 대조(B5)
+- [x] 실기 뒤 고침(2026-11-27): 아래 고정 줄을 창 바닥 · 가로 전체에 고정(S3-D10 — `position: fixed` · `--foot-h`), 짧은 화면도 창 바닥 · Toast는 늘 줄 위 · verify 검사 바꿈
 - [ ] 실기 확인(사용자, 피그마): 만들기 실행 → 첫 화면 결과 Toast / 연결 화면에서 연결 → 첫 화면으로 와서 창 아래 Toast / 만들기 화면 안 잠금 사유 → 아래 고정 줄 위 Toast / 잠긴 버튼 클릭 → warning / 최소화 중 실패 → 펼치면 [보기]
 
 - 구현 메모(DS-3b PR): ① `notify(text, tone, { action?, tip? })`가 `showStatusLine`을 바꾼다(`setMini`의 같은 이름 인자는 `tellCode`로). ② `toast()`는 `#toastHost`가 없으면 만든다(모음 화면). ③ 화면에 고정된 요소는 `offsetParent`가 늘 null이라 verify는 Toast가 보이는지를 크기로 잰다(`toastShown`) — 옛 `visible(p, '#statusLine')` 검사도 이것으로. ④ 연결 화면 아래 고정 줄은 이제 창 바닥(510)에 붙는다(옛 검사 `≤ 510 − 24`를 바꿈). ⑤ 스크린샷 `docs/qa/ds3b/`(B6-a · B6-b · error · 긴 글).

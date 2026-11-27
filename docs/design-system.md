@@ -67,7 +67,8 @@
 | `--prog` | `ui.ts`(진행 표시) | 진행 비율(%) |
 | `--band-ic` | `ui.html`(안내 띠 규칙) | 띠 앞 아이콘 그림(data URI) |
 | `--tip-x` | `src/ui/components/tooltip.ts`(DS-2) | 툴팁 꼬리의 가로 위치(px) |
-| `--toast-bottom` · `--toast-space-body` · `--toast-space-bar` · `--toast-space-side` | `ui.ts`(Toast 자리 — DS-3b) | Toast 아래 띄움 · Toast가 떠 있는 동안 비우는 높이(본문 아래 · 아래 고정 줄 위 · 변수 탭 사이드바 — ia-v4 §4.1b "자리") |
+| `--toast-bottom` · `--toast-space-body` · `--toast-space-side` | `ui.ts`(Toast 자리 — DS-3b) | Toast 아래 띄움 · Toast가 떠 있는 동안 비우는 높이(본문 아래 · 변수 탭 사이드바 — ia-v4 §4.1b "자리") |
+| `--foot-h` | `ui.ts`(`syncFootShadow`) | 창 바닥에 고정된 아래 고정 줄의 높이 — 본문 아래 여백(ia-v4 §4.1b S3-D10) |
 
 ## 3. Design Tokens (최종 값)
 
@@ -301,7 +302,7 @@
 | **Content Section** | `.ds-section` — `.ds-section__title`(`text-heading-sm`) · `.ds-section__desc`(`text-body-sm` `color-text-secondary`) · 본문. 절 사이 `space-6`, 제목–본문 `space-2` | `space-2` · `space-6` | `.step` |
 | **Settings Section** | `.ds-settings` — `.ds-settings__row` 줄 목록: 라벨(왼쪽, `text-label` + 설명 `text-body-sm`) · 컨트롤(오른쪽). 줄 최소 높이 `size-control-md` + 위아래 `space-1`, 줄 사이 구분선 없음 | `text-label` | ⚙ 설정 화면 |
 | **Result Section** | `.ds-result` — `.ds-result__summary`(한 줄 요약, `text-body`) + List Item 목록 + 빈 · 오류 상태 자리(§6.5 State) | `space-2` | `.results` · 트리 |
-| **Bottom Action Bar** | `.ds-actionbar` — 위 1px 선, 바탕 `color-background-primary`. `.ds-actionbar__start`(Ghost: 취소 · 뒤로) · `.ds-actionbar__end`(오른쪽 끝 Primary 하나, 그 왼쪽 Secondary). PluginLayout의 flex 자식이라 본문을 가리지 않는다(본문만 스크롤 — 아래 여백 따로 두지 않음) | `size-action-bar` · 버튼 `size-control-md` · 사이 `space-2` · 좌우 `space-3` | `.sub-foot` · `.make-foot`(DS-3a 뒤 — 선택 탭 첫 화면의 `.sel-tools`는 아래 고정 줄이 아니라 카드 안 할 일 줄이 된다, ia-v4 §4.1b S3-D1). 내용이 밑에 깔릴 때만 `elevation-sticky`(S3-D10) |
+| **Bottom Action Bar** | `.ds-actionbar` — 위 1px 선, 바탕 `color-background-primary`. `.ds-actionbar__start`(Ghost: 취소 · 뒤로) · `.ds-actionbar__end`(오른쪽 끝 Primary 하나, 그 왼쪽 Secondary). 창 바닥 · 가로 전체에 고정(지금 코드 — 카드 안에 있어도 `position: fixed`, 본문 아래 여백 = 줄 높이 `--foot-h`, ia-v4 §4.1b S3-D10 · 2026-11-27). PluginLayout으로 옮기면 flex 자식이 되어 아래 여백이 필요 없다 | `size-action-bar` · 버튼 `size-control-md` · 사이 `space-2` · 좌우 `space-3` | `.sub-foot` · `.make-foot`(DS-3a 뒤 — 선택 탭 첫 화면의 `.sel-tools`는 아래 고정 줄이 아니라 카드 안 할 일 줄이 된다, ia-v4 §4.1b S3-D1). 내용이 밑에 깔릴 때만 `elevation-sticky`(S3-D10) |
 | **Modal Layout** | Modal(§6.5)의 짜임 — `.ds-modal__header`(제목 `text-heading` + 닫기 Icon Button sm) · `.ds-modal__body`(스크롤) · `.ds-modal__footer`(오른쪽 [취소(Ghost)] [확인(Primary 또는 Destructive)], 위 1px 선) | `size-modal-*` · `radius-large` · `elevation-3` · 안쪽 `space-4` · 머리 · 바닥 위아래 `space-3` | `.modal` |
 
 PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~ Modal Layout)을 담는다(그래서 표는 9행).
