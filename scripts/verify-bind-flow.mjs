@@ -548,7 +548,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
 for (const w of [560]) {
   const p = await open(w);
   const r = await p.evaluate(() => ({ h: Math.round(document.querySelector('.tabs').getBoundingClientRect().height), hs: document.documentElement.scrollWidth > document.documentElement.clientWidth }));
-  check(`9 ${w}px 탭 바 한 줄·가로 스크롤 없음`, r.h <= 40 && !r.hs, `높이 ${r.h}px`);
+  check(`9 ${w}px 탭 바 한 줄(띠 44 — S3-D20)·가로 스크롤 없음`, r.h <= 44 && !r.hs, `높이 ${r.h}px`);
   await p.close();
 }
 
@@ -4702,6 +4702,8 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   check('DS-3c 무료 Semantic 탭 — 미리보기 뒤에도 🔒(수 1 대신)', st.txt === 'Semantic🔒', JSON.stringify(st));
   const foot = await p.evaluate(() => parseFloat(getComputedStyle(document.getElementById('makeFoot')).paddingLeft));
   check('DS-3c 아래 고정 줄 좌우 안쪽 24 그대로(사용자 결정)', foot === 24, String(foot));
+  const tb = await p.evaluate(() => { const e = document.querySelector('.tabs'); const s = getComputedStyle(e); const r = e.getBoundingClientRect(); return { t: Math.round(r.top), l: Math.round(r.left), r: Math.round(r.right), h: Math.round(r.height), bt: parseFloat(s.borderTopWidth), bb: parseFloat(s.borderBottomWidth), rad: parseFloat(s.borderTopLeftRadius), iw: document.documentElement.clientWidth }; });
+  check('DS-3c S3-D20 맨 위 탭 줄 띠 — 위 0 · 좌우 창 안쪽 폭 전체 · 높이 44 · 아래 선 1 · 위 선 0 · 둥근 모서리 0', tb.t === 0 && tb.l === 0 && tb.r === tb.iw && tb.h === 44 && tb.bb === 1 && tb.bt === 0 && tb.rad === 0, JSON.stringify(tb));
   check('DS-3c 카드 안 카드 0 · 560 가로 스크롤 0', (await nestedCards(p)).length === 0 && (await p.evaluate(() => document.documentElement.scrollWidth)) <= 560, JSON.stringify(await nestedCards(p)));
   // 무료 → 유료(만들기 화면에서): 다시 읽음 · Text Style 후보 읽기 · 수
   const exN = (await sent(p, 'EXTRACT')).length;

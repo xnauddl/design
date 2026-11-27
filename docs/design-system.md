@@ -234,7 +234,8 @@
 | `size-avatar-sm` · `-md` | 16 · 24px | 사람 · 파일 표시(지금 쓰는 곳 없음 — 모음 화면에서만) |
 | `size-modal-sm` · `-md` | 320 · 400px | Modal 너비(창이 좁으면 `100% - 2 × space-4`까지) |
 | `size-header` | 40px | Plugin Header · Page Header |
-| `size-nav` | 36px | Navigation(탭 줄 — ia-v4 §8) |
+| `size-nav` | 36px | 밑줄형 Tab(`.ds-tab`) · Navigation(`.ds-navbar`) |
+| `size-tabs-bar` | 44px | 맨 위 탭 줄 띠(`.tabs` — Figma Tabs bar, ia-v4 §4.1b S3-D20 · §8) |
 | `size-action-bar` | 52px | Bottom Action Bar |
 | `size-compact` | 26px | 촘촘한 칸 높이 — 알약 · 편집 팝업 칸 · 목록 머리 검색(ia-v4 §8 "검색 26") · 색 입력 (표 아래) |
 | `size-hit-min` | 24px | 누르는 곳 최소(ia-v3 §2.10) |
@@ -242,7 +243,7 @@
 - 버튼 · 입력의 높이는 **`height`로** 정한다(`height: var(--size-control-md)`, 좌우 `padding`만, 위아래 0). 지금처럼 위아래 padding + 줄 높이로 높이를 만들지 않는다.
   - 높이는 **기본 `button` 규칙과 한 줄 입력(`input[type=text]` · `input[type=number]` · `select`)에만** 준다. `textarea`는 높이를 주지 않는다.
   - 아래 버튼은 글자 안에 놓이거나 자기 모양이 있어 `height: auto`로 지금 높이를 지킨다: `button.link` · `button.link-btn`(`.sel-diff` 안 포함 — 24 이하) · `.step-chip` · `.ctx-menu button` · `.var-use` · `.ed-copy`. 작은 한 줄 입력 `.ts-edit input`(텍스트 스타일 편집 줄, 지금 약 21) · `select.r-role`(색 목록 역할 고르개, 지금 약 24)도 `height: auto`로 둔다(위아래 padding 3 → 4는 A.3대로 받아들여 약 2px 커짐). 자기 `height`를 이미 정한 버튼 · 칸(`.bv-switch` · `.mk-row button` · `.tr-edit` 22 · `.subtab` 32 등)은 맞는 크기 토큰이 있으면 토큰으로, 없으면 그 값 그대로(너비 · 높이는 검사 밖 — §3.6 마지막 줄).
-  - 탭: `.tabs`는 `min-height: var(--size-nav)`(36 — 지금과 같음) · 안쪽 `space-0-5`, `.tab-btn`은 `height: var(--size-control-sm)`(24 — 지금과 같음), `.tab-min` 28은 `size-control-md`.
+  - 탭: `.tabs`는 창 위 · 좌우에 붙은 띠 — `min-height: var(--size-tabs-bar)`(44) · 안쪽 좌우 `space-3` · 아래 1px 선(DS-3c S3-D20 — 전에는 `size-nav` 36 둥근 상자 · 안쪽 `space-0-5`), `.tab-btn`은 `height: var(--size-control-sm)`(24 — 지금과 같음), `.tab-min` 28은 `size-control-md`.
 - **26px 칸**은 모두 `size-compact`로 한다(28로 올리지 않음 — 옆 줄과 맞춘 값이라): `.vp-pill .vp-item` · `.make-opts` · `.ed-field`(min-height) · `.ed-go` · `.ed-type` · `.list-head .search-box input` · `input[type="color"]`, 그리고 그 칸과 줄을 맞춘 `line-height: 26px`(`.ed-dl dt` · `dd.ed-plain`).
 - 너비 · 높이의 다른 px(열 폭 88 · 견본 14 등)는 검사하지 않는다 — DS-2에서 컴포넌트로 옮길 때 정한다.
 
@@ -297,7 +298,7 @@
 |---|---|---|---|
 | **PluginLayout**(그릇) | `.ds-layout` — 세로 flex, 높이 100vh. 자식 순서 Header · Navigation · (Page Header) · `.ds-layout__body`(스크롤 — 이것만 `overflow: auto`) · Bottom Action Bar | `color-background-primary` · 본문 양옆 `space-3` | `body` · `.tab-section` |
 | **Plugin Header** | `.ds-header` — 왼쪽 `.ds-header__brand`(로고 16 + 이름 `text-heading-sm`), 가운데 `.ds-header__scope`(선택 대상, 말줄임, `text-body-sm` `color-text-secondary`), 오른쪽 Icon Button(⚙ `settings` · 도움말 `circle-help`). 로고 그림은 DS-3에서 정함. 아래 1px 선 | `size-header` · 좌우 `space-3` · 사이 `space-2` | 없음(SC-D27) |
-| **Navigation** | `.ds-navbar` — 밑줄형 Tab(§6.3)을 한 줄로. 왼쪽 맞춤, 탭 사이 `space-4`. 아래 1px 선 | `size-nav` · 좌우 `space-3` | `.tabs`(세그먼트형) |
+| **Navigation** | `.ds-navbar` — 밑줄형 Tab(§6.3)을 한 줄로. 왼쪽 맞춤, 탭 사이 `space-4`. 아래 1px 선 | `size-nav` · 좌우 `space-3` | `.tabs`(DS-3c S3-D20 뒤 창 위 · 좌우에 붙은 띠 — `size-tabs-bar` 44 · 바탕 `surface-secondary` · 아래 1px 선, 안의 탭은 세그먼트형 그대로) |
 | **Page Header** | `.ds-page-header` — ← Icon Button(sm) · 제목(`text-heading`, 말줄임) · 오른쪽 보조 정보(`text-body-sm` `color-text-secondary`, 말줄임). 아래 1px 선 | `size-header` · 사이 `space-2` | `.sub-head` |
 | **Content Section** | `.ds-section` — `.ds-section__title`(`text-heading-sm`) · `.ds-section__desc`(`text-body-sm` `color-text-secondary`) · 본문. 절 사이 `space-6`, 제목–본문 `space-2` | `space-2` · `space-6` | `.step`(DS-3c 뒤 연결 · 만들기 · 이름 정리 화면 `.step.bind-v4`는 카드 모양 없음 — 탭 패널 위에 바로, ia-v4 §4.1b S3-D18) |
 | **Settings Section** | `.ds-settings` — `.ds-settings__row` 줄 목록: 라벨(왼쪽, `text-label` + 설명 `text-body-sm`) · 컨트롤(오른쪽). 줄 최소 높이 `size-control-md` + 위아래 `space-1`, 줄 사이 구분선 없음 | `text-label` | ⚙ 설정 화면 |
