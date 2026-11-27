@@ -2,15 +2,15 @@
 
 > 2026-11-25 작성 · DS-1 검토 4회(중대 13 → 4 → 2 → 1 → 0), 디자인 방향 DS-D5–DS-D9. 2026-11-26 DS-2 명세(§5 · §6 · 부록 C — DS-D10–DS-D13) · 검토 3회(중대 19 → 5 → 0). 결정은 `docs/redesign/brief.md` §7 · §8. 리디자인 세션(SC-D30)의 첫 일이다.
 > 이 문서가 토큰 · 컴포넌트 · 레이아웃 · 사용 규칙의 **단일 명세**다. 토큰 값의 **단일 원본**은 `design-tokens/tokens.json`이고, 이 문서의 표는 그 원본과 같아야 한다(다르면 원본이 맞고 표를 고친다).
-> 본문 §3의 값은 **최종 값(DS-1 ② 단계 뒤)** 이다. ① 단계의 임시 값과 옮기기 규칙은 부록 A.
-> 기준: 본문 §0–§9에 중대 결함 0(CLAUDE.md 4단계). 부록 A · B는 DS-1 PR, 부록 C는 DS-2 PR에서 닫는다.
+> 본문 §3의 값은 **최종 값(DS-1 ② 단계 뒤)** 이다. ① 단계의 임시 값과 옮기기 규칙(옛 부록 A — A.0–A.4)은 DS-1 병합 뒤 지웠다(2026-11-27). 지운 표는 커밋 `3c618db`의 이 문서에 있다 — 아래 "A.n"은 그 표를 가리킨다.
+> 기준: 본문 §0–§9에 중대 결함 0(CLAUDE.md 4단계). 부록 B는 DS-1 PR(#182 — 닫힘, 실기 확인 2026-11-27), 부록 C는 DS-2 PR에서 닫는다.
 
 ## 0. 결정 요약
 
 | 항목 | 결정 |
 |---|---|
 | 디자인 방향 (DS-D5) | **Modern Minimalism · 모노크롬.** Primary `#111111`. 장식 · 과한 색 · 복잡한 카드를 줄이고 정보 구조 · 가독성 · 정렬 · 간격을 앞세운다. 상태색은 상태를 알릴 때만(brief §8). |
-| 단계 (DS-D1 · DS-D6) | **DS-1(지금, 한 PR에 두 단계)** — ① 옮기기: 토큰 원본 + `src/ui.html` · `src/ui.ts` · `src/treeList.ts`의 직접 값을 토큰으로(값은 지금과 거의 같음 — 부록 A) ② 새 값: 토큰 원본의 값만 §3의 최종 값으로. **DS-2** 공통 컴포넌트 30종 · 레이아웃 9종 + 개발용 모음 화면. **DS-3** 리디자인(작업별 탭 · Header · 하단 실행 줄 · 영어 문구, brief). |
+| 단계 (DS-D1 · DS-D6) | **DS-1(지금, 한 PR에 두 단계)** — ① 옮기기: 토큰 원본 + `src/ui.html` · `src/ui.ts` · `src/treeList.ts`의 직접 값을 토큰으로(값은 지금과 거의 같음 — 옛 부록 A) ② 새 값: 토큰 원본의 값만 §3의 최종 값으로. **DS-2** 공통 컴포넌트 30종 · 레이아웃 9종 + 개발용 모음 화면. **DS-3** 리디자인(작업별 탭 · Header · 하단 실행 줄 · 영어 문구, brief). |
 | 컴포넌트 범위 (DS-D2) | 요청 목록 **30종 전부**(§6). 지금 화면에 없는 5종(Split Button · Radio · Breadcrumb · Table · Toast)도 만든다. |
 | 간격 (DS-D3) | 4px 격자(4 · 8 · 12 · 16 · 20 · 24 · 32 · 40) + 2px. |
 | DS-2 (DS-D10–DS-D13) | 새 브랜치 · 새 PR · 만드는 법은 CSS 클래스(`ds-`) + TS 함수 · 지금 화면은 기본 5종(Button · Icon Button · Input/Select · Checkbox · Badge/Tag)만 바꿈 · 아이콘은 Lucide 24개(ISC · 일부 MIT — §6.6) — §6 |
@@ -187,7 +187,7 @@
 | `space-10` | 40px | 빈 상태 · 모달 바깥 위 여백 |
 
 - `padding*` · `margin*` · `gap` · `row-gap` · `column-gap`은 이 토큰 · Component 치수 토큰(§3.8) · `0` · `auto` · `-1px`(테두리 겹치기)만 쓴다. 그 밖의 음수는 `calc(-1 * var(--space-…))`.
-- 옮길 때 값 맞추는 법은 부록 A.3.
+- 옮길 때 값 맞추는 법은 옛 부록 A.3(DS-1에서 끝남 — 위 머리말).
 
 ### 3.4 Radius (DS-D9)
 
@@ -218,7 +218,7 @@
 
 - 테두리 굵기(`border*`의 굵기)는 `0` · `1px` · 토큰만. 1px는 머리카락 선이라 직접 쓴다.
 - `box-shadow` · `outline`은 `none` · `0` · `1px` · `inset` · `solid` · `inherit` · 토큰만(예: `inset 0 0 0 var(--border-width-medium) var(--color-interactive-focus)`, `outline: var(--border-width-thick) solid var(--color-interactive-focus)`).
-- 그림자는 떠 있는 것(메뉴 · 툴팁 · 모달)에만. **카드에는 그림자를 쓰지 않는다**(DS-D5 — ② 단계에서 카드의 `elevation-1`을 뺀다, 부록 A.4).
+- 그림자는 떠 있는 것(메뉴 · 툴팁 · 모달)에만. **카드에는 그림자를 쓰지 않는다**(DS-D5 — ② 단계에서 카드의 `elevation-1`을 뺀다, 옛 부록 A.4).
 
 ### 3.6 Size
 
@@ -509,118 +509,9 @@ PluginLayout은 그릇이고, 요청 목록의 레이아웃 8종(Plugin Header ~
 | DS-O2 | 상태 글자 대비(DS-D7 — 지정 값 그대로): Warning #B7791F 흰 바탕 3.6:1 · 옅은 바탕 3.3:1, Error #D64545 흰 바탕 4.4:1 · 옅은 바탕 3.8:1 · 흰 글자를 얹은 삭제 버튼 4.4:1, Success #16845B 옅은 바탕 4.1:1. 대비 검사 예외 | 사용자 결정으로 유지 |
 | DS-O3 | 포커스 모양이 두 가지(`focus-ring-default` · `focus-ring-field`)이고, 스위치 · 일부 줄은 `outline`으로 따로 그린다 | DS-2에서 입력류는 `focus-ring-field` 하나로(§6.9). 누르는 것 · 입력 두 가지는 규칙으로 남김(§6.0). 스위치의 `outline` · 줄(`.tr` · `.vs-item` · `.vt-row`)의 안쪽 그림자 포커스는 DS-3 |
 | DS-O4 | 잠긴 버튼(`aria-disabled`)과 꺼진 버튼(`:disabled`)의 모양이 다르다(글자 흐림 · 투명도) | DS-2에서 같은 모양으로(§6.0 상태 표) |
-| DS-O5 | `.ed-copy` · `.ed-plink`가 포커스 색(`--accent` 2.9:1)을 글자에 썼다 — ① 단계에서 `color-text-link`로 옮김(부록 A.1). ② 뒤 #111111로 해결 | 닫힘(DS-1) |
+| DS-O5 | `.ed-copy` · `.ed-plink`가 포커스 색(`--accent` 2.9:1)을 글자에 썼다 — ① 단계에서 `color-text-link`로 옮김(옛 부록 A.1). ② 뒤 #111111로 해결 | 닫힘(DS-1) |
 
 ---
-
-## 부록 A. DS-1 옮기기 (DS-1 병합 뒤 지움)
-
-### A.0 ① 단계 Global (지금 값 그대로)
-
-① 단계의 `tokens.json`은 아래 Global을 쓰고, Semantic은 A.1의 짝을 가리킨다. 색은 지금과 같다(★만 바뀜 — A.1 · A.2). ② 단계는 Global을 §3.1의 Foundation으로 바꾸고 Semantic이 가리키는 Global을 §3.1 표로 바꾼다(Semantic 이름은 그대로).
-
-| 계열 | 값 |
-|---|---|
-| gray | `0` #ffffff · `50` #f4f5f6 · `100` #eceef0 · `120` #ededed · `150` #e7e8ea · `200` #d4d6da · `210` #d8d8d8 · `220` #d0d5dd · `400` #9298a1 · `600` #5e636b · `800` #2b2a2a · `900` #1b1b1f · `920` #222222 · `1000` #000000 |
-| blue | `50` #ecf6ff · `100` #c4e4ff · `500` #0d99ff · `600` #0a86e6 · `700` #0974c9 · `800` #0a6dbf |
-| green · amber · red | `green-50` #e8f5ec · `green-700` #117b34 · `amber-50` #fbf1df · `amber-700` #9a6300 · `red-50` #fdecec · `red-100` #f4c9cc · `red-600` #c8252f |
-| 투명 | `black-a10` · `a12` · `a15` · `a18` · `a20` · `a28` (지금 쓰는 rgba(0,0,0,…) 그대로) |
-
-① 단계 Semantic → Global: primary blue-800 · primary-hover blue-700 · primary-subtle blue-50 · text-on-primary gray-0 · secondary-bg gray-0 · secondary-border gray-200 · background-primary gray-0 · surface-primary gray-0 · surface-secondary gray-50 · surface-selected gray-120 · surface-inverse gray-900 · border-default gray-150 · border-strong gray-200 · text-primary gray-900 · text-emphasis gray-1000 · text-secondary gray-600 · text-tertiary gray-400 · text-link blue-800 · text-inverse gray-0 · success green-700 / green-50 · warning amber-700 / amber-50 · error red-600 / red-50 / red-100 · info blue-800 / blue-50 / blue-100 · interactive-hover gray-100 · focus blue-500 · focus-hover blue-600 · focus-subtle blue-50 · overlay black-a28. Component: chip-value-bg gray-800 · chip-value-text gray-210 · chip-alias-text gray-1000 · swatch-border gray-1000 · swatch-outline black-a15(★ 아래) · checker-color gray-220 · nav-selected-badge-bg gray-1000. 툴팁 `.vt-tip`의 #222는 `color-surface-inverse`로(★ #1b1b1f).
-
-① 단계 비색 토큰: 둥글기 `radius-xs` 3 · `-small` 5 · `-medium` 7 · `-large` 10 · `-full` 9999(지금 `--r-sm` 5 · `--r` 7 · `--r-lg` 10), 그림자 rgba(20,22,28,…) 지금 값, `opacity-disabled` .42. 나머지(글자 · 간격 · 크기 · 움직임 · 겹침 · §3.8)는 §3 값 그대로.
-
-### A.1 옛 CSS 변수 → 새 토큰
-
-| 옛 이름 | 새 토큰 |
-|---|---|
-| `--bg` | `--color-background-primary` (`var(--bg, #fff)`의 대체값 뺌) |
-| `--surface` | `button` 기본 바탕 = `--color-secondary-bg`, 그 밖 = `--color-surface-primary` |
-| `--surface-2` | `--color-surface-secondary` (버튼 hover도 — ② 뒤 hover와 같은 neutral-100) |
-| `--surface-hover` | `--color-interactive-hover` |
-| `--text` | `--color-text-primary` |
-| `--text-2` | `--color-text-secondary` |
-| `--muted` | 아래 닫힌 목록대로 나눈다(§3.1 — tertiary는 자리 표시 · 비활성 · 장식만). **tertiary(그대로 #9298a1):** `::placeholder` · `[aria-disabled="true"]` 규칙 전부(`button` · `button.primary` · `label.inline:has(…)` · `.ctx-menu button` · `.ed-opt`) · `.ctx-menu button:disabled` · `.r-role.lk` · 장식(`.step-head .chev` · `.ts-edit .ts-sep` · `.be-art.icon` · `.tree.vlike button.tr-car` · `.vt-group .tw`) · 흐린 소수 크기 줄(TR-D14 · ia-v4 §4.3 — `#tsList .r-card.ts-decimal .r-title/.r-sum` · `.tr.ts-decimal .ts-aa/.tr-sub/.bv-tw` · `.tree.vlike .tr.ts-decimal .tr-lt` · `.tree.vlike .tr.ts-decimal .vchip .vl`). (꺼진 줄 이름 `.tr-name.muted`는 자기 규칙이 `--text-2`라 A.1대로 `color-text-secondary` — 지금 색 그대로, 새 규칙 없음.) **secondary★(#9298a1 → #5e636b, 읽어야 하는 글자):** 공용 `.muted`(카드 제목 개수 · 만들기 "단계 i/n" · `.unused-sum` · 새 그룹 메모 등) · `.ed-changes .muted` · `.ctx-menu .menu-note` · `.r-sum` · `.r-meta` · `.ed-changes .ed-ch-h` · `.ed-phead` · `.ed-pnote` · `.modal dt` · `.ed-ptag`. **쓰는 곳 없음(B.12에서 지움):** `.pipe-mini span` · `.bind-steps .bs` · `.bs-dot` · `.vs-tw` · `.col-role .sub` · `.vu-props`. 이 목록에 없는 `--muted`가 구현 때 나오면 tertiary로 두고 PR에 적는다 |
-| `--border` | `--color-border-default` (`var(--border-2, var(--border))` → `--color-border-strong`) |
-| `--border-2` | `button` 기본 테두리 = `--color-secondary-border`, 그 밖 = `--color-border-strong` |
-| `--accent` | 포커스 링 · 외곽선 · 고르개 테두리 · 체크박스 `accent-color` · 편집 중 칸 테두리(`.tr input.tr-edit`) · 메뉴가 열린 알약 테두리(`.vp-item.menu-open`) = `--color-interactive-focus` · 켠 스위치 · 진행 막대 · 돌기 · 고른 밑줄 = `--color-primary`(★) · 글자(`.ed-copy` · `.ed-plink`) = `--color-text-link`(★) |
-| `--accent-hover` | `--color-interactive-focus-hover` |
-| `--accent-press` | `--color-primary-hover` |
-| `--accent-strong` | 주 버튼 바탕 · 테두리 · 새 표시 바탕 = `--color-primary`, 링크 글자 = `--color-text-link`, 그 밖 글자 · 안내 띠 아이콘(`background-color`) = `--color-state-info` |
-| `--accent-subtle` | 포커스 띠(`box-shadow`) = `--color-interactive-focus-subtle`, 안내 띠(`.banner` · `.ux` 등) = `--color-state-info-subtle`, 그 밖 = `--color-primary-subtle` |
-| `--accent-border` | `--color-state-info-border` |
-| `--on-accent` | 주 버튼 위 = `--color-text-on-primary`, 짙은 바탕 위(있으면) = `--color-text-inverse` |
-| `--ok` · `--ok-subtle` | `--color-state-success` · `-subtle` (대체값 뺌) |
-| `--warn` · `--warn-subtle` | `--color-state-warning` · `-subtle` (대체값 뺌) |
-| `--danger` · `--danger-subtle` · `--danger-border` | `--color-state-error` · `-subtle` · `-border` (대체값 뺌) |
-| `--vchip-dark` · `--vchip-dark-fg` · `--vchip-fg` | `--chip-value-bg` · `--chip-value-text` · `--chip-alias-text` |
-| `--swatch-line` | `--swatch-border` |
-| `--side-sel` | `--color-surface-selected` |
-| `--r-sm` · `--r` · `--r-lg` | `--radius-small` · `--radius-medium` · `--radius-large` |
-| `--shadow-sm` · `--shadow` | `--elevation-1` · `--elevation-2` |
-| `--fs` | `--font-size-md` |
-| `--font` · `--mono` | `--font-family-sans` · `--font-family-mono` |
-
-`src/ui.ts` · `src/treeList.ts`의 `var(--ok)` · `var(--warn)` · `var(--text)` · `var(--text-2)` · `var(--border)`도 같은 표로.
-
-### A.2 직접 쓴 색 → 토큰 (★ = ① 단계에서 눈에 띄게 바뀜)
-
-| 지금 | 자리 | 새 토큰 |
-|---|---|---|
-| #fff | 어두운 면 · 오류 버튼 · 배지 · 새 표시 위 글자 | `--color-text-inverse`(주 버튼 위면 `--color-text-on-primary`) |
-| #fff | 스위치 손잡이 · 체커 바탕 | `--color-surface-primary` |
-| #1b1b1f · ★ #222 | 툴팁 바탕(`#uiTip` · ★ `.vt-tip`) | `--color-surface-inverse`(#1b1b1f) |
-| #000 | 고른 사이드 항목 글자 · 개수 | `--color-text-emphasis` |
-| #000 | 고른 사이드 항목 배지 바탕 | `--nav-selected-badge-bg` |
-| #d0d5dd | 체커 무늬 | `--checker-color` |
-| rgba(0,0,0, .1 · .12 · .15 · .18) | 사용자 색 견본 테두리 | `--swatch-outline`(.15로 합침 — 차이 .03 이내라 ★ 아님) |
-| rgba(0,0,0,.2) | 스위치 손잡이 그림자 | `--toggle-knob-shadow` |
-| ★ `0 2px 8px rgba(0,0,0,.08)` | 고르개 그림자 | `--elevation-2`(모양이 조금 바뀜) |
-| rgba(0,0,0,.28) | 모달 막 | `--color-overlay` |
-| ★ #0d99ff | 켠 스위치 · 진행 막대 · 고른 밑줄 | `--color-primary`(#0a6dbf — A.1 `--accent`) |
-
-### A.3 값 맞추기 (① 단계)
-
-옮길 때 값이 토큰 단계에 없으면 아래 순서로 정한다. 위에 있는 규칙이 이긴다.
-
-1. **사용자 결정 치수** → §3.8 Component 토큰(값 그대로).
-2. **컨트롤 높이**(버튼 · 입력 · 고르개) → §3.6의 규칙(높이를 주는 곳 · `height: auto` 예외 · 26px 칸 = `size-compact`). 버튼(지금 7 · 11 + 줄 높이 1 = 28) → `size-control-md` + 좌우 `space-3`(11 → 12). 입력(지금 6 · 8 + 1.4 ≈ 31) → `size-control-md` 28 + 좌우 `space-2`(★ 3px 낮아짐).
-3. **간격** — 가장 가까운 단계. 가운데 값:
-   | 지금 | 줄 안 요소 사이(`gap` · 가로 `margin`) · 컨트롤 · 칩 안쪽 | 상자 안쪽(카드 · 모달 · 띠 · 메뉴의 `padding`) · 블록 사이 세로 `margin` · 세로로 쌓는 `gap`(`flex-direction: column` · `grid` 행) |
-   |---|---|---|
-   | 6 | 4 | 8 |
-   | 10 | 8 | 12 |
-   | 14 | 12 | 16 |
-   | 18 | 16 | 20 |
-   그 밖: 1 → 0(위아래 1px로 줄 높이를 맞추던 곳) 또는 `space-0-5`(글자 좌우), 3 → 4, 5 → 4, 7 → 8, 9 → 8, 11 → 12, 21 → 20, 36 → 40, 48 → 40. 음수: `-1px`는 그대로(테두리 겹치기), `-2px` → `calc(-1 * var(--space-0-5))`, `-3px` → `calc(-1 * var(--space-1))`.
-4. **글자 크기** — 11.5 → 11, 12.5 → 12, 18 → 16(소수 내림). 단 §3.8 `pill-font-size`(11.5)는 그대로.
-5. **줄 높이** — `1` → `line-height-none`, `1.25` · `1.3` → `-tight`, `1.35` · `1.4` · `1.45` → `-snug`, `1.5` → `-normal`. px: `10px` · `12px` → `-xs`, `14px` → `-sm`, `16px` → `-md`, `26px` → `var(--size-compact)`(§3.6 26px 칸과 줄 맞춤). 줄 높이 없는 `font: 11px var(--mono)`는 줄 높이를 더하지 않는다(물려받음 그대로).
-6. **둥글기** — 지금 2 · 3 · 4px → `radius-xs`, 5 · 6px → `radius-small`, 7 · 8px → `radius-medium`, 10px → `radius-large`, 13px · 999px · 50% → `radius-full`(① 단계 값은 A.0).
-7. **겹침** — §3.7 표의 지금 값 → 같은 값의 토큰. `-1` → `z-below`.
-8. **움직임** — .1s · .12s → `motion-duration-fast`, .9s · 1s → `motion-duration-spin`.
-9. **투명도** — `:disabled` 버튼 .42 · 꺼진 스위치 .45 → `opacity-disabled`. 그 밖 opacity는 그대로.
-
-### A.4 ② 단계에서 바꾸는 것 (토큰 원본 + 검사 기대값)
-
-- Global을 §3.1 Foundation으로, Semantic · Component가 가리키는 Global을 §3.1 표로.
-- 둥글기를 §3.4(4 · 6 · 8 · 10)로, 그림자 색을 rgba(17,17,17,…)로, `opacity-disabled` .5로.
-- 카드 그림자 없음(DS-D5): 그림자는 `.step`에만 있다(`.bind-card`는 `.step`, `.sel-card`는 그림자 없음) — `.step`의 `box-shadow: var(--elevation-1)`을 지운다. ② 단계의 CSS 변경은 이 한 줄뿐이다.
-- 카드 둘의 둥글기가 다르다(`.step` large 10 · `.sel-card` medium 8 — 지금 `--r-lg` · `--r`를 그대로 옮긴 결과). §3.4의 Card = medium으로 맞추는 일은 DS-2(컴포넌트 Card로 옮길 때).
-- `scripts/verify-bind-flow.mjs`의 색 기대값(2회차 검토 기준 줄 번호 — 구현 때 다시 확인):
-
-  | verify 줄 | 지금 값 | ② 값 | 토큰 |
-  |---|---|---|---|
-  | 715 · 1447 | rgb(94,99,107) | #555555 | `color-text-secondary` |
-  | 720 · 1655 · 1665 | rgb(236,238,240) | #F5F5F5 | `color-interactive-hover` |
-  | 1154 | rgb(10,109,191) | #111111 | `color-primary` |
-  | 1845 · 2314 · 2360 · 3597 · 3666 | rgb(244,245,246) | #F5F5F5 | `color-surface-secondary` |
-  | 2314 · 2448 · 2499 | rgb(146,152,161) | #999999 | `color-text-tertiary` |
-  | 3071 | 1px rgb(0,0,0) | #111111 | `swatch-border` |
-  | 3137 | 바탕 rgb(237,237,237) · 배지 rgb(0,0,0) | #ECECEC · #111111 | `color-surface-selected` · `nav-selected-badge-bg` |
-  | 3778 | rgb(251,241,223) | #F8F2E9 | `color-state-warning-subtle` |
-
-  검사 이름 문자열의 "#ededed · 검정"도 새 값으로. ①에서 `--muted` → secondary★로 바뀐 줄의 기대값도 이 표와 함께 확인.
-- `docs/ia-v4.md`에서 색 값을 적은 줄(V-D5 #ededed · 검정 배지 등)에 "② 뒤 값은 design-system.md §3.1" 한 줄.
 
 ## 부록 B. DS-1 체크리스트
 
