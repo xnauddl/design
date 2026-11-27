@@ -1901,7 +1901,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     "wizard.seq.bindNone": "\uC5F0\uACB0 0\uACF3 \u2014 \uBCC0\uC218\uC640 \uAC12\uC774 \uAC19\uC740 \uACF3\uC774 \uC5C6\uC5B4\uC694",
     "wizard.seq.bindAllBound": "\uC5F0\uACB0 0\uACF3 \u2014 \uC774\uBBF8 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "wizard.seq.bindAllOff": "\uC5F0\uACB0 0\uACF3 \u2014 \uB0A8\uC740 \uACF3\uC740 \uB048 \uAC12\uC774\uC5D0\uC694",
-    "wizard.seq.bindNoTier": "\uC5F0\uACB0 0\uACF3 \u2014 \uACC4\uCE35\uC73C\uB85C \uC4F8 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694",
     // 마법사 완료 요약(summarize, wizard.ts)
     /* ---------- 정적 HTML 라벨(ui.html, data-i18n[-html]) ---------- */
     "common.cancel": "\uCDE8\uC18C",
@@ -2057,7 +2056,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     "bind.switchAria": "{name} \uC5F0\uACB0",
     // 연결 후 결과 카드
     "bind.candChanged": "\uD6C4\uBCF4\uAC00 \uBC14\uB00C\uC5C8\uC5B4\uC694 \xB7 {a}\uACF3 \uCD94\uAC00 \xB7 {b}\uACF3 \uC81C\uC678",
-    "bind.noTier": "\uBCC0\uC218\uB294 \uC788\uC9C0\uB9CC \uACC4\uCE35\uC73C\uB85C \uC4F8 \uCEEC\uB809\uC158\uC774 \uC5C6\uC5B4\uC694",
     "tsSkip.hasStyle": "\uC774\uBBF8 \uC2A4\uD0C0\uC77C \uC788\uC74C",
     "tsSkip.noStyle": "\uAC19\uC740 \uC2A4\uD0C0\uC77C \uC5C6\uC74C",
     "tsSkip.ambiguous": "\uAC19\uC740 \uBAA8\uC591 \uC2A4\uD0C0\uC77C\uC774 \uB458 \uC774\uC0C1",
@@ -2103,16 +2101,15 @@ button.ds-tag { border: 0; cursor: pointer; }
     "v4.libSame": "\uB77C\uC774\uBE0C\uB7EC\uB9AC\uC5D0 \uAC19\uC740 \uAC12 {k}\uACF3 \u2014 \uC624\uB978\uCABD \uD328\uB110\uC5D0\uC11C \uC5F0\uACB0\uD574\uC694",
     // 문구 임시 — UX 라이팅 단계에서 확정(2026-11-19 사용자, IA v4 §4.1 상태 5)
     "v4.makeArrow": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30 \u2192",
-    "v4.find0": "\uBCC0\uC218 \uC5C6\uB294 \uAC12",
-    "v4.findN": "\uBCC0\uC218 \uC5C6\uB294 \uAC12 {n}\uACF3",
+    "v4.find0": "\uC5F0\uACB0\uD560 \uACF3",
+    "v4.linkPlaces": "\uC5F0\uACB0\uD560 \uACF3 {m}\uACF3",
+    "v4.makeValues": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {n}\uAC1C",
+    "v4.makeLinkN": "{n}\uAC1C \uB9CC\uB4E4\uACE0 {p}\uACF3 \uC5F0\uACB0 \u2192",
     "v4.findTip": "\uC778\uC2A4\uD134\uC2A4 \uC548\uCABD \xB7 \uC228\uAE34 \uB808\uC774\uC5B4 \uC81C\uC678 \u2014 \uC778\uC2A4\uD134\uC2A4\uC758 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8\uB294 \uD3EC\uD568",
     "v4.mainsLine": "\uC120\uD0DD \uBC16 \uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD574\uC694",
     "v4.mainsMore": "\uC678 {n}\uAC1C",
     "v4.allBoundMains": "\uBA54\uC778 \uCEF4\uD3EC\uB10C\uD2B8 {c}\uAC1C\uB3C4 \uD568\uAED8 \uC5F0\uACB0\uD588\uC5B4\uC694",
     "v4.linkN": "{n}\uACF3 \uC5F0\uACB0",
-    "v4.noVarPlaces": "\uC0C8\uB85C \uB9CC\uB4E4 \uAC12 {k}\uACF3",
-    "v4.scopePlaces": "\uC6A9\uB3C4 \uB9DE\uCD9C \uAC12 {u}\uACF3",
-    "v4.scopePlacesTip": "\uAC19\uC740 \uAC12\uC758 \uBCC0\uC218\uAC00 \uC788\uC9C0\uB9CC \uC774 \uC790\uB9AC \uC6A9\uB3C4\uAC00 \uAEBC\uC838 \uC788\uC5B4\uC694 \u2014 [\uBCC0\uC218 \uB9CC\uB4E4\uAE30]\uAC00 \uC6A9\uB3C4\uB97C \uB354\uD574 \uC5F0\uACB0\uD574\uC694",
     "v4.allBound": "\u2713 \uCC3E\uC740 \uAC12\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB3FC \uC788\uC5B4\uC694",
     "v4.allLinked": "\u2713 \uC5F0\uACB0\uD560 \uACF3\uC740 \uBAA8\uB450 \uC5F0\uACB0\uB410\uC5B4\uC694",
     "v4.nothingToLink": "\uC5F0\uACB0\uD560 \uC218 \uC788\uB294 \uAC12\uC774 \uC5C6\uC5B4\uC694",
@@ -2193,8 +2190,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     "mkc.created": "Global \uBCC0\uC218 {n}\uAC1C\uB97C \uB9CC\uB4E4\uC5C8\uC5B4\uC694 \xB7 \u2318Z\uB85C \uB418\uB3CC\uB9AC\uAE30",
     "mkc.more": "\uC678 {k}\uAC1C \uBCF4\uAE30",
     "mkc.makeAll": "Global {g}\uAC1C \uBAA8\uB450 \uB9CC\uB4E4\uAE30",
-    "mkc.goGR": "Global {g} \xB7 Semantic {r} \uB9CC\uB4E4\uAE30 \u2192",
-    "mkc.goG": "Global {g}\uAC1C \uB9CC\uB4E4\uAE30 \u2192",
     "mkc.lockFull": "\u{1F512} Semantic {r}\uAC1C \xB7 \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
     "mkc.lockNoSem": "\u{1F512} \uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C \xB7 \uB2E4\uD06C \uBAA8\uB4DC",
     "mkc.lockAfter": "\u{1F512} Semantic {r}\uAC1C",
@@ -2221,6 +2216,9 @@ button.ds-tag { border: 0; cursor: pointer; }
     "common.paidTag": "\uC720\uB8CC",
     "make.run": "\uBCC0\uC218 \uB9CC\uB4E4\uAE30",
     "make.runN": "\uBCC0\uC218 {g}\uAC1C \uB9CC\uB4E4\uAE30",
+    "make.runLinkN": "{g}\uAC1C \uB9CC\uB4E4\uACE0 {p}\uACF3 \uC5F0\uACB0",
+    "make.needLink": "\uB9CC\uB4E4 \uBCC0\uC218\uAC00 \uC5C6\uC5B4\uC694 \u2014 \uBC14\uB85C \uC5F0\uACB0\uC744 \uCF1C \uC8FC\uC138\uC694",
+    "make.nothing": "\uB9CC\uB4E4 \uBCC0\uC218\uB3C4 \uC5F0\uACB0\uD560 \uACF3\uB3C4 \uC5C6\uC5B4\uC694",
     "make.runStyles": "\uC2A4\uD0C0\uC77C {t}\uAC1C \uB9CC\uB4E4\uAE30",
     "make.needOn": "\uB9CC\uB4E4 \uAC12\uC744 \uCF1C \uC8FC\uC138\uC694",
     "make.counting": "\uC138\uB294 \uC911\u2026",
@@ -2231,8 +2229,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     "make.tagHasTip": "\uAC19\uC740 \uC774\uB984 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uAC12\uB9CC \uB9DE\uCDB0\uC694",
     "make.tagReuse": "\uC788\uB294 \uBCC0\uC218",
     "make.tagReuseTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0 \uADF8\uAC83\uC744 \uC368\uC694",
-    "make.tagReuseScope": "\uC788\uB294 \uBCC0\uC218 \xB7 \uC6A9\uB3C4 \uB354\uD568",
-    "make.tagReuseScopeTip": "\uAC12\uC774 \uAC19\uC740 \uBCC0\uC218\uAC00 \uC788\uC5B4 \uC0C8\uB85C \uB9CC\uB4E4\uC9C0 \uC54A\uACE0, \uC774 \uC790\uB9AC \uC6A9\uB3C4\uB97C \uB354\uD574 \uC368\uC694",
     "make.tagManual": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218",
     "make.tagManualTip": "\uC9C1\uC811 \uB9CC\uB4E0 \uBCC0\uC218\uB77C \uB36E\uC5B4\uC4F0\uC9C0 \uC54A\uC544\uC694",
     "make.rowAria": "{name} \uB9CC\uB4E4\uAE30",
@@ -2257,6 +2253,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     "make.cancelled": "\uCDE8\uC18C\uD588\uC5B4\uC694",
     "make.cancelledUpTo": "\uCDE8\uC18C\uD588\uC5B4\uC694 \xB7 {step}\uAE4C\uC9C0 \uB410\uC5B4\uC694",
     "make.done.create": "Global {g}\uAC1C \xB7 Semantic {r}\uAC1C",
+    "make.done.semOnly": "Semantic {r}\uAC1C",
     "make.done.dark": "\uB2E4\uD06C {k}\uAC1C",
     "make.done.styles": "\uD14D\uC2A4\uD2B8 \uC2A4\uD0C0\uC77C {s}\uAC1C",
     "make.done.missing": "\uC54C\uB9BC {k}\uAC1C",
@@ -2782,6 +2779,439 @@ button.ds-tag { border: 0; cursor: pointer; }
     return /^#[0-9a-f]{6}([0-9a-f]{2})?$/i.test(v.trim());
   }
 
+  // src/lib/color.ts
+  var mod360 = (h) => (h % 360 + 360) % 360;
+  function srgbToLinear(c) {
+    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  }
+  function linearToSrgb(c) {
+    return c <= 31308e-7 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  }
+  function linearRgbToOklab(r, g, b) {
+    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    const l_ = Math.cbrt(l);
+    const m_ = Math.cbrt(m);
+    const s_ = Math.cbrt(s);
+    return {
+      L: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
+      a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
+      b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
+    };
+  }
+  function oklabToLinearRgb(lab) {
+    const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
+    const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
+    const s_ = lab.L - 0.0894841775 * lab.a - 1.291485548 * lab.b;
+    const l = l_ ** 3;
+    const m = m_ ** 3;
+    const s = s_ ** 3;
+    return {
+      r: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+      g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+      b: -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
+    };
+  }
+  function oklabToOklch(lab) {
+    const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
+    const h = c < 1e-7 ? 0 : mod360(Math.atan2(lab.b, lab.a) * 180 / Math.PI);
+    return { l: lab.L, c, h };
+  }
+  function oklchToOklab(lch) {
+    const hr = lch.h * Math.PI / 180;
+    return { L: lch.l, a: lch.c * Math.cos(hr), b: lch.c * Math.sin(hr) };
+  }
+  function rgbToOklch(rgb) {
+    return oklabToOklch(linearRgbToOklab(srgbToLinear(rgb.r), srgbToLinear(rgb.g), srgbToLinear(rgb.b)));
+  }
+  function oklchToRgb(lch) {
+    const lin = oklabToLinearRgb(oklchToOklab(lch));
+    return { r: clamp01(linearToSrgb(lin.r)), g: clamp01(linearToSrgb(lin.g)), b: clamp01(linearToSrgb(lin.b)) };
+  }
+  function hexToOklch(hex) {
+    return rgbToOklch(hexToRgb(hex));
+  }
+  function oklchToHex(lch) {
+    return rgbToHex(oklchToRgb(lch));
+  }
+  function inGamut(lch) {
+    const lin = oklabToLinearRgb(oklchToOklab(lch));
+    const eps = 1e-4;
+    return lin.r >= -eps && lin.r <= 1 + eps && lin.g >= -eps && lin.g <= 1 + eps && lin.b >= -eps && lin.b <= 1 + eps;
+  }
+  function clampToGamut(lch) {
+    if (inGamut(lch)) return lch;
+    let lo = 0;
+    let hi = lch.c;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (inGamut({ l: lch.l, c: mid, h: lch.h })) lo = mid;
+      else hi = mid;
+    }
+    return { l: lch.l, c: lo, h: lch.h };
+  }
+
+  // src/lib/colorName.ts
+  var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var STEP_L = STEP_LIST.map((_, i) => 0.97 + (0.16 - 0.97) * (i / (STEP_LIST.length - 1)));
+  var ACHROMATIC_C = 0.03;
+  var HUE_CENTERS = [
+    { name: "red", h: 25 },
+    { name: "orange", h: 65 },
+    { name: "yellow", h: 100 },
+    { name: "green", h: 145 },
+    { name: "teal", h: 190 },
+    { name: "blue", h: 250 },
+    { name: "indigo", h: 285 },
+    { name: "purple", h: 320 },
+    { name: "pink", h: 355 }
+  ];
+  var HUE_FAMILIES = [...HUE_CENTERS.map((c) => c.name), "gray"];
+  function angularDist(a, b) {
+    const d = Math.abs(((a - b) % 360 + 360) % 360);
+    return Math.min(d, 360 - d);
+  }
+  function hueName(h) {
+    let best = HUE_CENTERS[0];
+    let bestD = Infinity;
+    for (const c of HUE_CENTERS) {
+      const d = angularDist(h, c.h);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best.name;
+  }
+  function stepForL(l) {
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < STEP_LIST.length; i++) {
+      const d = Math.abs(STEP_L[i] - l);
+      if (d < bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    return STEP_LIST[best];
+  }
+  function classifyColor(hex) {
+    const o = hexToOklch(hex);
+    const achromatic = o.c < ACHROMATIC_C;
+    if (achromatic && o.l >= 0.985) return { family: "gray", step: 0, achromatic };
+    if (achromatic && o.l <= 0.05) return { family: "gray", step: 1e3, achromatic };
+    return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
+  }
+  function stepRefL(step) {
+    if (step === 0) return 1;
+    if (step === 1e3) return 0;
+    const i = STEP_LIST.indexOf(step);
+    if (i >= 0) return STEP_L[i];
+    for (let k = 0; k < STEP_LIST.length - 1; k++) if ((STEP_LIST[k] + STEP_LIST[k + 1]) / 2 === step) return (STEP_L[k] + STEP_L[k + 1]) / 2;
+    return NaN;
+  }
+  function midSteps(step) {
+    const i = STEP_LIST.indexOf(step);
+    if (i < 0) return { lighter: null, darker: null };
+    return { lighter: i > 0 ? (STEP_LIST[i - 1] + step) / 2 : null, darker: i < STEP_LIST.length - 1 ? (step + STEP_LIST[i + 1]) / 2 : null };
+  }
+  var cmpHex = (a, b) => a < b ? -1 : a > b ? 1 : 0;
+  function nameColorsByHue(hexes, opaqueCount = hexes.length, taken = /* @__PURE__ */ new Set()) {
+    const used = new Set(taken);
+    const out = /* @__PURE__ */ new Map();
+    const info = new Map(hexes.map((h) => [h, __spreadProps(__spreadValues({}, classifyColor(h)), { l: hexToOklch(h).l })]));
+    const nameOf = (fam, step) => `color/${fam}/${step}`;
+    const fallback = (base) => {
+      for (let i = 2; ; i++) if (!used.has(`${base}-${i}`)) return `${base}-${i}`;
+    };
+    const phase = (list) => {
+      var _a3, _b, _c, _d;
+      const groups = /* @__PURE__ */ new Map();
+      for (const h of list) {
+        const c = info.get(h);
+        const k = nameOf(c.family, c.step);
+        groups.set(k, [...(_a3 = groups.get(k)) != null ? _a3 : [], h]);
+      }
+      const owners = /* @__PURE__ */ new Map();
+      const losers = [];
+      for (const [k, hs] of groups) {
+        const c = info.get(hs[0]);
+        const ref = stepRefL(c.step);
+        const sorted = [...hs].sort((a, b) => Math.abs(info.get(a).l - ref) - Math.abs(info.get(b).l - ref) || cmpHex(a, b));
+        let ownerL;
+        let rest = sorted;
+        if (!used.has(k)) {
+          owners.set(k, sorted[0]);
+          out.set(sorted[0], k);
+          used.add(k);
+          ownerL = info.get(sorted[0]).l;
+          rest = sorted.slice(1);
+        } else {
+          ownerL = (_b = ownerLOf.get(k)) != null ? _b : ref;
+        }
+        for (const h of rest) losers.push({ hex: h, stepName: k, ownerL, step: c.step, fam: c.family });
+        if (owners.has(k)) ownerLOf.set(k, ownerL);
+      }
+      const wants = /* @__PURE__ */ new Map();
+      const fallbackers = [];
+      const byKeySide = /* @__PURE__ */ new Map();
+      for (const x of losers) {
+        const side = info.get(x.hex).l > x.ownerL ? "lighter" : "darker";
+        const key = `${x.stepName}|${side}`;
+        byKeySide.set(key, [...(_c = byKeySide.get(key)) != null ? _c : [], x]);
+      }
+      for (const [key, xs] of byKeySide) {
+        const side = key.endsWith("|lighter") ? "lighter" : "darker";
+        const sorted = [...xs].sort((a, b) => Math.abs(info.get(a.hex).l - a.ownerL) - Math.abs(info.get(b.hex).l - b.ownerL) || cmpHex(a.hex, b.hex));
+        const first = sorted[0];
+        const mid = midSteps(first.step)[side];
+        if (mid != null) {
+          const m = nameOf(first.fam, mid);
+          wants.set(m, [...(_d = wants.get(m)) != null ? _d : [], { hex: first.hex, refL: stepRefL(mid) }]);
+        } else fallbackers.push({ hex: first.hex, stepName: first.stepName, refL: stepRefL(first.step) });
+        for (const x of sorted.slice(1)) fallbackers.push({ hex: x.hex, stepName: x.stepName, refL: stepRefL(x.step) });
+      }
+      const stepOfHex = new Map(losers.map((x) => [x.hex, x]));
+      for (const [m, ws] of wants) {
+        const sorted = [...ws].sort((a, b) => Math.abs(info.get(a.hex).l - a.refL) - Math.abs(info.get(b.hex).l - b.refL) || cmpHex(a.hex, b.hex));
+        let i = 0;
+        if (!used.has(m)) {
+          out.set(sorted[0].hex, m);
+          used.add(m);
+          i = 1;
+        }
+        for (const w of sorted.slice(i)) {
+          const x = stepOfHex.get(w.hex);
+          fallbackers.push({ hex: w.hex, stepName: x.stepName, refL: stepRefL(x.step) });
+        }
+      }
+      fallbackers.sort((a, b) => cmpHex(a.stepName, b.stepName) || Math.abs(info.get(a.hex).l - a.refL) - Math.abs(info.get(b.hex).l - b.refL) || cmpHex(a.hex, b.hex));
+      for (const f of fallbackers) {
+        const n = fallback(f.stepName);
+        out.set(f.hex, n);
+        used.add(n);
+      }
+    };
+    const ownerLOf = /* @__PURE__ */ new Map();
+    const uniq = [...new Set(hexes)];
+    const opaque = uniq.filter((h) => hexes.indexOf(h) < opaqueCount);
+    phase(opaque);
+    phase(uniq.filter((h) => !out.has(h)));
+    return hexes.map((h) => out.get(h));
+  }
+  var STEP_SET = /* @__PURE__ */ new Set([0, 1e3, ...STEP_LIST]);
+
+  // src/lib/palette.ts
+  var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
+  var lerp = (a, b, t2) => a + (b - a) * t2;
+  var CHROMA_FALLOFF = 0.6;
+  var LOW_CHROMA = 0.03;
+  function swatchAt(step, l, c, h) {
+    const lch = clampToGamut({ l, c, h });
+    return { step, hex: oklchToHex(lch), oklch: lch };
+  }
+  function buildScale(family, brandHex2, opts = {}) {
+    var _a3;
+    const base = hexToOklch(brandHex2);
+    const [lLight, lDark] = (_a3 = opts.lightRange) != null ? _a3 : [0.97, 0.16];
+    const n = STEPS.length;
+    const targetL = STEPS.map((_, i) => lerp(lLight, lDark, i / (n - 1)));
+    let peak = Math.round((n - 1) / 2);
+    if (opts.anchor) {
+      peak = 0;
+      for (let i = 1; i < n; i++) {
+        if (Math.abs(targetL[i] - base.l) < Math.abs(targetL[peak] - base.l)) peak = i;
+      }
+    }
+    const swatches = STEPS.map((step, i) => {
+      if (opts.anchor && i === peak) return { step, hex: brandHex2.toLowerCase(), oklch: base };
+      const falloff = 1 - CHROMA_FALLOFF * (Math.abs(i - peak) / (n - 1));
+      return swatchAt(step, targetL[i], base.c * falloff, base.h);
+    });
+    return { family, swatches };
+  }
+  var HARMONY_OFFSETS = {
+    complementary: [180],
+    analogous: [-30, 30],
+    triadic: [120, 240],
+    split: [150, 210],
+    tetradic: [90, 180, 270]
+  };
+  var rotate = (lch, deg) => ({ l: lch.l, c: lch.c, h: mod360(lch.h + deg) });
+  function harmonyHexes(brandHex2, scheme) {
+    const base = hexToOklch(brandHex2);
+    return HARMONY_OFFSETS[scheme].map((deg) => oklchToHex(clampToGamut(rotate(base, deg))));
+  }
+  function neutralScale(brandHex2, tint = 8e-3) {
+    const base = hexToOklch(brandHex2);
+    const [lLight, lDark] = [0.985, 0.15];
+    const n = STEPS.length;
+    const swatches = STEPS.map(
+      (step, i) => swatchAt(step, lerp(lLight, lDark, i / (n - 1)), tint, base.h)
+    );
+    return { family: "neutral", swatches };
+  }
+  function statusScales() {
+    const anchors = [
+      { family: "success", h: 150 },
+      { family: "warning", h: 85 },
+      { family: "error", h: 28 },
+      { family: "info", h: 250 }
+    ];
+    return anchors.map(({ family, h }) => {
+      const seed = oklchToHex(clampToGamut({ l: 0.62, c: 0.16, h }));
+      return buildScale(family, seed);
+    });
+  }
+  function scaleHue(scale) {
+    var _a3;
+    const mid = (_a3 = scale.swatches.find((s) => s.step === 500)) != null ? _a3 : scale.swatches[Math.floor(scale.swatches.length / 2)];
+    return classifyColor(mid.hex).family;
+  }
+  function generatePalette(input) {
+    var _a3;
+    const warnings = [];
+    const base = hexToOklch(input.brand.primary);
+    if (base.c < LOW_CHROMA) {
+      warnings.push(t("palette.lowChroma"));
+    }
+    const built = [];
+    built.push({ role: "primary", scale: buildScale("primary", input.brand.primary, { anchor: true }) });
+    if (input.brand.secondary) built.push({ role: "secondary", scale: buildScale("secondary", input.brand.secondary, { anchor: true }) });
+    if (input.harmony) {
+      harmonyHexes(input.brand.primary, input.harmony).forEach((hex, i) => {
+        built.push({ role: `accent-${i + 1}`, scale: buildScale(`accent-${i + 1}`, hex) });
+      });
+    }
+    if (input.includeNeutral) built.push({ role: "neutral", scale: neutralScale(input.brand.primary) });
+    if (input.includeStatus) for (const s of statusScales()) built.push({ role: roleForStatusHue(s), scale: s });
+    const used = /* @__PURE__ */ new Map();
+    const scales = [];
+    const roles = [];
+    for (const b of built) {
+      const hue = scaleHue(b.scale);
+      const n = ((_a3 = used.get(hue)) != null ? _a3 : 0) + 1;
+      used.set(hue, n);
+      const family = n === 1 ? hue : `${hue}-${n}`;
+      scales.push({ family, swatches: b.scale.swatches });
+      roles.push({ role: b.role, family });
+    }
+    return { scales, roles, warnings };
+  }
+  function roleForStatusHue(scale) {
+    return scale.family;
+  }
+  function paletteSemanticMap(p) {
+    const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
+    const map = {};
+    const primary = byRole.get("primary");
+    if (primary) {
+      map["color/background/brand"] = `color/${primary}/500`;
+      map["color/background/brand-bold"] = `color/${primary}/700`;
+      map["color/background/brand-subtle"] = `color/${primary}/100`;
+      map["color/text/brand"] = `color/${primary}/600`;
+      map["color/border/brand"] = `color/${primary}/500`;
+    }
+    const secondary = byRole.get("secondary");
+    if (secondary) map["color/background/accent"] = `color/${secondary}/500`;
+    for (const r of p.roles) if (r.role.startsWith("accent-")) map[`color/background/${r.role}`] = `color/${r.family}/500`;
+    const neutral = byRole.get("neutral");
+    if (neutral) {
+      map["color/background/default"] = `color/${neutral}/50`;
+      map["color/background/subtle"] = `color/${neutral}/100`;
+      map["color/background/inverse"] = `color/${neutral}/900`;
+      map["color/text/default"] = `color/${neutral}/900`;
+      map["color/text/subtle"] = `color/${neutral}/600`;
+      map["color/text/inverse"] = `color/${neutral}/50`;
+      map["color/border/default"] = `color/${neutral}/200`;
+      map["color/border/bold"] = `color/${neutral}/400`;
+      map["color/icon/default"] = `color/${neutral}/700`;
+    }
+    for (const role of ["success", "warning", "error", "info"]) {
+      const f = byRole.get(role);
+      const name = role === "error" ? "danger" : role;
+      if (f) {
+        map[`color/background/${name}`] = `color/${f}/500`;
+        map[`color/text/${name}`] = `color/${f}/700`;
+      }
+    }
+    return map;
+  }
+  function paletteToDraftTokens(p) {
+    const tokens2 = [];
+    for (const scale of p.scales) {
+      for (const sw of scale.swatches) {
+        tokens2.push({
+          name: `color/${scale.family}/${sw.step}`,
+          category: "color",
+          value: sw.hex,
+          sources: ["fill"]
+        });
+      }
+    }
+    return tokens2;
+  }
+
+  // src/lib/usageRoles.ts
+  var LIGHTER = ["subtle", "subtler", "subtlest"];
+  var DARKER = ["strong", "stronger", "strongest"];
+  var LADDER_WORDS = [...LIGHTER, ...DARKER];
+
+  // src/lib/sameValue.ts
+  var round2 = (n) => Math.round(n * 100) / 100;
+  function valueKeyOf(kind, value, alpha) {
+    if (kind === "color") {
+      const s = String(value);
+      return s.includes("@") ? s.toLowerCase() : colorKey(s, alpha);
+    }
+    if (kind === "num") return String(round2(Number(value)));
+    return String(value);
+  }
+  function tokenable(kind, value) {
+    if (kind === "color" || kind === "opacity") return true;
+    const v = round2(Number(value));
+    return v > 0 && Number.isInteger(v);
+  }
+
+  // src/lib/scopes.ts
+  var FIELD_SCOPE = {
+    width: "WIDTH_HEIGHT",
+    height: "WIDTH_HEIGHT",
+    itemSpacing: "GAP",
+    counterAxisSpacing: "GAP",
+    gridRowGap: "GAP",
+    gridColumnGap: "GAP",
+    paddingLeft: "GAP",
+    paddingRight: "GAP",
+    paddingTop: "GAP",
+    paddingBottom: "GAP",
+    topLeftRadius: "CORNER_RADIUS",
+    topRightRadius: "CORNER_RADIUS",
+    bottomLeftRadius: "CORNER_RADIUS",
+    bottomRightRadius: "CORNER_RADIUS",
+    strokeWeight: "STROKE_FLOAT",
+    strokeTopWeight: "STROKE_FLOAT",
+    strokeRightWeight: "STROKE_FLOAT",
+    strokeBottomWeight: "STROKE_FLOAT",
+    strokeLeftWeight: "STROKE_FLOAT",
+    fontSize: "FONT_SIZE",
+    lineHeight: "LINE_HEIGHT",
+    letterSpacing: "LETTER_SPACING",
+    opacity: "OPACITY"
+  };
+  var STROKE_SCOPES = ["STROKE_COLOR"];
+  var FRAME_LIKE = /* @__PURE__ */ new Set(["FRAME", "COMPONENT", "COMPONENT_SET", "INSTANCE", "SECTION"]);
+  var TEXT_FILLS = ["ALL_FILLS", "TEXT_FILL"];
+  var FRAME_FILLS = ["ALL_FILLS", "FRAME_FILL"];
+  var SHAPE_FILLS = ["ALL_FILLS", "SHAPE_FILL"];
+  function fillScopesFor(nodeType) {
+    if (nodeType === "TEXT") return TEXT_FILLS;
+    if (FRAME_LIKE.has(nodeType)) return FRAME_FILLS;
+    return SHAPE_FILLS;
+  }
+  var EFFECT_SCOPES = ["EFFECT_COLOR"];
+
   // src/lib/selCards.ts
   var SEL_KINDS = ["gap", "radius", "size", "stroke", "opacity", "color", "text"];
   var PADDING2 = /* @__PURE__ */ new Set(["paddingLeft", "paddingRight", "paddingTop", "paddingBottom"]);
@@ -2800,8 +3230,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (TEXT.has(field)) return "text";
     return "other";
   }
-  var NO_VAR_REASONS = ["no-match"];
-  var SCOPE_ADD_REASONS = ["scope-add"];
   var FIX_SKIP_REASONS = ["fraction", "size-fraction", "deleted-var"];
   var INFO_SKIP_REASONS = ["styled", "space-between", "hug-fill", "empty-text"];
   var LAYER_SKIP_REASONS = ["instance-children", "hidden", "no-autolayout", "size-free-layout", "font", "library-main"];
@@ -2818,33 +3246,68 @@ button.ds-tag { border: 0; cursor: pointer; }
     return { fix: pick(FIX_SKIP_REASONS, false), keep: [...pick(INFO_SKIP_REASONS, false), ...pick(LAYER_SKIP_REASONS, true)] };
   }
   var sumKinds = (r) => Object.values(r != null ? r : {}).reduce((a, b) => a + (b != null ? b : 0), 0);
-  function cardCounts(candidateFields, counts) {
+  function cardCounts(candidateFields, counts, make = [], libs = []) {
     var _a3;
     const byKind = /* @__PURE__ */ new Map();
-    const noVar = /* @__PURE__ */ new Map();
-    const add = (map, k2, n) => {
-      var _a4;
-      map.set(k2, ((_a4 = map.get(k2)) != null ? _a4 : 0) + n);
-    };
-    for (const f of candidateFields) add(byKind, fieldKind(f), 1);
-    let k = 0;
-    for (const r of NO_VAR_REASONS) {
-      for (const [kind, n] of Object.entries((_a3 = counts == null ? void 0 : counts[r]) != null ? _a3 : {})) {
-        if (!n) continue;
-        k += n;
-        add(noVar, kind, n);
-      }
-    }
-    let u = 0;
-    for (const r of SCOPE_ADD_REASONS) u += sumKinds(counts == null ? void 0 : counts[r]);
+    for (const f of candidateFields) byKind.set(fieldKind(f), ((_a3 = byKind.get(fieldKind(f))) != null ? _a3 : 0) + 1);
     let s = 0;
     for (const r of FIX_SKIP_REASONS) s += sumKinds(counts == null ? void 0 : counts[r]);
+    let n = 0;
+    let q = 0;
+    for (const mv of make) {
+      if (mv.kind === "text") continue;
+      const lib = libs.length ? new Set(libSameGroups(makeToken(mv), libs)) : null;
+      let left = 0;
+      for (const [g, places] of Object.entries(mv.by)) if (places > 0 && !(lib == null ? void 0 : lib.has(g))) left += places;
+      if (left > 0) {
+        n++;
+        q += left;
+      }
+    }
     const order = (map) => [...SEL_KINDS, "other"].map((kind) => {
       var _a4;
       return { kind, n: (_a4 = map.get(kind)) != null ? _a4 : 0 };
     }).filter((x) => x.n > 0);
-    const m = candidateFields.length;
-    return { m, k, u, s, n: m + k + u, byKind: order(byKind), noVarByKind: order(noVar) };
+    return { m: candidateFields.length, s, n, q, byKind: order(byKind) };
+  }
+  var makeToken = (mv) => __spreadProps(__spreadValues({
+    name: "",
+    category: mv.kind === "color" ? "color" : mv.kind,
+    value: mv.value
+  }, mv.alpha != null ? { alpha: mv.alpha } : {}), {
+    freeBy: mv.by
+  });
+  function placeGroupKey(field, nodeType) {
+    var _a3;
+    if (field === "fills") return fillScopesFor(nodeType).join("|");
+    if (field === "strokes") return STROKE_SCOPES.join("|");
+    if (field === "effects") return EFFECT_SCOPES.join("|");
+    if (field === "fontFamily") return "FONT_FAMILY";
+    return (_a3 = FIELD_SCOPE[field]) != null ? _a3 : "ALL_SCOPES";
+  }
+  function linkPlacesForMake(cands, nodeTypeOf, libs = []) {
+    var _a3, _b;
+    let p = 0;
+    const libMemo = /* @__PURE__ */ new Map();
+    for (const c of cands) {
+      const kind = fieldKind(c.field);
+      if (kind === "text" || kind === "other") continue;
+      const isColor = kind === "color";
+      const value = isColor ? c.currentValue : c.pillFrom != null ? 9999 : Number(c.currentValue);
+      if (!tokenable(kind, value)) continue;
+      if (libs.length) {
+        const g = placeGroupKey(c.field, (_a3 = nodeTypeOf(c.nodeId)) != null ? _a3 : "");
+        const mk = `${kind}\0${value}\0${(_b = c.currentAlpha) != null ? _b : 1}\0${g}`;
+        let same = libMemo.get(mk);
+        if (same === void 0) {
+          same = libSameGroups(makeToken(__spreadProps(__spreadValues({ kind, value }, c.currentAlpha != null ? { alpha: c.currentAlpha } : {}), { by: { [g]: 1 } })), libs).length > 0;
+          libMemo.set(mk, same);
+        }
+        if (same) continue;
+      }
+      p++;
+    }
+    return p;
   }
   var COLOR_CATS = /* @__PURE__ */ new Set(["color", "effectColor"]);
   function libValueSame(tk, v) {
@@ -2852,11 +3315,11 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (!val || val.kind === "alias") return false;
     if (COLOR_CATS.has(tk.category)) {
       if (v.type !== "COLOR" || val.kind !== "color" || typeof val.hex !== "string" || typeof tk.value !== "string") return false;
-      return colorKey(tk.value, tk.alpha) === colorKey(val.hex, val.alpha);
+      return valueKeyOf("color", tk.value, tk.alpha) === valueKeyOf("color", val.hex, val.alpha);
     }
     if (typeof tk.value !== "number" || v.type !== "FLOAT" || val.kind !== "number") return false;
     const x = Number(val.text);
-    return Number.isFinite(x) && Math.round(x * 100) === Math.round(tk.value * 100);
+    return Number.isFinite(x) && valueKeyOf("num", x) === valueKeyOf("num", tk.value);
   }
   function libScopeOk(v, key) {
     if (!v.scopes || !key) return true;
@@ -2880,6 +3343,24 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   function libSameGroups(tk, libs) {
     return tokenGroups(tk).filter((key) => libs.some((v) => libValueSame(tk, v) && libScopeOk(v, key)));
+  }
+  function withoutLibGroups(tokens2, libs) {
+    if (!libs.length) return [...tokens2];
+    return tokens2.map((tk) => {
+      var _a3;
+      const lib = libSameGroups(tk, libs);
+      if (!lib.length || !((_a3 = tk.uses) == null ? void 0 : _a3.some((u) => u.by))) return tk;
+      const uses = tk.uses.map((u) => {
+        var _a4, _b;
+        if (!u.by) return u;
+        const by = {};
+        let cut = 0;
+        for (const [k, n] of Object.entries(u.by)) if (lib.includes(k)) cut += n;
+        else by[k] = n;
+        return __spreadProps(__spreadValues({}, u), { by, free: Math.max(0, ((_a4 = u.free) != null ? _a4 : 0) - cut), keys: ((_b = u.keys) != null ? _b : []).filter((k) => !lib.includes(k)) });
+      });
+      return __spreadProps(__spreadValues({}, tk), { uses });
+    });
   }
   function onlyItems(tokens2, libs) {
     const out = [];
@@ -3404,13 +3885,13 @@ button.ds-tag { border: 0; cursor: pointer; }
     return state2 === false;
   }
   function mergeSameNameTokens(tokens2) {
-    var _a3, _b, _c, _d, _e;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k;
     const out = [];
     const byName = /* @__PURE__ */ new Map();
     for (const t2 of tokens2) {
       const prev = byName.get(t2.name);
       if (!prev) {
-        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues({}, u)) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
+        const copy = __spreadValues(__spreadValues(__spreadProps(__spreadValues({}, t2), { sources: [...t2.sources] }), t2.uses ? { uses: t2.uses.map((u) => __spreadValues(__spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {}), u.by ? { by: __spreadValues({}, u.by) } : {})) } : {}), t2.freeBy ? { freeBy: __spreadValues({}, t2.freeBy) } : {});
         byName.set(t2.name, copy);
         out.push(copy);
         continue;
@@ -3421,14 +3902,21 @@ button.ds-tag { border: 0; cursor: pointer; }
         const uses = (_b = prev.uses) != null ? _b : prev.uses = [];
         for (const u of t2.uses) {
           const same = uses.find((x) => x.name === u.name && x.bg === u.bg);
-          if (same) same.count += u.count;
-          else uses.push(__spreadValues({}, u));
+          if (same) {
+            same.count += u.count;
+            if (u.free != null) same.free = ((_c = same.free) != null ? _c : 0) + u.free;
+            for (const k of (_d = u.keys) != null ? _d : []) if (!((_e = same.keys) != null ? _e : same.keys = []).includes(k)) same.keys.push(k);
+            for (const [k, n] of Object.entries((_f = u.by) != null ? _f : {})) {
+              const by = (_g = same.by) != null ? _g : same.by = {};
+              by[k] = ((_h = by[k]) != null ? _h : 0) + n;
+            }
+          } else uses.push(__spreadValues(__spreadValues(__spreadValues({}, u), u.keys ? { keys: [...u.keys] } : {}), u.by ? { by: __spreadValues({}, u.by) } : {}));
         }
       }
-      if (t2.count != null) prev.count = Math.max((_c = prev.count) != null ? _c : 0, t2.count);
+      if (t2.count != null) prev.count = Math.max((_i = prev.count) != null ? _i : 0, t2.count);
       if (t2.freeBy) {
-        const fb = (_d = prev.freeBy) != null ? _d : prev.freeBy = {};
-        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_e = fb[k]) != null ? _e : 0) + n;
+        const fb = (_j = prev.freeBy) != null ? _j : prev.freeBy = {};
+        for (const [k, n] of Object.entries(t2.freeBy)) fb[k] = ((_k = fb[k]) != null ? _k : 0) + n;
       }
     }
     return out;
@@ -4319,380 +4807,6 @@ button.ds-tag { border: 0; cursor: pointer; }
     };
   }
 
-  // src/lib/color.ts
-  var mod360 = (h) => (h % 360 + 360) % 360;
-  function srgbToLinear(c) {
-    return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-  }
-  function linearToSrgb(c) {
-    return c <= 31308e-7 ? c * 12.92 : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
-  }
-  function linearRgbToOklab(r, g, b) {
-    const l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
-    const m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
-    const s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
-    const l_ = Math.cbrt(l);
-    const m_ = Math.cbrt(m);
-    const s_ = Math.cbrt(s);
-    return {
-      L: 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_,
-      a: 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_,
-      b: 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_
-    };
-  }
-  function oklabToLinearRgb(lab) {
-    const l_ = lab.L + 0.3963377774 * lab.a + 0.2158037573 * lab.b;
-    const m_ = lab.L - 0.1055613458 * lab.a - 0.0638541728 * lab.b;
-    const s_ = lab.L - 0.0894841775 * lab.a - 1.291485548 * lab.b;
-    const l = l_ ** 3;
-    const m = m_ ** 3;
-    const s = s_ ** 3;
-    return {
-      r: 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-      g: -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-      b: -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s
-    };
-  }
-  function oklabToOklch(lab) {
-    const c = Math.sqrt(lab.a * lab.a + lab.b * lab.b);
-    const h = c < 1e-7 ? 0 : mod360(Math.atan2(lab.b, lab.a) * 180 / Math.PI);
-    return { l: lab.L, c, h };
-  }
-  function oklchToOklab(lch) {
-    const hr = lch.h * Math.PI / 180;
-    return { L: lch.l, a: lch.c * Math.cos(hr), b: lch.c * Math.sin(hr) };
-  }
-  function rgbToOklch(rgb) {
-    return oklabToOklch(linearRgbToOklab(srgbToLinear(rgb.r), srgbToLinear(rgb.g), srgbToLinear(rgb.b)));
-  }
-  function oklchToRgb(lch) {
-    const lin = oklabToLinearRgb(oklchToOklab(lch));
-    return { r: clamp01(linearToSrgb(lin.r)), g: clamp01(linearToSrgb(lin.g)), b: clamp01(linearToSrgb(lin.b)) };
-  }
-  function hexToOklch(hex) {
-    return rgbToOklch(hexToRgb(hex));
-  }
-  function oklchToHex(lch) {
-    return rgbToHex(oklchToRgb(lch));
-  }
-  function inGamut(lch) {
-    const lin = oklabToLinearRgb(oklchToOklab(lch));
-    const eps = 1e-4;
-    return lin.r >= -eps && lin.r <= 1 + eps && lin.g >= -eps && lin.g <= 1 + eps && lin.b >= -eps && lin.b <= 1 + eps;
-  }
-  function clampToGamut(lch) {
-    if (inGamut(lch)) return lch;
-    let lo = 0;
-    let hi = lch.c;
-    for (let i = 0; i < 24; i++) {
-      const mid = (lo + hi) / 2;
-      if (inGamut({ l: lch.l, c: mid, h: lch.h })) lo = mid;
-      else hi = mid;
-    }
-    return { l: lch.l, c: lo, h: lch.h };
-  }
-
-  // src/lib/colorName.ts
-  var STEP_LIST = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
-  var STEP_L = STEP_LIST.map((_, i) => 0.97 + (0.16 - 0.97) * (i / (STEP_LIST.length - 1)));
-  var ACHROMATIC_C = 0.03;
-  var HUE_CENTERS = [
-    { name: "red", h: 25 },
-    { name: "orange", h: 65 },
-    { name: "yellow", h: 100 },
-    { name: "green", h: 145 },
-    { name: "teal", h: 190 },
-    { name: "blue", h: 250 },
-    { name: "indigo", h: 285 },
-    { name: "purple", h: 320 },
-    { name: "pink", h: 355 }
-  ];
-  var HUE_FAMILIES = [...HUE_CENTERS.map((c) => c.name), "gray"];
-  function angularDist(a, b) {
-    const d = Math.abs(((a - b) % 360 + 360) % 360);
-    return Math.min(d, 360 - d);
-  }
-  function hueName(h) {
-    let best = HUE_CENTERS[0];
-    let bestD = Infinity;
-    for (const c of HUE_CENTERS) {
-      const d = angularDist(h, c.h);
-      if (d < bestD) {
-        bestD = d;
-        best = c;
-      }
-    }
-    return best.name;
-  }
-  function stepForL(l) {
-    let best = 0;
-    let bestD = Infinity;
-    for (let i = 0; i < STEP_LIST.length; i++) {
-      const d = Math.abs(STEP_L[i] - l);
-      if (d < bestD) {
-        bestD = d;
-        best = i;
-      }
-    }
-    return STEP_LIST[best];
-  }
-  function classifyColor(hex) {
-    const o = hexToOklch(hex);
-    const achromatic = o.c < ACHROMATIC_C;
-    if (achromatic && o.l >= 0.985) return { family: "gray", step: 0, achromatic };
-    if (achromatic && o.l <= 0.05) return { family: "gray", step: 1e3, achromatic };
-    return { family: achromatic ? "gray" : hueName(o.h), step: stepForL(o.l), achromatic };
-  }
-  function stepRefL(step) {
-    if (step === 0) return 1;
-    if (step === 1e3) return 0;
-    const i = STEP_LIST.indexOf(step);
-    if (i >= 0) return STEP_L[i];
-    for (let k = 0; k < STEP_LIST.length - 1; k++) if ((STEP_LIST[k] + STEP_LIST[k + 1]) / 2 === step) return (STEP_L[k] + STEP_L[k + 1]) / 2;
-    return NaN;
-  }
-  function midSteps(step) {
-    const i = STEP_LIST.indexOf(step);
-    if (i < 0) return { lighter: null, darker: null };
-    return { lighter: i > 0 ? (STEP_LIST[i - 1] + step) / 2 : null, darker: i < STEP_LIST.length - 1 ? (step + STEP_LIST[i + 1]) / 2 : null };
-  }
-  var cmpHex = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-  function nameColorsByHue(hexes, opaqueCount = hexes.length, taken = /* @__PURE__ */ new Set()) {
-    const used = new Set(taken);
-    const out = /* @__PURE__ */ new Map();
-    const info = new Map(hexes.map((h) => [h, __spreadProps(__spreadValues({}, classifyColor(h)), { l: hexToOklch(h).l })]));
-    const nameOf = (fam, step) => `color/${fam}/${step}`;
-    const fallback = (base) => {
-      for (let i = 2; ; i++) if (!used.has(`${base}-${i}`)) return `${base}-${i}`;
-    };
-    const phase = (list) => {
-      var _a3, _b, _c, _d;
-      const groups = /* @__PURE__ */ new Map();
-      for (const h of list) {
-        const c = info.get(h);
-        const k = nameOf(c.family, c.step);
-        groups.set(k, [...(_a3 = groups.get(k)) != null ? _a3 : [], h]);
-      }
-      const owners = /* @__PURE__ */ new Map();
-      const losers = [];
-      for (const [k, hs] of groups) {
-        const c = info.get(hs[0]);
-        const ref = stepRefL(c.step);
-        const sorted = [...hs].sort((a, b) => Math.abs(info.get(a).l - ref) - Math.abs(info.get(b).l - ref) || cmpHex(a, b));
-        let ownerL;
-        let rest = sorted;
-        if (!used.has(k)) {
-          owners.set(k, sorted[0]);
-          out.set(sorted[0], k);
-          used.add(k);
-          ownerL = info.get(sorted[0]).l;
-          rest = sorted.slice(1);
-        } else {
-          ownerL = (_b = ownerLOf.get(k)) != null ? _b : ref;
-        }
-        for (const h of rest) losers.push({ hex: h, stepName: k, ownerL, step: c.step, fam: c.family });
-        if (owners.has(k)) ownerLOf.set(k, ownerL);
-      }
-      const wants = /* @__PURE__ */ new Map();
-      const fallbackers = [];
-      const byKeySide = /* @__PURE__ */ new Map();
-      for (const x of losers) {
-        const side = info.get(x.hex).l > x.ownerL ? "lighter" : "darker";
-        const key = `${x.stepName}|${side}`;
-        byKeySide.set(key, [...(_c = byKeySide.get(key)) != null ? _c : [], x]);
-      }
-      for (const [key, xs] of byKeySide) {
-        const side = key.endsWith("|lighter") ? "lighter" : "darker";
-        const sorted = [...xs].sort((a, b) => Math.abs(info.get(a.hex).l - a.ownerL) - Math.abs(info.get(b.hex).l - b.ownerL) || cmpHex(a.hex, b.hex));
-        const first = sorted[0];
-        const mid = midSteps(first.step)[side];
-        if (mid != null) {
-          const m = nameOf(first.fam, mid);
-          wants.set(m, [...(_d = wants.get(m)) != null ? _d : [], { hex: first.hex, refL: stepRefL(mid) }]);
-        } else fallbackers.push({ hex: first.hex, stepName: first.stepName, refL: stepRefL(first.step) });
-        for (const x of sorted.slice(1)) fallbackers.push({ hex: x.hex, stepName: x.stepName, refL: stepRefL(x.step) });
-      }
-      const stepOfHex = new Map(losers.map((x) => [x.hex, x]));
-      for (const [m, ws] of wants) {
-        const sorted = [...ws].sort((a, b) => Math.abs(info.get(a.hex).l - a.refL) - Math.abs(info.get(b.hex).l - b.refL) || cmpHex(a.hex, b.hex));
-        let i = 0;
-        if (!used.has(m)) {
-          out.set(sorted[0].hex, m);
-          used.add(m);
-          i = 1;
-        }
-        for (const w of sorted.slice(i)) {
-          const x = stepOfHex.get(w.hex);
-          fallbackers.push({ hex: w.hex, stepName: x.stepName, refL: stepRefL(x.step) });
-        }
-      }
-      fallbackers.sort((a, b) => cmpHex(a.stepName, b.stepName) || Math.abs(info.get(a.hex).l - a.refL) - Math.abs(info.get(b.hex).l - b.refL) || cmpHex(a.hex, b.hex));
-      for (const f of fallbackers) {
-        const n = fallback(f.stepName);
-        out.set(f.hex, n);
-        used.add(n);
-      }
-    };
-    const ownerLOf = /* @__PURE__ */ new Map();
-    const uniq = [...new Set(hexes)];
-    const opaque = uniq.filter((h) => hexes.indexOf(h) < opaqueCount);
-    phase(opaque);
-    phase(uniq.filter((h) => !out.has(h)));
-    return hexes.map((h) => out.get(h));
-  }
-  var STEP_SET = /* @__PURE__ */ new Set([0, 1e3, ...STEP_LIST]);
-
-  // src/lib/palette.ts
-  var STEPS = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
-  var lerp = (a, b, t2) => a + (b - a) * t2;
-  var CHROMA_FALLOFF = 0.6;
-  var LOW_CHROMA = 0.03;
-  function swatchAt(step, l, c, h) {
-    const lch = clampToGamut({ l, c, h });
-    return { step, hex: oklchToHex(lch), oklch: lch };
-  }
-  function buildScale(family, brandHex2, opts = {}) {
-    var _a3;
-    const base = hexToOklch(brandHex2);
-    const [lLight, lDark] = (_a3 = opts.lightRange) != null ? _a3 : [0.97, 0.16];
-    const n = STEPS.length;
-    const targetL = STEPS.map((_, i) => lerp(lLight, lDark, i / (n - 1)));
-    let peak = Math.round((n - 1) / 2);
-    if (opts.anchor) {
-      peak = 0;
-      for (let i = 1; i < n; i++) {
-        if (Math.abs(targetL[i] - base.l) < Math.abs(targetL[peak] - base.l)) peak = i;
-      }
-    }
-    const swatches = STEPS.map((step, i) => {
-      if (opts.anchor && i === peak) return { step, hex: brandHex2.toLowerCase(), oklch: base };
-      const falloff = 1 - CHROMA_FALLOFF * (Math.abs(i - peak) / (n - 1));
-      return swatchAt(step, targetL[i], base.c * falloff, base.h);
-    });
-    return { family, swatches };
-  }
-  var HARMONY_OFFSETS = {
-    complementary: [180],
-    analogous: [-30, 30],
-    triadic: [120, 240],
-    split: [150, 210],
-    tetradic: [90, 180, 270]
-  };
-  var rotate = (lch, deg) => ({ l: lch.l, c: lch.c, h: mod360(lch.h + deg) });
-  function harmonyHexes(brandHex2, scheme) {
-    const base = hexToOklch(brandHex2);
-    return HARMONY_OFFSETS[scheme].map((deg) => oklchToHex(clampToGamut(rotate(base, deg))));
-  }
-  function neutralScale(brandHex2, tint = 8e-3) {
-    const base = hexToOklch(brandHex2);
-    const [lLight, lDark] = [0.985, 0.15];
-    const n = STEPS.length;
-    const swatches = STEPS.map(
-      (step, i) => swatchAt(step, lerp(lLight, lDark, i / (n - 1)), tint, base.h)
-    );
-    return { family: "neutral", swatches };
-  }
-  function statusScales() {
-    const anchors = [
-      { family: "success", h: 150 },
-      { family: "warning", h: 85 },
-      { family: "error", h: 28 },
-      { family: "info", h: 250 }
-    ];
-    return anchors.map(({ family, h }) => {
-      const seed = oklchToHex(clampToGamut({ l: 0.62, c: 0.16, h }));
-      return buildScale(family, seed);
-    });
-  }
-  function scaleHue(scale) {
-    var _a3;
-    const mid = (_a3 = scale.swatches.find((s) => s.step === 500)) != null ? _a3 : scale.swatches[Math.floor(scale.swatches.length / 2)];
-    return classifyColor(mid.hex).family;
-  }
-  function generatePalette(input) {
-    var _a3;
-    const warnings = [];
-    const base = hexToOklch(input.brand.primary);
-    if (base.c < LOW_CHROMA) {
-      warnings.push(t("palette.lowChroma"));
-    }
-    const built = [];
-    built.push({ role: "primary", scale: buildScale("primary", input.brand.primary, { anchor: true }) });
-    if (input.brand.secondary) built.push({ role: "secondary", scale: buildScale("secondary", input.brand.secondary, { anchor: true }) });
-    if (input.harmony) {
-      harmonyHexes(input.brand.primary, input.harmony).forEach((hex, i) => {
-        built.push({ role: `accent-${i + 1}`, scale: buildScale(`accent-${i + 1}`, hex) });
-      });
-    }
-    if (input.includeNeutral) built.push({ role: "neutral", scale: neutralScale(input.brand.primary) });
-    if (input.includeStatus) for (const s of statusScales()) built.push({ role: roleForStatusHue(s), scale: s });
-    const used = /* @__PURE__ */ new Map();
-    const scales = [];
-    const roles = [];
-    for (const b of built) {
-      const hue = scaleHue(b.scale);
-      const n = ((_a3 = used.get(hue)) != null ? _a3 : 0) + 1;
-      used.set(hue, n);
-      const family = n === 1 ? hue : `${hue}-${n}`;
-      scales.push({ family, swatches: b.scale.swatches });
-      roles.push({ role: b.role, family });
-    }
-    return { scales, roles, warnings };
-  }
-  function roleForStatusHue(scale) {
-    return scale.family;
-  }
-  function paletteSemanticMap(p) {
-    const byRole = new Map(p.roles.map((r) => [r.role, r.family]));
-    const map = {};
-    const primary = byRole.get("primary");
-    if (primary) {
-      map["color/background/brand"] = `color/${primary}/500`;
-      map["color/background/brand-bold"] = `color/${primary}/700`;
-      map["color/background/brand-subtle"] = `color/${primary}/100`;
-      map["color/text/brand"] = `color/${primary}/600`;
-      map["color/border/brand"] = `color/${primary}/500`;
-    }
-    const secondary = byRole.get("secondary");
-    if (secondary) map["color/background/accent"] = `color/${secondary}/500`;
-    for (const r of p.roles) if (r.role.startsWith("accent-")) map[`color/background/${r.role}`] = `color/${r.family}/500`;
-    const neutral = byRole.get("neutral");
-    if (neutral) {
-      map["color/background/default"] = `color/${neutral}/50`;
-      map["color/background/subtle"] = `color/${neutral}/100`;
-      map["color/background/inverse"] = `color/${neutral}/900`;
-      map["color/text/default"] = `color/${neutral}/900`;
-      map["color/text/subtle"] = `color/${neutral}/600`;
-      map["color/text/inverse"] = `color/${neutral}/50`;
-      map["color/border/default"] = `color/${neutral}/200`;
-      map["color/border/bold"] = `color/${neutral}/400`;
-      map["color/icon/default"] = `color/${neutral}/700`;
-    }
-    for (const role of ["success", "warning", "error", "info"]) {
-      const f = byRole.get(role);
-      const name = role === "error" ? "danger" : role;
-      if (f) {
-        map[`color/background/${name}`] = `color/${f}/500`;
-        map[`color/text/${name}`] = `color/${f}/700`;
-      }
-    }
-    return map;
-  }
-  function paletteToDraftTokens(p) {
-    const tokens2 = [];
-    for (const scale of p.scales) {
-      for (const sw of scale.swatches) {
-        tokens2.push({
-          name: `color/${scale.family}/${sw.step}`,
-          category: "color",
-          value: sw.hex,
-          sources: ["fill"]
-        });
-      }
-    }
-    return tokens2;
-  }
-
   // src/lib/roles.ts
   var TSHIRT = ["3xs", "2xs", "xs", "sm", "md", "lg", "xl", "2xl", "3xl", "4xl"];
   var TSHIRT_MID = TSHIRT.indexOf("md");
@@ -4839,7 +4953,8 @@ button.ds-tag { border: 0; cursor: pointer; }
   function makeDoneText(totals, opts) {
     var _a3, _b, _c;
     const parts = [];
-    if (totals.created) parts.push(makeCreatedText(totals.created, opts.isPaid));
+    const createdText = totals.created ? makeCreatedText(totals.created, opts.isPaid) : "";
+    if (createdText) parts.push(createdText);
     if (totals.darkFilled != null) parts.push(t("make.done.dark", { k: totals.darkFilled }));
     if (totals.styles) parts.push(totals.styles.a > 0 ? t("make.done.stylesLinked", { s: totals.styles.s, a: totals.styles.a }) : t("make.done.styles", { s: totals.styles.s }));
     if ((_b = (_a3 = totals.styles) == null ? void 0 : _a3.missing) == null ? void 0 : _b.length) parts.push(t("make.done.missing", { k: totals.styles.missing.length }));
@@ -4853,7 +4968,9 @@ button.ds-tag { border: 0; cursor: pointer; }
     return parts.join(" \xB7 ");
   }
   function makeCreatedText(c, isPaid2) {
-    return isPaid2 ? t("make.done.create", { g: c.g, r: c.r }) : t("make.globalN", { g: c.g });
+    if (!isPaid2) return c.g > 0 ? t("make.globalN", { g: c.g }) : "";
+    if (c.g > 0) return t("make.done.create", { g: c.g, r: c.r });
+    return c.r > 0 ? t("make.done.semOnly", { r: c.r }) : "";
   }
   function darkResultText(r) {
     const keptPart = r.kept > 0 ? t("dark.keptPart", { k: r.kept }) : "";
@@ -4899,7 +5016,6 @@ button.ds-tag { border: 0; cursor: pointer; }
   var colorsFromPalette = false;
   var colorsCreated = false;
   var hasGlobal = false;
-  var hasBindable = false;
   var prereqLocalVars = 0;
   var prereqKnown = false;
   var prereqInFlight = false;
@@ -5985,7 +6101,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     bindHereSel = false;
     bindLeftSince = false;
     const base = baseline != null ? baseline : curSel;
-    const doVars = !(prereqKnown && !hasBindable && prereqLocalVars > 0);
+    const doVars = true;
     if (!silent && doVars) {
       bindFinding = true;
       showApplyProgress(t("bind.finding"));
@@ -6005,6 +6121,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     } else {
       bindCandidates = [];
       bindCounts = void 0;
+      bindMake = [];
       bindSkips = [];
       bindSkipLayers = {};
       bindSkipReasons = {};
@@ -6021,6 +6138,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     renderBindTree();
     if (activeTab === "select" && selSub === "bind" && bindTsOnly() && !bindTsRows.length) showSelSub("home");
     renderSelHome();
+    if (activeTab === "select" && selSub === "make" && !mkRunning && !mkResults && !mkEditSig) renderMakeScreen();
   }
   $("btnApplyConfirm").addEventListener("click", () => {
     const eff = bindTsOnly() ? [] : effCandidates();
@@ -6351,7 +6469,7 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   if (!licenseVerifyConfigured()) $("licenseSetupHint").style.display = "";
   window.onmessage = (event) => {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p, _q, _r, _s, _t, _u, _v;
     const msg = event.data.pluginMessage;
     if (!msg) return;
     opReceived(msg);
@@ -6472,9 +6590,11 @@ button.ds-tag { border: 0; cursor: pointer; }
           bindCandidates = (_c = msg.candidates) != null ? _c : [];
           bindMains = (_d = msg.mains) != null ? _d : [];
           bindCounts = msg.counts;
+          bindMake = (_e = msg.make) != null ? _e : [];
+          bindNodeTypes = new Map(((_f = msg.nodes) != null ? _f : []).map((x) => [x.id, x.type]));
           bindVarPending = false;
           bindChecked.clear();
-          renderSkipReasons((_e = msg.reasons) != null ? _e : {});
+          renderSkipReasons((_g = msg.reasons) != null ? _g : {});
           if (silent) {
             const r = carryRowChecks(prev, prevChecked, bindCandidates);
             for (const k of r.checked) bindChecked.add(k);
@@ -6486,9 +6606,9 @@ button.ds-tag { border: 0; cursor: pointer; }
           setStatus("applyStatus", "", "");
           bindFindSettle();
         } else {
-          const n = msg.bound + ((_f = msg.textStylesApplied) != null ? _f : 0);
-          const m = msg.skipped + ((_g = msg.textStylesSkipped) != null ? _g : 0);
-          rememberMainsBound((_h = msg.mainsBound) != null ? _h : []);
+          const n = msg.bound + ((_h = msg.textStylesApplied) != null ? _h : 0);
+          const m = msg.skipped + ((_i = msg.textStylesSkipped) != null ? _i : 0);
+          rememberMainsBound((_j = msg.mainsBound) != null ? _j : []);
           clearBindPreview();
           setStatus("applyStatus", "", "");
           if (activeTab === "select" && selSub === "bind") showSelSub("home");
@@ -6561,8 +6681,8 @@ button.ds-tag { border: 0; cursor: pointer; }
         break;
       case "TEXT_STYLE_CANDIDATES": {
         $("btnTsRowLabels").disabled = !msg.styles.length;
-        tsExistingNames = ((_i = msg.existing) != null ? _i : []).map((e) => e.name);
-        tsDecimal = (_j = msg.decimalRows) != null ? _j : [];
+        tsExistingNames = ((_k = msg.existing) != null ? _k : []).map((e) => e.name);
+        tsDecimal = (_l = msg.decimalRows) != null ? _l : [];
         tsRead = true;
         if (!msg.styles.length && tsDecimal.length) {
           tsSpecs = [];
@@ -6571,7 +6691,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         } else if (msg.styles.length) {
           tsSpecs = msg.styles.map((x) => __spreadValues({}, x));
           tsScanNote = {
-            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_k = msg.fallback) != null ? _k : 0 }) : "",
+            namePart: msg.labeled != null ? t("textStyle.nameSplit", { a: msg.labeled, b: (_m = msg.fallback) != null ? _m : 0 }) : "",
             warnings: msg.warnings
           };
           renderTextStyles();
@@ -6586,7 +6706,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         break;
       }
       case "TEXT_STYLES_RESULT": {
-        const why = Object.entries((_l = msg.applyReasons) != null ? _l : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
+        const why = Object.entries((_n = msg.applyReasons) != null ? _n : {}).filter(([, n]) => (n != null ? n : 0) > 0).map(([k, n]) => `${t("tsSkip." + k)} ${t("v4.layerCount", { n })}`);
         const tsTip = [why.join("\n"), msg.missing.join("\n")].filter(Boolean).join("\n\n");
         setTsStatus(
           t("textStyle.registered", { n: msg.created + msg.updated, c: msg.created, u: msg.updated, b: msg.bound }) + (msg.applied ? t("textStyle.linkedN", { a: msg.applied }) : "") + (msg.applySkipped ? t("textStyle.linkSkipped", { k: msg.applySkipped }) : "") + // 알림은 경고와 분리 — 행간 %처럼 '의도된 미바인딩'을 미연결로 적으면 정상 동작이 경고로 읽힌다.
@@ -6614,12 +6734,11 @@ button.ds-tag { border: 0; cursor: pointer; }
         prereqInFlight = false;
         reentry.release();
         hasGlobal = msg.hasGlobal;
-        hasBindable = msg.hasBindable;
-        prereqLocalVars = ((_m = msg.tierVars) != null ? _m : 0) + ((_n = msg.otherVars) != null ? _n : 0);
+        prereqLocalVars = ((_o = msg.tierVars) != null ? _o : 0) + ((_p = msg.otherVars) != null ? _p : 0);
         if (activeTab === "select") queueMicrotask(readLayerLibUse);
-        darkUnfilled = (_o = msg.darkUnfilled) != null ? _o : 0;
-        darkOld = (_p = msg.darkOld) != null ? _p : false;
-        darkOldManual = (_q = msg.darkOldManual) != null ? _q : false;
+        darkUnfilled = (_q = msg.darkUnfilled) != null ? _q : 0;
+        darkOld = (_r = msg.darkOld) != null ? _r : false;
+        darkOldManual = (_s = msg.darkOldManual) != null ? _s : false;
         updateGates();
         break;
       case "LICENSE_STATUS": {
@@ -6629,7 +6748,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         $("licenseInfo").textContent = t("license.current", { tier: msg.tier.toUpperCase(), source, expPart });
         if (false) $("tier").value = msg.tier;
         if (msg.note) {
-          setStatus("licenseStatus", msg.note, (_r = msg.noteKind) != null ? _r : "ok");
+          setStatus("licenseStatus", msg.note, (_t = msg.noteKind) != null ? _t : "ok");
           if (msg.noteTip) $("licenseStatus").title = msg.noteTip;
         }
         isPaid = msg.unlimited;
@@ -6645,7 +6764,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         }
         saveExportFile(msg.content, msg.format);
         const saved = t("export.saved", { format: label, file: msg.format === "css" ? "tokens.css" : "tokens.json" });
-        const tail = exportStatusTail((_s = msg.clashes) != null ? _s : [], (_t = msg.globalDupes) != null ? _t : [], msg.globalDupesFrom);
+        const tail = exportStatusTail((_u = msg.clashes) != null ? _u : [], (_v = msg.globalDupes) != null ? _v : [], msg.globalDupesFrom);
         setStatus("exportStatus", tail ? `${saved} ${tail}` : saved, tail ? "warn" : "ok");
         break;
       }
@@ -7192,6 +7311,15 @@ button.ds-tag { border: 0; cursor: pointer; }
       readMake();
     }, AUTO_SCAN_DELAY);
   }
+  var mkSentLibSig = "";
+  var mkLibSig = (toks) => {
+    const libs = libDirectNow();
+    return JSON.stringify(toks.map((tk) => libs.length ? libSameGroups(tk, libs) : []));
+  };
+  function mkLibChanged() {
+    if (activeTab !== "select" || selSub !== "make" || mkRunning || mkResults || mkEditSig || !mkPreviewReq) return;
+    if (mkLibSig(mkSendTokens()) !== mkSentLibSig) mkPreviewSoon();
+  }
   function mkPreviewSoon() {
     if (mkPreviewTimer) clearTimeout(mkPreviewTimer);
     mkPreviewTimer = setTimeout(() => {
@@ -7213,7 +7341,8 @@ button.ds-tag { border: 0; cursor: pointer; }
     mkPreviewReq = mkNextReq();
     const base = Number($("base").value) || 16;
     opSilent = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base, preview: true, reqId: mkPreviewReq });
+    mkSentLibSig = mkLibSig(toks);
+    send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base, preview: true, reqId: mkPreviewReq });
     opSilent = false;
     renderMakeScreen();
   }
@@ -7291,7 +7420,26 @@ button.ds-tag { border: 0; cursor: pointer; }
     s.title = tip;
     return s;
   }
-  var mkLayers = (n) => trLeft(t("make.layers", { n: n != null ? n : 0 }));
+  var mkTsPlaces = (n) => trLeft(t("tree.places", { n: n != null ? n : 0 }));
+  var tokenFree = (tk) => {
+    var _a3;
+    return tk.freeBy ? Object.values(tk.freeBy).reduce((a, b) => a + (b > 0 ? b : 0), 0) : (_a3 = tk.count) != null ? _a3 : 0;
+  };
+  var mkPlaces = (tk) => trLeft(t("tree.places", { n: tokenFree(tk) }));
+  function tokenLinkPlaces(tk, libs) {
+    if (!tk.freeBy) return 0;
+    const lib = libs.length ? new Set(libSameGroups(tk, libs)) : null;
+    let n = 0;
+    for (const [g, places] of Object.entries(tk.freeBy)) if (places > 0 && !(lib == null ? void 0 : lib.has(g))) n += places;
+    return n;
+  }
+  function mkLinkPlaces() {
+    const libs = libDirectNow();
+    let p = 0;
+    for (const tk of mkGlobalsOn()) p += tokenLinkPlaces(tk, libs);
+    return p + linkTsPlaces();
+  }
+  var linkTsPlaces = () => baseline && bindPreviewed && selFindFor === baseKey() && !selFindInFlight ? tsAllNodes().size : 0;
   function mkTabsVisible() {
     const out = [];
     if (mkTokens.length) out.push("global", "semantic");
@@ -7315,9 +7463,9 @@ button.ds-tag { border: 0; cursor: pointer; }
           const locked = mkLocked(tk);
           const on = mkIsOn(tk);
           const name = (st == null ? void 0 : st.varName) ? st.varName : tk.name;
-          const cells = [mkLead(tk), mkLayers(tk.count), trChip(name, mkValueText(tk))];
+          const cells = [mkLead(tk), mkPlaces(tk), trChip(name, mkValueText(tk))];
           if ((st == null ? void 0 : st.state) === "update") cells.push(mkTag(t("make.tagHas"), t("make.tagHasTip")));
-          else if ((st == null ? void 0 : st.state) === "reuse") cells.push(st.scopeAdd ? mkTag(t("make.tagReuseScope"), t("make.tagReuseScopeTip")) : mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
+          else if ((st == null ? void 0 : st.state) === "reuse") cells.push(mkTag(t("make.tagReuse"), t("make.tagReuseTip")));
           else if ((st == null ? void 0 : st.state) === "manual") cells.push(mkTag(t("make.tagManual"), t("make.tagManualTip"), true));
           return {
             key: `g:${tk.name}`,
@@ -7377,13 +7525,13 @@ button.ds-tag { border: 0; cursor: pointer; }
           const why = document.createElement("span");
           why.className = "tr-sub ts-why";
           why.textContent = t("textStyle.decimalRow");
-          items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: "ts-decimal", cells: [trLeadAa(), mkLayers(c.count), trChip(null, sum)], right: [why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
+          items.push({ key: `td:${tsSig(c)}`, indent: 8, cls: "ts-decimal", cells: [trLeadAa(), mkTsPlaces(c.count), trChip(null, sum)], right: [why], aria: `${sum} \xB7 ${t("textStyle.decimalRow")}` });
           continue;
         }
         const s = x;
         const sig = tsSig(s);
         const on = mkTsOn.has(sig);
-        const cells = [trLeadAa(), mkLayers(s.count)];
+        const cells = [trLeadAa(), mkTsPlaces(s.count)];
         if (mkEditSig === sig) cells.push(mkEditInput(s));
         else {
           const chip = trChip(mkTsName(s), tsSummary(s));
@@ -7459,6 +7607,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         onMakeScan(p);
       } else renderMakeScreen();
       focusRow($("makeTree"), `t:${sig}`);
+      mkLibChanged();
     };
     inp.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -7664,7 +7813,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
   }
   function renderMakeFoot(showResults) {
-    var _a3;
+    var _a3, _b;
     const run = $("btnMakeRun");
     const opts = $("makeOpts");
     opts.hidden = showResults;
@@ -7696,13 +7845,24 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (gOn) count = mkPreview ? (isPaid ? t("make.countGR", { g: mkPreview.g, r: mkPreview.r }) : t("make.globalN", { g: mkPreview.g })) + (mkPreview.m ? t("create.sumManual", { n: mkPreview.m }) : "") : t("make.counting");
     $("makeCount").textContent = count ? count + tsTail : tsTail.replace(/^ · /, "");
     $("makeCount").title = (_a3 = $("makeCount").textContent) != null ? _a3 : "";
-    run.textContent = gOn ? mkPreview ? t("make.runN", { g: mkPreview.g }) : t("make.run") : tsOn ? t("make.runStyles", { t: tsOn }) : t("make.run");
+    const linkOn = $("makeOptLink").checked;
+    const g = (_b = mkPreview == null ? void 0 : mkPreview.g) != null ? _b : 0;
+    const p = gOn && mkPreview && linkOn ? mkLinkPlaces() : 0;
+    let label = t("make.run");
+    let nothing = "";
+    if (!gOn) label = tsOn ? t("make.runStyles", { t: tsOn }) : t("make.run");
+    else if (!mkPreview) label = t("make.run");
+    else if (g >= 1) label = linkOn && p >= 1 ? t("make.runLinkN", { g, p }) : t("make.runN", { g });
+    else if (linkOn && p >= 1) label = t("bind.linkN", { n: p });
+    else if (tsOn) label = t("make.runStyles", { t: tsOn });
+    else nothing = linkOn ? t("make.nothing") : t("make.needLink");
+    run.textContent = label;
     const conflict = mkTsOnList().map(mkTsConflict).find(Boolean);
-    const reason = !baseline ? t("status.noSelection") : !mkReady() ? t("v4.reading") : !gOn && !tsOn ? t("make.needOn") : conflict === "dup" ? t("make.tsDup") : conflict === "exists" ? t("make.tsExists") : "";
+    const reason = !baseline ? t("status.noSelection") : !mkReady() ? t("v4.reading") : !gOn && !tsOn ? t("make.needOn") : conflict === "dup" ? t("make.tsDup") : conflict === "exists" ? t("make.tsExists") : nothing;
     setLock(run, reason ? "prereq" : null, reason);
   }
   async function runMake() {
-    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o, _p;
+    var _a3, _b, _c, _d, _e, _f, _g, _h, _i, _j, _k, _l, _m, _n, _o;
     if (mkRunning || wizardRunning) return;
     mkCommitEdit();
     renderMakeScreen();
@@ -7719,6 +7879,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     if (!steps.length || !baseline) return;
     const ids = baseline.ids.slice();
     const toks = mkSendTokens();
+    const libs = libDirectNow();
     const styles = mkTsOnList().map((s) => {
       const name = mkTsName(s);
       if (name === s.name) return __spreadValues({}, s);
@@ -7749,7 +7910,7 @@ button.ds-tag { border: 0; cursor: pointer; }
       try {
         if (id === "create") {
           const rid = mkNextReq();
-          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: toks, base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
+          const r = await wizardRequest(__spreadValues({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libs), base, reqId: rid }, isPaid ? {} : { globalOnly: true }), ["CREATE_RESULT"], rid);
           totals.created = { g: r.created + r.updated, r: (_a3 = r.roles) != null ? _a3 : 0, m: (_b = r.skippedManual) != null ? _b : 0 };
           results.push({ id, mark: "ok", text: t("wizard.seq.createDone", { created: r.created, updated: r.updated }) });
         } else if (id === "dark") {
@@ -7784,7 +7945,7 @@ button.ds-tag { border: 0; cursor: pointer; }
           wizBindPending = true;
           try {
             const sendToks = mkSendTokens();
-            const only = onlyItems(sendToks, libDirectNow());
+            const only = onlyItems(sendToks, libs);
             const off = onlyItems(mkTokens.filter((tk) => !sendToks.includes(tk)), []);
             const r = only.length ? await wizardRequest(__spreadValues({ type: "APPLY", preview: false, nodeIds: ids, reqId: wizBindReq, skipTextStyleNodes: true, only }, off.length ? { off } : {}), ["APPLY_RESULT"], wizBindReq) : null;
             const n = (_e = r == null ? void 0 : r.bound) != null ? _e : 0;
@@ -7815,8 +7976,8 @@ button.ds-tag { border: 0; cursor: pointer; }
             else if (ts) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindTsOnly", { t: ts }) + (tsFail ? t("wizard.seq.bindTsFail") : "") });
             else if (!r) results.push({ id, mark: tsFail ? "warn" : "ok", text: t("wizard.seq.bindNoneOn") + (tsFail ? t("wizard.seq.bindTsFail") : "") });
             else {
-              const noMatch = ((_j = reasons["no-match"]) != null ? _j : 0) + ((_k = reasons["scope-add"]) != null ? _k : 0);
-              const zero = prereqKnown && !hasBindable ? "wizard.seq.bindNoTier" : !noMatch && ((_l = reasons["make-off"]) != null ? _l : 0) > 0 ? "wizard.seq.bindAllOff" : ((_m = reasons["already-bound"]) != null ? _m : 0) > 0 && !noMatch ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
+              const noMatch = (_j = reasons["no-match"]) != null ? _j : 0;
+              const zero = !noMatch && ((_k = reasons["make-off"]) != null ? _k : 0) > 0 ? "wizard.seq.bindAllOff" : ((_l = reasons["already-bound"]) != null ? _l : 0) > 0 && !noMatch ? "wizard.seq.bindAllBound" : "wizard.seq.bindNone";
               if ((zero === "wizard.seq.bindAllBound" || zero === "wizard.seq.bindAllOff") && !tsFail) results.push({ id, mark: "ok", text: t(zero) });
               else {
                 results.push({ id, mark: "warn", text: t(zero) + (tsFail ? t("wizard.seq.bindTsFail") : "") });
@@ -7843,7 +8004,7 @@ button.ds-tag { border: 0; cursor: pointer; }
         break;
       }
     }
-    const finishedSteps = (_n = mkProg == null ? void 0 : mkProg.done) != null ? _n : [];
+    const finishedSteps = (_m = mkProg == null ? void 0 : mkProg.done) != null ? _m : [];
     rememberMainsBound(mkMainsDone, mkBase);
     mkRunning = false;
     mkProg = null;
@@ -7851,7 +8012,10 @@ button.ds-tag { border: 0; cursor: pointer; }
     opWizardEnd(stay ? "fail" : stopped ? "cancel" : "ok");
     if (stopped && !stay) {
       const last = finishedSteps[finishedSteps.length - 1];
-      mkCancelNote = last ? t("make.cancelledUpTo", { step: t(`wizard.step.${last}`) }) + (totals.created ? ` (${makeCreatedText(totals.created, isPaid)}${totals.styles ? " \xB7 " + t("make.done.styles", { s: totals.styles.s }) : ""})` : "") : t("make.cancelled");
+      mkCancelNote = last ? t("make.cancelledUpTo", { step: t(`wizard.step.${last}`) }) + (() => {
+        const done = [totals.created ? makeCreatedText(totals.created, isPaid) : "", totals.styles ? t("make.done.styles", { s: totals.styles.s }) : ""].filter(Boolean);
+        return totals.created && done.length ? ` (${done.join(" \xB7 ")})` : "";
+      })() : t("make.cancelled");
       renderMakeScreen();
       return;
     }
@@ -7870,7 +8034,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
     const linkOff = !link;
     if (selSub === "make") showSelSub("home");
-    const doneTip = (_p = (_o = totals.styles) == null ? void 0 : _o.missing) == null ? void 0 : _p.join("\n");
+    const doneTip = (_o = (_n = totals.styles) == null ? void 0 : _n.missing) == null ? void 0 : _o.join("\n");
     showStatusLine(makeDoneText(totals, { isPaid, linkOff }), __spreadValues(__spreadValues({ cls: "ok" }, doneTip ? { tip: doneTip } : {}), linkOff ? { action: { label: t("wizard.toBind"), run: () => {
       showTab("select");
       showSelSub("bind");
@@ -7940,6 +8104,8 @@ button.ds-tag { border: 0; cursor: pointer; }
   var bindSilentReq = 0;
   var bindSilentCarry = false;
   var bindCounts;
+  var bindMake = [];
+  var bindNodeTypes = /* @__PURE__ */ new Map();
   var layerLibUse = null;
   var layerLibReq = 0;
   var bindMains = [];
@@ -7996,10 +8162,10 @@ button.ds-tag { border: 0; cursor: pointer; }
     for (const r of bindTsRows) if (!bindTsOff.has(r.styleId)) n += r.nodeIds.length;
     return n;
   }
-  var bindTsOnly = () => prereqKnown && !hasBindable;
+  var bindTsOnly = () => prereqKnown && prereqLocalVars === 0;
   var bindCountsMemo = null;
   function bindCardCounts() {
-    const src = [bindCandidates, bindCounts, bindSkips, bindTsRows];
+    const src = [bindCandidates, bindCounts, bindSkips, bindTsRows, bindMake, usageMap, libVars];
     if (bindCountsMemo && bindCountsMemo.src.every((x, i) => x === src[i])) return bindCountsMemo.val;
     const val = countBindCards();
     bindCountsMemo = { src, val };
@@ -8007,25 +8173,20 @@ button.ds-tag { border: 0; cursor: pointer; }
   }
   function countBindCards() {
     const ts = tsAllNodes();
+    const libs = libDirectNow();
     const fields = bindCandidates.filter((c2) => !(fieldKind(c2.field) === "text" && ts.has(c2.nodeId))).map((c2) => c2.field);
-    const c = cardCounts(fields, bindCounts);
-    let dk = 0;
-    let du = 0;
+    const c = cardCounts(fields, bindCounts, bindMake, libs);
     let ds = 0;
     for (const s of bindSkips) {
       if (!ts.has(s.nodeId) || fieldKind(s.field) !== "text") continue;
-      if (NO_VAR_REASONS.includes(s.reason)) dk++;
-      else if (SCOPE_ADD_REASONS.includes(s.reason)) du++;
-      else if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
+      if (FIX_SKIP_REASONS.includes(s.reason)) ds++;
     }
     const t2 = ts.size;
     const m = c.m + t2;
-    const k = Math.max(0, c.k - dk);
-    const u = Math.max(0, c.u - du);
     const byKind = [...c.byKind];
-    const noVarByKind = c.noVarByKind.map((x) => x.kind === "text" ? __spreadProps(__spreadValues({}, x), { n: x.n - dk }) : x).filter((x) => x.n > 0);
     if (t2) byKind.push({ kind: "textStyle", n: t2 });
-    return __spreadProps(__spreadValues({}, c), { m, k, u, s: Math.max(0, c.s - ds), n: m + k + u, byKind, noVarByKind, t: t2 });
+    const p = linkPlacesForMake(bindCandidates, (id) => bindNodeTypes.get(id), libs) + c.q + t2;
+    return __spreadProps(__spreadValues({}, c), { m, s: Math.max(0, c.s - ds), byKind, t: t2, p });
   }
   function typeMark(value) {
     return isHexColor(value) ? "\u25CF" : /^-?\d/.test(value) ? "#" : "T";
@@ -8130,7 +8291,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     else if (zero) text = bindSkipMode() && bindCardCounts().s > 0 ? t("v4.allLinked") : t("v4.allBound");
     else if (!hasBindPreview() || bindTsOnly() && !bindTsRows.length) {
       text = t("v4.nothingToLink");
-      if (bindCardCounts().k + bindCardCounts().u > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
+      if (bindCardCounts().n > 0) action = [t("v4.makeArrow"), () => showMakeScreen()];
     }
     box.hidden = !text;
     if (!text) return;
@@ -8148,7 +8309,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     }
   }
   function bindZero() {
-    return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().k + bindCardCounts().u === 0;
+    return bindPreviewed && !bindLinking && !bindTsOnly() && !hasBindPreview() && bindCardCounts().n === 0;
   }
   function skipListRows() {
     const r = skipRowCounts(bindSkipReasons, bindSkips, tsAllNodes(), bindTsOnly(), bindSkipLayers);
@@ -8357,6 +8518,7 @@ button.ds-tag { border: 0; cursor: pointer; }
     bindHereSel = false;
     bindPreviewed = false;
     bindCandidates = [];
+    bindMake = [];
     bindSkips = [];
     bindSkipLayers = {};
     bindSkipReasons = {};
@@ -9127,7 +9289,7 @@ ${opts.tip}` : text;
     const c = bindCardCounts();
     if (bindTsOnly()) return c.t ? t("v4.tsPlaces", { t: c.t }) : "";
     if (bindSkipMode()) return c.s ? t("v4.fixPlaces", { s: c.s }) : "";
-    return c.n ? t("v4.findN", { n: c.n }) : "";
+    return c.m ? t("v4.linkPlaces", { m: c.m }) : "";
   }
   function setSubRight(name, tail, sep) {
     const box = $("subRight");
@@ -9698,6 +9860,7 @@ ${opts.tip}` : text;
       libVars = msg.libraryVars;
       deletedUse = msg.deleted;
       if (libChanged) libRedraw();
+      mkLibChanged();
     }
     renderSelHome();
     reentry.release();
@@ -11833,7 +11996,7 @@ ${opts.tip}` : text;
     renderBindChrome();
   }
   function readLayerLibUse() {
-    if (!prereqKnown || hasBindable || prereqLocalVars > 0 || !curSel.count || curSel.scanned > BIG_SELECTION || layerLibUse !== null || layerLibReq) return;
+    if (!prereqKnown || prereqLocalVars > 0 || !curSel.count || curSel.scanned > BIG_SELECTION || layerLibUse !== null || layerLibReq) return;
     layerLibReq = ++bindReqSeq;
     send({ type: "SCAN_USAGE", reqId: layerLibReq, nodeIds: curSel.ids });
   }
@@ -11980,12 +12143,15 @@ ${opts.tip}` : text;
   }
   var mcShown = () => {
     var _a3, _b;
-    return (_b = (_a3 = mcLibSplit()) == null ? void 0 : _a3.left) != null ? _b : mcPicked();
+    return (_b = (_a3 = mcLibSplit()) == null ? void 0 : _a3.left) != null ? _b : baseline && usageMap ? libSameSplit(mcPicked(), []).left : mcPicked();
   };
-  var mcSigOf = (toks) => JSON.stringify(toks.map((tk) => {
-    var _a3;
-    return [tk.name, tk.value, (_a3 = tk.alpha) != null ? _a3 : 1];
-  }));
+  var mcSigOf = (toks) => {
+    const libs = libDirectNow();
+    return JSON.stringify(toks.map((tk) => {
+      var _a3;
+      return [tk.name, tk.value, (_a3 = tk.alpha) != null ? _a3 : 1, libs.length ? libSameGroups(tk, libs) : []];
+    }));
+  };
   var mcExtracting = () => mcInFlight && mcPreviewReq === 0;
   var mcState = (name) => {
     var _a3;
@@ -12032,7 +12198,7 @@ ${opts.tip}` : text;
       if (rid === mcExtractReq || rid === mcPreviewReq) {
         mcInFlight = false;
         const extractFailed = rid === mcExtractReq && mcPreviewReq === 0;
-        if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && mcLibSplit() && !mcShown().length) {
+        if (!extractFailed && mcSendBase === baseKey() && mcFor === baseKey() && !mcShown().length) {
           mcPrevFor = mcFor;
           mcPrevSig = mcSigOf([]);
           renderSelHome();
@@ -12085,7 +12251,7 @@ ${opts.tip}` : text;
     mcSendBase = baseKey();
     mcPreviewReq = mcNextReq();
     opSilent = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
+    send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base: Number($("base").value) || 16, preview: true, reqId: mcPreviewReq });
     opSilent = false;
   }
   function mcResync() {
@@ -12123,7 +12289,7 @@ ${opts.tip}` : text;
     mcCreateReq = mcNextReq();
     mcCreating = { base: baseKey(), names: toks.map((tk) => tk.name) };
     opCardCreate = true;
-    send({ type: "CREATE_TOKENS", tokens: toks, base: Number($("base").value) || 16, reqId: mcCreateReq, globalOnly: true });
+    send({ type: "CREATE_TOKENS", tokens: withoutLibGroups(toks, libDirectNow()), base: Number($("base").value) || 16, reqId: mcCreateReq, globalOnly: true });
     opCardCreate = false;
     renderSelHome();
   }
@@ -12162,7 +12328,7 @@ ${opts.tip}` : text;
     return other ? t("bind.waitOp", { op: other }) : null;
   }
   function renderMakeCard(put, keep, lib) {
-    var _a3, _b, _c, _d;
+    var _a3, _b, _c;
     const base = baseKey();
     const c = keep ? mcMadeCount() : 0;
     const title = keep ? t("mkc.titleMade", { c }) : lib ? lib.n != null ? t("mkc.titleLib", { n: lib.n }) : t("v4.reading") : t("v4.noVarsFile");
@@ -12297,7 +12463,7 @@ ${opts.tip}` : text;
       nm.title = name;
       const cnt = document.createElement("span");
       cnt.className = "c";
-      cnt.textContent = t("make.layers", { n: (_c = tk.count) != null ? _c : 0 });
+      cnt.textContent = t("tree.places", { n: tokenFree(tk) });
       row.append(sw, v, nm, cnt);
       if (!isPaid) {
         const state2 = mcState(tk.name);
@@ -12323,7 +12489,9 @@ ${opts.tip}` : text;
     }
     const k = picked.length - rows.length;
     if (isPaid) {
-      const go = selBtn(r > 0 ? t("mkc.goGR", { g, r }) : t("mkc.goG", { g }), (el) => showSelSub("make", el), true);
+      const libs = libDirectNow();
+      const p = picked.reduce((a, tk) => a + tokenLinkPlaces(tk, libs), 0) + linkTsPlaces();
+      const go = selBtn(g > 0 ? t("v4.makeLinkN", { n: g, p }) : t("mkc.link", { o: p }), (el) => showSelSub("make", el), true);
       go.dataset.k = "mkGo";
       foot(k > 0 ? more(k) : null, go);
       tsLine(true);
@@ -12341,7 +12509,7 @@ ${opts.tip}` : text;
     }
     if (r > 0) lockLine(t("mkc.lockAfter", { r }));
     if (findHere && !mcNoLinkUntilFind) mcLastO = { base, o: bindCardCounts().m };
-    const o = mcNoLinkUntilFind ? 0 : findHere ? (_d = mcLastO == null ? void 0 : mcLastO.o) != null ? _d : 0 : (mcLastO == null ? void 0 : mcLastO.base) === base && (selFindInFlight || reading) ? mcLastO.o : 0;
+    const o = mcNoLinkUntilFind ? 0 : findHere ? (_c = mcLastO == null ? void 0 : mcLastO.o) != null ? _c : 0 : (mcLastO == null ? void 0 : mcLastO.base) === base && (selFindInFlight || reading) ? mcLastO.o : 0;
     let link = null;
     if (o > 0) {
       link = selBtn(t("mkc.link", { o }), (el) => showSelSub("bind", el), true);
@@ -12369,7 +12537,6 @@ ${opts.tip}` : text;
     }
     clearMount(head);
     clearMount(cards);
-    selMakeHot = false;
     const noSel = !baseline;
     for (const id of ["btnGoMake", "btnGoRename"]) setLock($(id), (baseline != null ? baseline : curSel).count ? null : "prereq", t("status.noSelection"));
     if (baseline) {
@@ -12453,11 +12620,8 @@ ${opts.tip}` : text;
     renderDeletedCard(put);
     finishSelFocus(hadFocus);
   }
-  var selMakeHot = false;
   function updateMakeEmphasis() {
-    const hot = selMakeHot && !!baseline && !$("selCards").querySelector("button.primary");
-    $("btnGoMake").classList.toggle("primary", hot);
-    $("btnGoMake").classList.toggle("ds-btn--primary", hot);
+    $("btnGoMake").classList.remove("primary", "ds-btn--primary");
   }
   function finishSelFocus(key) {
     var _a3, _b, _c;
@@ -12501,20 +12665,11 @@ ${opts.tip}` : text;
     lastMainsBound = uniq.length && base ? { base, ids: uniq } : null;
   }
   function renderFindCard(put, counts) {
-    if (prereqKnown && !hasBindable) {
-      lastMainsBound = null;
-      const subs2 = [t("bind.noTier")];
-      const actions2 = [];
-      tsOnlyExtra(subs2, actions2);
-      put(selCard({ title: t("v4.find0"), subs: subs2, actions: actions2 }));
-      if (selFindFor === baseKey() && !selFindInFlight) selMakeHot = true;
-      return;
-    }
     if (!counts) {
       put(selCard({ title: t("v4.find0"), subs: [t("v4.reading")] }));
       return;
     }
-    const { m, k, u, s, n } = counts;
+    const { m, s, n, p } = counts;
     const boundMains = () => {
       if (lastMainsBound && lastMainsBound.base !== baseKey()) lastMainsBound = null;
       if (!lastMainsBound) return [];
@@ -12530,12 +12685,12 @@ ${opts.tip}` : text;
       for (const e of els) e.dataset.mains = "1";
       return els;
     };
-    if (n === 0 && s === 0) {
+    if (m === 0 && n === 0 && s === 0) {
       const mb = markMains(boundMains());
       put(mainsSub(selCard({ title: t("v4.allBound"), cls: "ok", subs: mb })));
       return;
     }
-    if (n === 0) {
+    if (m === 0 && n === 0) {
       const v = selLink(t("v4.view"), (el) => {
         bindSkipsOpen = true;
         showSelSub("bind", el);
@@ -12547,30 +12702,31 @@ ${opts.tip}` : text;
       return;
     }
     lastMainsBound = null;
+    const title = [m > 0 ? t("v4.linkPlaces", { m }) : "", n > 0 ? t("v4.makeValues", { n }) : ""].filter(Boolean).join(" \xB7 ");
     const parts = m > 0 ? counts.byKind.filter((x) => x.kind !== "other").map((x) => `${kindLabel(x.kind)} ${x.n}`) : [];
-    if (k > 0) parts.push(t("v4.noVarPlaces", { k }));
-    const sub = document.createElement("span");
-    sub.textContent = parts.join(" \xB7 ");
-    if (u > 0) {
-      if (parts.length) sub.append(" \xB7 ");
-      const us = document.createElement("span");
-      us.dataset.k = "scope";
-      us.textContent = t("v4.scopePlaces", { u });
-      us.title = t("v4.scopePlacesTip");
-      sub.appendChild(us);
+    const subs = [];
+    if (parts.length) {
+      const sub = document.createElement("span");
+      sub.textContent = parts.join(" \xB7 ");
+      subs.push(sub);
     }
     const actions = [];
-    if (m > 0) {
+    if (n > 0) {
+      const go = selBtn(t("v4.makeLinkN", { n, p }), (el) => {
+        showSelSub("make", el);
+      }, true);
+      go.dataset.k = "makeLink";
+      actions.push(go);
+    } else {
       const go = selBtn(t("v4.linkN", { n: m }), (el) => {
         showSelSub("bind", el);
       }, true);
       go.dataset.k = "link";
       actions.push(go);
-    } else if (k + u > 0) selMakeHot = true;
+    }
     const mainIds = m > 0 ? mainUnitIds(bindCandidates, bindTsRows) : [];
-    const subs = [sub];
     if (mainIds.length) subs.push(...markMains([mainsLineEl(mainIds)]));
-    const card = mainsSub(selCard({ title: t("v4.findN", { n }), subs, actions }));
+    const card = mainsSub(selCard({ title, subs, actions }));
     card.querySelector(".t").title = t("v4.findTip");
     put(card);
   }

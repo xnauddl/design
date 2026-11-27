@@ -104,3 +104,19 @@ test('makeDoneText — B.35 연결 부분: n > 0 꼬리 · n = 0 · t > 0 독립
   assert.equal(makeDoneText({ created: { g: 1, r: 1, m: 0 }, bound: 0 }, o), 'Global 1개 · Semantic 1개 · 0곳 연결');
   assert.equal(makeDoneText({ created: { g: 1, r: 1, m: 0 } }, o), 'Global 1개 · Semantic 1개'); // 건너뜀 · 스타일 0
 });
+
+// S-2(ia-v4 §2.9 "결과 문장") — 만든 것이 없으면 만들기 부분을 뺀다: g = 0 · r = 0이면 빼고, g = 0 · r > 0이면 "Semantic {r}개", 무료 g = 0이면 뺀다.
+test('S-2 makeDoneText · makeCreatedText — g = 0이면 만들기 부분을 빼거나 "Semantic {r}개"만', () => {
+  const paid = { isPaid: true, linkOff: false };
+  const free = { isPaid: false, linkOff: false };
+  assert.equal(makeDoneText({ created: { g: 0, r: 1, m: 0 }, bound: 3 }, paid), 'Semantic 1개 · 3곳 연결'); // 예 (나) 유료
+  assert.equal(makeDoneText({ created: { g: 0, r: 1, m: 0 }, bound: 3 }, free), '3곳 연결'); // 예 (나) 무료
+  assert.equal(makeDoneText({ created: { g: 0, r: 0, m: 0 }, bound: 2 }, paid), '2곳 연결'); // 예 (다)
+  assert.equal(makeDoneText({ created: { g: 2, r: 2, m: 0 }, bound: 5 }, paid), 'Global 2개 · Semantic 2개 · 5곳 연결'); // 예 (가) — 그대로
+  assert.equal(makeDoneText({ created: { g: 2, r: 0, m: 0 }, bound: 5 }, paid), 'Global 2개 · Semantic 0개 · 5곳 연결'); // g > 0이면 r = 0도 적는다(지금 그대로)
+  assert.equal(makeCreatedText({ g: 0, r: 0 }, true), '');
+  assert.equal(makeCreatedText({ g: 0, r: 3 }, true), 'Semantic 3개');
+  assert.equal(makeCreatedText({ g: 0, r: 3 }, false), '');
+  // 직접 만든 변수라 건너뛴 수는 만들기 부분이 빠져도 남는다
+  assert.equal(makeDoneText({ created: { g: 0, r: 0, m: 1 }, bound: 1 }, paid), '1곳 연결 · 직접 만든 변수라 건너뜀 1');
+});

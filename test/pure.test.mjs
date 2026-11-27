@@ -5,6 +5,8 @@ import assert from 'node:assert/strict';
 import {
   fieldKind,
   cardCounts,
+  linkPlacesForMake,
+  placeGroupKey,
   rgbToHex,
   hexToRgb,
   scopesFor,
@@ -2215,33 +2217,70 @@ test('fieldKind — 찾기 속성 → 종류', () => {
   assert.equal(fieldKind('fontFamily'), 'text');
   assert.equal(fieldKind(undefined), 'other');
 });
-test('cardCounts — m · k · s · n, 레이어 단위 사유와 already-bound는 s에서 뺀다', () => {
-  const c = cardCounts(['fills', 'fills', 'itemSpacing'], {
-    'no-match': { color: 2, gap: 1 },
+// S-2(ia-v4 §2.9 S2-P7)로 고쳐 씀: k · u · noVarByKind는 없어지고, n = 새로 만들 값의 수(값 단위 — `make` 목록) · q = 그 자리 수다.
+// 사유 수(`no-match` — 글자 자리 포함)로는 n을 세지 않는다.
+test('cardCounts — m · s · n · q: n · q는 make 목록에서만, 레이어 단위 사유와 already-bound는 s에서 뺀다', () => {
+  const counts = {
+    'no-match': { color: 2, gap: 1, text: 4 },
     'size-fraction': { size: 1 },
     styled: { color: 1 },
     'already-bound': { color: 5 },
     'instance-children': { other: 9 },
     font: { other: 2 },
-  });
+  };
+  const make = [
+    { kind: 'color', value: '#111111', by: { 'ALL_FILLS|FRAME_FILL': 1, STROKE_COLOR: 1 } }, // 칠 · 선이 한 값
+    { kind: 'gap', value: 16, by: { GAP: 1 } },
+  ];
+  const c = cardCounts(['fills', 'fills', 'itemSpacing'], counts, make);
   assert.equal(c.m, 3);
-  assert.equal(c.k, 3); // size-fraction은 k가 아니라 s(만들기가 소수 크기를 만들지 않는다 — §4.1 k ②)
+  assert.equal(c.n, 2); // 값 단위 — 자리 3곳이 값 2개
+  assert.equal(c.q, 3);
   assert.equal(c.s, 1); // styled(스타일 사용 중)는 s에 넣지 않는다 — 칩으로만(§4.1 · §4.2 INFO_SKIP_REASONS)
-  assert.equal(c.n, 6);
-  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]); // 연결할 곳만(k는 noVarByKind)
-  assert.deepEqual(c.noVarByKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]);
-  assert.deepEqual(cardCounts([], undefined), { m: 0, k: 0, u: 0, s: 0, n: 0, byKind: [], noVarByKind: [] });
-  assert.equal(c.u, 0);
+  assert.deepEqual(c.byKind, [{ kind: 'gap', n: 1 }, { kind: 'color', n: 2 }]); // 연결할 곳만
+  assert.deepEqual(cardCounts([], undefined), { m: 0, s: 0, n: 0, q: 0, byKind: [] });
+  // make가 없으면 no-match 사유가 있어도 n = 0(후보 없는 글자 자리만 남은 선택 — SC-D32 ⑥)
+  assert.equal(cardCounts([], { 'no-match': { text: 4 } }).n, 0);
+  assert.equal('k' in c || 'u' in c || 'noVarByKind' in c, false);
 });
 
-test('cardCounts — u(용도 맞출 값, B.33): scope-add는 k · s가 아니라 u, n = m + k + u', () => {
-  const c = cardCounts(['fills'], { 'no-match': { color: 2 }, 'scope-add': { color: 5 } });
-  assert.equal(c.m, 1);
-  assert.equal(c.k, 2);
-  assert.equal(c.u, 5);
-  assert.equal(c.s, 0);
-  assert.equal(c.n, 8);
-  assert.deepEqual(c.noVarByKind, [{ kind: 'color', n: 2 }]); // u는 종류별로 두지 않는다
+test('cardCounts — 라이브러리 같은 값: 같은 값 · 그 묶음 용도를 받는 라이브러리 변수가 있는 묶음은 q에서 빼고, 묶음이 안 남는 값은 n에서 뺀다(S2-P7)', () => {
+  const make = [
+    { kind: 'color', value: '#111111', by: { 'ALL_FILLS|FRAME_FILL': 3, STROKE_COLOR: 2 } },
+    { kind: 'radius', value: 8, by: { CORNER_RADIUS: 4 } },
+    { kind: 'gap', value: 8, by: { GAP: 2 } },
+  ];
+  const libs = [
+    { type: 'COLOR', value: { kind: 'color', hex: '#111111' }, scopes: ['ALL_FILLS'] }, // 칠 묶음만 받음
+    { type: 'FLOAT', value: { kind: 'number', text: '8' }, scopes: ['CORNER_RADIUS'] }, // 반경 8 — 간격 8은 받지 않음
+  ];
+  const c = cardCounts([], undefined, make, libs);
+  assert.equal(c.n, 2); // 색(선 묶음이 남음) · 간격 8. 반경 8은 묶음이 다 빠져 n에서 빠짐
+  assert.equal(c.q, 4); // 선 2 + 간격 2
+  assert.equal(cardCounts([], undefined, make).q, 11);
+});
+
+test('linkPlacesForMake — 카드 p의 "연결할 곳" 몫: 글자 · 라이브러리 같은 값 묶음 · 추출이 토큰을 내지 않는 자리를 뺀다(S2-P7 · M5 · N1)', () => {
+  const cands = [
+    { nodeId: 'f', field: 'fills', currentValue: '#111111' },
+    { nodeId: 't', field: 'fills', currentValue: '#111111' },
+    { nodeId: 'f', field: 'paddingLeft', currentValue: '0' }, // 여백 0 + 사용자 0 변수 — m에는 들고 p에서는 빠짐
+    { nodeId: 'f', field: 'itemSpacing', currentValue: '12.5' }, // 소수 간격
+    { nodeId: 'f', field: 'itemSpacing', currentValue: '-4' },
+    { nodeId: 'f', field: 'topLeftRadius', currentValue: '12.5', pillFrom: 12.5 }, // 알약으로 판정된 자리 — 값은 9999라 든다
+    { nodeId: 'f', field: 'topRightRadius', currentValue: '12.5' }, // 알약이 아닌 것으로 판정된 소수 반경
+    { nodeId: 'f', field: 'opacity', currentValue: '0.5' },
+    { nodeId: 't', field: 'fontSize', currentValue: '14' }, // 글자 종류는 처음부터 p에 없다
+    { nodeId: 'f', field: 'width', currentValue: '24' },
+  ];
+  const typeOf = (id) => (id === 't' ? 'TEXT' : 'FRAME');
+  assert.equal(linkPlacesForMake(cands, typeOf), 5); // 칠 2 · 알약 1 · 투명도 1 · 크기 1
+  // 프레임 칠 묶음만 받는 라이브러리 같은 값 → 프레임의 칠 자리만 빠진다(글자 칠은 TEXT_FILL 묶음)
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#111111' }, scopes: ['FRAME_FILL'] }];
+  assert.equal(linkPlacesForMake(cands, typeOf, libs), 4);
+  assert.equal(placeGroupKey('fills', 'TEXT'), 'ALL_FILLS|TEXT_FILL');
+  assert.equal(placeGroupKey('strokes', 'FRAME'), 'STROKE_COLOR');
+  assert.equal(placeGroupKey('topLeftRadius', 'FRAME'), 'CORNER_RADIUS');
 });
 
 test('groupByVarKind · carryRowChecks — (변수, 종류) 줄 · 종류 순서 · 줄 단위 스위치 이어받기(IA v4 §4.2)', async () => {
@@ -2795,4 +2834,312 @@ test('B.41 pillOrder — 숫자 작은 순 → 숫자 아님(글자 · 값 없�
     { id: 'e', c: { kind: 'number', text: '1.5' } },
   ];
   assert.deepEqual(pillOrder(rows, (r) => r.c).map((r) => r.id), ['e', 'b', 'c', 'd', 'a', 's', 'none', 'al']);
+});
+
+/* ============================================================
+   S-2 "같은 값" 함수 하나 — sameValue.ts (ia-v4 §2.9 S2-P1–S2-P8 · B.39)
+   ============================================================ */
+const sv = await import('../dist/pure.mjs');
+let svSeq = 0;
+/** VarInfo 하나 — 기본은 사용자 컬렉션의 원시값 · ALL_SCOPES. */
+const vi = (name, type, key, over = {}) => ({
+  id: `v${++svSeq}`, name, type, key, scopes: ['ALL_SCOPES'], hops: 0, collection: 'user', autoRole: false, manual: false, mirror: false, user: true, colIdx: 0, ...over,
+});
+const alias = (name, type, key, over = {}) => vi(name, type, key, { hops: 1, ...over });
+const pg = (name, type, key, over = {}) => vi(name, type, key, { collection: 'pluginGlobal', user: false, colIdx: 9, ...over });
+const role = (name, type, key, over = {}) => vi(name, type, key, { hops: 1, collection: 'pluginSemantic', user: false, autoRole: true, colIdx: 8, ...over });
+const fillPlace = (key = '#111111', over = {}) => ({ type: 'COLOR', key, allowed: ['ALL_FILLS', 'FRAME_FILL'], usage: 'color/background/default', ...over });
+const radPlace = (key = '16', over = {}) => ({ type: 'FLOAT', key, allowed: ['CORNER_RADIUS'], usage: 'radius/default', tokenName: `radius/${key}`, ...over });
+
+test('S-2 valueKeyOf — 색은 소문자 hex + 투명도(소수 둘째 자리 · 1이면 없음), 숫자는 소수 둘째 자리, 글꼴은 그대로(S2-P2)', () => {
+  const { valueKeyOf, sameNumber, round2 } = sv;
+  assert.equal(valueKeyOf('color', '#AABBCC'), '#aabbcc');
+  assert.equal(valueKeyOf('color', '#AABBCC', 1), '#aabbcc');
+  assert.equal(valueKeyOf('color', '#000000', 0.084), valueKeyOf('color', '#000000', 0.08));
+  assert.notEqual(valueKeyOf('color', '#000000', 0.08), valueKeyOf('color', '#000000'));
+  assert.equal(valueKeyOf('color', '#000000@0.08'), valueKeyOf('color', '#000000', 0.08)); // 이미 값 키면 그대로
+  assert.equal(valueKeyOf('num', 12.004), '12');
+  assert.equal(valueKeyOf('num', 12.5), '12.5');
+  assert.notEqual(valueKeyOf('num', 12.01), valueKeyOf('num', 12)); // 허용오차 없음
+  assert.equal(valueKeyOf('text', 'Inter'), 'Inter');
+  assert.notEqual(valueKeyOf('text', 'inter'), valueKeyOf('text', 'Inter'));
+  assert.equal(sameNumber(8, 8.004), true);
+  assert.equal(sameNumber(8, 8.01), false);
+  assert.equal(round2(1.005 * 100) > 0, true);
+});
+
+test('S-2 pickCandidate — 별칭이 원시값보다 먼저 → 홉 수 작은 것 → 이름 오름차순(코드 단위) → 같은 이름이면 사용자 컬렉션 먼저 · 컬렉션 목록 순(S2-P5)', () => {
+  const { pickCandidate } = sv;
+  const raw = vi('a/raw', 'COLOR', '#111111');
+  const far = alias('a/far', 'COLOR', '#111111', { hops: 2 });
+  const near = alias('z/near', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [raw, far, near]).variable, near); // 별칭 먼저 · 홉 1 < 2
+  assert.equal(pickCandidate(fillPlace(), [raw, far, near]).alias, true);
+  assert.equal(pickCandidate(fillPlace(), [raw, far]).variable, far); // 원시값 이름이 앞서도 별칭이 먼저
+  const b = alias('b/x', 'COLOR', '#111111');
+  const B = alias('B/x', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [b, B]).variable, B); // 코드 단위 — 대문자가 먼저
+  // 원시값 후보끼리도 이름 오름차순 → 사용자 컬렉션 먼저(SC-D32 ②)
+  const pgA = pg('ink/900', 'COLOR', '#111111');
+  const usZ = vi('zinc/900', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [usZ, pgA]).variable, pgA);
+  assert.equal(pickCandidate(fillPlace(), [usZ, pgA]).alias, false);
+  const same1 = pg('ink/900', 'COLOR', '#111111');
+  const same2 = vi('ink/900', 'COLOR', '#111111', { colIdx: 3 });
+  const same3 = vi('ink/900', 'COLOR', '#111111', { colIdx: 1 });
+  assert.equal(pickCandidate(fillPlace(), [same1, same2, same3]).variable, same3);
+  // 직접 만든 변수는 같은 이름일 때 플러그인 컬렉션 쪽 순서(user: false — SC-D38 (a))
+  const manual = pg('ink/900', 'COLOR', '#111111', { manual: true });
+  assert.equal(pickCandidate(fillPlace(), [manual, same2]).variable, same2);
+  // 값 · 타입이 다르거나 값을 모르는 변수는 후보가 아니다
+  assert.equal(pickCandidate(fillPlace(), [vi('x', 'COLOR', '#222222'), vi('y', 'FLOAT', '#111111'), vi('z', 'COLOR', null)]), null);
+});
+
+test('S-2 pickCandidate — 용도: 사용자 변수는 용도가 맞을 때만 · 빈 배열은 어느 자리의 후보도 아님 · 용도는 변수 자신의 것(S2-P3)', () => {
+  const { pickCandidate, scopeFitsPlace } = sv;
+  const strokeOnly = vi('ink', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'] });
+  const hidden = vi('ink2', 'COLOR', '#111111', { scopes: [] });
+  const frame = vi('ink3', 'COLOR', '#111111', { scopes: ['FRAME_FILL'] });
+  assert.equal(pickCandidate(fillPlace(), [strokeOnly, hidden]), null);
+  assert.equal(pickCandidate(fillPlace(), [strokeOnly, hidden, frame]).variable, frame);
+  assert.equal(scopeFitsPlace(['ALL_SCOPES'], ['GAP']), true);
+  assert.equal(scopeFitsPlace([], ['GAP']), false);
+});
+
+test('S-2 pickCandidate — 플러그인이 만든 역할은 그 자리 쓰임 이름의 가족일 때만 · 여럿이면 가족 순서 첫 번째 하나 · 표시 없는 옛 색 이름 넷도 역할(S2-P4 · S2-P5 ①)', () => {
+  const { pickCandidate } = sv;
+  const fam2 = role('color/background/default-2', 'COLOR', '#111111');
+  const fam = role('color/background/default', 'COLOR', '#111111');
+  const other = role('color/text/default', 'COLOR', '#111111'); // 값 · 용도는 맞지만 가족이 아니다
+  assert.equal(pickCandidate(fillPlace(), [other]), null);
+  assert.equal(pickCandidate(fillPlace(), [fam2, other, fam]).variable, fam); // 기본 이름 → -n
+  // 쓰임 이름을 모르면(색 자리 이름을 아직 안 정함) 플러그인이 만든 역할은 후보가 아니다
+  assert.equal(pickCandidate(fillPlace('#111111', { usage: undefined }), [fam]), null);
+  // 사용자 별칭 + 역할 하나 → S2-P5 ② 순서(이름 오름차순) — "디자이너가 만든 것이 먼저"는 없다
+  const user = alias('surface/strong', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [user, fam]).variable, fam); // 'c' < 's'
+  const user2 = alias('brand/bg', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [user2, fam]).variable, user2);
+  // 역할이 여럿이어도 남는 것은 하나 — 가족 뒤쪽 이름이 사용자 별칭보다 앞서도 뽑히지 않는다
+  const fam3 = role('color/background/default-3', 'COLOR', '#111111');
+  const mid = alias('color/background/default-25', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [fam2, fam3, mid]).variable, fam2);
+  // 표시 없는 옛 색 이름(color/background/default) — 가족일 때만
+  const old = alias('color/background/default', 'COLOR', '#111111', { collection: 'pluginSemantic', user: false });
+  assert.equal(pickCandidate(fillPlace(), [old]).variable, old);
+  assert.equal(pickCandidate(fillPlace('#111111', { usage: 'color/text/default', allowed: ['ALL_FILLS', 'TEXT_FILL'] }), [old]), null);
+  // 숫자 역할 — `radius/default`의 가족은 radius/default · 크기 말(radius/sm …), radius/full · radius/top-left는 아니다
+  const rd = role('radius/sm', 'FLOAT', '16');
+  const full = role('radius/full', 'FLOAT', '16');
+  assert.equal(pickCandidate(radPlace(), [full]), null);
+  assert.equal(pickCandidate(radPlace(), [full, rd]).variable, rd);
+});
+
+test('S-2 pickCandidate — 거울 · 표시 없는 옛 단계 이름의 별칭은 뺀다(같은 값이어도 붙이지 않는다 — S2-P4 "뺀다")', () => {
+  const { pickCandidate } = sv;
+  const mirror = alias('color/gray/950', 'COLOR', '#111111', { mirror: true });
+  const raw = pg('color/gray/950', 'COLOR', '#111111');
+  assert.equal(pickCandidate(fillPlace(), [mirror, raw]).variable, raw);
+  const oldStep = alias('radius/md', 'FLOAT', '16', { collection: 'pluginSemantic', user: false });
+  assert.equal(pickCandidate(radPlace(), [oldStep]), null);
+  // 원시값 변수는 이름이 옛 단계여도 후보다(별칭만 뺀다)
+  const rawStep = vi('radius/md', 'FLOAT', '16');
+  assert.equal(pickCandidate(radPlace(), [rawStep]).variable, rawStep);
+  // 플러그인 Global 컬렉션 안의 별칭 변수는 스스로 거울이 아니다 — 사용자 변수 갈래의 후보
+  const inG = alias('a/shortcut', 'COLOR', '#111111', { collection: 'pluginGlobal', user: false });
+  assert.equal(pickCandidate(fillPlace(), [inG, raw]).variable, inG);
+});
+
+test('S-2 pickCandidate — 글자 자리의 별칭 후보는 그룹 접두사 이름일 때만(사용자 변수도) · 원시값은 이름과 상관없이(S2-P4 · SC-D32 ⑨)', () => {
+  const { pickCandidate } = sv;
+  const place = { type: 'FLOAT', key: '16', allowed: ['FONT_SIZE'], usage: 'font-size/text', textGroup: 'font-size' };
+  const spacing = alias('spacing/md', 'FLOAT', '16');
+  const body = alias('font-size/body', 'FLOAT', '16');
+  const r2 = role('font-size/text-2', 'FLOAT', '16');
+  const r1 = role('font-size/text', 'FLOAT', '16');
+  assert.equal(pickCandidate(place, [spacing]), null); // 이름이 다른 숫자 변수가 글자에 붙지 않는다
+  assert.equal(pickCandidate(place, [spacing, body]).variable, body);
+  assert.equal(pickCandidate(place, [r2, r1]).variable, r1); // 역할은 이름 오름차순 첫 번째
+  const raw = pg('font-size/16', 'FLOAT', '16', { scopes: ['FONT_SIZE'] });
+  assert.equal(pickCandidate(place, [raw]).variable, raw);
+  // 글자 자리에는 용도 예외가 없다
+  assert.equal(pickCandidate({ ...place, tokenName: 'font-size/16' }, [pg('font-size/16', 'FLOAT', '16', { scopes: ['GAP'] })]), null);
+});
+
+test('S-2 pickCandidate — 색 용도 예외: 용도가 맞는 후보가 하나도 없을 때만 · 플러그인 Global의 직접 값 변수 · 값만 본다 · 직접 만든 변수도(SC-D38)', () => {
+  const { pickCandidate } = sv;
+  const g = pg('color/gray/950', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'] });
+  const r = pickCandidate(fillPlace(), [g]);
+  assert.equal(r.variable, g);
+  assert.equal(r.scopeAdd, 'ALL_FILLS'); // 자리 allowed의 첫째
+  assert.equal(r.alias, false);
+  // 이름을 보지 않는다 — 이름을 바꾼 플러그인 Global도
+  assert.equal(pickCandidate(fillPlace(), [pg('whatever', 'COLOR', '#111111', { scopes: [] })]).scopeAdd, 'ALL_FILLS');
+  // 직접 만든 변수(dsl.manual)도 똑같이
+  const m = pg('color/gray/950', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'], manual: true });
+  assert.equal(pickCandidate(fillPlace(), [m]).scopeAdd, 'ALL_FILLS');
+  // 용도가 맞는 후보(원시값이든 별칭이든)가 하나라도 있으면 예외는 쓰지 않는다
+  const ok = vi('zzz', 'COLOR', '#111111', { scopes: ['FRAME_FILL'] });
+  const p2 = pickCandidate(fillPlace(), [g, ok]);
+  assert.equal(p2.variable, ok);
+  assert.equal(p2.scopeAdd, undefined);
+  // 사용자 컬렉션의 변수 · 플러그인 Global 안의 별칭에는 예외가 없다
+  assert.equal(pickCandidate(fillPlace(), [vi('ink', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'] })]), null);
+  assert.equal(pickCandidate(fillPlace(), [alias('ink', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'], collection: 'pluginGlobal', user: false })]), null);
+  // 여럿이면 이름 오름차순
+  const g2 = pg('color/gray/900', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'] });
+  assert.equal(pickCandidate(fillPlace(), [g, g2]).variable, g2);
+});
+
+test('S-2 pickCandidate — 숫자 용도 예외는 같은 이름 · 같은 값일 때만(SC-D34): radius/16 ↔ 반경 16, spacing/16은 섞이지 않는다 · 직접 만든 변수도', () => {
+  const { pickCandidate } = sv;
+  const r16 = pg('radius/16', 'FLOAT', '16', { scopes: ['GAP'] });
+  const s16 = pg('spacing/16', 'FLOAT', '16', { scopes: ['GAP'] });
+  const p = pickCandidate(radPlace(), [s16, r16]);
+  assert.equal(p.variable, r16);
+  assert.equal(p.scopeAdd, 'CORNER_RADIUS');
+  assert.equal(pickCandidate(radPlace(), [s16]), null);
+  assert.equal(pickCandidate(radPlace(), [pg('radius/16', 'FLOAT', '16', { scopes: ['GAP'], manual: true })]).scopeAdd, 'CORNER_RADIUS');
+  // 토큰 이름을 모르는 자리(tokenName 없음)는 숫자 예외가 없다
+  assert.equal(pickCandidate(radPlace('16', { tokenName: undefined }), [r16]), null);
+  // 같은 이름 · 다른 값은 아니다
+  assert.equal(pickCandidate(radPlace('12', { tokenName: 'radius/12' }), [r16]), null);
+});
+
+test('S-2 splitPlaces — 한 자리는 한쪽에만 · 새로 만들 값은 값 단위(종류, 값 키) · 글자 자리는 make에 없음(S2-P7)', () => {
+  const { splitPlaces } = sv;
+  const vars = [vi('ink', 'COLOR', '#111111')];
+  const mk = (kind, value, alpha) => ({ make: { kind, value, ...(alpha != null ? { alpha } : {}) } });
+  const places = [
+    { ...fillPlace('#111111'), ...mk('color', '#111111') }, // 후보 있음
+    { ...fillPlace('#222222'), ...mk('color', '#222222') },
+    { ...fillPlace('#222222', { allowed: ['STROKE_COLOR'] }), ...mk('color', '#222222') }, // 같은 값 · 다른 묶음(선)
+    { ...fillPlace('#222222'), ...mk('color', '#222222') },
+    { ...radPlace('16'), ...mk('radius', 16) },
+    { type: 'FLOAT', key: '16', allowed: ['GAP'], usage: 'spacing/gap', tokenName: 'spacing/16', ...mk('gap', 16) }, // 간격 16과 반경 16은 다른 값
+    { type: 'FLOAT', key: '14', allowed: ['FONT_SIZE'], usage: 'font-size/text', textGroup: 'font-size' }, // 글자 no-match — make 없음
+    { type: 'FLOAT', key: '12.5', allowed: ['GAP'], usage: 'spacing/gap' }, // 소수 — 손볼 곳
+  ];
+  const r = splitPlaces(places, vars);
+  assert.equal(r.link.length, 1);
+  assert.equal(r.link[0].place, places[0]);
+  assert.equal(r.made.length, 5);
+  assert.equal(r.none.length, 2);
+  assert.equal(r.link.length + r.made.length + r.none.length, places.length); // 한쪽에만
+  assert.deepEqual(r.make, [
+    { kind: 'color', value: '#222222', by: { 'ALL_FILLS|FRAME_FILL': 2, STROKE_COLOR: 1 } },
+    { kind: 'radius', value: 16, by: { CORNER_RADIUS: 1 } },
+    { kind: 'gap', value: 16, by: { GAP: 1 } },
+  ]);
+  assert.equal(r.make.some((m) => m.kind === 'text'), false);
+  // 반투명은 다른 값
+  const r2 = splitPlaces([{ ...fillPlace('#222222@0.5'), ...mk('color', '#222222', 0.5) }, { ...fillPlace('#222222'), ...mk('color', '#222222') }], []);
+  assert.equal(r2.make.length, 2);
+  assert.equal(r2.make[0].alpha, 0.5);
+});
+
+test('S-2 tokenReuse — 묶음마다 pickCandidate, 모두 있으면 재사용 · 하나라도 없거나 묶음 0개면 null(S2-P8)', () => {
+  const { tokenReuse } = sv;
+  const fillOnly = vi('ink', 'COLOR', '#111111', { scopes: ['ALL_FILLS'] });
+  const groups = [fillPlace('#111111', { usage: undefined }), { type: 'COLOR', key: '#111111', allowed: ['STROKE_COLOR'] }];
+  assert.equal(tokenReuse(groups, [fillOnly]), null); // 선 묶음에 후보 없음 → 새로 만듦
+  assert.equal(tokenReuse([groups[0]], [fillOnly])[0].variable, fillOnly);
+  assert.equal(tokenReuse([], [fillOnly]), null); // "묶음이 없으니 모두 후보가 있다"로 읽지 않는다
+  const strokeToo = alias('line', 'COLOR', '#111111', { scopes: ['STROKE_COLOR'], rawId: 'raw1' });
+  const picks = tokenReuse(groups, [fillOnly, strokeToo]);
+  assert.deepEqual(picks.map((p) => p.variable.name), ['ink', 'line']); // 묶음마다 다른 변수를 골라도 된다
+  // 이름을 바꾼 플러그인 Global도 값이 같으면 다시 쓴다(7-13의 11번)
+  assert.equal(tokenReuse([groups[0]], [pg('renamed/brand', 'COLOR', '#111111', { scopes: ['ALL_FILLS'] })])[0].variable.name, 'renamed/brand');
+});
+
+test('S-2 userRadiusKeys — 플러그인 Global 컬렉션 밖 · 역할 아님 · CORNER_RADIUS를 직접 켬(ALL_SCOPES · [] 아님) · 별칭은 자신의 용도(SC-D37 · SC-D39)', () => {
+  const { userRadiusKeys } = sv;
+  const R = ['CORNER_RADIUS'];
+  const keys = (vars) => [...userRadiusKeys(vars)].sort();
+  assert.deepEqual(keys([vi('corner/12', 'FLOAT', '12', { scopes: R })]), ['12']);
+  assert.deepEqual(keys([vi('corner/12', 'FLOAT', '12', { scopes: ['GAP', 'CORNER_RADIUS'] })]), ['12']); // 다른 용도가 함께 있어도
+  assert.deepEqual(keys([vi('spacing/12', 'FLOAT', '12')]), []); // ALL_SCOPES — 알약을 가져가지 못한다
+  assert.deepEqual(keys([vi('corner/12', 'FLOAT', '12', { scopes: [] })]), []);
+  assert.deepEqual(keys([vi('corner/12', 'FLOAT', null, { scopes: R })]), []); // 값을 모름
+  assert.deepEqual(keys([vi('c', 'COLOR', '12', { scopes: R })]), []);
+  // 플러그인 Global 컬렉션의 변수는 직접 만들었든 · 별칭이든 넣지 않는다
+  assert.deepEqual(keys([pg('radius/12', 'FLOAT', '12', { scopes: R })]), []);
+  assert.deepEqual(keys([pg('radius/12', 'FLOAT', '12', { scopes: R, manual: true })]), []);
+  assert.deepEqual(keys([alias('radius/chip', 'FLOAT', '12', { scopes: R, collection: 'pluginGlobal', user: false })]), []);
+  // 플러그인이 만든 역할은 넣지 않고, 플러그인 Semantic의 표시 없는 변수는 넣는다
+  assert.deepEqual(keys([role('radius/default', 'FLOAT', '12', { scopes: R })]), []);
+  assert.deepEqual(keys([alias('radius/chip', 'FLOAT', '12', { scopes: R, collection: 'pluginSemantic', user: false })]), ['12']);
+  // 별칭의 용도는 그 변수 자신의 scopes
+  assert.deepEqual(keys([alias('radius/chip', 'FLOAT', '12')]), []); // ALL_SCOPES 별칭(가리키는 원시값이 CORNER_RADIUS여도)
+  assert.deepEqual(keys([alias('radius/chip', 'FLOAT', '12', { scopes: R })]), ['12']);
+  // 거울 · 옛 단계 이름의 별칭은 아니다(원시값은 든다)
+  assert.deepEqual(keys([alias('radius/12', 'FLOAT', '12', { scopes: R, mirror: true }), alias('radius/md', 'FLOAT', '8', { scopes: R })]), []);
+  assert.deepEqual(keys([vi('radius/md', 'FLOAT', '8', { scopes: R })]), ['8']);
+  // 집합에 든 변수는 그 값의 반경 자리에서 늘 후보다
+  const c12 = vi('corner/12', 'FLOAT', '12', { scopes: R });
+  assert.equal(sv.pickCandidate(radPlace('12'), [c12]).variable, c12);
+});
+
+test('S-2 pillCorners(keep) — 판정 집합에 원래 값이 있는 모서리는 알약이 아니다 · 모서리마다 판정 · 넘기지 않으면 지금 동작(SC-D36 ①)', () => {
+  const { pillCorners } = sv;
+  assert.deepEqual(pillCorners([12, 12, 12, 12], 80, 24), [9999, 9999, 9999, 9999]);
+  assert.deepEqual(pillCorners([12, 12, 12, 12], 80, 24, new Set(['12'])), [12, 12, 12, 12]);
+  assert.deepEqual(pillCorners([12, 12, 12, 12], 80, 24, new Set()), [9999, 9999, 9999, 9999]);
+  assert.deepEqual(pillCorners([20, 150, 20, 150], 120, 40, new Set(['20'])), [20, 9999, 20, 9999]);
+  assert.deepEqual(pillCorners([20, 8, 20, 8], 120, 40, new Set(['20'])), [20, 8, 20, 8]);
+  assert.deepEqual(pillCorners([20, 8, 20, 8], 120, 40), [9999, 8, 9999, 8]);
+  assert.deepEqual(pillCorners([12.5, 12.5, 12.5, 12.5], 80, 25, new Set(['12.5'])), [12.5, 12.5, 12.5, 12.5]); // 소수 알약
+  assert.deepEqual(pillCorners([12, 12, 12, 12], 80, 80, new Set()), [12, 12, 12, 12]); // 알약 모양이 아니면 판정과 무관
+});
+
+test('S-2 tokenable — 투명도 · 색은 참, Spacing · Radius · Size · Stroke는 반올림한 값이 0보다 큰 정수일 때(S2-P7 표 · N1)', () => {
+  const { tokenable } = sv;
+  for (const k of ['gap', 'radius', 'size', 'stroke']) {
+    assert.equal(tokenable(k, 16), true, k);
+    assert.equal(tokenable(k, 0), false, k);
+    assert.equal(tokenable(k, -4), false, k);
+    assert.equal(tokenable(k, 12.5), false, k);
+    assert.equal(tokenable(k, 16.004), true, k); // 소수 둘째 자리로 반올림하면 정수
+    assert.equal(tokenable(k, 0.004), false, k); // 반올림 뒤 0(6회차 — 0 이하 판정도 반올림 뒤 값으로)
+  }
+  assert.equal(tokenable('radius', 9999), true);
+  assert.equal(tokenable('opacity', 0.5), true);
+  assert.equal(tokenable('color', '#111111'), true);
+});
+
+test('S-2 aliasCovers — 값 키가 같고 역할 용도를 모두 덮는 별칭이 있으면 Semantic을 세지도 만들지도 않는다(S2-P8 "Semantic 수 r")', () => {
+  const { aliasCovers } = sv;
+  const q = { type: 'COLOR', key: '#111111', need: ['FRAME_FILL', 'SHAPE_FILL'], base: 'color/background/default' };
+  assert.equal(aliasCovers([alias('surface/strong', 'COLOR', '#111111')], q), true); // 사용자 별칭은 이름과 상관없이
+  assert.equal(aliasCovers([alias('surface/strong', 'COLOR', '#111111', { scopes: ['FRAME_FILL'] })], q), false); // 일부만 덮음 → 만든다
+  assert.equal(aliasCovers([alias('surface/strong', 'COLOR', '#111111', { scopes: ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'] })], q), true);
+  assert.equal(aliasCovers([vi('ink/900', 'COLOR', '#111111')], q), false); // 원시값은 아니다
+  assert.equal(aliasCovers([alias('x', 'COLOR', '#222222')], q), false);
+  assert.equal(aliasCovers([role('color/text/default', 'COLOR', '#111111')], q), false); // 플러그인이 만든 역할은 가족일 때만
+  assert.equal(aliasCovers([role('color/background/default-2', 'COLOR', '#111111')], q), true);
+  assert.equal(aliasCovers([alias('color/gray/950', 'COLOR', '#111111', { mirror: true })], q), false);
+});
+
+test('S-2 SC-D46 withoutLibGroups — 라이브러리 같은 값 묶음의 몫을 쓰임(free · keys · by)에서 뺀다 · freeBy는 그대로 · 라이브러리 없음 · 옛 토큰은 그대로', async () => {
+  const { withoutLibGroups } = await import('../dist/pure.mjs');
+  const F = 'ALL_FILLS|FRAME_FILL';
+  const T = 'ALL_FILLS|TEXT_FILL';
+  const tk = {
+    name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { [F]: 10, [T]: 3 },
+    uses: [
+      { name: 'color/background', count: 12, free: 10, keys: [F], by: { [F]: 10 } },
+      { name: 'color/text', count: 3, free: 3, keys: [T], by: { [T]: 3 } },
+    ],
+  };
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#3b82f6' }, scopes: ['FRAME_FILL'] }];
+  const [out] = withoutLibGroups([tk], libs);
+  assert.deepEqual(out.uses, [
+    { name: 'color/background', count: 12, free: 0, keys: [], by: {} }, // 연결 단계가 붙이지 않는 묶음 — 역할 · 밝기에서 빠진다
+    { name: 'color/text', count: 3, free: 3, keys: [T], by: { [T]: 3 } },
+  ]);
+  assert.deepEqual(out.freeBy, tk.freeBy);
+  assert.equal(tk.uses[0].free, 10, '원래 토큰은 바꾸지 않는다');
+  assert.equal(withoutLibGroups([tk], [])[0], tk);
+  const old = { name: 'color/blue/500', category: 'color', value: '#3B82F6', freeBy: { [F]: 10 }, uses: [{ name: 'color/background', count: 10 }] };
+  assert.equal(withoutLibGroups([old], libs)[0], old);
 });

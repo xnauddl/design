@@ -37,6 +37,7 @@ import {
   dropRemoteClusters,
   creationOrder,
   bindSelection,
+  readVarInfos,
   collectLocalMains,
   createRole,
   judgeUnused,
@@ -1518,7 +1519,9 @@ test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바�
   assert.equal(res.bound, 1);
 });
 
-test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색은 fill에 안 붙음)', async () => {
+// S-2(ia-v4 §2.9 S2-P3 · SC-D31 ⑧)로 기대가 바뀜: 플러그인 Global은 용도가 달라도 같은 변수다 — 용도가 맞는 후보가 없으면 붙이고 용도를 더한다
+// (전에는 "stroke 전용 색은 fill에 안 붙음"). 사용자 변수는 여전히 용도가 맞을 때만이다(아래 B.33 ②).
+test('bindSelection — 색상의 용도: 용도가 맞는 변수가 먼저, 플러그인 Global은 용도만 다르면 붙이고 용도를 더함(S2-P3)', async () => {
   const figma = installFigma();
   await createTokens(
     [
@@ -1546,9 +1549,11 @@ test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색�
   const fillVar = findVar(figma, 'Global', 'color/aa0000');
   const strokeVar = findVar(figma, 'Global', 'color/0000aa');
   assert.equal(roleTarget(figma, node.fills[0].boundVariables.color.id), fillVar.id); // fill 매칭
-  assert.equal(node.fills[1].boundVariables, undefined); // stroke 전용 색은 fill에 안 붙음
+  assert.equal(roleTarget(figma, node.fills[1].boundVariables.color.id), strokeVar.id); // 용도 예외 — 같은 값 플러그인 Global에(새 Semantic으로 감쌈)
+  assert.deepEqual([...strokeVar.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']); // 연결하며 용도를 더함
+  assert.deepEqual([...fillVar.scopes], ['ALL_FILLS']); // 용도가 맞는 쪽은 그대로
   assert.equal(roleTarget(figma, node.strokes[0].boundVariables.color.id), strokeVar.id); // stroke 매칭
-  assert.equal(res.bound, 2);
+  assert.equal(res.bound, 3);
 });
 
 test('bindSelection — 반투명 칠하기 · 그림자는 hex · 투명도까지 같은 변수에만 붙고 레이어 값은 그대로(ia-v3 §2.11 "색")', async () => {
@@ -1667,7 +1672,7 @@ test('bindSelection — 역할 별칭(text)이 같은 값의 Semantic 거울(col
   await bindSelection([node]);
   assert.equal(label.fills[0].boundVariables.color.id, findVar(figma, 'Semantic', 'text').id);
   const gap = node.boundVariables.itemSpacing.id;
-  assert.equal(varName(figma, gap), 'spacing/gap'); // 옛 고정 칸 이름(spacing/sm)은 순서 3에서 빠진다(12.7)
+  assert.equal(varName(figma, gap), 'spacing/gap'); // 옛 고정 칸 이름(spacing/sm)의 별칭은 후보에서 빠진다(12.7 · ia-v4 §2.9 S2-P4)
   assert.equal(roleTarget(figma, gap), findVar(figma, 'Global', 'spacing/8').id);
 });
 
@@ -4222,11 +4227,13 @@ test('역할 매핑 표 — 이름은 직접 값 Global에서, 없으면 reuseMa
   assert.deepEqual(made.valuesByMode[sem.defaultModeId], { type: 'VARIABLE_ALIAS', id: blue.id });
 });
 
-test('연결 — 새 역할은 플러그인 Semantic에, 별칭 대상은 사용자 Global 먼저 · 플러그인 Global의 별칭 변수는 대상 아님', async () => {
+// S-2(ia-v4 §2.9 S2-P4 · S2-P5 · SC-D32 ②)로 기대가 바뀜: ① 플러그인 Global 컬렉션 안의 별칭 변수도 후보(사용자 변수 갈래)이고 별칭이 원시값보다 먼저다
+// ② 원시값 후보끼리는 이름 오름차순 → 이름까지 같으면 사용자 컬렉션 먼저(전에는 "사용자 컬렉션 먼저 → 이름 순", 별칭 변수는 대상 아님).
+test('연결 — 별칭이 먼저(플러그인 Global 안의 별칭도) · 원시값끼리는 이름 오름차순 → 같은 이름이면 사용자 컬렉션 먼저 · 새 역할은 플러그인 Semantic에(S2-P5)', async () => {
   const figma = installFigma();
   withRoot(figma);
   const g = figma.variables.createVariableCollection('Global'); // 이어받을 플러그인 Global
-  const shortcut = figma.variables.createVariable('a/shortcut', g, 'COLOR'); // 별칭 변수(이름 순 첫 번째)
+  const shortcut = figma.variables.createVariable('a/shortcut', g, 'COLOR'); // 별칭 변수
   const pg = figma.variables.createVariable('b/blue', g, 'COLOR');
   pg.setValueForMode(g.defaultModeId, rgbOf('#aa0000'));
   shortcut.setValueForMode(g.defaultModeId, { type: 'VARIABLE_ALIAS', id: pg.id });
@@ -4242,11 +4249,22 @@ test('연결 — 새 역할은 플러그인 Semantic에, 별칭 대상은 사용
   };
   const dry = await bindSelection([node], false);
   assert.equal(dry.candidates.length, 1);
-  assert.equal(dry.candidates[0].newRole.globalId, up.id); // 사용자 Global 먼저
-  // 사용자 Global이 없으면 플러그인 Global의 직접 값 변수(별칭 shortcut 아님)
-  up.remove();
+  assert.equal(dry.candidates[0].variableId, shortcut.id); // 별칭 먼저 — 새 역할 없음
+  assert.equal(dry.candidates[0].newRole, undefined);
+  // 별칭이 없으면 원시값끼리 이름 오름차순(b/blue < z/red) — 유료는 그것을 가리키는 새 역할
+  shortcut.remove();
   const dry2 = await bindSelection([node], false);
   assert.equal(dry2.candidates[0].newRole.globalId, pg.id);
+  assert.equal(dry2.candidates[0].newRoleGlobalName, 'b/blue');
+  // 이름까지 같으면 사용자 컬렉션 먼저
+  const up2 = figma.variables.createVariable('b/blue', prim, 'COLOR');
+  up2.setValueForMode(prim.defaultModeId, rgbOf('#aa0000'));
+  up2.scopes = ['ALL_SCOPES'];
+  const dry3 = await bindSelection([node], false);
+  assert.equal(dry3.candidates[0].newRole.globalId, up2.id);
+  // 무료는 그 원시값에 바로
+  const free = await bindSelection([node], false, {}, { noNewRoles: true });
+  assert.equal(free.candidates[0].variableId, up2.id);
 });
 
 test('팔레트 정리 — 플러그인 컬렉션 안에서만 지운다(사용자 컬렉션의 같은 패밀리 색은 보존)', async () => {
@@ -5501,26 +5519,38 @@ test('칠하기 용도는 레이어 종류(QA #4 불합격 1) — 흰 글자는 
   assert.equal(roleTarget(figma, inv.id), findVar(figma, 'Global', 'color/gray/0').id);
 });
 
-test('보는 순서 1 → 3 → 2 → 4 — 같은 값이면 디자이너 변수가 쓰임 이름 역할보다 먼저, 이름 순', async () => {
+// S-2(ia-v4 §2.9 S2-P5 · 불변식 §3)로 고쳐 씀: "보는 순서 1 → 3 → 2 → 4"(디자이너가 만든 것이 플러그인 역할보다 먼저)는 없다.
+// 별칭 후보(사용자 별칭 전부 + 플러그인이 만든 역할 가운데 가족 순서 첫 번째 하나)를 홉 → 이름 오름차순으로 줄 세운다.
+test('고르는 순서(S2-P5) — 별칭 후보끼리는 이름 오름차순: 사용자 별칭과 플러그인이 만든 역할을 같은 줄에 세운다(디자이너 먼저 없음)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
   const g = findVar(figma, 'Global', 'spacing/16');
   const auto = designerRole(figma, 'spacing/gap', g);
   auto.setPluginData('dsl.autoRole', '1'); // 플러그인이 만든 쓰임 역할
   const zed = designerRole(figma, 'spacing/zed', g);
-  const alpha = designerRole(figma, 'spacing/alpha', g);
   const frame = {
     type: 'FRAME', id: 'f', name: 'f', fills: [], layoutMode: 'VERTICAL', itemSpacing: 16, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
     layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', setBoundVariable() {},
   };
+  // 사용자 별칭 spacing/zed + 플러그인 역할 spacing/gap(가족) → 이름 오름차순이라 역할(전에는 디자이너 변수 zed가 먼저였다)
+  const dry0 = await bindSelection([frame], false);
+  assert.equal(dry0.candidates[0].variableId, auto.id);
+  // 이름이 앞서는 사용자 별칭이 있으면 그것
+  const alpha = designerRole(figma, 'spacing/alpha', g);
   const dry = await bindSelection([frame], false);
-  assert.equal(dry.candidates[0].variableId, alpha.id); // 디자이너 변수(이름 순 첫 번째)
-  void zed;
-  // 디자이너 변수가 없으면 쓰임 이름 역할(순서 2)
+  assert.equal(dry.candidates[0].variableId, alpha.id);
+  // 사용자 별칭이 없으면 쓰임 이름 역할
   alpha.remove();
   zed.remove();
   const dry2 = await bindSelection([frame], false);
   assert.equal(dry2.candidates[0].variableId, auto.id);
+  // 가족이 아닌 플러그인 역할(spacing/padding)은 같은 값이어도 후보가 아니다 — 원시값을 감싸는 새 역할
+  auto.remove();
+  const pad = designerRole(figma, 'spacing/padding', g);
+  pad.setPluginData('dsl.autoRole', '1');
+  const dry3 = await bindSelection([frame], false);
+  assert.equal(dry3.candidates[0].newRole.name, 'spacing/gap');
+  assert.equal(dry3.candidates[0].newRole.globalId, g.id);
 });
 
 test('무료 자동 연결은 새 Semantic을 만들지 않는다 — 맞는 Semantic이 없으면 Global에 · 있으면 그대로 · 유료는 새 Semantic (IA v4 §2.3-7 · F6)', async () => {
@@ -5638,10 +5668,10 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
   const { tokens } = extractFromSelection([card]);
   const by = (name) => tokens.find((x) => x.name === name);
   // 주인(card)을 쓰지 않는다(ia-v3 §2.12 12.12 N-D1 — 전에는 spacing/card/gap · spacing/card/padding)
-  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1 }]);
-  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4 }]);
-  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1 }]);
-  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light' }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
+  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, free: 1, keys: ['GAP'], by: { GAP: 1 } }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
+  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, free: 4, keys: ['GAP'], by: { GAP: 4 } }]);
+  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, free: 1, keys: ['ALL_FILLS|FRAME_FILL'], by: { 'ALL_FILLS|FRAME_FILL': 1 } }]);
+  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
 });
 
 /* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
@@ -5726,7 +5756,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   card.parent = root;
   const { tokens } = extractFromSelection([root]);
   const white = tokens.find((x) => x.name === 'color/ffffff');
-  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma' }, { name: 'color/text', count: 1, bg: 'light' }]);
+  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }, { name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }]);
   await createTokens(tokens, 16);
   await createUsageRoles(tokens);
   const inv = findVar(figma, 'Semantic', 'color/text/inverse');
@@ -5736,7 +5766,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   assert.ok(findVar(figma, 'Semantic', 'color/text/default')); // #111(2곳)이 기준
 });
 
-test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형도 순서 3에서 빼고 쓰임 역할을 만든다', async () => {
+test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형의 별칭도 후보에서 빼고 쓰임 역할을 만든다(S-2 — ia-v4 §2.9 S2-P4 "뺀다", 기대는 그대로)', async () => {
   for (const n of ['size/md', 'spacing/4xl-2', 'size/4xl-20', 'radius/full', 'radius/3xl', 'stroke-width/thin', 'spacing/none']) assert.equal(isOldPluginName(n), true, n);
   for (const n of ['size/icon', 'size/avatar', 'spacing/gap-2', 'radius/default', 'stroke-width/default', 'spacing/card/gap', 'radius/button']) assert.equal(isOldPluginName(n), false, n);
   const figma = installFigma();
@@ -6206,7 +6236,11 @@ test('직접 만든 변수 지키기 — createTokens(쓰임 있는 토큰, 12.1
   const targets = sem.map((v) => Object.values(v.valuesByMode)[0].id);
   assert.ok(targets.includes(same.id));
   assert.ok(targets.includes(findVar(figma, 'Global', 'color/00ff00-2').id));
-  assert.equal(targets.includes(diff.id), false);
+  // S-2(ia-v4 §2.9 S2-P8 ① · SC-D38)로 기대가 바뀜: 재사용은 이름이 아니라 값으로 — 값이 #0000ff인 직접 만든 변수 `color/00ff00`은
+  // #0000ff 토큰이 다시 쓴다(전에는 `color/0000ff`를 새로 만들어 diff를 가리키는 역할이 없었다). #00ff00 토큰은 여전히 다음 이름이다.
+  assert.equal(s.globalOf.get('color/0000ff'), diff.id);
+  assert.equal(findVar(figma, 'Global', 'color/0000ff'), undefined);
+  assert.equal(s.globalOf.get('color/00ff00'), findVar(figma, 'Global', 'color/00ff00-2').id);
 });
 
 test('직접 만든 변수 지키기 — prunePaletteColors는 지우지 않고, createSemanticAliases는 덮어쓰지 않고 건너뜀으로 센다', async () => {
@@ -6374,7 +6408,7 @@ test('createUsageRoles · previewCreateTokens — tokenStates(쓰임 있는 토�
   const s = await previewCreateTokens(toks, 16);
   assert.deepEqual(Object.fromEntries(s.tokenStates), {
     'color/0066ff': { state: 'reuse', varName: 'blue/500' },
-    'color/ff0000': { state: 'reuse', varName: 'color/ff0000', scopeAdd: true }, // 목 변수 용도 [] — 실행 때 칠 용도를 더함(ia-v4 §4.3 B.33)
+    'color/ff0000': { state: 'reuse', varName: 'color/ff0000' }, // 목 변수 용도 [] — 실행 때 칠 용도를 더하지만 태그는 "있는 변수" 하나다(S-2 — `scopeAdd` 필드 삭제, ia-v4 §2.9)
     'color/00ff00': { state: 'new', varName: 'color/00ff00-2' },
     'spacing/8': { state: 'reuse', varName: 'spacing/8' },
     'spacing/12': { state: 'new' },
@@ -7767,7 +7801,7 @@ test('A.21 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주�
   assert.equal(r.newRoles, 1);
   assert.equal(card._bound.itemSpacing, button._bound.itemSpacing);
   const uses = extractFromSelection([card, button]).tokens.find((t) => t.name === 'spacing/16').uses;
-  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2 }]);
+  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, free: 2, keys: ['GAP'], by: { GAP: 2 } }]);
 });
 
 test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {
@@ -7786,7 +7820,7 @@ test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radi
   assert.equal(nameKindOf('spacing/gap', '8'), 'number');
 });
 
-test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반경 9999 · 반쪽 알약 · 갈린 모서리 · 순서 3은 원래 값', async () => {
+test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반경 9999 · 반쪽 알약 · 갈린 모서리 · 원래 값의 사용자 변수(CORNER_RADIUS)가 있으면 보통 자리(S-2 SC-D36 ①)', async () => {
   let figma = installFigma();
   await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
   const btn = a20Frame('btn', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
@@ -7825,13 +7859,21 @@ test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반�
   assert.ok(!by('radius/150') && !by('radius/20'), '원래 값은 세지 않는다');
   assert.deepEqual(by('radius/9999').uses.map((u) => u.name).sort(), ['radius/bottom-left', 'radius/full', 'radius/top-left']);
   assert.deepEqual(by('radius/8').uses.map((u) => u.name).sort(), ['radius/bottom-right', 'radius/top-right']);
-  // 순서 3(디자이너 Semantic)은 원래 값으로 — 150 변수가 있으면 그대로 붙는다(9999로 바꾸지 않음)
+  // S-2(SC-D36 ① · SC-D37): 원래 값과 같고 용도에 CORNER_RADIUS를 직접 켠 사용자 변수가 있으면 알약이 아니다 — 150 변수에 그대로 붙는다(9999로 바꾸지 않음)
   figma = installFigma();
-  const d = await semNum(figma, 'radius/pill', 150, { cat: 'radius' });
+  const d = await semNum(figma, 'radius/pill', 150, { cat: 'radius', scopes: ['CORNER_RADIUS'] });
   const btn3 = a20Frame('btn3', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
   const d3 = await bindSelection([btn3], false);
   const c3 = d3.candidates.filter((c) => c.field.endsWith('Radius'));
+  assert.equal(c3.length, 4);
   assert.ok(c3.every((c) => c.variableId === d.id && c.pillFrom == null));
+  // 좁아짐(SC-D37): 용도 제한이 없는(ALL_SCOPES) 디자이너 별칭은 더는 알약을 가져가지 못한다 — 알약(값 9999)이고 9999 후보가 없으면 새로 만들 값
+  figma = installFigma();
+  await semNum(figma, 'radius/pill', 150, { cat: 'radius' }); // ALL_SCOPES
+  const btn4 = a20Frame('btn4', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
+  const d4 = await bindSelection([btn4], false);
+  assert.equal(d4.candidates.filter((c) => c.field.endsWith('Radius')).length, 0);
+  assert.deepEqual(d4.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
 });
 
 test('A.21 ④ body/large-w500-120 · body/large-w700-150 → font-size/body/large 하나(표시) · 파일에 = 19가 있으면 18은 -sm(덮지 않음)', async () => {
@@ -8803,15 +8845,24 @@ const strokeOnlyBlack = async () => {
   return globalThis.figma._state.variables.find((v) => v.name === 'color/000000');
 };
 
-test('B.33 ① 유료 — 선 용도만 있는 플러그인 Global + 같은 색 칠 → scope-add(u), no-match 아님 · 변수 그대로', async () => {
-  installFigma();
+// S-2(ia-v4 §2.9 S2-P3 · SC-D31 ⑧)로 기대가 바뀜: 유료도 붙인다 — 사유 `scope-add`(u)는 없어지고 후보 + `scopeAdd`가 된다(새 Semantic으로 감싸고 Global에 용도를 더함).
+test('B.33 ① 유료 — 선 용도만 있는 플러그인 Global + 같은 색 칠 → 후보(새 Semantic) + scopeAdd · 미리보기는 변수 그대로 → 연결 뒤 Global 용도에 ALL_FILLS', async () => {
+  const figma = installFigma();
   const g = await strokeOnlyBlack();
   assert.deepEqual(g.scopes, ['STROKE_COLOR']);
   const res = await bindSelection([blackFrame()], false);
-  assert.equal(res.reasons['scope-add'], 1);
+  assert.equal(res.reasons['scope-add'], undefined);
   assert.equal(res.reasons['no-match'] ?? 0, 0);
-  assert.equal(res.bound, 0);
-  assert.deepEqual(g.scopes, ['STROKE_COLOR']);
+  assert.equal(res.bound, 1);
+  assert.equal(res.candidates[0].scopeAdd, 'ALL_FILLS');
+  assert.equal(res.candidates[0].newRole.globalId, g.id);
+  assert.equal(res.make, undefined, '새로 만들 값이 아니다');
+  assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+  const node = blackFrame('bf1');
+  const run = await bindSelection([node], true);
+  assert.equal(run.bound, 1);
+  assert.equal(roleTarget(figma, node.fills[0].boundVariables.color.id), g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
 });
 
 test('B.33 ② 사용자 컬렉션 Global은 용도를 존중 — no-match 그대로', async () => {
@@ -8822,21 +8873,34 @@ test('B.33 ② 사용자 컬렉션 Global은 용도를 존중 — no-match 그�
   assert.equal(res.reasons['scope-add'] ?? 0, 0);
 });
 
-test('B.33 ②′ · ②″ 플러그인 Global 컬렉션의 직접 만든 변수 — 유료 · 무료 모두 scope-add(무료도 붙이지 않음 · 용도 그대로)', async () => {
-  installFigma();
+// SC-D38(2026-11-26 — SC-D32 ①을 뒤집음)로 기대가 바뀜: 직접 만든 변수도 용도 예외에 든다 — 유료 · 무료 모두 후보 + `scopeAdd`,
+// 연결 뒤 그 변수의 용도가 더해진다(전의 "붙지 않음 · 용도 그대로"는 없앤다). 값은 바뀌지 않는다.
+test('B.33 ②′ · ②″ 플러그인 Global 컬렉션의 직접 만든 변수 — 유료 · 무료 모두 후보 + scopeAdd, 연결 뒤 용도가 더해짐 · 값 그대로(SC-D38)', async () => {
+  const figma = installFigma();
   const g = await strokeOnlyBlack();
   g.setPluginData('dsl.manual', '1');
+  const value = JSON.stringify(g.valuesByMode);
   const paid = await bindSelection([blackFrame()], false);
-  assert.equal(paid.reasons['scope-add'], 1);
+  assert.equal(paid.reasons['scope-add'], undefined);
+  assert.equal(paid.bound, 1);
+  assert.equal(paid.candidates[0].scopeAdd, 'ALL_FILLS');
+  assert.equal(paid.candidates[0].newRole.globalId, g.id);
+  assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+  const dryFree = await bindSelection([blackFrame()], false, {}, { noNewRoles: true });
+  assert.equal(dryFree.candidates[0].variableId, g.id);
+  assert.equal(dryFree.candidates[0].scopeAdd, 'ALL_FILLS');
   const node = blackFrame('bf2');
   const free = await bindSelection([node], true, {}, { noNewRoles: true });
-  assert.equal(free.reasons['scope-add'], 1);
-  assert.equal(free.bound, 0);
-  assert.equal(node.fills[0].boundVariables, undefined);
-  assert.deepEqual(g.scopes, ['STROKE_COLOR']);
+  assert.equal(free.reasons['scope-add'], undefined);
+  assert.equal(free.bound, 1);
+  assert.equal(node.fills[0].boundVariables.color.id, g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+  assert.equal(JSON.stringify(g.valuesByMode), value, '값은 그대로');
+  assert.equal(figma._state.variables.filter((v) => v.name.startsWith('color/000000')).length, 1, '같은 값의 Global을 새로 만들지 않는다');
 });
 
-test('B.33 ③ 숫자 자리는 하지 않음 — 플러그인 spacing/16(GAP) + 반경 16 → no-match', async () => {
+// S-2: 기대는 그대로(이름이 다른 숫자 변수는 섞이지 않는다 — SC-D34) — 제목만 고침. 숫자 예외는 같은 이름 · 같은 값일 때만이다.
+test('B.33 ③ 숫자 예외는 같은 이름일 때만 — 플러그인 spacing/16(GAP) + 반경 16 → no-match(섞이지 않음)', async () => {
   installFigma();
   await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
   const node = { ...blackFrame('r16'), fills: [], cornerRadius: 16, topLeftRadius: 16, topRightRadius: 16, bottomLeftRadius: 16, bottomRightRadius: 16 };
@@ -8857,6 +8921,24 @@ test('B.33 ④ 무료 — 미리보기 후보 scopeAdd(ALL_FILLS) · 변수 그�
   const res = await bindSelection([node], true, {}, { noNewRoles: true });
   assert.equal(res.bound, 1);
   assert.equal(node.fills[0].boundVariables.color.id, g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+// S-2: ④의 유료 갈래(SC-D31 ⑧ — 유료는 새 Semantic으로 감싸고 Global에 용도를 더한다. Semantic의 용도는 역할 이름에서).
+test('B.33 ④ 유료 — 후보는 새 Semantic(color/background/default) + scopeAdd → 연결 뒤 Semantic이 Global을 가리키고 Global 용도에 ALL_FILLS', async () => {
+  const figma = installFigma();
+  const g = await strokeOnlyBlack();
+  const dry = await bindSelection([blackFrame()], false);
+  assert.equal(dry.candidates[0].newRole.name, 'color/background/default');
+  assert.equal(dry.candidates[0].scopeAdd, 'ALL_FILLS');
+  const node = blackFrame('bf4');
+  const res = await bindSelection([node], true);
+  assert.equal(res.bound, 1);
+  assert.equal(res.newRoles, 1);
+  const role = figma._state.variables.find((v) => v.id === node.fills[0].boundVariables.color.id);
+  assert.equal(role.name, 'color/background/default');
+  assert.deepEqual([...role.scopes].sort(), ['FRAME_FILL', 'SHAPE_FILL']);
+  assert.equal(Object.values(role.valuesByMode)[0].id, g.id);
   assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
 });
 
@@ -9069,4 +9151,774 @@ test('B.41 creationOrder · createTokens — 그룹 안 숫자 값 작은 순 ·
   const order = figma._state.variables.map((v) => v.name);
   const sp = order.filter((n) => n.startsWith('spacing/'));
   assert.deepEqual(sp, ['spacing/4', 'spacing/8', 'spacing/16'], '새 숫자 변수는 값 작은 순으로 만든다');
+});
+
+/* ============================================================
+   S-2 "같은 값" 함수 통합 — 회귀(ia-v4 §2.9 · B.39)
+   찾기(카드) · 추출(만들기 화면) · 만들기 미리보기 · 실행이 같은 판정을 쓰는지 예 (가)(나)(다) · (i)–(v)와 결정 SC-D31–SC-D39로 본다.
+   ============================================================ */
+const { userRadiusKeys: s2Keys, cardCounts: s2CardCounts, linkPlacesForMake: s2LinkPlaces, onlyItems: s2OnlyItems, libSameGroups: s2LibSame, makeDoneText: s2DoneText } = await import('../dist/pure.mjs');
+const S2_PAGE = { type: 'PAGE', id: 's2p', name: 'Page 1' };
+const s2Radius = (r) => ({ cornerRadius: r, topLeftRadius: r, topRightRadius: r, bottomLeftRadius: r, bottomRightRadius: r });
+const s2Fill = (hex, extra = {}) => [{ type: 'SOLID', visible: true, opacity: 1, color: rgbOf(hex), ...extra }];
+/** 오토레이아웃 없는 프레임 — 붙인 변수는 boundVariables에 남는다(다시 찾으면 "이미 연결됨"). */
+const s2Frame = (id, extra = {}) => ({
+  type: 'FRAME', id, name: id, visible: true, fills: [], strokes: [], effects: [], layoutMode: 'NONE',
+  layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 200, height: 80, ...s2Radius(0), children: [], parent: S2_PAGE, boundVariables: {},
+  setBoundVariable(field, v) { if (v) this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete this.boundVariables[field]; },
+  ...extra,
+});
+const s2Chip = (id, extra = {}) => s2Frame(id, { width: 80, height: 24, ...s2Radius(12), ...extra }); // 알약 모양(반경 ≥ 짧은 변 / 2)
+const s2Card = (id, extra = {}) => s2Frame(id, { width: 200, height: 80, ...s2Radius(12), ...extra }); // 알약 모양 아님
+const s2Button = (id, extra = {}) => s2Frame(id, { width: 120, height: 40, ...s2Radius(150), ...extra });
+const s2AutoFrame = (id, extra = {}) => s2Frame(id, { layoutMode: 'VERTICAL', primaryAxisAlignItems: 'MIN', layoutWrap: 'NO_WRAP', itemSpacing: 0, counterAxisSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', ...extra });
+const s2Text = (id, extra = {}) => ({
+  type: 'TEXT', id, name: id, visible: true, characters: 'Hi', fontSize: 14, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' },
+  letterSpacing: { unit: 'PERCENT', value: 0 }, fills: [], strokes: [], effects: [], parent: S2_PAGE, boundVariables: {}, setRangeBoundVariable() {}, ...extra,
+});
+/** 사용자 컬렉션의 별칭 변수. */
+const s2Alias = (figma, name, target, scopes = ['ALL_SCOPES'], colName = 'Tokens') => {
+  const v = mkVar(figma, name, target.resolvedType, scopes, undefined, colName);
+  const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
+  v.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: target.id });
+  return v;
+};
+/** 플러그인 Global 컬렉션(표시 있음)의 변수 — manual이면 직접 만든 변수(`dsl.manual`). */
+const s2Global = (figma, name, type, scopes, value, manual = false) => {
+  let col = figma._state.collections.find((c) => c._pd['dsl.owned'] === 'global');
+  if (!col) { col = figma.variables.createVariableCollection('Global'); col.setPluginData('dsl.owned', 'global'); }
+  const v = figma.variables.createVariable(name, col, type);
+  v.scopes = scopes;
+  if (value !== undefined) v.setValueForMode(col.defaultModeId, value);
+  if (manual) v.setPluginData('dsl.manual', '1');
+  return v;
+};
+const s2Sem = (figma) => figma._state.collections.find((c) => c._pd['dsl.owned'] === 'semantic');
+const s2SemVars = (figma) => figma._state.variables.filter((v) => v.variableCollectionId === s2Sem(figma)?.id);
+const s2Named = (figma, name) => figma._state.variables.filter((v) => v.name === name);
+const S2_MAKE_CATS = new Set(['color', 'effectColor', 'gap', 'radius', 'size', 'strokeWidth', 'opacity']);
+const s2FreeSum = (tk) => Object.values(tk.freeBy ?? {}).reduce((a, b) => a + (b > 0 ? b : 0), 0);
+/** `EXTRACT` 처리와 같은 추출 — 찾기 색인과 같은 변수 읽기에서 알약 판정 집합을 내고 메인 · 인스턴스 루트 판정을 넘긴다. */
+async function s2Extract(sel) {
+  const mains = await collectLocalMains(sel);
+  const roots = [...sel, ...mains.units.flatMap((u) => u.roots)];
+  const { infos } = await readVarInfos();
+  return extractFromSelection(roots, new Set(mains.mainOf.keys()), { userRadiusKeys: s2Keys(infos), mainOf: mains.mainOf }).tokens;
+}
+/** 만들기 화면을 연 직후 켜진 줄 — 글자 종류가 아니고 빈 자리가 있는 값. */
+const s2OnTokens = async (sel) => (await s2Extract(sel)).filter((tk) => S2_MAKE_CATS.has(tk.category) && s2FreeSum(tk) > 0);
+/** 카드 1의 숫자(찾기 응답에서) — m · n · q · s · p. */
+async function s2CardOf(sel, free = false, libs = []) {
+  const res = await bindSelection(sel, false, {}, free ? { noNewRoles: true } : {});
+  const c = s2CardCounts(res.candidates.map((x) => x.field), res.counts, res.make ?? [], libs);
+  const types = new Map(res.nodes.map((x) => [x.id, x.type]));
+  return { res, m: c.m, n: c.n, q: c.q, s: c.s, p: s2LinkPlaces(res.candidates, (id) => types.get(id), libs) + c.q };
+}
+/** 만들기 화면을 연 직후의 수 — g(미리보기 created + updated) · r(유료 Semantic 수) · p(켠 줄의 빈 자리 수 합). */
+async function s2MakeOf(sel, free = false) {
+  const toks = await s2OnTokens(sel);
+  const pv = await previewCreateTokens(toks, 16);
+  const r = free ? 0 : await createUsageRoles(toks, true, pv.globalOf, undefined, pv.finalName);
+  return { toks, pv, g: pv.created + pv.updated, r, p: toks.reduce((a, tk) => a + s2FreeSum(tk), 0), by: (name) => toks.find((tk) => tk.name === name), state: (name) => pv.tokenStates.get(name) };
+}
+/** 만들기 실행(만들기 + 연결 단계 — 켠 줄만). */
+async function s2Run(sel, free = false) {
+  const toks = await s2OnTokens(sel);
+  const s = await createTokens(toks, 16);
+  const roles = free ? 0 : await createUsageRoles(toks, false, s.globalOf, undefined, s.finalName);
+  const res = await bindSelection(sel, true, {}, { ...(free ? { noNewRoles: true } : {}), only: s2OnlyItems(toks, []) });
+  return { s, roles, res };
+}
+/** 레이어 속성에 붙은 변수(이름). */
+const s2Bound = (figma, node, field) => varName(figma, node.boundVariables?.[field]?.id);
+const s2FillBound = (figma, node, i = 0) => varName(figma, node.fills[i]?.boundVariables?.color?.id);
+const S2_CORNERS = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'];
+/** 어느 레이어에도 붙지 않은 플러그인 Semantic 변수 이름. */
+function s2UnusedRoles(figma, nodes) {
+  const used = new Set();
+  for (const n of nodes) {
+    for (const a of Object.values(n.boundVariables ?? {})) if (a?.id) used.add(a.id);
+    for (const p of n.fills ?? []) if (p.boundVariables?.color?.id) used.add(p.boundVariables.color.id);
+  }
+  return s2SemVars(figma).filter((v) => !used.has(v.id)).map((v) => v.name);
+}
+
+for (const free of [false, true]) {
+  const tier = free ? '무료' : '유료';
+
+  test(`S-2 예 (가) ${tier} — 로컬 변수 0개 · #111111 3곳 · #FFFFFF 2곳 → make 2값 5곳 · 카드 n = 만들기 g = 2 · p = 5 · 만들기 뒤 5곳 연결`, async () => {
+    const figma = installFigma();
+    const sel = [...[1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') })), ...[1, 2].map((i) => s2Frame(`w${i}`, { fills: s2Fill('#ffffff') }))];
+    const card = await s2CardOf(sel, free);
+    assert.equal(card.m, 0);
+    assert.deepEqual(card.res.make, [
+      { kind: 'color', value: '#111111', by: { 'ALL_FILLS|FRAME_FILL': 3 } },
+      { kind: 'color', value: '#ffffff', by: { 'ALL_FILLS|FRAME_FILL': 2 } },
+    ]);
+    assert.deepEqual([card.n, card.q, card.p], [2, 5, 5]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.toks.map(s2FreeSum).sort(), [2, 3]); // 줄 "3곳" · "2곳"
+    assert.equal(make.g, card.n);
+    assert.equal(make.pv.updated, 0, '기본 상태의 미리보기 updated = 0');
+    assert.equal(make.r, free ? 0 : 2);
+    assert.equal(make.p, card.p);
+    const run = await s2Run(sel, free);
+    assert.equal(run.s.created, 2);
+    assert.equal(run.res.bound, 5);
+    assert.equal(s2DoneText({ created: { g: 2, r: run.roles, m: 0 }, bound: run.res.bound }, { isPaid: !free, linkOff: false }), free ? 'Global 2개 · 5곳 연결' : 'Global 2개 · Semantic 2개 · 5곳 연결');
+    const after = await s2CardOf(sel, free);
+    assert.deepEqual([after.m, after.n], [0, 0]); // ✓
+    assert.equal(figma._state.variables.length, free ? 2 : 4);
+  });
+
+  test(`S-2 예 (나) ${tier} — 선 색만 켠 플러그인 Global + 같은 색 채움 3곳 → 연결할 곳 3 · scopeAdd · 미리보기는 변수 그대로 · 만들기 reuse · created 0 · 연결 뒤 용도에 ALL_FILLS`, async () => {
+    const figma = installFigma();
+    const g = s2Global(figma, 'color/gray/950', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 });
+    const sel = [1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.p], [3, 0, 3]);
+    assert.equal(card.res.make, undefined);
+    assert.equal(card.res.reasons['scope-add'], undefined);
+    assert.ok(card.res.candidates.every((c) => c.scopeAdd === 'ALL_FILLS'));
+    if (free) assert.ok(card.res.candidates.every((c) => c.variableId === g.id));
+    else assert.ok(card.res.candidates.every((c) => c.newRole?.name === 'color/background/default' && c.newRole.globalId === g.id));
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.state(make.toks[0].name), { state: 'reuse', varName: 'color/gray/950' }); // "3곳 · 있는 변수"
+    assert.equal(s2FreeSum(make.toks[0]), 3);
+    assert.deepEqual([make.g, make.r, make.p], [0, free ? 0 : 1, 3]); // "Global 0개 · Semantic 1개" · [3곳 연결]
+    assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+    // 연결 화면에서 연결
+    const linked = await bindSelection(sel, true, {}, free ? { noNewRoles: true } : {});
+    assert.equal(linked.bound, 3);
+    assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+    assert.equal(s2FillBound(figma, sel[0]), free ? 'color/gray/950' : 'color/background/default');
+    if (!free) assert.equal(roleTarget(figma, sel[0].fills[0].boundVariables.color.id), g.id);
+    assert.equal(s2Named(figma, 'color/gray/950').length, 1);
+    assert.equal(figma._state.variables.length, free ? 1 : 2);
+    assert.equal(s2DoneText({ created: { g: 0, r: free ? 0 : 1, m: 0 }, bound: 3 }, { isPaid: !free, linkOff: false }), free ? '3곳 연결' : 'Semantic 1개 · 3곳 연결');
+  });
+
+  test(`S-2 예 (나) ${tier} — 만들기 실행으로도 같은 결과: Global을 새로 만들지 않고 그 변수의 용도를 합쳐 3곳 연결`, async () => {
+    const figma = installFigma();
+    const g = s2Global(figma, 'color/gray/950', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 });
+    const sel = [1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+    const run = await s2Run(sel, free);
+    assert.equal(run.s.created + run.s.updated, 0);
+    assert.equal(run.roles, free ? 0 : 1);
+    assert.equal(run.res.bound, 3);
+    assert.ok(g.scopes.includes('ALL_FILLS') && g.scopes.includes('STROKE_COLOR'));
+    assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === g.variableCollectionId).length, 1);
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+  });
+
+  for (const sameCol of [true, false]) {
+    test(`S-2 예 (다) ${tier} · ${sameCol ? '같은 컬렉션(별칭 50% — 계층이 섞임)' : '다른 컬렉션'} — 원시 ink/900 + 별칭 surface/strong · 채움 2곳 → surface/strong · 새 역할 0 · Semantic 미리보기 0`, async () => {
+      const figma = installFigma();
+      const ink = mkVar(figma, 'ink/900', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 }, 'Brand');
+      const strong = s2Alias(figma, 'surface/strong', ink, ['ALL_SCOPES'], sameCol ? 'Brand' : 'Theme');
+      const sel = [1, 2].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+      const card = await s2CardOf(sel, free);
+      assert.deepEqual([card.m, card.n, card.p], [2, 0, 2]);
+      assert.ok(card.res.candidates.every((c) => c.variableId === strong.id && !c.newRole)); // 별칭 먼저 — 유료 · 무료 같음
+      const make = await s2MakeOf(sel, free);
+      assert.deepEqual(make.state(make.toks[0].name), { state: 'reuse', varName: 'surface/strong' });
+      assert.equal(make.pv.globalOf.get(make.toks[0].name), ink.id, '가리킬 원시값 = 별칭이 닿는 원시값 변수');
+      assert.deepEqual([make.g, make.r, make.p], [0, 0, 2]); // "Global 0개 · Semantic 0개" · [2곳 연결]
+      const run = await s2Run(sel, free);
+      assert.equal(run.roles, 0);
+      assert.equal(run.res.bound, 2);
+      assert.equal(run.res.newRoles ?? 0, 0);
+      assert.equal(s2FillBound(figma, sel[0]), 'surface/strong');
+      assert.equal(figma._state.variables.length, 2, '안 쓰는 Semantic을 만들지 않는다');
+    });
+  }
+
+  test(`S-2 SC-D38 ${tier} — 직접 만든 color/gray/950(선 색만) + 같은 색 채움 3곳 → 후보 3 · scopeAdd · make 없음 · 연결 뒤 용도에 ALL_FILLS · 값 그대로 · 새 Global 없음`, async () => {
+    const figma = installFigma();
+    const g = s2Global(figma, 'color/gray/950', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 }, true);
+    const value = JSON.stringify(g.valuesByMode);
+    const sel = [1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n], [3, 0]);
+    assert.equal(card.res.make, undefined);
+    assert.ok(card.res.candidates.every((c) => c.scopeAdd === 'ALL_FILLS'));
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.state(make.toks[0].name), { state: 'reuse', varName: 'color/gray/950' });
+    assert.equal(make.pv.created, 0);
+    const linked = await bindSelection(sel, true, {}, free ? { noNewRoles: true } : {});
+    assert.equal(linked.bound, 3);
+    assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+    assert.equal(JSON.stringify(g.valuesByMode), value);
+    assert.equal(s2FillBound(figma, sel[0]), free ? 'color/gray/950' : 'color/background/default'); // 유료는 새 Semantic으로 감쌈
+    const gNames = figma._state.variables.filter((v) => v.variableCollectionId === g.variableCollectionId).map((v) => v.name);
+    assert.deepEqual(gNames, ['color/gray/950'], '새 Global · -2 · 반 단계 이름 없음');
+  });
+
+  test(`S-2 SC-D34 · M9 ${tier} — 용도가 좁아진 플러그인 radius/16(직접 만든 변수여도) + 반경 16 자리 → 연결할 곳 · 새로 만들 값 0 · scopeAdd · 연결 뒤 CORNER_RADIUS · radius/16-2 없음`, async () => {
+    for (const manual of [false, true]) {
+      const figma = installFigma();
+      const g = s2Global(figma, 'radius/16', 'FLOAT', ['GAP'], 16, manual);
+      const node = s2Frame('c', s2Radius(16)); // 200 × 80 — 알약 모양 아님
+      const card = await s2CardOf([node], free);
+      assert.deepEqual([card.m, card.n, card.p], [4, 0, 4]);
+      assert.ok(card.res.candidates.every((c) => c.scopeAdd === 'CORNER_RADIUS'));
+      const make = await s2MakeOf([node], free);
+      assert.deepEqual(make.state('radius/16'), { state: 'reuse', varName: 'radius/16' });
+      assert.deepEqual([make.g, make.p], [0, 4]); // 카드 n = 만들기 g
+      assert.deepEqual(g.scopes, ['GAP'], '미리보기는 변수를 바꾸지 않는다');
+      const linked = await bindSelection([node], true, {}, free ? { noNewRoles: true } : {});
+      assert.equal(linked.bound, 4);
+      assert.deepEqual([...g.scopes].sort(), ['CORNER_RADIUS', 'GAP']);
+      assert.equal(s2Bound(figma, node, 'topLeftRadius'), free ? 'radius/16' : 'radius/default'); // 유료는 새 Semantic + Global 용도, 무료는 Global 직접
+      assert.equal(node.topLeftRadius, 16);
+      assert.equal(s2Named(figma, 'radius/16-2').length, 0);
+      assert.equal(s2Named(figma, 'radius/16').length, 1);
+    }
+  });
+
+  test(`S-2 예 (i) ${tier} — 높이 24 · 반경 12 칩 + 사용자 corner/12(CORNER_RADIUS) → 보통 자리: 연결할 곳 4 · make 없음 · 토큰 radius/12 · 실행 뒤 반경 그대로`, async () => {
+    const figma = installFigma();
+    const corner = mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+    const chip = s2Chip('chip');
+    const card = await s2CardOf([chip], free);
+    assert.deepEqual([card.m, card.n, card.p], [4, 0, 4]);
+    assert.equal(card.res.make, undefined);
+    assert.ok(card.res.candidates.every((c) => c.pillFrom == null && c.currentValue === '12'));
+    const make = await s2MakeOf([chip], free);
+    assert.deepEqual(make.toks.map((tk) => tk.name), ['radius/12'], 'radius/9999 토큰 없음');
+    assert.deepEqual(make.by('radius/12').uses.map((u) => u.name), ['radius/default']);
+    assert.deepEqual(make.state('radius/12'), { state: 'reuse', varName: 'corner/12' });
+    assert.deepEqual([make.g, make.r, make.p], [0, free ? 0 : 1, 4]);
+    assert.equal(make.pv.created, 0);
+    const run = await s2Run([chip], free);
+    assert.equal(run.res.bound, 4);
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'corner/12' : 'radius/default');
+      assert.equal(chip[c], 12, '반경 그대로');
+    }
+    if (!free) assert.equal(roleTarget(figma, chip.boundVariables.topLeftRadius.id), corner.id);
+    assert.equal(s2Named(figma, 'radius/9999').length + s2Named(figma, 'radius/full').length, 0);
+    assert.equal(figma._state.variables.length, free ? 1 : 2);
+  });
+
+  test(`S-2 예 (ii) ${tier} — 반경 12 × 4(corner/12) + 반경 150 × 4 → 카드 m = 4 · n = 1 · p = 8, 만들기 g = 1 · r = 2 · p = 8, 실행 뒤 8곳 · 실행 전 찾기와 연결 단계 찾기의 자리 값이 같다`, async () => {
+    const figma = installFigma();
+    mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+    const chip = s2Chip('chip');
+    const btn = s2Button('btn');
+    const sel = [chip, btn];
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [4, 1, 4, 8]);
+    assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.toks.map((tk) => [tk.name, s2FreeSum(tk)]), [['radius/12', 4], ['radius/9999', 4]]);
+    assert.deepEqual([make.g, make.r, make.p], [1, free ? 0 : 2, 8]);
+    const run = await s2Run(sel, free);
+    assert.equal(run.res.bound, 8);
+    // 연결 단계의 새 찾기가 같은 자리를 같은 값으로 모았다 — 12 자리는 원래 값, 150 자리는 9999(pillFrom 150)
+    const byNode = (id) => run.res.candidates.filter((c) => c.nodeId === id);
+    assert.ok(byNode('chip').every((c) => c.pillFrom == null && c.variableValue === '12'));
+    assert.ok(byNode('btn').every((c) => c.pillFrom === 150 && c.variableValue === '9999'));
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'corner/12' : 'radius/default');
+      assert.equal(chip[c], 12);
+      assert.equal(s2Bound(figma, btn, c), free ? 'radius/9999' : 'radius/full');
+      assert.equal(btn[c], 9999);
+    }
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+    const after = await s2CardOf(sel, free);
+    assert.deepEqual([after.m, after.n], [0, 0]);
+  });
+
+  test(`S-2 예 (iii) ${tier} — [20, 8, 20, 8] 탭(corner/20) + 반경 150 버튼 → 토큰 radius/8(2) · radius/20(2) · radius/9999(4 · radius/full뿐), 카드 2 · 2 · 8, 만들기 2 · 5 · 8, 실행 뒤 8곳 · 안 쓰는 역할 0 · -2 이름 0`, async () => {
+    const figma = installFigma();
+    mkVar(figma, 'corner/20', 'FLOAT', ['CORNER_RADIUS'], 20);
+    const tab = s2Frame('tab', { width: 120, height: 40, cornerRadius: figma.mixed, topLeftRadius: 20, topRightRadius: 8, bottomLeftRadius: 20, bottomRightRadius: 8 });
+    const btn = s2Button('btn');
+    const sel = [tab, btn];
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [2, 2, 6, 8]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.toks.map((tk) => [tk.name, s2FreeSum(tk)]), [['radius/20', 2], ['radius/8', 2], ['radius/9999', 4]]);
+    assert.deepEqual(make.by('radius/9999').uses.map((u) => u.name), ['radius/full']); // 탭의 20인 모서리는 radius/9999 토큰에 들지 않는다(4회차 Q1)
+    assert.deepEqual(make.by('radius/20').uses.map((u) => u.name).sort(), ['radius/bottom-left', 'radius/top-left']);
+    assert.deepEqual([make.g, make.r, make.p], [2, free ? 0 : 5, 8]);
+    const run = await s2Run(sel, free);
+    assert.equal(run.res.bound, 8);
+    if (free) {
+      assert.deepEqual(S2_CORNERS.map((c) => s2Bound(figma, tab, c)), ['corner/20', 'radius/8', 'corner/20', 'radius/8']);
+      assert.ok(S2_CORNERS.every((c) => s2Bound(figma, btn, c) === 'radius/9999'));
+    } else {
+      assert.deepEqual(S2_CORNERS.map((c) => s2Bound(figma, tab, c)), ['radius/top-left', 'radius/top-right', 'radius/bottom-left', 'radius/bottom-right']);
+      assert.ok(S2_CORNERS.every((c) => s2Bound(figma, btn, c) === 'radius/full'));
+      assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['radius/bottom-left', 'radius/bottom-right', 'radius/full', 'radius/top-left', 'radius/top-right']);
+    }
+    assert.deepEqual([tab.topLeftRadius, tab.topRightRadius, btn.topLeftRadius], [20, 8, 9999]);
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+    assert.equal(figma._state.variables.some((v) => /-\d+$/.test(v.name)), false, '-2 이름 없음');
+  });
+
+  test(`S-2 예 (iv) · SC-D37 ${tier} — 높이 24 · 반경 12 칩 + 사용자 spacing/12(ALL_SCOPES)만 → 알약: m = 0 · make (Radius, 9999) · 토큰 radius/9999 · g = 1 · 실행 뒤 반경 9999 · spacing/12 그대로`, async () => {
+    const figma = installFigma();
+    const sp = mkVar(figma, 'spacing/12', 'FLOAT', ['ALL_SCOPES'], 12);
+    const chip = s2Chip('chip');
+    const card = await s2CardOf([chip], free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [0, 1, 4, 4]);
+    assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+    const make = await s2MakeOf([chip], free);
+    assert.deepEqual(make.toks.map((tk) => tk.name), ['radius/9999']);
+    assert.deepEqual([make.g, make.r, make.p], [1, free ? 0 : 1, 4]);
+    const run = await s2Run([chip], free);
+    assert.equal(run.res.bound, 4);
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'radius/9999' : 'radius/full');
+      assert.equal(chip[c], 9999);
+    }
+    assert.deepEqual(sp.scopes, ['ALL_SCOPES']);
+    assert.equal(Object.values(sp.valuesByMode)[0], 12);
+  });
+
+  test(`S-2 예 (v) ${tier} — 알약 모양이 아닌 반경 12 + spacing/12(ALL_SCOPES) → 연결할 곳 4 · 그 변수가 후보 · g = 0`, async () => {
+    const figma = installFigma();
+    const sp = mkVar(figma, 'spacing/12', 'FLOAT', ['ALL_SCOPES'], 12);
+    const cardNode = s2Card('card');
+    const card = await s2CardOf([cardNode], free);
+    assert.deepEqual([card.m, card.n, card.p], [4, 0, 4]);
+    assert.ok(card.res.candidates.every((c) => (free ? c.variableId === sp.id : c.newRole?.globalId === sp.id && c.newRole.name === 'radius/default')));
+    const make = await s2MakeOf([cardNode], free);
+    assert.deepEqual(make.state('radius/12'), { state: 'reuse', varName: 'spacing/12' });
+    assert.deepEqual([make.g, make.r, make.p], [0, free ? 0 : 1, 4]);
+    const run = await s2Run([cardNode], free);
+    assert.equal(run.res.bound, 4);
+    assert.equal(s2Bound(figma, cardNode, 'topLeftRadius'), free ? 'spacing/12' : 'radius/default');
+    assert.equal(figma._state.variables.length, free ? 1 : 2);
+  });
+
+  test(`S-2 SC-D39 ${tier} — 직접 만든 radius/12(CORNER_RADIUS 없음) + 알약이 아닌 반경 12 자리 + 알약 칩 → 실행 전 · 연결 단계 모두 칩은 알약, 실행 뒤 칩은 radius/full(무료 radius/9999) · 보통 자리는 radius/12(용도 더해짐) · 안 쓰는 변수 없음`, async () => {
+    const figma = installFigma();
+    const man = s2Global(figma, 'radius/12', 'FLOAT', ['GAP'], 12, true);
+    const chip = s2Chip('chip');
+    const cardNode = s2Card('card');
+    const sel = [chip, cardNode];
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [4, 1, 4, 8]);
+    assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual([make.g, make.p], [1, 8]);
+    const run = await s2Run(sel, free);
+    assert.equal(run.res.bound, 8);
+    assert.ok(man.scopes.includes('CORNER_RADIUS'), '보통 자리에 붙으며 용도가 더해짐');
+    assert.ok(run.res.candidates.filter((c) => c.nodeId === 'chip').every((c) => c.pillFrom === 12), '연결 단계에서도 칩은 알약(직접 만든 변수는 판정 집합에 들지 않는다)');
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'radius/9999' : 'radius/full');
+      assert.equal(chip[c], 9999);
+      assert.equal(s2Bound(figma, cardNode, c), free ? 'radius/12' : 'radius/default');
+      assert.equal(cardNode[c], 12);
+    }
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+    assert.equal(Object.values(man.valuesByMode)[0], 12);
+  });
+}
+
+test('S-2 7-13의 11번 — 이름을 바꾼 플러그인 Global이 같은 값이면 다시 쓴다(다시 만들지 않음)', async () => {
+  const figma = installFigma();
+  const g = s2Global(figma, 'brand/ink', 'COLOR', ['ALL_FILLS'], { ...rgbOf('#111111'), a: 1 }); // 플러그인이 만든 뒤 사용자가 이름을 바꿈
+  const sel = [s2Frame('k', { fills: s2Fill('#111111') })];
+  const make = await s2MakeOf(sel);
+  assert.deepEqual(make.state('color/111111'), { state: 'reuse', varName: 'brand/ink' });
+  assert.equal(make.g, 0);
+  const s = await createTokens(make.toks, 16);
+  assert.equal(s.created, 0);
+  assert.equal(s.globalOf.get('color/111111'), g.id);
+  assert.equal(figma._state.variables.length, 1);
+});
+
+test('S-2 스타일이 붙은 칠 · 선 · 효과는 freeBy에 없다(연결 찾기의 styled와 같은 판정) — 토큰 · 쓰임은 그대로 모은다', async () => {
+  installFigma();
+  const styled = s2Frame('s', { fills: s2Fill('#111111'), fillStyleId: 'S:fill', strokes: s2Fill('#222222'), strokeStyleId: 'S:stroke', strokeWeight: 1, effects: [{ type: 'DROP_SHADOW', visible: true, color: { r: 0, g: 0, b: 0, a: 0.25 }, offset: { x: 0, y: 1 }, radius: 4, spread: 0 }], effectStyleId: 'S:fx' });
+  const plain = s2Frame('p', { fills: s2Fill('#111111') });
+  const toks = await s2Extract([styled, plain]);
+  const by = (n) => toks.find((tk) => tk.name === n);
+  assert.deepEqual(by('color/111111').freeBy, { 'ALL_FILLS|FRAME_FILL': 1 }); // 스타일 없는 칠 하나만
+  assert.equal(by('color/111111').count, 2);
+  assert.equal(s2FreeSum(by('color/222222')), 0);
+  assert.equal(s2FreeSum(toks.find((tk) => tk.category === 'effectColor')), 0);
+  const res = await bindSelection([styled, plain], false);
+  assert.equal(res.reasons.styled, 3);
+  assert.deepEqual(res.make, [{ kind: 'stroke', value: 1, by: { STROKE_FLOAT: 1 } }, { kind: 'color', value: '#111111', by: { 'ALL_FILLS|FRAME_FILL': 1 } }]); // 선 두께는 스타일과 무관한 자리
+});
+
+test('S-2 같은 이름 · 다른 값의 직접 만든 변수 → 그 변수 그대로이고 새 Global은 다음 이름(지금 그대로 — S2-P8)', async () => {
+  const figma = installFigma();
+  const man = s2Global(figma, 'spacing/16', 'FLOAT', ['GAP'], 20, true);
+  const node = s2AutoFrame('al', { itemSpacing: 16 });
+  const card = await s2CardOf([node]);
+  assert.deepEqual([card.m, card.n], [0, 1]);
+  const make = await s2MakeOf([node]);
+  assert.deepEqual(make.state('spacing/16'), { state: 'new', varName: 'spacing/16-2' });
+  assert.equal(make.g, card.n);
+  await s2Run([node]);
+  assert.equal(Object.values(man.valuesByMode)[0], 20);
+  assert.deepEqual(man.scopes, ['GAP']);
+  assert.equal(Object.values(s2Named(figma, 'spacing/16-2')[0].valuesByMode)[0], 16);
+});
+
+test('S-2 SC-D38 — 직접 만든 숫자 radius/16(용도 GAP만) + 알약 아닌 반경 16 → 붙고 CORNER_RADIUS가 더해진다 · spacing/16만 있으면 새로 만들 값 1(섞이지 않음)', async () => {
+  let figma = installFigma();
+  const man = s2Global(figma, 'radius/16', 'FLOAT', ['GAP'], 16, true);
+  const node = s2Frame('c', s2Radius(16));
+  const r = await bindSelection([node], true, {}, { noNewRoles: true });
+  assert.equal(r.bound, 4);
+  assert.equal(s2Bound(figma, node, 'topLeftRadius'), 'radius/16');
+  assert.deepEqual([...man.scopes].sort(), ['CORNER_RADIUS', 'GAP']);
+  figma = installFigma();
+  s2Global(figma, 'spacing/16', 'FLOAT', ['GAP'], 16);
+  const card = await s2CardOf([s2Frame('c2', s2Radius(16))]);
+  assert.deepEqual([card.m, card.n], [0, 1]);
+  const make = await s2MakeOf([s2Frame('c3', s2Radius(16))]);
+  assert.equal(make.g, 1);
+});
+
+test('S-2 SC-D32 ⑥ — 글자 값만 후보 없는 선택 → m = n = 0이고 reasons["no-match"]는 그대로 · 소수 글자 크기 13.5는 손볼 곳 s 그대로', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'x', 'FLOAT', ['GAP'], 4); // 로컬 변수는 있다
+  const card = await s2CardOf([s2Text('t1'), s2Text('t2', { fontSize: 18 })]);
+  assert.deepEqual([card.m, card.n, card.q, card.s], [0, 0, 0, 0]); // 카드는 "✓ 찾은 값은 모두 연결돼 있어요"
+  assert.equal(card.res.make, undefined);
+  assert.equal(card.res.reasons['no-match'], 2);
+  assert.equal(card.res.counts['no-match'].text, 2);
+  assert.ok(card.res.skips.some((x) => x.reason === 'no-match'));
+  const dec = await s2CardOf([s2Text('t3', { fontSize: 13.5 })]);
+  assert.deepEqual([dec.m, dec.n, dec.s], [0, 0, 1]);
+  assert.equal(dec.res.reasons.fraction, 1);
+});
+
+test('S-2 M1 — 인스턴스 5개 + 선택 밖 메인(루트 채움) → 연결 1곳 · 추출 freeBy 1곳(인스턴스 루트는 메인을 따르는 자리)', async () => {
+  installFigma();
+  const M = mkMain('M', [], { fills: a18solid(BLUE), layoutMode: 'NONE', ...s2Radius(0) });
+  const insts = [1, 2, 3, 4, 5].map((i) => mkInst(`I${i}`, M, { fills: a18solid(BLUE), layoutMode: 'NONE' }));
+  const F = a18Frame('F', insts);
+  const res = await bindSelection([F], false);
+  assert.deepEqual(res.make, [{ kind: 'color', value: BLUE, by: { 'ALL_FILLS|FRAME_FILL': 1 } }]);
+  const toks = await s2Extract([F]);
+  const tk = toks.find((x) => x.value === BLUE);
+  assert.equal(s2FreeSum(tk), 1);
+  assert.equal(tk.count, 6, '토큰 · 쓰임은 지금처럼 모은다');
+  // 값을 바꾼 인스턴스 루트는 제 자리다
+  const over = mkInst('I9', M, { fills: a18solid(RED), layoutMode: 'NONE' });
+  const F2 = a18Frame('F2', [mkInst('I8', M, { fills: a18solid(BLUE), layoutMode: 'NONE' }), over]);
+  const res2 = await bindSelection([F2], false);
+  const toks2 = await s2Extract([F2]);
+  assert.equal(res2.make.reduce((a, m) => a + Object.values(m.by).reduce((x, y) => x + y, 0), 0), 2);
+  assert.equal(toks2.reduce((a, x) => a + s2FreeSum(x), 0), 2);
+});
+
+test('S-2 M2 · M3 · SC-D36 ① — 소수 알약(높이 25 · 반경 12.5): 사용자 corner/12.5가 있으면 그 변수에 붙고 반경 그대로 · 토큰 없음 · p에 없음, 없으면 no-match · make (Radius, 9999) · 추출 radius/9999와 같은 수', async () => {
+  let figma = installFigma();
+  const c125 = mkVar(figma, 'corner/12.5', 'FLOAT', ['CORNER_RADIUS'], 12.5);
+  const chip = s2Frame('chip', { width: 80, height: 25, ...s2Radius(12.5) });
+  const card = await s2CardOf([chip], true);
+  assert.deepEqual([card.m, card.n, card.p], [4, 0, 0]); // 연결할 곳이지만 만들기 화면에 줄이 없어 p에서 빠진다
+  assert.ok(card.res.candidates.every((c) => c.variableId === c125.id && c.pillFrom == null));
+  assert.deepEqual(await s2Extract([chip]), [], '그 값의 토큰 없음(보통 소수 반경)');
+  const r = await bindSelection([chip], true, {}, { noNewRoles: true });
+  assert.equal(r.bound, 4);
+  assert.equal(chip.topLeftRadius, 12.5);
+  figma = installFigma();
+  mkVar(figma, 'x', 'FLOAT', ['GAP'], 4);
+  const chip2 = s2Frame('chip2', { width: 80, height: 25, ...s2Radius(12.5) });
+  const card2 = await s2CardOf([chip2]);
+  assert.equal(card2.res.reasons.fraction, undefined, '알약으로 판정된 모서리는 값이 9999라 소수 사유가 없다');
+  assert.equal(card2.res.reasons['no-match'], 4);
+  assert.deepEqual(card2.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+  assert.deepEqual([card2.m, card2.n, card2.s, card2.p], [0, 1, 0, 4]);
+  const toks = await s2Extract([chip2]);
+  assert.deepEqual(toks.map((tk) => [tk.name, s2FreeSum(tk)]), [['radius/9999', 4]]);
+});
+
+test('S-2 SC-D36 ① — 플러그인 radius/12 Global · 플러그인 역할 radius/default = 12만 있으면(사용자 변수 없음) 높이 24 · 반경 12는 알약: make (Radius, 9999) · 토큰 radius/9999 · 실행 뒤 radius/full · 반경 9999', async () => {
+  const figma = installFigma();
+  const g = s2Global(figma, 'radius/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  const role = designerRole(figma, 'radius/default', g);
+  figma._state.collections.find((c) => c.id === role.variableCollectionId).setPluginData('dsl.owned', 'semantic');
+  role.scopes = ['CORNER_RADIUS'];
+  role.setPluginData('dsl.autoRole', '1');
+  const chip = s2Chip('chip');
+  const card = await s2CardOf([chip]);
+  assert.deepEqual([card.m, card.n], [0, 1]);
+  assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+  assert.deepEqual((await s2Extract([chip])).map((tk) => tk.name), ['radius/9999']);
+  const run = await s2Run([chip]);
+  assert.equal(run.res.bound, 4);
+  assert.equal(s2Bound(figma, chip, 'topLeftRadius'), 'radius/full');
+  assert.equal(chip.topLeftRadius, 9999);
+});
+
+test('S-2 SC-D39 — 플러그인 Global 컬렉션의 변수는 직접 만들었든 · 별칭이든 알약 판정 집합에 들지 않는다 · 플러그인 Semantic의 표시 없는 변수는 들고 실행이 그 값 · 용도를 바꾸지 않는다', async () => {
+  const pillMake = [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }];
+  // 직접 만든 radius/12(CORNER_RADIUS 켬)만 → 알약 그대로
+  let figma = installFigma();
+  s2Global(figma, 'radius/12', 'FLOAT', ['CORNER_RADIUS'], 12, true);
+  assert.deepEqual((await bindSelection([s2Chip('a')], false)).make, pillMake);
+  // 플러그인 Global 컬렉션 안의 별칭 변수(CORNER_RADIUS 켬 — 직접 만든 것 · 플러그인 Global이 별칭으로 바뀐 것)
+  for (const manual of [true, false]) {
+    figma = installFigma();
+    const raw = s2Global(figma, 'base/12', 'FLOAT', ['GAP'], 12);
+    const al = s2Global(figma, 'radius/chip', 'FLOAT', ['CORNER_RADIUS'], { type: 'VARIABLE_ALIAS', id: raw.id }, manual);
+    assert.equal(s2Keys((await readVarInfos()).infos).size, 0);
+    assert.deepEqual((await bindSelection([s2Chip('b')], false)).make, pillMake);
+    void al;
+  }
+  // 플러그인 Semantic의 표시 없는 변수(CORNER_RADIUS 켬) → 집합에 든다 — 칩은 보통 자리이고 그 변수에 붙는다
+  figma = installFigma();
+  const g = s2Global(figma, 'base/12', 'FLOAT', ['GAP'], 12);
+  const own = designerRole(figma, 'radius/chip', g);
+  figma._state.collections.find((c) => c.id === own.variableCollectionId).setPluginData('dsl.owned', 'semantic');
+  own.scopes = ['CORNER_RADIUS'];
+  assert.deepEqual([...s2Keys((await readVarInfos()).infos)], ['12']);
+  const chip = s2Chip('c');
+  const before = JSON.stringify([own.valuesByMode, own.scopes]);
+  const run = await s2Run([chip]);
+  assert.equal(run.res.bound, 4);
+  assert.equal(s2Bound(figma, chip, 'topLeftRadius'), 'radius/chip');
+  assert.equal(chip.topLeftRadius, 12);
+  assert.equal(JSON.stringify([own.valuesByMode, own.scopes]), before, '실행은 집합에 드는 변수의 값 · 용도를 고치지 않는다');
+});
+
+test('S-2 SC-D36 ① — 원래 값 사용자 변수와 9999 사용자 변수가 함께 있으면 원래 값 쪽 · 원래 값 9999 + 사용자 9999 변수 → 그 변수 · radius/full', async () => {
+  let figma = installFigma();
+  const c12 = mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  mkVar(figma, 'corner/pill', 'FLOAT', ['CORNER_RADIUS'], 9999);
+  const res = await bindSelection([s2Chip('chip')], false, {}, { noNewRoles: true });
+  assert.equal(res.candidates.length, 4);
+  assert.ok(res.candidates.every((c) => c.variableId === c12.id && c.pillFrom == null));
+  figma = installFigma();
+  const pill = mkVar(figma, 'corner/pill', 'FLOAT', ['CORNER_RADIUS'], 9999);
+  const big = s2Frame('big', { width: 120, height: 40, ...s2Radius(9999) });
+  const paid = await bindSelection([big], false);
+  assert.ok(paid.candidates.every((c) => c.newRole?.name === 'radius/full' && c.newRole.globalId === pill.id && c.pillFrom == null));
+  const r = await bindSelection([big], true, {}, { noNewRoles: true });
+  assert.equal(r.bound, 4);
+  assert.equal(big.topLeftRadius, 9999);
+  assert.equal(s2Bound(figma, big, 'topLeftRadius'), 'corner/pill');
+});
+
+test('S-2 SC-D37 — 용도 [] 사용자 변수는 집합에도 후보에도 없다 · 별칭의 용도는 그 변수 자신의 것 · ALL_SCOPES 디자이너 별칭뿐이면 알약(지금과 달라짐) · corner/12 + spacing/12면 보통 자리이고 둘 다 후보', async () => {
+  const keys = async () => [...s2Keys((await readVarInfos()).infos)];
+  // 용도 [] — 집합에 없음 · 어느 자리의 후보도 아님
+  let figma = installFigma();
+  mkVar(figma, 'corner/12', 'FLOAT', [], 12).scopes = [];
+  assert.deepEqual(await keys(), []);
+  assert.equal((await bindSelection([s2Card('c')], false)).candidates.length, 0);
+  // CORNER_RADIUS를 켠 원시값을 가리키는 ALL_SCOPES 별칭 — 원시값이 집합에 든다(원시값 자신의 scopes)
+  figma = installFigma();
+  const raw = mkVar(figma, 'base/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  s2Alias(figma, 'radius/chip', raw, ['ALL_SCOPES'], 'Theme');
+  assert.deepEqual(await keys(), ['12']);
+  // 거꾸로 ALL_SCOPES 원시값을 가리키는 CORNER_RADIUS 별칭 — 별칭이 집합에 든다
+  figma = installFigma();
+  const raw2 = mkVar(figma, 'base/12', 'FLOAT', ['ALL_SCOPES'], 12);
+  const al2 = s2Alias(figma, 'radius/chip', raw2, ['CORNER_RADIUS'], 'Theme');
+  assert.deepEqual(await keys(), ['12']);
+  const r2 = await bindSelection([s2Chip('chip')], false);
+  assert.ok(r2.candidates.length === 4 && r2.candidates.every((c) => c.variableId === al2.id && c.pillFrom == null));
+  // ALL_SCOPES 디자이너 별칭 radius/chip = 12뿐 → 알약 칩은 9999(좁아짐)
+  figma = installFigma();
+  const raw3 = mkVar(figma, 'base/12', 'FLOAT', ['ALL_SCOPES'], 12);
+  s2Alias(figma, 'radius/chip', raw3, ['ALL_SCOPES'], 'Theme');
+  assert.deepEqual(await keys(), []);
+  assert.deepEqual((await bindSelection([s2Chip('chip')], false)).make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+  // corner/12(CORNER_RADIUS) + spacing/12(ALL_SCOPES) → 보통 자리 · 둘 다 후보(S2-P5 — 둘 다 원시값이면 이름 오름차순, 범용 쪽이 별칭이면 별칭이 먼저)
+  figma = installFigma();
+  const c12 = mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  const s12 = mkVar(figma, 'spacing/12', 'FLOAT', ['ALL_SCOPES'], 12);
+  const { candidatePool } = await import('../dist/pure.mjs');
+  const pool = candidatePool({ type: 'FLOAT', key: '12', allowed: ['CORNER_RADIUS'] }, (await readVarInfos()).infos);
+  assert.deepEqual(pool.raws.map((v) => v.name).sort(), ['corner/12', 'spacing/12']);
+  const both = await bindSelection([s2Chip('chip')], false, {}, { noNewRoles: true });
+  assert.ok(both.candidates.every((c) => c.variableId === c12.id && c.pillFrom == null));
+  const generic = s2Alias(figma, 'radius/any', s12, ['ALL_SCOPES'], 'Theme');
+  const both2 = await bindSelection([s2Chip('chip')], false, {}, { noNewRoles: true });
+  assert.ok(both2.candidates.every((c) => c.variableId === generic.id));
+});
+
+test('S-2 SC-D36 ① — 높이 40 · [20, 150, 20, 150] + corner/20 → [20, 9999, 20, 9999]: 모서리별 이름 · 9999 모서리의 역할도 모서리별 이름', async () => {
+  const figma = installFigma();
+  const c20 = mkVar(figma, 'corner/20', 'FLOAT', ['CORNER_RADIUS'], 20);
+  const node = s2Frame('n', { width: 120, height: 40, cornerRadius: figma.mixed, topLeftRadius: 20, topRightRadius: 150, bottomLeftRadius: 20, bottomRightRadius: 150 });
+  const dry = await bindSelection([node], false);
+  const by = Object.fromEntries(dry.candidates.map((c) => [c.field, c]));
+  assert.equal(by.topLeftRadius.newRole.name, 'radius/top-left');
+  assert.equal(by.topLeftRadius.newRole.globalId, c20.id);
+  assert.equal(by.topRightRadius, undefined);
+  assert.deepEqual(dry.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 2 } }]);
+  const toks = await s2Extract([node]);
+  assert.deepEqual(toks.find((tk) => tk.name === 'radius/9999').uses.map((u) => u.name).sort(), ['radius/bottom-right', 'radius/top-right']);
+  assert.deepEqual(toks.find((tk) => tk.name === 'radius/20').uses.map((u) => u.name).sort(), ['radius/bottom-left', 'radius/top-left']);
+  await s2Run([node]);
+  assert.deepEqual(S2_CORNERS.map((c) => s2Bound(figma, node, c)), ['radius/top-left', 'radius/top-right', 'radius/bottom-left', 'radius/bottom-right']);
+  assert.deepEqual(S2_CORNERS.map((c) => node[c]), [20, 9999, 20, 9999]);
+  // 높이 40 · 반경 20(넷 같음) + corner/20 → radius/default(20)
+  const same = s2Frame('s', { width: 120, height: 40, ...s2Radius(20) });
+  assert.ok((await bindSelection([same], false)).candidates.every((c) => c.pillFrom == null));
+});
+
+test('S-2 N1 — 여백 0 + 사용자 0 변수(용도 맞음) → 연결할 곳 m에 들고 카드 p · 만들기 화면 p에 없다 · 간격 12.5 + 사용자 12.5 변수도 같다', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'space/0', 'FLOAT', ['GAP'], 0);
+  mkVar(figma, 'space/12.5', 'FLOAT', ['GAP'], 12.5);
+  const node = s2AutoFrame('al', { itemSpacing: 12.5, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 });
+  const card = await s2CardOf([node], true);
+  assert.deepEqual([card.m, card.n, card.p], [5, 0, 0]);
+  const make = await s2MakeOf([node], true);
+  assert.deepEqual([make.toks.length, make.p], [0, 0], '추출에 그 값의 토큰이 없다');
+  // 후보가 없으면 지금 그대로 — 0은 버림, 소수는 손볼 곳
+  installFigma();
+  const bare = await s2CardOf([s2AutoFrame('al2', { itemSpacing: 12.5 })]);
+  assert.deepEqual([bare.m, bare.n, bare.s], [0, 0, 1]);
+  assert.equal(bare.res.reasons['no-match'], undefined);
+});
+
+test('S-2 M5 — 라이브러리 같은 값 묶음의 "연결할 곳"은 카드 p에서 빠지고 만들기 화면 p와 같다', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 });
+  const sel = [s2Frame('a', { fills: s2Fill('#111111') }), s2Frame('b', { fills: s2Fill('#111111') }), s2Frame('c', { fills: s2Fill('#333333'), ...s2Radius(8) })];
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#111111' }, scopes: ['ALL_FILLS'] }, { type: 'FLOAT', value: { kind: 'number', text: '8' }, scopes: ['CORNER_RADIUS'] }];
+  const card = await s2CardOf(sel, true, libs);
+  assert.equal(card.m, 2); // 제목 m은 빼지 않는다
+  assert.deepEqual([card.n, card.q, card.p], [1, 1, 1]); // 반경 8은 라이브러리 같은 값이라 n · q에서 빠지고 #333333 한 값만
+  const toks = await s2OnTokens(sel);
+  const makeP = toks.reduce((a, tk) => { const lib = new Set(s2LibSame(tk, libs)); return a + Object.entries(tk.freeBy).reduce((x, [g, n]) => x + (lib.has(g) ? 0 : n), 0); }, 0);
+  assert.equal(makeP, card.p);
+  assert.equal((await s2CardOf(sel, true)).p, 7); // 라이브러리가 없으면 2 + 1 + 4
+});
+
+test('S-2 M8 — 묶음마다 다른 원시값을 골라도 가리킬 원시값은 첫 빈 묶음의 것 하나이고 만들기 실행 뒤 -2 역할이 없다', async () => {
+  const figma = installFigma();
+  const fillRaw = mkVar(figma, 'a/fill', 'COLOR', ['ALL_FILLS'], { ...rgbOf('#111111'), a: 1 });
+  const lineRaw = mkVar(figma, 'b/line', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 });
+  const node = s2Frame('n', { fills: s2Fill('#111111'), strokes: s2Fill('#111111'), strokeWeight: 0 });
+  const make = await s2MakeOf([node]);
+  assert.deepEqual(make.state('color/111111'), { state: 'reuse', varName: 'a/fill' });
+  assert.equal(make.pv.globalOf.get('color/111111'), fillRaw.id);
+  assert.deepEqual([make.g, make.r], [0, 2]);
+  const run = await s2Run([node]);
+  assert.equal(run.res.bound, 2);
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['color/background/default', 'color/border/default']);
+  assert.equal(figma._state.variables.some((v) => /-\d+$/.test(v.name)), false);
+  assert.equal(s2FillBound(figma, node), 'color/background/default');
+  assert.equal(varName(figma, node.strokes[0].boundVariables.color.id), 'color/border/default');
+  void lineRaw;
+});
+
+test('S-2 createRole — 같은 이름의 플러그인 Semantic 역할이 같은 값이면(가리키는 원시값이 달라도) 그것을 쓰고 -2를 만들지 않는다 · 사용자 컬렉션의 같은 이름은 돌려주지 않는다(S2-P6)', async () => {
+  const figma = installFigma();
+  const a = mkVar(figma, 'a/ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 });
+  const b = mkVar(figma, 'b/ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 });
+  const spec = { name: 'color/background/default', globalId: a.id, scopes: ['FRAME_FILL', 'SHAPE_FILL'] };
+  const r1 = await createRole(spec, a);
+  const r2 = await createRole({ ...spec, globalId: b.id }, b);
+  assert.equal(r2.id, r1.id);
+  assert.equal(s2SemVars(figma).length, 1);
+  // 값이 다르면 다음 번호
+  const c = mkVar(figma, 'c/ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#222222'), a: 1 });
+  assert.equal((await createRole({ ...spec, globalId: c.id }, c)).name, 'color/background/default-2');
+});
+
+test('S-2 추출에 판정 집합을 넘기지 않으면 지금과 같은 토큰(알약 모양 모서리는 모두 9999)', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  const chip = s2Chip('chip');
+  assert.deepEqual(extractFromSelection([chip]).tokens.map((tk) => tk.name), ['radius/9999']);
+  assert.deepEqual((await s2Extract([chip])).map((tk) => tk.name), ['radius/12']);
+});
+
+test('S-2 글자 토큰에도 freeBy — 변수 · 텍스트 스타일이 붙지 않았고 빈 글자 · 텍스트 스타일 후보 레이어가 아닌 글자 속성', async () => {
+  installFigma();
+  const plain = s2Text('a', { lineHeight: { unit: 'PIXELS', value: 20 } });
+  const empty = s2Text('b', { characters: '' });
+  const styled = s2Text('c', { textStyleId: 'S:1' });
+  const cand = s2Text('d');
+  const toks = extractFromSelection([plain, empty, styled, cand], undefined, { textStyleNode: (n) => n.id === 'd' }).tokens;
+  const by = (n) => toks.find((tk) => tk.name === n);
+  assert.deepEqual(by('font-size/14').freeBy, { FONT_SIZE: 1 });
+  assert.equal(by('font-size/14').count, 4);
+  assert.deepEqual(by('font-family/Inter').freeBy, { FONT_FAMILY: 1 }); // 같은 글꼴의 변수가 아직 없어도 빈 자리로 센다
+  assert.deepEqual(by('line-height/20').freeBy, { LINE_HEIGHT: 1 });
+});
+
+/* ---------- S-2 코드 검토 반영(2026-11-26 SC-D40 · SC-D41) ---------- */
+
+test('S-2 SC-D40 밝기 이름 대상 — 사용자 별칭이 붙을 색 자리도 넣는다: 만들기가 지은 strong을 연결 단계가 다시 쓰고 안 쓰는 Semantic이 없다', async () => {
+  const figma = installFigma();
+  const white = mkVar(figma, 'white', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#ffffff'), a: 1 }, 'Brand');
+  s2Alias(figma, 'surface/base', white, ['ALL_SCOPES'], 'Brand');
+  const sel = [...[1, 2, 3].map((i) => s2Frame(`w${i}`, { fills: s2Fill('#ffffff') })), ...[1, 2].map((i) => s2Frame(`g${i}`, { fills: s2Fill('#f5f5f5') }))];
+  const card = await s2CardOf(sel, false);
+  const make = await s2MakeOf(sel, false);
+  assert.deepEqual([card.m, card.n, card.p], [3, 1, 5]);
+  assert.deepEqual([make.g, make.r, make.p], [1, 1, 5]); // 카드 n = 만들기 g
+  const run = await s2Run(sel, false);
+  assert.equal(run.roles, 1);
+  assert.equal(run.res.bound, 5);
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name), ['color/background/strong']); // 화면의 Semantic 1개 = 실제
+  assert.deepEqual(s2UnusedRoles(figma, sel), []);
+  assert.deepEqual(sel.map((n) => s2FillBound(figma, n)), ['surface/base', 'surface/base', 'surface/base', 'color/background/strong', 'color/background/strong']);
+});
+
+test('S-2 SC-D41 만들기 재사용의 가족 — 밝기까지 정한 밑이름으로 본다: 다른 밝기의 플러그인 역할(strong)은 default 자리의 후보가 아니라 카드 n = 만들기 g = 1', async () => {
+  const figma = installFigma();
+  const ink = mkVar(figma, 'brand/ink', 'COLOR', ['TEXT_FILL'], { ...rgbOf('#111111'), a: 1 }, 'Brand');
+  const col = figma.variables.createVariableCollection('Semantic');
+  col.setPluginData('dsl.owned', 'semantic');
+  const role = figma.variables.createVariable('color/background/strong', col, 'COLOR');
+  role.scopes = ['FRAME_FILL', 'SHAPE_FILL'];
+  role.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: ink.id });
+  role.setPluginData('dsl.autoRole', '1');
+  const sel = [s2Frame('k1', { fills: s2Fill('#111111') })];
+  for (const free of [false, true]) {
+    const card = await s2CardOf(sel, free);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.p], [0, 1, 1], free ? 'free card' : 'paid card');
+    assert.deepEqual([make.g, make.p], [1, 1], free ? 'free make' : 'paid make');
+    assert.equal(make.state(make.toks[0].name)?.state, 'new');
+  }
+  const run = await s2Run(sel, false);
+  assert.equal(run.s.created, 1);
+  assert.equal(run.res.bound, 1);
+  assert.equal(s2FillBound(figma, sel[0]), 'color/background/default');
+});
+
+test('S-2 SC-D41 만들기 재사용 — 같은 묶음의 쓰임이 둘이면 쓰임마다 가족을 본다(radius/top-left 역할은 radius/default 자리의 후보가 아님)', async () => {
+  const figma = installFigma();
+  const raw = mkVar(figma, 'r/8', 'FLOAT', ['GAP'], 8, 'Brand'); // 반경 용도가 없는 원시값 — 반경 자리의 후보는 역할뿐
+  const col = figma.variables.createVariableCollection('Semantic');
+  col.setPluginData('dsl.owned', 'semantic');
+  const role = figma.variables.createVariable('radius/top-left', col, 'FLOAT');
+  role.scopes = ['CORNER_RADIUS'];
+  role.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: raw.id });
+  role.setPluginData('dsl.autoRole', '1');
+  const mixed = s2Frame('m', { cornerRadius: figma.mixed, topLeftRadius: 8, topRightRadius: 4, bottomLeftRadius: 4, bottomRightRadius: 4 });
+  const even = s2Frame('e', { cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomLeftRadius: 8, bottomRightRadius: 8 });
+  const sel = [mixed, even];
+  const card = await s2CardOf(sel, false);
+  const make = await s2MakeOf(sel, false);
+  // 고치기 전: 만들기가 radius/8을 radius/top-left로 재사용해 g = 1 — 카드 n = 2와 달랐다
+  assert.deepEqual([card.m, card.n, card.p], [1, 2, 8]);
+  assert.deepEqual([make.g, make.p], [2, 8]);
+  assert.equal(make.state('radius/8')?.state, 'new');
+});
+
+test('S-2 SC-D45 밝기 · 쓰임 역할은 빈 자리로 — 테두리 #222222(별칭이 덮음)가 3곳은 이미 붙고 1곳만 비면 기준색은 빈 자리가 많은 #444444: 만들기 · 연결 같은 이름 · 안 쓰는 Semantic 없음', async () => {
+  const figma = installFigma();
+  const ink = mkVar(figma, 'ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#222222'), a: 1 }, 'Brand');
+  const lineInk = s2Alias(figma, 'line/ink', ink, ['ALL_SCOPES'], 'Brand');
+  const line = (id, hex, v) => s2Frame(id, { strokes: s2Fill(hex).map((p) => (v ? { ...p, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: v.id } } } : p)), strokeWeight: 1 });
+  const sel = [line('b1', '#222222', lineInk), line('b2', '#222222', lineInk), line('b3', '#222222', lineInk), line('b4', '#222222'), line('c1', '#444444'), line('c2', '#444444')];
+  const make = await s2MakeOf(sel, false);
+  assert.deepEqual([make.g, make.r], [2, 2]); // Semantic = stroke-width/default · color/border/default
+  const run = await s2Run(sel, false);
+  // 고치기 전: 만들기는 붙은 #222 3곳까지 세어 기준색 #222 → #444를 subtle로 지었고(안 쓰임), 연결은 빈 자리로 default를 또 만들었다(Semantic 3개)
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['color/border/default', 'stroke-width/default']);
+  assert.deepEqual(sel.map((n) => varName(figma, n.strokes[0].boundVariables?.color?.id)), ['line/ink', 'line/ink', 'line/ink', 'line/ink', 'color/border/default', 'color/border/default']);
 });

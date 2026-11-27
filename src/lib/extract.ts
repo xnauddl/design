@@ -15,8 +15,9 @@ import {
   alphaPct,
 } from './tokens';
 import { bgKindOf, colorUse, composeName, paddingProp, pillCorners, radiusName, simpleNumericName, strokeName, type BgKind, type Padding } from './usageRoles'; // 쓰임 이름(§2.12)
-import { aspectLocked, colorState, lockedSizeState, nodeFieldState, numAllowed, type SlotState } from './bind'; // 자리 연결 상태 — 연결 찾기와 같은 판정(IA v4 §4.1 "만들기 카드 — 상태 5")
-import { STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes';
+import { aspectLocked, colorState, hasStyleId, lockedSizeState, nodeFieldState, numAllowed, sameAsMain, textFieldState, type SlotState } from './bind'; // 자리 연결 상태 — 연결 찾기와 같은 판정(IA v4 §4.1 "만들기 카드 — 상태 5" · §2.9 S2-P7)
+import { STROKE_SCOPES, EFFECT_SCOPES, FIELD_SCOPE, fillScopesFor } from './scopes';
+import { tokenable } from './sameValue'; // 추출이 그 자리에서 토큰을 내는가 — 카드의 p와 같은 술어(IA v4 §2.9 S2-P7)
 
 interface Accumulator {
   map: Map<string, DraftToken>;
@@ -29,6 +30,14 @@ interface Accumulator {
   skipped: Set<string>;
   /** 메인을 함께 읽는 인스턴스 id(ia-v3 §2.11 11번). */
   covered?: ReadonlySet<string>;
+  /** 알약 반경 판정 집합(ia-v4 §2.9 S2-P2 — `userRadiusKeys`). 없으면 알약 모양 모서리는 모두 알약이다. */
+  radiusKeys?: ReadonlySet<string>;
+  /** 인스턴스 id → 쓰는 메인(함께 걷는 것만) — 인스턴스 루트에서 메인 루트와 같은 값인 자리는 빈 자리로 세지 않는다(S2-P7). */
+  mainOf?: ReadonlyMap<string, SceneNode>;
+  /** 텍스트 스타일 후보 글자인가 — 그 글자의 글자 자리는 빈 자리가 아니다(스타일 몫, S2-P7). */
+  textStyleNode?: (node: TextNode) => boolean;
+  /** 지금 걷는 노드가 메인을 함께 걷는 인스턴스면 그 메인. */
+  curMain?: SceneNode;
   /**
    * 토큰 키 → 마지막으로 집계한 노드 id. walk가 한 노드를 끝까지 처리한 뒤 자식으로 내려가므로,
    * 같은 노드에서 온 연속 add는 이 비교로 걸러진다(padding 4방향이 count 4가 되지 않게).
@@ -56,6 +65,15 @@ function onScale(acc: Accumulator, v: number, step = 1): boolean {
   if (!ok) acc.skipped.add(SKIP_FRACTION);
   return ok;
 }
+/**
+ * 만들기 카드 종류(Spacing · Radius · Size · Stroke)의 자리에서 토큰을 내는가 — `tokenable`(소수 둘째 자리로 반올림한 값이 0보다 큰 정수)로 모은다
+ * (IA v4 §2.9 S2-P7 · B.39 6회차 — 0 이하 판정도 반올림 뒤 값으로). 0보다 큰 소수면 "소수 값" 사유를 남긴다(onScale과 같음).
+ */
+function tokenOk(acc: Accumulator, kind: string, raw: number): boolean {
+  if (tokenable(kind, raw)) return true;
+  if (round(raw) > 0) acc.skipped.add(SKIP_FRACTION);
+  return false;
+}
 
 function keyOf(category: TokenCategory, value: string | number, unit?: Unit, alpha?: number): string {
   return `${category}|${value}|${unit ?? ''}|${alpha ?? 1}`; // 같은 hex라도 투명도가 다르면 다른 토큰
@@ -81,7 +99,9 @@ const scopeKey = (allowed: readonly string[]): string => allowed.join('|');
 /** 붙은 자리인가 — 어떤 변수든(라이브러리 · 삭제된 변수) 붙어 있으면 bound · deleted. */
 const isFree = (st: SlotState): boolean => st === 'none';
 /** 한 값 속성 자리 하나(간격 · 여백 · 선 두께 · 투명도 · 크기 축) — 스코프는 필드별 numAllowed. */
-const fieldPlace = (node: SceneNode, field: string, places = 1): Place => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) ? places : 0 });
+const fieldPlace = (acc: Accumulator, node: SceneNode, field: string, places = 1): Place => ({ key: scopeKey(numAllowed(field)), free: isFree(nodeFieldState(node, field)) && !followsMain(acc, node, field) ? places : 0 });
+/** 메인을 함께 걷는 인스턴스의 루트 자리가 메인 루트와 같은 값인가 — 연결 찾기가 버리는 자리(`bind.ts` sameAsMain, S2-P7). */
+const followsMain = (acc: Accumulator, node: SceneNode, field: string, index?: number): boolean => !!acc.curMain && sameAsMain(node, acc.curMain, field, index);
 
 function add(
   acc: Accumulator,
@@ -111,9 +131,17 @@ function add(
   }
   if (use) {
     const uses = (existing.uses ??= []);
-    const u = uses.find((x) => x.name === use && x.bg === bg);
+    let u = uses.find((x) => x.name === use && x.bg === bg);
     if (u) u.count++;
-    else uses.push(bg ? { name: use, count: 1, bg } : { name: use, count: 1 });
+    else uses.push((u = bg ? { name: use, count: 1, bg } : { name: use, count: 1 }));
+    // 이 쓰임의 빈 자리가 있는 용도 묶음(만들기의 재사용이 쓰임 × 묶음마다 가족 판정 — ia-v4 §2.9 S2-P8 · SC-D41)
+    // 빈 자리 수(free)는 색 밝기 이름의 입력이다 — 연결 찾기가 연결 안 된 자리만 보는 것과 같게(SC-D45)
+    if (place) u.free = (u.free ?? 0) + Math.max(0, place.free);
+    if (place && place.free > 0) {
+      if (!(u.keys ??= []).includes(place.key)) u.keys.push(place.key);
+      const by = (u.by ??= {});
+      by[place.key] = (by[place.key] ?? 0) + place.free; // 묶음별 빈 자리 — 라이브러리 같은 값 묶음을 뺄 때(SC-D46)
+    }
   }
 }
 
@@ -149,6 +177,9 @@ function collectPaints(
   const nodeId = node.id;
   if (paints === figma.mixed || !Array.isArray(paints)) return;
   const key = scopeKey(source === 'fill' ? fillScopesFor(node.type) : STROKE_SCOPES);
+  const field = source === 'fill' ? 'fills' : 'strokes';
+  // 색 스타일이 붙은 칠 · 선은 빈 자리가 아니다 — 연결 찾기가 `styled`로 건너뛴다(S2-P7).
+  const styled = hasStyleId(node, source === 'fill' ? 'fillStyleId' : 'strokeStyleId');
   for (let i = 0; i < paints.length; i++) {
     const p = paints[i];
     if (p.visible === false) continue;
@@ -162,7 +193,7 @@ function collectPaints(
     const cu = colorUse(node.type, source === 'fill' ? 'fills' : 'strokes', isInsideIconFrame(node));
     const bgHex = cu === 'text' || cu === 'icon' || cu === 'border' ? backgroundOf(node) : undefined;
     // 자리 = 페인트 하나(연결 찾기 bindPaints와 같은 단위) — 그 페인트 · 노드 배열 어느 쪽이든 변수가 붙었으면 붙은 자리.
-    const free = isFree(colorState(p, node, source === 'fill' ? 'fills' : 'strokes', i)) ? 1 : 0;
+    const free = !styled && isFree(colorState(p, node, field, i)) && !followsMain(acc, node, field, i) ? 1 : 0;
     add(acc, colorToken('color', hex, alpha), source, nodeId, `color/${cu}`, bgHex ? bgKindOf(bgHex) : undefined, { key, free });
     // 페인트 불투명도(p.opacity)는 따로 `opacity/…` 토큰으로 만들지 않는다 — OPACITY 스코프는 **레이어** 불투명도 전용.
     // 대신 색 토큰의 투명도(alpha)로 담는다: 색 변수를 붙이면 피그마가 칠 불투명도를 변수 alpha로 맞춘다(§2.11 "색").
@@ -171,13 +202,20 @@ function collectPaints(
 
 /* ---------- typography ---------- */
 function collectText(acc: Accumulator, node: TextNode): void {
+  // 글자 자리(S2-P7) — 변수도 텍스트 스타일도 붙지 않았고 빈 글자가 아니며 텍스트 스타일 후보 레이어가 아닌 글자 속성 하나.
+  // 연결 찾기(bindText)와 같은 조건: 글꼴이 섞인 글자 · 빈 글자 · 스타일이 붙은 글자는 자리가 없다.
+  const open = node.fontName !== figma.mixed && node.characters.length > 0 && !hasStyleId(node, 'textStyleId') && !acc.textStyleNode?.(node);
+  const place = (field: VariableBindableTextField): Place => ({
+    key: field === 'fontFamily' ? 'FONT_FAMILY' : (FIELD_SCOPE[field] as string),
+    free: open && isFree(textFieldState(node, field)) ? 1 : 0,
+  });
   if (node.fontSize !== figma.mixed) {
     const v = round(node.fontSize);
-    if (onScale(acc, v)) add(acc, { name: numberTokenName('font-size', v), category: 'fontSize', value: v }, 'fontSize', node.id);
+    if (onScale(acc, v)) add(acc, { name: numberTokenName('font-size', v), category: 'fontSize', value: v }, 'fontSize', node.id, undefined, undefined, place('fontSize'));
   }
   if (node.fontName !== figma.mixed) {
     const fam = node.fontName.family;
-    add(acc, { name: `font-family/${fam}`, category: 'fontFamily', value: fam }, 'fontFamily', node.id);
+    add(acc, { name: `font-family/${fam}`, category: 'fontFamily', value: fam }, 'fontFamily', node.id, undefined, undefined, place('fontFamily'));
   }
   // 행간·자간은 **px로 직접 입력된 정수 값만** 변수 후보다. %는 변수로 만들지 않는다(A안, 2026-10-28):
   // Figma는 행간·자간 변수를 px로만 바인딩하므로 150%를 변수로 두려면 글자 크기마다 다른 px가
@@ -187,12 +225,12 @@ function collectText(acc: Accumulator, node: TextNode): void {
   if (node.lineHeight !== figma.mixed && node.lineHeight.unit === 'PIXELS') {
     const v = round(node.lineHeight.value);
     const unit: Unit = 'px';
-    if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName('line-height', v), category: 'lineHeight', value: v, unit }, 'lineHeight', node.id);
+    if (v > 0 && onScale(acc, v)) add(acc, { name: numberTokenName('line-height', v), category: 'lineHeight', value: v, unit }, 'lineHeight', node.id, undefined, undefined, place('lineHeight'));
   }
   if (node.letterSpacing !== figma.mixed && node.letterSpacing.unit === 'PIXELS') {
     const v = round(node.letterSpacing.value);
     const unit: Unit = 'px';
-    if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing', node.id);
+    if (v !== 0 && onScale(acc, v)) add(acc, { name: numberTokenName('letter-spacing', v), category: 'letterSpacing', value: v, unit }, 'letterSpacing', node.id, undefined, undefined, place('letterSpacing'));
   }
 }
 
@@ -237,9 +275,9 @@ function collectSpacing(acc: Accumulator, node: FrameNode | ComponentNode | Inst
     if (typeof node.counterAxisSpacing === 'number' && !gapSkip(node, 'counterAxisSpacing')) gaps.push([node.counterAxisSpacing, simpleNumericName('counterAxisSpacing') as string, 'counterAxisSpacing']);
   }
   for (const [g, use, field] of gaps) {
-    if (typeof g === 'number' && g > 0) {
+    if (typeof g === 'number' && tokenOk(acc, 'gap', g)) {
       const v = round(g);
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id, use, undefined, fieldPlace(node, field));
+      add(acc, { name: numberTokenName('spacing', v), category: 'gap', value: v }, 'gap', node.id, use, undefined, fieldPlace(acc, node, field));
     }
   }
 }
@@ -378,11 +416,11 @@ function collectSize(acc: Accumulator, node: SceneNode): void {
   let lockedTaken = false;
   const addSize = (v: number, field: 'width' | 'height') => {
     const rv = round(v);
-    if (!(rv > 0 && Number.isInteger(rv))) return;
+    if (!tokenable('size', v)) return;
     let place: Place;
-    if (!locked) place = fieldPlace(node, field);
+    if (!locked) place = fieldPlace(acc, node, field);
     else {
-      place = { key: scopeKey(numAllowed(field)), free: !lockedTaken && isFree(lockedSizeState(node).state) ? 1 : 0 };
+      place = { key: scopeKey(numAllowed(field)), free: !lockedTaken && isFree(lockedSizeState(node).state) && !followsMain(acc, node, field) ? 1 : 0 };
       lockedTaken = true;
     }
     add(acc, { name: numberTokenName('size', rv), category: 'size', value: rv }, 'size', node.id, `size/${isIconSelf(node) ? 'icon' : 'avatar'}`, undefined, place);
@@ -399,16 +437,17 @@ function collectRadius(acc: Accumulator, node: SceneNode): void {
   if (r !== figma.mixed && typeof r !== 'number') return;
   const values = corners.map((c) => (r !== figma.mixed ? (r as number) : Number((node as unknown as Record<string, unknown>)[c]) || 0));
   // 알약 모서리(반경 ≥ 짧은 변 / 2)는 원래 값이 아니라 9999 하나로 센다 — Global `radius/9999` · Semantic `radius/full`(12.12 N-D5).
+  // 연결 찾기와 같은 판정(ia-v4 §2.9 S2-P2): 판정 집합에 원래 값이 있는 모서리는 알약이 아니다 — `radius/{원래 값}` 토큰 · 보통 쓰임 이름.
   const { width, height } = node as unknown as { width: number; height: number };
-  const named = pillCorners(values, width, height);
+  const named = pillCorners(values, width, height, acc.radiusKeys);
   // 연결이 모서리마다 붙이므로 쓰임도 모서리마다 센다(같으면 한 이름 — radiusName).
   const list = r === figma.mixed ? corners.map((c, i) => [c, named[i]] as const) : [[corners[0], named[0]] as const];
   for (const [c, rv] of list) {
-    if (rv > 0) {
+    if (tokenOk(acc, 'radius', rv)) {
       const v = round(rv);
       // 자리 = 모서리 하나(연결 찾기 bindRadius는 같은 반경이어도 모서리 4자리) — 하나로 셀 때는 안 붙은 모서리 수.
-      const place: Place = r === figma.mixed ? fieldPlace(node, c) : { key: scopeKey(numAllowed(c)), free: corners.filter((cc) => isFree(nodeFieldState(node, cc))).length };
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, radiusName(c, named), undefined, place);
+      const place: Place = r === figma.mixed ? fieldPlace(acc, node, c) : { key: scopeKey(numAllowed(c)), free: corners.filter((cc) => isFree(nodeFieldState(node, cc)) && !followsMain(acc, node, cc)).length };
+      add(acc, { name: numberTokenName('radius', v), category: 'radius', value: v }, 'radius', node.id, radiusName(c, named), undefined, place);
     }
   }
 }
@@ -426,10 +465,10 @@ function collectStroke(acc: Accumulator, node: SceneNode): void {
   if (w === figma.mixed) sides.forEach((sd, i) => widths.push([sd, sideValues[i]]));
   else if (typeof w === 'number') widths.push(['strokeWeight', w]);
   for (const [field, wv] of widths) {
-    if (wv > 0) {
+    if (tokenOk(acc, 'stroke', wv)) {
       const v = round(wv);
       // 자리 = strokeWeight 하나 또는 방향별 하나씩(연결 찾기 bindStroke — strokeWeight는 한 방향이라도 붙었으면 붙음).
-      if (onScale(acc, v)) add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, strokeName(field, sideValues), undefined, fieldPlace(node, field));
+      add(acc, { name: numberTokenName('stroke-width', v), category: 'strokeWidth', value: v }, 'strokeWidth', node.id, strokeName(field, sideValues), undefined, fieldPlace(acc, node, field));
     }
   }
 }
@@ -440,13 +479,14 @@ function collectOpacity(acc: Accumulator, node: SceneNode): void {
   const o = (node as { opacity: number }).opacity;
   if (typeof o !== 'number' || o >= 1 || o <= 0) return; // 1(불투명)·0(숨김 동등)은 토큰화 안 함
   const v = round(o);
-  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, simpleNumericName('opacity') as string, undefined, fieldPlace(node, 'opacity'));
+  add(acc, { name: numberTokenName('opacity', v), category: 'opacity', value: v }, 'opacity', node.id, simpleNumericName('opacity') as string, undefined, fieldPlace(acc, node, 'opacity'));
 }
 
 /* ---------- effects ---------- */
 function collectEffects(acc: Accumulator, node: SceneNode): void {
   if (!('effects' in node)) return;
   const effects = (node as { effects: readonly Effect[] }).effects;
+  const styled = hasStyleId(node, 'effectStyleId'); // 효과 스타일이 붙은 효과는 빈 자리가 아니다(S2-P7)
   for (let i = 0; i < effects.length; i++) {
     const e = effects[i];
     if (e.visible === false) continue;
@@ -455,7 +495,7 @@ function collectEffects(acc: Accumulator, node: SceneNode): void {
       if (alpha === 0) continue; // 보이지 않는 그림자 — 숨긴 효과처럼 건너뜀
       const hex = rgbToHex(e.color);
       // 자리 = 효과 하나(연결 찾기 bindEffects). 그림자 수치(effectFloat)는 만들기 카드 종류가 아니라 자리를 세지 않는다.
-      const free = isFree(colorState(e, node, 'effects', i)) ? 1 : 0;
+      const free = !styled && isFree(colorState(e, node, 'effects', i)) && !followsMain(acc, node, 'effects', i) ? 1 : 0;
       add(acc, colorToken('effectColor', hex, alpha), 'effectColor', node.id, 'color/shadow', undefined, { key: scopeKey(EFFECT_SCOPES), free });
       for (const [g, val] of [
         ['shadow-blur', e.radius],
@@ -479,6 +519,8 @@ function walk(acc: Accumulator, node: SceneNode): void {
     acc.skipped.add(SKIP_HIDDEN);
     return;
   }
+  // 메인을 함께 걷는 인스턴스의 루트 — 메인 루트와 같은 값인 자리는 빈 자리로 세지 않는다(토큰 · 쓰임은 그대로 모은다, S2-P7).
+  acc.curMain = node.type === 'INSTANCE' ? acc.mainOf?.get(node.id) : undefined;
   if ('fills' in node) collectPaints(acc, node, node.fills, 'fill');
   if ('strokes' in node) collectPaints(acc, node, node.strokes, 'stroke');
   if (node.type === 'TEXT') collectText(acc, node);
@@ -517,13 +559,24 @@ function isEffectivelyVisible(node: SceneNode): boolean {
   return true;
 }
 
+export interface ExtractOptions {
+  /** 알약 반경 판정 집합(`sameValue.ts` userRadiusKeys — `EXTRACT` 처리가 찾기와 같은 변수 읽기에서 낸다). */
+  userRadiusKeys?: ReadonlySet<string>;
+  /** 인스턴스 id → 쓰는 메인(함께 걷는 것 — `collectLocalMains().mainOf`). */
+  mainOf?: ReadonlyMap<string, SceneNode>;
+  /** 텍스트 스타일 후보 글자 판정(`textStyleCandidateTest`). */
+  textStyleNode?: (node: TextNode) => boolean;
+}
+
 /** 현재 선택(자식 포함)에서 토큰 후보를 추출. */
 export function extractFromSelection(
   selection: readonly SceneNode[],
   /** 메인을 함께 읽는 인스턴스 id(ia-v3 §2.11 11번) — 이 인스턴스는 "인스턴스 안쪽 건너뜀"을 남기지 않는다. */
   coveredInstances?: ReadonlySet<string>,
+  /** 연결 찾기와 같은 자리 판정에 쓰는 것(ia-v4 §2.9 S2-P2 · S2-P7) — 넘기지 않으면 알약 모양 모서리는 모두 알약이고 자리는 추출 혼자 센다. */
+  opts: ExtractOptions = {},
 ): ExtractResult {
-  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), covered: coveredInstances };
+  const acc: Accumulator = { map: new Map(), warnings: new Set(), lastNode: new Map(), skipped: new Set(), covered: coveredInstances, radiusKeys: opts.userRadiusKeys, mainOf: opts.mainOf, textStyleNode: opts.textStyleNode };
   for (const node of selection) {
     if (!isEffectivelyVisible(node)) {
       acc.skipped.add(SKIP_HIDDEN); // 숨긴 그룹 안의 자식을 직접 고른 경우 — walk가 못 거른다
