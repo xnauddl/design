@@ -3100,19 +3100,21 @@ B.20 PR 1과의 순서는 정하지 않는다 — 둘이 같은 키(`license.man
 
 계기: DS-3a(B.42)에서 남긴 상태 줄 → Toast. Figma 대략 시안 B5(4가지 tone · 2줄 · 닫기)로 방향 확인, 정밀 시안 B6(Toast 9가지 A–I · 자리 B6-a 첫 화면 · B6-b 하위 화면) — B6을 보고 긴 글은 자르지 않고 모두 보이게로 바꿈(S3-D15).
 
-- [ ] 명세: §4.1b "결과 알림" — 읽는 법 · tone 4가지 · 부르는 곳 37곳 표 · 모양 · 자리 · 남는 시간 · 최소화 · 접근성 · 문장형 다 됨 글, §2.1 · §2.6 · §4.3 "다 됨" 가리킴, 덮는 곳, design-system §6.5
-- [ ] 명세 검토(코드 대조) 중대 결함 0
-- [ ] 정밀 시안 확인(사용자) — 결과(success) · 실패 [보기](error) · 잠금 사유(warning) · 안내(info) · 긴 글(자르지 않음), 첫 화면(아래 고정 줄 없음 — 본문 아래 여백)과 하위 화면(아래 고정 줄 위) 자리
-- [ ] `src/ui/components/toast.css`: 연한 상태색 바탕(tone별) · 테두리 없음 · `radius-small` · `elevation-2` · 너비 창 − 2 × `space-3` · 안쪽 `space-2` `space-3` · 글 `color-text-primary` 12/16 · 줄 수 제한 없이 줄바꿈(말줄임 없음) · 아이콘 상태색 · 동작 링크 같은 색 밑줄 · 닫기 `color-text-secondary` 16(누르는 자리 24, 위아래 −4px) · `bottom: var(--toast-bottom)`
-- [ ] `src/ui/components/toast.ts`: `#toastHost`(늘 있음 · `role="status"` · `aria-atomic`)에 넣음 · error면 `aria-live="assertive"` · 글 `title`은 툴팁 줄이 있을 때만(`tip`) · 닫기 뒤 포커스 되돌림 · 뜨고 사라질 때 자리 · 본문 여백 알림
-- [ ] `src/ui.ts`: `showStatusLine` · `clearStatusLine` · `statusTimer` · `background` 지움, 37곳을 tone 표대로 `toast()`로 · `dismissStickyOnAction`은 Toast 전체를 빼고 그대로(주석의 "캔버스 선택 변경" 고침) · `onDeletedUnbound`의 `title` 덮어쓰기를 툴팁 인자로 · `STATUS_LINE` 이름 정리(오류 갈래는 error Toast)
-- [ ] 자리: `--toast-bottom` · 비우는 자리 — 아래 "`dismissStickyOnAction` 예외 …" 항목과 §4.1b "자리"대로
-- [ ] `src/ui.html`: `.status-line` 규칙 · `#statusLine` 지움, `#toastHost` 더함, `.sub-foot` · `.make-foot` `bottom: 0`, `body` 아래 여백 `space-10` → `space-3`, 사이드바 `max-height`의 `− 24px` 뺌, `body.is-mini`에서 Toast 숨김 확인
-- [ ] `src/lib/wizard.ts` `makeDoneText` 문장형(S3-D16) — 새 키 `make.done.madeG` · `madeR` · `places` · `placesTs` · `placesTsOnly` · `noPlace` · `sentCreateBind` · `sentCreate` · `sentBind`, `make.done.bind` 지움(`wizard.seq.bindTs*`는 남은 쓰임 확인), `test/wizard.test.mjs` 기대 글 바꿈(§4.1b 예 표 10줄)
-- [ ] 만들기 다 됨 → 첫 화면 + success Toast(동작 없음 4초 · 바로 연결 끔이면 [연결하기 →] 남음)
-- [ ] `v4.linked` 글 앞 "🔗 " 뺌 · `make.done.noPlace` "변수를 연결한 곳은 없어요"
-- [ ] `dismissStickyOnAction` 예외에 `#btnMinimize` · `#btnExpand` · Toast 전체, `--toast-bottom`은 보이는 아래 고정 줄이 Toast 자리와 겹칠 때만 그 줄의 실제 위 끝 + `space-3`(스크롤 때도 다시 잼), 비우는 자리 셋(본문 아래 · 아래 고정 줄 위 — 스크롤될 때만 · 사이드바 `max-height`) · `toast()` 시간 멈춤을 "포인터 위 또는 포커스 안"으로
-- [ ] design-system §3 radius 표의 `radius-large` 쓰임에서 Toast 뺌 · `src/gallery/gallery.ts` Toast 줄(meta · 네 tone 예 · 긴 글 예)
-- [ ] verify: `#statusLine` 0 · 37곳 가운데 대표(연결 다 됨 success · 찾기 취소 warning [다시 읽기] 남음 · 잠금 사유 warning 4초 · 오류 error · 최소화 실패 error [보기]) 글 · tone · 남는 시간 · 닫기 · 긴 글이 잘리지 않음(높이 = 줄 수 × 16 + 16 · `scrollHeight` = `clientHeight`) · 툴팁은 tip이 있을 때만 `title` · `role="status"` · error `assertive` · 최소화 중 숨김 · 펼칠 때 남은 Toast · 하위 화면에서 아래 고정 줄과 겹치지 않음 · 첫 화면 끝까지 스크롤하면 할 일 줄이 Toast 위 · Toast 안 클릭은 Toast를 지우지 않음 · [—] · 펼치기가 남은 Toast를 지우지 않음 · 하위 화면 끝까지 스크롤하면 마지막 목록 줄이 Toast 위 · 포커스가 든 Toast가 사라지면 들어오기 전 요소로 · 560에서 가로 스크롤 0. 지금 `#statusText` 검사는 모두 Toast 글로 옮김(811줄 연결 다 됨 기대 글은 "🔗 " 없이 · 1340줄 `!startsWith('🔗')`는 🔗를 빼면 늘 참이라 "연결 화면 글이 아님"을 다른 방법(예 연결 화면 `#applyStatus` 글과 다름 · Toast tone)으로) · 짧은 하위 화면에서 Toast가 떠도 아래 고정 줄이 움직이지 않음
-- [ ] 4검사 · `dist/` · 실제 화면 스크린샷 대조(B5)
+- [x] 명세: §4.1b "결과 알림" — 읽는 법 · tone 4가지 · 부르는 곳 37곳 표 · 모양 · 자리 · 남는 시간 · 최소화 · 접근성 · 문장형 다 됨 글, §2.1 · §2.6 · §4.3 "다 됨" 가리킴, 덮는 곳, design-system §6.5
+- [x] 명세 검토(코드 대조) 중대 결함 0
+- [x] 정밀 시안 확인(사용자) — 결과(success) · 실패 [보기](error) · 잠금 사유(warning) · 안내(info) · 긴 글(자르지 않음), 첫 화면(아래 고정 줄 없음 — 본문 아래 여백)과 하위 화면(아래 고정 줄 위) 자리
+- [x] `src/ui/components/toast.css`: 연한 상태색 바탕(tone별) · 테두리 없음 · `radius-small` · `elevation-2` · 너비 창 − 2 × `space-3` · 안쪽 `space-2` `space-3` · 글 `color-text-primary` 12/16 · 줄 수 제한 없이 줄바꿈(말줄임 없음) · 아이콘 상태색 · 동작 링크 같은 색 밑줄 · 닫기 `color-text-secondary` 16(누르는 자리 24, 위아래 −4px) · `bottom: var(--toast-bottom)`
+- [x] `src/ui/components/toast.ts`: `#toastHost`(늘 있음 · `role="status"` · `aria-atomic`)에 넣음 · error면 `aria-live="assertive"` · 글 `title`은 툴팁 줄이 있을 때만(`tip`) · 닫기 뒤 포커스 되돌림 · 뜨고 사라질 때 자리 · 본문 여백 알림
+- [x] `src/ui.ts`: `showStatusLine` · `clearStatusLine` · `statusTimer` · `background` 지움, 37곳을 tone 표대로 `toast()`로 · `dismissStickyOnAction`은 Toast 전체를 빼고 그대로(주석의 "캔버스 선택 변경" 고침) · `onDeletedUnbound`의 `title` 덮어쓰기를 툴팁 인자로 · `STATUS_LINE` 이름 정리(오류 갈래는 error Toast)
+- [x] 자리: `--toast-bottom` · 비우는 자리 — 아래 "`dismissStickyOnAction` 예외 …" 항목과 §4.1b "자리"대로
+- [x] `src/ui.html`: `.status-line` 규칙 · `#statusLine` 지움, `#toastHost` 더함, `.sub-foot` · `.make-foot` `bottom: 0`, `body` 아래 여백 `space-10` → `space-3`, 사이드바 `max-height`의 `− 24px` 뺌, `body.is-mini`에서 Toast 숨김 확인
+- [x] `src/lib/wizard.ts` `makeDoneText` 문장형(S3-D16) — 새 키 `make.done.madeG` · `madeR` · `places` · `placesTs` · `placesTsOnly` · `noPlace` · `sentCreateBind` · `sentCreate` · `sentBind`, `make.done.bind` 지움(`wizard.seq.bindTs*`는 남은 쓰임 확인), `test/wizard.test.mjs` 기대 글 바꿈(§4.1b 예 표 10줄)
+- [x] 만들기 다 됨 → 첫 화면 + success Toast(동작 없음 4초 · 바로 연결 끔이면 [연결하기 →] 남음)
+- [x] `v4.linked` 글 앞 "🔗 " 뺌 · `make.done.noPlace` "변수를 연결한 곳은 없어요"
+- [x] `dismissStickyOnAction` 예외에 `#btnMinimize` · `#btnExpand` · Toast 전체, `--toast-bottom`은 보이는 아래 고정 줄이 Toast 자리와 겹칠 때만 그 줄의 실제 위 끝 + `space-3`(스크롤 때도 다시 잼), 비우는 자리 셋(본문 아래 · 아래 고정 줄 위 — 스크롤될 때만 · 사이드바 `max-height`) · `toast()` 시간 멈춤을 "포인터 위 또는 포커스 안"으로
+- [x] design-system §3 radius 표의 `radius-large` 쓰임에서 Toast 뺌 · `src/gallery/gallery.ts` Toast 줄(meta · 네 tone 예 · 긴 글 예)
+- [x] verify: `#statusLine` 0 · 37곳 가운데 대표(연결 다 됨 success · 찾기 취소 warning [다시 읽기] 남음 · 잠금 사유 warning 4초 · 오류 error · 최소화 실패 error [보기]) 글 · tone · 남는 시간 · 닫기 · 긴 글이 잘리지 않음(높이 = 줄 수 × 16 + 16 · `scrollHeight` = `clientHeight`) · 툴팁은 tip이 있을 때만 `title` · `role="status"` · error `assertive` · 최소화 중 숨김 · 펼칠 때 남은 Toast · 하위 화면에서 아래 고정 줄과 겹치지 않음 · 첫 화면 끝까지 스크롤하면 할 일 줄이 Toast 위 · Toast 안 클릭은 Toast를 지우지 않음 · [—] · 펼치기가 남은 Toast를 지우지 않음 · 하위 화면 끝까지 스크롤하면 마지막 목록 줄이 Toast 위 · 포커스가 든 Toast가 사라지면 들어오기 전 요소로 · 560에서 가로 스크롤 0. 지금 `#statusText` 검사는 모두 Toast 글로 옮김(811줄 연결 다 됨 기대 글은 "🔗 " 없이 · 1340줄 `!startsWith('🔗')`는 🔗를 빼면 늘 참이라 "연결 화면 글이 아님"을 다른 방법(예 연결 화면 `#applyStatus` 글과 다름 · Toast tone)으로) · 짧은 하위 화면에서 Toast가 떠도 아래 고정 줄이 움직이지 않음
+- [x] 4검사 · `dist/` · 실제 화면 스크린샷 대조(B5)
 - [ ] 실기 확인(사용자, 피그마): 만들기 실행 → 첫 화면 결과 Toast / 연결 화면에서 연결 → 첫 화면으로 와서 창 아래 Toast / 만들기 화면 안 잠금 사유 → 아래 고정 줄 위 Toast / 잠긴 버튼 클릭 → warning / 최소화 중 실패 → 펼치면 [보기]
+
+- 구현 메모(DS-3b PR): ① `notify(text, tone, { action?, tip? })`가 `showStatusLine`을 바꾼다(`setMini`의 같은 이름 인자는 `tellCode`로). ② `toast()`는 `#toastHost`가 없으면 만든다(모음 화면). ③ 화면에 고정된 요소는 `offsetParent`가 늘 null이라 verify는 Toast가 보이는지를 크기로 잰다(`toastShown`) — 옛 `visible(p, '#statusLine')` 검사도 이것으로. ④ 연결 화면 아래 고정 줄은 이제 창 바닥(510)에 붙는다(옛 검사 `≤ 510 − 24`를 바꿈). ⑤ 스크린샷 `docs/qa/ds3b/`(B6-a · B6-b · error · 긴 글).

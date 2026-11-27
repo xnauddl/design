@@ -260,9 +260,16 @@ const variants = ['primary', 'secondary', 'ghost', 'danger', 'link'] as const;
   meta(s, { tokens: 'color-state-*(-subtle · -border) · radius-small/-medium · text-body-sm', code: "alert({ tone, title, text, box, onClose })", a11y: '오류 role="alert", 나머지 role="status"' });
 }
 {
-  const s = section('Feedback', 'c-toast', 'Toast', '한 번에 하나 · 4초(동작이 있으면 남음)', 'component');
-  row(s, '', [button({ label: '성공 Toast', onClick: () => toast({ tone: 'success', text: 'Global 변수 5개를 만들고 97곳에 연결했어요', closeLabel: '닫기' }) }).el, button({ label: '실패 Toast', onClick: () => toast({ tone: 'error', text: '연결 실패', closeLabel: '닫기', action: { label: '보기', onClick: () => undefined } }) }).el]);
-  meta(s, { tokens: 'color-surface-inverse · radius-large · elevation-2 · z-tooltip', code: "toast({ tone, text, closeLabel, action, sticky })", a11y: 'role="status" · aria-live(오류 assertive)' });
+  const s = section('Feedback', 'c-toast', 'Toast', '한 번에 하나 · 4초(동작이 있으면 남음) · 글은 자르지 않음', 'component');
+  const LONG = 'Global 24개 · Semantic 18개를 만들었어요 · 다크 5개 · 텍스트 스타일 3개(글자 18개) · 알림 1개 · 변수를 연결한 곳은 없어요 · 이름 6개 정리 · 직접 만든 변수라 건너뜀 2';
+  row(s, '', [
+    button({ label: '결과(success)', onClick: () => toast({ tone: 'success', text: 'Global 변수 5개를 만들고 97곳에 연결했어요', closeLabel: '닫기' }) }).el,
+    button({ label: '실패(error) [보기]', onClick: () => toast({ tone: 'error', text: '변수 만들기 실패', closeLabel: '닫기', action: { label: '보기', onClick: () => undefined } }) }).el,
+    button({ label: '잠금 사유(warning)', onClick: () => toast({ tone: 'warning', text: '연결이 끝나면 다시 해 주세요', closeLabel: '닫기' }) }).el,
+    button({ label: '안내(info) [← 되돌리기]', onClick: () => toast({ tone: 'info', text: 'color/blue/500(으)로 옮겼어요', closeLabel: '닫기', action: { label: '← 되돌리기', onClick: () => undefined } }) }).el,
+    button({ label: '긴 글', onClick: () => toast({ tone: 'success', text: LONG, closeLabel: '닫기' }) }).el,
+  ]);
+  meta(s, { tokens: 'color-state-*-subtle · color-state-*(아이콘) · color-text-primary · color-text-secondary(닫기) · radius-small · elevation-2 · z-tooltip · font-size-md / line-height-md', code: "toast({ tone, text, tip, closeLabel, action, sticky })", a11y: '#toastHost role="status" · aria-live(오류 assertive) · aria-atomic' });
 }
 {
   const s = section('Feedback', 'c-modal', 'Modal', '머리 · 본문 · 바닥 — Tab 가두기 · Esc', 'component');

@@ -67,6 +67,7 @@
 | `--prog` | `ui.ts`(진행 표시) | 진행 비율(%) |
 | `--band-ic` | `ui.html`(안내 띠 규칙) | 띠 앞 아이콘 그림(data URI) |
 | `--tip-x` | `src/ui/components/tooltip.ts`(DS-2) | 툴팁 꼬리의 가로 위치(px) |
+| `--toast-bottom` · `--toast-space-body` · `--toast-space-bar` · `--toast-space-side` | `ui.ts`(Toast 자리 — DS-3b) | Toast 아래 띄움 · Toast가 떠 있는 동안 비우는 높이(본문 아래 · 아래 고정 줄 위 · 변수 탭 사이드바 — ia-v4 §4.1b "자리") |
 
 ## 3. Design Tokens (최종 값)
 

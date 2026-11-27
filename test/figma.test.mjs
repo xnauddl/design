@@ -9265,7 +9265,7 @@ for (const free of [false, true]) {
     const run = await s2Run(sel, free);
     assert.equal(run.s.created, 2);
     assert.equal(run.res.bound, 5);
-    assert.equal(s2DoneText({ created: { g: 2, r: run.roles, m: 0 }, bound: run.res.bound }, { isPaid: !free, linkOff: false }), free ? 'Global 2개 · 5곳 연결' : 'Global 2개 · Semantic 2개 · 5곳 연결');
+    assert.equal(s2DoneText({ created: { g: 2, r: run.roles, m: 0 }, bound: run.res.bound }, { isPaid: !free, linkOff: false }), free ? 'Global 변수 2개를 만들고 5곳에 연결했어요' : 'Global 2개 · Semantic 2개를 만들고 5곳에 연결했어요');
     const after = await s2CardOf(sel, free);
     assert.deepEqual([after.m, after.n], [0, 0]); // ✓
     assert.equal(figma._state.variables.length, free ? 2 : 4);
@@ -9295,7 +9295,7 @@ for (const free of [false, true]) {
     if (!free) assert.equal(roleTarget(figma, sel[0].fills[0].boundVariables.color.id), g.id);
     assert.equal(s2Named(figma, 'color/gray/950').length, 1);
     assert.equal(figma._state.variables.length, free ? 1 : 2);
-    assert.equal(s2DoneText({ created: { g: 0, r: free ? 0 : 1, m: 0 }, bound: 3 }, { isPaid: !free, linkOff: false }), free ? '3곳 연결' : 'Semantic 1개 · 3곳 연결');
+    assert.equal(s2DoneText({ created: { g: 0, r: free ? 0 : 1, m: 0 }, bound: 3 }, { isPaid: !free, linkOff: false }), free ? '3곳에 연결했어요' : 'Semantic 변수 1개를 만들고 3곳에 연결했어요');
   });
 
   test(`S-2 예 (나) ${tier} — 만들기 실행으로도 같은 결과: Global을 새로 만들지 않고 그 변수의 용도를 합쳐 3곳 연결`, async () => {

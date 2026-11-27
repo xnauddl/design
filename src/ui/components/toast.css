@@ -1,12 +1,27 @@
-/* Toast — design-system §6.5(새로 — 상태 줄 대신은 DS-3b). 한 번에 하나. */
-.ds-toast {
-  position: fixed; left: var(--space-3); right: var(--space-3); bottom: var(--space-3); z-index: var(--z-tooltip);
-  display: flex; align-items: center; gap: var(--space-2); margin: 0 auto; max-width: max-content;
-  padding: var(--space-2) var(--space-3); border-radius: var(--radius-large); box-shadow: var(--elevation-2);
-  background: var(--color-surface-inverse); color: var(--color-text-inverse); font: var(--text-body-sm);
+/* Toast — design-system §6.5 · ia-v4 §4.1b "결과 알림 — Toast 하나"(DS-3b · S3-P4 · S3-D14–S3-D17). 한 번에 하나.
+   담는 곳 #toastHost는 늘 있고 창 아래 가운데에 고정 — 아래 띄움은 --toast-bottom(ui.ts가 아래 고정 줄을 보고 정함). */
+.ds-toast-host {
+  position: fixed; left: var(--space-3); right: var(--space-3); bottom: var(--toast-bottom, var(--space-3)); z-index: var(--z-tooltip);
+  pointer-events: none;
 }
-.ds-toast__text { flex: 1 1 auto; min-width: 0; }
-.ds-toast__action { color: inherit; font-weight: var(--font-weight-semibold); }
-.ds-toast > .ds-icbtn { color: var(--color-text-inverse); }
-.ds-toast > .ds-icbtn:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-inverse); }
-.ds-toast[hidden] { display: none; }
+.ds-toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-small); box-shadow: var(--elevation-2);
+  background: var(--color-state-info-subtle); color: var(--color-text-primary);
+  font: var(--font-weight-regular) var(--font-size-md)/var(--line-height-md) var(--font-family-sans);
+}
+.ds-toast--success { background: var(--color-state-success-subtle); }
+.ds-toast--warning { background: var(--color-state-warning-subtle); }
+.ds-toast--error { background: var(--color-state-error-subtle); }
+.ds-toast > .ds-ic { flex: none; width: var(--size-icon-md); height: var(--size-icon-md); color: var(--color-state-info); }
+.ds-toast--success > .ds-ic { color: var(--color-state-success); }
+.ds-toast--warning > .ds-ic { color: var(--color-state-warning); }
+.ds-toast--error > .ds-ic { color: var(--color-state-error); }
+/* 글은 자르지 않는다 — 줄 수 제한 없이 줄바꿈(S3-D15). */
+.ds-toast__text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.ds-toast__action.ds-btn--link { flex: none; color: inherit; font: inherit; font-weight: var(--font-weight-semibold); line-height: var(--line-height-md); }
+.ds-toast__action.ds-btn--link:hover:not(:disabled):not([aria-disabled="true"]) { color: inherit; }
+/* 닫기 — 보이는 아이콘 16, 누르는 자리 24(위아래 −4px로 한 줄 높이 32를 지킴). 마우스를 올려도 바탕 없음. */
+.ds-toast > .ds-icbtn { flex: none; margin: calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) calc(-1 * var(--space-1)) 0; color: var(--color-text-secondary); }
+.ds-toast > .ds-icbtn:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }

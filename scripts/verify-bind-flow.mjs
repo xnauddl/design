@@ -86,6 +86,13 @@ async function rightClick(p, selector) {
   await p.click(selector, { button: 'right' });
 }
 const tabsOf = (p) => p.$$eval('#makeTabs [role="tab"]:not([hidden])', (e) => e.map((x) => `${x.textContent}${x.getAttribute('aria-selected') === 'true' ? '*' : ''}`));
+// 결과 알림 Toast(ia-v4 §4.1b — DS-3b): 공통 상태 줄 대신. 없으면 ''.
+const toastText = (p) => p.evaluate(() => document.querySelector('#toastHost .ds-toast__text')?.textContent ?? '');
+const toastAct = (p) => p.evaluate(() => document.querySelector('#toastHost .ds-toast__action')?.textContent ?? '');
+const toastTip = (p) => p.evaluate(() => document.querySelector('#toastHost .ds-toast__text')?.title ?? '');
+const toastTone = (p) => p.evaluate(() => (document.querySelector('#toastHost .ds-toast')?.className.match(/ds-toast--(\w+)/) ?? [])[1] ?? '');
+const toastShown = (p) => p.evaluate(() => { const t = document.querySelector('#toastHost .ds-toast'); return !!t && t.getClientRects().length > 0 && t.getBoundingClientRect().width > 0; });
+const toastActShown = (p) => p.evaluate(() => !!document.querySelector('#toastHost .ds-toast__action'));
 const visible = (p, sel) => p.$eval(sel, (e) => e.offsetParent !== null && getComputedStyle(e).display !== 'none');
 
 const PREREQ = { type: 'PREREQ_STATE', hasGlobal: true, tierVars: 3, otherVars: 0 }; // 연결할 변수가 있는가는 로컬 변수 수(tierVars + otherVars)로 본다(ia-v4 §2.9 S2-P9 — hasBindable 삭제)
@@ -103,7 +110,7 @@ const FILL_G = 'ALL_FILLS|FRAME_FILL';
 const locked = (p, sel) => p.getAttribute(sel, 'aria-disabled').then((v) => v === 'true');
 const named = async (p, sel, name) => (await p.getByRole('button', { name, exact: true }).count()) >= 1 && (await p.$eval(sel, (e, n) => e.textContent.trim() === n, name));
 const emptyText = (p) => p.$eval('#bindEmpty', (e) => (e.hidden ? null : e.querySelector('.be-text')?.textContent ?? ''));
-const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return p.textContent('#statusText'); };
+const lockMsg = async (p, sel) => { await p.click(sel, { force: true }); return toastText(p); };
 /** 목록(트리 §2.7) — 머리는 "이름 {n}개", 줄은 [이름(옅은 칸 — "→ " 뺌), 곳 수(왼쪽 글), 켬](TR 뒤 — ia-v4 §2.7 "변수 목록 모양"). */
 const bindList = (p) => p.$$eval('#bindTree > .tr', (e) => e.map((x) => (x.classList.contains('tr-head') ? `${x.querySelector('.tr-name').textContent} ${x.querySelector('.tr-cnt').textContent}` : [x.querySelector('.vchip .al').textContent.replace(/^→ /, ''), x.querySelector('.tr-lt').textContent, x.querySelector('.bv-switch').getAttribute('aria-checked') === 'true'])));
 const TS0 = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
@@ -256,23 +263,23 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   await p.click('#varTree .vt-group >> nth=0');
   // 클릭 = 연결 — 선택 없음이면 보내지 않고 사유
   await p.click('.vp-item[data-id="sp8"]');
-  check('9 선택 없음에서 클릭 → 연결 안 함 · "선택이 없어요"', (await sent(p, 'APPLY_VARIABLE')).length === 0 && (await p.textContent('#statusText')).includes('선택이 없어요'));
+  check('9 선택 없음에서 클릭 → 연결 안 함 · "선택이 없어요"', (await sent(p, 'APPLY_VARIABLE')).length === 0 && (await toastText(p)).includes('선택이 없어요'));
   await recv(p, { ...sel(1, 2), scanned: 40, firstName: 'Card', ids: ['1:2'] });
   await p.waitForTimeout(450);
   await p.dblclick('.vp-item[data-id="sp8"]');
   const av = await sent(p, 'APPLY_VARIABLE');
   check('9 더블클릭 → 연결 한 번(두 번째 click 버림) · target 없음', av.length === 1 && av[0].id === 'sp8' && !('target' in av[0]), JSON.stringify(av));
   await recv(p, { type: 'VARIABLE_APPLIED', reqId: av[0].reqId, applied: 3, skipped: 1, skipReasons: { 'not-autolayout': 1 }, name: 'spacing/8' });
-  check('9 결과 "레이어 3개에 spacing/8 연결 · 1개는 맞지 않아 건너뜀 · ⌘Z로 되돌리기" + 사유 툴팁', (await p.textContent('#statusText')) === '레이어 3개에 spacing/8 연결 · 1개는 맞지 않아 건너뜀 · ⌘Z로 되돌리기' && (await p.getAttribute('#statusText', 'title')).includes('오토 레이아웃 아님 1'), await p.textContent('#statusText'));
+  check('9 결과 "레이어 3개에 spacing/8 연결 · 1개는 맞지 않아 건너뜀 · ⌘Z로 되돌리기" + 사유 툴팁', (await toastText(p)) === '레이어 3개에 spacing/8 연결 · 1개는 맞지 않아 건너뜀 · ⌘Z로 되돌리기' && (await toastTip(p)).includes('오토 레이아웃 아님 1'), await toastText(p));
   // 연결 중에는 다른 클릭 연결 잠금
   await p.focus('.vp-item[data-id="r4"]');
   await p.keyboard.press(' ');
   const av2 = (await sent(p, 'APPLY_VARIABLE')).at(-1);
   check('9 Space → 연결', av2.id === 'r4' && (await sent(p, 'APPLY_VARIABLE')).length === 2);
   await p.click('.vp-item[data-id="sp8"]');
-  check('9 클릭 연결 진행 중 → 쓰기 잠금 사유 · 요청 없음', (await sent(p, 'APPLY_VARIABLE')).length === 2 && (await p.textContent('#statusText')).includes('작업이 끝나면 다시 해 주세요'), await p.textContent('#statusText'));
+  check('9 클릭 연결 진행 중 → 쓰기 잠금 사유 · 요청 없음', (await sent(p, 'APPLY_VARIABLE')).length === 2 && (await toastText(p)).includes('작업이 끝나면 다시 해 주세요'), await toastText(p));
   await recv(p, { type: 'VARIABLE_APPLIED', reqId: av2.reqId, applied: 0, skipped: 2, skipReasons: { 'no-prop': 2 }, name: 'radius/4' });
-  check('9 하나도 못 붙임 → "선택한 레이어에 radius/4을 붙일 곳이 없어요"', (await p.textContent('#statusText')) === '선택한 레이어에 radius/4을 붙일 곳이 없어요');
+  check('9 하나도 못 붙임 → "선택한 레이어에 radius/4을 붙일 곳이 없어요"', (await toastText(p)) === '선택한 레이어에 radius/4을 붙일 곳이 없어요');
   // 키보드 — ↓ 다음 줄 · ←→ 줄 안
   // 키보드(V1 뒤 — §4.6 "키보드"): 색 줄은 ↑ ↓ 줄 하나씩 · ← → 무시, 알약 묶음 안은 ← →
   await p.focus('.vt-row[data-id="g0"]');
@@ -376,8 +383,8 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   check('9 별칭 칸에 [→]', (await p.$$('.modal .ed-go')).length === 2);
   await p.click('.modal .ed-go >> nth=0');
   await p.waitForTimeout(50);
-  check('9 [→] → 팝업 닫고 Global의 color/gray/900로 · 상태 줄 [← 되돌리기]', (await p.$('.modal')) === null && (await sideSelected(p)) === 'side:col:g' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9' && (await p.textContent('#statusText')) === 'color/gray/900(으)로 옮겼어요', JSON.stringify([!!(await p.$('.modal')), await sideSelected(p), await p.evaluate(() => document.activeElement?.dataset?.id ?? document.activeElement?.className), await p.textContent('#statusText')]));
-  await p.click('#statusAction');
+  check('9 [→] → 팝업 닫고 Global의 color/gray/900로 · 상태 줄 [← 되돌리기]', (await p.$('.modal')) === null && (await sideSelected(p)) === 'side:col:g' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'g9' && (await toastText(p)) === 'color/gray/900(으)로 옮겼어요', JSON.stringify([!!(await p.$('.modal')), await sideSelected(p), await p.evaluate(() => document.activeElement?.dataset?.id ?? document.activeElement?.className), await toastText(p)]));
+  await p.click('#toastHost .ds-toast__action');
   check('9 [← 되돌리기] → Semantic · 그 줄', (await sideSelected(p)) === 'side:col:s' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx');
   // 키보드 — 사이드바(listbox)
   await p.focus('#varSide [data-key="side:col:s"]');
@@ -491,7 +498,7 @@ const sideSelected = (p) => p.$eval('#varSide [aria-selected="true"]', (e) => e.
   const ub = (await sent(p, 'UNBIND_DELETED')).at(-1);
   check('9 [연결 풀기] → UNBIND_DELETED(기준)', ub?.nodeIds?.[0] === '1:2');
   await recv(p, { type: 'DELETED_UNBOUND', reqId: ub.reqId, unbound: 3, failed: 0, failReasons: {} });
-  check('9 연결 풀기 결과 문구', (await p.textContent('#statusText')).startsWith('삭제된 변수 연결 3곳을 풀었어요'));
+  check('9 연결 풀기 결과 문구', (await toastText(p)).startsWith('삭제된 변수 연결 3곳을 풀었어요'));
   const ap2 = (await sent(p, 'APPLY')).at(-1);
   check('9 연결 풀기 뒤 다시 읽기(찾기 · 사용 수)', ap2.reqId !== ap.reqId);
   await recv(p, preview(ap2.reqId));
@@ -629,7 +636,7 @@ const reenter = (p) => p.evaluate(() => {
   await p.click('#btnMinimize');
   const mini = (await sent(p, 'SET_UI_SIZE')).at(-1);
   check('10 최소화 → SET_UI_SIZE mini', mini?.mode === 'mini');
-  check('10 최소화: 마크만 보임', (await visible(p, '#btnExpand')) && !(await visible(p, '#tabBar')) && !(await visible(p, '#statusLine')));
+  check('10 최소화: 마크만 보임', (await visible(p, '#btnExpand')) && !(await visible(p, '#tabBar')) && !(await toastShown(p)));
   check('10 최소화: 진행 테두리(작업 중)', await p.$eval('#btnExpand', (e) => e.classList.contains('busy')));
   check('10 최소화: 접근성 이름 "펼치기 · 작업 중"', (await p.getAttribute('#btnExpand', 'aria-label')) === '펼치기 · 작업 중');
   const markBox = await p.$eval('#btnExpand', (e) => { const r = e.getBoundingClientRect(); return { w: r.width, h: r.height }; });
@@ -646,7 +653,7 @@ const reenter = (p) => p.evaluate(() => {
   check('10 펼치기 → SET_UI_SIZE default', (await sent(p, 'SET_UI_SIZE')).at(-1)?.mode === 'default');
   check('10 펼치면 [—]에 포커스', (await p.evaluate(() => document.activeElement?.id)) === 'btnMinimize');
   check('10 펼치면 다시 읽기 1번', (await count(p, 'GET_PREREQ')) === before + 1, `${(await count(p, 'GET_PREREQ')) - before}번`);
-  check('10 펼치면 "실패 · [보기]"', (await p.textContent('#statusText')).includes('실패') && (await visible(p, '#statusAction')));
+  check('10 펼치면 "실패 · [보기]"', (await toastText(p)).includes('실패') && (await toastActShown(p)));
   // 팝업은 최소화할 때 닫힌다
   await p.click('#tabbtn-variables');
   await recv(p, { type: 'VAR_TABLE', collections: COLS, vars: VARS });
@@ -672,11 +679,11 @@ const reenter = (p) => p.evaluate(() => {
   check('10 잠긴 버튼은 포커스 가능', (await p.evaluate(() => document.activeElement?.id)) === 'btnScanText');
   check('10 잠긴 버튼은 aria-disabled', (await p.getAttribute('#btnScanText', 'aria-disabled')) === 'true');
   await p.click('#btnScanText', { force: true });
-  check('10 누르면 공통 상태 줄에 유료 사유', (await p.textContent('#statusText')).includes('유료 기능이에요') && (await p.textContent('#statusAction')) === '라이선스 →');
+  check('10 누르면 공통 상태 줄에 유료 사유', (await toastText(p)).includes('유료 기능이에요') && (await toastAct(p)) === '라이선스 →');
   check('10 잠긴 버튼은 동작하지 않음', (await count(p, 'SCAN_TEXT_STYLES')) === 0);
   await p.keyboard.press('Tab'); // 포커스 이동은 메시지를 지우지 않는다
-  check('10 포커스 이동은 상태 줄 메시지를 지우지 않음', await visible(p, '#statusAction'));
-  await p.click('#statusAction');
+  check('10 포커스 이동은 상태 줄 메시지를 지우지 않음', await toastActShown(p));
+  await p.click('#toastHost .ds-toast__action');
   check('10 [라이선스 →] → 설정 › 키 입력칸 포커스', (await visible(p, '#tab-settings')) && (await p.evaluate(() => document.activeElement?.id)) === 'licenseKey');
   // 24×24
   await p.click('#tabbtn-variables');
@@ -703,7 +710,26 @@ const reenter = (p) => p.evaluate(() => {
     const tabs = document.querySelector('.tabs').getBoundingClientRect();
     return { top: Math.round(bar.top), bottom: Math.round(bar.bottom), selBottom: Math.round(tabs.bottom), long: document.getElementById('bindTree').getBoundingClientRect().bottom > 510 };
   });
-  check('10 510에서 [n곳 연결] 줄이 스크롤해도 보임', tb.long && tb.top >= tb.selBottom && tb.bottom <= 510 - 24, JSON.stringify(tb));
+  check('10 510에서 [n곳 연결] 줄이 스크롤해도 보임 · 창 바닥에 붙음(상태 줄 24 몫 없음 — DS-3b)', tb.long && tb.top >= tb.selBottom && tb.bottom === 510, JSON.stringify(tb));
+  // DS-3b(ia-v4 §4.1b "자리") — 스크롤되는 하위 화면: Toast는 아래 고정 줄 위 끝 + 12, 줄 위 여백을 Toast 높이 + 12만큼 늘림
+  await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
+  await p.waitForTimeout(60);
+  const tp = await p.evaluate(() => {
+    const bar = document.getElementById('bindFoot').getBoundingClientRect();
+    const t = document.querySelector('#toastHost .ds-toast').getBoundingClientRect();
+    return { barTop: Math.round(bar.top), toastBottom: Math.round(t.bottom), toastH: Math.round(t.height), space: getComputedStyle(document.documentElement).getPropertyValue('--toast-space-bar').trim(), mt: getComputedStyle(document.getElementById('bindFoot')).marginTop };
+  });
+  check('DS-3b 하위 화면(스크롤됨) — Toast가 아래 고정 줄 위 12 · 줄 위 여백 = 8 + Toast 높이 + 12', Math.abs(tp.barTop - 12 - tp.toastBottom) <= 1 && tp.space === `${tp.toastH + 12}px` && tp.mt === `${8 + tp.toastH + 12}px`, JSON.stringify(tp));
+  await p.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await p.waitForTimeout(80);
+  const te = await p.evaluate(() => {
+    const rows = [...document.querySelectorAll('#bindTree [role="row"]')];
+    const last = rows.at(-1).getBoundingClientRect();
+    const t = document.querySelector('#toastHost .ds-toast').getBoundingClientRect();
+    const bar = document.getElementById('bindFoot').getBoundingClientRect();
+    return { lastBottom: Math.round(last.bottom), toastTop: Math.round(t.top), toastBottom: Math.round(t.bottom), barTop: Math.round(bar.top) };
+  });
+  check('DS-3b 하위 화면 끝까지 스크롤 — 마지막 목록 줄이 Toast 위 · Toast는 줄 위 12', te.lastBottom <= te.toastTop && Math.abs(te.barTop - 12 - te.toastBottom) <= 1, JSON.stringify(te));
   const area = await p.evaluate(() => {
     const tabs = document.querySelector('.tabs').getBoundingClientRect();
     return { contentH: Math.round(510 - tabs.bottom - 24) };
@@ -808,7 +834,7 @@ const reenter = (p) => p.evaluate(() => {
   const a0 = (await sent(p, 'APPLY')).length;
   await recv(p, { type: 'APPLY_RESULT', bound: 4, skipped: 1, reasons: { 'already-bound': 1 }, skips: [], reqId: req.reqId, textStylesApplied: 2, textStylesSkipped: 0 });
   await p.waitForTimeout(400);
-  check('B2 연결 끝 → 첫 화면 · 상태 줄 "🔗 6곳 연결 · ⌘Z로 되돌리기 · 건너뜀 1"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === '🔗 6곳 연결 · ⌘Z로 되돌리기 · 건너뜀 1', await p.textContent('#statusText'));
+  check('B2 연결 끝 → 첫 화면 · success Toast "6곳 연결 · ⌘Z로 되돌리기 · 건너뜀 1"(🔗 없음 — DS-3b)', (await visible(p, '#selHome')) && (await toastText(p)) === '6곳 연결 · ⌘Z로 되돌리기 · 건너뜀 1' && (await toastTone(p)) === 'success', await toastText(p));
   check('B2 연결 끝 → 카드 다시 읽음(찾기 1번 더)', (await sent(p, 'APPLY')).length === a0 + 1, `${(await sent(p, 'APPLY')).length - a0}`);
   await p.close();
 }
@@ -824,7 +850,7 @@ const reenter = (p) => p.evaluate(() => {
   await p.waitForTimeout(500);
   check('B2 창 다시 들어옴 → 조용히 다시 찾기(진행 줄 없음)', (await sent(p, 'APPLY')).length === 2 && (await sent(p, 'PREVIEW_TEXT_STYLES')).length === 2 && !(await visible(p, '#applyProgress')));
   await found(p, { candidates: [...B2_CANDS.slice(0, 3), cand('n3', 'topLeftRadius', 'sp8', 'spacing/8')] });
-  check('B2 같은 (변수, 종류) 줄은 꺼진 채 이어받음 · 알림', JSON.stringify((await bindList(p)).filter(Array.isArray)) === JSON.stringify([['spacing/8', '2곳', true], ['spacing/8', '2곳', false]]) && (await p.textContent('#statusText')).includes('1곳 추가'), JSON.stringify(await bindList(p)));
+  check('B2 같은 (변수, 종류) 줄은 꺼진 채 이어받음 · 알림', JSON.stringify((await bindList(p)).filter(Array.isArray)) === JSON.stringify([['spacing/8', '2곳', true], ['spacing/8', '2곳', false]]) && (await toastText(p)).includes('1곳 추가'), JSON.stringify(await bindList(p)));
   // 후보 0
   await reenter(p);
   await recv(p, PREREQ);
@@ -850,7 +876,7 @@ const reenter = (p) => p.evaluate(() => {
   await p.click('#selCards button');
   check('B2 [읽기] → 찾기 + 텍스트 스타일 미리보기 · 진행 줄', (await sent(p, 'APPLY')).length === 1 && (await sent(p, 'PREVIEW_TEXT_STYLES')).length === 1);
   await recv(p, { type: 'APPLY_RESULT', preview: true, cancelled: true, bound: 0, skipped: 0, reasons: {}, reqId: await lastReq(p, 'APPLY') });
-  check('B2 취소 → "읽기를 취소했어요" + [다시 읽기]', (await p.textContent('#statusText')) === '읽기를 취소했어요' && (await p.textContent('#statusAction')).includes('다시 읽기'), await p.textContent('#statusText'));
+  check('B2 취소 → "읽기를 취소했어요" + [다시 읽기]', (await toastText(p)) === '읽기를 취소했어요' && (await toastAct(p)).includes('다시 읽기'), await toastText(p));
   await p.close();
 }
 {
@@ -1011,7 +1037,7 @@ async function saveAndGet(p) {
   check('12 성공 → 문구 없음 · [닫기] 포커스 · [저장] 잠김 · 칸이 새 값', (await edAlert(p)) === '' && (await activeText(p)) === '닫기' && (await edSaveLocked(p)) && (await edSaveText(p)) === '저장' && (await p.inputValue(NAME)) === 'color/fg/default' && (await p.inputValue('.modal input[aria-label="Dark 값"]')) === '#FFFFFF80' && (await p.textContent('.modal h3')).includes('color/fg/default'));
   check('12 성공 뒤 고친 표시 없음', (await p.$$('.modal .ed-field.changed')).length === 0);
   await p.keyboard.press('Escape');
-  check('12 닫은 뒤 변수 id로 행 다시 찾아 포커스 · 상태 줄 문구 없음', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx' && !(await p.textContent('#statusText')).includes('행은'));
+  check('12 닫은 뒤 변수 id로 행 다시 찾아 포커스 · 상태 줄 문구 없음', (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tx' && !(await toastText(p)).includes('행은'));
   await p.close();
 }
 {
@@ -1025,7 +1051,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name'] });
   await recv(p, { type: 'VAR_TABLE', collections: ECOLS, vars: EVARS.map((v) => (v.id === 'tx' ? { ...v, name: 'color/fg/default' } : v)) });
   await p.click('.modal .m-foot button:not(.primary)');
-  check('12 항목이 목록에 없으면 첫 항목으로 · "{새 이름}은 지금 목록에 보이지 않아요"', (await p.evaluate(() => document.activeElement?.closest('#varTree, #listHead') !== null)) && (await p.textContent('#statusText')) === 'color/fg/default은 지금 목록에 보이지 않아요', await p.textContent('#statusText'));
+  check('12 항목이 목록에 없으면 첫 항목으로 · "{새 이름}은 지금 목록에 보이지 않아요"', (await p.evaluate(() => document.activeElement?.closest('#varTree, #listHead') !== null)) && (await toastText(p)) === 'color/fg/default은 지금 목록에 보이지 않아요', await toastText(p));
   // 고르개 후보: Global은 없음 · 계층 없음은 모든 컬렉션(순환 제외)
   await p.click('#varSide [data-key="side:col:g"]');
   await menuEdit(p, 'g0');
@@ -1070,7 +1096,7 @@ async function saveAndGet(p) {
   check('12 확인 줄에서 Esc = [계속 고치기] → 확인 줄 닫고 직전 칸', (await p.$eval('.modal .ed-confirm', (e) => e.hidden)) && (await activeLabel(p)) === 'Dark 값');
   await p.click('.modal .m-foot button:not(.primary)');
   await p.click('.modal .ed-confirm button >> text=버리기');
-  check('12 [버리기] → 닫힘 · "일부만 저장됐어요"(행 있음) · 원래 행', (await p.$('.modal')) === null && (await p.textContent('#statusText')) === '일부만 저장됐어요' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tm');
+  check('12 [버리기] → 닫힘 · "일부만 저장됐어요"(행 있음) · 원래 행', (await p.$('.modal')) === null && (await toastText(p)) === '일부만 저장됐어요' && (await p.evaluate(() => document.activeElement?.dataset?.id)) === 'tm');
   await p.close();
 }
 {
@@ -1092,7 +1118,7 @@ async function saveAndGet(p) {
   check('12 남는 문구는 칸을 고쳐도 · [저장]을 눌러도 그대로', (await edAlert(p)) === '다른 곳에서 바뀌었어요 · 닫고 다시 열어 주세요' && (await edSaveLocked(p)));
   await p.keyboard.press('Escape');
   await p.click('.modal .ed-confirm button >> text=버리기');
-  check('12 바뀐 응답이 없었으면 닫을 때 상태 줄 문구 없음', !(await p.textContent('#statusText')).includes('저장'));
+  check('12 바뀐 응답이 없었으면 닫을 때 상태 줄 문구 없음', !(await toastText(p)).includes('저장'));
   await menuEdit(p, 'tx');
   await p.fill(NAME, 'color/text/main');
   u = await saveAndGet(p);
@@ -1336,8 +1362,8 @@ async function saveAndGet(p) {
   await wizTs(p, ap.reqId);
   await p.waitForTimeout(120);
   await p.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/b7-make-done-missing.png` : '/dev/null' }).catch(() => {});
-  check('17 다 됨 → 첫 화면 · 상태 줄 "… 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결"(글꼴 알림이 있어도 연결까지 돈다) · 툴팁에 알림 글', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === 'Global 2개 · Semantic 1개 · 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결' && (await p.getAttribute('#statusText', 'title')).includes("title: 글꼴 'Gone Bold'"), await p.textContent('#statusText'));
-  check('17 실행 결과로 연결 화면 상태 줄 "🔗 …곳 연결"을 쓰지 않음', !(await p.textContent('#statusText')).startsWith('🔗'));
+  check('17 다 됨 → 첫 화면 · 상태 줄 "… 텍스트 스타일 1개(글자 3개) · 알림 1개 · 5곳 연결"(글꼴 알림이 있어도 연결까지 돈다) · 툴팁에 알림 글', (await visible(p, '#selHome')) && (await toastText(p)) === 'Global 2개 · Semantic 1개를 만들고 5곳에 연결했어요 · 텍스트 스타일 1개(글자 3개) · 알림 1개' && (await toastTip(p)).includes("title: 글꼴 'Gone Bold'"), await toastText(p));
+  check('17 실행 결과로 연결 화면 글("{n}곳 연결 · ⌘Z로 되돌리기")을 쓰지 않음 — 만들기 문장형', !(await toastText(p)).includes('곳 연결 · ⌘Z로 되돌리기') && (await toastText(p)).includes('연결했어요'));
   await p.close();
 }
 {
@@ -1402,7 +1428,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'already-bound': 3 }, preview: false, reqId: ap.reqId });
   await wizTs(p, ap.reqId);
   await p.waitForTimeout(80);
-  check('17 연결 0곳 · 이미 모두 연결됨 → 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
+  check('17 연결 0곳 · 이미 모두 연결됨 → 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await toastText(p));
   await p.close();
 }
 {
@@ -1431,7 +1457,7 @@ async function saveAndGet(p) {
   await recv(p, { type: 'APPLY_RESULT', bound: 0, skipped: 0, reasons: { 'make-off': 2 }, preview: false, reqId: ap.reqId });
   await wizTs(p, ap.reqId);
   await p.waitForTimeout(80);
-  check('B.36 연결 0곳 · 남은 곳은 끈 값(make-off) → ✓ · 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await p.textContent('#statusText'));
+  check('B.36 연결 0곳 · 남은 곳은 끈 값(make-off) → ✓ · 결과 화면에 머물지 않고 첫 화면(다 됨)', (await visible(p, '#selHome')) && !(await visible(p, '#makeResults')), await toastText(p));
   await p.close();
 }
 {
@@ -1477,7 +1503,7 @@ async function saveAndGet(p) {
   check('17 무료 실행 — 이어 이름 정리(기준 nodeIds · reqId) · 다크 없음', rn?.apply === true && rn.nodeIds?.[0] === 'w3' && typeof rn.reqId === 'number' && (await sent(p, 'GENERATE_DARK_MODE')).length === 0);
   await recv(p, { type: 'RENAME_RESULT', reqId: rn.reqId, changes: [{ id: 'a', before: 'Frame', after: 'card' }], nodes: [], applied: true });
   await p.waitForTimeout(100);
-  check('17 무료 다 됨 — "Global 2개 · 이름 1개 정리 · 연결은 아직 안 했어요" + [연결하기 →](무료 꼬리 없음)', (await p.textContent('#statusText')) === 'Global 2개 · 이름 1개 정리 · 연결은 아직 안 했어요' && (await p.textContent('#statusAction')) === '연결하기 →', await p.textContent('#statusText'));
+  check('17 무료 다 됨 — "Global 2개 · 이름 1개 정리 · 연결은 아직 안 했어요" + [연결하기 →](무료 꼬리 없음)', (await toastText(p)) === 'Global 변수 2개를 만들었어요 · 이름 1개 정리 · 연결은 아직 안 했어요' && (await toastAct(p)) === '연결하기 →', await toastText(p));
   await p.close();
 }
 
@@ -1508,7 +1534,7 @@ async function saveAndGet(p) {
   check('18 바꾸기 — 켠 줄 + 이름 그대로인 노드의 역할만(roleOnly) · reqId', !!ap && typeof ap.reqId === 'number' && JSON.stringify(ap.items.map((i) => i.id)) === JSON.stringify(['a', 'k']) && ap.items[1].after === 'Title', JSON.stringify(ap?.items));
   await recv(p, { type: 'RENAME_RESULT', reqId: ap.reqId, applied: true, changes: [{ id: 'a', before: 'Frame 12', after: 'card-header' }], nodes: [] });
   await p.waitForTimeout(60);
-  check('18 끝 → 첫 화면 · 상태 줄 "이름 1개 바꿈 · ⌘Z로 되돌리기"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')) === '이름 1개 바꿈 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
+  check('18 끝 → 첫 화면 · 상태 줄 "이름 1개 바꿈 · ⌘Z로 되돌리기"', (await visible(p, '#selHome')) && (await toastText(p)) === '이름 1개 바꿈 · ⌘Z로 되돌리기', await toastText(p));
   await p.close();
 }
 
@@ -2068,7 +2094,7 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => (e.querySelector('
   await p.fill('.modal .ed-field input >> nth=0', 'color/x');
   check('24 칸을 고쳐도 사유 줄은 그대로', await visible(p, '.modal .ed-alert.paid'));
   await p.click(saveSel, { force: true });
-  check('24 잠긴 [만들기]를 눌러도 CREATE_VARIABLE 없음 · 공통 상태 줄에 띄우지 않음 · 사유 줄 하나', (await sent(p, 'CREATE_VARIABLE')).length === 0 && !(await p.textContent('#statusText')).includes('유료') && (await p.$$('.modal .ed-alert.paid')).length === 1);
+  check('24 잠긴 [만들기]를 눌러도 CREATE_VARIABLE 없음 · 공통 상태 줄에 띄우지 않음 · 사유 줄 하나', (await sent(p, 'CREATE_VARIABLE')).length === 0 && !(await toastText(p)).includes('유료') && (await p.$$('.modal .ed-alert.paid')).length === 1);
   await p.click('.modal .ed-alert.paid button');
   await p.waitForTimeout(30);
   check('24 팝업의 [라이선스 →] → 팝업 닫고 설정 › 키 입력 칸', (await p.$('.modal')) === null && (await p.evaluate(() => document.activeElement?.id)) === 'licenseKey');
@@ -2145,7 +2171,7 @@ const cardText = (p) => p.$eval('#selCards .sel-card', (e) => (e.querySelector('
   const rl = await p.$eval('#colorTable select.r-role', (s) => ({ dis: s.getAttribute('aria-disabled'), tip: s.title, lk: s.previousElementSibling?.textContent }));
   check('24 무료 색 — 줄의 Semantic 고르개 유료 잠금(왼쪽 🔒 · 사유 "Semantic 변수는 유료예요")', rl.dis === 'true' && rl.tip === 'Semantic 변수는 유료예요' && rl.lk === '🔒', JSON.stringify(rl));
   await p.click('#colorTable select.r-role', { force: true });
-  check('24 잠긴 Semantic 고르개를 누르면 상태 줄 "Semantic 변수는 유료예요 · 라이선스 →"', (await p.textContent('#statusText')) === 'Semantic 변수는 유료예요' && (await p.textContent('#statusAction')) === '라이선스 →');
+  check('24 잠긴 Semantic 고르개를 누르면 상태 줄 "Semantic 변수는 유료예요 · 라이선스 →"', (await toastText(p)) === 'Semantic 변수는 유료예요' && (await toastAct(p)) === '라이선스 →');
   await p.click('#btnColorVars');
   const cr = (await sent(p, 'CREATE_TOKENS')).at(-1);
   check('24 무료 [색 변수 만들기] → CREATE_TOKENS{globalOnly}', cr?.globalOnly === true && !cr.preview, JSON.stringify(cr));
@@ -2279,7 +2305,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   const errs0 = pageErrors.length;
   await recv(p, { type: 'ERROR', message: '선택 실패', op: 'SELECT_NODES' });
   await p.waitForTimeout(30);
-  check('25 변수 탭 레이어 선택 오류 → 공통 상태 줄 · 콘솔 오류 없음', (await p.textContent('#statusText')) === '선택 실패' && pageErrors.length === errs0, JSON.stringify({ t: await p.textContent('#statusText'), e: pageErrors.slice(errs0) }));
+  check('25 변수 탭 레이어 선택 오류 → 공통 상태 줄 · 콘솔 오류 없음', (await toastText(p)) === '선택 실패' && pageErrors.length === errs0, JSON.stringify({ t: await toastText(p), e: pageErrors.slice(errs0) }));
   await p.close();
 }
 {
@@ -2352,7 +2378,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   await p.evaluate(() => { window.__sent.length = 0; });
   await p.click('#btnLicenseLink', { force: true });
   await p.waitForTimeout(30);
-  check('26 잠긴 구매 버튼 누름 → 상태 줄 사유 · OPEN_LICENSE_LINK 안 보냄', (await p.textContent('#statusText')) === '구독 관리 페이지는 아직 준비 중이에요' && (await sent(p, 'OPEN_LICENSE_LINK')).length === 0, await p.textContent('#statusText'));
+  check('26 잠긴 구매 버튼 누름 → 상태 줄 사유 · OPEN_LICENSE_LINK 안 보냄', (await toastText(p)) === '구독 관리 페이지는 아직 준비 중이에요' && (await sent(p, 'OPEN_LICENSE_LINK')).length === 0, await toastText(p));
   await recv(p, { type: 'LICENSE_STATUS', tier: 'paid', unlimited: true, source: 'key', status: 'active' });
   await p.waitForTimeout(30);
   const pd = await lk();
@@ -2422,7 +2448,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   check('27 지우기 → DELETE_VARIABLES(켠 id) · 확인하는 중 잠금', del?.ids?.length === 1 && (await p.textContent('.modal .unused-prog')).includes('확인하는 중') && (await p.$$eval('.modal .unused-tree .bv-switch', (e) => e.every((x) => x.getAttribute('aria-disabled') === 'true'))));
   await recv(p, { type: 'VARIABLES_DELETED', reqId: del.reqId, deleted: 1, skipped: 1, failed: 0 });
   await p.waitForTimeout(40);
-  check('27 지운 뒤 팝업 닫힘 · 상태 줄 문구', (await p.$$('.modal')).length === 0 && (await p.textContent('#statusText')) === '변수 1개를 지웠어요 · ⌘Z로 되돌리기 · 건너뜀 1', await p.textContent('#statusText'));
+  check('27 지운 뒤 팝업 닫힘 · 상태 줄 문구', (await p.$$('.modal')).length === 0 && (await toastText(p)) === '변수 1개를 지웠어요 · ⌘Z로 되돌리기 · 건너뜀 1', await toastText(p));
   await p.close();
 }
 
@@ -2558,7 +2584,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
     check('28g [등록] aria-disabled', (await p.getAttribute('#btnTextStyles', 'aria-disabled')) === 'true');
     await p.click('#btnTextStyles', { force: true });
     await p.waitForTimeout(20);
-    check('28g 누르면 상태 줄 "만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요" · CREATE_TEXT_STYLES 0', (await p.textContent('#statusText')) === '만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요' && (await count(p, 'CREATE_TEXT_STYLES')) === 0, await p.textContent('#statusText'));
+    check('28g 누르면 상태 줄 "만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요" · CREATE_TEXT_STYLES 0', (await toastText(p)) === '만들 수 있는 스타일이 없어요 — 글자 크기가 모두 소수예요' && (await count(p, 'CREATE_TEXT_STYLES')) === 0, await toastText(p));
     await p.close();
   }
 }
@@ -2597,7 +2623,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   // 28c 연결 뒤 메인 줄(결정 B)
   await recv(p, { type: 'APPLY_RESULT', reqId: as.reqId, bound: 3, skipped: 0, reasons: {}, skips: [], mainsBound: ['S', 'M'] });
   await p.waitForTimeout(40);
-  check('28c 상태 줄에 "메인 컴포넌트" 없음(v4.linked 글 그대로)', (await p.textContent('#statusText')) === '🔗 3곳 연결 · ⌘Z로 되돌리기', await p.textContent('#statusText'));
+  check('28c 상태 줄에 "메인 컴포넌트" 없음(v4.linked 글 그대로)', (await toastText(p)) === '3곳 연결 · ⌘Z로 되돌리기', await toastText(p));
   const doneFind = async (extra = {}) => { const id = await lastReq(p, 'APPLY'); await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {}, ...extra }); await recv(p, tsPrev(id)); await p.waitForTimeout(40); };
   const boundLine = () => p.evaluate(() => [...document.querySelectorAll('#selCards .s.mains')].map((e) => e.textContent).join('|'));
   await p.waitForTimeout(450);
@@ -2720,7 +2746,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId, mainsBound: ['a'] });
   await wizTs(p, ap.reqId);
   await p.waitForTimeout(120);
-  check('28c 만들기 다 됨 줄에 "메인 컴포넌트" 없음', (await visible(p, '#selHome')) && !(await p.textContent('#statusText')).includes('메인'), await p.textContent('#statusText'));
+  check('28c 만들기 다 됨 줄에 "메인 컴포넌트" 없음', (await visible(p, '#selHome')) && !(await toastText(p)).includes('메인'), await toastText(p));
   await p.waitForTimeout(450);
   const id = await lastReq(p, 'APPLY');
   await recv(p, { ...preview(id), candidates: [], reasons: {}, counts: {} });
@@ -2760,7 +2786,7 @@ const activeId = (p) => p.evaluate(() => (document.activeElement?.classList.cont
   check('29 변수 탭 — 사용 수 읽기 오류 뒤에도 창 다시 들어옴 다시 읽기(변수 표)가 나감', v2 > v1, `${v1} → ${v2}`);
   // 누를 수 있는 메시지([라이선스 →]) — 유료 거절 응답 경로
   const paid = () => recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
-  const actionShown = () => p.$eval('#statusAction', (b) => !b.hidden);
+  const actionShown = () => toastActShown(p);
   await paid();
   await p.waitForTimeout(30);
   const shown = await actionShown();
@@ -3465,7 +3491,7 @@ async function backHome30(p, libs) {
   await recv(p, { type: 'VARIABLE_UPDATED', reqId: up.reqId, ok: true, applied: ['name'] });
   await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV.map((v) => (v.id === 'dg9' ? { ...v, name: 'color/blue/900' } : v)) });
   await p.click('.modal .m-foot button:not(.primary)');
-  check('9d 상세 — 접힌 단 아래로 이름 고침 → 닫기 → 포커스 접힌 blue 머리 · 상태 줄 "지금 목록에 보이지 않아요"', (await act()) === 'g:g|color/blue' && (await p.textContent('#statusText')) === 'color/blue/900은 지금 목록에 보이지 않아요', JSON.stringify([await act(), await p.textContent('#statusText')]));
+  check('9d 상세 — 접힌 단 아래로 이름 고침 → 닫기 → 포커스 접힌 blue 머리 · 상태 줄 "지금 목록에 보이지 않아요"', (await act()) === 'g:g|color/blue' && (await toastText(p)) === 'color/blue/900은 지금 목록에 보이지 않아요', JSON.stringify([await act(), await toastText(p)]));
   await recv(p, { type: 'VAR_TABLE', collections: DC, vars: DV });
   // 새 변수 뒤 모든 윗단 펴짐
   await more('사이드바 모두 접기');
@@ -4163,7 +4189,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await recv(p, { type: 'APPLY_RESULT', bound: 5, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
   await wizTs(p, ap.reqId);
   await p.waitForTimeout(150);
-  check('S-2 예 (가) 결과 — "Global 2개 · Semantic 2개 · 5곳 연결"', (await p.textContent('#statusText')) === 'Global 2개 · Semantic 2개 · 5곳 연결', await p.textContent('#statusText'));
+  check('S-2 예 (가) 결과 — "Global 2개 · Semantic 2개 · 5곳 연결"', (await toastText(p)) === 'Global 2개 · Semantic 2개를 만들고 5곳에 연결했어요', await toastText(p));
   await p.close();
   // 6번 — g ≥ 1 · 바로 연결 켬 · p = 0(빈 자리가 모두 붙은 값 — 기본 꺼진 줄을 켬) → [변수 {g}개 만들기]
   const pv6 = { created: 2, updated: 0, roles: 2, tokenStates: {} };
@@ -4184,7 +4210,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
     // 10번 — g = 0 · 바로 연결 끔 → 잠금 "만들 변수가 없어요 — 바로 연결을 켜 주세요"
     await p.click('#makeOptLink');
     await p.waitForTimeout(30);
-    check(`S-2 버튼 10번 ${tier} — g = 0 · 바로 연결 끔 → [변수 만들기] 잠금 "만들 변수가 없어요 — 바로 연결을 켜 주세요"`, (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수가 없어요 — 바로 연결을 켜 주세요', await p.textContent('#statusText'));
+    check(`S-2 버튼 10번 ${tier} — g = 0 · 바로 연결 끔 → [변수 만들기] 잠금 "만들 변수가 없어요 — 바로 연결을 켜 주세요"`, (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수가 없어요 — 바로 연결을 켜 주세요', await toastText(p));
     if (tier === 'paid') { await p.waitForTimeout(200); await s2Shot(p, 's2-B4'); } // 시안 B4 — 바로 연결 끔(버튼 전환이 끝난 뒤)
     await p.click('#makeOptLink');
     await p.waitForTimeout(30);
@@ -4199,7 +4225,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
     await recv(p, { type: 'APPLY_RESULT', bound: 3, skipped: 0, reasons: {}, preview: false, newRoles: 0, reqId: ap.reqId });
     await wizTs(p, ap.reqId);
     await p.waitForTimeout(150);
-    check(`S-2 예 (나) ${tier} 결과 — "${tier === 'paid' ? 'Semantic 1개 · 3곳 연결' : '3곳 연결'}"(만든 것이 없는 부분은 뺀다)`, (await p.textContent('#statusText')) === (tier === 'paid' ? 'Semantic 1개 · 3곳 연결' : '3곳 연결'), await p.textContent('#statusText'));
+    check(`S-2 예 (나) ${tier} 결과 — "${tier === 'paid' ? 'Semantic 변수 1개를 만들고 3곳에 연결했어요' : '3곳에 연결했어요'}"(만든 것이 없는 부분은 뺀다)`, (await toastText(p)) === (tier === 'paid' ? 'Semantic 변수 1개를 만들고 3곳에 연결했어요' : '3곳에 연결했어요'), await toastText(p));
     await p.close();
   }
   // 예 (다) — 별칭 후보가 있어 Semantic도 만들지 않음: "Global 0개 · Semantic 0개" · [2곳 연결] · 결과 "2곳 연결"
@@ -4211,7 +4237,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   p = await openMake('paid', REUSE.map((tk) => ({ ...tk, freeBy: { [FILL_G]: 0 } })), pv9);
   await allOn(p);
   await answerPv(p, pv9);
-  check('S-2 버튼 9번 — g = 0 · 바로 연결 켬 · p = 0 → 줄 "0곳" · [변수 만들기] 잠금 "만들 변수도 연결할 곳도 없어요"', (await p.textContent('#makeTree [data-tkey="g:color/gray/950"] .tr-lt')) === '0곳' && (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수도 연결할 곳도 없어요', await p.textContent('#statusText'));
+  check('S-2 버튼 9번 — g = 0 · 바로 연결 켬 · p = 0 → 줄 "0곳" · [변수 만들기] 잠금 "만들 변수도 연결할 곳도 없어요"', (await p.textContent('#makeTree [data-tkey="g:color/gray/950"] .tr-lt')) === '0곳' && (await p.textContent('#btnMakeRun')) === '변수 만들기' && (await locked(p, '#btnMakeRun')) && (await lockMsg(p, '#btnMakeRun')) === '만들 변수도 연결할 곳도 없어요', await toastText(p));
   await p.waitForTimeout(200);
   await s2Shot(p, 's2-B3'); // 시안 B3 — 만들 변수도 연결할 곳도 없음
   // 2번 — 켠 Global 줄 0개 · 켠 스타일 0개 → "만들 값을 켜 주세요"(그대로)
@@ -4293,7 +4319,7 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   const as = (await sent(p, 'APPLY_SELECTED')).filter((m) => m.reqId === ap.reqId).at(-1);
   check('B.35 ④ 변수 연결 뒤 PREVIEW_TEXT_STYLES(기준 · 마법사 reqId) → APPLY_SELECTED{items: [], textStyles}', !!pts && pts.nodeIds?.[0] === 'w1' && !!as && as.items.length === 0 && as.textStyles?.[0]?.styleId === 'S:1', JSON.stringify(as));
   await p.waitForTimeout(150);
-  check('B.35 다 됨 줄 — "… · 4곳 연결 · Text Style 9곳"', (await visible(p, '#selHome')) && (await p.textContent('#statusText')).endsWith('4곳 연결 · Text Style 9곳'), await p.textContent('#statusText'));
+  check('B.35 다 됨 줄 — "… · 4곳 연결 · Text Style 9곳"', (await visible(p, '#selHome')) && (await toastText(p)).endsWith('4곳 · Text Style 9곳에 연결했어요'), await toastText(p));
   await p.close();
   // 켠 Global 줄 없음(모두 끄기) + 스타일만 → APPLY 없이 ④ → "Text Style {t}곳 연결"
   const q = await setup();
@@ -4364,6 +4390,82 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await p.click('#btnGoMake');
   await p.waitForTimeout(60);
   check('33 [변수 보기] — 연결된 로컬 변수 없음 → 변수 탭으로만 · 강조 없음', (await p.getAttribute('#tabbtn-variables', 'aria-selected')) === 'true' && (await p.$$('#varTree .hl-flash')).length === 0);
+  await p.close();
+}
+
+/* ---------- DS-3b 상태 줄 → Toast(ia-v4 §4.1b "결과 알림 — Toast 하나" · B.43) ---------- */
+{
+  const p = await open(560, 'select');
+  check('DS-3b 공통 상태 줄 없음 · #toastHost 하나(role="status" · aria-atomic) · body 바로 아래 · #overlayRoot 밖', (await p.$('#statusLine')) === null && (await p.evaluate(() => { const h = document.getElementById('toastHost'); return h.parentElement === document.body && h.getAttribute('role') === 'status' && h.getAttribute('aria-atomic') === 'true' && !document.getElementById('overlayRoot').contains(h); })));
+  // warning + 동작(남음)
+  await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
+  await p.waitForTimeout(40);
+  const look = await p.evaluate(() => {
+    const t = document.querySelector('#toastHost .ds-toast');
+    const cs = getComputedStyle(t);
+    const tx = getComputedStyle(t.querySelector('.ds-toast__text'));
+    const close = t.querySelector('.ds-icbtn');
+    const r = t.getBoundingClientRect();
+    return { n: document.querySelectorAll('#toastHost .ds-toast').length, h: Math.round(r.height), w: Math.round(r.width), bottom: Math.round(innerHeight - r.bottom), radius: cs.borderTopLeftRadius, border: cs.borderTopWidth, shadow: cs.boxShadow !== 'none', color: tx.color, size: tx.fontSize, lh: tx.lineHeight, closeLabel: close?.getAttribute('aria-label'), closeColor: getComputedStyle(close).color, live: document.getElementById('toastHost').getAttribute('aria-live') };
+  });
+  const prim = await p.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--color-text-primary').trim());
+  check('DS-3b warning Toast 모양 — 한 줄 32 · 너비 536 · 창 아래 12 · radius 6 · 테두리 0 · 그림자 · 글 12/16 · 닫기 "닫기" · polite', look.n === 1 && look.h === 32 && look.w === 536 && look.bottom === 12 && look.radius === '6px' && look.border === '0px' && look.shadow && look.size === '12px' && look.lh === '16px' && look.closeLabel === '닫기' && look.live === 'polite' && (await toastTone(p)) === 'warning' && (await toastAct(p)) === '라이선스 →', JSON.stringify({ ...look, prim }));
+  check('DS-3b 첫 화면(아래 고정 줄 없음) — 떠 있는 동안 본문 아래 여백 = 12 + Toast 높이 + 12', (await p.evaluate(() => getComputedStyle(document.body).paddingBottom)) === `${12 + look.h + 12}px`);
+  await p.click('#toastHost .ds-toast__text');
+  await p.waitForTimeout(30);
+  check('DS-3b Toast 안 클릭은 남는 Toast를 지우지 않음', await toastActShown(p));
+  await p.click('#btnMinimize');
+  await p.waitForTimeout(40);
+  check('DS-3b 최소화 중 Toast 숨김(요소는 남음)', !(await toastShown(p)) && (await p.$('#toastHost .ds-toast')) !== null);
+  await p.click('#btnExpand');
+  await p.waitForTimeout(60);
+  check('DS-3b [—] · 펼치기는 남는 Toast를 지우지 않음 — 펼치면 다시 보임', (await toastActShown(p)) && (await toastShown(p)));
+  await p.mouse.click(280, 200);
+  await p.waitForTimeout(30);
+  check('DS-3b 다른 곳 클릭 → 남는 Toast 사라짐 · 본문 아래 여백 되돌림', (await toastText(p)) === '' && (await p.evaluate(() => getComputedStyle(document.body).paddingBottom)) === '12px');
+  // error(이 화면의 실패) — 4초 · assertive · 툴팁 = Figma 원문
+  await recv(p, { type: 'ERROR', op: 'UNBIND_DELETED', message: 'Figma raw message' });
+  await p.waitForTimeout(40);
+  check('DS-3b error Toast — assertive · 툴팁에 원문 · 동작 없음', (await toastTone(p)) === 'error' && (await p.getAttribute('#toastHost', 'aria-live')) === 'assertive' && (await toastTip(p)) === 'Figma raw message' && !(await toastActShown(p)));
+  await p.hover('#toastHost .ds-toast');
+  await p.waitForTimeout(4300);
+  check('DS-3b 포인터가 위에 있으면 4초 시간이 멈춤', (await toastTone(p)) === 'error');
+  await p.mouse.move(280, 150);
+  await p.waitForTimeout(4300);
+  check('DS-3b 동작 없는 Toast는 떠난 뒤 4초에 사라짐', (await toastText(p)) === '');
+  // 긴 글 — 자르지 않음(S3-D15)
+  await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
+  await p.waitForTimeout(30);
+  const long = await p.evaluate(() => {
+    const tx = document.querySelector('#toastHost .ds-toast__text');
+    tx.textContent = 'Global 24개 · Semantic 18개를 만들었어요 · 다크 5개 · 텍스트 스타일 3개(글자 18개) · 알림 1개 · 변수를 연결한 곳은 없어요 · 이름 6개 정리 · 직접 만든 변수라 건너뜀 2 · 문구가 길어도 자르지 않고 줄을 늘려 모두 보여요';
+    const t = tx.closest('.ds-toast');
+    const cs = getComputedStyle(tx);
+    return { h: Math.round(t.getBoundingClientRect().height), clip: tx.scrollHeight > tx.clientHeight + 1, clamp: cs.webkitLineClamp, ov: cs.overflow, ws: cs.whiteSpace };
+  });
+  check('DS-3b 긴 글은 잘리지 않음 — 여러 줄(높이 > 48) · 말줄임 · line-clamp 없음', long.h > 48 && (long.h - 16) % 16 === 0 && !long.clip && (long.clamp === 'none' || long.clamp === '') && long.ov === 'visible' && long.ws === 'normal', JSON.stringify(long));
+  // 닫기 — 포커스는 들어오기 전 요소로
+  await p.focus('#btnSettings');
+  await p.keyboard.press('Tab');
+  await p.evaluate(() => document.querySelector('#toastHost .ds-toast__action').focus());
+  await p.evaluate(() => { const b = document.querySelector('#toastHost .ds-icbtn'); b.focus(); });
+  await p.keyboard.press('Enter');
+  await p.waitForTimeout(30);
+  check('DS-3b 닫기(Enter) → Toast 사라짐 · 포커스가 body로 떨어지지 않음', (await toastText(p)) === '' && (await p.evaluate(() => document.activeElement !== document.body && document.activeElement?.isConnected)));
+  await p.close();
+}
+{
+  // 짧은 하위 화면 — Toast가 떠도 아래 고정 줄이 움직이지 않음 · Toast는 창 아래
+  const p = await open(560, 'select');
+  await openSel(p);
+  await found(p);
+  await p.click('[data-k="todo-link"]');
+  await p.waitForTimeout(80);
+  const before = await p.evaluate(() => ({ top: Math.round(document.getElementById('bindFoot').getBoundingClientRect().top), scrolls: document.documentElement.scrollHeight > innerHeight }));
+  await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', message: '' });
+  await p.waitForTimeout(60);
+  const after = await p.evaluate(() => { const t = document.querySelector('#toastHost .ds-toast').getBoundingClientRect(); return { top: Math.round(document.getElementById('bindFoot').getBoundingClientRect().top), toastBottomGap: Math.round(innerHeight - t.bottom), toastTop: Math.round(t.top), barBottom: Math.round(document.getElementById('bindFoot').getBoundingClientRect().bottom) }; });
+  check('DS-3b 짧은 하위 화면 — Toast가 떠도 아래 고정 줄이 움직이지 않음 · 줄을 가리지 않음', !before.scrolls && before.top === after.top && (after.toastTop >= after.barBottom || after.toastBottomGap > 12), JSON.stringify({ before, after }));
   await p.close();
 }
 

@@ -17,7 +17,7 @@
     [hidden] { display: none !important; }
     body {
       font: var(--font-weight-regular) var(--font-size-md)/var(--line-height-normal) var(--font-family-sans);
-      margin: 0; padding: var(--space-3) var(--space-3) var(--space-10); /* 아래 36 = 공통 상태 줄(24) + 여백 */
+      margin: 0; padding: var(--space-3) var(--space-3) calc(var(--space-3) + var(--toast-space-body, 0px)); /* 아래 여백 + Toast가 떠 있는 동안 비우는 높이(ia-v4 §4.1b "자리") */
       color: var(--color-text-primary); background: var(--color-background-primary);
       -webkit-font-smoothing: antialiased;
       overflow-x: hidden; /* 툴팁 등이 가로 스크롤을 만들지 않게 */
@@ -66,7 +66,7 @@
     .step.collapsed .step-body { display: none; }
 
     /* ── 버튼 ── 모양 · 상태는 src/ui/components/button.css(design-system §6.1 · §6.9). 여기는 자리만. */
-    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 공통 상태 줄에 사유. opacity는 쓰지 않는다(버튼 밖 요소도). */
+    /* 잠금·전제 미충족(IA v3 §2.3) — 포커스는 받고, 누르면 Toast로 사유(DS-3b). opacity는 쓰지 않는다(버튼 밖 요소도). */
     [aria-disabled="true"] { color: var(--color-text-tertiary); cursor: not-allowed; box-shadow: none; }
     label.inline:has(input[aria-disabled="true"]) { color: var(--color-text-tertiary); cursor: not-allowed; }
 
@@ -157,7 +157,7 @@
     .sub-right-tail { flex: 0 0 auto; white-space: pre; }
     .var-empty { padding: var(--space-10) var(--space-2); text-align: center; }
     /* IA v4 §4.2 연결 화면 */
-    .sub-foot { position: sticky; bottom: 24px; display: flex; align-items: center; gap: var(--space-2); min-height: 52px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: var(--space-2); }
+    .sub-foot { position: sticky; bottom: 0; display: flex; align-items: center; gap: var(--space-2); min-height: 52px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: calc(var(--space-2) + var(--toast-space-bar, 0px)); }
 
     /* ── 단계 레일 — 만들기 4단계 · 적용 3단계. 한 화면에 한 단계만 보인다. ── */
     .steps { display: grid; gap: var(--space-1); margin: 0 0 var(--space-3); }
@@ -615,7 +615,7 @@
     .mk-info { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; min-height: 14px; padding: 0; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: none; font: var(--font-weight-semibold) var(--font-size-xs)/var(--line-height-xs) var(--font-family-sans); color: var(--color-text-secondary); cursor: help; flex: 0 0 auto; }
     .mk-info:hover:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-text-primary); }
     .make-tabnote { font-size: var(--font-size-sm); color: var(--color-text-secondary); padding: var(--space-2) var(--space-0-5); border-bottom: 1px solid var(--color-border-default); }
-    .make-foot { position: sticky; bottom: 24px; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: var(--space-2); padding: var(--space-2) 0 var(--space-2); z-index: var(--z-sticky); }
+    .make-foot { position: sticky; bottom: 0; background: var(--color-background-primary); border-top: 1px solid var(--color-border-default); margin-top: calc(var(--space-2) + var(--toast-space-bar, 0px)); padding: var(--space-2) 0 var(--space-2); z-index: var(--z-sticky); }
     /* 아래 고정 줄 — 내용이 밑에 깔릴 때만 옅은 그림자(DS-3a S3-D10, 상태는 속성으로) */
     .sub-foot[data-overlapped], .make-foot[data-overlapped] { box-shadow: var(--elevation-sticky); }
     .make-opts { display: flex; align-items: center; gap: var(--space-0-5); height: var(--size-compact); font-size: var(--font-size-sm); white-space: nowrap; overflow: hidden; }
@@ -677,7 +677,7 @@
       background: linear-gradient(to right, transparent 127px, var(--color-border-default) 127px 128px, transparent 128px) no-repeat; }
     .vl-side {
       width: 128px; flex: 0 0 128px; position: sticky; top: var(--side-top, 75px); align-self: flex-start;
-      max-height: calc(100vh - var(--side-top, 75px) - 24px); overflow-y: auto; border-right: 1px solid var(--color-border-default);
+      max-height: calc(100vh - var(--side-top, 75px) - var(--toast-space-side, 0px)); overflow-y: auto; border-right: 1px solid var(--color-border-default);
       padding: var(--space-1) var(--space-1); background: var(--color-surface-primary);
     }
     .vs-item { display: flex; align-items: center; gap: var(--nav-item-gap); height: 28px; min-height: 28px; padding: 0 var(--space-2); border-radius: var(--radius-small); color: var(--color-text-primary); cursor: pointer; font-size: var(--font-size-md); font-weight: var(--font-weight-regular); }
@@ -773,18 +773,6 @@
 
     /* ── 하위 화면 돌아가기 링크 ── */
     .back-link { display: inline-block; margin: 0 0 var(--space-3); padding: var(--space-1) 0; min-height: 24px; }
-
-    /* ── 공통 상태 줄(§4.1) — 창 맨 아래 고정, 높이 24, 한 줄 말줄임. 끝 버튼은 말줄임 밖. ── */
-    .status-line {
-      position: fixed; left: 0; right: 0; bottom: 0; z-index: var(--z-fixed); height: 24px;
-      display: flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-3);
-      background: var(--color-surface-secondary); border-top: 1px solid var(--color-border-default);
-      font-size: var(--font-size-sm); color: var(--color-text-secondary);
-    }
-    .status-line .sl-text { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .status-line .sl-action { flex: 0 0 auto; font-size: var(--font-size-sm); min-height: 20px; }
-    .status-line.ok .sl-text { color: var(--color-state-success); }
-    .status-line.warn .sl-text { color: var(--color-state-warning); }
 
     /* ── 최소화(§4.9) — 창 140×104(Tokens Studio처럼 작은 사각형). 펼친 내용은 숨기고 가운데 펼치기 버튼만. ── */
     body.is-mini { padding: 0; overflow: hidden; }
@@ -1140,12 +1128,6 @@
   <!-- 창 리사이즈 핸들(우하단) -->
   <div id="uiTip" role="tooltip" hidden></div>
 
-  <!-- 공통 상태 줄(§4.1) — 창 맨 아래 고정, 모든 탭 공통. 알림은 여기서만 한다. 버튼은 말줄임 밖. -->
-  <div class="status-line" id="statusLine" aria-live="polite">
-    <span class="sl-text" id="statusText"></span>
-    <button class="link sl-action ds-btn--link" id="statusAction" type="button" hidden></button>
-  </div>
-
   <!-- 최소화 상태(§4.9) — 창 140×104, 가운데 펼치기 버튼(↙↗)만. 누르면 펼친다. -->
   <div class="mini" id="miniView" hidden>
     <button class="mini-mark" id="btnExpand" type="button" data-i18n-aria-label="ui.expand" aria-label="펼치기">
@@ -1178,6 +1160,9 @@
 
   <!-- 공용 레이어: 우클릭 메뉴·팝업이 붙는 자리 -->
   <div id="overlayRoot"></div>
+
+  <!-- 결과 알림 Toast(ia-v4 §4.1b — DS-3b) — 늘 있는 담는 곳. body 바로 아래 · #overlayRoot 밖이라 최소화 중 숨김 규칙에 든다. -->
+  <div class="ds-toast-host" id="toastHost" role="status" aria-live="polite" aria-atomic="true"></div>
 
   <!-- UI_SCRIPT -->
   <!-- 스크립트는 반드시 마지막 — 위 마크업이 모두 있어야 리스너가 붙는다. -->

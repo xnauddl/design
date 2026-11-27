@@ -18,6 +18,7 @@ import { pillOrder, leafName, lastTwo, varValueText, varTypeMark, orderCollectio
 import { varKind, APPLY_TARGETS, targetAllowed, scopeFits, scopesForNew, type ApplyTarget } from './lib/varKind';
 import { createReentryScheduler } from './lib/reread';
 import { icon } from './ui/icons';
+import { toast, currentToast } from './ui/components/toast';
 import type { VarInfo } from './shared/messages';
 import { generatePalette, paletteToDraftTokens, paletteSemanticMap, type Harmony } from './lib/palette';
 import { nameColorsByHue } from './lib/colorName';
@@ -1104,7 +1105,7 @@ let unusedWarn: HTMLElement | null = null;
 const unusedBusy = (): boolean => unusedState === 'loading' || unusedState === 'reading' || unusedState === 'checking';
 function openUnused(opener: HTMLElement): void {
   const lock = writeLockReason();
-  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
+  if (lock) { notify(lock, 'warning'); return; }
   unusedItems = [];
   unusedOn.clear();
   unusedCollapsed.clear();
@@ -1340,7 +1341,8 @@ function onVariablesDeleted(msg: Extract<CodeToUi, { type: 'VARIABLES_DELETED' }
   if (unusedState) { unusedState = null; closeModal(); }
   const tail = (msg.skipped ? t('unused.skippedTail', { s: msg.skipped }) : '') + (msg.failed ? t('unused.failedTail', { f: msg.failed }) : '');
   const text = (msg.deleted ? t('unused.deleted', { d: msg.deleted }) : t('unused.deletedNone')) + tail;
-  showStatusLine(text, { cls: msg.failed ? 'warn' : msg.deleted ? 'ok' : '', tip: msg.skipped ? t('unused.skippedTip') : undefined });
+  // tone(§4.1b 표 2): 못 지움 0 — 지운 수 > 0 success · 0 info / 못 지움 > 0 — 지운 수 > 0 warning · 0 error. 건너뜀은 tone에 넣지 않는다.
+  notify(text, msg.failed ? (msg.deleted ? 'warning' : 'error') : msg.deleted ? 'success' : 'info', msg.skipped ? { tip: t('unused.skippedTip') } : {});
 }
 /** 읽기 · 지우기 오류(§1) — 팝업이 열려 있으면 ⑤, 닫힌 뒤면 상태 줄(최소화는 쓰기 작업 규칙). true = 처리함. */
 function onUnusedError(msg: Extract<CodeToUi, { type: 'ERROR' }>): boolean {
@@ -1351,7 +1353,7 @@ function onUnusedError(msg: Extract<CodeToUi, { type: 'ERROR' }>): boolean {
     unusedRender();
     return true;
   }
-  if (msg.op === 'DELETE_VARIABLES' && !isMini) showStatusLine(t('unused.deleteFail'), { cls: 'warn', tip: explainError(msg.message).message });
+  if (msg.op === 'DELETE_VARIABLES' && !isMini) notify(t('unused.deleteFail'), 'error', { tip: explainError(msg.message).message });
   return true;
 }
 $('btnTextStyles').addEventListener('click', () => {
@@ -1658,7 +1660,7 @@ function updateGates(): void {
   // 유료 잠금(#12) — Free는 유료 버튼을 클릭 전에 사전 비활성 + 🔒 배지(클릭-후-거부 방지).
   for (const id of PAID_FIELDS) {
     const el = $(id) as HTMLButtonElement;
-    setLock(el, isPaid ? null : 'paid'); // aria-disabled — 포커스는 받고, 누르면 공통 상태 줄에 사유(§2.3)
+    setLock(el, isPaid ? null : 'paid'); // aria-disabled — 포커스는 받고, 누르면 Toast에 사유(§2.3)
     setLockTitle(el, !isPaid); // 카드 배지를 못 본 채 회색 버튼만 보는 경우 대비
   }
   // 색 카드는 Free('선택에서 추출')와 Paid('팔레트 생성'·'색 변수 만들기')가 한 툴바에 섞여
@@ -2012,7 +2014,7 @@ window.onmessage = (event: MessageEvent) => {
         bindTsPending = false;
         selFindInFlight = false;
         setStatus('applyStatus', t('v4.readCancelled'), 'warn');
-        showStatusLine(t('v4.readCancelled'), { cls: 'warn', action: { label: t('v4.reread'), run: () => readSelFind(true, true) } });
+        notify(t('v4.readCancelled'), 'warning', { action: { label: t('v4.reread'), run: () => readSelFind(true, true) } });
       } else if (msg.preview) {
         // 찾은 곳을 변수 카드로. 처음에는 모든 변수를 켠다.
         const prev = bindCandidates;
@@ -2029,7 +2031,7 @@ window.onmessage = (event: MessageEvent) => {
           // 조용한 재계산: 스위치는 변수 단위로 이어받고, 달라졌을 때만 알린다(§4.6 ⑧). 건너뜀 펼침은 그대로.
           const r = carryRowChecks(prev, prevChecked, bindCandidates);
           for (const k of r.checked) bindChecked.add(k);
-          if (bindSilentCarry && (r.added || r.removed)) showStatusLine(t('bind.candChanged', { a: r.added, b: r.removed }));
+          if (bindSilentCarry && (r.added || r.removed)) notify(t('bind.candChanged', { a: r.added, b: r.removed }), 'info');
         } else {
           bindSkipsOpen = false;
           for (const c of bindCandidates) bindChecked.add(candKey(c));
@@ -2037,14 +2039,14 @@ window.onmessage = (event: MessageEvent) => {
         setStatus('applyStatus', '', '');
         bindFindSettle();
       } else {
-        // 연결 후(§4.2) — 첫 화면으로 돌아오고 상태 줄 "🔗 {n}곳 연결 · ⌘Z로 되돌리기"(+ 건너뜀). 카드는 다시 읽는다.
+        // 연결 후(§4.2) — 첫 화면으로 돌아오고 Toast "{n}곳 연결 · ⌘Z로 되돌리기"(+ 건너뜀). 카드는 다시 읽는다.
         const n = msg.bound + (msg.textStylesApplied ?? 0);
         const m = msg.skipped + (msg.textStylesSkipped ?? 0);
         rememberMainsBound(msg.mainsBound ?? []); // 상태 줄 글은 그대로 — 메인 수는 카드 1 ✓ 아래 줄만(결정 B)
         clearBindPreview();
         setStatus('applyStatus', '', '');
         if (activeTab === 'select' && selSub === 'bind') showSelSub('home');
-        showStatusLine(t('v4.linked', { n }) + (m ? t('v4.linkedSkipped', { m }) : ''), { cls: 'ok' });
+        notify(t('v4.linked', { n }) + (m ? t('v4.linkedSkipped', { m }) : ''), 'success');
         selFindFor = null;
       }
       if (linkEnded) onBindLinkingChanged();
@@ -2085,11 +2087,11 @@ window.onmessage = (event: MessageEvent) => {
       onVariablesDeleted(msg);
       break;
     case 'SELECT_RESULT':
-      // 변수 탭에서 고른 레이어 선택 — 결과는 공통 상태 줄(§4.4: 한 번에 최대 200개).
+      // 변수 탭에서 고른 레이어 선택 — 결과는 Toast(§4.4: 한 번에 최대 200개).
       if (selectStatusTarget === 'list') {
-        if (msg.capped) showStatusLine(t('select.capped', { found: msg.found, requested: msg.requested }), { cls: 'warn' });
-        else if (!msg.found) showStatusLine(t('select.none'), { cls: 'warn' });
-        else if (msg.found < msg.requested) showStatusLine(t('select.partial', { found: msg.found, missing: msg.requested - msg.found }), { cls: 'warn' });
+        if (msg.capped) notify(t('select.capped', { found: msg.found, requested: msg.requested }), 'warning');
+        else if (!msg.found) notify(t('select.none'), 'warning');
+        else if (msg.found < msg.requested) notify(t('select.partial', { found: msg.found, missing: msg.requested - msg.found }), 'warning');
         break;
       }
       // 미리보기 이후 레이어가 지워졌거나 다른 페이지로 옮겨졌으면 그만큼 못 찾는다 — 조용히 실패하지 않게.
@@ -2276,7 +2278,7 @@ window.onmessage = (event: MessageEvent) => {
     }
     case 'PREMIUM_REQUIRED': {
       // 기능에 맞는 카드 영역으로 라우팅 — 거부 안내는 사용자가 누른 카드에 떠야 한다.
-      // IA v3: 잠금 사유는 공통 상태 줄로(§2.3). 카드 상태 영역은 그 카드 작업의 결과 요약만 남긴다.
+      // IA v3: 잠금 사유는 Toast로(§2.3). 카드 상태 영역은 그 카드 작업의 결과 요약만 남긴다.
       showPaidReason();
       break;
     }
@@ -2292,7 +2294,7 @@ window.onmessage = (event: MessageEvent) => {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
       if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       if (msg.op === 'UPDATE_VARIABLE') break;
-      // 사용 수 읽기 실패 — 진행 중 표시를 풀어 다음 읽기 · 창 다시 들어옴 다시 읽기가 막히지 않게(#110 검토 ②). 알림은 아래 공통 상태 줄 그대로.
+      // 사용 수 읽기 실패 — 진행 중 표시를 풀어 다음 읽기 · 창 다시 들어옴 다시 읽기가 막히지 않게(#110 검토 ②). 알림은 아래 Toast 그대로.
       if (msg.op === 'SCAN_USAGE' && msg.reqId != null) {
         // 같은 기준에서는 저절로 다시 보내지 않는다 — 실패가 이어지면 창에 들어올 때마다 같은 경고가 뜬다. [읽기] · 작업 직후 · 기준이 바뀌면 다시.
         if (msg.reqId === vmUsageReq) { vmUsageInFlight = false; usageFailedFor = baseKey(); reentry.release(); }
@@ -2317,7 +2319,7 @@ window.onmessage = (event: MessageEvent) => {
       if (fromWizard) wizardErrorMsg = null;
       // UX7: 실패한 작업 영역에 친절한 메시지 + 복구 행동 + (가능하면) 다시 시도.
       // 레이어 선택은 부른 자리가 여럿이라 표를 못 쓴다 — 마지막으로 부른 쪽을 따른다.
-      // 상태 자리가 없는 작업(삭제된 변수 연결 풀기 · 변수 탭 레이어 선택 · 그 밖의 읽기)은 공통 상태 줄(ia-v4 §2.8).
+      // 상태 자리가 없는 작업(삭제된 변수 연결 풀기 · 변수 탭 레이어 선택 · 그 밖의 읽기)은 Toast(ia-v4 §2.8).
       const mapped = msg.op === 'SELECT_NODES' ? selectStatusTarget : msg.op ? OP_STATUS[msg.op] : undefined;
       const statusId = mapped && mapped !== STATUS_LINE ? resolveStatusId(mapped) : STATUS_LINE;
       if (msg.op === 'APPLY') hideApplyProgress();
@@ -2329,7 +2331,7 @@ window.onmessage = (event: MessageEvent) => {
         onBindLinkingChanged();
       }
       if (fromWizard) break;
-      if (statusId === STATUS_LINE) { showStatusLine(explainError(msg.message).message, { cls: 'warn', tip: msg.message }); break; }
+      if (statusId === STATUS_LINE) { notify(explainError(msg.message).message, 'error', { tip: msg.message }); break; }
       showError(statusId, explainError(msg.message), msg.op);
       break;
     }
@@ -2337,9 +2339,9 @@ window.onmessage = (event: MessageEvent) => {
 };
 
 /* ---------- UX7: 오류 라우팅/표시 ---------- */
-/** 상태 자리 대신 공통 상태 줄(`showStatusLine`)로 — 카드가 아니라 C-D14 대상이 아니다(ia-v4 §2.8). */
+/** 상태 자리 대신 Toast(`notify` — DS-3b)로 — 카드가 아니라 C-D14 대상이 아니다(ia-v4 §2.8). */
 const STATUS_LINE = 'list';
-/** 그 작업을 시작한 화면의 상태 자리(ia-v4 §2.8 "오류 상자가 뜨는 곳"). 없는 작업은 공통 상태 줄. */
+/** 그 작업을 시작한 화면의 상태 자리(ia-v4 §2.8 "오류 상자가 뜨는 곳"). 없는 작업은 Toast. */
 const OP_STATUS: Record<string, string> = {
   EXTRACT: 'colorStatus',
   CREATE_TOKENS: 'createStatus',
@@ -2580,7 +2582,7 @@ function renderRenameResult(msg: Extract<CodeToUi, { type: 'RENAME_RESULT' }>): 
     renameNodes = [];
     renameFor = null;
     if (activeTab === 'select' && selSub === 'rename') showSelSub('home');
-    showStatusLine(t('rename.doneStatus', { k: msg.changes.length }), { cls: 'ok' });
+    notify(t('rename.doneStatus', { k: msg.changes.length }), 'success');
     return;
   }
   if (msg.reqId == null || msg.reqId !== renameReq || msg.applied) return;
@@ -3402,17 +3404,17 @@ async function runMake(): Promise<void> {
     results.sort((a, b) => MAKE_STEP_ORDER.indexOf(a.id) - MAKE_STEP_ORDER.indexOf(b.id));
     mkResults = results;
     mkResultsCreated = !!totals.created;
-    if (!(activeTab === 'select' && selSub === 'make')) showStatusLine(t('make.partialStatus'), { cls: 'warn', action: { label: t('common.view'), run: () => { showTab('select'); showSelSub('make'); } } });
+    if (!(activeTab === 'select' && selSub === 'make')) notify(t('make.partialStatus'), 'warning', { action: { label: t('common.view'), run: () => { showTab('select'); showSelSub('make'); } } });
     renderMakeScreen();
     if (activeTab === 'select' && selSub === 'make') $('btnMakeRun').focus();
     return;
   }
-  // 다 됨 — 하위 화면을 첫 화면으로(탭은 바꾸지 않음) + 상태 줄.
+  // 다 됨 — 하위 화면을 첫 화면으로(탭은 바꾸지 않음) + 결과 Toast.
   const linkOff = !link;
   // 포커스는 할 일 줄 첫 칸(§4.1b — 다시 읽어 ✓가 되면 같은 칸의 [변수 보기], 키 todo-make로 남음)
   if (selSub === 'make') { showSelSub('home'); if (activeTab === 'select') selFallbackFocus(true).focus(); }
   const doneTip = totals.styles?.missing?.join('\n'); // 텍스트 스타일 알림 목록(§4.3 "글꼴")
-  showStatusLine(makeDoneText(totals, { isPaid, linkOff }), { cls: 'ok', ...(doneTip ? { tip: doneTip } : {}), ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
+  notify(makeDoneText(totals, { isPaid, linkOff }), 'success', { ...(doneTip ? { tip: doneTip } : {}), ...(linkOff ? { action: { label: t('wizard.toBind'), run: () => { showTab('select'); showSelSub('bind'); } } } : {}) });
 }
 $('btnMakeRun').addEventListener('click', () => void runMake());
 $('btnMakeCancel').addEventListener('click', () => { mkCancelReq = true; send({ type: 'CANCEL' }); });
@@ -4197,69 +4199,83 @@ function applyStaticI18n(root: ParentNode = document): void {
   }
 }
 
-/* ---------- 공통 상태 줄(§4.1) ----------
-   창 맨 아래 고정, 모든 탭 공통. 잠금·전제 사유, 선택 없음, 다시 읽기 결과, 이동·되돌리기,
-   숨김 안내, 작업 진행, 최소화 중 실패를 띄운다. 카드 상태 영역은 그 카드 작업의 결과만. */
+/* ---------- 결과 알림 — Toast 하나(ia-v4 §4.1b "결과 알림" — DS-3b, S3-D7 · S3-D14–S3-D17) ----------
+   Toast을 없애고 결과 · 실패 · 잠금 사유를 Toast로. 한 번에 하나. tone · 동작 · 툴팁은 §4.1b "부르는 곳 37곳" 표.
+   동작이 있으면 남고(누르거나 닫거나 다른 조작까지), 없으면 4초. */
 interface StatusAction { label: string; run: () => void }
-let statusTimer: ReturnType<typeof setTimeout> | null = null;
-/** 누를 수 있는 메시지가 떠 있는가 — 다음 사용자 조작까지 유지, 배경 메시지가 덮지 않는다. */
-let statusSticky = false;
-function showStatusLine(text: string, opts: { cls?: 'ok' | 'warn' | ''; action?: StatusAction; background?: boolean; tip?: string } = {}): void {
-  if (opts.background && statusSticky) return;
-  const line = $('statusLine');
-  const txt = $('statusText');
-  const btn = $('statusAction') as HTMLButtonElement;
-  if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
-  txt.textContent = text;
-  txt.title = opts.tip ? `${text}\n${opts.tip}` : text; // 말줄임된 글 전체는 툴팁으로(사유별 수가 있으면 함께)
-  line.className = `status-line ${opts.cls ?? ''}`.trim();
-  if (opts.action) {
-    btn.textContent = opts.action.label;
-    btn.onclick = () => { const a = opts.action!; clearStatusLine(); a.run(); };
-    btn.hidden = false;
-    statusSticky = true;
-  } else {
-    btn.hidden = true;
-    btn.onclick = null;
-    statusSticky = false;
-    // 일반 메시지는 4초 뒤 사라진다.
-    if (text) statusTimer = setTimeout(clearStatusLine, 4000);
+type NotifyTone = 'success' | 'error' | 'warning' | 'info';
+function notify(text: string, tone: NotifyTone, o: { action?: StatusAction; tip?: string } = {}): void {
+  toast({
+    tone,
+    text,
+    ...(o.tip ? { tip: o.tip } : {}),
+    closeLabel: t('common.close'),
+    ...(o.action ? { action: { label: o.action.label, onClick: o.action.run } } : {}),
+    fallbackFocus: () => document.querySelector<HTMLElement>('.tab-section.active[role="tabpanel"]'),
+    onChange: () => judgeToastSpace(),
+  });
+}
+/** 지금 화면의 보이는 아래 고정 줄(연결 · 이름 정리 `.sub-foot` · 만들기 `.make-foot`). */
+function visibleFoot(): HTMLElement | null {
+  for (const id of ['bindFoot', 'renameFoot', 'makeFoot']) { const f = $(id); if (f.offsetParent && f.getClientRects().length) return f; }
+  return null;
+}
+const cssPx = (name: string): number => parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+/** 가리지 않게 비우는 자리(§4.1b "자리") — Toast를 띄울 때 · 탭이나 하위 화면이 바뀔 때만 판정한다. */
+function judgeToastSpace(): void {
+  const st = document.documentElement.style;
+  const root = currentToast()?.root;
+  for (const v of ['--toast-space-body', '--toast-space-bar', '--toast-space-side']) st.setProperty(v, '0px');
+  if (root && root.isConnected) {
+    const h = root.offsetHeight + cssPx('--space-3');
+    const foot = visibleFoot();
+    if (!foot) st.setProperty('--toast-space-body', `${h}px`);
+    else if (document.documentElement.scrollHeight > window.innerHeight) st.setProperty('--toast-space-bar', `${h}px`); // 스크롤될 때만 — 짧은 화면은 줄을 움직이지 않는다
+    st.setProperty('--toast-space-side', `${h}px`);
   }
+  placeToast();
 }
-function clearStatusLine(): void {
-  if (statusTimer) { clearTimeout(statusTimer); statusTimer = null; }
-  statusSticky = false;
-  $('statusText').textContent = '';
-  $('statusText').title = '';
-  const btn = $('statusAction') as HTMLButtonElement;
-  btn.hidden = true;
-  btn.onclick = null;
-  $('statusLine').className = 'status-line';
+/** 아래 띄움(--toast-bottom) — 보이는 아래 고정 줄이 Toast 자리와 겹치면 그 줄의 실제 위 끝 + space-3, 아니면 space-3. 스크롤 · 크기 바뀜 때도. */
+function placeToast(): void {
+  const st = document.documentElement.style;
+  const root = currentToast()?.root;
+  const s3 = cssPx('--space-3');
+  const foot = root ? visibleFoot() : null;
+  let bottom = s3;
+  if (root && foot) {
+    const r = foot.getBoundingClientRect();
+    if (r.bottom > window.innerHeight - (root.offsetHeight + 2 * s3)) bottom = Math.max(s3, window.innerHeight - r.top + s3);
+  }
+  st.setProperty('--toast-bottom', `${Math.round(bottom)}px`);
 }
-// 누를 수 있는 메시지를 지우는 조작: 클릭, 실행(Enter·Space), 글자 입력, 탭 전환, 캔버스 선택 변경.
-// 지우지 않는 조작: 포커스 이동(Tab·화살표), 포인터 이동·hover, 스크롤.
+window.addEventListener('scroll', placeToast, { passive: true });
+window.addEventListener('resize', placeToast);
+new ResizeObserver(placeToast).observe(document.body);
+// 동작이 있는 Toast를 지우는 조작: 클릭, 실행 · 글자 입력, 탭 전환(클릭). 지우지 않는 조작: 포커스 이동(Tab · 화살표),
+// 포인터 이동 · hover, 스크롤, 캔버스 선택 변경(지우는 코드 없음), Toast 안의 조작, [—] 최소화 · 펼치기(§4.1b "남는 시간").
 function dismissStickyOnAction(e: Event): void {
-  if (!statusSticky) return;
+  const cur = currentToast();
+  if (!cur || !cur.sticky) return;
   const target = e.target as HTMLElement | null;
-  if (target && target.closest('#statusAction')) return; // 그 버튼 자체는 자기 일을 한다
+  if (target && target.closest('#toastHost, #btnMinimize, #btnExpand')) return;
   if (e.type === 'keydown') {
     const k = (e as KeyboardEvent).key;
     if (k === 'Tab' || k.startsWith('Arrow') || k === 'Shift' || k === 'Home' || k === 'End' || k === 'PageUp' || k === 'PageDown' || k === 'Escape') return;
-    // ⌘ · Ctrl · Alt(조합 키 시작 · 창 전환)은 조작이 아니다 — 누를 수 있는 메시지를 지우지 않는다(#110 검토 ⑤).
+    // ⌘ · Ctrl · Alt(조합 키 시작 · 창 전환)은 조작이 아니다 — 남는 알림을 지우지 않는다(#110 검토 ⑤).
     const ke = e as KeyboardEvent;
     if (k === 'Control' || k === 'Meta' || k === 'Alt' || k === 'AltGraph') return;
     // 조합 키와 함께여도 조작인 것: Enter(⌘ · Ctrl+Enter 실행) · Option · AltGr로 친 글자(AltGr은 Ctrl+Alt로 온다).
     const altText = k.length === 1 && ke.altKey && !ke.metaKey;
     if (k !== 'Enter' && !altText && (ke.ctrlKey || ke.metaKey || ke.altKey)) return;
   }
-  clearStatusLine();
+  cur.close();
 }
 document.addEventListener('pointerdown', dismissStickyOnAction, true);
 document.addEventListener('keydown', dismissStickyOnAction, true);
 
 /** 유료 잠금 사유(§2.3) — [라이선스 →]는 설정 › 라이선스 키 입력칸으로. */
 function showPaidReason(): void {
-  showStatusLine(t('status.paid'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } });
+  notify(t('status.paid'), 'warning', { action: { label: t('status.paidAction'), run: goToLicense } });
 }
 function goToLicense(): void {
   showTab('settings');
@@ -4273,7 +4289,7 @@ function goToLicense(): void {
 /* ---------- 잠금(§2.3) — aria-disabled: 포커스는 받고, 누르면 동작 대신 사유 ---------- */
 type LockReason = 'paid' | 'prereq';
 /**
- * 버튼·체크박스 잠금. reason이 null이면 푼다. prereqMsg는 전제 미충족 사유(공통 상태 줄 문구).
+ * 버튼·체크박스 잠금. reason이 null이면 푼다. prereqMsg는 전제 미충족 사유(Toast 문구).
  * 그 화면의 사유(base)는 따로 기억하고, 대기 사유(setWait — 연결 중 · 다른 쓰기 작업 중)와 합쳐 건다.
  * 순서: 유료 → 대기 → 전제(§2 원칙 3 · §4.6 버튼 절).
  */
@@ -4305,7 +4321,7 @@ function applyLock(el: HTMLElement): void {
 }
 /**
  * 대기 잠금(§4.6 "연결 중의 다른 일") — msg가 있으면 걸고 툴팁 뒤에 " · {msg}"를 붙인다. null이면 푼다.
- * target이 있으면 누를 때 사유를 그 카드 상태 줄에, 없으면 공통 상태 줄에 띄운다.
+ * target이 있으면 누를 때 사유를 그 카드 상태 줄에, 없으면 Toast에 띄운다.
  */
 function setWait(el: HTMLElement, msg: string | null, target = ''): void {
   const attr = el.hasAttribute('data-tip') ? 'data-tip' : 'title';
@@ -4347,11 +4363,11 @@ function onLockedActivate(e: Event): void {
   e.preventDefault();
   e.stopImmediatePropagation();
   if (e.type === 'click' || e.type === 'keydown') {
-    if (el.dataset.lock === 'paid' && el.dataset.paidMsg) showStatusLine(el.dataset.paidMsg, { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } });
+    if (el.dataset.lock === 'paid' && el.dataset.paidMsg) notify(el.dataset.paidMsg, 'warning', { action: { label: t('status.paidAction'), run: goToLicense } });
     else if (el.dataset.lock === 'paid') showPaidReason();
     else if (el.dataset.lock === 'edit') edLockedSave(); // 고치기 [저장] — 사유는 팝업 안 알림 줄에
     else if (el.dataset.wait && el.dataset.waitTarget) setStatus(el.dataset.waitTarget, el.dataset.wait, 'warn'); // 연결 카드 버튼 — 카드 상태 줄
-    else if (el.dataset.lockMsg) showStatusLine(el.dataset.lockMsg, { cls: 'warn' });
+    else if (el.dataset.lockMsg) notify(el.dataset.lockMsg, 'warning');
   }
 }
 document.addEventListener('click', onLockedActivate, true);
@@ -4364,7 +4380,7 @@ let isMini = false;
 let miniFailure: { label: string; go: () => void } | null = null;
 let miniOkTimer: ReturnType<typeof setTimeout> | null = null;
 
-function setMini(on: boolean, notify = true): void {
+function setMini(on: boolean, tellCode = true): void {
   if (on === isMini) return;
   isMini = on;
   if (on) {
@@ -4375,18 +4391,18 @@ function setMini(on: boolean, notify = true): void {
   }
   document.body.classList.toggle('is-mini', on);
   $('miniView').hidden = !on;
-  if (notify) send({ type: 'SET_UI_SIZE', mode: on ? 'mini' : 'default' });
+  if (tellCode) send({ type: 'SET_UI_SIZE', mode: on ? 'mini' : 'default' });
   if (on) {
     renderMiniMark();
     ($('btnExpand') as HTMLButtonElement).focus();
     return;
   }
-  // 펼칠 때: ⚠가 있었으면 상태 줄에 "{작업} 실패 · [보기]". 보던 화면 유지, 포커스는 [—], 다시 읽기 1번.
+  // 펼칠 때: ⚠가 있었으면 Toast로 "{작업} 실패 · [보기]". 보던 화면 유지, 포커스는 [—], 다시 읽기 1번.
   const fail = miniFailure;
   miniFailure = null;
   if (miniOkTimer) { clearTimeout(miniOkTimer); miniOkTimer = null; }
   $('miniBadge').hidden = true;
-  if (fail) showStatusLine(t('status.failed', { op: fail.label }), { cls: 'warn', action: { label: t('status.view'), run: fail.go } });
+  if (fail) notify(t('status.failed', { op: fail.label }), 'error', { action: { label: t('status.view'), run: fail.go } });
   syncStickyOffsets();
   ($('btnMinimize') as HTMLButtonElement).focus();
   readScreen('expand');
@@ -4462,7 +4478,7 @@ let opWizard = false;
 /* ---------- 연결 중 잠금(§4.6 "연결 중의 다른 일") ----------
    연결 중에는 쓰기 작업 버튼을 aria-disabled로 두고 사유 bind.waitLink를 띄운다.
    반대로 다른 쓰기 작업 중에는 [🔗 연결]을 bind.waitOp로 잠근다. 읽기 요청(write: false)은 막지 않는다. */
-/** OPS write: true 요청의 버튼 + 마법사 [전체 실행] — 사유는 공통 상태 줄. */
+/** OPS write: true 요청의 버튼 + 마법사 [전체 실행] — 사유는 Toast. */
 const WAIT_LINK_IDS = [
   'btnCreate', 'btnCreateApply', 'btnColorVars', // CREATE_TOKENS
   'btnSemantics', // CREATE_SEMANTICS
@@ -4705,6 +4721,7 @@ function showTab(name: TabName): void {
     readScreen('enter');
   }
   renderSelHome();
+  if (currentToast()) judgeToastSpace(); // 탭이 바뀌면 비우는 자리를 다시 판정(§4.1b "자리")
 }
 
 /** 선택 탭 하위 화면 전환(§2.1). 탭은 바꾸지 않는다(부르는 쪽이 showTab). */
@@ -4797,6 +4814,7 @@ function subBack(): void {
   }
   showSelSub('home');
   // 연 버튼(할 일 줄은 다시 그려져도 같은 동작 키 — 연결 todo-link · 만들기 todo-make · 이름 정리 todo-rename), 없으면 할 일 줄 첫 칸(§4.1b).
+  if (currentToast()) judgeToastSpace(); // 하위 화면이 바뀌면 비우는 자리를 다시 판정(§4.1b "자리")
   const key = subOpener?.dataset.k;
   const byKey = key ? $('selCards').querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`) : null;
   const target = byKey ?? (subOpener && document.body.contains(subOpener) && subOpener.offsetParent ? subOpener : null);
@@ -4845,7 +4863,7 @@ function showPick(step?: MakeStep, from: 'make' | 'vars' = 'vars'): void {
 }
 /** 변수 만들기 화면으로(§4.3) — 선택이 없으면 들어갈 수 없다. */
 function showMakeScreen(opener?: HTMLElement | null): void {
-  if (!(baseline ?? curSel)?.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
+  if (!(baseline ?? curSel)?.count) { notify(t('status.noSelection'), 'warning'); return; }
   showTab('select');
   showSelSub('make', opener ?? (document.activeElement as HTMLElement | null));
 }
@@ -5941,17 +5959,17 @@ function writeLockReason(): string | null {
 }
 function applyVar(v: VarRow, target?: ApplyTarget): void {
   const lock = writeLockReason();
-  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
-  if (!curSel.count) { showStatusLine(t('status.noSelection'), { cls: 'warn' }); return; }
-  if (!target && varKind(v) === 'other') { showStatusLine(t('apply.otherKind'), { cls: 'warn' }); return; }
+  if (lock) { notify(lock, 'warning'); return; }
+  if (!curSel.count) { notify(t('status.noSelection'), 'warning'); return; }
+  if (!target && varKind(v) === 'other') { notify(t('apply.otherKind'), 'warning'); return; }
   applyVarReq = ++bindReqSeq;
   send({ type: 'APPLY_VARIABLE', reqId: applyVarReq, id: v.id, ...(target ? { target } : {}) });
 }
 function onVariableApplied(msg: Extract<CodeToUi, { type: 'VARIABLE_APPLIED' }>): void {
   if (msg.reqId !== applyVarReq) return;
   const tip = Object.entries(msg.skipReasons).filter(([, n]) => n > 0).map(([k, n]) => `${t('apply.reason.' + k)} ${n}`).join(' · ');
-  if (!msg.applied) { showStatusLine(t('apply.none', { name: msg.name }), { cls: 'warn', tip }); return; }
-  showStatusLine(t('apply.done', { n: msg.applied, name: msg.name }) + (msg.skipped ? t('apply.skipped', { m: msg.skipped }) : '') + t('apply.undo'), { cls: msg.skipped ? 'warn' : 'ok', tip });
+  if (!msg.applied) { notify(t('apply.none', { name: msg.name }), 'warning', { tip }); return; }
+  notify(t('apply.done', { n: msg.applied, name: msg.name }) + (msg.skipped ? t('apply.skipped', { m: msg.skipped }) : '') + t('apply.undo'), msg.skipped ? 'warning' : 'success', { tip });
 }
 
 /* ---------- 행 메뉴(§4.6 우클릭) ---------- */
@@ -6318,7 +6336,7 @@ function edEdited(): void {
 /** 잠긴 [저장]을 눌렀다 — 사유는 팝업 안 알림 줄에(상태 줄은 팝업 뒤에 가려진다). */
 function edLockedSave(): void {
   const e = ed;
-  if (e?.create?.paidLocked) { edPaidPing(e); return; } // 유료 잠금 — 공통 상태 줄이 아니라 팝업 안 사유 줄(§4.9 F2)
+  if (e?.create?.paidLocked) { edPaidPing(e); return; } // 유료 잠금 — Toast이 아니라 팝업 안 사유 줄(§4.9 F2)
   if (!e || e.saving || e.sticky) return; // 저장 중 · 남는 상태 문구는 그대로
   const st = edState(e);
   if (bindLinking) e.event = { text: t('bind.waitLink'), err: false }; // 연결 중(§4.6 "연결 중의 다른 일")
@@ -6877,8 +6895,8 @@ function edAfterClose(e: Editor): HTMLElement {
   const { el: target, present } = focusAfterDetail(e.v.id);
   if (e.appliedAny) {
     const name = vmVars.find((x) => x.id === e.v.id)?.name ?? e.v.name;
-    if (e.lastPartial) showStatusLine(present ? t('edit.partial') : t('edit.closedPartialMissing', { name }), { cls: 'warn' });
-    else if (!present) showStatusLine(t('edit.closedMissing', { name }));
+    if (e.lastPartial) notify(present ? t('edit.partial') : t('edit.closedPartialMissing', { name }), 'warning');
+    else if (!present) notify(t('edit.closedMissing', { name }), 'info');
   }
   return target;
 }
@@ -7052,7 +7070,7 @@ function edGoTarget(targetId: string): void {
 /** 변수 탭의 그 변수로 이동 + 상태 줄 [← 되돌리기](§4.8). */
 function varJump(id: string): void {
   const v = vmVars.find((x) => x.id === id);
-  if (!v) { showStatusLine(t('list.libVar')); return; }
+  if (!v) { notify(t('list.libVar'), 'info'); return; }
   // 상세는 변수 탭에서만 열린다(§4.8).
   const undo = { sel: sideSel, userPick: sideUserPick, collapsed: new Set(grpCollapsed), query, scroll: window.scrollY, focusKey };
   showTab('variables');
@@ -7070,7 +7088,7 @@ function varJump(id: string): void {
     item.scrollIntoView({ block: 'center' });
     item.focus({ preventScroll: true });
   }
-  showStatusLine(t('list.jumped', { name: v.name }), {
+  notify(t('list.jumped', { name: v.name }), 'info', {
     action: {
       label: t('list.undo'),
       run: () => {
@@ -7243,16 +7261,16 @@ function onVariableCreated(msg: Extract<CodeToUi, { type: 'VARIABLE_CREATED' }>)
   afterTable = { focus: `v:${msg.id}`, pick: true };
   e.create.opener = null;
   closeModal();
-  showStatusLine(t('newVar.created'), { cls: 'ok' });
+  notify(t('newVar.created'), 'success');
 }
 
 /* ---------- 복제 · 삭제(§4.9) ---------- */
 let dupReq = 0;
 function duplicateVar(v: VarRow): void {
   const paid = dupPaidReason(v);
-  if (paid) { showStatusLine(paid, { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } }); return; }
+  if (paid) { notify(paid, 'warning', { action: { label: t('status.paidAction'), run: goToLicense } }); return; }
   const lock = writeLockReason();
-  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
+  if (lock) { notify(lock, 'warning'); return; }
   dupReq = ++bindReqSeq;
   send({ type: 'DUPLICATE_VARIABLE', reqId: dupReq, id: v.id });
 }
@@ -7263,7 +7281,7 @@ function onVariableDuplicated(msg: Extract<CodeToUi, { type: 'VARIABLE_DUPLICATE
 let delReq = 0;
 function confirmDeleteVar(v: VarRow, el: HTMLElement): void {
   const lock = writeLockReason();
-  if (lock) { showStatusLine(lock, { cls: 'warn' }); return; }
+  if (lock) { notify(lock, 'warning'); return; }
   // {m} — 이 변수를 가리키는 로컬 변수(모든 모드의 별칭 대상).
   const m = vmVars.filter((x) => x.id !== v.id && Object.values(x.values).some((c) => c?.kind === 'alias' && c.aliasId === v.id)).length;
   // 지운 뒤 포커스 — 같은 그룹의 다음 항목, 없으면 이전, 그것도 없으면 그룹 머리.
@@ -7299,7 +7317,7 @@ function confirmDeleteVar(v: VarRow, el: HTMLElement): void {
 }
 function onVariableDeleted(msg: Extract<CodeToUi, { type: 'VARIABLE_DELETED' }>): void {
   if (msg.reqId !== delReq) return;
-  showStatusLine(t('del.done'), { cls: 'ok' });
+  notify(t('del.done'), 'success');
 }
 /** 새 변수 · 복제 · 삭제 · 클릭 연결의 ERROR(§4.9) — code로 문구를 정한다. */
 function onVarOpError(msg: Extract<CodeToUi, { type: 'ERROR' }>): boolean {
@@ -7312,17 +7330,17 @@ function onVarOpError(msg: Extract<CodeToUi, { type: 'ERROR' }>): boolean {
     return true;
   }
   if (msg.op === 'DUPLICATE_VARIABLE' && msg.reqId === dupReq) {
-    if (msg.code === 'paid') showStatusLine(t('paid.semantic'), { cls: 'warn', action: { label: t('status.paidAction'), run: goToLicense } });
-    else showStatusLine(msg.code === 'deleted' ? t('edit.deleted') : t('newVar.dupFailed'), { cls: 'warn', tip: msg.message });
+    if (msg.code === 'paid') notify(t('paid.semantic'), 'warning', { action: { label: t('status.paidAction'), run: goToLicense } });
+    else notify(msg.code === 'deleted' ? t('edit.deleted') : t('newVar.dupFailed'), 'error', { tip: msg.message });
     return true;
   }
   if (msg.op === 'DELETE_VARIABLE' && msg.reqId === delReq) {
     afterTable = null;
-    showStatusLine(msg.code === 'deleted' ? t('edit.deleted') : t('del.failed'), { cls: 'warn', tip: msg.message });
+    notify(msg.code === 'deleted' ? t('edit.deleted') : t('del.failed'), 'error', { tip: msg.message });
     return true;
   }
   if (msg.op === 'APPLY_VARIABLE' && msg.reqId === applyVarReq) {
-    showStatusLine(msg.code === 'deleted' ? t('edit.deleted') : t('apply.failed'), { cls: 'warn', tip: msg.message });
+    notify(msg.code === 'deleted' ? t('edit.deleted') : t('apply.failed'), 'error', { tip: msg.message });
     return true;
   }
   return false;
@@ -8038,9 +8056,9 @@ function onDeletedUnbound(msg: Extract<CodeToUi, { type: 'DELETED_UNBOUND' }>): 
   unbindReq = 0;
   let text = t('v4.unbound', { k: msg.unbound });
   if (msg.failed) text += t('v4.unboundFailed', { m: msg.failed });
-  showStatusLine(text, { cls: msg.failed ? 'warn' : 'ok' });
   const tip = Object.entries(msg.failReasons).map(([k, n]) => `${t('v4.unbindFail.' + k)} ${n}`).join(' · ');
-  if (tip) $('statusText').title = tip;
+  // tone(§4.1b 표 37): 못 풂 0 success / 못 풂 > 0 — 푼 수 > 0 warning · 0 error.
+  notify(text, msg.failed ? (msg.unbound ? 'warning' : 'error') : 'success', tip ? { tip } : {});
   // 카드가 사라지면 포커스는 할 일 줄 첫 칸(§4.1b "포커스").
   if (document.activeElement === document.body || !document.activeElement?.isConnected) selFallbackFocus(true).focus();
   queueMicrotask(() => { if (!$('selCards').contains(document.activeElement)) selFallbackFocus(true).focus(); });
