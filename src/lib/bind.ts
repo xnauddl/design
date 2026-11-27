@@ -4,26 +4,24 @@
      새 Semantic 역할을 만들어(같은 값 Global의 별칭) 붙인다. 이미 붙은 연결은 바꾸지도 풀지도 않는다(§2.12 12.8).
    - 프레임 크기(Fixed)·여백(오토레이아웃)·반경·효과·텍스트 지원.
    ============================================================ */
-import { rgbToHex, colorKey, roundAlpha, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
-import { collectionTiers, ensureOwnedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
+import { rgbToHex, colorKey, roundAlpha, numberTokenName, scopeForSemanticRole, scopesForType, type ScopeName, type ResolvedType } from './tokens';
+import { collectionTiers, ensureOwnedCollection, ownedCollections, pluginGlobalNames } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13 — 이름 차지 · 배지에만, 후보 고르기에는 쓰지 않는다 ia-v4 §2.9 S2-P4)
+import { round2, sameNumber, splitPlaces, userRadiusKeys, valueKeyOf, type CandidatePick, type MakeValue, type SplitPlace, type VarInfo } from './sameValue'; // 같은 값 · 후보 고르기 · 자리 가르기(ia-v4 §2.9 S2-P1)
 import { FIELD_SCOPE, STROKE_SCOPES, EFFECT_SCOPES, fillScopesFor } from './scopes'; // 용도 규칙
 import type { BindCandidate, BindNode, BindSkip, MainUnitInfo, NewRoleRef } from '../shared/messages';
 import { backgroundOf, gapSkip, isIconOrAvatar, inAutoLayoutFlow, iconOrAvatarKind, isInsideIconFrame } from './extract'; // 쓰지 않는 간격 판정(사이 간격 자동 · 줄바꿈 아님) · 크기 대상 판정(아이콘 · 아바타 · 오토레이아웃 흐름) — 만들기와 같은 기준
 import { ROLE_KEY, isKnownRole } from './naming';
+import { MANUAL_KEY } from './varKind'; // 직접 만든 변수 표시(§4.9) — variables.ts를 가져오면 순환 참조라 키를 직접 읽는다
 import { fieldKind, type ReasonCounts } from './selCards'; // 카드 숫자 — 속성 → 종류(IA v4 §4.1)
 import {
   AUTO_ROLE_KEY,
   assignNames,
   bgKindOf,
-  byFamilyOrder,
   colorRoleBases,
   colorRoleRef,
   colorSlotKey,
   colorUse,
   composeName,
-  familyRe,
-  isOldPluginName,
-  nameKindOf,
   paddingProp,
   pickOwner,
   pillCorners,
@@ -41,19 +39,12 @@ import {
 
 interface VarEntry {
   variable: Variable;
-  tier: number; // Component 3 > Semantic 2 > Global 1
-  /** Global과 같은 이름의 Semantic 거울(예전 createTokens의 1:1 미러) — 역할로 치지 않는다(§2.12 12.7). */
-  mirror?: boolean;
-  /** 플러그인이 만든 쓰임 역할(`dsl.autoRole`) — 순서 3 "디자이너가 만든 것"에서 뺀다. */
-  auto?: boolean;
+  /** 같은 값 · 후보 판정에 쓰는 요약(`sameValue.ts` — ia-v4 §2.9). */
+  info: VarInfo;
+  /** 컬렉션 계층(Component 3 > Semantic 2 > Global 1, 0 = 계층 아님) — 후보 배지 · 새 역할 이름 차지에만 쓴다(후보를 고르지 않는다). */
+  tier: number;
   type: VariableResolvedDataType;
   scopes: readonly VariableScope[]; // 용도 스코프 — 필드와 안 맞는 변수 오매칭 차단
-  /** 사용자 컬렉션의 변수인가(§2.13 — 같은 이름이면 사용자 것 먼저). */
-  user: boolean;
-  /** 컬렉션 목록 순서(같은 이름 · 같은 사용자 여부일 때). */
-  colIdx: number;
-  /** 기본 모드 값이 직접 값인가 — Global 계층의 별칭 변수는 새 역할의 별칭 대상이 아니다(13.3 · 13.5). */
-  direct: boolean;
   colorHex?: string;
   /** 색 변수 값의 투명도(소수 둘째 자리, `a` 없으면 1). */
   colorAlpha?: number;
@@ -64,13 +55,9 @@ interface VarEntry {
 }
 
 /**
- * "같은 값"(IA v3 §2.11) — 숫자는 소수 둘째 자리까지 같으면 같다(화면에 보이는 값).
- * 허용오차는 없앴다: 레이어 값을 바꾸는 연결은 하지 않는다.
+ * "같은 값"(IA v4 §2.9 S2-P2) — 숫자는 소수 둘째 자리까지 같으면 같다. 판정은 `sameValue.ts`에 있고 여기서는 다시 내보낸다.
  */
-export const round2 = (n: number): number => Math.round(n * 100) / 100;
-export function sameNumber(a: number, b: number): boolean {
-  return round2(a) === round2(b);
-}
+export { round2, sameNumber };
 
 export interface BindResult {
   bound: number;
@@ -95,6 +82,8 @@ export interface BindResult {
   mains?: MainUnitInfo[];
   /** 적용 모드 — 실제로 붙인 자리가 있는 메인 단위 id. */
   mainsBound?: string[];
+  /** 새로 만들 값(ia-v4 §2.9 S2-P7) — 후보가 없고 만들 수 있는 값(글자 종류 제외), 값 단위. 카드의 n · q는 이 목록에서만 나온다. */
+  make?: MakeValue[];
 }
 
 /**
@@ -293,7 +282,7 @@ export function colorState(
  * `boundVariables[field]`는 구간들에 붙은 별칭 배열이다. 그게 비어 있는 환경을 위해
  * 전 구간 조회(`getRangeBoundVariable`)도 본다(mixed = 일부 구간 연결).
  */
-function textFieldState(node: TextNode, field: VariableBindableTextField): SlotState {
+export function textFieldState(node: TextNode, field: VariableBindableTextField): SlotState {
   const fromBv = nodeFieldState(node, field);
   if (fromBv !== 'none') return fromBv;
   const len = node.characters.length;
@@ -309,7 +298,7 @@ function textFieldState(node: TextNode, field: VariableBindableTextField): SlotS
 }
 
 /** 스타일이 붙어 있는가(빈 문자열 = 없음, mixed = 일부 구간에 있음 → 붙은 것으로). */
-function hasStyleId(node: SceneNode, key: 'fillStyleId' | 'strokeStyleId' | 'effectStyleId' | 'textStyleId'): boolean {
+export function hasStyleId(node: SceneNode, key: 'fillStyleId' | 'strokeStyleId' | 'effectStyleId' | 'textStyleId'): boolean {
   const v = (node as unknown as Record<string, unknown>)[key];
   if (v === figma.mixed) return true;
   return typeof v === 'string' && v !== '';
@@ -462,7 +451,7 @@ function countNodes(sel: readonly SceneNode[], units: readonly MainUnit[] = []):
  * 인스턴스 루트 자신의 자리 값이 메인(쓰는 변형) 루트의 같은 자리 값과 같은가(§2.11 11번 "인스턴스 루트 자신의 속성").
  * 같으면 메인을 따르는 값이라 후보 · 자리 단위 사유를 만들지 않는다. index가 없으면 그 속성 전체를 본다.
  */
-function sameAsMain(inst: SceneNode, main: SceneNode, field: string, index?: number): boolean {
+export function sameAsMain(inst: SceneNode, main: SceneNode, field: string, index?: number): boolean {
   const a = (inst as unknown as Record<string, unknown>)[field];
   const b = (main as unknown as Record<string, unknown>)[field];
   if (a === undefined && b === undefined) return false;
@@ -507,10 +496,39 @@ export interface BindOptions {
    */
   skipTextStyleNode?: (node: TextNode) => boolean;
   /**
-   * 무료 자동 연결(IA v4 §2.3-7 · F6) — 새 Semantic(보는 순서 4)을 만들지 않는다. 맞는 Semantic(1 → 3 → 2)이
-   * 없는 자리는 새 Semantic이 가리켰을 Global(`globalFor`)에 바로 붙인다(그런 Global도 없으면 지금처럼 건너뜀).
+   * 무료 자동 연결(IA v4 §2.3-7 · F6 · §2.9 S2-P6) — 새 Semantic을 만들지 않는다. 고른 것이 원시값 변수면 그 변수에 바로 붙인다
+   * (별칭이면 유료와 같다. 후보가 없으면 건너뜀).
    */
   noNewRoles?: boolean;
+  /**
+   * 만들기 실행의 연결 단계(IA v4 §4.3 "B.35 뒤 연결 단계" ①) — 켠 줄의 값 · 용도 묶음에 맞는 자리만 붙인다.
+   * 맞지 않는 자리는 붙이지 않는다 — 그 가운데 `off`와 맞는 자리만 사유 수에 `make-off`로 센다(B.36). 없으면 거르지 않는다(연결 화면 · 찾기).
+   */
+  only?: readonly OnlyItem[];
+  /**
+   * 꺼진 줄의 값(IA v4 §4.3 B.36 — 모양은 `only`와 같음). `only`가 버린 자리 가운데 이것과 맞는 자리만 `reasons['make-off']`로 센다
+   * (`skipped` · `skips` · `skipLayers` · `counts`에는 넣지 않는다). 켠 줄의 ②로 빠진 묶음 · 줄 없는 값의 자리는 세지 않는다.
+   */
+  off?: readonly OnlyItem[];
+}
+
+/** 연결 거름 항목 — 값(색 hex · 숫자 · 글꼴 이름) · 색 투명도 · 허용 용도 묶음 키(스코프를 `|`로 이은 것). */
+export interface OnlyItem {
+  value: string | number;
+  alpha?: number;
+  groups: readonly string[];
+}
+
+/** 자리가 거름 항목 중 하나와 맞는가(§4.3 B.35 ① — 자리의 값으로 견준다: 알약으로 판정된 자리는 9999. 묶음 키는 `allowed.join('|')`). */
+function onlyMatch(only: readonly OnlyItem[], s: Slot): boolean {
+  const key = s.allowed.join('|');
+  const v = slotKey(s);
+  return only.some((it) => {
+    if (!it.groups.includes(key)) return false;
+    if (s.kind === 'color') return typeof it.value === 'string' && valueKeyOf('color', it.value, it.alpha) === v;
+    if (typeof s.value === 'number') return typeof it.value === 'number' && valueKeyOf('num', it.value) === v;
+    return it.value === s.value;
+  });
 }
 
 /** 이름 정리가 남긴 역할(`dsRole`) — 어휘 안 · 구조 폴백이 아니면(§2.12 12.3 ①). 텍스트 스타일 label 판정(`inUiRole`)이 쓴다. */
@@ -572,13 +590,25 @@ export async function bindSelection(
   }
   ctx.mainId = undefined;
   if (mains.units.length) res.mains = mains.units.map((u) => ({ id: u.id, name: u.name, page: u.page }));
+  if (opts.only) {
+    // 만들기 연결 단계 — 켠 줄만(§4.3 B.35 ①). 버린 자리 중 꺼진 줄의 값만 make-off로 센다(B.36 — 0곳 사유 "남은 곳은 끈 값")
+    const only = opts.only;
+    const off = opts.off ?? [];
+    let offN = 0;
+    ctx.slots = ctx.slots.filter((s) => {
+      if (onlyMatch(only, s)) return true;
+      if (off.length && onlyMatch(off, s)) offN++;
+      return false;
+    });
+    if (offN) res.reasons['make-off'] = (res.reasons['make-off'] ?? 0) + offN;
+  }
   resolveSlots(ctx); // 자리마다 붙일 변수(또는 새 역할)를 고른다 — 색 밝기 · 번호는 찾기 전체를 보고 정한다(§2.12)
   if (apply && preview.candidates.length) {
     // 적용 모드도 같은 규칙 — 찾은 후보를 연결 경로(bindSelectedItems)로 붙인다(§2.12 12.9).
     const known = new Map<string, SceneNode>();
     for (const s of ctx.slots) known.set(s.node.id, s.node);
     const r = await bindSelectedItems(
-      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}) })),
+      preview.candidates.map((c) => ({ nodeId: c.nodeId, field: c.field, index: c.index, variableId: c.variableId, newRole: c.newRole, ...(c.mainId ? { mainId: c.mainId } : {}), ...(c.pillFrom != null ? { pillFrom: c.pillFrom } : {}), ...(c.scopeAdd ? { scopeAdd: c.scopeAdd } : {}) })),
       {},
       known, // 찾기에서 본 레이어 그대로(다시 찾지 않는다)
     );
@@ -607,50 +637,117 @@ export async function bindSelection(
   return res;
 }
 
-/* ---------- 변수 인덱스(resolved 값 + tier) ---------- */
+/* ---------- 변수 읽기(같은 값 판정의 입력 — ia-v4 §2.9 S2-P2 · S2-P4) ---------- */
+
+/** 로컬 변수 전부를 한 번 읽은 것 — 찾기 색인 · 추출의 알약 판정 집합 · 만들기의 재사용이 같은 읽기를 쓴다. */
+export interface VarRead {
+  cols: VariableCollection[];
+  vars: Variable[];
+  /** 로컬 변수마다 하나(값을 못 읽는 변수는 `key: null`). */
+  infos: VarInfo[];
+  byId: Map<string, Variable>;
+  infoById: Map<string, VarInfo>;
+  /** 변수 id → 기본 모드에서 별칭을 끝까지 따라간 값(못 읽으면 없음). */
+  valueOf: Map<string, VariableValue>;
+}
+
+/** 변수의 값 키 — 색(hex + 투명도) · 숫자(소수 둘째 자리) · 글꼴. 그 밖(불리언 · 못 읽음)은 null. */
+function keyOfValue(type: VariableResolvedDataType, val: VariableValue | undefined): string | null {
+  if (val == null) return null;
+  if (type === 'COLOR') return isRGB(val) ? valueKeyOf('color', rgbToHex(val), roundAlpha((val as RGBA).a)) : null;
+  if (type === 'FLOAT') return typeof val === 'number' ? valueKeyOf('num', val) : null;
+  if (type === 'STRING') return typeof val === 'string' ? valueKeyOf('text', val) : null;
+  return null;
+}
+
+/**
+ * 로컬 변수를 읽어 `VarInfo`로 만든다. 값은 컬렉션마다 기본 모드만 읽고 별칭을 끝까지 따라간다 — 12홉 안에 직접 값에 닿지 않거나
+ * 대상이 로컬 변수가 아니면(라이브러리 · 삭제된 변수) 값을 모르는 변수다(후보가 아니다).
+ * 컬렉션의 계층 판정(`tiers.ts`)은 쓰지 않는다 — 갈래는 플러그인 Global · 플러그인 Semantic · 그 밖(사용자) 셋뿐이다.
+ */
+export async function readVarInfos(): Promise<VarRead> {
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
+  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
+  const owned = ownedCollections(cols);
+  const gId = owned.global?.id;
+  const sId = owned.semantic?.id;
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const globalNames = pluginGlobalNames(cols, vars);
+  const infos: VarInfo[] = [];
+  const valueOf = new Map<string, VariableValue>();
+  for (const v of vars) {
+    let cur: Variable | undefined = v;
+    let hops = 0;
+    let val: VariableValue | undefined;
+    let rawId: string | undefined;
+    for (let i = 0; i < 12 && cur; i++) {
+      const mode = modeOf.get(cur.variableCollectionId);
+      const x: VariableValue | undefined = mode ? cur.valuesByMode[mode] : undefined;
+      if (isAlias(x)) {
+        cur = byId.get((x as VariableAlias).id);
+        hops++;
+      } else {
+        val = x;
+        rawId = cur.id;
+        break;
+      }
+    }
+    const key = keyOfValue(v.resolvedType, val);
+    if (val != null) valueOf.set(v.id, val);
+    const collection = v.variableCollectionId === gId ? 'pluginGlobal' : v.variableCollectionId === sId ? 'pluginSemantic' : 'user';
+    infos.push({
+      id: v.id,
+      name: v.name,
+      type: v.resolvedType,
+      key,
+      scopes: (v.scopes ?? ['ALL_SCOPES']) as string[],
+      hops,
+      collection,
+      autoRole: readFlag(v, AUTO_ROLE_KEY),
+      manual: collection === 'pluginGlobal' && readFlag(v, MANUAL_KEY),
+      // 거울(12.7) — 플러그인 Global 컬렉션 밖의 별칭 변수가 플러그인 Global 컬렉션의 변수와 이름이 같음(ia-v4 §2.9 S2-P4 "뺀다")
+      mirror: hops > 0 && collection !== 'pluginGlobal' && globalNames.has(v.name),
+      user: collection === 'user',
+      colIdx: colIdx.get(v.variableCollectionId) ?? 0,
+      ...(key != null && rawId ? { rawId } : {}),
+    });
+  }
+  return { cols, vars, infos, byId, infoById: new Map(infos.map((i) => [i.id, i])), valueOf };
+}
+
+/* ---------- 찾기 색인 ---------- */
 interface VarIndexAll {
+  /** 값을 아는 로컬 변수 전부(S2-P4 — 계층으로 넣거나 빼지 않는다). */
   entries: VarEntry[];
+  /** 같은 값 판정에 넘기는 목록(entries의 info). */
+  infos: VarInfo[];
   /** Semantic(계층 2) 이름 → 값 키(값을 못 읽으면 '') — 새 역할 번호가 이미 있는 이름을 피하게. */
   semNames: Map<string, string[]>;
   byId: Map<string, VarEntry>;
+  /** 알약 반경 판정 집합(S2-P2 — `userRadiusKeys`). */
+  radiusKeys: Set<string>;
 }
 
 async function buildIndex(): Promise<VarIndexAll> {
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-  const vars = await figma.variables.getLocalVariablesAsync();
-  const tierOf = collectionTiers(cols, vars);
-  const owned = ownedIds(cols);
-  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-  // 예전 파일에 남은 Semantic 거울(Global과 같은 이름) — 역할로 치지 않는다(§2.12 12.7).
-  const globalNames = new Set(vars.filter((v) => tierOf.get(v.variableCollectionId) === 1).map((v) => v.name));
+  const read = await readVarInfos();
+  const tierOf = collectionTiers(read.cols, read.vars);
   const entries: VarEntry[] = [];
-  // Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음 — 같은 이름이 여러 컬렉션에 있으면 값을 모은다(13.5).
+  // Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음 — 같은 이름이 여러 컬렉션에 있으면 값을 모은다(13.5). 이름 짓기에만 쓴다.
   const semNames = new Map<string, string[]>();
   const addSem = (name: string, key: string): void => {
     const arr = semNames.get(name);
     if (!arr) semNames.set(name, key ? [key] : []);
     else if (key && !arr.includes(key)) arr.push(key);
   };
-  for (const v of vars) {
+  for (const info of read.infos) {
+    const v = read.byId.get(info.id) as Variable;
     const tier = tierOf.get(v.variableCollectionId) ?? 0;
-    if (tier < 1) continue; // Global/Semantic/Component 3계층만(다른 컬렉션 제외)
-    const val = await resolveValue(v, modeOf);
     if (tier === 2) addSem(v.name, '');
-    if (val == null) continue;
-    const raw = v.valuesByMode[modeOf.get(v.variableCollectionId) ?? ''];
-    const direct = !(raw && typeof raw === 'object' && 'type' in raw && (raw as VariableAlias).type === 'VARIABLE_ALIAS');
-    const e: VarEntry = {
-      variable: v,
-      tier,
-      type: v.resolvedType,
-      scopes: v.scopes ?? ['ALL_SCOPES'],
-      user: !owned.has(v.variableCollectionId),
-      colIdx: colIdx.get(v.variableCollectionId) ?? 0,
-      direct,
-    };
-    if (tier === 2 && globalNames.has(v.name)) e.mirror = true;
-    if (tier === 2 && readAutoRole(v)) e.auto = true;
+    const val = read.valueOf.get(v.id);
+    if (info.key == null || val == null) continue;
+    const e: VarEntry = { variable: v, info, tier, type: v.resolvedType, scopes: v.scopes ?? ['ALL_SCOPES'] };
     // 색 변수는 투명도도 함께 색인한다(§2.11 "색") — 투명도까지 같은 칠하기 · 그림자에만 붙인다.
     if (v.resolvedType === 'COLOR' && isRGB(val)) {
       e.colorHex = rgbToHex(val);
@@ -661,16 +758,15 @@ async function buildIndex(): Promise<VarIndexAll> {
     if (tier === 2) addSem(v.name, entryKey(e));
     entries.push(e);
   }
-  // 높은 tier 우선(Component의 "지금 순서"는 이 정렬 안의 피그마 순서).
-  entries.sort((a, b) => b.tier - a.tier);
-  return { entries, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])) };
+  const infos = entries.map((e) => e.info);
+  return { entries, infos, semNames, byId: new Map(entries.map((e) => [e.variable.id, e])), radiusKeys: userRadiusKeys(infos) };
 }
 
-/** 변수에 플러그인 표시(`dsl.autoRole`)가 있나 — 목 변수는 API가 없을 수 있다. */
-function readAutoRole(v: Variable): boolean {
+/** 변수의 플러그인 표시(값 '1')를 읽는다 — 목 변수는 API가 없을 수 있다. */
+function readFlag(v: Variable, key: string): boolean {
   const fn = (v as unknown as { getPluginData?: (k: string) => string }).getPluginData;
   try {
-    return typeof fn === 'function' && fn.call(v, AUTO_ROLE_KEY) === '1';
+    return typeof fn === 'function' && fn.call(v, key) === '1';
   } catch {
     return false;
   }
@@ -714,6 +810,27 @@ function scopeOk(scopes: readonly VariableScope[], allowed: readonly VariableSco
   return scopes.includes('ALL_SCOPES') || allowed.some((s) => scopes.includes(s));
 }
 
+/** 개별 칠 용도 — `ALL_FILLS`가 모두 담는다. */
+const PART_FILLS: readonly string[] = ['FRAME_FILL', 'SHAPE_FILL', 'TEXT_FILL'];
+
+/**
+ * 용도 합치기(ia-v4 §2.3-7 · ia-v3 12.11) — 이미 있거나 `ALL_SCOPES`면 그대로, `ALL_FILLS`가 들어가면 개별 칠 용도는 뺀다.
+ * 타입에 맞지 않는 용도는 버린다(`scopesForType`).
+ */
+export function mergeScopes(current: readonly string[], add: readonly string[], type: ResolvedType): ScopeName[] {
+  if (current.includes('ALL_SCOPES')) return [...current] as ScopeName[];
+  const set = new Set<string>([...current, ...add]);
+  if (set.has('ALL_FILLS')) for (const p of PART_FILLS) set.delete(p);
+  return scopesForType([...set] as ScopeName[], type);
+}
+
+/** 변수에 용도 하나를 더한다(바뀔 때만 쓴다). */
+function addVariableScope(v: Variable, scope: VariableScope): void {
+  const cur = (v.scopes ?? ['ALL_SCOPES']) as string[];
+  if (cur.includes('ALL_SCOPES') || cur.includes(scope)) return;
+  v.scopes = mergeScopes(cur, [scope], v.resolvedType as ResolvedType) as VariableScope[];
+}
+
 /* ---------- 찾기: 자리 모으기 → 역할 고르기 (§2.12) ---------- */
 
 /** 연결할 자리 하나 — 값 · 용도 · 쓰임이 정해지면 resolveSlots가 변수(또는 새 역할)를 고른다. */
@@ -735,8 +852,8 @@ interface Slot {
   bg?: BgKind;
   /** 연결 후보가 없을 때의 사유 — 'drop'은 만들기가 뽑지 않는 값이라 어디에도 세지 않는다(§4.1 k ①). */
   noMatchReason: string;
-  /** 알약 반경 자리(12.12 N-D5) — 순서 2 · 4 · 무료는 이 값(9999)으로 찾는다. 순서 1 · 3은 원래 값(`value`). */
-  pill?: number;
+  /** 알약으로 판정된 반경 자리(ia-v4 §2.9 S2-P2) — 찾을 때 읽은 원래 값. 자리의 값(`value`)은 9999 하나다. */
+  pillFrom?: number;
   /** 선택 밖 메인 단위 안 자리(§2.11 11번). */
   mainId?: string;
 }
@@ -746,7 +863,7 @@ const DROP = 'drop';
 /** 소수 = 소수 둘째 자리로 반올림해도 정수가 아님(extract round · onScale과 같은 판정, §4.1 k ②). */
 const isFrac = (v: number): boolean => Math.abs(v - Math.round(v)) >= 0.005;
 /** 정수만 만드는 숫자 자리의 실패 사유 — 0 이하는 버림, 소수는 fraction(s), 그 밖은 no-match(k). */
-const numReason = (v: number, dropAtOrBelowZero = true): string => (dropAtOrBelowZero && v <= 0 ? DROP : isFrac(v) ? 'fraction' : 'no-match');
+const numReason = (v: number): string => (round2(v) <= 0 ? DROP : isFrac(v) ? 'fraction' : 'no-match'); // 0 이하는 반올림한 값으로 본다(추출 `tokenable`과 같게 — B.39 6회차)
 
 interface Ctx {
   index: VarIndexAll;
@@ -766,165 +883,141 @@ interface Ctx {
   visited?: Set<string>;
 }
 
-/** 값 · 용도가 맞는 변수들(12.2 전제). `value`를 주면 그 값으로(알약 자리의 9999 — 12.12 N-D5). */
-function sameValueEntries(ctx: Ctx, s: Slot, value: number | string = s.value): VarEntry[] {
-  return ctx.index.entries.filter((e) => {
-    if (!scopeOk(e.scopes, s.allowed)) return false;
-    if (s.kind === 'color') return e.colorKey === value; // hex · 투명도 모두
-    if (typeof value === 'number') return e.num != null && sameNumber(e.num, value);
-    return e.str != null && e.str === value;
-  });
-}
-
 /** 이름 순 — 같은 이름이면 사용자 컬렉션 먼저, 그다음 컬렉션 목록 순(§2.13 13.5). */
 const byName = (a: VarEntry, b: VarEntry): number =>
-  a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.user) - Number(a.user) || a.colIdx - b.colIdx;
-/** 별칭 대상 Global 순서 — 사용자 컬렉션 먼저, 그 안에서 이름 순(13.5 ②). */
-const byUserThenName = (a: VarEntry, b: VarEntry): number => Number(b.user) - Number(a.user) || byName(a, b);
-/** 가족(12.5) 첫 번째 — 가족 순서, 같은 이름이면 13.5 순서. */
-const firstInFamily = (list: VarEntry[], base: string): VarEntry | undefined => {
-  const ord = byFamilyOrder(base);
-  return [...list].sort((a, b) => ord(a.variable.name, b.variable.name) || Number(b.user) - Number(a.user) || a.colIdx - b.colIdx)[0];
-};
+  a.variable.name < b.variable.name ? -1 : a.variable.name > b.variable.name ? 1 : Number(b.info.user) - Number(a.info.user) || a.info.colIdx - b.info.colIdx;
 
-/** 순서 1 → 3(디자이너 변수) — 숫자 · 색. 글자는 1만. */
-function pickDesigned(cands: VarEntry[], kind: Slot['kind']): VarEntry | null {
-  const comp = cands.find((e) => e.tier === 3);
-  if (comp) return comp;
-  if (kind === 'text') return null;
-  return cands.filter((e) => e.tier === 2 && !e.auto && !e.mirror && !isOldPluginName(e.variable.name)).sort(byName)[0] ?? null;
+/** 자리의 값 키(S2-P2). */
+const slotKey = (s: Slot): string => valueKeyOf(s.kind === 'color' ? 'color' : typeof s.value === 'number' ? 'num' : 'text', s.value);
+
+/** 숫자 자리 종류 → 토큰 그룹(만들기가 그 자리 값에 붙일 이름 `{그룹}/{값}` — 숫자 용도 예외, S2-P3 · SC-D34). */
+const TOKEN_GROUP: Record<string, string> = { gap: 'spacing', radius: 'radius', size: 'size', stroke: 'stroke-width', opacity: 'opacity' };
+
+type SlotPlace = SplitPlace & { slot: Slot };
+
+/** 자리 → 판정 입력(`sameValue.ts`). 색 자리의 쓰임 이름(`color/{쓰임}/{밝기}`)은 찾기 전체를 보고 정해 넘긴다. */
+function placeOf(s: Slot, colorBase?: string): SlotPlace {
+  const kind = fieldKind(s.field);
+  const type = s.kind === 'color' ? 'COLOR' : typeof s.value === 'number' ? 'FLOAT' : 'STRING';
+  const group = TOKEN_GROUP[kind];
+  const usage = s.kind === 'color' ? colorBase : s.usage;
+  return {
+    slot: s,
+    type,
+    key: slotKey(s),
+    allowed: s.allowed,
+    ...(usage ? { usage } : {}),
+    ...(s.kind === 'num' && group && typeof s.value === 'number' ? { tokenName: numberTokenName(group, round2(s.value)) } : {}),
+    ...(s.kind === 'text' ? { textGroup: s.usage.split('/')[0] } : {}),
+    // 새로 만들 값 — 후보가 없고 만들 수 있는 값(no-match)만. 글자 종류는 싣지 않는다(S2-P7).
+    ...(s.noMatchReason === 'no-match' && s.kind !== 'text'
+      ? { make: { kind, value: s.kind === 'color' ? s.display : round2(s.value as number), ...(s.alpha != null ? { alpha: s.alpha } : {}) } }
+      : {}),
+  };
 }
 
 interface Pending {
   slot: Slot;
   base: string;
-  global: VarEntry | null;
+  global: VarEntry;
   /** 색 사다리의 기준색(12.4 default — 12.5). */
   refHex?: string;
+  /** 용도 예외(S2-P3) — 연결할 때 가리킬 Global에 더할 용도. */
+  scopeAdd?: string;
 }
 
 /**
- * 자리마다 붙일 변수를 고른다(§2.12 12.2 보는 순서 1 → 3 → 2 → 4, 글자 1 → 2 → 4).
+ * 자리마다 붙일 변수를 고른다(IA v4 §2.9 S2-P3–S2-P7 — `sameValue.ts` `splitPlaces` 한 번).
+ * 별칭이면 그 변수에, 원시값이면 유료는 새 역할(그 변수를 가리킴) · 무료는 그 변수에 바로. 용도 예외면 후보에 `scopeAdd`를 싣는다.
  * 새 역할의 색 밝기 이름(12.4)과 이름 꼬리(12.5)는 찾기 전체를 보고 정한다.
  */
 function resolveSlots(ctx: Ctx): void {
   const { res, preview } = ctx;
-  const pending: Pending[] = [];
-  const colorLeft: { slot: Slot; cands: VarEntry[] }[] = [];
-  const emit = (s: Slot, e: VarEntry, viaPill = false): void => {
+  const infos = ctx.index.infos;
+  const emit = (s: Slot, e: VarEntry, scopeAdd?: string): void => {
     res.bound++;
-    preview.candidates.push(candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), viaPill, e.type));
+    const c = candOf(s, e.variable.id, e.variable.name, e.tier, entryDisplay(e, s), entryAlpha(e), e.type);
+    if (scopeAdd) c.scopeAdd = scopeAdd;
+    preview.candidates.push(c);
   };
-  const globalFor = (cands: VarEntry[]): VarEntry | null => {
-    // 직접 값 Global만(별칭 변수는 사슬을 만든다 — 13.3), 사용자 컬렉션 먼저.
-    return cands.filter((e) => e.tier === 1 && e.direct).sort(byUserThenName)[0] ?? null;
-  };
-  for (const s of ctx.slots) {
-    const cands = sameValueEntries(ctx, s);
-    const d = pickDesigned(cands, s.kind);
-    if (d) {
-      emit(s, d);
-      continue;
-    }
-    if (s.kind === 'color') {
-      colorLeft.push({ slot: s, cands });
-      continue;
-    }
-    // 순서 2 — 숫자: 쓰임 이름의 가족(12.5), 글자: 같은 그룹 아무 이름(거울 제외). 알약 자리는 9999로(12.12 N-D5).
-    const viaPill = s.pill != null;
-    const cands2 = viaPill ? sameValueEntries(ctx, s, s.pill as number) : cands;
-    const group = s.usage.split('/')[0];
-    const two =
-      s.kind === 'text'
-        ? cands2.filter((e) => e.tier === 2 && !e.mirror && e.variable.name.startsWith(`${group}/`)).sort(byName)[0]
-        : firstInFamily(cands2.filter((e) => e.tier === 2 && !e.mirror && familyRe(s.usage, nameKindOf(s.usage, valueKey(slotValue(s)))).test(e.variable.name)), s.usage);
-    if (two) {
-      emit(s, two, viaPill);
-      continue;
-    }
-    pending.push({ slot: s, base: s.usage, global: globalFor(cands2) });
-  }
 
-  // 색: 남은 자리를 쓰임별로 모아 밝기 이름을 한 번에 정한다(12.4 처리 순서 ②~④).
-  const byUse = new Map<string, { slot: Slot; cands: VarEntry[] }[]>();
-  for (const x of colorLeft) {
-    const arr = byUse.get(x.slot.usage);
-    if (arr) arr.push(x);
-    else byUse.set(x.slot.usage, [x]);
+  // 색: 쓰임 이름(밝기)을 쓰임별로 한 번에 정한다(12.4 처리 순서 ②~④). 대상 = 그 쓰임의 연결 안 된 색 자리 전부 — 별칭 후보가 있는
+  // 자리도 넣는다. 만들기(`createUsageRoles`)가 쓰임 전체로 이름을 짓는 것과 같은 기준이어야 연결 단계가 만든 역할을 다시 쓴다(§2.9 SC-D40).
+  const colorBase = new Map<Slot, { base: string; refHex?: string }>();
+  const byUse = new Map<string, Slot[]>();
+  for (const s of ctx.slots) {
+    if (s.kind !== 'color') continue;
+    const arr = byUse.get(s.usage);
+    if (arr) arr.push(s);
+    else byUse.set(s.usage, [s]);
   }
   for (const [use, list] of byUse) {
     // 입력 = (hex · 배경 종류 · 곳 수). inverse 여부는 기준색을 정한 뒤 함수 안에서 판정한다(12.4).
     // 키는 투명도까지 나누고 밝기는 hex로만 본다(§2.11 "반투명 색 토큰").
     const counts = new Map<string, { hex: string; count: number; bg?: BgKind; alpha?: number }>();
-    for (const x of list) {
-      const k = colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha);
+    for (const sl of list) {
+      const k = colorSlotKey(sl.display, sl.bg, sl.alpha);
       const c = counts.get(k);
       if (c) c.count++;
-      else counts.set(k, { hex: x.slot.display, count: 1, bg: x.slot.bg, ...(x.slot.alpha != null ? { alpha: x.slot.alpha } : {}) });
+      else counts.set(k, { hex: sl.display, count: 1, bg: sl.bg, ...(sl.alpha != null ? { alpha: sl.alpha } : {}) });
     }
     const def = ctx.index.entries.filter((e) => e.tier === 2 && e.variable.name === `color/${use}/default` && e.colorHex).sort(byName)[0];
     const bases = colorRoleBases([...counts.values()], def?.colorHex, use);
     const refHex = colorRoleRef([...counts.values()], def?.colorHex, use);
-    for (const x of list) {
-      const base = `color/${use}/${bases.get(colorSlotKey(x.slot.display, x.slot.bg, x.slot.alpha)) ?? 'default'}`;
-      const fam = familyRe(base, nameKindOf(base, valueKey(x.slot.value)));
-      const two = firstInFamily(x.cands.filter((e) => e.tier === 2 && !e.mirror && fam.test(e.variable.name)), base);
-      if (two) {
-        emit(x.slot, two);
-        continue;
-      }
-      pending.push({ slot: x.slot, base, global: globalFor(x.cands), refHex });
-    }
+    for (const sl of list) colorBase.set(sl, { base: `color/${use}/${bases.get(colorSlotKey(sl.display, sl.bg, sl.alpha)) ?? 'default'}`, ...(refHex ? { refHex } : {}) });
   }
 
-  // 순서 4 — 새 역할. 이름 번호는 한꺼번에(곳 수 순).
-  const live = pending.filter((p) => {
-    if (p.global) return true;
-    if (p.slot.noMatchReason !== DROP) skip(res, p.slot.noMatchReason, p.slot.node, preview, p.slot.field);
-    return false;
-  });
-  // 무료(F6 — §2.3-7): 새 역할을 만들지 않고 그 Global에 바로 붙인다.
-  if (ctx.noNewRoles) {
-    for (const p of live) emit(p.slot, p.global as VarEntry, p.slot.pill != null);
-    return;
+  const split = splitPlaces(ctx.slots.map((s) => placeOf(s, colorBase.get(s)?.base)), infos);
+  const pickOf = new Map<Slot, CandidatePick>();
+  for (const { place, pick } of split.link) pickOf.set(place.slot, pick);
+  if (split.make.length) res.make = split.make;
+
+  const pending: Pending[] = [];
+  for (const s of ctx.slots) {
+    const pick = pickOf.get(s);
+    if (!pick) {
+      // 후보 없음 — 글자 no-match도 사유 · 수에는 그대로 남는다(`make` 목록에만 없다, S2-P7)
+      if (s.noMatchReason !== DROP) skip(res, s.noMatchReason, s.node, preview, s.field);
+      continue;
+    }
+    const e = ctx.index.byId.get(pick.variable.id) as VarEntry;
+    // 별칭이면 그 변수에. 무료(F6 — §2.3-7)는 원시값에도 바로 붙인다(새 Semantic 없음).
+    if (pick.alias || ctx.noNewRoles) emit(s, e, pick.scopeAdd);
+    else {
+      const cb = colorBase.get(s);
+      pending.push({ slot: s, base: s.kind === 'color' ? cb?.base ?? `color/${s.usage}/default` : s.usage, global: e, ...(cb?.refHex ? { refHex: cb.refHex } : {}), ...(pick.scopeAdd ? { scopeAdd: pick.scopeAdd } : {}) });
+    }
   }
-  // 재사용은 순서 2가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
+  if (!pending.length) return;
+
+  // 유료 — 원시값 변수는 그것을 가리키는 새 역할로 감싼다(S2-P6). 이름 번호는 한꺼번에(곳 수 순).
+  // 재사용은 후보 고르기가 했다 — 여기서는 차지 판정만(같은 값이어도 용도가 틀리거나 거울인 이름은 차 있음, 12.5).
   const names = assignNames(
-    live.map((p) => ({ base: p.base, value: valueKey(slotValue(p.slot)), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
+    pending.map((p) => ({ base: p.base, value: valueKey(p.slot.value), count: 1, ...(p.refHex ? { refHex: p.refHex } : {}) })),
     ctx.index.semNames,
     { reuse: false },
   );
-  const roleOf = new Map<string, NewRoleSpec>(); // 이름 → 역할(처음 본 Global)
-  for (const p of live) {
-    const name = names.get(`${p.base}\u0000${valueKey(slotValue(p.slot))}`) ?? p.base;
-    let spec = roleOf.get(name);
-    if (!spec) {
-      const g = p.global as VarEntry;
-      const scopes = (scopeForSemanticRole(name) ?? (g.scopes as string[])) as string[];
-      spec = { name, globalId: g.variable.id, scopes, globalName: g.variable.name };
-      roleOf.set(name, spec);
+  const scopesOfRole = new Map<string, string[]>(); // 이름 → 역할 용도(처음 본 원시값)
+  for (const p of pending) {
+    const name = names.get(`${p.base}\u0000${valueKey(p.slot.value)}`) ?? p.base;
+    const g = p.global;
+    let scopes = scopesOfRole.get(name);
+    if (!scopes) {
+      scopes = (scopeForSemanticRole(name) ?? (g.scopes as string[])) as string[];
+      scopesOfRole.set(name, scopes);
     }
     res.bound++;
-    const g = p.global as VarEntry;
     preview.candidates.push({
-      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), p.slot.pill != null, g.type), // 타입 = 가리킬 Global(TR-18)
-      newRole: { name: spec.name, globalId: spec.globalId, scopes: spec.scopes },
-      newRoleGlobalName: spec.globalName,
+      ...candOf(p.slot, `new:${name}`, name, 2, entryDisplay(g, p.slot), entryAlpha(g), g.type), // 타입 = 가리킬 원시값(TR-18)
+      // 가리킬 원시값은 그 자리가 고른 것이다 — 용도 예외의 용도는 이 변수에 더한다(다른 자리의 사용자 변수에 더하지 않게).
+      newRole: { name, globalId: g.variable.id, scopes },
+      newRoleGlobalName: g.variable.name,
+      ...(p.scopeAdd ? { scopeAdd: p.scopeAdd } : {}),
     });
   }
 }
 
-interface NewRoleSpec {
-  name: string;
-  globalId: string;
-  scopes: string[];
-  globalName: string;
-}
-
-/** 순서 2 · 4 · 무료가 찾는 값 — 알약 자리면 9999(12.12 N-D5), 아니면 원래 값. */
-const slotValue = (s: Slot): number | string => s.pill ?? s.value;
-
-function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number, viaPill = false, resolvedType?: VariableResolvedDataType): BindCandidate {
+function candOf(s: Slot, variableId: string, variableName: string, tier: number, variableValue: string, variableAlpha?: number, resolvedType?: VariableResolvedDataType): BindCandidate {
   return {
     nodeId: s.node.id,
     field: s.field,
@@ -939,7 +1032,7 @@ function candOf(s: Slot, variableId: string, variableName: string, tier: number,
     ...(variableAlpha != null ? { variableAlpha } : {}),
     ...(s.mainId ? { mainId: s.mainId } : {}),
     // 9999로 붙이는 알약 자리 — 연결 직전 다시 확인은 "원래 값이 같고 지금도 알약"(12.12 N-D5)
-    ...(viaPill && typeof s.value === 'number' ? { pillFrom: s.value } : {}),
+    ...(s.pillFrom != null ? { pillFrom: s.pillFrom } : {}),
   };
 }
 
@@ -1148,11 +1241,16 @@ function bindRadius(node: SceneNode, ctx: Ctx): void {
   const corners = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'] as const;
   const values = corners.map((c) => (r !== figma.mixed && typeof r === 'number' ? r : Number((node as unknown as Record<string, number>)[c]) || 0));
   if (r !== figma.mixed && !(typeof r === 'number' && r > 0)) return;
-  // 알약 모서리(반경 ≥ 짧은 변 / 2)는 9999로 바꾼 값으로 이름 짓고, 순서 2 · 4 · 무료는 9999로 찾는다(12.12 N-D5).
+  // 알약 반경 판정(ia-v4 §2.9 S2-P2 · SC-D36 ① · SC-D37) — 알약 모양 모서리(반경 ≥ 짧은 변 / 2)라도 원래 값과 같고 용도에
+  // CORNER_RADIUS를 직접 켠 사용자 변수가 있으면(색인의 판정 집합) 보통 자리다. 판정이 끝난 자리의 값은 하나다:
+  // 알약이면 9999(사유 no-match — 원래 값이 소수여도), 아니면 원래 값(사유는 그 값으로). 이름은 판정 뒤의 네 값으로 짓는다.
   const { width, height } = node as unknown as { width: number; height: number };
-  const named = pillCorners(values, width, height);
+  const named = pillCorners(values, width, height, ctx.index.radiusKeys);
   corners.forEach((c, i) => {
-    if (values[i] > 0) tryBind(ctx, node, c, values[i], radiusName(c, named), numReason(values[i]), named[i] !== values[i] ? PILL_RADIUS : undefined);
+    if (!(values[i] > 0)) return;
+    const pill = named[i] !== values[i];
+    if (pill) tryBind(ctx, node, c, PILL_RADIUS, radiusName(c, named), 'no-match', values[i]);
+    else tryBind(ctx, node, c, values[i], radiusName(c, named), numReason(values[i]));
   });
 }
 
@@ -1280,8 +1378,8 @@ function tryBind(
   usage: string,
   /** 매칭 실패 사유 키 — 호출자가 좁힌 조건으로 실패했을 때 그 이유를 남긴다. */
   noMatchReason = 'no-match',
-  /** 알약 반경 자리면 9999(12.12 N-D5). */
-  pill?: number,
+  /** 알약으로 판정된 반경 자리 — 찾을 때 읽은 원래 값(자리의 값 `value`는 9999, ia-v4 §2.9 S2-P2). */
+  pillFrom?: number,
 ): void {
   const allowed = numAllowed(field);
   const st = stateReason(nodeFieldState(node, field));
@@ -1289,7 +1387,7 @@ function tryBind(
     note(ctx.res, st, node, ctx.preview, field);
     return;
   }
-  ctx.slots.push({ node, field, kind: 'num', value, display: String(value), allowed, usage, noMatchReason, ...(pill != null ? { pill } : {}) });
+  ctx.slots.push({ node, field, kind: 'num', value, display: String(pillFrom ?? value), allowed, usage, noMatchReason, ...(pillFrom != null ? { pillFrom } : {}) });
 }
 
 /* ---------- 체크한 자리 연결(APPLY_SELECTED) — 연결 직전 다시 확인(§4.6 "찾는 범위") ---------- */
@@ -1306,6 +1404,8 @@ export interface SelectedBindItem {
   mainId?: string;
   /** 9999로 붙일 알약 자리의 찾을 때 읽은 원래 값(12.12 N-D5). */
   pillFrom?: number;
+  /** 용도 예외(ia-v4 §2.9 S2-P3) — 다른 다시 확인을 통과한 뒤 붙이기 바로 전에 이 용도를 변수(새 역할이면 가리킬 Global)에 더한다. */
+  scopeAdd?: string;
 }
 
 /** 연결 진행률 · 양보 훅(§4.6 "찾기 · 연결의 수"). 묶음이 끝날 때마다 부른다. */
@@ -1459,10 +1559,14 @@ export async function bindSelectedItems(
           const alpha = itemAlpha(x);
           const allowed = key === 'fills' ? fillScopesFor(node.type) : key === 'strokes' ? STROKE_SCOPES : EFFECT_SCOPES;
           // hex · 투명도(소수 둘째 자리)가 같아야 — 투명도 0(보이지 않게 바뀜)도 그 사이 바뀜
-          if (alpha === 0 || vv.variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || rgbToHex(value) !== hex || roundAlpha((value as RGBA).a) !== alpha || !scopeOk(scopesOf(), allowed)) {
+          // 용도 예외(ia-v4 §2.9 S2-P3 — 유료 · 무료)면 가리킬 플러그인 Global의 용도 다시 확인은 건너뛴다 — 값 · 투명도 · 타입 확인은 그대로.
+          // 새 역할 자리는 역할의 용도(`newRole.scopes`)로 본다.
+          const scopeAdd = it.scopeAdd ? (it.scopeAdd as VariableScope) : undefined;
+          if (alpha === 0 || vv.variable.resolvedType !== 'COLOR' || !value || !isRGB(value) || valueKeyOf('color', rgbToHex(value), roundAlpha((value as RGBA).a)) !== valueKeyOf('color', hex, alpha) || (!(scopeAdd && !it.newRole) && !scopeOk(scopesOf(), allowed))) {
             fail('changed', node, key); // 값 · 용도가 그 사이 달라짐(칠하기 용도는 레이어 종류 — §2.11)
             continue;
           }
+          if (scopeAdd) addVariableScope(vv.variable, scopeAdd);
           const variable = await target();
           const arr = list.slice();
           arr[i] =
@@ -1546,6 +1650,8 @@ export async function bindSelectedItems(
           fail('changed', node, it.field);
           continue;
         }
+        // 숫자 용도 예외(SC-D34) — 값 확인을 통과한 뒤 붙이기 바로 전에 가리킬 플러그인 Global에 용도를 더한다.
+        if (it.scopeAdd) addVariableScope(vv.variable, it.scopeAdd as VariableScope);
         const tv = await target();
         if (pill) (node as unknown as Record<string, number>)[it.field] = PILL_RADIUS; // 겉모습 그대로(같은 값 규칙의 예외 — 12.12 N-D5)
         (node as unknown as { setBoundVariable: (f: VariableBindableNodeField, x: Variable) => void }).setBoundVariable(it.field as VariableBindableNodeField, tv);
@@ -1581,32 +1687,32 @@ export async function bindSelectedItems(
 
 /**
  * 쓰임 역할 하나를 만든다(§2.12 12.5 · 12.6). Semantic 컬렉션(없으면 만듦)에 같은 이름이 있으면:
- * 같은 Global을 가리키면 그것을 쓰고, 다른 값이면 다음 번호. 모든 모드에 같은 Global 별칭, 용도는 쓰임에서,
- * 플러그인 표시를 남긴다. 이미 있는 역할의 값은 바꾸지 않는다.
+ * 같은 값이면(별칭을 따라간 값 키 — 가리키는 원시값 변수가 달라도, ia-v4 §2.9 S2-P6) 그것을 쓰고, 다른 값이면 다음 번호.
+ * 모든 모드에 같은 Global 별칭, 용도는 쓰임에서, 플러그인 표시를 남긴다. 이미 있는 역할의 값은 바꾸지 않는다.
  */
 export async function createRole(spec: NewRoleRef, global: Variable): Promise<Variable> {
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const all = await figma.variables.getLocalVariablesAsync();
+  const read = await readVarInfos();
+  const { cols, vars: all } = read;
   const tiers = collectionTiers(cols, all);
-  // 만드는 곳은 플러그인 Semantic, 이름 차지 · 같은 역할 찾기는 Semantic 계층 전부(§2.13 13.5).
+  // 만드는 곳은 플러그인 Semantic, 이름 차지는 Semantic 계층 전부(§2.13 13.5 — 이름 짓기라 그대로).
   const col = ensureOwnedCollection(cols, 'semantic');
   const semCols = new Map(cols.filter((c) => tiers.get(c.id) === 2).map((c) => [c.id, c]));
   semCols.set(col.id, col);
   const inCol = all.filter((v) => semCols.has(v.variableCollectionId));
-  const pointsAtGlobal = (v: Variable): boolean =>
-    v.resolvedType === global.resolvedType &&
-    (semCols.get(v.variableCollectionId) ?? col).modes.every((m) => {
-      const val = v.valuesByMode[m.modeId];
-      return !!val && typeof val === 'object' && (val as VariableAlias).type === 'VARIABLE_ALIAS' && (val as VariableAlias).id === global.id;
-    });
   const re = new RegExp(`^${spec.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:-\\d+)?$`);
-  // 이미 있는 역할을 쓰는 조건: 같은 Global · 용도가 새 역할 용도를 모두 덮거나 ALL_SCOPES · 거울 아님(12.5 "연결 직전").
-  const globalNames = new Set(all.filter((v) => tiers.get(v.variableCollectionId) === 1).map((v) => v.name));
+  // 이미 있는 역할을 쓰는 조건: 플러그인 Semantic 안 · 별칭 · 같은 값 키 · 용도가 새 역할 용도를 모두 덮거나 ALL_SCOPES · 거울 아님(12.5 "연결 직전").
+  const key = read.infoById.get(global.id)?.key ?? null;
   const covers = (v: Variable): boolean => {
     const sc = (v.scopes ?? []) as string[];
     return sc.includes('ALL_SCOPES') || spec.scopes.every((x) => sc.includes(x));
   };
-  const same = inCol.filter((v) => re.test(v.name) && pointsAtGlobal(v) && covers(v) && !globalNames.has(v.name)).sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
+  const same = all
+    .filter((v) => {
+      if (v.variableCollectionId !== col.id || !re.test(v.name) || v.resolvedType !== global.resolvedType || !covers(v)) return false;
+      const i = read.infoById.get(v.id);
+      return !!i && key != null && i.hops > 0 && i.key === key && !i.mirror;
+    })
+    .sort((a, b) => a.name.length - b.name.length || (a.name < b.name ? -1 : 1))[0];
   if (same) return same;
   const names = new Set(inCol.map((v) => v.name));
   let name = spec.name;

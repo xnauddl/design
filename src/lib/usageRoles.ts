@@ -39,9 +39,13 @@ export function isPillRadius(v: number, width: number, height: number): boolean 
   return v > 0 && Number.isFinite(short) && v >= short / 2;
 }
 
-/** 모서리 값 → 알약 모서리를 9999로 바꾼 값(12.12 N-D5 — 이름은 바꾼 뒤의 값으로 정한다). */
-export function pillCorners(values: readonly number[], width: number, height: number): number[] {
-  return values.map((v) => (isPillRadius(v, width, height) ? PILL_RADIUS : v));
+/**
+ * 모서리 값 → 알약 모서리를 9999로 바꾼 값(12.12 N-D5 — 이름은 바꾼 뒤의 값으로 정한다).
+ * `keep`(알약 판정 집합 — `sameValue.ts` `userRadiusKeys`, ia-v4 §2.9 S2-P2)에 원래 값의 값 키가 있는 모서리는 알약으로 보지 않는다
+ * (원래 값 그대로 — 보통 반경 자리). 넘기지 않으면 알약 모양 모서리는 모두 9999다.
+ */
+export function pillCorners(values: readonly number[], width: number, height: number, keep?: ReadonlySet<string>): number[] {
+  return values.map((v) => (isPillRadius(v, width, height) && !keep?.has(String(Math.round(v * 100) / 100)) ? PILL_RADIUS : v));
 }
 
 const near = (a: number, b: number): boolean => Math.abs(a - b) < 0.005;
@@ -573,7 +577,16 @@ function cmpValue(a: string, b: string): number {
 const OLD_LADDER = /^(spacing|radius|size|stroke-width)\/(none|3xs|2xs|xs|sm|md|lg|xl|2xl|3xl|4xl|full|thin|thick)(-\d+)?$/;
 const OLD_COLOR = new Set(['color/background/default', 'color/text/default', 'color/border/default', 'color/background/brand']);
 
-/** 옛 플러그인 이름인가(순서 3 "디자이너가 만든 것"에서 뺀다). 옛 색 4개는 순서 2에서는 쓴다. */
+/** 옛 단계 이름인가(`spacing/sm` · `radius/md` — 표시 없는 별칭 변수면 같은 값이어도 후보가 아니다, ia-v4 §2.9 S2-P4). */
+export function isOldLadderName(name: string): boolean {
+  return OLD_LADDER.test(name);
+}
+/** 표시 없는 옛 색 이름 넷(12.7) — 플러그인이 만든 역할로 본다(가족일 때만 후보, ia-v4 §2.9 S2-P4). */
+export function isOldColorName(name: string): boolean {
+  return OLD_COLOR.has(name);
+}
+
+/** 옛 플러그인 이름인가(옛 단계 이름 또는 옛 색 4개). */
 export function isOldPluginName(name: string): boolean {
   return OLD_LADDER.test(name) || OLD_COLOR.has(name);
 }

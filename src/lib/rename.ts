@@ -1,9 +1,10 @@
 /* ============================================================
    rename.ts — 레이어를 "역할(role)"에 맞게 정돈 (naming.ts 규칙 사용)
    원칙: 역할이 이름을 정한다. 토큰은 신호로만 쓰고 경로를 복사하지 않는다.
-   - 정규화: 뚜렷한 역할(card/list/field/button/header… 등)은 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
-     역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하고 맥락만 자식에게 통과.
-     선택 루트(depth 0) 컨테이너는 보존(자식 맥락 앵커) — 단 카드/리스트/필드/버튼처럼 확실한 시멘틱이면 루트도 교체.
+   - 정규화: 뚜렷한 역할(card/list/field/button/header… 등)은 역할 기반 이름으로 교체 — **기본명 · 플러그인이 붙인 이름만**
+     (S-2b — ia-v4 §4.4 "S-2b 이름 보존": 사람이 지은 이름은 그대로 두고 역할 · 지킨 이름 표시만 기록, 자식에게는 판정 이름을 맥락으로).
+     역할 없는 순수 레이아웃(container/wrapper/stack-x/stack-y 폴백)은 이름으로 쓰지 않고(이름 그대로 · 역할만 기록) 맥락만 자식에게 통과.
+     선택 루트(depth 0) 컨테이너는 보존(자식 맥락 앵커) — 단 카드/리스트/필드/버튼처럼 확실한 시멘틱이면 루트도 교체(루트 이름이 사람 이름이면 역할만 기록).
      보존한 루트 이름의 낱말(역할이 아닌 것 — 'website' · 'copy')은 맥락 계산에는 그대로 쓰되, 보이는 이름에서는
      뗀다(`dsl-header` → `header`). 떼기 전 이름은 `dsNameKey`로 남겨 등록 묶기가 지금과 같게 한다(ia-v4 §4.4).
    - 역할 판정:
@@ -25,7 +26,7 @@
    - 이름 형식: {맥락}-{역할} 최대 2토막. 형제 충돌에 숫자 안 붙임(Figma 중복 허용).
    - 제외: Component/ComponentSet · Instance · 잠긴 레이어는 서브트리째 스킵, Text는 자기 이름만 보존.
    ============================================================ */
-import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, isScopeRole, isDefaultName, nameKeyFor, EMITTED_ROLES, ROLE_KEY, NAME_KEY } from './naming';
+import { parseTokenName, layerNameFromRole, pickScope, kebab, isKnownRole, isScopeRole, isDefaultName, nameKeyFor, EMITTED_ROLES, ROLE_KEY, NAME_KEY, KEPT_KEY } from './naming';
 import { isIconFrame, shortOneLine } from './componentLike';
 import type { ParsedToken } from './naming';
 import type { KeepReason, RenameChange, RenameNode } from '../shared/messages';
@@ -152,7 +153,8 @@ async function recurse(
       prefixForChildren = sc && !isScopeRole(sc) ? sc : null;
     }
 
-    if (!decided.skip && decided.name) {
+    // 빈 이름('' — 기본명)을 지킨 노드도 이 블록을 타야 역할 기록 · 맥락 통과가 된다(S-2b — 이름이 아니라 undefined로 가른다)
+    if (!decided.skip && decided.name !== undefined) {
       // 보이는 이름 = 판정 이름에서 루트 접두사를 뗀 것. 판정 이름은 그대로 맥락으로 쓴다(역할 · 토큰 맥락이 지금과 같게).
       // 아이콘 모양 이름을 그대로 두는 경우(A1)는 접두사를 떼지 않는다.
       const visible = decided.keepName ? decided.name : stripRootPrefix(decided.name, rootPrefix, decided.role);
@@ -165,10 +167,12 @@ async function recurse(
         col.changes.push({ id: node.id, before, after, ...(nameKey ? { nameKey } : {}) });
         if (opts.apply) node.name = after;
       }
-      // 판정한 역할을 노드에 남긴다 — 등록이 머리명사로 읽어 이름 파싱 추측을 없앤다.
+      // 판정한 역할을 노드에 남긴다 — 다음 이름 정리와 텍스트 스타일 label 판정이 읽어 이름 파싱 추측을 없앤다.
       // 이름이 안 바뀐 재실행에서도 기록해 예전 리네임 결과에 값을 채운다(멱등).
       if (opts.apply && decided.role) writeRole(node, decided.role);
       if (opts.apply) writeNameKey(node, nameKey ?? null);
+      // 지킨 이름 표시(S-2b SC-D51) — 사람 이름을 지킨 노드는 지금 이름, 아니면 지운다(다음 실행에서 ⓐ로 바뀌지 않게).
+      if (opts.apply) writeKept(node, decided.kept ? before : null);
       // 맥락: 일반 레이아웃(passthrough)은 받은 맥락을 그대로 통과, 그 외엔 내 새 이름.
       // 이름 힌트로 이름을 둔 노드는 이름이 아니라 기록한 역할 낱말을 넘긴다(디자이너 낱말을 자손이 베끼지 않게).
       contextForChildren = decided.ctxName ?? (decided.passthrough ? ancestorName : decided.name);
@@ -176,7 +180,7 @@ async function recurse(
     }
 
     // 영향 여부와 무관하게 트리에 담는다(전체 서브트리 + 영향 노드 강조).
-    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role, ...(nameKey ? { nameKey } : {}) });
+    col.nodes.push({ id: node.id, name: before, type: node.type, depth, parentId, after, keep: decided.keep, role: decided.role, ...(nameKey ? { nameKey } : {}), ...(decided.kept ? { kept: true } : {}) });
 
     // 제외 대상은 서브트리째 건너뛴다 — decide()가 노드 자신만 스킵하면 내부는 그대로 리네임돼
     // 메인 컴포넌트 내부 이름(→ 모든 인스턴스에 전파)과 잠금 레이어까지 덮어쓰게 된다.
@@ -200,6 +204,8 @@ interface Decided {
   keepName?: boolean;
   keepKey?: boolean;
   ctxName?: string;
+  /** 사람이 지은 이름이라 지킨 노드(S-2b) — `RenameNode.kept` · 적용 때 `dsKept`. */
+  kept?: boolean;
 }
 
 async function decide(
@@ -223,7 +229,10 @@ async function decide(
     if (!hc) return { skip: true, keep: 'root' };
     let hcScope = ancestorName ? pickScope(ancestorName) : null;
     if (hcScope === hc) hcScope = null;
-    return { skip: false, role: hc, name: layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth }) };
+    const hcName = layerNameFromRole(hcScope, hc, { maxDepth: opts.maxDepth });
+    // S-2b R2B-P3 — 루트 이름이 사람 이름이면 이름은 그대로, 고신뢰 역할만 기록하고 자식에게는 바꿨을 때와 같은 맥락을 넘긴다.
+    if ((await nameKindOf(node, pos.rootPrefix)) === 'human') return { skip: false, role: hc, name: node.name, keepName: true, ctxName: hcName, kept: true };
+    return { skip: false, role: hc, name: hcName };
   }
 
   // 전체 정규화: 현재 이름과 무관하게 역할 기반 이름으로 교체(사람이 지은 이름도 덮어씀).
@@ -238,18 +247,24 @@ async function decide(
   if (isContainerType(node) && !isIconFrameNode(node)) {
     const h = hintRole(node, pos.rootPrefix);
     if (h && (role === h || HINT_WEAK_ROLES.has(role))) {
-      return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h };
+      return { skip: false, role: h, name: node.name, keepName: true, keepKey: true, ctxName: h, kept: true }; // 힌트 이름도 사람 이름 — 지킨 이름 표시(S-2b SC-D51)
     }
   }
   // 역할 없는 순수 레이아웃(container/wrapper 폴백)은 맥락 없는 plain 역할명으로 정리하되,
   // 상속 맥락은 자식에게 그대로 통과(passthrough)시켜 의미있는 후손이 카드 맥락을 받게.
-  if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: role, passthrough: true };
+  // S-2b R2B-P2 — 구조 폴백 넷은 이름으로 쓰지 않는다: 이름 그대로 · 역할만 기록(사람 이름이면 지킨 이름 표시도).
+  if (PASSTHROUGH_ROLES.has(role)) return { skip: false, role, name: node.name, keepName: true, passthrough: true, ...((await nameKindOf(node, pos.rootPrefix)) === 'human' ? { kept: true } : {}) };
   // 아이콘 프레임은 모양 이름 그대로 — 뜻 없는 이름일 때만 맥락 + icon(ia-v4 §4.4 A1).
   if (role === 'icon' && isIconFrameNode(node) && !isMeaninglessIconName(node, pos.rootPrefix)) {
-    return { skip: false, role, name: node.name, keepName: true };
+    return { skip: false, role, name: node.name, keepName: true, kept: true }; // 아이콘 모양 이름도 사람 이름 — 지킨 이름 표시(S-2b SC-D51)
   }
   const scope = ctxScope === role ? null : ctxScope; // 맥락==역할이면 중복 제거(button-button 방지)
   const name = layerNameFromRole(scope, role, { maxDepth: opts.maxDepth });
+  // S-2b R2B-P2 · R2B-P4 — 사람이 지은 이름은 그대로 두고 역할만 기록. 자식에게는 바꿨다면 지었을 이름(판정 이름)을 넘겨
+  // 자식 이름이 S-2b 전과 같다. 세분화 1차 역할은 지금처럼 맥락 통과(recurse는 ctxName을 passthrough보다 먼저 본다).
+  if ((await nameKindOf(node, pos.rootPrefix)) === 'human') {
+    return { skip: false, role, name: node.name, keepName: true, kept: true, ...(REFINED_PASSTHROUGH.has(role) ? { passthrough: true } : { ctxName: name }) };
+  }
   // 세분화 1차 역할은 이름만 맥락 + 역할, 자식에게는 받은 맥락을 통과(B1–B3).
   if (REFINED_PASSTHROUGH.has(role)) return { skip: false, role, name, passthrough: true };
   return { skip: false, role, name };
@@ -297,6 +312,92 @@ export function writeNameKey(node: SceneNode, key: string | null): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * 지킨 이름 표시(`dsKept` — S-2b SC-D51)를 기록하거나(name) 지운다(null). 실제로 바뀐 경우만 쓰고 true —
+ * `RENAME_APPLY`가 undo 묶음 판단(roleWrites)에 센다. API가 없거나 실패하면 false.
+ */
+export function writeKept(node: SceneNode, name: string | null): boolean {
+  const n = node as { setPluginData?: (k: string, v: string) => void; getPluginData?: (k: string) => string };
+  if (typeof n.setPluginData !== 'function') return false;
+  try {
+    const cur = typeof n.getPluginData === 'function' ? n.getPluginData.call(node, KEPT_KEY) : '';
+    const next = name ?? '';
+    if (cur === next) return false;
+    n.setPluginData.call(node, KEPT_KEY, next);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/* ---------- 이름의 갈래(ia-v4 §4.4 "S-2b 이름 보존" R2B-P1) ---------- */
+/** 레이어에 붙은 변수 이름 — 노드 속성(`boundVariables`)과 칠 · 선의 색 변수(SC-D52 ⓒ). 못 읽으면 빼고 넘어간다. */
+async function boundVariableNames(node: SceneNode): Promise<string[]> {
+  const ids = new Set<string>();
+  const add = (e: unknown): void => {
+    if (!e) return;
+    if (Array.isArray(e)) for (const a of e) add(a);
+    else if (typeof (e as VariableAlias).id === 'string') ids.add((e as VariableAlias).id);
+  };
+  const bv = (node as { boundVariables?: Record<string, unknown> }).boundVariables;
+  if (bv && typeof bv === 'object') for (const v of Object.values(bv)) add(v);
+  for (const f of ['fills', 'strokes'] as const) {
+    const ps = (node as unknown as Record<string, unknown>)[f];
+    if (Array.isArray(ps)) for (const p of ps) add((p as { boundVariables?: { color?: unknown } }).boundVariables?.color);
+  }
+  const out: string[] = [];
+  for (const id of ids) {
+    try {
+      const v = await figma.variables.getVariableByIdAsync(id);
+      if (v) out.push(v.name);
+    } catch {
+      /* 못 읽는 변수는 건너뛴다 */
+    }
+  }
+  return out;
+}
+/** ASCII 밖 글자(한글 · 이모지 등) — 있으면 늘 사람 이름(`kebab`이 지워 빈 낱말이 되는 것을 막는다). */
+const NON_ASCII = /[^\x00-\x7F]/;
+/** 숫자 낱말(`2` · `1_5`). */
+const NUM_WORD = /^[\d_]+$/;
+/** 플러그인이 내는 역할 낱말 열(하이픈 역할은 낱말 여럿 — `text-group` · `stack-x`), 긴 것 먼저. */
+const EMITTED_SEQS: readonly (readonly string[])[] = [...EMITTED_ROLES].map((r) => r.split('-')).sort((a, b) => b.length - a.length);
+/** 낱말이 모두 역할 낱말 열로 나뉘는가(1개 이상). */
+function allEmitted(toks: readonly string[]): boolean {
+  if (!toks.length) return false;
+  const ok = (i: number): boolean => i === toks.length || EMITTED_SEQS.some((seq) => seq.every((w, k) => toks[i + k] === w) && ok(i + seq.length));
+  return ok(0);
+}
+
+/**
+ * 레이어 지금 이름의 갈래 — 기본명 · 플러그인 이름 · 사람 이름(R2B-P1). 플러그인 이름 = ASCII 밖 글자가 없고
+ * ⓐ 기록한 `dsRole`과 맞는 이름(`{역할}` · `{숫자 아닌 낱말 하나}-{역할}` · `namedByPlugin`, 지킨 이름 표시와 같으면 아님 — SC-D50 · SC-D51)
+ * 또는 ⓑ 낱말이 모두 역할 낱말(맨 앞 한 낱말만 루트 접두사 · 숫자 낱말 없음 — SC-D47)
+ * 또는 ⓒ 그 레이어에 붙은 변수 이름과 같은 이름(예전 토큰 경로 베낌 — SC-D52).
+ */
+async function nameKindOf(node: SceneNode, rootPrefix: string | null): Promise<'default' | 'plugin' | 'human'> {
+  const name = node.name;
+  if (isDefaultName(name)) return 'default';
+  if (NON_ASCII.test(name)) return 'human';
+  const toks = kebab(name).split('-').filter(Boolean);
+  if (!toks.length) return 'human';
+  const role = readPluginKey(node, ROLE_KEY);
+  const kept = readPluginKey(node, KEPT_KEY);
+  if (role && !(kept && kebab(kept) === toks.join('-'))) {
+    const rt = kebab(role).split('-').filter(Boolean);
+    if (rt.length && toks.length >= rt.length && toks.slice(toks.length - rt.length).join('-') === rt.join('-')) {
+      const head = toks.slice(0, toks.length - rt.length);
+      if (!head.length || (head.length === 1 && !NUM_WORD.test(head[0])) || namedByPlugin(name, role, rootPrefix)) return 'plugin';
+    }
+  }
+  if (allEmitted(toks)) return 'plugin';
+  if (rootPrefix && toks.length > 1 && toks[0] === rootPrefix && allEmitted(toks.slice(1))) return 'plugin';
+  // ⓒ 예전 버전이 붙은 변수 경로를 베낀 이름(`color/121210` → `color-121210`) — 그 레이어에 붙은 변수 이름과 같으면 플러그인 이름(SC-D52).
+  // 변수 읽기가 드니 동기 판정(ⓐ · ⓑ) 뒤, 사람 이름으로 떨어지기 직전에만 본다(숫자 낱말이 든 베낌 이름도 여기서 잡힌다).
+  if ((await boundVariableNames(node)).some((v) => kebab(v) === toks.join('-'))) return 'plugin';
+  return 'human';
 }
 
 /**

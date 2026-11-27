@@ -1,0 +1,6 @@
+/* Breadcrumb — design-system §6.3(새로 — 모음 화면만). */
+.ds-crumb ol { display: flex; align-items: center; gap: var(--space-1); margin: 0; padding: 0; list-style: none; font: var(--text-body-sm); }
+.ds-crumb li { display: inline-flex; align-items: center; gap: var(--space-1); }
+.ds-crumb a { color: var(--color-text-link); text-decoration: underline; text-underline-offset: 2px; }
+.ds-crumb .ds-ic { color: var(--color-text-tertiary); }
+.ds-crumb [aria-current="page"] { font-weight: var(--font-weight-semibold); color: var(--color-text-primary); }

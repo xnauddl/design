@@ -34,7 +34,6 @@
 - 🎯 **변수 연결** — 값이 **같은** 변수에만 연결하고, 이미 변수·스타일이 붙은 곳은 건너뜁니다. 찾은 곳을 변수별 카드로 보고 켠 변수만 연결, 건너뛴 사유는 칩으로
 - 🔤 **기존 텍스트 스타일 연결** — 모든 글자 속성이 같은 로컬 스타일에 텍스트를 연결(무료). 스타일 등록은 유료
 - ✏️ **레이어 이름 정리** — 역할 기반의 일관된 이름으로, 바뀌는 이름을 미리 보고 적용
-- 🧩 **컴포넌트 · 베리언트 (유료 · 베타)** — 컴포넌트 등록, 베리언트 분류, 누락 조합 생성, 속성 노출
 - 📦 **코드 내보내기** — W3C 디자인 토큰 JSON / CSS 변수 (px·rem 선택)
 - 🗕 **최소화** — 작업 중에는 창을 작은 사각형(140×104)으로 접어 두기
 
@@ -54,7 +53,6 @@
 - 🎯 **Link variables** — only to variables with the **same** value; places that already have a variable or style are skipped. Review finds per variable, link only the ones you turn on, with skip reasons as chips
 - 🔤 **Link existing text styles** — attach text to a local style whose properties all match (free). Registering styles is paid
 - ✏️ **Rename** layers from roles, previewing every change
-- 🧩 **Components & variants (paid)** — register, classify variants, generate missing combos, expose properties, componentize similar frames
 - 📦 **Export** to W3C Design Tokens JSON / CSS variables (px or rem)
 - 🗕 **Minimize** the panel to a small 140×104 square while you work
 
@@ -65,7 +63,7 @@
 ---
 
 ## 태그 (Tags · 최대 12개)
-design systems, design tokens, variables, tokens, styles, automation, naming, components, variants, export, css, developer handoff
+design systems, design tokens, variables, tokens, styles, automation, naming, export, css, developer handoff
 
 ## 카테고리 (제안)
 - 1순위: **Design** (또는 Design systems)

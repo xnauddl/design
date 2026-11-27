@@ -1,0 +1,79 @@
+/* Button · Icon Button · Button Group · Split Button — design-system §6.1 · 상태 §6.0.
+   기본 button 요소 = Secondary md(클래스를 안 붙인 버튼도 같은 모양 — §6.9-3). 배치(inline-flex)는 클래스에만. */
+button, .ds-btn {
+  font: var(--text-label);
+  height: var(--size-control-md); padding: 0 var(--space-3); border-radius: var(--radius-small);
+  border: 1px solid var(--color-secondary-border); background: var(--color-secondary-bg); color: var(--color-text-primary);
+  cursor: pointer; white-space: nowrap;
+  transition: background var(--motion-duration-fast) ease, border-color var(--motion-duration-fast) ease, color var(--motion-duration-fast) ease, box-shadow var(--motion-duration-fast) ease;
+}
+.ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-1); position: relative; }
+button:hover:not(:disabled):not([aria-disabled="true"]), .ds-btn:hover:not(:disabled):not([aria-disabled="true"]),
+button:active:not(:disabled):not([aria-disabled="true"]), .ds-btn:active:not(:disabled):not([aria-disabled="true"]) { background: var(--color-interactive-hover); }
+button:focus-visible, .ds-btn:focus-visible { outline: none; box-shadow: var(--focus-ring-default); }
+
+/* 크기 */
+.ds-btn--sm { height: var(--size-control-sm); padding: 0 var(--space-2); font: var(--text-label-sm); }
+.ds-btn--lg { height: var(--size-control-lg); padding: 0 var(--space-4); }
+.ds-btn--sm .ds-ic { width: var(--size-icon-sm); height: var(--size-icon-sm); }
+
+/* 변형 */
+.ds-btn--primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-text-on-primary); box-shadow: var(--elevation-1); }
+.ds-btn--primary:hover:not(:disabled):not([aria-disabled="true"]), .ds-btn--primary:active:not(:disabled):not([aria-disabled="true"]) { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+.ds-btn--primary:focus-visible { box-shadow: var(--focus-ring-default); }
+.ds-btn--ghost { background: transparent; border-color: transparent; color: var(--color-text-secondary); }
+.ds-btn--ghost:hover:not(:disabled):not([aria-disabled="true"]), .ds-btn--ghost:active:not(:disabled):not([aria-disabled="true"]) { background: var(--color-interactive-hover); color: var(--color-text-primary); }
+.ds-btn--danger { background: var(--color-state-error); border-color: var(--color-state-error); color: var(--color-text-inverse); }
+.ds-btn--danger:hover:not(:disabled):not([aria-disabled="true"]), .ds-btn--danger:active:not(:disabled):not([aria-disabled="true"]) { background: var(--color-state-error-hover); border-color: var(--color-state-error-hover); }
+.ds-btn--link {
+  height: auto; padding: 0; border: 0; background: none; box-shadow: none;
+  font: inherit; font-weight: var(--font-weight-semibold); color: var(--color-text-link);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.ds-btn--link:hover:not(:disabled):not([aria-disabled="true"]), .ds-btn--link:active:not(:disabled):not([aria-disabled="true"]) { background: none; color: var(--color-interactive-focus-hover); }
+
+/* 꺼짐 · 잠김 — 같은 모양(§6.0, ia-v3 §2.3): 글자 tertiary · hover 없음 · 투명도 없음 */
+button:disabled, .ds-btn:disabled, button[aria-disabled="true"], .ds-btn[aria-disabled="true"] {
+  color: var(--color-text-tertiary); border-color: var(--color-border-default); box-shadow: none;
+}
+button:disabled, .ds-btn:disabled { cursor: default; }
+button[aria-disabled="true"], .ds-btn[aria-disabled="true"] { cursor: not-allowed; }
+button[aria-disabled="true"]:focus-visible, .ds-btn[aria-disabled="true"]:focus-visible { box-shadow: var(--focus-ring-default); }
+.ds-btn--primary:disabled, .ds-btn--primary[aria-disabled="true"],
+.ds-btn--danger:disabled, .ds-btn--danger[aria-disabled="true"] { background: var(--color-surface-secondary); border-color: var(--color-border-default); }
+.ds-btn--ghost:disabled, .ds-btn--ghost[aria-disabled="true"],
+.ds-btn--link:disabled, .ds-btn--link[aria-disabled="true"] { background: transparent; border-color: transparent; }
+
+/* Loading — 글자 · 아이콘 투명(너비 유지) + 가운데 돌기 */
+.ds-btn[aria-busy="true"] { color: transparent; pointer-events: none; }
+.ds-btn[aria-busy="true"] .ds-ic { visibility: hidden; }
+.ds-btn[aria-busy="true"]::after {
+  content: ''; position: absolute; inset: 0; margin: auto;
+  width: var(--size-icon-sm); height: var(--size-icon-sm); box-sizing: border-box;
+  border: var(--border-width-thick) solid var(--color-text-primary); border-right-color: transparent; border-radius: var(--radius-full);
+  animation: ds-spin var(--motion-duration-spin) linear infinite;
+}
+.ds-btn--primary[aria-busy="true"]::after { border-color: var(--color-text-on-primary); border-right-color: transparent; }
+.ds-btn--danger[aria-busy="true"]::after { border-color: var(--color-text-inverse); border-right-color: transparent; }
+.ds-btn--ghost[aria-busy="true"]::after { border-color: var(--color-text-secondary); border-right-color: transparent; }
+@keyframes ds-spin { to { transform: rotate(360deg); } }
+
+/* Icon Button — 안쪽 0 · 너비 = 높이 · 아이콘 16(sm도) */
+.ds-icbtn { padding: 0; width: var(--size-control-md); }
+.ds-icbtn.ds-btn--sm { padding: 0; width: var(--size-control-sm); }
+.ds-icbtn.ds-btn--sm .ds-ic { width: var(--size-icon-md); height: var(--size-icon-md); }
+
+/* Button Group */
+.ds-btngroup { display: inline-flex; }
+.ds-btngroup > .ds-btn + .ds-btn { margin-left: -1px; }
+.ds-btngroup > .ds-btn:not(:first-child) { border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.ds-btngroup > .ds-btn:not(:last-child) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ds-btngroup--spaced { gap: var(--space-2); }
+.ds-btngroup--spaced > .ds-btn + .ds-btn { margin-left: 0; }
+.ds-btngroup--spaced > .ds-btn { border-radius: var(--radius-small); }
+
+/* Split Button — 주 버튼 + 펼침 Icon Button */
+.ds-split { display: inline-flex; }
+.ds-split > .ds-btn:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.ds-split > .ds-split__toggle { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left: 1px solid var(--color-border-default); margin-left: -1px; }
+.ds-split > .ds-btn--primary.ds-split__toggle { border-left-color: var(--color-border-on-primary); }

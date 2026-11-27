@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DSL 디자인 시스템 모음</title>
+  <style>
+    :root {
+      color-scheme: light;
+      /* @design-tokens */
+    }
+    /* @ds-components */
+    /* ── 모음 화면 자리(개발용 — design-system §6.10). 토큰만 쓴다(§8). ── */
+    * { box-sizing: border-box; }
+    body { margin: 0; font: var(--text-body); color: var(--color-text-primary); background: var(--color-surface-secondary); }
+    .g-shell { display: flex; min-height: 100vh; }
+    .g-nav { width: 220px; flex: none; position: sticky; top: 0; height: 100vh; overflow: auto; padding: var(--space-3); background: var(--color-background-primary); border-right: 1px solid var(--color-border-default); }
+    .g-nav h1 { margin: 0 0 var(--space-3); font: var(--text-heading); }
+    .g-nav h2 { margin: var(--space-4) 0 var(--space-1); font: var(--text-label-sm); color: var(--color-text-tertiary); }
+    .g-nav a { display: block; padding: var(--space-0-5) var(--space-2); border-radius: var(--radius-small); color: var(--color-text-secondary); text-decoration: none; font: var(--text-body-sm); }
+    .g-nav a:hover { background: var(--color-interactive-hover); color: var(--color-text-primary); }
+    .g-main { flex: 1 1 auto; min-width: 0; padding: var(--space-6); }
+    .g-frame { margin: 0 auto; max-width: 960px; }
+    body.g-narrow .g-frame { max-width: 560px; }
+    .g-bar { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-4); }
+    .g-sec { background: var(--color-background-primary); border: 1px solid var(--color-border-default); border-radius: var(--radius-medium); padding: var(--space-4); margin-bottom: var(--space-4); }
+    .g-sec > h3 { margin: 0 0 var(--space-1); font: var(--text-heading); }
+    .g-sec > p { margin: 0 0 var(--space-3); font: var(--text-body-sm); color: var(--color-text-secondary); }
+    .g-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: var(--space-2) 0; }
+    .g-label { min-width: 72px; font: var(--text-label-sm); color: var(--color-text-tertiary); }
+    .g-cell { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--space-1); }
+    .g-cell > small { font: var(--text-caption); color: var(--color-text-tertiary); }
+    .g-meta { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px solid var(--color-border-default); font: var(--text-body-sm); color: var(--color-text-secondary); }
+    .g-meta code, .g-code { font: var(--text-mono); color: var(--color-text-primary); }
+    .g-code { display: block; white-space: pre-wrap; padding: var(--space-2); margin-top: var(--space-1); border-radius: var(--radius-small); background: var(--color-surface-secondary); }
+    .g-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--space-2); }
+    .g-swatch { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1); border: 1px solid var(--color-border-default); border-radius: var(--radius-small); background: var(--color-background-primary); cursor: pointer; text-align: left; height: auto; font: var(--text-body-sm); }
+    .g-chipc { width: var(--space-6); height: var(--space-6); border-radius: var(--radius-xs); box-shadow: inset 0 0 0 1px var(--swatch-outline); flex: none; }
+    .g-detail { margin-top: var(--space-3); }
+    .g-bar-sp { display: block; height: var(--space-3); background: var(--color-primary); border-radius: var(--radius-xs); }
+    .g-box { width: var(--space-10); height: var(--space-10); background: var(--color-surface-secondary); border: 1px solid var(--color-border-default); }
+    .g-lay { border: 1px dashed var(--color-border-strong); border-radius: var(--radius-small); overflow: hidden; background: var(--color-background-primary); }
+    .g-lay .ds-layout { height: auto; min-height: var(--space-10); }
+    /* 강제 상태(§6.0 — 이 파일에만) */
+    .ds-btn.is-hover:not(.ds-btn--primary):not(.ds-btn--danger):not(.ds-btn--link) { background: var(--color-interactive-hover); }
+    .ds-btn--ghost.is-hover { color: var(--color-text-primary); }
+    .ds-btn--primary.is-hover { background: var(--color-primary-hover); border-color: var(--color-primary-hover); }
+    .ds-btn--danger.is-hover { background: var(--color-state-error-hover); border-color: var(--color-state-error-hover); }
+    .ds-btn--link.is-hover { color: var(--color-interactive-focus-hover); }
+    .ds-btn.is-focus, .ds-check.is-focus, .ds-radio.is-focus, .ds-toggle.is-focus, .ds-tab.is-focus { box-shadow: var(--focus-ring-default); }
+    .ds-input.is-hover { border-color: var(--color-border-strong); }
+    .ds-input.is-focus { background: var(--color-surface-primary); border-color: var(--color-interactive-focus); box-shadow: var(--focus-ring-field); }
+    .ds-navitem.is-hover, .ds-li.is-hover { background: var(--color-interactive-hover); }
+  </style>
+</head>
+<body>
+  <div class="g-shell">
+    <nav class="g-nav" id="gNav" aria-label="목록"><h1>DSL 디자인 시스템</h1></nav>
+    <main class="g-main"><div class="g-frame">
+      <div class="g-bar"><label class="ds-checkline"><input type="checkbox" class="ds-check" id="gNarrow" /> <span>560 플러그인 폭으로 보기</span></label></div>
+      <div id="gBody"></div>
+    </div></main>
+  </div>
+<!-- UI_SCRIPT -->
+</body>
+</html>

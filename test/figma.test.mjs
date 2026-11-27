@@ -3,7 +3,7 @@
    순수 로직(tokens·naming)은 pure.test.mjs가 담당. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pickScope as pickScopePure, highConfidenceComponentRole as hcRolePure, isKnownRole as isKnownRolePure } from '../dist/pure.mjs';
+import { pickScope as pickScopePure, isKnownRole as isKnownRolePure } from '../dist/pure.mjs';
 import { rgbToHex, hexToRgb, isKnownRole, nameTextStyles, clusterTextStyles, nameColorsByHue, resolveGlobalNames, isExtractOnlyColorName } from '../dist/pure.mjs';
 import {
   extractFromSelection,
@@ -29,14 +29,15 @@ import {
   scanTextStyles,
   createSemanticTextStyles,
   renameTextRoleVars,
-  planTsRename,
-  applyTsRename,
   applyExistingTextStyles,
   planExistingTextStyles,
   applyTextStyleRows,
   applyRegisteredTextStyles,
   textStyleCandidateTest,
+  dropRemoteClusters,
+  creationOrder,
   bindSelection,
+  readVarInfos,
   collectLocalMains,
   createRole,
   judgeUnused,
@@ -65,11 +66,6 @@ import {
   DARK_FILL_KEY,
   ensureDarkMode,
   DARK_MODE_NAME,
-  createIconRegistry,
-  cleanupAfterRegister,
-  tallyRestoreFailures,
-  swapVectorSlots,
-  transplantImageFills,
   applyVariableToNodes,
   isManualVar,
   createManualVariable,
@@ -1523,7 +1519,9 @@ test('bindSelection — 선 두께(strokeWeight)는 STROKE_FLOAT 변수에 바�
   assert.equal(res.bound, 1);
 });
 
-test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색은 fill에 안 붙음)', async () => {
+// S-2(ia-v4 §2.9 S2-P3 · SC-D31 ⑧)로 기대가 바뀜: 플러그인 Global은 용도가 달라도 같은 변수다 — 용도가 맞는 후보가 없으면 붙이고 용도를 더한다
+// (전에는 "stroke 전용 색은 fill에 안 붙음"). 사용자 변수는 여전히 용도가 맞을 때만이다(아래 B.33 ②).
+test('bindSelection — 색상의 용도: 용도가 맞는 변수가 먼저, 플러그인 Global은 용도만 다르면 붙이고 용도를 더함(S2-P3)', async () => {
   const figma = installFigma();
   await createTokens(
     [
@@ -1551,9 +1549,11 @@ test('bindSelection — 색상도 용도 스코프로 분리(stroke 전용 색�
   const fillVar = findVar(figma, 'Global', 'color/aa0000');
   const strokeVar = findVar(figma, 'Global', 'color/0000aa');
   assert.equal(roleTarget(figma, node.fills[0].boundVariables.color.id), fillVar.id); // fill 매칭
-  assert.equal(node.fills[1].boundVariables, undefined); // stroke 전용 색은 fill에 안 붙음
+  assert.equal(roleTarget(figma, node.fills[1].boundVariables.color.id), strokeVar.id); // 용도 예외 — 같은 값 플러그인 Global에(새 Semantic으로 감쌈)
+  assert.deepEqual([...strokeVar.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']); // 연결하며 용도를 더함
+  assert.deepEqual([...fillVar.scopes], ['ALL_FILLS']); // 용도가 맞는 쪽은 그대로
   assert.equal(roleTarget(figma, node.strokes[0].boundVariables.color.id), strokeVar.id); // stroke 매칭
-  assert.equal(res.bound, 2);
+  assert.equal(res.bound, 3);
 });
 
 test('bindSelection — 반투명 칠하기 · 그림자는 hex · 투명도까지 같은 변수에만 붙고 레이어 값은 그대로(ia-v3 §2.11 "색")', async () => {
@@ -1672,7 +1672,7 @@ test('bindSelection — 역할 별칭(text)이 같은 값의 Semantic 거울(col
   await bindSelection([node]);
   assert.equal(label.fills[0].boundVariables.color.id, findVar(figma, 'Semantic', 'text').id);
   const gap = node.boundVariables.itemSpacing.id;
-  assert.equal(varName(figma, gap), 'spacing/gap'); // 옛 고정 칸 이름(spacing/sm)은 순서 3에서 빠진다(12.7)
+  assert.equal(varName(figma, gap), 'spacing/gap'); // 옛 고정 칸 이름(spacing/sm)의 별칭은 후보에서 빠진다(12.7 · ia-v4 §2.9 S2-P4)
   assert.equal(roleTarget(figma, gap), findVar(figma, 'Global', 'spacing/8').id);
 });
 
@@ -2120,15 +2120,19 @@ test('renameSelection — 선택 루트 컨테이너는 사람이 지은 이름�
   assert.equal(node.name, 'OriginalName');
 });
 
-test('renameSelection — 정규화: 사람이 지은 하위 레이어 이름도 역할로 교체(뚜렷한 역할)', async () => {
+test('renameSelection — S-2b: 사람이 지은 하위 레이어 이름은 그대로 · 역할 · 지킨 이름 표시만 기록(ia-v4 §4.4 R2B-P2 · SC-D51)', async () => {
   installFigma();
-  const inner = { type: 'VECTOR', id: 'in', name: 'OriginalName' }; // 사람이 지은 이름
-  // 선택 루트(보존) 아래의 사람이 지은 이름 → 보존하지 않고 역할(VECTOR → icon)로 교체.
+  const inner = withPluginData({ type: 'VECTOR', id: 'in', name: 'OriginalName' }); // 사람이 지은 이름
+  // S-2b 전에는 역할(VECTOR → icon)로 덮어썼다. 이제는 이름을 지키고 역할만 기록한다.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [inner] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
-  const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('in'), 'icon'); // 'OriginalName'을 역할(icon)로 덮어씀
-  assert.equal(inner.name, 'icon');
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  assert.equal(changes.some((c) => c.id === 'in'), false);
+  assert.equal(inner.name, 'OriginalName');
+  const n = nodes.find((x) => x.id === 'in');
+  assert.equal(n.role, 'icon');
+  assert.equal(n.kept, true);
+  assert.equal(inner.getPluginData('dsRole'), 'icon');
+  assert.equal(inner.getPluginData('dsKept'), 'OriginalName');
 });
 
 test('renameSelection — 토큰 신호로 맥락/역할 결정(조상 없음 → 토큰 접두사 폴백, 원시 토큰은 무시)', async () => {
@@ -2238,11 +2242,14 @@ test('renameSelection — swatch 규칙: 색만 채운 빈 프레임 → swatch,
   const emptyFrame = { type: 'FRAME', id: 'e', name: 'Frame 3', children: [] };
   // #7b: 대상들을 루트(보존) 아래에 둬 역할 추론을 depth≥1에서 검증.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [swatch, imageFrame, emptyFrame] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('s'), 'swatch'); // 색만 채운 빈 프레임 → swatch
   assert.equal(after.get('im'), 'image'); // 이미지 채움 → image
-  assert.equal(after.get('e'), 'container'); // 빈 프레임 → container(맥락 없이 plain)
+  // 빈 프레임 → 역할 container. S-2b(ia-v4 §4.4 R2B-P2): 구조 폴백은 이름으로 쓰지 않는다 — 이름 그대로 · 역할만 기록
+  assert.equal(after.has('e'), false);
+  assert.equal(nodes.find((n) => n.id === 'e').role, 'container');
+  assert.equal(emptyFrame.name, 'Frame 3');
 });
 
 test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아니라 컨테이너', async () => {
@@ -2257,9 +2264,11 @@ test('renameSelection — 색이 있어도 자식이 있으면 스와치가 아�
   };
   // #7b: card를 루트(보존) 아래에 둬 depth≥1에서 역할 추론 검증.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('card'), 'container'); // 색+자식 다수, 라운드/그림자 없음 → container(plain)
+  // 색+자식 다수, 라운드/그림자 없음 → 역할 container(S-2b: 폴백은 이름 그대로 · 역할만 기록)
+  assert.equal(after.has('card'), false);
+  assert.equal(nodes.find((n) => n.id === 'card').role, 'container');
   assert.equal(after.get('ci'), 'icon'); // 부모가 일반 container → 맥락 접두사 안 붙임
 });
 
@@ -2289,13 +2298,14 @@ test('renameSelection — 멱등: 한 번 정돈한 이름은 재실행에도 �
 
 test('renameSelection — apply:false면 미리보기만(노드 이름 불변)', async () => {
   installFigma();
-  const node = { type: 'FRAME', id: 'f', name: 'Frame 1', children: [] };
+  // 색만 채운 빈 프레임 → swatch(S-2b 뒤 빈 프레임의 container는 이름으로 쓰지 않으므로 바뀌는 예로 swatch)
+  const node = { type: 'FRAME', id: 'f', name: 'Frame 1', fills: [{ type: 'SOLID', visible: true }], children: [] };
   // #7b: depth0 루트는 보존이므로 대상을 루트 아래에 둔다(루트는 변경에 안 잡힘).
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [node] };
   const { changes, applied } = await renameSelection([root], { apply: false, maxDepth: 3 });
   assert.equal(applied, false);
   assert.equal(changes.length, 1);
-  assert.equal(changes[0].after, 'container');
+  assert.equal(changes[0].after, 'swatch');
   assert.equal(node.name, 'Frame 1'); // 적용 안 함
 });
 
@@ -2416,7 +2426,7 @@ test('renameSelection — 영역 추론: 페이지 세로 스택의 첫=header, 
 test('renameSelection — 영역 추론: [header, 본문] 2분할에서 키 큰 블록은 footer가 아니라 main, 그 자식은 section/footer', async () => {
   installFigma();
   // Flightin QA 파일 형태: 1440x4970 페이지 = header 80px + 본문 4890px(섹션 4 + 진짜 푸터).
-  const sec = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, layoutMode: 'VERTICAL', width: 1440, height: h,
+  const sec = (id, h) => ({ type: 'FRAME', id, name: 'Frame', layoutMode: 'VERTICAL', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: `${id}-v`, name: 'Vector' }] });
   const body = {
     type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4890,
@@ -2465,12 +2475,12 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
       ],
     }],
   };
-  const sec = (id, h) => ({ type: 'FRAME', id, name: `Frame ${id}`, layoutMode: 'VERTICAL', width: 1440, height: h,
+  const sec = (id, h) => ({ type: 'FRAME', id, name: 'Frame', layoutMode: 'VERTICAL', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: `${id}-v`, name: 'Vector' }] });
   const body = { type: 'FRAME', id: 'body', name: 'Frame 9', layoutMode: 'VERTICAL', width: 1440, height: 4890,
     children: [sec('hero', 700), sec('s2', 900), sec('ft', 312)] };
   const page = { type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL', width: 1440, height: 4970, children: [header, body] };
-  const { changes } = await renameSelection([page], { apply: true, maxDepth: 5 });
+  const { changes, nodes } = await renameSelection([page], { apply: true, maxDepth: 5 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
   assert.equal(after.get('hd'), 'header');
   assert.equal(after.get('logo'), 'header-logo'); // 헤더 첫 자리의 작은 묶음
@@ -2478,7 +2488,9 @@ test('renameSelection — 헤더 안 logo/nav/actions + 본문 첫 블록 hero (
   assert.equal(after.get('act'), 'header-actions'); // 마지막 자리의 텍스트 2개
   // 중첩 컨테이너(ctxDepth 2)의 첫·끝 자리는 logo/actions가 아니라 일반 구조어로 남는다.
   // 가로 오토레이아웃 묶음은 stack-x(ia-v3 §2.12 12.12 N-D6 — 전에는 container)
-  assert.ok(['stack-x', 'wrapper'].includes(after.get('util')), `util → ${after.get('util')}`);
+  // S-2b(ia-v4 §4.4 R2B-P2): 구조 폴백은 이름으로 쓰지 않는다 — 바꿀 줄 없이 역할만 실린다
+  const utilRole = nodes.find((n) => n.id === 'util').role;
+  assert.ok(['stack-x', 'wrapper'].includes(utilRole) && !after.has('util'), `util → ${utilRole} / ${after.get('util')}`);
   // 글자 1개 + 아이콘인 가로 묶음은 글자 버튼(ia-v4 §4.4 A2 — B.24에서 바뀜, 전에는 container/wrapper)
   assert.equal(after.get('sup'), 'header-button');
   assert.equal(after.get('lang'), 'header-button');
@@ -2633,7 +2645,7 @@ test('renameSelection — aside: 납작한 툴바의 작은 자식은 aside 아�
 
 test('renameSelection — HTML 랜드마크 section: 페이지 중간 블록(3개 초과) → section', async () => {
   installFigma();
-  const mk = (id, vid) => ({ type: 'FRAME', id, name: id, children: [{ type: 'VECTOR', id: vid, name: 'Vector' }] });
+  const mk = (id, vid) => ({ type: 'FRAME', id, name: 'Frame', children: [{ type: 'VECTOR', id: vid, name: 'Vector' }] });
   const page = {
     type: 'FRAME', id: 'page', name: 'Frame 1', layoutMode: 'VERTICAL',
     children: [mk('hd', 'v0'), mk('s1', 'v1'), mk('s2', 'v2'), mk('s3', 'v3'), mk('ft', 'v4')],
@@ -2650,7 +2662,7 @@ test('renameSelection — HTML 랜드마크 section: 페이지 중간 블록(3�
 test('renameSelection — HTML 시맨틱 article: 피드(리스트) 안의 카드형 항목 → article', async () => {
   installFigma();
   const card = (id) => ({
-    type: 'FRAME', id, name: 'Frame X', width: 300, height: 120,
+    type: 'FRAME', id, name: 'Frame', width: 300, height: 120,
     cornerRadius: 8, fills: [{ type: 'SOLID', visible: true }],
     children: [
       { type: 'TEXT', id: id + 't', name: 'Title', characters: '제목' },
@@ -2700,7 +2712,7 @@ test('renameSelection — 칩: 작은 알약형 버튼 → chip', async () => {
 test('renameSelection — 리스트: 오토레이아웃+유사 반복 자식 3개↑ → list, 자식 → item', async () => {
   installFigma();
   const mkRow = (id) => ({
-    type: 'FRAME', id, name: 'Frame X', width: 300, height: 48,
+    type: 'FRAME', id, name: 'Frame', width: 300, height: 48,
     children: [{ type: 'TEXT', id: id + 't', name: 't', characters: 'x' }],
   });
   const list = {
@@ -2752,10 +2764,11 @@ test('renameSelection — 스냅샷 토큰 베낌(line-height-150-percent-px)도
   const frame = { type: 'FRAME', id: 'f', name: 'line-height-150-percent-px', children: [] };
   // #7b: depth0 루트는 보존이므로 대상을 루트 아래에 둔다.
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [frame] };
-  const { changes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
   const after = new Map(changes.map((c) => [c.id, c.after]));
-  assert.equal(after.get('f'), 'container'); // percent-px echo → 그대로 두지 않고 container로 정리
-  assert.notEqual(frame.name, 'line-height-150-percent-px');
+  // 역할은 container(토큰 베낌 이름에 끌려가지 않음). S-2b: 구조 폴백은 이름으로 쓰지 않으므로 이름은 그대로 두고 역할만 기록한다
+  assert.equal(after.has('f'), false);
+  assert.equal(nodes.find((n) => n.id === 'f').role, 'container');
 });
 
 test('renameSelection(#7b) — 선택 루트 컨테이너는 기본명이어도 보존, 자식은 정돈(맥락 누수 없음)', async () => {
@@ -3018,7 +3031,7 @@ test('renameSelection — 메인 컴포넌트·컴포넌트 세트·잠긴 서�
 test('renameSelection — 페이지 섹션 스택은 list가 아니라 랜드마크로', async () => {
   installFigma();
   const mk = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
   const page = {
@@ -3046,7 +3059,7 @@ function stackPage(rootName, prefix = '', pd = false) {
     return n;
   };
   const mk = (id, h) => ({
-    type: 'FRAME', id: prefix + id, name: `Frame ${id}`, width: 1440, height: h,
+    type: 'FRAME', id: prefix + id, name: 'Frame', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: prefix + id + 'v', name: 'Vector' }],
   });
   const page = withPd({
@@ -3138,7 +3151,7 @@ test('B.22 ⑧ apply면 뗀 노드에 dsNameKey · 떼지 않은 노드는 없�
 test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음', async () => {
   installFigma();
   const mkCard = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 360, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 360, height: h,
     cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
     children: [
       { type: 'TEXT', id: id + 't', name: 'Title', characters: 'x' },
@@ -3158,7 +3171,7 @@ test('renameSelection — depth 1의 카드가 header/footer로 덮이지 않음
 test('renameSelection — 넓은 커버 이미지가 있어도 카드는 field가 아니라 card', async () => {
   installFigma();
   const card = {
-    type: 'FRAME', id: 'card', name: 'Product Card', layoutMode: 'VERTICAL', width: 320, height: 400,
+    type: 'FRAME', id: 'card', name: 'Frame 5', layoutMode: 'VERTICAL', width: 320, height: 400,
     cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
     children: [
       { type: 'TEXT', id: 'tt', name: 'Title', characters: '제품' },
@@ -3174,7 +3187,7 @@ test('renameSelection — 넓은 커버 이미지가 있어도 카드는 field�
 test('renameSelection — 반복 필드 3개인 폼도 field/input 사슬 유지', async () => {
   installFigma();
   const mkField = (id) => ({
-    type: 'FRAME', id, name: `Field ${id}`, layoutMode: 'VERTICAL', width: 400, height: 70,
+    type: 'FRAME', id, name: 'Frame', layoutMode: 'VERTICAL', width: 400, height: 70,
     children: [
       { type: 'TEXT', id: id + 'l', name: 'Label', characters: '라벨' },
       { type: 'RECTANGLE', id: id + 'i', name: 'Rectangle', width: 400, height: 44, strokes: [{ type: 'SOLID', visible: true }] },
@@ -3193,7 +3206,7 @@ test('renameSelection — 반복 필드 3개인 폼도 field/input 사슬 유지
 test('renameSelection — 숨긴 힌트·에러 줄이 있어도 field 유지', async () => {
   installFigma();
   const field = {
-    type: 'FRAME', id: 'field', name: 'Email Field', layoutMode: 'VERTICAL', width: 240, height: 70,
+    type: 'FRAME', id: 'field', name: 'Frame 5', layoutMode: 'VERTICAL', width: 240, height: 70,
     children: [
       { type: 'TEXT', id: 'lb', name: 'Label', characters: '이메일' },
       { type: 'RECTANGLE', id: 'box', name: 'Rectangle 1', width: 240, height: 40, strokes: [{ type: 'SOLID', visible: true }] },
@@ -3211,10 +3224,10 @@ test('renameSelection — 숨긴 힌트·에러 줄이 있어도 field 유지', 
 test('renameSelection — 랜드마크 슬롯은 숨김·TEXT 형제를 세지 않음', async () => {
   installFigma();
   const mk = (id) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 1000, height: 200,
+    type: 'FRAME', id, name: 'Frame', width: 1000, height: 200,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
-  const ghost = { type: 'FRAME', id: 'ghost', name: 'Frame G', visible: false, width: 1000, height: 10, children: [] };
+  const ghost = { type: 'FRAME', id: 'ghost', name: 'Frame', visible: false, width: 1000, height: 10, children: [] };
   const page = {
     type: 'FRAME', id: 'page', name: 'Desktop', width: 1000, height: 900, layoutMode: 'VERTICAL',
     children: [ghost, mk('hd'), mk('mn'), mk('ft'), { type: 'TEXT', id: 'cp', name: 'c', characters: '© 2026' }],
@@ -3250,7 +3263,7 @@ test('renameSelection — 히어로 섹션 안에는 header/footer 랜드마크�
 test('renameSelection — 페이지는 이름이 역할 어휘가 아니고 화면 크기일 때만 랜드마크', async () => {
   installFigma();
   const block = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 1440, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 1440, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
   // 'Desktop'은 역할 어휘가 아니고 1440x2400은 페이지 크롬 → 랜드마크 인정.
@@ -3314,7 +3327,7 @@ test('renameSelection — 시트·드로어·무명 좁은 패널에는 header/f
 test('renameSelection — 모바일 Home 화면은 세로 랜드마크 유지', async () => {
   installFigma();
   const block = (id, h) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 390, height: h,
+    type: 'FRAME', id, name: 'Frame', width: 390, height: h,
     children: [{ type: 'VECTOR', id: id + 'v', name: 'Vector' }],
   });
   const home = {
@@ -3331,15 +3344,15 @@ test('renameSelection — 모바일 Home 화면은 세로 랜드마크 유지', 
 test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
   installFigma();
   const col = (id, t) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 48,
+    type: 'FRAME', id, name: 'Frame', width: 80, height: 48,
     children: [{ type: 'TEXT', id: id + 't', name: 'n', characters: t }],
   });
   const row = {
-    type: 'FRAME', id: 'row', name: 'Frame R', layoutMode: 'HORIZONTAL', width: 300, height: 48,
+    type: 'FRAME', id: 'row', name: 'Frame', layoutMode: 'HORIZONTAL', width: 300, height: 48,
     children: [col('a', '12'), col('b', '34'), col('c', '56')],
   };
   const card = {
-    type: 'FRAME', id: 'card', name: 'Frame C', width: 320, height: 200, cornerRadius: 12,
+    type: 'FRAME', id: 'card', name: 'Frame', width: 320, height: 200, cornerRadius: 12,
     fills: [{ type: 'SOLID', visible: true }],
     children: [row, { type: 'TEXT', id: 'ct', name: 'Title', characters: 'x' }],
   };
@@ -3353,11 +3366,11 @@ test('renameSelection — 카드 안 통계 행은 nav가 아님', async () => {
 test('renameSelection — nav의 링크 자식은 nav-item', async () => {
   installFigma();
   const link = (id) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 80, height: 32,
+    type: 'FRAME', id, name: 'Frame', width: 80, height: 32,
     children: [{ type: 'TEXT', id: id + 't', name: 'l', characters: '링크' }],
   });
   const nav = {
-    type: 'FRAME', id: 'nav', name: 'Frame N', layoutMode: 'HORIZONTAL', width: 600, height: 48,
+    type: 'FRAME', id: 'nav', name: 'Frame', layoutMode: 'HORIZONTAL', width: 600, height: 48,
     children: [link('l1'), link('l2'), link('l3')],
   };
   const page = { type: 'FRAME', id: 'page', name: 'Desktop', width: 1440, height: 900, children: [nav] };
@@ -3372,11 +3385,11 @@ test('renameSelection — 자식 역할은 부모에게 부여된 역할에서�
   // 카드 크롬이 있어 card로 확정되지만, 구조만 보면 isListLike도 참인 프레임.
   // 구조를 재판정하면 자식이 item이 된다 — 확정 역할(card)에서만 파생해야 한다.
   const row = (id) => ({
-    type: 'FRAME', id, name: `Frame ${id}`, width: 280, height: 48,
+    type: 'FRAME', id, name: 'Frame', width: 280, height: 48,
     children: [{ type: 'TEXT', id: id + 't', name: 't', characters: 'x' }],
   });
   const card = {
-    type: 'FRAME', id: 'card', name: 'Frame C', layoutMode: 'VERTICAL', width: 320, height: 200,
+    type: 'FRAME', id: 'card', name: 'Frame', layoutMode: 'VERTICAL', width: 320, height: 200,
     cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
     children: [row('r1'), row('r2'), row('r3')],
   };
@@ -4128,209 +4141,6 @@ test('createSemanticTextStyles — 같은 px 자간 이름에 원본이 갈리�
 
 /* themeApply.ts(다크) 테스트는 파일 끝 — D-T1(ia-v3 13.7 · A.25) */
 
-/* ================= artwork.ts (그림 슬롯 이식) ================= */
-/** 최소 씬그래프 목 — clone은 실물처럼 **형제로** 끼운다(코드가 즉시 페이지로 옮기는지 본다). */
-function sceneMock() {
-  let seq = 0;
-  const detach = (n) => {
-    if (n.parent) n.parent.children.splice(n.parent.children.indexOf(n), 1);
-    n.parent = null;
-  };
-  const mk = (props = {}) => {
-    const n = {
-      id: `n${seq++}`,
-      name: 'node',
-      type: 'FRAME',
-      x: 0,
-      y: 0,
-      width: 16,
-      height: 16,
-      fills: [],
-      parent: null,
-      removed: false,
-      ...props,
-      children: [], // 스프레드 뒤에 새 배열로 — props.children을 그대로 쓰면 아래 appendChild가 같은 배열에 또 담는다
-      appendChild(c) { detach(c); c.parent = this; this.children.push(c); },
-      insertChild(i, c) { detach(c); c.parent = this; this.children.splice(i, 0, c); },
-      resize(w, h) { this.width = w; this.height = h; },
-      remove() { detach(this); this.removed = true; },
-      clone() {
-        const copy = mk({ ...this, id: `n${seq++}`, children: [], parent: null });
-        for (const k of this.children) copy.appendChild(k.clone());
-        if (this.parent) this.parent.appendChild(copy); // 실물: 같은 부모의 형제로 들어온다
-        return copy;
-      },
-    };
-    for (const c of props.children ?? []) n.appendChild(c);
-    return n;
-  };
-  const page = mk({ name: 'Components', type: 'PAGE' });
-  globalThis.figma = {
-    createComponentFromNode(node) {
-      node.type = 'COMPONENT';
-      node.key = `key:${node.id}`;
-      node.createInstance = function () {
-        const inst = mk({ ...this, id: `n${seq++}`, type: 'INSTANCE', children: [], parent: null, mainComponent: this });
-        for (const k of this.children) inst.appendChild(k.clone());
-        page.appendChild(inst);
-        return inst;
-      };
-      return node;
-    },
-  };
-  return { mk, page };
-}
-
-test('createIconRegistry — 지문별 1개 · 복제본을 멤버 트리 밖으로 즉시 꺼낸다', () => {
-  const { mk, page } = sceneMock();
-  const placed = [];
-  const failures = [];
-  const reg = createIconRegistry({
-    page,
-    place: (c) => placed.push(c),
-    uniqueName: (b) => (placed.length ? `${b}${placed.length + 1}` : b),
-    onFailure: (m) => failures.push(m),
-  });
-
-  const heart = mk({ name: 'icon', type: 'VECTOR' });
-  const star = mk({ name: 'icon', type: 'VECTOR' });
-  const cardA = mk({ name: 'card', children: [heart, mk({ name: 'label', type: 'TEXT' })] });
-  const cardB = mk({ name: 'card', children: [star, mk({ name: 'label', type: 'TEXT' })] });
-
-  const a = reg.ensure('k1', heart, 'Icon');
-  const b = reg.ensure('k2', star, 'Icon');
-  const again = reg.ensure('k1', heart, 'Icon');
-
-  assert.equal(reg.created(), 2); // 같은 지문은 다시 만들지 않는다
-  assert.equal(again, a);
-  assert.notEqual(a, b);
-  assert.deepEqual(placed.map((c) => c.name), ['Icon', 'Icon2']);
-  assert.equal(a.type, 'COMPONENT');
-  // 복제본이 멤버 안에 남으면 뒤따르는 슬롯의 인덱스 경로가 어긋난다 — 자식 수는 그대로여야 한다.
-  assert.equal(cardA.children.length, 2);
-  assert.equal(cardB.children.length, 2);
-  assert.equal(reg.get('k1'), a);
-  assert.equal(reg.get('없는키'), null);
-  assert.deepEqual(failures, []);
-});
-
-/* [등록] 끝 정리(ia-v3 §4.7 "인스턴스 자리" 7번 — 2026-11-13 사용자 결정 C-D4, A.15) */
-function registerCleanupFixture(pageName = 'Components') {
-  const { mk, page } = sceneMock();
-  page.name = pageName;
-  const doc = mk({ name: 'doc', type: 'DOCUMENT' });
-  doc.appendChild(page);
-  const reg = createIconRegistry({ page, place: (c) => page.appendChild(c), uniqueName: (b) => b, onFailure: () => {} });
-  // 문서 전체 인스턴스 — mainComponent로 센다(피그마 getInstancesAsync 대신)
-  const all = [];
-  const instancesOf = async (comp) => all.filter((i) => i.mainComponent === comp && !i.removed);
-  const use = (comp, parent) => { const inst = comp.createInstance(); parent.appendChild(inst); all.push(inst); return inst; };
-  return { mk, page, doc, reg, instancesOf, use };
-}
-
-test('[등록] 끝 정리 — 마스터를 못 만들면 새로 만든 아이콘 · 이번에 만든 Components 페이지를 지운다(아이콘 0)', async () => {
-  const { mk, page, doc, reg, instancesOf } = registerCleanupFixture();
-  reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star'); // 마스터 만들기 전에 만든 아이콘 — 마스터 실패로 아무도 안 씀
-  assert.equal(reg.created(), 1);
-  const removed = await cleanupAfterRegister({ registry: reg, page, pageCreated: true, instancesOf });
-  assert.equal(removed, 1);
-  assert.equal(reg.created(), 0, '"아이콘 n"에서 빠진다');
-  assert.equal(page.removed, true, '이번에 만든 빈 페이지는 지운다');
-  assert.ok(!doc.children.includes(page));
-});
-
-test('[등록] 끝 정리 — 전부터 있던 빈 Components 페이지는 남긴다', async () => {
-  const { mk, page, reg, instancesOf } = registerCleanupFixture();
-  reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star');
-  await cleanupAfterRegister({ registry: reg, page, pageCreated: false, instancesOf });
-  assert.equal(page.children.length, 0);
-  assert.equal(page.removed, false);
-});
-
-test('[등록] 끝 정리 — 원본으로 남은 나머지 멤버 몫 아이콘은 지우고, 쓰이는 아이콘 · 컴포넌트가 있는 페이지는 남긴다', async () => {
-  const { mk, page, reg, instancesOf, use } = registerCleanupFixture();
-  const heart = reg.ensure('heart', mk({ name: 'heart', type: 'VECTOR' }), 'Heart'); // 마스터가 씀
-  const star = reg.ensure('star', mk({ name: 'star', type: 'VECTOR' }), 'Star'); // 넣지 못해 원본으로 남은 멤버 몫
-  const master = mk({ name: 'Card', type: 'COMPONENT' });
-  page.appendChild(master);
-  use(heart, master);
-  const removed = await cleanupAfterRegister({ registry: reg, page, pageCreated: true, instancesOf });
-  assert.equal(removed, 1);
-  assert.equal(star.removed, true);
-  assert.equal(heart.removed, false);
-  assert.equal(reg.created(), 1);
-  assert.equal(page.removed, false);
-});
-
-test('[등록] 속성 값 꼬리 — 한 자리는 한 번만(넣을 때 센 자리의 되돌리기 실패는 다시 세지 않음) · 이름이 같은 다른 자리는 따로', () => {
-  const roots = [{ node: {}, name: 'Card', counted: true }, { node: {}, name: 'Card' }, { node: {}, name: 'Card' }];
-  const propFailed = ['Card']; // 0번 자리를 넣을 때 셌다
-  const diag = [];
-  tallyRestoreFailures(roots, new Map([[0, ['Title', 'Body']]]), propFailed, (n, p) => diag.push(`${n}:${p}`));
-  assert.deepEqual(propFailed, ['Card'], '같은 자리 두 번 실패 → 1');
-  assert.deepEqual(diag, ['Card:Title', 'Card:Body'], '진단은 속성마다');
-  const tail = [];
-  tallyRestoreFailures(roots, new Map([[1, ['Title']], [2, ['Title']]]), tail, () => {});
-  assert.deepEqual(tail, ['Card', 'Card'], '이름이 같은 두 자리가 따로 실패 → 2');
-});
-
-test('swapVectorSlots — 벡터 자리를 아이콘 인스턴스로(자리·이름·크기 유지)', () => {
-  const { mk, page } = sceneMock();
-  const reg = createIconRegistry({ page, place: () => {}, uniqueName: (b) => b, onFailure: () => {} });
-  const icon = reg.ensure('k1', mk({ name: 'icon', type: 'VECTOR' }), 'Icon');
-
-  const vector = mk({ name: 'icon-heart', type: 'VECTOR', width: 20, height: 20, x: 4, y: 6 });
-  const master = mk({
-    name: 'Chip',
-    type: 'COMPONENT',
-    layoutMode: 'NONE',
-    children: [mk({ name: 'label', type: 'TEXT' }), vector, mk({ name: 'tail', type: 'TEXT' })],
-  });
-
-  const failures = swapVectorSlots(master, [{ layerName: 'icon-heart', layerPath: '1', icon }]);
-  assert.deepEqual(failures, []);
-  assert.equal(master.children.length, 3); // 자식 수 유지 → 다른 슬롯 경로가 살아 있다
-  const slot = master.children[1];
-  assert.equal(slot.type, 'INSTANCE');
-  assert.equal(slot.mainComponent, icon);
-  assert.equal(slot.name, 'icon-heart'); // 원래 레이어 이름 보존
-  assert.deepEqual([slot.width, slot.height, slot.x, slot.y], [20, 20, 4, 6]);
-  assert.equal(vector.removed, true);
-  assert.deepEqual(master.children.map((c) => c.name), ['label', 'icon-heart', 'tail']);
-});
-
-test('swapVectorSlots — 아이콘을 못 만들었으면 원본을 그대로 둔다(사유 보고)', () => {
-  const { mk } = sceneMock();
-  const vector = mk({ name: 'icon', type: 'VECTOR' });
-  const master = mk({ name: 'Chip', type: 'COMPONENT', children: [vector] });
-  const failures = swapVectorSlots(master, [{ layerName: 'icon', layerPath: '0', icon: null }]);
-  assert.equal(failures.length, 1);
-  assert.match(failures[0], /아이콘 자리 교체 실패/);
-  assert.equal(master.children[0], vector); // 그림을 잃지 않는다
-  assert.equal(vector.removed, false);
-});
-
-test('transplantImageFills — 인스턴스의 같은 경로에 원본 사진 fill을 이식', () => {
-  const { mk } = sceneMock();
-  const photo = [{ type: 'IMAGE', imageHash: 'h2', visible: true }];
-  const inst = mk({
-    name: 'Card',
-    type: 'INSTANCE',
-    children: [mk({ name: 'body', children: [mk({ name: 'thumbnail', type: 'RECTANGLE', fills: [{ type: 'IMAGE', imageHash: 'h1' }] })] })],
-  });
-
-  const ok = transplantImageFills(inst, { '0/0': photo });
-  assert.equal(ok.applied, 1);
-  assert.deepEqual(ok.failures, []);
-  assert.deepEqual(inst.children[0].children[0].fills, photo);
-
-  // 자리를 못 찾으면 조용히 넘어가지 않고 사유를 남긴다(사진이 마스터 것으로 통일된 셈).
-  const bad = transplantImageFills(inst, { '9/9': photo });
-  assert.equal(bad.applied, 0);
-  assert.equal(bad.failures.length, 1);
-  assert.match(bad.failures[0], /사진 이식 실패/);
-});
-
 /* ================= 플러그인 컬렉션 · 사용자 컬렉션(§2.13, A.12) ================= */
 const withRoot = (figma) => {
   const data = {};
@@ -4430,11 +4240,13 @@ test('역할 매핑 표 — 이름은 직접 값 Global에서, 없으면 reuseMa
   assert.deepEqual(made.valuesByMode[sem.defaultModeId], { type: 'VARIABLE_ALIAS', id: blue.id });
 });
 
-test('연결 — 새 역할은 플러그인 Semantic에, 별칭 대상은 사용자 Global 먼저 · 플러그인 Global의 별칭 변수는 대상 아님', async () => {
+// S-2(ia-v4 §2.9 S2-P4 · S2-P5 · SC-D32 ②)로 기대가 바뀜: ① 플러그인 Global 컬렉션 안의 별칭 변수도 후보(사용자 변수 갈래)이고 별칭이 원시값보다 먼저다
+// ② 원시값 후보끼리는 이름 오름차순 → 이름까지 같으면 사용자 컬렉션 먼저(전에는 "사용자 컬렉션 먼저 → 이름 순", 별칭 변수는 대상 아님).
+test('연결 — 별칭이 먼저(플러그인 Global 안의 별칭도) · 원시값끼리는 이름 오름차순 → 같은 이름이면 사용자 컬렉션 먼저 · 새 역할은 플러그인 Semantic에(S2-P5)', async () => {
   const figma = installFigma();
   withRoot(figma);
   const g = figma.variables.createVariableCollection('Global'); // 이어받을 플러그인 Global
-  const shortcut = figma.variables.createVariable('a/shortcut', g, 'COLOR'); // 별칭 변수(이름 순 첫 번째)
+  const shortcut = figma.variables.createVariable('a/shortcut', g, 'COLOR'); // 별칭 변수
   const pg = figma.variables.createVariable('b/blue', g, 'COLOR');
   pg.setValueForMode(g.defaultModeId, rgbOf('#aa0000'));
   shortcut.setValueForMode(g.defaultModeId, { type: 'VARIABLE_ALIAS', id: pg.id });
@@ -4450,11 +4262,22 @@ test('연결 — 새 역할은 플러그인 Semantic에, 별칭 대상은 사용
   };
   const dry = await bindSelection([node], false);
   assert.equal(dry.candidates.length, 1);
-  assert.equal(dry.candidates[0].newRole.globalId, up.id); // 사용자 Global 먼저
-  // 사용자 Global이 없으면 플러그인 Global의 직접 값 변수(별칭 shortcut 아님)
-  up.remove();
+  assert.equal(dry.candidates[0].variableId, shortcut.id); // 별칭 먼저 — 새 역할 없음
+  assert.equal(dry.candidates[0].newRole, undefined);
+  // 별칭이 없으면 원시값끼리 이름 오름차순(b/blue < z/red) — 유료는 그것을 가리키는 새 역할
+  shortcut.remove();
   const dry2 = await bindSelection([node], false);
   assert.equal(dry2.candidates[0].newRole.globalId, pg.id);
+  assert.equal(dry2.candidates[0].newRoleGlobalName, 'b/blue');
+  // 이름까지 같으면 사용자 컬렉션 먼저
+  const up2 = figma.variables.createVariable('b/blue', prim, 'COLOR');
+  up2.setValueForMode(prim.defaultModeId, rgbOf('#aa0000'));
+  up2.scopes = ['ALL_SCOPES'];
+  const dry3 = await bindSelection([node], false);
+  assert.equal(dry3.candidates[0].newRole.globalId, up2.id);
+  // 무료는 그 원시값에 바로
+  const free = await bindSelection([node], false, {}, { noNewRoles: true });
+  assert.equal(free.candidates[0].variableId, up2.id);
 });
 
 test('팔레트 정리 — 플러그인 컬렉션 안에서만 지운다(사용자 컬렉션의 같은 패밀리 색은 보존)', async () => {
@@ -5709,26 +5532,38 @@ test('칠하기 용도는 레이어 종류(QA #4 불합격 1) — 흰 글자는 
   assert.equal(roleTarget(figma, inv.id), findVar(figma, 'Global', 'color/gray/0').id);
 });
 
-test('보는 순서 1 → 3 → 2 → 4 — 같은 값이면 디자이너 변수가 쓰임 이름 역할보다 먼저, 이름 순', async () => {
+// S-2(ia-v4 §2.9 S2-P5 · 불변식 §3)로 고쳐 씀: "보는 순서 1 → 3 → 2 → 4"(디자이너가 만든 것이 플러그인 역할보다 먼저)는 없다.
+// 별칭 후보(사용자 별칭 전부 + 플러그인이 만든 역할 가운데 가족 순서 첫 번째 하나)를 홉 → 이름 오름차순으로 줄 세운다.
+test('고르는 순서(S2-P5) — 별칭 후보끼리는 이름 오름차순: 사용자 별칭과 플러그인이 만든 역할을 같은 줄에 세운다(디자이너 먼저 없음)', async () => {
   const figma = installFigma();
   await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
   const g = findVar(figma, 'Global', 'spacing/16');
   const auto = designerRole(figma, 'spacing/gap', g);
   auto.setPluginData('dsl.autoRole', '1'); // 플러그인이 만든 쓰임 역할
   const zed = designerRole(figma, 'spacing/zed', g);
-  const alpha = designerRole(figma, 'spacing/alpha', g);
   const frame = {
     type: 'FRAME', id: 'f', name: 'f', fills: [], layoutMode: 'VERTICAL', itemSpacing: 16, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0,
     layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', setBoundVariable() {},
   };
+  // 사용자 별칭 spacing/zed + 플러그인 역할 spacing/gap(가족) → 이름 오름차순이라 역할(전에는 디자이너 변수 zed가 먼저였다)
+  const dry0 = await bindSelection([frame], false);
+  assert.equal(dry0.candidates[0].variableId, auto.id);
+  // 이름이 앞서는 사용자 별칭이 있으면 그것
+  const alpha = designerRole(figma, 'spacing/alpha', g);
   const dry = await bindSelection([frame], false);
-  assert.equal(dry.candidates[0].variableId, alpha.id); // 디자이너 변수(이름 순 첫 번째)
-  void zed;
-  // 디자이너 변수가 없으면 쓰임 이름 역할(순서 2)
+  assert.equal(dry.candidates[0].variableId, alpha.id);
+  // 사용자 별칭이 없으면 쓰임 이름 역할
   alpha.remove();
   zed.remove();
   const dry2 = await bindSelection([frame], false);
   assert.equal(dry2.candidates[0].variableId, auto.id);
+  // 가족이 아닌 플러그인 역할(spacing/padding)은 같은 값이어도 후보가 아니다 — 원시값을 감싸는 새 역할
+  auto.remove();
+  const pad = designerRole(figma, 'spacing/padding', g);
+  pad.setPluginData('dsl.autoRole', '1');
+  const dry3 = await bindSelection([frame], false);
+  assert.equal(dry3.candidates[0].newRole.name, 'spacing/gap');
+  assert.equal(dry3.candidates[0].newRole.globalId, g.id);
 });
 
 test('무료 자동 연결은 새 Semantic을 만들지 않는다 — 맞는 Semantic이 없으면 Global에 · 있으면 그대로 · 유료는 새 Semantic (IA v4 §2.3-7 · F6)', async () => {
@@ -5846,10 +5681,10 @@ test('extractFromSelection — 쓰임 목록(uses)을 모은다, 격자 정리�
   const { tokens } = extractFromSelection([card]);
   const by = (name) => tokens.find((x) => x.name === name);
   // 주인(card)을 쓰지 않는다(ia-v3 §2.12 12.12 N-D1 — 전에는 spacing/card/gap · spacing/card/padding)
-  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1 }]);
-  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4 }]);
-  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1 }]);
-  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light' }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
+  assert.deepEqual(by('spacing/24').uses, [{ name: 'spacing/gap', count: 1, free: 1, keys: ['GAP'], by: { GAP: 1 } }]); // keys — 빈 자리가 있는 용도 묶음(SC-D41)
+  assert.deepEqual(by('spacing/16').uses, [{ name: 'spacing/padding', count: 4, free: 4, keys: ['GAP'], by: { GAP: 4 } }]);
+  assert.deepEqual(by('color/ffffff').uses, [{ name: 'color/background', count: 1, free: 1, keys: ['ALL_FILLS|FRAME_FILL'], by: { 'ALL_FILLS|FRAME_FILL': 1 } }]);
+  assert.deepEqual(by('color/111111').uses, [{ name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }]); // 흰 카드 위 글자 — 배경 종류를 함께 센다(12.4)
 });
 
 /* ---------- A.10 (2026-11-06 실기 뒤): 용도가 틀린 연결 바꾸기 · 크기 연결 풀기 · inverse 합친 판정 · 옛 단계 이름 ---------- */
@@ -5934,7 +5769,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   card.parent = root;
   const { tokens } = extractFromSelection([root]);
   const white = tokens.find((x) => x.name === 'color/ffffff');
-  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma' }, { name: 'color/text', count: 1, bg: 'light' }]);
+  assert.deepEqual(white.uses, [{ name: 'color/text', count: 1, bg: 'chroma', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }, { name: 'color/text', count: 1, bg: 'light', free: 1, keys: ['ALL_FILLS|TEXT_FILL'], by: { 'ALL_FILLS|TEXT_FILL': 1 } }]);
   await createTokens(tokens, 16);
   await createUsageRoles(tokens);
   const inv = findVar(figma, 'Semantic', 'color/text/inverse');
@@ -5944,7 +5779,7 @@ test('extractFromSelection — 같은 흰 글자가 버튼 위 · 카드 위에 
   assert.ok(findVar(figma, 'Semantic', 'color/text/default')); // #111(2곳)이 기준
 });
 
-test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형도 순서 3에서 빼고 쓰임 역할을 만든다', async () => {
+test('옛 단계 이름(12.7) — size · 칸 밖 · -N 변형의 별칭도 후보에서 빼고 쓰임 역할을 만든다(S-2 — ia-v4 §2.9 S2-P4 "뺀다", 기대는 그대로)', async () => {
   for (const n of ['size/md', 'spacing/4xl-2', 'size/4xl-20', 'radius/full', 'radius/3xl', 'stroke-width/thin', 'spacing/none']) assert.equal(isOldPluginName(n), true, n);
   for (const n of ['size/icon', 'size/avatar', 'spacing/gap-2', 'radius/default', 'stroke-width/default', 'spacing/card/gap', 'radius/button']) assert.equal(isOldPluginName(n), false, n);
   const figma = installFigma();
@@ -6414,7 +6249,11 @@ test('직접 만든 변수 지키기 — createTokens(쓰임 있는 토큰, 12.1
   const targets = sem.map((v) => Object.values(v.valuesByMode)[0].id);
   assert.ok(targets.includes(same.id));
   assert.ok(targets.includes(findVar(figma, 'Global', 'color/00ff00-2').id));
-  assert.equal(targets.includes(diff.id), false);
+  // S-2(ia-v4 §2.9 S2-P8 ① · SC-D38)로 기대가 바뀜: 재사용은 이름이 아니라 값으로 — 값이 #0000ff인 직접 만든 변수 `color/00ff00`은
+  // #0000ff 토큰이 다시 쓴다(전에는 `color/0000ff`를 새로 만들어 diff를 가리키는 역할이 없었다). #00ff00 토큰은 여전히 다음 이름이다.
+  assert.equal(s.globalOf.get('color/0000ff'), diff.id);
+  assert.equal(findVar(figma, 'Global', 'color/0000ff'), undefined);
+  assert.equal(s.globalOf.get('color/00ff00'), findVar(figma, 'Global', 'color/00ff00-2').id);
 });
 
 test('직접 만든 변수 지키기 — prunePaletteColors는 지우지 않고, createSemanticAliases는 덮어쓰지 않고 건너뜀으로 센다', async () => {
@@ -6582,7 +6421,7 @@ test('createUsageRoles · previewCreateTokens — tokenStates(쓰임 있는 토�
   const s = await previewCreateTokens(toks, 16);
   assert.deepEqual(Object.fromEntries(s.tokenStates), {
     'color/0066ff': { state: 'reuse', varName: 'blue/500' },
-    'color/ff0000': { state: 'reuse', varName: 'color/ff0000' },
+    'color/ff0000': { state: 'reuse', varName: 'color/ff0000' }, // 목 변수 용도 [] — 실행 때 칠 용도를 더하지만 태그는 "있는 변수" 하나다(S-2 — `scopeAdd` 필드 삭제, ia-v4 §2.9)
     'color/00ff00': { state: 'new', varName: 'color/00ff00-2' },
     'spacing/8': { state: 'reuse', varName: 'spacing/8' },
     'spacing/12': { state: 'new' },
@@ -6705,16 +6544,17 @@ test('code.ts — 8a reqId 전부(ia-v4 B.19a · T-P28 · T-P29): 결과 · ERRO
   assert.deepEqual(ofType(out, 'ERROR').map((m) => [m.op, m.reqId]), [['NAME_TEXT_STYLES_BY_ROW', 25]]);
   // 무료 거절 — PREMIUM_REQUIRED{feature, reqId}
   await p.send({ type: 'SET_LICENSE', tier: 'free' });
-  out = await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: [], reqId: 26 });
-  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'components', reqId: 26 }]);
+  // (컴포넌트 · 이름 다시 짓기는 S-1a · S-1b로 없어짐 — 남은 유료 요청으로 본다)
+  out = await p.send({ type: 'CREATE_SEMANTICS', map: {}, reqId: 26 });
+  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'semantics', reqId: 26 }]);
   out = await p.send({ type: 'GENERATE_DARK_MODE', reqId: 27 });
   assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'tokens', reqId: 27 }]);
   out = await p.send({ type: 'SCAN_TEXT_STYLES', reqId: 28, make: true });
   assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'textStyles', reqId: 28 }]);
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 29, items: [] });
+  out = await p.send({ type: 'CREATE_TEXT_STYLES', styles: [], reqId: 29 });
   assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0].reqId, 29);
-  out = await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: [] });
-  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'components' }], 'reqId 없는 요청의 거절에는 싣지 않는다');
+  out = await p.send({ type: 'CREATE_SEMANTICS', map: {} });
+  assert.deepEqual(ofType(out, 'PREMIUM_REQUIRED'), [{ type: 'PREMIUM_REQUIRED', feature: 'semantics' }], 'reqId 없는 요청의 거절에는 싣지 않는다');
 });
 
 test('code.ts — CREATE_TOKENS 미리보기: 쓰임 있는 토큰은 값 다른 직접 만든 변수를 피해 다음 이름(new + varName) · roleRows도 최종 이름', async () => {
@@ -7009,18 +6849,7 @@ test('createSemanticTextStyles — 스타일 하나의 도중 오류는 그 행�
   assert.ok(r2.missing.every((m) => !/^(font-size|line-height|letter-spacing)\//.test(m)), r2.missing.join(' | '));
 });
 
-/* ================= [이름 다시 짓기] · 역할 변수 · 등록 경로 되돌림 · UI 역할(docs/text-style-krds.md §3.2-1 · §5) ================= */
-/** 값이 있는 로컬 텍스트 스타일(줄 높이 px). */
-function mkTs(figma, name, fontSize, style = 'Regular', lh = fontSize * 1.5) {
-  const st = figma.createTextStyle();
-  st.name = name;
-  st.fontName = { family: 'Inter', style };
-  st.fontSize = fontSize;
-  st.lineHeight = { unit: 'PIXELS', value: lh };
-  return st;
-}
-const tsSigOf = (st) => `${st.fontSize}|${st.lineHeight.value}|0|Inter|${st.fontName.style}`;
-const tsItem = (st, to) => ({ id: st.id, from: st.name, to, sig: tsSigOf(st) });
+/* ================= 역할 변수 · 등록 경로 되돌림 · UI 역할(docs/text-style-krds.md §3.2-1 · §6 "등록 순서") ================= */
 /** 이름 쓰기를 기록하고, 쓸 때마다 로컬 스타일 이름이 겹치지 않는지 본다. guard(n, cur)가 던지면 그 쓰기는 실패. */
 function watchNames(figma, guard = () => {}) {
   const log = [];
@@ -7041,126 +6870,92 @@ function watchNames(figma, guard = () => {}) {
   }
   return { log, dup: () => dup };
 }
-const byStatus = (r) => Object.fromEntries(r.results.map((x) => [x.id, x.status]));
 
-test('applyTsRename — 연쇄 A→B · B→C · 맞바꿈 X↔Y: 임시 이름 2단계라 같은 이름이 잠깐도 둘 생기지 않는다', async () => {
-  const figma = installFigma();
-  const a = mkTs(figma, 'a', 16);
-  const b = mkTs(figma, 'b', 17);
-  const x = mkTs(figma, 'x', 18);
-  const y = mkTs(figma, 'y', 19);
-  const w = watchNames(figma);
-  const r = await applyTsRename([tsItem(a, 'b'), tsItem(b, 'c'), tsItem(x, 'y'), tsItem(y, 'x')]);
-  assert.equal(r.renamed, 4);
-  assert.equal(r.skipped, 0);
-  assert.deepEqual([a.name, b.name, x.name, y.name], ['b', 'c', 'y', 'x']);
-  assert.equal(w.dup(), null, '이름이 겹친 순간이 없음');
-  assert.ok(w.log.some(([id, n]) => id === a.id && n === `__dsl_tmp_${a.id}`), '1단계 임시 이름');
-  assert.deepEqual(r.results.find((q) => q.id === a.id), { id: a.id, status: 'renamed', name: 'b' });
-});
-
-test('applyTsRename — 최종 이름 집합 고정점: 남는 이름과 겹치면 name-taken, 빠진 항목의 이름을 원하던 항목도 함께 빠진다', async () => {
-  const figma = installFigma();
-  const p = mkTs(figma, 'p', 16);
-  const q = mkTs(figma, 'q', 17);
-  mkTs(figma, 'z', 18); // 후보 아님
-  const r1 = mkTs(figma, 'r', 19);
-  const k1 = mkTs(figma, 'k1', 20);
-  const k2 = mkTs(figma, 'k2', 21);
-  const r = await applyTsRename([tsItem(p, 'z'), tsItem(q, 'p'), tsItem(r1, 's'), tsItem(k1, 'same'), tsItem(k2, 'same')]);
-  const st = byStatus(r);
-  assert.equal(st[p.id], 'name-taken');
-  assert.equal(st[q.id], 'name-taken', 'p가 빠져 이름 p가 남으므로');
-  assert.equal(st[k1.id], 'name-taken');
-  assert.equal(st[k2.id], 'name-taken', '같은 to를 원하는 후보 둘은 함께 빠진다');
-  assert.equal(st[r1.id], 'renamed');
-  assert.deepEqual([p.name, q.name, r1.name], ['p', 'q', 's']);
-  assert.equal(r.renamed, 1);
-  assert.equal(r.skipped, 4);
-  assert.deepEqual(r.skipReasons, { 'name-taken': 4 });
-});
-
-test('applyTsRename — 다시 확인: 그 사이 이름이 바뀜(없어진 스타일 포함) · 값이 바뀜은 건너뛴다', async () => {
-  const figma = installFigma();
-  const a = mkTs(figma, 'a', 16);
-  const b = mkTs(figma, 'b', 17);
-  const c = mkTs(figma, 'c', 18);
-  const ia = tsItem(a, 'a2');
-  const ib = tsItem(b, 'b2');
-  a.name = 'a-moved';
-  b.fontSize = 20;
-  const r = await applyTsRename([ia, ib, tsItem(c, 'c2'), { id: 'style:gone', from: 'g', to: 'g2', sig: 'x' }]);
-  assert.deepEqual(byStatus(r), { [a.id]: 'renamed-meanwhile', [b.id]: 'value-changed', [c.id]: 'renamed', 'style:gone': 'renamed-meanwhile' });
-  assert.deepEqual(r.skipReasons, { 'renamed-meanwhile': 2, 'value-changed': 1 });
-  assert.deepEqual([a.name, b.name, c.name], ['a-moved', 'b', 'c2']);
-  assert.equal(r.results.find((x) => x.id === 'style:gone').name, '');
-});
-
-test('applyTsRename — 오류는 되돌리고(error) 그 이름을 원하던 항목도 연쇄로 되돌린다(error-chain) · 되돌리지 못하면 error-stuck · 되돌린 스타일의 역할 변수는 그대로', async () => {
-  const figma = installFigma();
-  const spec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
-  await createSemanticTextStyles([spec('a', 16), spec('b', 18), spec('d', 20), spec('g', 22), spec('f', 24)]);
-  const [a, b, d, g, f] = ['a', 'b', 'd', 'g', 'f'].map((n) => figma._state.textStyles.find((s) => s.name === n));
-  watchNames(figma, (st, n, cur) => {
-    if (st === b && n === 'c') throw new Error('boom'); // 2단계 오류
-    if (st === f && n.startsWith('__dsl_tmp_')) throw new Error('boom'); // 1단계 오류 — 이름은 그대로
-    if (st === g && (n === 'h' || (n === 'g' && cur !== 'g'))) throw new Error('boom'); // 되돌림도 실패
-  });
-  const r = await applyTsRename([tsItem(a, 'b'), tsItem(b, 'c'), tsItem(d, 'e'), tsItem(g, 'h'), tsItem(f, 'f2')]);
-  assert.deepEqual(byStatus(r), { [a.id]: 'error-chain', [b.id]: 'error', [d.id]: 'renamed', [g.id]: 'error-stuck', [f.id]: 'error' });
-  assert.deepEqual([a.name, b.name, d.name, f.name], ['a', 'b', 'e', 'f']);
-  assert.equal(g.name, `__dsl_tmp_${g.id}`);
-  assert.equal(r.results.find((x) => x.id === g.id).name, `__dsl_tmp_${g.id}`, '결과에 지금 이름');
-  // 역할 변수: 바뀐 d만
-  assert.ok(findVar(figma, 'Semantic', 'font-size/e'));
-  assert.ok(findVar(figma, 'Semantic', 'font-size/a') && findVar(figma, 'Semantic', 'font-size/b') && findVar(figma, 'Semantic', 'font-size/g'));
-  assert.equal(r.roleVarsRenamed, 2, 'd의 font-size · line-height');
-});
-
-test('applyTsRename — 역할 변수도 함께: Semantic만 · 사용자 컬렉션 · 직접 만든 변수는 그대로 · 겹치면 roleVarsTaken', async () => {
-  const figma = installFigma();
-  const spec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
-  await createSemanticTextStyles([spec('a', 16), spec('b', 18), spec('c', 20)]);
-  const [a, b, c] = ['a', 'b', 'c'].map((n) => figma._state.textStyles.find((s) => s.name === n));
+/** Semantic 변수의 이름 쓰기를 지켜본다 — 쓸 때마다 같은 이름이 둘 생기지 않는지 본다. guard(v, n, cur)가 던지면 그 쓰기는 실패. */
+function watchVarNames(figma, guard = () => {}) {
   const sem = figma._state.collections.find((x) => x.name === 'Semantic');
+  const vars = () => figma._state.variables.filter((v) => v.variableCollectionId === sem.id);
+  let dup = null;
+  for (const v of vars()) {
+    let name = v.name;
+    Object.defineProperty(v, 'name', {
+      configurable: true,
+      get: () => name,
+      set: (n) => {
+        guard(v, n, name);
+        name = n;
+        const names = vars().map((x) => x.name);
+        if (new Set(names).size !== names.length && !dup) dup = names.slice();
+      },
+    });
+  }
+  return { dup: () => dup };
+}
+const roleSpec = (name, fontSize) => ({ name, fontSize, lineHeight: fontSize * 1.5, letterSpacing: 0, family: 'Inter', style: 'Regular' });
+
+test('renameTextRoleVars — 최종 이름 집합 고정점: 남는 이름과 겹치면 taken, 빠진 변수의 이름을 원하던 변수도 함께 빠진다 · 연쇄는 바뀐다', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('p', 16), roleSpec('q', 18), roleSpec('r', 20), roleSpec('k1', 22), roleSpec('k2', 24)]); // 짝수 크기 — 줄 높이(×1.5)가 정수라야 line-height 변수가 생긴다
+  const sem = figma._state.collections.find((x) => x.name === 'Semantic');
+  figma.variables.createVariable('font-size/z', sem, 'FLOAT'); // 후보 아님 — 최종 집합 밖의 다른 변수
+  const fs = (n) => findVar(figma, 'Semantic', `font-size/${n}`);
+  const lh = (n) => findVar(figma, 'Semantic', `line-height/${n}`);
+  const [fsP, fsQ, fsR, fsK1, fsK2] = ['p', 'q', 'r', 'k1', 'k2'].map(fs);
+  const [lhP, lhQ, lhR, lhK1, lhK2] = ['p', 'q', 'r', 'k1', 'k2'].map(lh);
+  const w = watchVarNames(figma);
+  const r = await renameTextRoleVars([{ from: 'p', to: 'z' }, { from: 'q', to: 'p' }, { from: 'r', to: 's' }, { from: 'k1', to: 'same' }, { from: 'k2', to: 'same' }]);
+  // font-size: z가 남아 p가 빠지고, p가 남으므로 q도 빠진다 · 같은 to를 원하는 k1 · k2는 함께 빠진다
+  assert.deepEqual([fsP.name, fsQ.name, fsK1.name, fsK2.name], ['font-size/p', 'font-size/q', 'font-size/k1', 'font-size/k2']);
+  assert.equal(fsR.name, 'font-size/s');
+  // line-height: z가 없으니 p → z · q → p 연쇄가 된다(임시 이름 2단계) · k1 · k2는 여기서도 빠진다
+  assert.deepEqual([lhP.name, lhQ.name, lhR.name], ['line-height/z', 'line-height/p', 'line-height/s']);
+  assert.deepEqual([lhK1.name, lhK2.name], ['line-height/k1', 'line-height/k2']);
+  assert.equal(r.taken, 6, 'font-size p · q · k1 · k2 + line-height k1 · k2');
+  assert.equal(r.renamed, 4);
+  assert.equal(r.error, 0);
+  assert.deepEqual(r.moved.map((m) => m.id).sort(), [fsR.id, lhP.id, lhQ.id, lhR.id].sort());
+  assert.equal(w.dup(), null, '같은 이름이 잠깐도 둘 생기지 않는다');
+});
+
+test('renameTextRoleVars — 오류는 되돌리고 그 이름을 원하던 변수도 연쇄로 되돌린다 · 1단계 오류는 그대로 · 되돌리지 못하면 stuck', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('a', 16), roleSpec('b', 18), roleSpec('d', 20), roleSpec('g', 22), roleSpec('f', 24)]);
+  const [a, b, d, g, f] = ['a', 'b', 'd', 'g', 'f'].map((n) => findVar(figma, 'Semantic', `font-size/${n}`));
+  const w = watchVarNames(figma, (v, n, cur) => {
+    if (v === b && n === 'font-size/c') throw new Error('boom'); // 2단계 오류
+    if (v === f && n.startsWith('__dsl_tmp_')) throw new Error('boom'); // 1단계 오류 — 이름은 그대로
+    if (v === g && (n === 'font-size/h' || (n === 'font-size/g' && cur !== n))) throw new Error('boom'); // 되돌림도 실패
+  });
+  const r = await renameTextRoleVars([{ from: 'a', to: 'b' }, { from: 'b', to: 'c' }, { from: 'd', to: 'e' }, { from: 'g', to: 'h' }, { from: 'f', to: 'f2' }]);
+  // a는 b의 이름을 원했으므로 b가 되돌아올 때 함께 되돌린다(같은 이름이 둘 생기지 않게)
+  assert.deepEqual([a.name, b.name, d.name, f.name], ['font-size/a', 'font-size/b', 'font-size/e', 'font-size/f']);
+  assert.ok(g.name.startsWith('__dsl_tmp_'), g.name);
+  assert.equal(r.error, 4, 'b(오류) · a(연쇄) · f(1단계 오류) · g(되돌리지 못함)');
+  assert.deepEqual(r.stuck, [g.name], '되돌리지 못한 변수의 지금 이름');
+  // 오류 없는 line-height 5개 + font-size d
+  assert.equal(r.renamed, 6);
+  assert.ok(r.moved.some((m) => m.id === d.id) && !r.moved.some((m) => [a.id, b.id, g.id, f.id].includes(m.id)), '되돌린 변수는 moved에 없다');
+  assert.deepEqual(['b', 'c', 'e', 'h', 'f2'].map((n) => findVar(figma, 'Semantic', `line-height/${n}`)?.name), ['line-height/b', 'line-height/c', 'line-height/e', 'line-height/h', 'line-height/f2']);
+  assert.equal(w.dup(), null, '되돌림도 임시 이름 2단계 — 같은 이름이 잠깐도 둘 생기지 않는다');
+});
+
+test('renameTextRoleVars — Semantic만 · 사용자 컬렉션 · 직접 만든 변수는 그대로', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([roleSpec('a', 16), roleSpec('b', 18)]);
+  const a = figma._state.textStyles.find((s) => s.name === 'a');
   const user = figma.variables.createVariableCollection('Variables');
   const userVar = figma.variables.createVariable('font-size/a', user, 'FLOAT');
   findVar(figma, 'Semantic', 'line-height/b').setPluginData('dsl.manual', '1');
-  figma.variables.createVariable('font-size/c2', sem, 'FLOAT'); // 최종 집합 밖의 다른 변수
   const fsA = findVar(figma, 'Semantic', 'font-size/a');
-  const r = await applyTsRename([tsItem(a, 'heading/large'), tsItem(b, 'body/medium'), tsItem(c, 'c2')]);
-  assert.equal(r.renamed, 3);
+  const r = await renameTextRoleVars([{ from: 'a', to: 'heading/large' }, { from: 'b', to: 'body/medium' }]);
   assert.equal(fsA.name, 'font-size/heading/large', '같은 변수(연결 유지)의 이름만');
   assert.equal(a.boundVariables.fontSize.id, fsA.id);
   assert.ok(findVar(figma, 'Semantic', 'line-height/heading/large'));
   assert.ok(findVar(figma, 'Semantic', 'font-size/body/medium'));
   assert.ok(findVar(figma, 'Semantic', 'line-height/b'), '직접 만든 변수는 그대로');
   assert.equal(userVar.name, 'font-size/a', '사용자 컬렉션은 그대로');
-  assert.ok(findVar(figma, 'Semantic', 'font-size/c'), '겹친 변수는 옛 이름으로 남음');
-  assert.ok(findVar(figma, 'Semantic', 'line-height/c2'));
-  assert.equal(r.roleVarsRenamed, 4);
-  assert.equal(r.roleVarsTaken, 1);
-  assert.equal(r.roleVarsError, 0);
-  assert.deepEqual(r.roleVarsStuck, []);
-});
-
-test('applyTsRename — 값을 쓰지 않는다: 글꼴을 못 불러오고 값 쓰기가 막혀도 이름은 바뀐다', async () => {
-  const figma = installFigma();
-  await createSemanticTextStyles([{ name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
-  const a = figma._state.textStyles[0];
-  const item = tsItem(a, 'body/medium');
-  figma.loadFontAsync = async () => { throw new Error('loadFontAsync called'); };
-  for (const f of ['fontName', 'fontSize', 'lineHeight', 'letterSpacing']) {
-    const val = a[f];
-    Object.defineProperty(a, f, { configurable: true, get: () => val, set: () => { throw new Error(`write ${f}`); } });
-  }
-  a.setBoundVariable = () => { throw new Error('setBoundVariable called'); };
-  for (const v of figma._state.variables) v.setValueForMode = () => { throw new Error('setValueForMode called'); };
-  const r = await applyTsRename([item]);
-  assert.equal(r.renamed, 1);
-  assert.equal(a.name, 'body/medium');
-  assert.equal(r.roleVarsRenamed, 2);
-  assert.equal(r.roleVarsError, 0);
+  assert.equal(r.renamed, 3);
+  assert.equal(r.taken, 0);
 });
 
 test('renameTextRoleVars — onlyIds · 바꿀 변수 오류는 되돌리고 error · 되돌리지 못한 변수는 stuck', async () => {
@@ -7238,46 +7033,6 @@ test('scanTextStyles — uiRole: 부모부터 올라가 처음 역할이 있는 
   const { samples } = await scanTextStyles([btn, outer]);
   const ui = Object.fromEntries(samples.map((s) => [s.id, s.uiRole]));
   assert.deepEqual(ui, { inBtn: true, inCard: false, selfRole: true, inChip: true });
-});
-
-test('planTsRename — 로컬 스타일 전부에 KRDS 이름 · 바뀌는 줄만 · sig', async () => {
-  const figma = installFigma();
-  const h1 = mkTs(figma, 'h1', 32, 'Bold');
-  const body = mkTs(figma, 'body', 17);
-  mkTs(figma, 'body/small', 15);
-  const odd = mkTs(figma, 'odd', 26.7, 'Bold', 40.05);
-  figma.loadFontAsync = async () => { throw new Error('loadFontAsync called'); };
-  const rows = await planTsRename();
-  const by = Object.fromEntries(rows.map((r) => [r.from, r]));
-  assert.deepEqual(Object.keys(by).sort(), ['body', 'h1', 'odd'], '이름이 같은 body/small은 없음');
-  assert.deepEqual(by.h1, { id: h1.id, from: 'h1', to: 'heading/large', sig: '32|48|0|Inter|Bold', step: 'heading/large' }); // 새 이름의 크기 단계(12.12 N-D2a)
-  assert.equal(by.body.step, 'body/medium');
-  assert.equal(by.body.to, 'body/medium');
-  assert.equal(by.body.sig, tsSigOf(body));
-  assert.equal(by.odd.to, 'heading/medium');
-  assert.equal(odd.name, 'odd', '읽기만');
-});
-
-test('code.ts — SCAN_TS_RENAME → TS_RENAME_PLAN · APPLY_TS_RENAME → TS_RENAMED + ⌘Z 한 번 + 준비 상태 · 무료는 잠김', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const h1 = mkTs(figma, 'h1', 32, 'Bold');
-  let out = await p.send({ type: 'SCAN_TS_RENAME', reqId: 4 });
-  const plan = ofType(out, 'TS_RENAME_PLAN')[0];
-  assert.equal(plan.reqId, 4);
-  assert.deepEqual(plan.rows.map((r) => [r.from, r.to]), [['h1', 'heading/large']]);
-  figma._undo = 0;
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 5, items: plan.rows.map(({ id, from, to, sig }) => ({ id, from, to, sig })) });
-  const res = ofType(out, 'TS_RENAMED')[0];
-  assert.deepEqual(res, { type: 'TS_RENAMED', reqId: 5, results: [{ id: h1.id, status: 'renamed', name: 'heading/large' }], renamed: 1, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] }); // 옮겨 연결 결과 칸(12.12 N-D2a)
-  assert.equal(figma._undo, 1);
-  assert.equal(ofType(out, 'PREREQ_STATE').length, 1);
-  await p.send({ type: 'SET_LICENSE', tier: 'free' });
-  out = await p.send({ type: 'SCAN_TS_RENAME', reqId: 6 });
-  assert.equal(ofType(out, 'TS_RENAME_PLAN').length, 0);
-  assert.equal(ofType(out, 'PREMIUM_REQUIRED')[0]?.feature, 'textStyles');
-  out = await p.send({ type: 'APPLY_TS_RENAME', reqId: 7, items: [] });
-  assert.equal(ofType(out, 'TS_RENAMED').length, 0);
 });
 
 /* ---------- ia-v3 A.14 — 쓰임 역할 이름 꼬리(12.5) · Global 색 이름(12.11) ---------- */
@@ -7934,7 +7689,7 @@ test('B.24 ② 글자 버튼 — 숨긴 앞뒤 아이콘 + 글자 1개 → butto
   assert.equal(r.changes.find((c) => c.id === 'bar')?.after, 'header');
 });
 
-test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 · [라벨 + 입력 상자]는 field (rename · componentLike)', async () => {
+test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 · [라벨 + 입력 상자]는 field (rename)', async () => {
   installFigma();
   const item = (i) => ({ type: 'FRAME', id: `p${i}`, name: `Frame ${30 + i}`, width: 292, height: 490, children: [T(`pt${i}`, 'x')] });
   const list = { type: 'FRAME', id: 'lst', name: '3타입', layoutMode: 'HORIZONTAL', width: 1264, height: 490, children: [item(0), item(1), item(2)] };
@@ -7945,12 +7700,10 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   assert.notEqual(a.get('sec'), 'field');
   assert.ok(!String(a.get('lst')).startsWith('field'));
   assert.ok(!String(a.get('more')).startsWith('field'));
-  assert.notEqual(hcRolePure(sec), 'field');
   const field = { type: 'FRAME', id: 'fd', name: 'Frame 1', layoutMode: 'VERTICAL', width: 300, height: 70, children: [
     T('lb', 'Email'), { type: 'FRAME', id: 'in', name: 'Frame 2', width: 300, height: 44, strokes: vis, children: [T('ph', 'you@x')] }] };
   const r2 = await renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [field] }], { apply: false, maxDepth: 5 });
   assert.equal(r2.changes.find((c) => c.id === 'fd')?.after, 'field');
-  assert.equal(hcRolePure(field), 'field');
   // 실기 2: [두 줄 안내 글 + 76×30 테두리 버튼] → field 아님, 버튼은 button
   const app = { type: 'FRAME', id: 'app', name: 'Frame 29', layoutMode: 'VERTICAL', width: 151, height: 70, children: [
     T('desc', '일상구독 앱을 다운받고\n다양한 혜택을 만나보세요.', { width: 135, height: 32 }),
@@ -7964,12 +7717,12 @@ test('B.24 ③ [제목 + 큰 목록 + 테두리 버튼] 섹션은 field 아님 �
   // 이름 `button` + 글자 버튼 판정 button → 이름 그대로(B.28 이름 힌트 r === h — 전에는 card-button)
   assert.ok(!a3.has('ab'));
   assert.equal(r3.nodes.find((n) => n.id === 'ab')?.role, 'button');
-  assert.notEqual(hcRolePure(app), 'field');
 });
 
 test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서가 뒤집혀도 actions는 가장 오른쪽', async () => {
   installFigma();
-  const links = { type: 'FRAME', id: 'links', name: 'top-inner', layoutMode: 'HORIZONTAL', x: 1412, width: 188, height: 24, children: [T('l1', '로그인'), T('l2', '회원가입')] };
+  const links = { type: 'FRAME', id: 'links', name: 'Frame 4', // 실기 이름 top-inner — S-2b 뒤 사람 이름은 그대로라 판정을 보려고 기본명으로
+    layoutMode: 'HORIZONTAL', x: 1412, width: 188, height: 24, children: [T('l1', '로그인'), T('l2', '회원가입')] };
   const logo = { type: 'FRAME', id: 'logo', name: 'Frame 6', x: 320, width: 130, height: 40, children: [V('lv', { width: 120, height: 40 })] };
   const row = { type: 'FRAME', id: 'row', name: 'Frame 5', x: 0, width: 1920, height: 40, children: [links, logo] };
   const header = { type: 'FRAME', id: 'hd', name: 'Frame 2', layoutMode: 'VERTICAL', width: 1920, height: 150, children: [row] };
@@ -7985,7 +7738,8 @@ test('B.24 ④ 헤더 오른쪽 0번 묶음은 logo 아님 · 레이어 순서�
 test('B.24 ⑤ row — 이름표 + 값 나란히 · 좁으면 아님 · 값 글자 3개 이상이면 아님 · 페이지 번호 아님', async () => {
   installFigma();
   const price = { type: 'INSTANCE', id: 'pv', name: '금액', x: 228, y: 0, width: 124, height: 23, children: [T('pvt', '9,999원')] };
-  const row = { type: 'FRAME', id: 'row', name: '구독', width: 352, height: 28, children: [T('lab', '구독', { x: 0, y: 2 }), price] };
+  // 실기 이름 '구독'(S-2b 뒤 사람 이름 그대로) — 판정을 보려고 기본명
+  const row = { type: 'FRAME', id: 'row', name: 'Frame 3', width: 352, height: 28, children: [T('lab', '구독', { x: 0, y: 2 }), price] };
   let r = await inCard(row);
   assert.equal(r.changes.find((c) => c.id === 'row')?.after, 'card-row');
   const narrow = { type: 'FRAME', id: 'nr', name: 'Frame 5', width: 60, height: 28, children: [T('a', '구독', { x: 0, y: 0 }), T('b', '1', { x: 40, y: 0 })] };
@@ -8002,7 +7756,8 @@ test('B.24 ⑤ row — 이름표 + 값 나란히 · 좁으면 아님 · 값 글�
 
 test('B.24 ⑥ text-group — 글자 2개 세로 · 가로 3개(오토레이아웃 · 자유 배치)는 아님', async () => {
   installFigma();
-  const tg = { type: 'FRAME', id: 'tg', name: '상품명', layoutMode: 'VERTICAL', width: 292, height: 42, children: [T('b', 'Vipp'), T('n', '소파')] };
+  // 실기 이름 '상품명'(S-2b 뒤 그대로) — 기본명으로
+  const tg = { type: 'FRAME', id: 'tg', name: 'Frame 3', layoutMode: 'VERTICAL', width: 292, height: 42, children: [T('b', 'Vipp'), T('n', '소파')] };
   let r = await inCard(tg);
   assert.equal(r.changes.find((c) => c.id === 'tg')?.after, 'card-text-group');
   const h3 = { type: 'FRAME', id: 'h3', name: 'menu', layoutMode: 'HORIZONTAL', width: 300, height: 20, children: [T('a', 'A'), T('b2', 'B'), T('c', 'C')] };
@@ -8015,7 +7770,8 @@ test('B.24 ⑥ text-group — 글자 2개 세로 · 가로 3개(오토레이아�
 
 test('B.24 ⑦ media — 사진 + 아이콘 프레임 · 원형 사진만이면 아님', async () => {
   installFigma();
-  const box = { type: 'FRAME', id: 'box', name: 'img_box', width: 292, height: 292, children: [
+  // 실기 이름 img_box(S-2b 뒤 사람 이름 그대로) — 기본명으로
+  const box = { type: 'FRAME', id: 'box', name: 'Frame 3', width: 292, height: 292, children: [
     { type: 'RECTANGLE', id: 'ph', name: 'image 18', width: 292, height: 292, fills: imgFill },
     { type: 'FRAME', id: 'ht', name: 'heart', width: 28, height: 28, children: [V('hv')] }] };
   let r = await inCard(box);
@@ -8100,7 +7856,7 @@ test('A.21 ① 카드 gap 16 · 버튼 gap 16 → 역할 하나 spacing/gap(주�
   assert.equal(r.newRoles, 1);
   assert.equal(card._bound.itemSpacing, button._bound.itemSpacing);
   const uses = extractFromSelection([card, button]).tokens.find((t) => t.name === 'spacing/16').uses;
-  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2 }]);
+  assert.deepEqual(uses, [{ name: 'spacing/gap', count: 2, free: 2, keys: ['GAP'], by: { GAP: 2 } }]);
 });
 
 test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radius/lg · radius/sm · 가족 · 되돌림', () => {
@@ -8119,7 +7875,7 @@ test('A.21 ② 반경 8(10곳) · 24(3곳) · 4(2곳) → radius/default · radi
   assert.equal(nameKindOf('spacing/gap', '8'), 'number');
 });
 
-test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반경 9999 · 반쪽 알약 · 갈린 모서리 · 순서 3은 원래 값', async () => {
+test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반경 9999 · 반쪽 알약 · 갈린 모서리 · 원래 값의 사용자 변수(CORNER_RADIUS)가 있으면 보통 자리(S-2 SC-D36 ①)', async () => {
   let figma = installFigma();
   await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
   const btn = a20Frame('btn', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
@@ -8158,13 +7914,21 @@ test('A.21 ③ 알약 반경 — radius/full = 9999 · 붙이면 레이어 반�
   assert.ok(!by('radius/150') && !by('radius/20'), '원래 값은 세지 않는다');
   assert.deepEqual(by('radius/9999').uses.map((u) => u.name).sort(), ['radius/bottom-left', 'radius/full', 'radius/top-left']);
   assert.deepEqual(by('radius/8').uses.map((u) => u.name).sort(), ['radius/bottom-right', 'radius/top-right']);
-  // 순서 3(디자이너 Semantic)은 원래 값으로 — 150 변수가 있으면 그대로 붙는다(9999로 바꾸지 않음)
+  // S-2(SC-D36 ① · SC-D37): 원래 값과 같고 용도에 CORNER_RADIUS를 직접 켠 사용자 변수가 있으면 알약이 아니다 — 150 변수에 그대로 붙는다(9999로 바꾸지 않음)
   figma = installFigma();
-  const d = await semNum(figma, 'radius/pill', 150, { cat: 'radius' });
+  const d = await semNum(figma, 'radius/pill', 150, { cat: 'radius', scopes: ['CORNER_RADIUS'] });
   const btn3 = a20Frame('btn3', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
   const d3 = await bindSelection([btn3], false);
   const c3 = d3.candidates.filter((c) => c.field.endsWith('Radius'));
+  assert.equal(c3.length, 4);
   assert.ok(c3.every((c) => c.variableId === d.id && c.pillFrom == null));
+  // 좁아짐(SC-D37): 용도 제한이 없는(ALL_SCOPES) 디자이너 별칭은 더는 알약을 가져가지 못한다 — 알약(값 9999)이고 9999 후보가 없으면 새로 만들 값
+  figma = installFigma();
+  await semNum(figma, 'radius/pill', 150, { cat: 'radius' }); // ALL_SCOPES
+  const btn4 = a20Frame('btn4', { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
+  const d4 = await bindSelection([btn4], false);
+  assert.equal(d4.candidates.filter((c) => c.field.endsWith('Radius')).length, 0);
+  assert.deepEqual(d4.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
 });
 
 test('A.21 ④ body/large-w500-120 · body/large-w700-150 → font-size/body/large 하나(표시) · 파일에 = 19가 있으면 18은 -sm(덮지 않음)', async () => {
@@ -8228,7 +7992,7 @@ test('A.21 ⑥ 색 기준색 — 배경은 가장 밝은 불투명 무채색, �
 
 test('A.21 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x, 세로 → stack-y, 오토레이아웃 아님 → container, 자식 1 → wrapper · stack-x 루트의 자식은 맥락 없음', async () => {
   installFigma();
-  const box = (id, layoutMode, kids) => ({ type: 'FRAME', id, name: `Frame ${id}`, ...(layoutMode ? { layoutMode } : {}), width: 600, height: 300, children: kids });
+  const box = (id, layoutMode, kids) => ({ type: 'FRAME', id, name: 'Frame', ...(layoutMode ? { layoutMode } : {}), width: 600, height: 300, children: kids });
   const sq = (id, x) => ({ type: 'RECTANGLE', id, name: `Rectangle ${id}`, x, y: 0, width: 200, height: 200, fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 }, visible: true }] });
   const root = { type: 'FRAME', id: 'root', name: 'Frame 0', width: 1600, height: 1600, children: [
     box('h', 'HORIZONTAL', [sq('h1', 0), sq('h2', 300)]),
@@ -8237,11 +8001,13 @@ test('A.21 ⑦ 이름 정리 — 가로 오토레이아웃 자식 2 → stack-x,
     box('w', 'HORIZONTAL', [sq('w1', 0)]),
   ] };
   const r = await renameSelection([root], { apply: false, maxDepth: 5 });
-  const a = new Map(r.changes.map((c) => [c.id, c.after]));
-  assert.equal(a.get('h'), 'stack-x');
-  assert.equal(a.get('v'), 'stack-y');
-  assert.equal(a.get('n'), 'container');
-  assert.equal(a.get('w'), 'wrapper');
+  // 역할 판정은 그대로. S-2b(ia-v4 §4.4 R2B-P2): 구조 폴백 넷은 이름으로 쓰지 않는다 — 바꿀 줄이 없고 역할만 실린다
+  const roleOf = new Map(r.nodes.map((n) => [n.id, n.role]));
+  assert.equal(roleOf.get('h'), 'stack-x');
+  assert.equal(roleOf.get('v'), 'stack-y');
+  assert.equal(roleOf.get('n'), 'container');
+  assert.equal(roleOf.get('w'), 'wrapper');
+  assert.equal(r.changes.some((c) => ['h', 'v', 'n', 'w'].includes(c.id)), false);
   // stack-x를 선택 루트로 다시 고르면 자식에게 x 맥락이 가지 않는다
   assert.equal(pickScopePure('stack-x'), null);
   assert.equal(pickScopePure('stack-y-2'), null);
@@ -8267,45 +8033,16 @@ test('A.21 ⑧ 옛 이름 spacing/card/gap만 있는 파일 → 새 spacing/gap�
   assert.equal(roleTarget(figma, old.id), roleTarget(figma, neu.id));
 });
 
-test('A.21 ⑨ 이름 다시 짓기 · 등록 — 새 규칙 변수는 단계가 바뀐 스타일만 옮겨 연결 · 옛 규칙 변수는 이름만 함께 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
+test('A.21 ⑨ 등록 — 새 규칙 변수는 스타일 이름을 따라 바꾸지 않음 · 표시 없는 같은 이름은 재사용하지 않음', async () => {
   let figma = installFigma();
   const spec = (name, style, step = 'body/large', fontSize = 18) => ({ name, step, fontSize, lineHeight: 27, letterSpacing: 0, family: 'Inter', style });
   await createSemanticTextStyles([spec('body/large-w500-120', 'Medium'), spec('body/large-w700-150', 'Bold')]);
-  const [s1, s2] = ['body/large-w500-120', 'body/large-w700-150'].map((n) => figma._state.textStyles.find((s) => s.name === n));
+  // 새 규칙 변수(표시 있음 · 크기 단계 이름 — 여러 스타일이 씀)는 스타일 이름을 따라 바꾸지 않는다(12.12 N-D2)
   const large = findVar(figma, 'Semantic', 'font-size/body/large');
-  const item = { ...tsItem(s1, 'body/medium-w500-120'), sig: `18|27|0|Inter|Medium`, step: 'body/medium' };
-  const r = await applyTsRename([item]);
-  assert.equal(r.renamed, 1);
-  assert.equal(r.roleMoveError, 0);
-  const medium = findVar(figma, 'Semantic', 'font-size/body/medium');
-  assert.ok(medium);
-  assert.equal(medium.getPluginData('dsl.textStep'), 'body/medium');
-  assert.equal(s1.boundVariables.fontSize.id, medium.id);
-  assert.equal(s1.boundVariables.lineHeight.id, findVar(figma, 'Semantic', 'line-height/body/medium').id);
-  assert.equal(s2.boundVariables.fontSize.id, large.id, '다른 스타일은 그대로');
-  assert.equal(large.name, 'font-size/body/large', '옛 단계 변수는 남음');
-  assert.equal(r.roleVarsRenamed, 0, '새 규칙 변수의 이름은 바꾸지 않는다');
-  // 단계가 그대로면(굵기 꼬리만) 연결을 건드리지 않는다
-  const r1 = await applyTsRename([{ ...tsItem(s2, 'body/large-w700'), sig: `18|27|0|Inter|Bold`, step: 'body/large' }]);
-  assert.equal(r1.renamed, 1);
-  assert.equal(s2.boundVariables.fontSize.id, large.id);
-  // 글꼴을 못 불러오면 옮기지 못함 — 이름은 바뀐 채, 옛 변수에 연결이 남음
-  figma.loadFontAsync = async () => { throw new Error('no font'); };
-  const r2 = await applyTsRename([{ ...tsItem(s2, 'body/small-w700'), sig: `18|27|0|Inter|Bold`, step: 'body/small' }]);
-  assert.equal(r2.renamed, 1);
-  assert.equal(r2.roleMoveError, 1);
-  assert.deepEqual(r2.roleMoveNames, ['body/small-w700']);
-  assert.equal(s2.boundVariables.fontSize.id, large.id);
-  // 옛 규칙 변수(표시 없음 · font-size/{지금 이름})에 붙은 스타일은 변수 이름만 함께 바뀐다
-  figma = installFigma();
-  await createSemanticTextStyles([{ name: 'a', fontSize: 16, lineHeight: 24, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
-  const a = figma._state.textStyles[0];
-  const fsA = findVar(figma, 'Semantic', 'font-size/a');
-  assert.equal(fsA.getPluginData('dsl.textStep'), '', 'step 없는 스펙은 표시 없음');
-  const ra = await applyTsRename([{ ...tsItem(a, 'body/medium'), step: 'body/medium' }]);
-  assert.equal(ra.roleVarsRenamed, 2);
-  assert.equal(fsA.name, 'font-size/body/medium');
-  assert.equal(a.boundVariables.fontSize.id, fsA.id);
+  assert.equal(large.getPluginData('dsl.textStep'), 'body/large');
+  const rr = await renameTextRoleVars([{ from: 'body/large', to: 'body/medium' }]);
+  assert.equal(rr.renamed, 0);
+  assert.equal(large.name, 'font-size/body/large');
   // 옛 스타일 body/large가 쓰던 표시 없는 font-size/body/large = 18 → body/large-w700(18) 등록은 재사용하지 않고 -2(표시)
   figma = installFigma();
   await createSemanticTextStyles([{ name: 'body/large', fontSize: 18, lineHeight: 27, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
@@ -8375,7 +8112,7 @@ test('A.21 ⑩ QA 5 모양 입력 — 주인 여럿 × 같은 간격 값, 18px �
   console.log(`A.21 ⑩ Semantic — 간격 ${spacingBefore} → ${spacingAfter}, 글자 ${textBefore} → ${textAfter}`);
 });
 
-/* ---------- 6-1b 컴포넌트 규칙 — SCAN_COMPONENT_CANDIDATES(ia-v3 A.19 6번 figma.test ①–⑥) ---------- */
+/* ---------- 6-1b ⑥ — 탭 모양 줄의 추출(EXTRACT)과 그 목 도우미 ---------- */
 
 const hexRgb = (h) => ({ r: parseInt(h.slice(1, 3), 16) / 255, g: parseInt(h.slice(3, 5), 16) / 255, b: parseInt(h.slice(5, 7), 16) / 255 });
 const sn = (o) => ({ visible: true, getPluginData: () => '', setPluginData() {}, ...o });
@@ -8391,75 +8128,6 @@ function link(n, parent) {
 function allNodes(n, out = []) { out.push(n); for (const c of n.children ?? []) allNodes(c, out); return out; }
 const menu61 = (id, n = 5, active = 0, name = 'nav') => sn({ type: 'FRAME', id, name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [],
   children: ['About', 'Services', 'Offers', 'Seats', 'Destination'].slice(0, n).map((c, i) => txt61(`${id}-${i}`, c, i === active ? '#000000' : '#7a7a7a')) });
-const pill61 = (id) => sn({ type: 'FRAME', id, name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa'),
-  children: ['Economy', 'Business Class', 'Fast Class'].map((l, i) => sn({ type: 'FRAME', id: `${id}-${i}`, name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24,
-    fills: i === 1 ? solid61('#3d5fdb') : [], children: [txt61(`${id}-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')] })) });
-/** 목 인스턴스 — 메인(세트 변형 또는 단독). `syncThrows`면 동기 mainComponent가 던진다(dynamic-page 흉내). */
-function inst61(id, main, { syncThrows = false } = {}) {
-  const n = sn({ type: 'INSTANCE', id, name: 'item', width: 160, height: 200, fills: [], children: [], getMainComponentAsync: async () => main });
-  Object.defineProperty(n, 'mainComponent', { get() { if (syncThrows) throw new Error('sync main in dynamic-page'); return null; } });
-  return n;
-}
-function variant61(id, setName, setKey, pd = {}) {
-  const set = { type: 'COMPONENT_SET', id: `${setKey}-id`, key: setKey, name: setName };
-  return { type: 'COMPONENT', id, key: `${id}-key`, name: 'State=Default', parent: set, width: 160, height: 200, children: [], visible: true, fills: [], getPluginData: (k) => pd[k] ?? '' };
-}
-async function scan61(rootKids, o = {}) {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  figma.loadAllPagesAsync = async () => {};
-  const root = link(sn({ type: 'FRAME', id: 'root', name: o.rootName ?? 'Flightin website', width: 1440, height: 900, fills: [], children: rootKids }), { type: 'PAGE', id: 'page' });
-  registerNodes(figma, allNodes(root));
-  const out = await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 1 });
-  return ofType(out, 'COMPONENT_CANDIDATES')[0];
-}
-const label61 = (n) => (n.group ? `${n.group} · ${n.variant}` : n.single);
-
-test('6-1b ① ② — 탭 바 둘(nav · card) → Tab Bar · Style=Text / Pill, 칸은 후보 아님 · 같은 Style 칸 4 바 → Tab Item · Style=Text', async () => {
-  const r = await scan61([menu61('m1', 5), menu61('m2', 5, 2), menu61('m3', 4), pill61('p')]);
-  const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
-  assert.equal(label61(by.m1), 'Tab Bar · Style=Text');
-  assert.equal(label61(by.m2), 'Tab Bar · Style=Text', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
-  assert.equal(label61(by.m3), 'Tab Item · Style=Text', '칸 수가 다른 바 — 칸만');
-  assert.equal(label61(by.p), 'Tab Bar · Style=Pill');
-  assert.ok(r.nodes.every((n) => n.defaultOn || !n.eligible));
-  assert.ok(!r.nodes.some((n) => /^(m\d|p)-/.test(n.id)), '칸은 후보 아님');
-  const one = await scan61([menu61('m1', 5)]);
-  assert.equal(label61(one.nodes.find((n) => n.id === 'm1')), 'Tab Bar', 'Style 하나 → 단독 Tab Bar');
-});
-
-const bkList = (id, mainOf, o) => sn({ type: 'FRAME', id, name: 'BkList', layoutMode: 'HORIZONTAL', width: 900, height: 200, itemSpacing: 16, fills: [],
-  children: Array.from({ length: 5 }, (_, i) => inst61(`${id}-${i}`, mainOf(i), o)) });
-
-test('6-1b ③ ④ — C-D18: 다른 컴포넌트 세트를 담은 같은 이름 목록 둘 → -Type1 · -Type2(동기 mainComponent가 던져도 같다)', async () => {
-  for (const syncThrows of [false, true]) {
-    const card = variant61('card-v', 'Card', 'S-card');
-    const cell = variant61('cell-v', 'TabCell', 'S-cell');
-    const r = await scan61([bkList('k1', () => card, { syncThrows }), bkList('k2', () => cell, { syncThrows })], { rootName: 'Booking' });
-    const by = Object.fromEntries(r.nodes.map((n) => [n.id, n]));
-    assert.match(label61(by.k1), /-Type1$/, String(syncThrows));
-    assert.match(label61(by.k2), /-Type2$/, String(syncThrows));
-    assert.ok(by.k1.single && by.k2.single, '저마다 단독');
-  }
-  // 같은 세트(다른 변형)면 한 가족
-  const a = variant61('card-a', 'Card', 'S-card');
-  const b = variant61('card-b', 'Card', 'S-card');
-  const r2 = await scan61([bkList('k1', () => a), bkList('k2', () => b)], { rootName: 'Booking' });
-  const by2 = Object.fromEntries(r2.nodes.map((n) => [n.id, n]));
-  assert.ok(!/-Type/.test(label61(by2.k1)), '한 가족');
-});
-
-test('6-1b ⑤ — 칸이 모두 Tab Item 인스턴스인 줄은 후보 목록에 없고 자동 이름 수에도 없다', async () => {
-  const ti = variant61('ti-v', 'Tab Item', 'S-ti', { 'dsl.reuse': 'variant:role:tab-item:abc' });
-  const row = (id, name) => sn({ type: 'FRAME', id, name, layoutMode: 'HORIZONTAL', width: 400, height: 20, fills: [],
-    children: Array.from({ length: 4 }, (_, i) => Object.assign(inst61(`${id}-${i}`, ti), { width: 60, height: 20 })) });
-  const other = variant61('x-v', 'Other', 'S-x');
-  const plain = sn({ type: 'FRAME', id: 'pl', name: 'Frame 9', layoutMode: 'HORIZONTAL', width: 400, height: 20, fills: [],
-    children: Array.from({ length: 4 }, (_, i) => Object.assign(inst61(`pl-${i}`, other), { width: 60, height: 20 })) });
-  const r = await scan61([row('r1', 'nav-4'), row('r2', 'Frame 7'), plain]);
-  assert.ok(!r.nodes.some((n) => n.id === 'r1' || n.id === 'r2'));
-  assert.equal(r.autoNamed, 1, 'Tab Item 줄(Frame 7)은 세지 않고, 다른 인스턴스 줄(Frame 9)만');
-});
 
 test('6-1b ⑥ — EXTRACT: 이름 tabs인 굵기 표지 줄 — 쓰임 이름에 주인이 새지 않음(6-2 N-D1 뒤)', async () => {
   const figma = installFigma();
@@ -8474,210 +8142,6 @@ test('6-1b ⑥ — EXTRACT: 이름 tabs인 굵기 표지 줄 — 쓰임 이름�
   // 6-2(ia-v3 §2.12 12.12 N-D1)부터 쓰임 이름에 주인이 없다 — 탭 판정(엄격 · 넓힌 구조)이 이름에 새지 않는지만 본다.
   assert.ok(uses.includes('spacing/gap'), `주인 없는 gap: ${uses}`);
   assert.ok(!uses.some((u) => /\/(tab|nav)(\/|$)/.test(u)), `쓰임 이름에 주인(tab · nav) 없음: ${uses}`);
-});
-
-/* ---------- 6-1b [등록] 탭 길 — 목 피그마 위의 REGISTER_COMPONENTS(실기 전 흐름 확인용) ----------
-   피그마의 동작 몇 가지만 흉내 낸다: 컴포넌트화는 그 자리에서(TEXT는 컴포넌트가 감싼다), 인스턴스는 메인 트리를 복제
-   (안 레이어 id `I{인스턴스};{원본}`), 인스턴스 레이어의 속성 연결은 메인을 따른다. 오토레이아웃 배치는 흉내 내지 않는다. */
-function regWorld(figma) {
-  let seq = 0;
-  const reg = new Map();
-  const detach = (n) => { const p = n.parent; if (p?.children) { const j = p.children.indexOf(n); if (j >= 0) p.children.splice(j, 1); } n.parent = null; };
-  const withKids = (n) => {
-    n.children = n.children ?? [];
-    n.insertChild = function (i, c) { detach(c); c.parent = this; this.children.splice(Math.min(i, this.children.length), 0, c); };
-    n.appendChild = function (c) { this.insertChild(this.children.length, c); };
-    return n;
-  };
-  const base = (type, props = {}) => {
-    const n = {
-      id: props.id ?? `n${seq++}`, type, name: type, visible: true, removed: false, x: 0, y: 0, width: 10, height: 10, parent: null, _pd: {}, _refs: null,
-      getPluginData(k) { return this._pd[k] ?? ''; }, setPluginData(k, v) { this._pd[k] = v; },
-      resize(w, h) { this.width = w; this.height = h; }, resizeWithoutConstraints(w, h) { this.width = w; this.height = h; },
-      remove() { const mark = (x) => { x.removed = true; for (const c of x.children ?? []) mark(c); }; mark(this); detach(this); },
-      ...props,
-    };
-    Object.defineProperty(n, 'componentPropertyReferences', {
-      get() { return this._refs ?? this._src?.componentPropertyReferences ?? null; },
-      set(v) { this._refs = v; }, configurable: true, enumerable: true,
-    });
-    if (type === 'TEXT') {
-      // 글자 자동 폭(WIDTH_AND_HEIGHT) 흉내 — 글자가 바뀌면 폭도
-      let chars = n.characters ?? '';
-      Object.defineProperty(n, 'characters', { get() { return chars; }, set(v) { chars = v; this.width = 40 + v.length; }, configurable: true, enumerable: true });
-    }
-    n.clone = function () {
-      const c = copyTree(this, (s) => `n${seq++}`);
-      if (this.parent) this.parent.insertChild(this.parent.children.indexOf(this) + 1, c);
-      return c;
-    };
-    reg.set(n.id, n);
-    return n;
-  };
-  const KEYS = ['name', 'visible', 'x', 'y', 'width', 'height', 'layoutMode', 'itemSpacing', 'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'fills', 'strokes', 'cornerRadius', 'characters', 'fontName', 'fontWeight', 'layoutSizingHorizontal', 'layoutSizingVertical'];
-  function copyTree(src, idOf, srcLink = false) {
-    const props = {};
-    for (const k of KEYS) if (src[k] !== undefined) props[k] = src[k];
-    const c = base(src.type, { ...props, id: idOf(src) });
-    if (srcLink) c._src = src;
-    if (src.type === 'TEXT') c.getRangeAllFontNames = () => [c.fontName];
-    if (src.type === 'INSTANCE') makeInstanceOf(c, src._main, false);
-    if (src.children) { withKids(c); for (const k of src.children) c.appendChild(copyTree(k, idOf, srcLink)); }
-    return c;
-  }
-  function makeInstanceOf(i, main, build = true) {
-    i.type = 'INSTANCE';
-    i._main = main;
-    i.getMainComponentAsync = async () => i._main;
-    Object.defineProperty(i, 'mainComponent', { get() { return i._main; }, configurable: true });
-    i.swapComponent = function (c) {
-      this._main = c;
-      for (const k of [...(this.children ?? [])]) detach(k);
-      withKids(this);
-      for (const k of c.children ?? []) this.appendChild(copyTree(k, (s) => `I${this.id};${s.id}`, true));
-    };
-    i.setProperties = function (p) {
-      for (const [key, v] of Object.entries(p)) {
-        const own = [];
-        const walk = (n) => { for (const c of n.children ?? []) { own.push(c); if (c.type !== 'INSTANCE') walk(c); } };
-        walk(this);
-        const tgt = own.find((l) => l.componentPropertyReferences && Object.values(l.componentPropertyReferences).includes(key));
-        if (!tgt) throw new Error(`no prop ${key}`);
-        const field = Object.keys(tgt.componentPropertyReferences).find((f) => tgt.componentPropertyReferences[f] === key);
-        if (field === 'mainComponent') tgt.swapComponent(reg.get(v));
-        else tgt[field] = v;
-      }
-    };
-    if (build) { withKids(i); for (const k of main.children ?? []) i.appendChild(copyTree(k, (s) => `I${i.id};${s.id}`, true)); }
-    return i;
-  }
-  function asComponent(n) {
-    n.type = 'COMPONENT';
-    n.key = `${n.id}-key`;
-    n._props = {};
-    n.addComponentProperty = function (name, type, def) { if (type === 'INSTANCE_SWAP' && !reg.get(def)) throw new Error('incompatible'); const id = `${name}#${seq++}`; this._props[id] = { type, defaultValue: def }; return id; };
-    n.createInstance = function () {
-      const i = base('INSTANCE', { name: this.name, width: this.width, height: this.height });
-      makeInstanceOf(i, this);
-      // 감싼 글자(제약 SCALE) 흉내 — 인스턴스 크기를 바꾸면 안 글자도
-      i.resize = function (w, h) { this.width = w; this.height = h; if (this.children.length === 1 && this.children[0].type === 'TEXT') { this.children[0].width = w; this.children[0].height = h; } };
-      figma.currentPage.appendChild(i);
-      return i;
-    };
-    n.getInstancesAsync = async () => [];
-    return n;
-  }
-  Object.assign(figma, {
-    loadAllPagesAsync: async () => {},
-    loadFontAsync: async () => {},
-    getNodeByIdAsync: async (id) => reg.get(id) ?? null,
-    createPage() { const p = withKids(base('PAGE', { name: 'Page' })); p.parent = figma.root; figma.root.children.push(p); return p; },
-    createComponentFromNode(node) {
-      if (node.type === 'TEXT') {
-        const p = node.parent;
-        const at = p ? p.children.indexOf(node) : -1;
-        const comp = asComponent(withKids(base('FRAME', { name: node.name, width: node.width, height: node.height, x: node.x, y: node.y })));
-        if (p) p.insertChild(at, comp);
-        comp.appendChild(node);
-        node.x = 0; node.y = 0;
-        return comp;
-      }
-      return asComponent(node);
-    },
-    combineAsVariants(comps, parent) {
-      const set = withKids(base('COMPONENT_SET', { name: 'Component Set' }));
-      set.key = `${set.id}-key`;
-      set._props = {};
-      set.addComponentProperty = function (name, type, def) { const id = `${name}#${seq++}`; this._props[id] = { type, defaultValue: def }; return id; };
-      parent.appendChild(set);
-      for (const c of comps) set.appendChild(c);
-      return set;
-    },
-  });
-  const page = withKids(base('PAGE', { name: 'Page 1' }));
-  const findAll = ({ types, pluginData }) => [...reg.values()].filter((n) => types.includes(n.type) && !n.removed && n.parent
-    && (!pluginData || pluginData.keys.every((k) => !!n._pd[k])));
-  figma.root = { type: 'DOCUMENT', children: [page], getPluginData: () => '', setPluginData() {}, findAllWithCriteria: findAll };
-  page.parent = figma.root;
-  figma.currentPage = page;
-  page.selection = [];
-  return { base, withKids, page, reg };
-}
-
-test('6-1b [등록] 탭 길(목) — 메뉴형 바 4(칸 5 · 5 · 4 · 테마 다른 5) + 알약형 1 → Tab Item 세트 4변형 · Tab Bar 세트 2변형 · 자리 인스턴스 · 꼬리', async () => {
-  const figma = installFigma();
-  const p = await loadPlugin(figma);
-  const w = regWorld(figma);
-  const T = (id, chars, color, o = {}) => w.base('TEXT', { id, name: chars, characters: chars, width: 40 + chars.length, height: 20, fills: solid61(color), fontName: { family: 'Inter', style: 'Regular' },
-    getRangeAllFontNames() { return [this.fontName]; }, ...o });
-  const F = (id, props, kids) => { const f = w.withKids(w.base('FRAME', { id, ...props })); for (const k of kids) f.appendChild(k); return f; };
-  const menu = (id, n, active, selColor = '#000000', name = 'nav') => F(id, { name, layoutMode: 'HORIZONTAL', width: 400, height: 20, itemSpacing: 24, fills: [] },
-    ['About', 'Services', 'Offers', 'Seats', 'Destination'].slice(0, n).map((c, i) => T(`${id}-${i}`, c, i === active ? selColor : '#7a7a7a')));
-  const pill = F('p', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
-    ['Economy', 'Business Class', 'Fast Class'].map((l, i) => F(`p-${i}`, { name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24, fills: i === 1 ? solid61('#3d5fdb') : [] },
-      [T(`p-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')])));
-  const bars = [menu('m1', 5, 0), menu('m2', 5, 2, '#000000', 'nav-copy'), menu('m3', 4, 0, '#000000', 'nav-4'), menu('mb', 5, 0, '#2563eb', 'nav-blue'), pill];
-  const root = F('root', { name: 'Flightin website', width: 1440, height: 900, fills: [] }, bars);
-  w.page.appendChild(root);
-  w.page.selection = [root];
-  const out = await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: bars.map((b) => b.id) });
-  const r = ofType(out, 'COMPONENTS_RESULT')[0];
-  assert.ok(r, JSON.stringify(out).slice(0, 400));
-  assert.equal(r.sets, 2, JSON.stringify(r.failures));
-  assert.deepEqual(r.singles, []);
-  assert.deepEqual(r.fillKept, ['nav-blue'], '테마 색이 다른 바는 원본 그대로');
-  assert.deepEqual(r.placeFailed, []);
-  const comps = figma.root.children.find((x) => x.name === 'Components');
-  const item = comps.children.find((x) => x.name === 'Tab Item');
-  const tbar = comps.children.find((x) => x.name === 'Tab Bar');
-  assert.deepEqual(item.children.map((c) => c.name), ['State=Selected, Style=Text', 'State=Default, Style=Text', 'State=Selected, Style=Pill', 'State=Default, Style=Pill']);
-  assert.ok(item.children.every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-item:')));
-  assert.deepEqual(tbar.children.map((c) => c.name), ['Style=Text', 'Style=Pill']);
-  assert.ok(tbar.children.every((c) => c.getPluginData('dsl.reuse').startsWith('variant:role:tab-bar:')));
-  assert.ok(tbar.x > item.x, 'Tab Bar는 Tab Item 오른쪽');
-  assert.ok(tbar.children.every((v) => v.children.every((k) => k.type === 'INSTANCE' && k.isExposedInstance === true)), 'Tab Bar 안 칸은 노출된 Tab Item 인스턴스');
-  assert.ok(Object.values(item._props).some((x) => x.type === 'TEXT'), 'Tab Item에는 글자 속성 노출');
-  assert.deepEqual(Object.keys(tbar._props), [], 'Tab Bar에는 노출하지 않는다');
-  assert.deepEqual(tbar.children[0].children.map((c) => c.children[0].characters), ['About', 'Services', 'Offers', 'Seats', 'Destination'], '노출 뒤에도 칸마다 제 글자(9번 값 지키기)');
-  const kids = root.children;
-  const mainName = async (n) => (await n.getMainComponentAsync())?.name;
-  assert.equal(kids[0].type, 'INSTANCE');
-  assert.equal(await mainName(kids[0]), 'Style=Text');
-  assert.equal(kids[1].type, 'INSTANCE', '칸 수가 같은 둘째 바 — Tab Bar 인스턴스');
-  assert.equal(await mainName(kids[1].children[2]), 'State=Selected, Style=Text', '선택 위치는 원래대로');
-  assert.equal(kids[1].children[1].children[0].characters, 'Services');
-  assert.equal(kids[2].type, 'FRAME', '칸 수가 다른 바 — 틀 그대로');
-  assert.ok(kids[2].children.every((c) => c.type === 'INSTANCE'), '칸만 Tab Item 인스턴스');
-  assert.deepEqual(kids[2].children.map((c) => c.children[0].characters), ['About', 'Services', 'Offers', 'Seats']);
-  assert.equal(kids[3].type, 'FRAME');
-  assert.ok(kids[3].children.every((c) => c.type === 'TEXT'), 'nav-blue 칸도 그대로');
-  assert.equal(kids[4].type, 'INSTANCE');
-  assert.equal(await mainName(kids[4]), 'Style=Pill');
-  assert.equal(figma._undo, 1);
-  // 같은 프레임을 다시 찾기 — Tab Bar 인스턴스 · 칸만 바꾼 칸 4 바는 후보에 없다(일반 후보로 떨어지지 않음)
-  const again = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root'], reqId: 2 }), 'COMPONENT_CANDIDATES')[0];
-  assert.deepEqual(again.nodes.filter((n) => n.eligible).map((n) => n.name), ['nav-blue'], '남은 것은 원본 그대로 둔 nav-blue뿐');
-  assert.equal(again.autoNamed, 0);
-  // 원본을 한 번 더 붙여 넣은 사본 → 재사용 Tab Item · Tab Bar
-  const bars2 = [menu('c1', 5, 0), menu('c2', 5, 2, '#000000', 'nav-copy'), menu('c3', 4, 0, '#000000', 'nav-4'), F('cp', { name: 'card', layoutMode: 'HORIZONTAL', width: 462, height: 71, cornerRadius: 32, fills: solid61('#f4f9fa') },
-    ['Economy', 'Business Class', 'Fast Class'].map((l, i) => F(`cp-${i}`, { name: i === 1 ? 'button' : 'wrapper', layoutMode: 'HORIZONTAL', width: 128, height: 47, cornerRadius: 24, fills: i === 1 ? solid61('#3d5fdb') : [] },
-      [T(`cp-${i}t`, l, i === 1 ? '#ffffff' : '#a3a3a3')])))];
-  const root2 = F('root2', { name: 'Flightin website 2', width: 1440, height: 900, fills: [] }, bars2);
-  w.page.appendChild(root2);
-  w.page.selection = [root2];
-  const pre = ofType(await p.send({ type: 'SCAN_COMPONENT_CANDIDATES', nodeIds: ['root2'], reqId: 3 }), 'COMPONENT_CANDIDATES')[0];
-  const pby = Object.fromEntries(pre.nodes.map((n) => [n.id, n]));
-  assert.equal(pby.c1.reuse?.name, 'Tab Bar · Style=Text');
-  assert.equal(pby.c3.reuse?.name, 'Tab Item · Style=Text');
-  const r2 = ofType(await p.send({ type: 'REGISTER_COMPONENTS', nodeIds: bars2.map((b) => b.id) }), 'COMPONENTS_RESULT')[0];
-  assert.deepEqual(r2.reused, ['Tab Item', 'Tab Bar'], JSON.stringify(r2.failures));
-  assert.equal(r2.sets, 0);
-  assert.deepEqual(r2.fillKept, [], '재사용 칸 맞추기 — 틀 칸(알약)도 기존 변형과 맞는다');
-  assert.equal(root2.children[3].type, 'INSTANCE', '알약 바도 기존 Tab Bar 인스턴스');
-  assert.equal(root2.children[0].type, 'INSTANCE');
-  assert.equal(await mainName(root2.children[0]), 'Style=Text');
-  assert.equal(root2.children[2].type, 'FRAME');
-  assert.ok(root2.children[2].children.every((c) => c.type === 'INSTANCE'));
 });
 
 /* ---------- 이름 힌트 (IA v4 §4.4 "이름 힌트" · B.28, 2026-11-19) ---------- */
@@ -8736,11 +8200,13 @@ test('B.28 실기 파일 구조 — 힌트 낱말 이름은 그대로 · 역할�
     assert.ok(!after.has(id), `${id} 이름 그대로 — 실제 ${after.get(id)}`);
     assert.equal(role(id), want, id);
   }
-  // 바뀌는 것: 헤더(확실한 판정) · 탭 밑줄 · 힌트 없는 버튼 상자 · 자동 이름 1px 띠
-  assert.equal(after.get('header'), 'header');
-  assert.equal(after.get('underline'), 'tab-indicator');
-  assert.equal(role('underline'), 'indicator');
-  assert.equal(after.get('cart'), 'wrapper');
+  // S-2b(ia-v4 §4.4 R2B-P2 · SC-D51): 사람이 지은 이름(헤더 · 탭 밑줄 · 버튼 상자)은 그대로 두고 역할 · 지킨 이름 표시만 기록.
+  // 바뀌는 것은 자동 이름 1px 띠뿐이다(S-2b 전에는 header · tab-indicator · wrapper로 바꿨다)
+  for (const [id, want] of [['header', 'header'], ['underline', 'indicator'], ['cart', 'wrapper']]) {
+    assert.ok(!after.has(id), `${id} 이름 그대로 — 실제 ${after.get(id)}`);
+    assert.equal(role(id), want, id);
+    assert.equal(byId.get(id).getPluginData('dsKept'), byId.get(id).name, id);
+  }
   assert.match(after.get('strip'), /divider$/);
   assert.equal(role('strip'), 'divider');
   // 미리보기 트리 노드도 역할을 싣는다(판넬 roleOnly 적용이 쓰는 값)
@@ -8779,10 +8245,17 @@ test('B.28 약한 판정 자리에서만 덮기 · 이 플러그인이 지은 �
     assert.ok(!r.changes.some((c) => c.id === 'n'), name);
     assert.equal(n._pd.get('dsRole'), want, name);
   }
-  for (const [name, pd] of [['nav-item', { dsRole: 'item' }], ['nav-link'], ['button-group'], ['btn-wrap'], ['divider-box'], ['nav 항목'], ['카테고리메뉴'], ['배송 경로 안내'],
-    ['tab-list', { dsRole: 'list' }]]) { // 이 플러그인이 지은 tab-list(dsRole list ≠ tabs · A1 ②ⓑ) → 힌트 아님
+  // 힌트가 아닌 이름 — 역할은 구조 판정(text-group). S-2b(ia-v4 §4.4 R2B-P1 · P2): 플러그인 이름(기록과 맞는 nav-item · tab-list)만 바꾸고,
+  // 사람 이름(nav-link · button-group · btn-wrap · divider-box · 한글)은 그대로 두고 역할만 기록한다(S-2b 전에는 모두 card-text-group)
+  for (const [name, pd] of [['nav-item', { dsRole: 'item' }], ['tab-list', { dsRole: 'list' }]]) { // 이 플러그인이 지은 tab-list(dsRole list ≠ tabs · A1 ②ⓑ) → 힌트 아님
     const r = await inCard(tg(name, pd));
     assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group', name);
+  }
+  for (const name of ['nav-link', 'button-group', 'btn-wrap', 'divider-box', 'nav 항목', '카테고리메뉴', '배송 경로 안내']) {
+    const n = tg(name);
+    const r = await inCard(n);
+    assert.ok(!r.changes.some((c) => c.id === 'n'), name);
+    assert.equal(n._pd.get('dsRole'), 'text-group', name);
   }
   // 확실한 판정(card)은 이름을 바꾼다
   const navCard = withPd({ type: 'FRAME', id: 'nc', name: 'nav', cornerRadius: 8, fills: vis, width: 300, height: 200, children: [T('x', 'x'), T('y', 'y')] });
@@ -9327,7 +8800,6 @@ test('code.ts — GENERATE_DARK_MODE: commitUndo 한 번 · DARK_MODE_RESULT에 
   f.figma._undo = 0;
   let out = await p.send({ type: 'GET_PREREQ' });
   let pre = ofType(out, 'PREREQ_STATE')[0];
-  assert.equal(pre.hasDarkMode, true);
   assert.equal(pre.darkOld, true);
   assert.equal(pre.darkUnfilled, 0);
   out = await p.send({ type: 'GENERATE_DARK_MODE' });
@@ -9351,7 +8823,6 @@ test('code.ts — GENERATE_DARK_MODE: commitUndo 한 번 · DARK_MODE_RESULT에 
   assert.equal(f.figma._undo, 2, '옮기기 + 채우기 전체가 ⌘Z 한 번');
   pre = ofType(out, 'PREREQ_STATE')[0];
   assert.equal(pre.darkOld, false);
-  assert.equal(pre.hasDarkMode, true);
   assert.equal(pre.darkUnfilled, 0);
   assert.equal(ofType(out, 'VARIABLES').length, 1);
   // 새 Global 색 → Dark 값이 없는 색 1
@@ -9426,4 +8897,1276 @@ test('다크 D-T1 옮기기 ③ — Global Dark 칸에 이미 사용자 기록(b
   assert.deepEqual(r.migrated, { moved: 1, split: 0, failed: 0, splitNames: [], failedNames: [], removedDark: 0 }, '덮지 않은 X는 옮긴 색 · 갈린 색에 안 셈');
   assert.equal(r.kept, 1, '⑥에서 그대로 둔 색으로 셈');
   assert.equal(r.filled, 0);
+});
+
+/* ---- 7-5 용도 어긋남(ia-v4 §2.3-7 "무료 · 용도 더함" · §4.1 u · B.33) ---- */
+const blackFrame = (id = 'bf') => ({
+  type: 'FRAME', id, name: id,
+  fills: [{ type: 'SOLID', color: { r: 0, g: 0, b: 0 } }],
+  strokes: [], effects: [],
+  layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', layoutMode: 'NONE',
+});
+const strokeOnlyBlack = async () => {
+  await createTokens([{ name: 'color/000000', category: 'color', sources: ['stroke'], value: '#000000', uses: [{ name: 'color/border', count: 1 }] }], 16);
+  return globalThis.figma._state.variables.find((v) => v.name === 'color/000000');
+};
+
+// S-2(ia-v4 §2.9 S2-P3 · SC-D31 ⑧)로 기대가 바뀜: 유료도 붙인다 — 사유 `scope-add`(u)는 없어지고 후보 + `scopeAdd`가 된다(새 Semantic으로 감싸고 Global에 용도를 더함).
+test('B.33 ① 유료 — 선 용도만 있는 플러그인 Global + 같은 색 칠 → 후보(새 Semantic) + scopeAdd · 미리보기는 변수 그대로 → 연결 뒤 Global 용도에 ALL_FILLS', async () => {
+  const figma = installFigma();
+  const g = await strokeOnlyBlack();
+  assert.deepEqual(g.scopes, ['STROKE_COLOR']);
+  const res = await bindSelection([blackFrame()], false);
+  assert.equal(res.reasons['scope-add'], undefined);
+  assert.equal(res.reasons['no-match'] ?? 0, 0);
+  assert.equal(res.bound, 1);
+  assert.equal(res.candidates[0].scopeAdd, 'ALL_FILLS');
+  assert.equal(res.candidates[0].newRole.globalId, g.id);
+  assert.equal(res.make, undefined, '새로 만들 값이 아니다');
+  assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+  const node = blackFrame('bf1');
+  const run = await bindSelection([node], true);
+  assert.equal(run.bound, 1);
+  assert.equal(roleTarget(figma, node.fills[0].boundVariables.color.id), g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('B.33 ② 사용자 컬렉션 Global은 용도를 존중 — no-match 그대로', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'black', 'COLOR', ['STROKE_COLOR'], { r: 0, g: 0, b: 0, a: 1 });
+  const res = await bindSelection([blackFrame()], false);
+  assert.equal(res.reasons['no-match'], 1);
+  assert.equal(res.reasons['scope-add'] ?? 0, 0);
+});
+
+// SC-D38(2026-11-26 — SC-D32 ①을 뒤집음)로 기대가 바뀜: 직접 만든 변수도 용도 예외에 든다 — 유료 · 무료 모두 후보 + `scopeAdd`,
+// 연결 뒤 그 변수의 용도가 더해진다(전의 "붙지 않음 · 용도 그대로"는 없앤다). 값은 바뀌지 않는다.
+test('B.33 ②′ · ②″ 플러그인 Global 컬렉션의 직접 만든 변수 — 유료 · 무료 모두 후보 + scopeAdd, 연결 뒤 용도가 더해짐 · 값 그대로(SC-D38)', async () => {
+  const figma = installFigma();
+  const g = await strokeOnlyBlack();
+  g.setPluginData('dsl.manual', '1');
+  const value = JSON.stringify(g.valuesByMode);
+  const paid = await bindSelection([blackFrame()], false);
+  assert.equal(paid.reasons['scope-add'], undefined);
+  assert.equal(paid.bound, 1);
+  assert.equal(paid.candidates[0].scopeAdd, 'ALL_FILLS');
+  assert.equal(paid.candidates[0].newRole.globalId, g.id);
+  assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+  const dryFree = await bindSelection([blackFrame()], false, {}, { noNewRoles: true });
+  assert.equal(dryFree.candidates[0].variableId, g.id);
+  assert.equal(dryFree.candidates[0].scopeAdd, 'ALL_FILLS');
+  const node = blackFrame('bf2');
+  const free = await bindSelection([node], true, {}, { noNewRoles: true });
+  assert.equal(free.reasons['scope-add'], undefined);
+  assert.equal(free.bound, 1);
+  assert.equal(node.fills[0].boundVariables.color.id, g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+  assert.equal(JSON.stringify(g.valuesByMode), value, '값은 그대로');
+  assert.equal(figma._state.variables.filter((v) => v.name.startsWith('color/000000')).length, 1, '같은 값의 Global을 새로 만들지 않는다');
+});
+
+// S-2: 기대는 그대로(이름이 다른 숫자 변수는 섞이지 않는다 — SC-D34) — 제목만 고침. 숫자 예외는 같은 이름 · 같은 값일 때만이다.
+test('B.33 ③ 숫자 예외는 같은 이름일 때만 — 플러그인 spacing/16(GAP) + 반경 16 → no-match(섞이지 않음)', async () => {
+  installFigma();
+  await createTokens([{ name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 }], 16);
+  const node = { ...blackFrame('r16'), fills: [], cornerRadius: 16, topLeftRadius: 16, topRightRadius: 16, bottomLeftRadius: 16, bottomRightRadius: 16 };
+  const res = await bindSelection([node], false);
+  assert.equal(res.reasons['scope-add'] ?? 0, 0);
+  assert.ok((res.reasons['no-match'] ?? 0) >= 1);
+});
+
+test('B.33 ④ 무료 — 미리보기 후보 scopeAdd(ALL_FILLS) · 변수 그대로 → 실제 연결 뒤 용도 더함 · 붙음', async () => {
+  installFigma();
+  const g = await strokeOnlyBlack();
+  const dry = await bindSelection([blackFrame()], false, {}, { noNewRoles: true });
+  assert.equal(dry.bound, 1);
+  assert.equal(dry.candidates[0].scopeAdd, 'ALL_FILLS');
+  assert.equal(dry.candidates[0].variableId, g.id);
+  assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+  const node = blackFrame('bf3');
+  const res = await bindSelection([node], true, {}, { noNewRoles: true });
+  assert.equal(res.bound, 1);
+  assert.equal(node.fills[0].boundVariables.color.id, g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+// S-2: ④의 유료 갈래(SC-D31 ⑧ — 유료는 새 Semantic으로 감싸고 Global에 용도를 더한다. Semantic의 용도는 역할 이름에서).
+test('B.33 ④ 유료 — 후보는 새 Semantic(color/background/default) + scopeAdd → 연결 뒤 Semantic이 Global을 가리키고 Global 용도에 ALL_FILLS', async () => {
+  const figma = installFigma();
+  const g = await strokeOnlyBlack();
+  const dry = await bindSelection([blackFrame()], false);
+  assert.equal(dry.candidates[0].newRole.name, 'color/background/default');
+  assert.equal(dry.candidates[0].scopeAdd, 'ALL_FILLS');
+  const node = blackFrame('bf4');
+  const res = await bindSelection([node], true);
+  assert.equal(res.bound, 1);
+  assert.equal(res.newRoles, 1);
+  const role = figma._state.variables.find((v) => v.id === node.fills[0].boundVariables.color.id);
+  assert.equal(role.name, 'color/background/default');
+  assert.deepEqual([...role.scopes].sort(), ['FRAME_FILL', 'SHAPE_FILL']);
+  assert.equal(Object.values(role.valuesByMode)[0].id, g.id);
+  assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+});
+
+test('B.33 mergeScopes — ALL_FILLS가 들어가면 개별 칠 용도를 빼고, ALL_SCOPES면 그대로', async () => {
+  const { mergeScopes } = await import('../dist/figma-lib.mjs');
+  assert.deepEqual(mergeScopes(['FRAME_FILL', 'STROKE_COLOR'], ['ALL_FILLS'], 'COLOR').sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+  assert.deepEqual(mergeScopes(['ALL_SCOPES'], ['ALL_FILLS'], 'COLOR'), ['ALL_SCOPES']);
+  assert.deepEqual(mergeScopes(['GAP'], ['CORNER_RADIUS'], 'FLOAT').sort(), ['CORNER_RADIUS', 'GAP']);
+});
+
+/* ---- 7-8 A 만들기 연결 단계 — only(ia-v4 §4.3 B.35 ①) ---- */
+test('B.35 only — 켠 값 · 묶음만 붙고, 끈 값 · 같은 값 다른 용도 자리는 그대로', async () => {
+  installFigma();
+  await createTokens([
+    { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'color/ff0000', category: 'color', sources: ['fill'], value: '#ff0000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ], 16);
+  const mk = (id, hex, gap) => ({
+    type: 'FRAME', id, name: id, fills: [{ type: 'SOLID', color: hex === '#000000' ? { r: 0, g: 0, b: 0 } : { r: 1, g: 0, b: 0 } }], strokes: [], effects: [],
+    layoutMode: 'HORIZONTAL', itemSpacing: gap, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], parent: { type: 'PAGE' },
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  });
+  const a = mk('a', '#000000', 16);
+  const b = mk('b', '#ff0000', 16);
+  const all = await bindSelection([mk('a0', '#000000', 16), mk('b0', '#ff0000', 16)], false, {}, { noNewRoles: true });
+  assert.ok(all.bound >= 2, '거르지 않으면 두 색 모두 후보');
+  // #000000(칠 · 프레임)만 켬 — #ff0000 · 간격 16은 끔
+  const res = await bindSelection([a, b], true, {}, { noNewRoles: true, only: [{ value: '#000000', groups: ['ALL_FILLS|FRAME_FILL'] }] });
+  assert.equal(res.bound, 1);
+  assert.ok(a.fills[0].boundVariables?.color, '켠 값은 붙음');
+  assert.equal(b.fills[0].boundVariables, undefined, '끈 값은 그대로');
+  assert.equal(a._bound?.itemSpacing, undefined, '끈 간격은 그대로');
+  assert.equal(res.reasons['no-match'] ?? 0, 0, '걸러진 자리는 사유 없이 버린다');
+  // 같은 값이지만 다른 묶음(글자 칠) → 안 붙음
+  const c = mk('c', '#000000', 16);
+  const r2 = await bindSelection([c], true, {}, { noNewRoles: true, only: [{ value: '#000000', groups: ['ALL_FILLS|TEXT_FILL'] }] });
+  assert.equal(r2.bound, 0);
+  // 숫자 값만 같고 묶음이 다르면(글자 크기 16) 간격 16은 안 붙음
+  const d = mk('d', '#000000', 16);
+  const r3 = await bindSelection([d], true, {}, { noNewRoles: true, only: [{ value: 16, groups: ['FONT_SIZE'] }] });
+  assert.equal(r3.bound, 0);
+  assert.equal(d._bound?.itemSpacing, undefined);
+  // 간격 16 켬 → 붙음
+  const e = mk('e', '#000000', 16);
+  const r4 = await bindSelection([e], true, {}, { noNewRoles: true, only: [{ value: 16, groups: ['GAP'] }] });
+  assert.equal(r4.bound, 1);
+  assert.ok(e._bound?.itemSpacing);
+});
+
+test('B.35 only — 알약 자리는 9999로 견준다(원래 값 150 아님)', async () => {
+  installFigma();
+  await createTokens([{ name: 'radius/9999', category: 'radius', sources: ['radius'], value: 9999 }], 16);
+  const pill = () => a20Frame('p' + Math.random(), { cornerRadius: 150, topLeftRadius: 150, topRightRadius: 150, bottomLeftRadius: 150, bottomRightRadius: 150 });
+  const n1 = pill();
+  const r1 = await bindSelection([n1], true, {}, { only: [{ value: 9999, groups: ['CORNER_RADIUS'] }] });
+  assert.equal(r1.bound, 4);
+  const n2 = pill();
+  const r2 = await bindSelection([n2], true, {}, { only: [{ value: 150, groups: ['CORNER_RADIUS'] }] });
+  assert.equal(r2.bound, 0);
+});
+
+test('B.36 off — only가 버린 자리 중 꺼진 줄 값만 make-off로 센다(skipped 그대로) · ② 묶음 · 소수 · off에 없는 값은 안 셈', async () => {
+  installFigma();
+  await createTokens([
+    { name: 'color/000000', category: 'color', sources: ['fill'], value: '#000000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'color/ff0000', category: 'color', sources: ['fill'], value: '#ff0000', uses: [{ name: 'color/background', count: 1 }] },
+    { name: 'spacing/16', category: 'gap', sources: ['gap'], value: 16 },
+  ], 16);
+  const mk = (id, hex, gap) => ({
+    type: 'FRAME', id, name: id, fills: [{ type: 'SOLID', color: hex === '#000000' ? { r: 0, g: 0, b: 0 } : { r: 1, g: 0, b: 0 } }], strokes: [], effects: [],
+    layoutMode: 'HORIZONTAL', itemSpacing: gap, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', children: [], parent: { type: 'PAGE' },
+    setBoundVariable(field, v) { (this._bound ??= {})[field] = v.id; },
+  });
+  const only = [{ value: '#000000', groups: ['ALL_FILLS|FRAME_FILL'] }];
+  // 끈 줄: #ff0000(칠) · 간격 16 → 둘 다 make-off
+  const base = await bindSelection([mk('a0', '#000000', 16), mk('b0', '#ff0000', 16)], true, {}, { noNewRoles: true, only });
+  const r1 = await bindSelection([mk('a', '#000000', 16), mk('b', '#ff0000', 16)], true, {}, {
+    noNewRoles: true, only, off: [{ value: '#ff0000', groups: ['ALL_FILLS|FRAME_FILL'] }, { value: 16, groups: ['GAP'] }],
+  });
+  assert.equal(r1.bound, 1);
+  assert.equal(r1.reasons['make-off'], 3, '#ff0000 칠 1 + 간격 16 두 곳');
+  assert.equal(r1.skipped, base.skipped, 'skipped는 그대로');
+  assert.equal(base.reasons['make-off'] ?? 0, 0, 'off가 없으면 세지 않는다(B.35 그대로)');
+  // off에 없는 값(간격 16 줄이 없음 — ② 묶음 · 줄 없는 값과 같음) → 세지 않음
+  const r2 = await bindSelection([mk('c', '#000000', 16)], true, {}, { noNewRoles: true, only, off: [{ value: '#ff0000', groups: ['ALL_FILLS|FRAME_FILL'] }] });
+  assert.equal(r2.reasons['make-off'] ?? 0, 0);
+  // 같은 값이라도 묶음이 다르면 세지 않음(켠 줄의 ②로 빠진 묶음은 off에 없다)
+  const r3 = await bindSelection([mk('d', '#ff0000', 0)], true, {}, { noNewRoles: true, only, off: [{ value: '#ff0000', groups: ['ALL_FILLS|TEXT_FILL'] }] });
+  assert.equal(r3.reasons['make-off'] ?? 0, 0);
+  // 소수 간격(16.5 — 줄이 없는 값)은 off에 16이 있어도 세지 않음
+  const r4 = await bindSelection([mk('e', '#000000', 16.5)], true, {}, { noNewRoles: true, only, off: [{ value: 16, groups: ['GAP'] }] });
+  assert.equal(r4.reasons['make-off'] ?? 0, 0);
+});
+
+/* ---- B.40 원격(라이브러리) 텍스트 스타일 후보(ia-v4 §4.2 RT-D1–RT-D5) ---- */
+function remoteStyle(id, name, fontSize, family = 'Inter') {
+  return { id, name, type: 'TEXT', remote: true, fontName: { family, style: 'Regular' }, fontSize, lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 } };
+}
+function rtText(id, fontSize, extra = {}) {
+  return {
+    type: 'TEXT', id, name: id, fontSize, fontName: { family: 'Inter', style: 'Regular' },
+    lineHeight: { unit: 'PIXELS', value: fontSize * 1.5 }, letterSpacing: { unit: 'PIXELS', value: 0 },
+    characters: 'hi', visible: true, textStyleId: '', _styleId: null,
+    async setTextStyleIdAsync(sid) { this._styleId = sid; this.textStyleId = sid; },
+    ...extra,
+  };
+}
+/** 원격 스타일 목: getStyleByIdAsync가 원격도 찾고, 페이지는 findAllWithCriteria로 글자를 준다. */
+function installRemote(figma, remotes, pageTexts, otherPages = []) {
+  const local = figma.getStyleByIdAsync;
+  figma.getStyleByIdAsync = async (id) => remotes.find((s) => s.id === id) ?? (await local(id));
+  const page = { type: 'PAGE', id: 'page:cur', parent: null, findAllWithCriteria: () => pageTexts };
+  for (const t of pageTexts) t.parent ??= page;
+  figma.currentPage = page;
+  for (const op of otherPages) {
+    op.loaded = false;
+    op.loadAsync = async () => { op.loaded = true; };
+    op.findAllWithCriteria = () => { assert.ok(op.loaded, '다른 페이지는 loadAsync 뒤에 훑는다'); return op.texts; };
+    for (const t of op.texts) t.parent ??= op;
+  }
+  return page;
+}
+
+test('B.40 원격 스타일 — 현재 페이지에 쓰인 원격만 후보 · 붙음 / 로컬 우선 / 원격 둘 같은 키는 모호', async () => {
+  const figma = installFigma();
+  await createSemanticTextStyles([{ name: 'local/24', fontSize: 24, lineHeight: 36, letterSpacing: 0, family: 'Inter', style: 'Regular' }]);
+  const local24 = figma._state.textStyles.find((s) => s.name === 'local/24');
+  const R16 = remoteStyle('S:r16', 'Lib/Body', 16);
+  const R24 = remoteStyle('S:r24', 'Lib/Title', 24);
+  const R20a = remoteStyle('S:r20a', 'Lib/A', 20);
+  const R20b = remoteStyle('S:r20b', 'Lib/B', 20);
+  const R40 = remoteStyle('S:r40', 'Lib/Huge', 40); // 다른 페이지에만 쓰임 → 후보 아님
+  const used = [16, 24, 20, 20].map((fs, i) => rtText(`used${i}`, fs, { textStyleId: [R16, R24, R20a, R20b][i].id }));
+  installRemote(figma, [R16, R24, R20a, R20b, R40], used);
+  const a = rtText('a', 16), b = rtText('b', 24), c = rtText('c', 20), d = rtText('d', 40);
+  const plan = await planExistingTextStyles([a, b, c, d]);
+  assert.deepEqual(plan.rows.map((r) => [r.name, r.nodeIds]).sort(), [['Lib/Body', ['a']], ['local/24', ['b']]]);
+  assert.equal(plan.skipReasons.ambiguous, 1, '원격 둘이 같은 키 → 모호');
+  assert.equal(plan.skipReasons.noStyle, 1, '다른 페이지에만 쓰인 원격은 후보 아님');
+  registerNodes(figma, [a, b]);
+  const r = await applyTextStyleRows([{ styleId: R16.id, nodeIds: ['a'] }, { styleId: local24.id, nodeIds: ['b'] }]);
+  assert.equal(r.applied, 2);
+  assert.equal(a._styleId, R16.id);
+  assert.equal(b._styleId, local24.id);
+  // 텍스트 스타일이 먼저(skipTextStyleNodes) 판정도 원격을 본다
+  const test1 = await textStyleCandidateTest([rtText('e', 16)]);
+  assert.equal(test1(rtText('f', 16)), true);
+  assert.equal(test1(rtText('g', 40)), false);
+});
+
+test('B.40 원격 스타일 — 기준 루트가 있는 페이지도 훑는다(loadAsync) · 다시 확인은 줄 styleId를 더한다 · 구간 스타일은 모으지 않음', async () => {
+  const figma = installFigma();
+  const R18 = remoteStyle('S:r18', 'Lib/Eighteen', 18);
+  const R30 = remoteStyle('S:r30', 'Lib/Thirty', 30);
+  const other = { type: 'PAGE', id: 'page:other', parent: null, texts: [] };
+  const onOther = rtText('o1', 18, { textStyleId: R18.id });
+  const target = rtText('t', 18);
+  other.texts.push(onOther, target);
+  const mixedUser = rtText('m', 30, { textStyleId: figma.mixed });
+  installRemote(figma, [R18, R30], [mixedUser], [other]);
+  const plan = await planExistingTextStyles([target]);
+  assert.deepEqual(plan.rows.map((r) => r.name), ['Lib/Eighteen'], '루트 페이지의 원격');
+  assert.equal((await planExistingTextStyles([rtText('x', 30)])).rows.length, 0, '구간 스타일(mixed) 글자의 스타일은 모으지 않는다');
+  // 다시 확인: 그 원격을 쓰던 글자가 사라져도 줄의 styleId로 남는다
+  other.texts.splice(0, 1);
+  registerNodes(figma, [target]);
+  const r = await applyTextStyleRows([{ styleId: R18.id, nodeIds: ['t'] }]);
+  assert.equal(r.applied, 1);
+  assert.equal(target._styleId, R18.id);
+});
+
+test('B.40 원격 스타일 — 만들기 후보에서 원격과 같은 묶음만 뺀다(RT-D5)', async () => {
+  const figma = installFigma();
+  const R16 = remoteStyle('S:r16', 'Lib/Body', 16);
+  const R20a = remoteStyle('S:r20a', 'Lib/A', 20);
+  const R20b = remoteStyle('S:r20b', 'Lib/B', 20);
+  const used = [rtText('u16', 16, { textStyleId: R16.id }), rtText('u20a', 20, { textStyleId: R20a.id }), rtText('u20b', 20, { textStyleId: R20b.id })];
+  installRemote(figma, [R16, R20a, R20b], used);
+  const nodes = {
+    a: rtText('a', 16), b: rtText('b', 16), // 원격 16과 같음 → 빠짐
+    up1: rtText('up1', 24, { textCase: 'UPPER' }), up2: rtText('up2', 24), // 24는 원격 없음 → 그대로
+    c: rtText('c', 20), // 원격 둘(모호) → 그대로
+    o1: rtText('o1', 16, { textStyleId: R16.id, fontSize: 17 }), // R이 붙었지만 크기를 바꿈 → 그대로
+  };
+  const nodeById = new Map(Object.entries(nodes).map(([, n]) => [n.id, n]));
+  const clusters = [
+    { key: 'r16', nodeIds: ['a', 'b'] },
+    { key: 'mixUpper', nodeIds: ['up1', 'up2'] },
+    { key: 'amb', nodeIds: ['c'] },
+    { key: 'changed', nodeIds: ['o1'] },
+    { key: 'r16+attached', nodeIds: ['a', 'u16'] },
+    { key: 'anchored', nodeIds: ['b'] },
+  ];
+  nodeById.set('u16', used[0]);
+  const inst = { type: 'INSTANCE', id: 'inst', parent: null };
+  const inInst = rtText('ii', 16, { parent: inst });
+  nodeById.set('ii', inInst);
+  clusters.push({ key: 'instance', nodeIds: ['a', 'ii'] });
+  const kept = await dropRemoteClusters(clusters, nodeById, [], (c) => c.key === 'anchored');
+  assert.deepEqual(kept.map((c) => c.key), ['mixUpper', 'amb', 'changed', 'anchored', 'instance']);
+});
+
+test('B.41 creationOrder · createTokens — 그룹 안 숫자 값 작은 순 · 그룹은 처음 나온 순서 · px 값으로', async () => {
+  const tk = (name, category, value, extra = {}) => ({ name, category, sources: [category], value, ...extra });
+  assert.deepEqual(creationOrder([tk('spacing/16', 'gap', 16), tk('spacing/4', 'gap', 4), tk('spacing/8', 'gap', 8)], 16).map((t) => t.name), ['spacing/4', 'spacing/8', 'spacing/16']);
+  assert.deepEqual(creationOrder([tk('radius/2', 'radius', 2), tk('spacing/4', 'gap', 4), tk('radius/1', 'radius', 1)], 16).map((t) => t.name), ['radius/1', 'radius/2', 'spacing/4']);
+  const figma = installFigma();
+  await createTokens([tk('spacing/16', 'gap', 16), tk('color/000000', 'color', '#000000', { sources: ['fill'] }), tk('spacing/4', 'gap', 4), tk('spacing/8', 'gap', 8)], 16);
+  const order = figma._state.variables.map((v) => v.name);
+  const sp = order.filter((n) => n.startsWith('spacing/'));
+  assert.deepEqual(sp, ['spacing/4', 'spacing/8', 'spacing/16'], '새 숫자 변수는 값 작은 순으로 만든다');
+});
+
+/* ============================================================
+   S-2 "같은 값" 함수 통합 — 회귀(ia-v4 §2.9 · B.39)
+   찾기(카드) · 추출(만들기 화면) · 만들기 미리보기 · 실행이 같은 판정을 쓰는지 예 (가)(나)(다) · (i)–(v)와 결정 SC-D31–SC-D39로 본다.
+   ============================================================ */
+const { userRadiusKeys: s2Keys, cardCounts: s2CardCounts, linkPlacesForMake: s2LinkPlaces, onlyItems: s2OnlyItems, libSameGroups: s2LibSame, makeDoneText: s2DoneText } = await import('../dist/pure.mjs');
+const S2_PAGE = { type: 'PAGE', id: 's2p', name: 'Page 1' };
+const s2Radius = (r) => ({ cornerRadius: r, topLeftRadius: r, topRightRadius: r, bottomLeftRadius: r, bottomRightRadius: r });
+const s2Fill = (hex, extra = {}) => [{ type: 'SOLID', visible: true, opacity: 1, color: rgbOf(hex), ...extra }];
+/** 오토레이아웃 없는 프레임 — 붙인 변수는 boundVariables에 남는다(다시 찾으면 "이미 연결됨"). */
+const s2Frame = (id, extra = {}) => ({
+  type: 'FRAME', id, name: id, visible: true, fills: [], strokes: [], effects: [], layoutMode: 'NONE',
+  layoutSizingHorizontal: 'FIXED', layoutSizingVertical: 'FIXED', width: 200, height: 80, ...s2Radius(0), children: [], parent: S2_PAGE, boundVariables: {},
+  setBoundVariable(field, v) { if (v) this.boundVariables[field] = { type: 'VARIABLE_ALIAS', id: v.id }; else delete this.boundVariables[field]; },
+  ...extra,
+});
+const s2Chip = (id, extra = {}) => s2Frame(id, { width: 80, height: 24, ...s2Radius(12), ...extra }); // 알약 모양(반경 ≥ 짧은 변 / 2)
+const s2Card = (id, extra = {}) => s2Frame(id, { width: 200, height: 80, ...s2Radius(12), ...extra }); // 알약 모양 아님
+const s2Button = (id, extra = {}) => s2Frame(id, { width: 120, height: 40, ...s2Radius(150), ...extra });
+const s2AutoFrame = (id, extra = {}) => s2Frame(id, { layoutMode: 'VERTICAL', primaryAxisAlignItems: 'MIN', layoutWrap: 'NO_WRAP', itemSpacing: 0, counterAxisSpacing: 0, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0, layoutSizingHorizontal: 'HUG', layoutSizingVertical: 'HUG', ...extra });
+const s2Text = (id, extra = {}) => ({
+  type: 'TEXT', id, name: id, visible: true, characters: 'Hi', fontSize: 14, fontName: { family: 'Inter', style: 'Regular' }, lineHeight: { unit: 'AUTO' },
+  letterSpacing: { unit: 'PERCENT', value: 0 }, fills: [], strokes: [], effects: [], parent: S2_PAGE, boundVariables: {}, setRangeBoundVariable() {}, ...extra,
+});
+/** 사용자 컬렉션의 별칭 변수. */
+const s2Alias = (figma, name, target, scopes = ['ALL_SCOPES'], colName = 'Tokens') => {
+  const v = mkVar(figma, name, target.resolvedType, scopes, undefined, colName);
+  const col = figma._state.collections.find((c) => c.id === v.variableCollectionId);
+  v.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: target.id });
+  return v;
+};
+/** 플러그인 Global 컬렉션(표시 있음)의 변수 — manual이면 직접 만든 변수(`dsl.manual`). */
+const s2Global = (figma, name, type, scopes, value, manual = false) => {
+  let col = figma._state.collections.find((c) => c._pd['dsl.owned'] === 'global');
+  if (!col) { col = figma.variables.createVariableCollection('Global'); col.setPluginData('dsl.owned', 'global'); }
+  const v = figma.variables.createVariable(name, col, type);
+  v.scopes = scopes;
+  if (value !== undefined) v.setValueForMode(col.defaultModeId, value);
+  if (manual) v.setPluginData('dsl.manual', '1');
+  return v;
+};
+const s2Sem = (figma) => figma._state.collections.find((c) => c._pd['dsl.owned'] === 'semantic');
+const s2SemVars = (figma) => figma._state.variables.filter((v) => v.variableCollectionId === s2Sem(figma)?.id);
+const s2Named = (figma, name) => figma._state.variables.filter((v) => v.name === name);
+const S2_MAKE_CATS = new Set(['color', 'effectColor', 'gap', 'radius', 'size', 'strokeWidth', 'opacity']);
+const s2FreeSum = (tk) => Object.values(tk.freeBy ?? {}).reduce((a, b) => a + (b > 0 ? b : 0), 0);
+/** `EXTRACT` 처리와 같은 추출 — 찾기 색인과 같은 변수 읽기에서 알약 판정 집합을 내고 메인 · 인스턴스 루트 판정을 넘긴다. */
+async function s2Extract(sel) {
+  const mains = await collectLocalMains(sel);
+  const roots = [...sel, ...mains.units.flatMap((u) => u.roots)];
+  const { infos } = await readVarInfos();
+  return extractFromSelection(roots, new Set(mains.mainOf.keys()), { userRadiusKeys: s2Keys(infos), mainOf: mains.mainOf }).tokens;
+}
+/** 만들기 화면을 연 직후 켜진 줄 — 글자 종류가 아니고 빈 자리가 있는 값. */
+const s2OnTokens = async (sel) => (await s2Extract(sel)).filter((tk) => S2_MAKE_CATS.has(tk.category) && s2FreeSum(tk) > 0);
+/** 카드 1의 숫자(찾기 응답에서) — m · n · q · s · p. */
+async function s2CardOf(sel, free = false, libs = []) {
+  const res = await bindSelection(sel, false, {}, free ? { noNewRoles: true } : {});
+  const c = s2CardCounts(res.candidates.map((x) => x.field), res.counts, res.make ?? [], libs);
+  const types = new Map(res.nodes.map((x) => [x.id, x.type]));
+  return { res, m: c.m, n: c.n, q: c.q, s: c.s, p: s2LinkPlaces(res.candidates, (id) => types.get(id), libs) + c.q };
+}
+/** 만들기 화면을 연 직후의 수 — g(미리보기 created + updated) · r(유료 Semantic 수) · p(켠 줄의 빈 자리 수 합). */
+async function s2MakeOf(sel, free = false) {
+  const toks = await s2OnTokens(sel);
+  const pv = await previewCreateTokens(toks, 16);
+  const r = free ? 0 : await createUsageRoles(toks, true, pv.globalOf, undefined, pv.finalName);
+  return { toks, pv, g: pv.created + pv.updated, r, p: toks.reduce((a, tk) => a + s2FreeSum(tk), 0), by: (name) => toks.find((tk) => tk.name === name), state: (name) => pv.tokenStates.get(name) };
+}
+/** 만들기 실행(만들기 + 연결 단계 — 켠 줄만). */
+async function s2Run(sel, free = false) {
+  const toks = await s2OnTokens(sel);
+  const s = await createTokens(toks, 16);
+  const roles = free ? 0 : await createUsageRoles(toks, false, s.globalOf, undefined, s.finalName);
+  const res = await bindSelection(sel, true, {}, { ...(free ? { noNewRoles: true } : {}), only: s2OnlyItems(toks, []) });
+  return { s, roles, res };
+}
+/** 레이어 속성에 붙은 변수(이름). */
+const s2Bound = (figma, node, field) => varName(figma, node.boundVariables?.[field]?.id);
+const s2FillBound = (figma, node, i = 0) => varName(figma, node.fills[i]?.boundVariables?.color?.id);
+const S2_CORNERS = ['topLeftRadius', 'topRightRadius', 'bottomLeftRadius', 'bottomRightRadius'];
+/** 어느 레이어에도 붙지 않은 플러그인 Semantic 변수 이름. */
+function s2UnusedRoles(figma, nodes) {
+  const used = new Set();
+  for (const n of nodes) {
+    for (const a of Object.values(n.boundVariables ?? {})) if (a?.id) used.add(a.id);
+    for (const p of n.fills ?? []) if (p.boundVariables?.color?.id) used.add(p.boundVariables.color.id);
+  }
+  return s2SemVars(figma).filter((v) => !used.has(v.id)).map((v) => v.name);
+}
+
+for (const free of [false, true]) {
+  const tier = free ? '무료' : '유료';
+
+  test(`S-2 예 (가) ${tier} — 로컬 변수 0개 · #111111 3곳 · #FFFFFF 2곳 → make 2값 5곳 · 카드 n = 만들기 g = 2 · p = 5 · 만들기 뒤 5곳 연결`, async () => {
+    const figma = installFigma();
+    const sel = [...[1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') })), ...[1, 2].map((i) => s2Frame(`w${i}`, { fills: s2Fill('#ffffff') }))];
+    const card = await s2CardOf(sel, free);
+    assert.equal(card.m, 0);
+    assert.deepEqual(card.res.make, [
+      { kind: 'color', value: '#111111', by: { 'ALL_FILLS|FRAME_FILL': 3 } },
+      { kind: 'color', value: '#ffffff', by: { 'ALL_FILLS|FRAME_FILL': 2 } },
+    ]);
+    assert.deepEqual([card.n, card.q, card.p], [2, 5, 5]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.toks.map(s2FreeSum).sort(), [2, 3]); // 줄 "3곳" · "2곳"
+    assert.equal(make.g, card.n);
+    assert.equal(make.pv.updated, 0, '기본 상태의 미리보기 updated = 0');
+    assert.equal(make.r, free ? 0 : 2);
+    assert.equal(make.p, card.p);
+    const run = await s2Run(sel, free);
+    assert.equal(run.s.created, 2);
+    assert.equal(run.res.bound, 5);
+    assert.equal(s2DoneText({ created: { g: 2, r: run.roles, m: 0 }, bound: run.res.bound }, { isPaid: !free, linkOff: false }), free ? 'Global 변수 2개를 만들고 5곳에 연결했어요' : 'Global 2개 · Semantic 2개를 만들고 5곳에 연결했어요');
+    const after = await s2CardOf(sel, free);
+    assert.deepEqual([after.m, after.n], [0, 0]); // ✓
+    assert.equal(figma._state.variables.length, free ? 2 : 4);
+  });
+
+  test(`S-2 예 (나) ${tier} — 선 색만 켠 플러그인 Global + 같은 색 채움 3곳 → 연결할 곳 3 · scopeAdd · 미리보기는 변수 그대로 · 만들기 reuse · created 0 · 연결 뒤 용도에 ALL_FILLS`, async () => {
+    const figma = installFigma();
+    const g = s2Global(figma, 'color/gray/950', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 });
+    const sel = [1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.p], [3, 0, 3]);
+    assert.equal(card.res.make, undefined);
+    assert.equal(card.res.reasons['scope-add'], undefined);
+    assert.ok(card.res.candidates.every((c) => c.scopeAdd === 'ALL_FILLS'));
+    if (free) assert.ok(card.res.candidates.every((c) => c.variableId === g.id));
+    else assert.ok(card.res.candidates.every((c) => c.newRole?.name === 'color/background/default' && c.newRole.globalId === g.id));
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.state(make.toks[0].name), { state: 'reuse', varName: 'color/gray/950' }); // "3곳 · 있는 변수"
+    assert.equal(s2FreeSum(make.toks[0]), 3);
+    assert.deepEqual([make.g, make.r, make.p], [0, free ? 0 : 1, 3]); // "Global 0개 · Semantic 1개" · [3곳 연결]
+    assert.deepEqual(g.scopes, ['STROKE_COLOR'], '미리보기는 변수를 바꾸지 않는다');
+    // 연결 화면에서 연결
+    const linked = await bindSelection(sel, true, {}, free ? { noNewRoles: true } : {});
+    assert.equal(linked.bound, 3);
+    assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+    assert.equal(s2FillBound(figma, sel[0]), free ? 'color/gray/950' : 'color/background/default');
+    if (!free) assert.equal(roleTarget(figma, sel[0].fills[0].boundVariables.color.id), g.id);
+    assert.equal(s2Named(figma, 'color/gray/950').length, 1);
+    assert.equal(figma._state.variables.length, free ? 1 : 2);
+    assert.equal(s2DoneText({ created: { g: 0, r: free ? 0 : 1, m: 0 }, bound: 3 }, { isPaid: !free, linkOff: false }), free ? '3곳에 연결했어요' : 'Semantic 변수 1개를 만들고 3곳에 연결했어요');
+  });
+
+  test(`S-2 예 (나) ${tier} — 만들기 실행으로도 같은 결과: Global을 새로 만들지 않고 그 변수의 용도를 합쳐 3곳 연결`, async () => {
+    const figma = installFigma();
+    const g = s2Global(figma, 'color/gray/950', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 });
+    const sel = [1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+    const run = await s2Run(sel, free);
+    assert.equal(run.s.created + run.s.updated, 0);
+    assert.equal(run.roles, free ? 0 : 1);
+    assert.equal(run.res.bound, 3);
+    assert.ok(g.scopes.includes('ALL_FILLS') && g.scopes.includes('STROKE_COLOR'));
+    assert.equal(figma._state.variables.filter((v) => v.variableCollectionId === g.variableCollectionId).length, 1);
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+  });
+
+  for (const sameCol of [true, false]) {
+    test(`S-2 예 (다) ${tier} · ${sameCol ? '같은 컬렉션(별칭 50% — 계층이 섞임)' : '다른 컬렉션'} — 원시 ink/900 + 별칭 surface/strong · 채움 2곳 → surface/strong · 새 역할 0 · Semantic 미리보기 0`, async () => {
+      const figma = installFigma();
+      const ink = mkVar(figma, 'ink/900', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 }, 'Brand');
+      const strong = s2Alias(figma, 'surface/strong', ink, ['ALL_SCOPES'], sameCol ? 'Brand' : 'Theme');
+      const sel = [1, 2].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+      const card = await s2CardOf(sel, free);
+      assert.deepEqual([card.m, card.n, card.p], [2, 0, 2]);
+      assert.ok(card.res.candidates.every((c) => c.variableId === strong.id && !c.newRole)); // 별칭 먼저 — 유료 · 무료 같음
+      const make = await s2MakeOf(sel, free);
+      assert.deepEqual(make.state(make.toks[0].name), { state: 'reuse', varName: 'surface/strong' });
+      assert.equal(make.pv.globalOf.get(make.toks[0].name), ink.id, '가리킬 원시값 = 별칭이 닿는 원시값 변수');
+      assert.deepEqual([make.g, make.r, make.p], [0, 0, 2]); // "Global 0개 · Semantic 0개" · [2곳 연결]
+      const run = await s2Run(sel, free);
+      assert.equal(run.roles, 0);
+      assert.equal(run.res.bound, 2);
+      assert.equal(run.res.newRoles ?? 0, 0);
+      assert.equal(s2FillBound(figma, sel[0]), 'surface/strong');
+      assert.equal(figma._state.variables.length, 2, '안 쓰는 Semantic을 만들지 않는다');
+    });
+  }
+
+  test(`S-2 SC-D38 ${tier} — 직접 만든 color/gray/950(선 색만) + 같은 색 채움 3곳 → 후보 3 · scopeAdd · make 없음 · 연결 뒤 용도에 ALL_FILLS · 값 그대로 · 새 Global 없음`, async () => {
+    const figma = installFigma();
+    const g = s2Global(figma, 'color/gray/950', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 }, true);
+    const value = JSON.stringify(g.valuesByMode);
+    const sel = [1, 2, 3].map((i) => s2Frame(`k${i}`, { fills: s2Fill('#111111') }));
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n], [3, 0]);
+    assert.equal(card.res.make, undefined);
+    assert.ok(card.res.candidates.every((c) => c.scopeAdd === 'ALL_FILLS'));
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.state(make.toks[0].name), { state: 'reuse', varName: 'color/gray/950' });
+    assert.equal(make.pv.created, 0);
+    const linked = await bindSelection(sel, true, {}, free ? { noNewRoles: true } : {});
+    assert.equal(linked.bound, 3);
+    assert.deepEqual([...g.scopes].sort(), ['ALL_FILLS', 'STROKE_COLOR']);
+    assert.equal(JSON.stringify(g.valuesByMode), value);
+    assert.equal(s2FillBound(figma, sel[0]), free ? 'color/gray/950' : 'color/background/default'); // 유료는 새 Semantic으로 감쌈
+    const gNames = figma._state.variables.filter((v) => v.variableCollectionId === g.variableCollectionId).map((v) => v.name);
+    assert.deepEqual(gNames, ['color/gray/950'], '새 Global · -2 · 반 단계 이름 없음');
+  });
+
+  test(`S-2 SC-D34 · M9 ${tier} — 용도가 좁아진 플러그인 radius/16(직접 만든 변수여도) + 반경 16 자리 → 연결할 곳 · 새로 만들 값 0 · scopeAdd · 연결 뒤 CORNER_RADIUS · radius/16-2 없음`, async () => {
+    for (const manual of [false, true]) {
+      const figma = installFigma();
+      const g = s2Global(figma, 'radius/16', 'FLOAT', ['GAP'], 16, manual);
+      const node = s2Frame('c', s2Radius(16)); // 200 × 80 — 알약 모양 아님
+      const card = await s2CardOf([node], free);
+      assert.deepEqual([card.m, card.n, card.p], [4, 0, 4]);
+      assert.ok(card.res.candidates.every((c) => c.scopeAdd === 'CORNER_RADIUS'));
+      const make = await s2MakeOf([node], free);
+      assert.deepEqual(make.state('radius/16'), { state: 'reuse', varName: 'radius/16' });
+      assert.deepEqual([make.g, make.p], [0, 4]); // 카드 n = 만들기 g
+      assert.deepEqual(g.scopes, ['GAP'], '미리보기는 변수를 바꾸지 않는다');
+      const linked = await bindSelection([node], true, {}, free ? { noNewRoles: true } : {});
+      assert.equal(linked.bound, 4);
+      assert.deepEqual([...g.scopes].sort(), ['CORNER_RADIUS', 'GAP']);
+      assert.equal(s2Bound(figma, node, 'topLeftRadius'), free ? 'radius/16' : 'radius/default'); // 유료는 새 Semantic + Global 용도, 무료는 Global 직접
+      assert.equal(node.topLeftRadius, 16);
+      assert.equal(s2Named(figma, 'radius/16-2').length, 0);
+      assert.equal(s2Named(figma, 'radius/16').length, 1);
+    }
+  });
+
+  test(`S-2 예 (i) ${tier} — 높이 24 · 반경 12 칩 + 사용자 corner/12(CORNER_RADIUS) → 보통 자리: 연결할 곳 4 · make 없음 · 토큰 radius/12 · 실행 뒤 반경 그대로`, async () => {
+    const figma = installFigma();
+    const corner = mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+    const chip = s2Chip('chip');
+    const card = await s2CardOf([chip], free);
+    assert.deepEqual([card.m, card.n, card.p], [4, 0, 4]);
+    assert.equal(card.res.make, undefined);
+    assert.ok(card.res.candidates.every((c) => c.pillFrom == null && c.currentValue === '12'));
+    const make = await s2MakeOf([chip], free);
+    assert.deepEqual(make.toks.map((tk) => tk.name), ['radius/12'], 'radius/9999 토큰 없음');
+    assert.deepEqual(make.by('radius/12').uses.map((u) => u.name), ['radius/default']);
+    assert.deepEqual(make.state('radius/12'), { state: 'reuse', varName: 'corner/12' });
+    assert.deepEqual([make.g, make.r, make.p], [0, free ? 0 : 1, 4]);
+    assert.equal(make.pv.created, 0);
+    const run = await s2Run([chip], free);
+    assert.equal(run.res.bound, 4);
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'corner/12' : 'radius/default');
+      assert.equal(chip[c], 12, '반경 그대로');
+    }
+    if (!free) assert.equal(roleTarget(figma, chip.boundVariables.topLeftRadius.id), corner.id);
+    assert.equal(s2Named(figma, 'radius/9999').length + s2Named(figma, 'radius/full').length, 0);
+    assert.equal(figma._state.variables.length, free ? 1 : 2);
+  });
+
+  test(`S-2 예 (ii) ${tier} — 반경 12 × 4(corner/12) + 반경 150 × 4 → 카드 m = 4 · n = 1 · p = 8, 만들기 g = 1 · r = 2 · p = 8, 실행 뒤 8곳 · 실행 전 찾기와 연결 단계 찾기의 자리 값이 같다`, async () => {
+    const figma = installFigma();
+    mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+    const chip = s2Chip('chip');
+    const btn = s2Button('btn');
+    const sel = [chip, btn];
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [4, 1, 4, 8]);
+    assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.toks.map((tk) => [tk.name, s2FreeSum(tk)]), [['radius/12', 4], ['radius/9999', 4]]);
+    assert.deepEqual([make.g, make.r, make.p], [1, free ? 0 : 2, 8]);
+    const run = await s2Run(sel, free);
+    assert.equal(run.res.bound, 8);
+    // 연결 단계의 새 찾기가 같은 자리를 같은 값으로 모았다 — 12 자리는 원래 값, 150 자리는 9999(pillFrom 150)
+    const byNode = (id) => run.res.candidates.filter((c) => c.nodeId === id);
+    assert.ok(byNode('chip').every((c) => c.pillFrom == null && c.variableValue === '12'));
+    assert.ok(byNode('btn').every((c) => c.pillFrom === 150 && c.variableValue === '9999'));
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'corner/12' : 'radius/default');
+      assert.equal(chip[c], 12);
+      assert.equal(s2Bound(figma, btn, c), free ? 'radius/9999' : 'radius/full');
+      assert.equal(btn[c], 9999);
+    }
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+    const after = await s2CardOf(sel, free);
+    assert.deepEqual([after.m, after.n], [0, 0]);
+  });
+
+  test(`S-2 예 (iii) ${tier} — [20, 8, 20, 8] 탭(corner/20) + 반경 150 버튼 → 토큰 radius/8(2) · radius/20(2) · radius/9999(4 · radius/full뿐), 카드 2 · 2 · 8, 만들기 2 · 5 · 8, 실행 뒤 8곳 · 안 쓰는 역할 0 · -2 이름 0`, async () => {
+    const figma = installFigma();
+    mkVar(figma, 'corner/20', 'FLOAT', ['CORNER_RADIUS'], 20);
+    const tab = s2Frame('tab', { width: 120, height: 40, cornerRadius: figma.mixed, topLeftRadius: 20, topRightRadius: 8, bottomLeftRadius: 20, bottomRightRadius: 8 });
+    const btn = s2Button('btn');
+    const sel = [tab, btn];
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [2, 2, 6, 8]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual(make.toks.map((tk) => [tk.name, s2FreeSum(tk)]), [['radius/20', 2], ['radius/8', 2], ['radius/9999', 4]]);
+    assert.deepEqual(make.by('radius/9999').uses.map((u) => u.name), ['radius/full']); // 탭의 20인 모서리는 radius/9999 토큰에 들지 않는다(4회차 Q1)
+    assert.deepEqual(make.by('radius/20').uses.map((u) => u.name).sort(), ['radius/bottom-left', 'radius/top-left']);
+    assert.deepEqual([make.g, make.r, make.p], [2, free ? 0 : 5, 8]);
+    const run = await s2Run(sel, free);
+    assert.equal(run.res.bound, 8);
+    if (free) {
+      assert.deepEqual(S2_CORNERS.map((c) => s2Bound(figma, tab, c)), ['corner/20', 'radius/8', 'corner/20', 'radius/8']);
+      assert.ok(S2_CORNERS.every((c) => s2Bound(figma, btn, c) === 'radius/9999'));
+    } else {
+      assert.deepEqual(S2_CORNERS.map((c) => s2Bound(figma, tab, c)), ['radius/top-left', 'radius/top-right', 'radius/bottom-left', 'radius/bottom-right']);
+      assert.ok(S2_CORNERS.every((c) => s2Bound(figma, btn, c) === 'radius/full'));
+      assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['radius/bottom-left', 'radius/bottom-right', 'radius/full', 'radius/top-left', 'radius/top-right']);
+    }
+    assert.deepEqual([tab.topLeftRadius, tab.topRightRadius, btn.topLeftRadius], [20, 8, 9999]);
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+    assert.equal(figma._state.variables.some((v) => /-\d+$/.test(v.name)), false, '-2 이름 없음');
+  });
+
+  test(`S-2 예 (iv) · SC-D37 ${tier} — 높이 24 · 반경 12 칩 + 사용자 spacing/12(ALL_SCOPES)만 → 알약: m = 0 · make (Radius, 9999) · 토큰 radius/9999 · g = 1 · 실행 뒤 반경 9999 · spacing/12 그대로`, async () => {
+    const figma = installFigma();
+    const sp = mkVar(figma, 'spacing/12', 'FLOAT', ['ALL_SCOPES'], 12);
+    const chip = s2Chip('chip');
+    const card = await s2CardOf([chip], free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [0, 1, 4, 4]);
+    assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+    const make = await s2MakeOf([chip], free);
+    assert.deepEqual(make.toks.map((tk) => tk.name), ['radius/9999']);
+    assert.deepEqual([make.g, make.r, make.p], [1, free ? 0 : 1, 4]);
+    const run = await s2Run([chip], free);
+    assert.equal(run.res.bound, 4);
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'radius/9999' : 'radius/full');
+      assert.equal(chip[c], 9999);
+    }
+    assert.deepEqual(sp.scopes, ['ALL_SCOPES']);
+    assert.equal(Object.values(sp.valuesByMode)[0], 12);
+  });
+
+  test(`S-2 예 (v) ${tier} — 알약 모양이 아닌 반경 12 + spacing/12(ALL_SCOPES) → 연결할 곳 4 · 그 변수가 후보 · g = 0`, async () => {
+    const figma = installFigma();
+    const sp = mkVar(figma, 'spacing/12', 'FLOAT', ['ALL_SCOPES'], 12);
+    const cardNode = s2Card('card');
+    const card = await s2CardOf([cardNode], free);
+    assert.deepEqual([card.m, card.n, card.p], [4, 0, 4]);
+    assert.ok(card.res.candidates.every((c) => (free ? c.variableId === sp.id : c.newRole?.globalId === sp.id && c.newRole.name === 'radius/default')));
+    const make = await s2MakeOf([cardNode], free);
+    assert.deepEqual(make.state('radius/12'), { state: 'reuse', varName: 'spacing/12' });
+    assert.deepEqual([make.g, make.r, make.p], [0, free ? 0 : 1, 4]);
+    const run = await s2Run([cardNode], free);
+    assert.equal(run.res.bound, 4);
+    assert.equal(s2Bound(figma, cardNode, 'topLeftRadius'), free ? 'spacing/12' : 'radius/default');
+    assert.equal(figma._state.variables.length, free ? 1 : 2);
+  });
+
+  test(`S-2 SC-D39 ${tier} — 직접 만든 radius/12(CORNER_RADIUS 없음) + 알약이 아닌 반경 12 자리 + 알약 칩 → 실행 전 · 연결 단계 모두 칩은 알약, 실행 뒤 칩은 radius/full(무료 radius/9999) · 보통 자리는 radius/12(용도 더해짐) · 안 쓰는 변수 없음`, async () => {
+    const figma = installFigma();
+    const man = s2Global(figma, 'radius/12', 'FLOAT', ['GAP'], 12, true);
+    const chip = s2Chip('chip');
+    const cardNode = s2Card('card');
+    const sel = [chip, cardNode];
+    const card = await s2CardOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.q, card.p], [4, 1, 4, 8]);
+    assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual([make.g, make.p], [1, 8]);
+    const run = await s2Run(sel, free);
+    assert.equal(run.res.bound, 8);
+    assert.ok(man.scopes.includes('CORNER_RADIUS'), '보통 자리에 붙으며 용도가 더해짐');
+    assert.ok(run.res.candidates.filter((c) => c.nodeId === 'chip').every((c) => c.pillFrom === 12), '연결 단계에서도 칩은 알약(직접 만든 변수는 판정 집합에 들지 않는다)');
+    for (const c of S2_CORNERS) {
+      assert.equal(s2Bound(figma, chip, c), free ? 'radius/9999' : 'radius/full');
+      assert.equal(chip[c], 9999);
+      assert.equal(s2Bound(figma, cardNode, c), free ? 'radius/12' : 'radius/default');
+      assert.equal(cardNode[c], 12);
+    }
+    assert.deepEqual(s2UnusedRoles(figma, sel), []);
+    assert.equal(Object.values(man.valuesByMode)[0], 12);
+  });
+}
+
+test('S-2 7-13의 11번 — 이름을 바꾼 플러그인 Global이 같은 값이면 다시 쓴다(다시 만들지 않음)', async () => {
+  const figma = installFigma();
+  const g = s2Global(figma, 'brand/ink', 'COLOR', ['ALL_FILLS'], { ...rgbOf('#111111'), a: 1 }); // 플러그인이 만든 뒤 사용자가 이름을 바꿈
+  const sel = [s2Frame('k', { fills: s2Fill('#111111') })];
+  const make = await s2MakeOf(sel);
+  assert.deepEqual(make.state('color/111111'), { state: 'reuse', varName: 'brand/ink' });
+  assert.equal(make.g, 0);
+  const s = await createTokens(make.toks, 16);
+  assert.equal(s.created, 0);
+  assert.equal(s.globalOf.get('color/111111'), g.id);
+  assert.equal(figma._state.variables.length, 1);
+});
+
+test('S-2 스타일이 붙은 칠 · 선 · 효과는 freeBy에 없다(연결 찾기의 styled와 같은 판정) — 토큰 · 쓰임은 그대로 모은다', async () => {
+  installFigma();
+  const styled = s2Frame('s', { fills: s2Fill('#111111'), fillStyleId: 'S:fill', strokes: s2Fill('#222222'), strokeStyleId: 'S:stroke', strokeWeight: 1, effects: [{ type: 'DROP_SHADOW', visible: true, color: { r: 0, g: 0, b: 0, a: 0.25 }, offset: { x: 0, y: 1 }, radius: 4, spread: 0 }], effectStyleId: 'S:fx' });
+  const plain = s2Frame('p', { fills: s2Fill('#111111') });
+  const toks = await s2Extract([styled, plain]);
+  const by = (n) => toks.find((tk) => tk.name === n);
+  assert.deepEqual(by('color/111111').freeBy, { 'ALL_FILLS|FRAME_FILL': 1 }); // 스타일 없는 칠 하나만
+  assert.equal(by('color/111111').count, 2);
+  assert.equal(s2FreeSum(by('color/222222')), 0);
+  assert.equal(s2FreeSum(toks.find((tk) => tk.category === 'effectColor')), 0);
+  const res = await bindSelection([styled, plain], false);
+  assert.equal(res.reasons.styled, 3);
+  assert.deepEqual(res.make, [{ kind: 'stroke', value: 1, by: { STROKE_FLOAT: 1 } }, { kind: 'color', value: '#111111', by: { 'ALL_FILLS|FRAME_FILL': 1 } }]); // 선 두께는 스타일과 무관한 자리
+});
+
+test('S-2 같은 이름 · 다른 값의 직접 만든 변수 → 그 변수 그대로이고 새 Global은 다음 이름(지금 그대로 — S2-P8)', async () => {
+  const figma = installFigma();
+  const man = s2Global(figma, 'spacing/16', 'FLOAT', ['GAP'], 20, true);
+  const node = s2AutoFrame('al', { itemSpacing: 16 });
+  const card = await s2CardOf([node]);
+  assert.deepEqual([card.m, card.n], [0, 1]);
+  const make = await s2MakeOf([node]);
+  assert.deepEqual(make.state('spacing/16'), { state: 'new', varName: 'spacing/16-2' });
+  assert.equal(make.g, card.n);
+  await s2Run([node]);
+  assert.equal(Object.values(man.valuesByMode)[0], 20);
+  assert.deepEqual(man.scopes, ['GAP']);
+  assert.equal(Object.values(s2Named(figma, 'spacing/16-2')[0].valuesByMode)[0], 16);
+});
+
+test('S-2 SC-D38 — 직접 만든 숫자 radius/16(용도 GAP만) + 알약 아닌 반경 16 → 붙고 CORNER_RADIUS가 더해진다 · spacing/16만 있으면 새로 만들 값 1(섞이지 않음)', async () => {
+  let figma = installFigma();
+  const man = s2Global(figma, 'radius/16', 'FLOAT', ['GAP'], 16, true);
+  const node = s2Frame('c', s2Radius(16));
+  const r = await bindSelection([node], true, {}, { noNewRoles: true });
+  assert.equal(r.bound, 4);
+  assert.equal(s2Bound(figma, node, 'topLeftRadius'), 'radius/16');
+  assert.deepEqual([...man.scopes].sort(), ['CORNER_RADIUS', 'GAP']);
+  figma = installFigma();
+  s2Global(figma, 'spacing/16', 'FLOAT', ['GAP'], 16);
+  const card = await s2CardOf([s2Frame('c2', s2Radius(16))]);
+  assert.deepEqual([card.m, card.n], [0, 1]);
+  const make = await s2MakeOf([s2Frame('c3', s2Radius(16))]);
+  assert.equal(make.g, 1);
+});
+
+test('S-2 SC-D32 ⑥ — 글자 값만 후보 없는 선택 → m = n = 0이고 reasons["no-match"]는 그대로 · 소수 글자 크기 13.5는 손볼 곳 s 그대로', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'x', 'FLOAT', ['GAP'], 4); // 로컬 변수는 있다
+  const card = await s2CardOf([s2Text('t1'), s2Text('t2', { fontSize: 18 })]);
+  assert.deepEqual([card.m, card.n, card.q, card.s], [0, 0, 0, 0]); // 카드는 "✓ 찾은 값은 모두 연결돼 있어요"
+  assert.equal(card.res.make, undefined);
+  assert.equal(card.res.reasons['no-match'], 2);
+  assert.equal(card.res.counts['no-match'].text, 2);
+  assert.ok(card.res.skips.some((x) => x.reason === 'no-match'));
+  const dec = await s2CardOf([s2Text('t3', { fontSize: 13.5 })]);
+  assert.deepEqual([dec.m, dec.n, dec.s], [0, 0, 1]);
+  assert.equal(dec.res.reasons.fraction, 1);
+});
+
+test('S-2 M1 — 인스턴스 5개 + 선택 밖 메인(루트 채움) → 연결 1곳 · 추출 freeBy 1곳(인스턴스 루트는 메인을 따르는 자리)', async () => {
+  installFigma();
+  const M = mkMain('M', [], { fills: a18solid(BLUE), layoutMode: 'NONE', ...s2Radius(0) });
+  const insts = [1, 2, 3, 4, 5].map((i) => mkInst(`I${i}`, M, { fills: a18solid(BLUE), layoutMode: 'NONE' }));
+  const F = a18Frame('F', insts);
+  const res = await bindSelection([F], false);
+  assert.deepEqual(res.make, [{ kind: 'color', value: BLUE, by: { 'ALL_FILLS|FRAME_FILL': 1 } }]);
+  const toks = await s2Extract([F]);
+  const tk = toks.find((x) => x.value === BLUE);
+  assert.equal(s2FreeSum(tk), 1);
+  assert.equal(tk.count, 6, '토큰 · 쓰임은 지금처럼 모은다');
+  // 값을 바꾼 인스턴스 루트는 제 자리다
+  const over = mkInst('I9', M, { fills: a18solid(RED), layoutMode: 'NONE' });
+  const F2 = a18Frame('F2', [mkInst('I8', M, { fills: a18solid(BLUE), layoutMode: 'NONE' }), over]);
+  const res2 = await bindSelection([F2], false);
+  const toks2 = await s2Extract([F2]);
+  assert.equal(res2.make.reduce((a, m) => a + Object.values(m.by).reduce((x, y) => x + y, 0), 0), 2);
+  assert.equal(toks2.reduce((a, x) => a + s2FreeSum(x), 0), 2);
+});
+
+test('S-2 M2 · M3 · SC-D36 ① — 소수 알약(높이 25 · 반경 12.5): 사용자 corner/12.5가 있으면 그 변수에 붙고 반경 그대로 · 토큰 없음 · p에 없음, 없으면 no-match · make (Radius, 9999) · 추출 radius/9999와 같은 수', async () => {
+  let figma = installFigma();
+  const c125 = mkVar(figma, 'corner/12.5', 'FLOAT', ['CORNER_RADIUS'], 12.5);
+  const chip = s2Frame('chip', { width: 80, height: 25, ...s2Radius(12.5) });
+  const card = await s2CardOf([chip], true);
+  assert.deepEqual([card.m, card.n, card.p], [4, 0, 0]); // 연결할 곳이지만 만들기 화면에 줄이 없어 p에서 빠진다
+  assert.ok(card.res.candidates.every((c) => c.variableId === c125.id && c.pillFrom == null));
+  assert.deepEqual(await s2Extract([chip]), [], '그 값의 토큰 없음(보통 소수 반경)');
+  const r = await bindSelection([chip], true, {}, { noNewRoles: true });
+  assert.equal(r.bound, 4);
+  assert.equal(chip.topLeftRadius, 12.5);
+  figma = installFigma();
+  mkVar(figma, 'x', 'FLOAT', ['GAP'], 4);
+  const chip2 = s2Frame('chip2', { width: 80, height: 25, ...s2Radius(12.5) });
+  const card2 = await s2CardOf([chip2]);
+  assert.equal(card2.res.reasons.fraction, undefined, '알약으로 판정된 모서리는 값이 9999라 소수 사유가 없다');
+  assert.equal(card2.res.reasons['no-match'], 4);
+  assert.deepEqual(card2.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+  assert.deepEqual([card2.m, card2.n, card2.s, card2.p], [0, 1, 0, 4]);
+  const toks = await s2Extract([chip2]);
+  assert.deepEqual(toks.map((tk) => [tk.name, s2FreeSum(tk)]), [['radius/9999', 4]]);
+});
+
+test('S-2 SC-D36 ① — 플러그인 radius/12 Global · 플러그인 역할 radius/default = 12만 있으면(사용자 변수 없음) 높이 24 · 반경 12는 알약: make (Radius, 9999) · 토큰 radius/9999 · 실행 뒤 radius/full · 반경 9999', async () => {
+  const figma = installFigma();
+  const g = s2Global(figma, 'radius/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  const role = designerRole(figma, 'radius/default', g);
+  figma._state.collections.find((c) => c.id === role.variableCollectionId).setPluginData('dsl.owned', 'semantic');
+  role.scopes = ['CORNER_RADIUS'];
+  role.setPluginData('dsl.autoRole', '1');
+  const chip = s2Chip('chip');
+  const card = await s2CardOf([chip]);
+  assert.deepEqual([card.m, card.n], [0, 1]);
+  assert.deepEqual(card.res.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+  assert.deepEqual((await s2Extract([chip])).map((tk) => tk.name), ['radius/9999']);
+  const run = await s2Run([chip]);
+  assert.equal(run.res.bound, 4);
+  assert.equal(s2Bound(figma, chip, 'topLeftRadius'), 'radius/full');
+  assert.equal(chip.topLeftRadius, 9999);
+});
+
+test('S-2 SC-D39 — 플러그인 Global 컬렉션의 변수는 직접 만들었든 · 별칭이든 알약 판정 집합에 들지 않는다 · 플러그인 Semantic의 표시 없는 변수는 들고 실행이 그 값 · 용도를 바꾸지 않는다', async () => {
+  const pillMake = [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }];
+  // 직접 만든 radius/12(CORNER_RADIUS 켬)만 → 알약 그대로
+  let figma = installFigma();
+  s2Global(figma, 'radius/12', 'FLOAT', ['CORNER_RADIUS'], 12, true);
+  assert.deepEqual((await bindSelection([s2Chip('a')], false)).make, pillMake);
+  // 플러그인 Global 컬렉션 안의 별칭 변수(CORNER_RADIUS 켬 — 직접 만든 것 · 플러그인 Global이 별칭으로 바뀐 것)
+  for (const manual of [true, false]) {
+    figma = installFigma();
+    const raw = s2Global(figma, 'base/12', 'FLOAT', ['GAP'], 12);
+    const al = s2Global(figma, 'radius/chip', 'FLOAT', ['CORNER_RADIUS'], { type: 'VARIABLE_ALIAS', id: raw.id }, manual);
+    assert.equal(s2Keys((await readVarInfos()).infos).size, 0);
+    assert.deepEqual((await bindSelection([s2Chip('b')], false)).make, pillMake);
+    void al;
+  }
+  // 플러그인 Semantic의 표시 없는 변수(CORNER_RADIUS 켬) → 집합에 든다 — 칩은 보통 자리이고 그 변수에 붙는다
+  figma = installFigma();
+  const g = s2Global(figma, 'base/12', 'FLOAT', ['GAP'], 12);
+  const own = designerRole(figma, 'radius/chip', g);
+  figma._state.collections.find((c) => c.id === own.variableCollectionId).setPluginData('dsl.owned', 'semantic');
+  own.scopes = ['CORNER_RADIUS'];
+  assert.deepEqual([...s2Keys((await readVarInfos()).infos)], ['12']);
+  const chip = s2Chip('c');
+  const before = JSON.stringify([own.valuesByMode, own.scopes]);
+  const run = await s2Run([chip]);
+  assert.equal(run.res.bound, 4);
+  assert.equal(s2Bound(figma, chip, 'topLeftRadius'), 'radius/chip');
+  assert.equal(chip.topLeftRadius, 12);
+  assert.equal(JSON.stringify([own.valuesByMode, own.scopes]), before, '실행은 집합에 드는 변수의 값 · 용도를 고치지 않는다');
+});
+
+test('S-2 SC-D36 ① — 원래 값 사용자 변수와 9999 사용자 변수가 함께 있으면 원래 값 쪽 · 원래 값 9999 + 사용자 9999 변수 → 그 변수 · radius/full', async () => {
+  let figma = installFigma();
+  const c12 = mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  mkVar(figma, 'corner/pill', 'FLOAT', ['CORNER_RADIUS'], 9999);
+  const res = await bindSelection([s2Chip('chip')], false, {}, { noNewRoles: true });
+  assert.equal(res.candidates.length, 4);
+  assert.ok(res.candidates.every((c) => c.variableId === c12.id && c.pillFrom == null));
+  figma = installFigma();
+  const pill = mkVar(figma, 'corner/pill', 'FLOAT', ['CORNER_RADIUS'], 9999);
+  const big = s2Frame('big', { width: 120, height: 40, ...s2Radius(9999) });
+  const paid = await bindSelection([big], false);
+  assert.ok(paid.candidates.every((c) => c.newRole?.name === 'radius/full' && c.newRole.globalId === pill.id && c.pillFrom == null));
+  const r = await bindSelection([big], true, {}, { noNewRoles: true });
+  assert.equal(r.bound, 4);
+  assert.equal(big.topLeftRadius, 9999);
+  assert.equal(s2Bound(figma, big, 'topLeftRadius'), 'corner/pill');
+});
+
+test('S-2 SC-D37 — 용도 [] 사용자 변수는 집합에도 후보에도 없다 · 별칭의 용도는 그 변수 자신의 것 · ALL_SCOPES 디자이너 별칭뿐이면 알약(지금과 달라짐) · corner/12 + spacing/12면 보통 자리이고 둘 다 후보', async () => {
+  const keys = async () => [...s2Keys((await readVarInfos()).infos)];
+  // 용도 [] — 집합에 없음 · 어느 자리의 후보도 아님
+  let figma = installFigma();
+  mkVar(figma, 'corner/12', 'FLOAT', [], 12).scopes = [];
+  assert.deepEqual(await keys(), []);
+  assert.equal((await bindSelection([s2Card('c')], false)).candidates.length, 0);
+  // CORNER_RADIUS를 켠 원시값을 가리키는 ALL_SCOPES 별칭 — 원시값이 집합에 든다(원시값 자신의 scopes)
+  figma = installFigma();
+  const raw = mkVar(figma, 'base/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  s2Alias(figma, 'radius/chip', raw, ['ALL_SCOPES'], 'Theme');
+  assert.deepEqual(await keys(), ['12']);
+  // 거꾸로 ALL_SCOPES 원시값을 가리키는 CORNER_RADIUS 별칭 — 별칭이 집합에 든다
+  figma = installFigma();
+  const raw2 = mkVar(figma, 'base/12', 'FLOAT', ['ALL_SCOPES'], 12);
+  const al2 = s2Alias(figma, 'radius/chip', raw2, ['CORNER_RADIUS'], 'Theme');
+  assert.deepEqual(await keys(), ['12']);
+  const r2 = await bindSelection([s2Chip('chip')], false);
+  assert.ok(r2.candidates.length === 4 && r2.candidates.every((c) => c.variableId === al2.id && c.pillFrom == null));
+  // ALL_SCOPES 디자이너 별칭 radius/chip = 12뿐 → 알약 칩은 9999(좁아짐)
+  figma = installFigma();
+  const raw3 = mkVar(figma, 'base/12', 'FLOAT', ['ALL_SCOPES'], 12);
+  s2Alias(figma, 'radius/chip', raw3, ['ALL_SCOPES'], 'Theme');
+  assert.deepEqual(await keys(), []);
+  assert.deepEqual((await bindSelection([s2Chip('chip')], false)).make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 4 } }]);
+  // corner/12(CORNER_RADIUS) + spacing/12(ALL_SCOPES) → 보통 자리 · 둘 다 후보(S2-P5 — 둘 다 원시값이면 이름 오름차순, 범용 쪽이 별칭이면 별칭이 먼저)
+  figma = installFigma();
+  const c12 = mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  const s12 = mkVar(figma, 'spacing/12', 'FLOAT', ['ALL_SCOPES'], 12);
+  const { candidatePool } = await import('../dist/pure.mjs');
+  const pool = candidatePool({ type: 'FLOAT', key: '12', allowed: ['CORNER_RADIUS'] }, (await readVarInfos()).infos);
+  assert.deepEqual(pool.raws.map((v) => v.name).sort(), ['corner/12', 'spacing/12']);
+  const both = await bindSelection([s2Chip('chip')], false, {}, { noNewRoles: true });
+  assert.ok(both.candidates.every((c) => c.variableId === c12.id && c.pillFrom == null));
+  const generic = s2Alias(figma, 'radius/any', s12, ['ALL_SCOPES'], 'Theme');
+  const both2 = await bindSelection([s2Chip('chip')], false, {}, { noNewRoles: true });
+  assert.ok(both2.candidates.every((c) => c.variableId === generic.id));
+});
+
+test('S-2 SC-D36 ① — 높이 40 · [20, 150, 20, 150] + corner/20 → [20, 9999, 20, 9999]: 모서리별 이름 · 9999 모서리의 역할도 모서리별 이름', async () => {
+  const figma = installFigma();
+  const c20 = mkVar(figma, 'corner/20', 'FLOAT', ['CORNER_RADIUS'], 20);
+  const node = s2Frame('n', { width: 120, height: 40, cornerRadius: figma.mixed, topLeftRadius: 20, topRightRadius: 150, bottomLeftRadius: 20, bottomRightRadius: 150 });
+  const dry = await bindSelection([node], false);
+  const by = Object.fromEntries(dry.candidates.map((c) => [c.field, c]));
+  assert.equal(by.topLeftRadius.newRole.name, 'radius/top-left');
+  assert.equal(by.topLeftRadius.newRole.globalId, c20.id);
+  assert.equal(by.topRightRadius, undefined);
+  assert.deepEqual(dry.make, [{ kind: 'radius', value: 9999, by: { CORNER_RADIUS: 2 } }]);
+  const toks = await s2Extract([node]);
+  assert.deepEqual(toks.find((tk) => tk.name === 'radius/9999').uses.map((u) => u.name).sort(), ['radius/bottom-right', 'radius/top-right']);
+  assert.deepEqual(toks.find((tk) => tk.name === 'radius/20').uses.map((u) => u.name).sort(), ['radius/bottom-left', 'radius/top-left']);
+  await s2Run([node]);
+  assert.deepEqual(S2_CORNERS.map((c) => s2Bound(figma, node, c)), ['radius/top-left', 'radius/top-right', 'radius/bottom-left', 'radius/bottom-right']);
+  assert.deepEqual(S2_CORNERS.map((c) => node[c]), [20, 9999, 20, 9999]);
+  // 높이 40 · 반경 20(넷 같음) + corner/20 → radius/default(20)
+  const same = s2Frame('s', { width: 120, height: 40, ...s2Radius(20) });
+  assert.ok((await bindSelection([same], false)).candidates.every((c) => c.pillFrom == null));
+});
+
+test('S-2 N1 — 여백 0 + 사용자 0 변수(용도 맞음) → 연결할 곳 m에 들고 카드 p · 만들기 화면 p에 없다 · 간격 12.5 + 사용자 12.5 변수도 같다', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'space/0', 'FLOAT', ['GAP'], 0);
+  mkVar(figma, 'space/12.5', 'FLOAT', ['GAP'], 12.5);
+  const node = s2AutoFrame('al', { itemSpacing: 12.5, paddingLeft: 0, paddingRight: 0, paddingTop: 0, paddingBottom: 0 });
+  const card = await s2CardOf([node], true);
+  assert.deepEqual([card.m, card.n, card.p], [5, 0, 0]);
+  const make = await s2MakeOf([node], true);
+  assert.deepEqual([make.toks.length, make.p], [0, 0], '추출에 그 값의 토큰이 없다');
+  // 후보가 없으면 지금 그대로 — 0은 버림, 소수는 손볼 곳
+  installFigma();
+  const bare = await s2CardOf([s2AutoFrame('al2', { itemSpacing: 12.5 })]);
+  assert.deepEqual([bare.m, bare.n, bare.s], [0, 0, 1]);
+  assert.equal(bare.res.reasons['no-match'], undefined);
+});
+
+test('S-2 M5 — 라이브러리 같은 값 묶음의 "연결할 곳"은 카드 p에서 빠지고 만들기 화면 p와 같다', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 });
+  const sel = [s2Frame('a', { fills: s2Fill('#111111') }), s2Frame('b', { fills: s2Fill('#111111') }), s2Frame('c', { fills: s2Fill('#333333'), ...s2Radius(8) })];
+  const libs = [{ type: 'COLOR', value: { kind: 'color', hex: '#111111' }, scopes: ['ALL_FILLS'] }, { type: 'FLOAT', value: { kind: 'number', text: '8' }, scopes: ['CORNER_RADIUS'] }];
+  const card = await s2CardOf(sel, true, libs);
+  assert.equal(card.m, 2); // 제목 m은 빼지 않는다
+  assert.deepEqual([card.n, card.q, card.p], [1, 1, 1]); // 반경 8은 라이브러리 같은 값이라 n · q에서 빠지고 #333333 한 값만
+  const toks = await s2OnTokens(sel);
+  const makeP = toks.reduce((a, tk) => { const lib = new Set(s2LibSame(tk, libs)); return a + Object.entries(tk.freeBy).reduce((x, [g, n]) => x + (lib.has(g) ? 0 : n), 0); }, 0);
+  assert.equal(makeP, card.p);
+  assert.equal((await s2CardOf(sel, true)).p, 7); // 라이브러리가 없으면 2 + 1 + 4
+});
+
+test('S-2 M8 — 묶음마다 다른 원시값을 골라도 가리킬 원시값은 첫 빈 묶음의 것 하나이고 만들기 실행 뒤 -2 역할이 없다', async () => {
+  const figma = installFigma();
+  const fillRaw = mkVar(figma, 'a/fill', 'COLOR', ['ALL_FILLS'], { ...rgbOf('#111111'), a: 1 });
+  const lineRaw = mkVar(figma, 'b/line', 'COLOR', ['STROKE_COLOR'], { ...rgbOf('#111111'), a: 1 });
+  const node = s2Frame('n', { fills: s2Fill('#111111'), strokes: s2Fill('#111111'), strokeWeight: 0 });
+  const make = await s2MakeOf([node]);
+  assert.deepEqual(make.state('color/111111'), { state: 'reuse', varName: 'a/fill' });
+  assert.equal(make.pv.globalOf.get('color/111111'), fillRaw.id);
+  assert.deepEqual([make.g, make.r], [0, 2]);
+  const run = await s2Run([node]);
+  assert.equal(run.res.bound, 2);
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['color/background/default', 'color/border/default']);
+  assert.equal(figma._state.variables.some((v) => /-\d+$/.test(v.name)), false);
+  assert.equal(s2FillBound(figma, node), 'color/background/default');
+  assert.equal(varName(figma, node.strokes[0].boundVariables.color.id), 'color/border/default');
+  void lineRaw;
+});
+
+test('S-2 createRole — 같은 이름의 플러그인 Semantic 역할이 같은 값이면(가리키는 원시값이 달라도) 그것을 쓰고 -2를 만들지 않는다 · 사용자 컬렉션의 같은 이름은 돌려주지 않는다(S2-P6)', async () => {
+  const figma = installFigma();
+  const a = mkVar(figma, 'a/ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 });
+  const b = mkVar(figma, 'b/ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#111111'), a: 1 });
+  const spec = { name: 'color/background/default', globalId: a.id, scopes: ['FRAME_FILL', 'SHAPE_FILL'] };
+  const r1 = await createRole(spec, a);
+  const r2 = await createRole({ ...spec, globalId: b.id }, b);
+  assert.equal(r2.id, r1.id);
+  assert.equal(s2SemVars(figma).length, 1);
+  // 값이 다르면 다음 번호
+  const c = mkVar(figma, 'c/ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#222222'), a: 1 });
+  assert.equal((await createRole({ ...spec, globalId: c.id }, c)).name, 'color/background/default-2');
+});
+
+test('S-2 추출에 판정 집합을 넘기지 않으면 지금과 같은 토큰(알약 모양 모서리는 모두 9999)', async () => {
+  const figma = installFigma();
+  mkVar(figma, 'corner/12', 'FLOAT', ['CORNER_RADIUS'], 12);
+  const chip = s2Chip('chip');
+  assert.deepEqual(extractFromSelection([chip]).tokens.map((tk) => tk.name), ['radius/9999']);
+  assert.deepEqual((await s2Extract([chip])).map((tk) => tk.name), ['radius/12']);
+});
+
+test('S-2 글자 토큰에도 freeBy — 변수 · 텍스트 스타일이 붙지 않았고 빈 글자 · 텍스트 스타일 후보 레이어가 아닌 글자 속성', async () => {
+  installFigma();
+  const plain = s2Text('a', { lineHeight: { unit: 'PIXELS', value: 20 } });
+  const empty = s2Text('b', { characters: '' });
+  const styled = s2Text('c', { textStyleId: 'S:1' });
+  const cand = s2Text('d');
+  const toks = extractFromSelection([plain, empty, styled, cand], undefined, { textStyleNode: (n) => n.id === 'd' }).tokens;
+  const by = (n) => toks.find((tk) => tk.name === n);
+  assert.deepEqual(by('font-size/14').freeBy, { FONT_SIZE: 1 });
+  assert.equal(by('font-size/14').count, 4);
+  assert.deepEqual(by('font-family/Inter').freeBy, { FONT_FAMILY: 1 }); // 같은 글꼴의 변수가 아직 없어도 빈 자리로 센다
+  assert.deepEqual(by('line-height/20').freeBy, { LINE_HEIGHT: 1 });
+});
+
+/* ---------- S-2 코드 검토 반영(2026-11-26 SC-D40 · SC-D41) ---------- */
+
+test('S-2 SC-D40 밝기 이름 대상 — 사용자 별칭이 붙을 색 자리도 넣는다: 만들기가 지은 strong을 연결 단계가 다시 쓰고 안 쓰는 Semantic이 없다', async () => {
+  const figma = installFigma();
+  const white = mkVar(figma, 'white', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#ffffff'), a: 1 }, 'Brand');
+  s2Alias(figma, 'surface/base', white, ['ALL_SCOPES'], 'Brand');
+  const sel = [...[1, 2, 3].map((i) => s2Frame(`w${i}`, { fills: s2Fill('#ffffff') })), ...[1, 2].map((i) => s2Frame(`g${i}`, { fills: s2Fill('#f5f5f5') }))];
+  const card = await s2CardOf(sel, false);
+  const make = await s2MakeOf(sel, false);
+  assert.deepEqual([card.m, card.n, card.p], [3, 1, 5]);
+  assert.deepEqual([make.g, make.r, make.p], [1, 1, 5]); // 카드 n = 만들기 g
+  const run = await s2Run(sel, false);
+  assert.equal(run.roles, 1);
+  assert.equal(run.res.bound, 5);
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name), ['color/background/strong']); // 화면의 Semantic 1개 = 실제
+  assert.deepEqual(s2UnusedRoles(figma, sel), []);
+  assert.deepEqual(sel.map((n) => s2FillBound(figma, n)), ['surface/base', 'surface/base', 'surface/base', 'color/background/strong', 'color/background/strong']);
+});
+
+test('S-2 SC-D41 만들기 재사용의 가족 — 밝기까지 정한 밑이름으로 본다: 다른 밝기의 플러그인 역할(strong)은 default 자리의 후보가 아니라 카드 n = 만들기 g = 1', async () => {
+  const figma = installFigma();
+  const ink = mkVar(figma, 'brand/ink', 'COLOR', ['TEXT_FILL'], { ...rgbOf('#111111'), a: 1 }, 'Brand');
+  const col = figma.variables.createVariableCollection('Semantic');
+  col.setPluginData('dsl.owned', 'semantic');
+  const role = figma.variables.createVariable('color/background/strong', col, 'COLOR');
+  role.scopes = ['FRAME_FILL', 'SHAPE_FILL'];
+  role.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: ink.id });
+  role.setPluginData('dsl.autoRole', '1');
+  const sel = [s2Frame('k1', { fills: s2Fill('#111111') })];
+  for (const free of [false, true]) {
+    const card = await s2CardOf(sel, free);
+    const make = await s2MakeOf(sel, free);
+    assert.deepEqual([card.m, card.n, card.p], [0, 1, 1], free ? 'free card' : 'paid card');
+    assert.deepEqual([make.g, make.p], [1, 1], free ? 'free make' : 'paid make');
+    assert.equal(make.state(make.toks[0].name)?.state, 'new');
+  }
+  const run = await s2Run(sel, false);
+  assert.equal(run.s.created, 1);
+  assert.equal(run.res.bound, 1);
+  assert.equal(s2FillBound(figma, sel[0]), 'color/background/default');
+});
+
+test('S-2 SC-D41 만들기 재사용 — 같은 묶음의 쓰임이 둘이면 쓰임마다 가족을 본다(radius/top-left 역할은 radius/default 자리의 후보가 아님)', async () => {
+  const figma = installFigma();
+  const raw = mkVar(figma, 'r/8', 'FLOAT', ['GAP'], 8, 'Brand'); // 반경 용도가 없는 원시값 — 반경 자리의 후보는 역할뿐
+  const col = figma.variables.createVariableCollection('Semantic');
+  col.setPluginData('dsl.owned', 'semantic');
+  const role = figma.variables.createVariable('radius/top-left', col, 'FLOAT');
+  role.scopes = ['CORNER_RADIUS'];
+  role.setValueForMode(col.defaultModeId, { type: 'VARIABLE_ALIAS', id: raw.id });
+  role.setPluginData('dsl.autoRole', '1');
+  const mixed = s2Frame('m', { cornerRadius: figma.mixed, topLeftRadius: 8, topRightRadius: 4, bottomLeftRadius: 4, bottomRightRadius: 4 });
+  const even = s2Frame('e', { cornerRadius: 8, topLeftRadius: 8, topRightRadius: 8, bottomLeftRadius: 8, bottomRightRadius: 8 });
+  const sel = [mixed, even];
+  const card = await s2CardOf(sel, false);
+  const make = await s2MakeOf(sel, false);
+  // 고치기 전: 만들기가 radius/8을 radius/top-left로 재사용해 g = 1 — 카드 n = 2와 달랐다
+  assert.deepEqual([card.m, card.n, card.p], [1, 2, 8]);
+  assert.deepEqual([make.g, make.p], [2, 8]);
+  assert.equal(make.state('radius/8')?.state, 'new');
+});
+
+test('S-2 SC-D45 밝기 · 쓰임 역할은 빈 자리로 — 테두리 #222222(별칭이 덮음)가 3곳은 이미 붙고 1곳만 비면 기준색은 빈 자리가 많은 #444444: 만들기 · 연결 같은 이름 · 안 쓰는 Semantic 없음', async () => {
+  const figma = installFigma();
+  const ink = mkVar(figma, 'ink', 'COLOR', ['ALL_SCOPES'], { ...rgbOf('#222222'), a: 1 }, 'Brand');
+  const lineInk = s2Alias(figma, 'line/ink', ink, ['ALL_SCOPES'], 'Brand');
+  const line = (id, hex, v) => s2Frame(id, { strokes: s2Fill(hex).map((p) => (v ? { ...p, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: v.id } } } : p)), strokeWeight: 1 });
+  const sel = [line('b1', '#222222', lineInk), line('b2', '#222222', lineInk), line('b3', '#222222', lineInk), line('b4', '#222222'), line('c1', '#444444'), line('c2', '#444444')];
+  const make = await s2MakeOf(sel, false);
+  assert.deepEqual([make.g, make.r], [2, 2]); // Semantic = stroke-width/default · color/border/default
+  const run = await s2Run(sel, false);
+  // 고치기 전: 만들기는 붙은 #222 3곳까지 세어 기준색 #222 → #444를 subtle로 지었고(안 쓰임), 연결은 빈 자리로 default를 또 만들었다(Semantic 3개)
+  assert.deepEqual(s2SemVars(figma).map((v) => v.name).sort(), ['color/border/default', 'stroke-width/default']);
+  assert.deepEqual(sel.map((n) => varName(figma, n.strokes[0].boundVariables?.color?.id)), ['line/ink', 'line/ink', 'line/ink', 'line/ink', 'color/border/default', 'color/border/default']);
+});
+
+/* ---------- S-2b 이름 보존(ia-v4 §4.4 "S-2b 이름 보존" · B.44 — SC-D21 · SC-D47–SC-D52) ---------- */
+const s2bCard = (name, pd = {}, id = 'c') => withPd({ type: 'FRAME', id, name, cornerRadius: 8, fills: vis, width: 300, height: 200, children: [T(id + 'x', 'x'), T(id + 'y', 'y')] }, pd);
+const s2bRun = (node, apply = true) => renameSelection([{ type: 'FRAME', id: 'root', name: 'Frame 0', width: 800, height: 800, children: [node] }], { apply, maxDepth: 5 });
+
+test('S-2b R2B-P1 · P2 — 기본명 · 플러그인 이름(ⓑ 역할 낱말로만 · 모양 상관없이)은 바꾸고, 사람 이름은 그대로 · 역할 · 지킨 이름 표시만', async () => {
+  installFigma();
+  for (const name of ['Frame 12', 'Header', 'HEADER', 'card_header', 'cardHeader', 'stack-x', 'nav', 'header-card']) {
+    const n = s2bCard(name);
+    const r = await s2bRun(n);
+    assert.equal(r.changes.find((c) => c.id === 'c')?.after, 'card', name);
+    assert.equal(n._pd.get('dsKept') ?? '', '', `${name} — 바꾼 노드는 지킨 이름 표시 없음`);
+  }
+  // 사람 이름 — 역할 낱말 아닌 낱말(banner · title) · 숫자 낱말 · 한글 · 이모지 · 기록 없는 두 토막
+  for (const name of ['Hero banner', 'Card Title', 'card-2', '상품 카드', '🔥 card', 'promo-card']) {
+    const n = s2bCard(name);
+    const r = await s2bRun(n);
+    assert.ok(!r.changes.some((c) => c.id === 'c'), name);
+    assert.equal(n.name, name);
+    const rn = r.nodes.find((x) => x.id === 'c');
+    assert.equal(rn.role, 'card', name);
+    assert.equal(rn.kept, true, name);
+    assert.equal(n._pd.get('dsRole'), 'card', name);
+    assert.equal(n._pd.get('dsKept'), name, name);
+  }
+});
+
+test('S-2b SC-D50 · SC-D51 — 역할 기록과 맞는 두 토막은 플러그인 이름 · 앞 낱말 숫자는 아님 · 지킨 이름 표시와 같으면(kebab) 아님', async () => {
+  installFigma();
+  let n = s2bCard('promo-card', { dsRole: 'card' });
+  assert.equal((await s2bRun(n)).changes.find((c) => c.id === 'c')?.after, 'card');
+  n = s2bCard('2-card', { dsRole: 'card' });
+  assert.ok(!(await s2bRun(n)).changes.some((c) => c.id === 'c'), '2-card');
+  n = s2bCard('promo-card', { dsRole: 'card', dsKept: 'promo-card' });
+  assert.ok(!(await s2bRun(n)).changes.some((c) => c.id === 'c'), '지킨 이름');
+  n = s2bCard('promo-card', { dsRole: 'card', dsKept: 'Promo Card' });
+  assert.ok(!(await s2bRun(n)).changes.some((c) => c.id === 'c'), '대소문자만 다른 지킨 이름');
+});
+
+test('S-2b 표 14 — 지킨 이름은 두 번째 정리에서도 그대로 · 대소문자만 고쳐도 그대로 · 다른 두 토막으로 고치면 다시 판정해 바꾸고 표시를 지운다', async () => {
+  installFigma();
+  const n = s2bCard('promo-card');
+  let r = await s2bRun(n);
+  assert.ok(!r.changes.some((c) => c.id === 'c'));
+  assert.equal(n._pd.get('dsRole'), 'card');
+  assert.equal(n._pd.get('dsKept'), 'promo-card');
+  r = await s2bRun(n);
+  assert.deepEqual(r.changes.filter((c) => c.id === 'c'), [], '두 번째 정리');
+  n.name = 'Promo Card';
+  r = await s2bRun(n);
+  assert.ok(!r.changes.some((c) => c.id === 'c'), '대소문자만');
+  n.name = 'sale-card';
+  r = await s2bRun(n);
+  assert.equal(r.changes.find((c) => c.id === 'c')?.after, 'card');
+  assert.equal(n.name, 'card');
+  assert.equal(n._pd.get('dsKept'), '');
+});
+
+test('S-2b R2B-P3 — 선택 루트가 고신뢰 card여도 사람 이름이면 그대로 · 역할만, 자식은 바꿨을 때와 같은 맥락(card-icon) · 기본명 루트는 지금처럼 card', async () => {
+  installFigma();
+  const rootOf = (name) => withPd({ type: 'FRAME', id: 'root', name, cornerRadius: 12, fills: vis, width: 300, height: 400, layoutMode: 'VERTICAL',
+    children: [T('t', '제목'), V('v', { width: 24, height: 24 })] });
+  const human = rootOf('Pricing card');
+  let r = await renameSelection([human], { apply: true, maxDepth: 5 });
+  assert.ok(!r.changes.some((c) => c.id === 'root'));
+  assert.equal(human.name, 'Pricing card');
+  const rn = r.nodes.find((x) => x.id === 'root');
+  assert.equal(rn.role, 'card');
+  assert.equal(rn.kept, true);
+  assert.equal(rn.keep, undefined, '보존(root)이 아니라 역할 기록 — 루트 접두사 없음');
+  const childAfterHuman = r.changes.find((c) => c.id === 'v')?.after;
+  assert.equal(childAfterHuman, 'card-icon');
+  const plain = rootOf('Frame 1');
+  r = await renameSelection([plain], { apply: true, maxDepth: 5 });
+  assert.equal(r.changes.find((c) => c.id === 'root')?.after, 'card');
+  assert.equal(r.changes.find((c) => c.id === 'v')?.after, childAfterHuman, '자식 이름은 루트를 바꿨을 때와 같다');
+});
+
+test('S-2b R2B-P4 표 10 — 사람 이름 카드(Pricing panel) 아래 자식은 지금과 같다(card-media · card-image)', async () => {
+  installFigma();
+  const img = { type: 'RECTANGLE', id: 'img', name: 'Rectangle 1', width: 100, height: 100, fills: [{ type: 'IMAGE', visible: true }] };
+  const wrapper = { type: 'FRAME', id: 'wrap', name: 'Frame 8', children: [img] };
+  const card = withPd({ type: 'FRAME', id: 'card', name: 'Pricing panel', cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }],
+    children: [wrapper, { type: 'TEXT', id: 'tt', name: 'Title', characters: 'x' }] });
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', children: [card] };
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 3 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(after.has('card'), false);
+  assert.equal(nodes.find((n) => n.id === 'card').role, 'card');
+  assert.equal(after.get('wrap'), 'card-media');
+  assert.equal(after.get('img'), 'card-image');
+});
+
+test('S-2b 구조 폴백 — 기본명 · 플러그인 이름 · 사람 이름 모두 이름 그대로, 지킨 이름 표시는 사람 이름만', async () => {
+  installFigma();
+  for (const [name, kept] of [['Frame 7', false], ['container', false], ['Layout box', true]]) {
+    const n = withPd({ type: 'FRAME', id: 'e', name, children: [] });
+    const r = await s2bRun(n);
+    assert.ok(!r.changes.some((c) => c.id === 'e'), name);
+    assert.equal(r.nodes.find((x) => x.id === 'e').role, 'container', name);
+    assert.equal(r.nodes.find((x) => x.id === 'e').kept ?? false, kept, name);
+    assert.equal(n._pd.get('dsKept') ?? '', kept ? name : '', name);
+  }
+});
+
+test('S-2b ⓑ 루트 접두사 — 루트 이름에서 온 접두사 한 낱말 + 역할 낱말(dsl-card)은 플러그인 이름', async () => {
+  installFigma();
+  const c = s2bCard('dsl-card');
+  const root = { type: 'FRAME', id: 'root', name: 'Flightin website (DSL 실기)', width: 800, height: 800, children: [c] };
+  const r = await renameSelection([root], { apply: false, maxDepth: 5 });
+  assert.equal(r.nodes.find((x) => x.id === 'root').keep, 'root');
+  assert.equal(r.changes.find((x) => x.id === 'c')?.after, 'card');
+});
+
+test('S-2b SC-D52 — 붙은 변수 이름과 같은 이름(예전 토큰 경로 베낌)은 플러그인 이름 · 붙은 변수와 다른 비슷한 이름은 사람 이름', async () => {
+  const figma = installFigma();
+  const glob = figma.variables.createVariableCollection('Global');
+  const v = figma.variables.createVariable('brand/card-bg', glob, 'COLOR');
+  const mk = (name) => withPd({ type: 'FRAME', id: 'c', name, cornerRadius: 8, fills: [{ type: 'SOLID', visible: true, boundVariables: { color: { type: 'VARIABLE_ALIAS', id: v.id } } }],
+    width: 300, height: 200, children: [T('cx', 'x'), T('cy', 'y')] });
+  assert.equal((await s2bRun(mk('brand-card-bg'))).changes.find((c) => c.id === 'c')?.after, 'card');
+  assert.ok(!(await s2bRun(mk('brand-card-bg-2'))).changes.some((c) => c.id === 'c'));
+});
+
+test('S-2b code.ts RENAME_APPLY — kept 항목은 dsKept를 기록하고, 없으면 지우며 바뀌면 roleWrites로 센다', async () => {
+  const figma = installFigma();
+  const p = await loadPlugin(figma);
+  const fr = withPd({ type: 'FRAME', id: 'h', name: 'Hero banner', visible: true, fills: [], children: [], parent: { type: 'PAGE' } });
+  registerNodes(figma, [fr]);
+  await p.send({ type: 'RENAME_APPLY', items: [{ id: 'h', before: 'Hero banner', after: 'Hero banner', role: 'section', kept: true }], reqId: 1 });
+  assert.equal(fr.name, 'Hero banner');
+  assert.equal(fr._pd.get('dsRole'), 'section');
+  assert.equal(fr._pd.get('dsKept'), 'Hero banner');
+  await p.send({ type: 'RENAME_APPLY', items: [{ id: 'h', before: 'Hero banner', after: 'section', role: 'section' }], reqId: 2 });
+  assert.equal(fr.name, 'section');
+  assert.equal(fr._pd.get('dsKept'), '');
+  // 이름 · 역할이 그대로이고 지킨 이름 표시만 새로 쓰는 항목도 ⌘Z 묶음을 닫는다(roleWrites — 다음 작업의 undo에 섞이지 않게)
+  const fr2 = withPd({ type: 'FRAME', id: 'k', name: 'Promo', visible: true, fills: [], children: [], parent: { type: 'PAGE' } }, { dsRole: 'card' });
+  registerNodes(figma, [fr2]);
+  const before = figma._undo ?? 0;
+  await p.send({ type: 'RENAME_APPLY', items: [{ id: 'k', before: 'Promo', after: 'Promo', role: 'card', kept: true }], reqId: 3 });
+  assert.equal(fr2._pd.get('dsKept'), 'Promo');
+  assert.equal(figma._undo ?? 0, before + 1, 'dsKept만 바뀌어도 commitUndo');
+});
+
+test('S-2b 더 — 하이픈 역할 ⓑ(Text Group) · 표 6 예전 이름(card-wrapper) · 세 토막(card-header-icon) · ⓐ 두 토막(dialog-text-group · brand-background) · 힌트 낱말로 끝나는 이름(dialog-button)은 힌트', async () => {
+  installFigma();
+  const tgOf = (name, pd) => withPd({ type: 'FRAME', id: 'n', name, width: 200, height: 60, children: [T('a', 'A', { y: 0 }), T('b', 'B', { y: 30 })] }, pd);
+  for (const name of ['Text Group', 'card-wrapper', 'card-header-icon']) {
+    const r = await inCard(tgOf(name));
+    assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group', name);
+  }
+  // ⓐ — 기록과 맞는 두 토막(앞 낱말은 역할 낱말이 아님)
+  let r = await inCard(tgOf('dialog-text-group', { dsRole: 'text-group' }));
+  assert.equal(r.changes.find((c) => c.id === 'n')?.after, 'card-text-group');
+  r = await inCard(tgOf('dialog-text-group'));
+  assert.ok(!r.changes.some((c) => c.id === 'n'), '기록이 없으면 사람 이름');
+  const bg = withPd({ type: 'RECTANGLE', id: 'bg', name: 'brand-background', width: 300, height: 400, fills: vis }, { dsRole: 'background' });
+  r = await inCard(bg);
+  assert.ok(r.changes.some((c) => c.id === 'bg'), 'brand-background(기록 background) — 다시 정리');
+  // 힌트 낱말 button으로 끝나는 이름 — B.28 조건이면 힌트가 먼저(이름 그대로 · 역할 button · 지킨 이름 표시)
+  const db = tgOf('dialog-button');
+  r = await inCard(db);
+  assert.ok(!r.changes.some((c) => c.id === 'n'));
+  assert.equal(db._pd.get('dsRole'), 'button');
+  assert.equal(db._pd.get('dsKept'), 'dialog-button');
+});
+
+test('S-2b 빈 이름(기본명) + 구조 폴백 — 역할 기록 · 맥락 통과는 그대로(자식 이름에 card 맥락)', async () => {
+  installFigma();
+  const sq = { type: 'RECTANGLE', id: 'sq', name: 'Rectangle 1', x: 0, y: 0, width: 200, height: 200, fills: [{ type: 'SOLID', color: { r: 0.5, g: 0.5, b: 0.5 }, visible: true }] };
+  const blank = withPd({ type: 'FRAME', id: 'w', name: '', layoutMode: 'HORIZONTAL', width: 600, height: 300, children: [sq] }); // 자식 1 → wrapper(A.21 ⑦)
+  const card = { type: 'FRAME', id: 'card', name: 'Frame 1', cornerRadius: 12, fills: [{ type: 'SOLID', visible: true }], width: 700, height: 500,
+    children: [blank, { type: 'TEXT', id: 'tt', name: 'Title', characters: 'x' }] };
+  const root = { type: 'FRAME', id: 'root', name: 'Frame 0', width: 1600, height: 1600, children: [card] };
+  const { changes, nodes } = await renameSelection([root], { apply: true, maxDepth: 5 });
+  const after = new Map(changes.map((c) => [c.id, c.after]));
+  assert.equal(nodes.find((n) => n.id === 'w').role, 'wrapper');
+  assert.equal(after.has('w'), false, '폴백은 이름으로 쓰지 않는다');
+  assert.equal(blank._pd.get('dsRole'), 'wrapper', '빈 이름 노드도 적용 때 역할 기록');
+  assert.match(after.get('sq') ?? '', /^card-/, `맥락 통과 — ${after.get('sq')}`);
 });

@@ -25,14 +25,15 @@ import {
 } from './tokens';
 import { paletteFamilyOf } from './palette';
 import { resolveGlobalNames, type FileGlobal, type GlobalNameReq, type GlobalNameResult } from './colorName'; // Global 이름 · 덮지 않음(§2.12 12.11)
-import { AUTO_ROLE_KEY, TEXT_STEP_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
-import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
-import { TextSample, TextStyleSpec, ExistingTextStyle, tsSig, isIntegerSize } from './textStyles';
-import { nameKrdsStyles, type KrdsInput } from './krdsType'; // KRDS 이름(docs/text-style-krds.md)
-import { dsRoleOwner } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1)
+import { AUTO_ROLE_KEY, TEXT_STEP_KEY, assignNames, colorRoleBases, colorRoleRef, colorSlotKey, familyRe, nameKindOf, valueKey, type BgKind } from './usageRoles'; // 쓰임 역할(§2.12 12.10)
+import { collectionTiers, ensureOwnedCollection, ownedCollection, ownedIds, pluginGlobalNames } from './collectionRoles'; // 플러그인 컬렉션 · 내용으로 판단한 계층(§2.13)
+import { TextSample, TextStyleSpec, ExistingTextStyle, isIntegerSize } from './textStyles';
+import { dsRoleOwner, mergeScopes, readVarInfos } from './bind'; // UI 역할 조상 탐색(docs/text-style-krds.md §3.2-1) · 변수 읽기(같은 값 판정의 입력)
+import { tokenGroups } from './selCards';
+import { aliasCovers, tokenReuse, valueKeyOf, type PlaceInfo } from './sameValue'; // 만들기의 재사용 · Semantic 수(ia-v4 §2.9 S2-P8)
 import { MANUAL_KEY, duplicateName } from './varKind'; // 직접 만든 변수(IA v4 §4.9)
 import type { EditValue } from './varTable';
-import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow, TsRenameRow, TsRenameItem } from '../shared/messages';
+import type { TextStyleSkipReason, TextStyleApplySkipReason, TokenState, RoleRow } from '../shared/messages';
 
 export const GLOBAL = 'Global';
 export const SEMANTIC = 'Semantic';
@@ -105,34 +106,67 @@ function sameLiteral(raw: VariableValue | undefined, lit: string | number, type:
   return typeof raw === 'number' && Math.round(raw * 100) === Math.round(Number(lit) * 100);
 }
 
+/** 값으로 찾은 재사용 하나(ia-v4 §2.9 S2-P8 ①). */
+interface ReusePick {
+  /** 첫 빈 묶음에서 고른 변수("있는 변수" 줄의 이름 칩). */
+  variable: Variable;
+  /** 그 변수가 닿는 원시값 변수 id — 쓰임 역할의 별칭 대상(`globalOf`). */
+  rawId: string;
+  /** 용도 예외로 고른 플러그인 Global(직접 만든 변수 포함 — SC-D38) — 실행 때 토큰의 용도를 합친다. */
+  adds: Variable[];
+}
+
 /**
- * 쓰임 목록이 있는 토큰마다 재사용할 사용자 Global(같은 종류 · 같은 값 · 용도를 받는 직접 값 변수)을 고른다.
- * 사용자 컬렉션 목록 순 · 이름 순 첫 번째. 쓰임이 없는 토큰(글자 · 팔레트 · 텍스트 스타일)은 고르지 않는다.
+ * 쓰임 목록이 있는 토큰(값)마다 **값으로** 다시 쓸 변수를 찾는다(ia-v4 §2.9 S2-P8 ① — `sameValue.ts` `tokenReuse`).
+ * 빈 자리가 있는 용도 묶음(`freeBy`의 키)마다 후보를 고르고, 모든 묶음에 후보가 있으면 재사용이다(사용자 변수 · 플러그인 Global · 별칭 모두 —
+ * 이름이 바뀐 플러그인 Global도 값이 같으면 다시 쓴다). 빈 묶음이 0개인 토큰과 쓰임이 없는 토큰(글자 · 팔레트 · 텍스트 스타일)은 고르지 않는다.
+ * 같은 이름의 토큰이 여럿이면(채움색 · 그림자색) 묶음을 모아 한 번 판정한다.
  */
-async function pickReusable(tokens: readonly DraftToken[], base: number): Promise<Map<string, Variable>> {
-  const out = new Map<string, Variable>();
+async function pickReusable(tokens: readonly DraftToken[], base: number): Promise<Map<string, ReusePick>> {
+  const out = new Map<string, ReusePick>();
   const withUses = tokens.filter((t) => t.uses?.length);
   if (!withUses.length) return out;
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const vars = await figma.variables.getLocalVariablesAsync();
-  const tiers = collectionTiers(cols, vars);
-  const owned = ownedIds(cols);
-  const colIdx = new Map(cols.map((c, i) => [c.id, i]));
-  const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
-  const userGlobals = vars
-    .filter((v) => tiers.get(v.variableCollectionId) === 1 && !owned.has(v.variableCollectionId))
-    .sort((a, b) => (colIdx.get(a.variableCollectionId) ?? 0) - (colIdx.get(b.variableCollectionId) ?? 0) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
-  for (const t of withUses) {
-    const type = resolvedTypeForToken(t);
-    const lit = literalOf(t, type, base);
-    const allowed = scopesForType(scopesForSources(t.sources), type);
-    const hit = userGlobals.find((v) => {
-      if (v.resolvedType !== type) return false;
-      const sc = (v.scopes ?? []) as ScopeName[];
-      if (!sc.includes('ALL_SCOPES' as ScopeName) && !allowed.some((x) => sc.includes(x))) return false;
-      return sameLiteral(directValue(v, modeOf), lit, type);
-    });
-    if (hit) out.set(t.name, hit);
+  const read = await readVarInfos();
+  const infos = read.infos.filter((i) => i.key != null);
+  // 색 밝기 이름 — 지을 역할 이름(`createUsageRoles`)과 같은 결과로 플러그인 역할의 가족을 본다(연결 찾기의 자리 쓰임 이름과 같다, SC-D41)
+  const { bases } = colorBasesOf(withUses, semanticIndex(await figma.variables.getLocalVariableCollectionsAsync(), await figma.variables.getLocalVariablesAsync()).existing);
+  const byName = new Map<string, DraftToken[]>();
+  for (const t of withUses) byName.set(t.name, [...(byName.get(t.name) ?? []), t]);
+  for (const [name, list] of byName) {
+    const places: PlaceInfo[] = [];
+    for (const t of list) {
+      const type = resolvedTypeForToken(t);
+      const lit = literalOf(t, type, base);
+      const key = type === 'FLOAT' ? valueKeyOf('num', Number(lit)) : String(lit);
+      // 플러그인이 만든 역할은 그 쓰임 이름의 가족일 때만 후보 — 색은 밝기까지 정한 밑이름(`color/{쓰임}/{밝기}`), 숫자는 쓰임 이름.
+      const family = (u: NonNullable<DraftToken['uses']>[number]): string => (u.name.startsWith('color/') ? bases.get(colorBaseKey(u.name, String(t.value), u.bg, t.alpha)) ?? `${u.name}/default` : u.name);
+      const okFor = (f: string) => (n: string): boolean => familyRe(f, nameKindOf(f, key)).test(n);
+      const tokenName = type === 'FLOAT' ? { tokenName: t.name } : {};
+      const uses = t.uses ?? [];
+      if (uses.some((u) => u.keys)) {
+        // 쓰임 × 빈 자리가 있는 묶음마다 한 자리 — 연결 찾기가 자리마다 자기 쓰임 이름으로 고르는 것과 같은 단위(SC-D41)
+        const seen = new Set<string>();
+        for (const u of uses) {
+          const f = family(u);
+          for (const g of u.keys ?? []) {
+            if (seen.has(`${f}\u0000${g}`)) continue;
+            seen.add(`${f}\u0000${g}`);
+            places.push({ type, key, allowed: g.split('|'), roleOk: okFor(f), ...tokenName });
+          }
+        }
+      } else {
+        // 쓰임별 묶음을 모르는 옛 토큰 — 묶음마다 쓰임 가운데 하나라도 가족이면(`selCards.ts` tokenGroups — 연결 단계의 거름과 같은 키)
+        const fams = uses.map(family);
+        const roleOk = (n: string): boolean => fams.some((f) => okFor(f)(n));
+        for (const g of tokenGroups(t)) places.push({ type, key, allowed: g.split('|'), roleOk, ...tokenName });
+      }
+    }
+    const picks = tokenReuse(places, infos);
+    if (!picks) continue;
+    const first = read.byId.get(picks[0].variable.id);
+    if (!first) continue;
+    const adds = [...new Set(picks.filter((p) => p.scopeAdd).map((p) => read.byId.get(p.variable.id)).filter((v): v is Variable => !!v))];
+    out.set(name, { variable: first, rawId: picks[0].variable.rawId ?? first.id, adds });
   }
   return out;
 }
@@ -214,14 +248,45 @@ function resolveUsesNames(tokens: readonly DraftToken[], skip: ReadonlyMap<strin
  * 거울 계층을 두지 않는다. 역할 없는 값은 바인딩이 Global에 직접 붙는다(bind.ts).
  * Semantic 컬렉션은 역할 단계가 쓸 수 있게 미리 만들어 둔다(빈 컬렉션).
  */
+/**
+ * 새로 만드는 Global의 순서(IA v4 §4.3 B.41 VO-D3) — 그룹(이름 첫 마디)은 처음 나온 순서, 그룹 안에서 숫자 아닌 토큰이
+ * 있던 자리는 그대로 두고 FLOAT 토큰끼리만 만들 px 값(`literalOf`) 작은 순(안정)으로 채운다.
+ */
+export function creationOrder(tokens: readonly DraftToken[], base: number): DraftToken[] {
+  const groups = new Map<string, DraftToken[]>();
+  for (const t of tokens) {
+    const g = t.name.split('/')[0];
+    const arr = groups.get(g);
+    if (arr) arr.push(t);
+    else groups.set(g, [t]);
+  }
+  const out: DraftToken[] = [];
+  for (const arr of groups.values()) {
+    const isNum = arr.map((t) => resolvedTypeForToken(t) === 'FLOAT');
+    const nums = arr
+      .map((t, i) => ({ t, i, v: Number(literalOf(t, 'FLOAT', base)) }))
+      .filter((x) => isNum[x.i])
+      .sort((a, b) => (Number.isFinite(a.v) && Number.isFinite(b.v) ? a.v - b.v : 0) || a.i - b.i);
+    let k = 0;
+    arr.forEach((t, i) => out.push(isNum[i] ? nums[k++].t : t));
+  }
+  return out;
+}
+
 export async function createTokens(tokens: DraftToken[], base: number): Promise<CreateSummary> {
   const reuse = await pickReusable(tokens, base);
   const summary: CreateSummary = { created: 0, updated: 0, globals: 0, semantics: 0, conversions: pxConversions(tokens, base), globalOf: new Map(), skippedManual: 0, skippedManualNames: new Set(), finalName: new Map() };
   const reuseMap = readReuseMap();
   const toCreate = tokens.filter((t) => !reuse.has(t.name));
-  for (const [name, v] of reuse) {
-    summary.globalOf.set(name, v.id);
-    reuseMap[name] = v.id;
+  for (const [name, r] of reuse) {
+    summary.globalOf.set(name, r.rawId);
+    reuseMap[name] = r.rawId;
+    // 용도 예외로 고른 플러그인 Global(직접 만든 변수 포함 — SC-D38)은 값은 그대로 두고 토큰의 용도를 합친다(12.11 — 아래 ②와 같은 합치기).
+    for (const v of r.adds) {
+      const type = v.resolvedType as ResolvedType;
+      const scopes = scopesForType(scopesForSources(tokens.filter((t) => t.name === name).flatMap((t) => t.sources)), type);
+      v.scopes = mergeScopes(v.scopes as string[], scopes, type) as VariableScope[];
+    }
   }
   if (toCreate.length) {
     // 플러그인 Global은 실제로 만들 때만 만든다(13.2-3 — 모두 재사용이면 생기지 않는다).
@@ -232,7 +297,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
     const named = resolveUsesNames(toCreate, reuse, base, fileGlobalsOf(globalCol, [...idx.values()]));
     // 같은 실행에서 같은 이름이 두 번 오면(채움색 #000 + 그림자색 #000) 스코프를 덮지 않고 합친다.
     const touched = new Set<string>();
-    for (const t of toCreate) {
+    for (const t of creationOrder(toCreate, base)) {
       const type = resolvedTypeForToken(t);
       const nm = named.get(t.name);
       if (nm) {
@@ -244,7 +309,7 @@ export async function createTokens(tokens: DraftToken[], base: number): Promise<
         delete reuseMap[t.name];
         if (nm.reuse) {
           // 값은 바꾸지 않고 용도는 합친다(12.11)
-          g.variable.scopes = scopesForType([...new Set([...(g.variable.scopes as ScopeName[]), ...scopes])], type);
+          g.variable.scopes = mergeScopes(g.variable.scopes as string[], scopes, type);
           touched.add(key);
           continue;
         }
@@ -334,8 +399,8 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
   for (const t of tokens) {
     const r = reuse.get(t.name);
     if (r) {
-      summary.globalOf.set(t.name, r.id);
-      setState(t.name, { state: 'reuse', varName: r.name });
+      summary.globalOf.set(t.name, r.rawId);
+      setState(t.name, { state: 'reuse', varName: r.variable.name });
       continue;
     }
     const nm = named.get(t.name);
@@ -344,7 +409,7 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
       if (nm.reuse) {
         const v = allVars.find((x) => x.variableCollectionId === gId && x.name === nm.name);
         if (v) summary.globalOf.set(t.name, v.id);
-        setState(t.name, { state: 'reuse', varName: nm.name });
+        setState(t.name, { state: 'reuse', varName: nm.name }); // 실행이 용도를 합쳐도 태그는 "있는 변수" 하나다(ia-v4 §2.9)
         continue;
       }
       setState(t.name, nm.name !== t.name ? { state: 'new', varName: nm.name } : { state: 'new' });
@@ -372,19 +437,12 @@ export async function previewCreateTokens(tokens: DraftToken[], base: number): P
 }
 
 /**
- * 쓰임 역할 만들기(§2.12 12.10) — 토큰의 쓰임(`uses`)마다 Semantic 역할을 만든다(같은 처리 · 같은 ⌘Z).
- * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 이름 꼬리(12.5): 같은 값 · 맞는 용도가 이미 있으면 그 이름을
- * 쓰고(만들지 않음), 다른 값이 차지했으면 후보 목록의 다음 꼬리. 이미 있는 역할의 값은 바꾸지 않는다.
- * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
- * rowsOut을 주면 preview일 때 셀 역할마다 {이름, 가리킬 Global 이름, 만든 토큰 이름}을 넣는다(IA v4 §4.3 `roleRows` — 길이 = 반환값).
+ * 이미 있는 Semantic 이름(§2.12 12.5) — Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 키 묶음(같은 이름이면 사용자 컬렉션 먼저 · 목록 순, 13.5)과
+ * 재사용 판정용 이름 → (값 키 · 변수). `createUsageRoles`와 만들기의 재사용(`pickReusable` — 색 밝기의 기준색)이 함께 쓴다.
  */
-export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[], finalName?: ReadonlyMap<string, string>): Promise<number> {
-  const withUses = tokens.filter((t) => t.uses?.length);
-  if (!withUses.length) return 0;
-  const cols = await figma.variables.getLocalVariableCollectionsAsync();
-  const vars = await figma.variables.getLocalVariablesAsync();
-  const tiers = collectionTiers(cols, vars);
-  const owned = ownedIds(cols);
+function semanticIndex(cols: readonly VariableCollection[], vars: readonly Variable[]): { existing: Map<string, string[]>; semByName: Map<string, { key: string; v: Variable }[]> } {
+  const tiers = collectionTiers(cols as VariableCollection[], vars as Variable[]);
+  const owned = ownedIds(cols as VariableCollection[]);
   const byId = new Map(vars.map((v) => [v.id, v]));
   const modeOf = new Map(cols.map((c) => [c.id, c.defaultModeId]));
   const resolve = (v: Variable): VariableValue | undefined => {
@@ -401,7 +459,6 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     if (typeof val === 'object' && 'r' in val) return colorKey(rgbToHex(val as RGB), (val as RGBA).a); // 색 값 키
     return typeof val === 'number' || typeof val === 'string' ? valueKey(val) : '';
   };
-  // 이미 있는 이름 = Semantic 계층 전부(플러그인 · 사용자)의 이름 → 값 묶음. 같은 이름이면 사용자 컬렉션 먼저 · 목록 순(13.5).
   const colIdx = new Map(cols.map((c, i) => [c.id, i]));
   const rank = (id: string): number => (owned.has(id) ? 1e6 : 0) + (colIdx.get(id) ?? 0);
   const existing = new Map<string, string[]>();
@@ -413,7 +470,60 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     else if (k && !arr.includes(k)) arr.push(k);
     semByName.set(v.name, [...(semByName.get(v.name) ?? []), { key: k, v }]);
   }
-  const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+  return { existing, semByName };
+}
+
+/** 쓰임의 곳 수 — 빈 자리 수를 실은 토큰(S-2 뒤 추출)은 빈 자리 수, 옛 토큰은 `count`(붙은 자리 포함). 밝기 이름 · 쓰임 역할의 입력(SC-D45). */
+const usePlaces = (t: DraftToken, u: NonNullable<DraftToken['uses']>[number]): number => ((t.uses ?? []).some((x) => x.free != null) ? u.free ?? 0 : u.count);
+
+/** 색 쓰임 밝기 찾기 키 — (쓰임, 색 값 · 배경 종류 · 투명도). */
+const colorBaseKey = (use: string, hex: string, bg: BgKind | undefined, alpha: number | undefined): string => `${use}\u0000${colorSlotKey(String(hex).toLowerCase(), bg, alpha)}`;
+
+/**
+ * 쓰임별 색 밝기 이름(12.4)과 기준색 — 키(`colorBaseKey`) → 역할 밑이름 `{쓰임}/{밝기}`. 입력은 쓰임이 있는 토큰 전부(곳 수 = 쓰임의 곳 수)와
+ * 이미 있는 `{쓰임}/default`의 값. `createUsageRoles`(지을 이름)와 `pickReusable`(플러그인 역할의 가족 판정)이 같은 결과를 쓴다 —
+ * 연결 찾기(`bind.ts` resolveSlots)도 그 쓰임의 연결 안 된 색 자리 전부로 같은 함수를 부른다(§2.9 SC-D40 · SC-D41).
+ */
+function colorBasesOf(withUses: readonly DraftToken[], existing: ReadonlyMap<string, string[]>): { bases: Map<string, string>; refs: Map<string, string | undefined> } {
+  const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
+  for (const t of withUses) {
+    for (const u of t.uses ?? []) {
+      if (!u.name.startsWith('color/')) continue;
+      const n = usePlaces(t, u);
+      if (!(n > 0)) continue; // 자리가 모두 붙은 쓰임 — 연결 찾기에도 그 자리는 없다(SC-D45)
+      const arr = colorUses.get(u.name) ?? [];
+      arr.push({ token: t, count: n, bg: u.bg });
+      colorUses.set(u.name, arr);
+    }
+  }
+  const bases = new Map<string, string>();
+  const refs = new Map<string, string | undefined>();
+  for (const [use, list] of colorUses) {
+    // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
+    const defKey = existing.get(`${use}/default`)?.[0];
+    const input = list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha }));
+    const b = colorRoleBases(input, defKey || undefined, use.slice('color/'.length)); // 색 값 키여도 colorRoleBases가 hex만 본다
+    refs.set(use, colorRoleRef(input, defKey || undefined, use.slice('color/'.length))); // 쓰임별 기준값(12.12 N-D4)
+    for (const x of list) bases.set(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha), `${use}/${b.get(colorSlotKey(String(x.token.value).toLowerCase(), x.bg, x.token.alpha)) ?? 'default'}`);
+  }
+  return { bases, refs };
+}
+
+/**
+ * 쓰임 역할 만들기(§2.12 12.10) — 토큰의 쓰임(`uses`)마다 Semantic 역할을 만든다(같은 처리 · 같은 ⌘Z).
+ * 숫자는 쓰임 이름 그대로, 색은 쓰임별 밝기 이름(colorRoleBases). 이름 꼬리(12.5): 같은 값 · 맞는 용도가 이미 있으면 그 이름을
+ * 쓰고(만들지 않음), 다른 값이 차지했으면 후보 목록의 다음 꼬리. 이미 있는 역할의 값은 바꾸지 않는다.
+ * preview면 만들지 않고 만들 수만 센다. 반환 = 새로 만든(만들) 역할 수.
+ * rowsOut을 주면 preview일 때 셀 역할마다 {이름, 가리킬 Global 이름, 만든 토큰 이름}을 넣는다(IA v4 §4.3 `roleRows` — 길이 = 반환값).
+ */
+export async function createUsageRoles(tokens: readonly DraftToken[], preview = false, globalOf?: ReadonlyMap<string, string>, rowsOut?: RoleRow[], finalName?: ReadonlyMap<string, string>): Promise<number> {
+  const withUses = tokens.filter((t) => t.uses?.length);
+  if (!withUses.length) return 0;
+  const cols = await figma.variables.getLocalVariableCollectionsAsync();
+  const vars = await figma.variables.getLocalVariablesAsync();
+  const byId = new Map(vars.map((v) => [v.id, v]));
+  const { existing, semByName } = semanticIndex(cols, vars);
+  const globalNames = pluginGlobalNames(cols, vars); // 거울(12.7 — 플러그인 Global 컬렉션의 이름과 같은 별칭, ia-v4 §2.9 S2-P4)
   const canReuse = (name: string, value: string, base: string): boolean => {
     if (globalNames.has(name)) return false; // 거울(12.7)
     const need = scopeForSemanticRole(base);
@@ -433,42 +543,41 @@ export async function createUsageRoles(tokens: readonly DraftToken[], preview = 
     return pluginGlobal ? vars.find((v) => v.variableCollectionId === pluginGlobal.id && v.name === nm) : undefined;
   };
 
-  // 요청 — 숫자는 쓰임 이름, 색은 쓰임별 밝기 이름.
+  // 요청 — 숫자는 쓰임 이름(토큰 순), 그다음 색은 쓰임별 밝기 이름(쓰임이 처음 나온 순 · 그 안은 토큰 순 — `colorBasesOf`, 만들기의 재사용과 같은 결과).
   const reqs: { base: string; value: string; count: number; token: DraftToken; refHex?: string }[] = [];
+  const { bases, refs } = colorBasesOf(withUses, existing);
   const colorUses = new Map<string, { token: DraftToken; count: number; bg?: BgKind }[]>();
   for (const t of withUses) {
     for (const u of t.uses ?? []) {
+      // 자리가 모두 붙은 쓰임은 역할을 만들지 않는다 — 붙일 자리가 없어 안 쓰는 Semantic이 된다(SC-D45). 곳 수 = 빈 자리 수.
+      const n = usePlaces(t, u);
+      if (!(n > 0)) continue;
       if (u.name.startsWith('color/')) {
         const arr = colorUses.get(u.name) ?? [];
-        arr.push({ token: t, count: u.count, bg: u.bg });
+        arr.push({ token: t, count: n, bg: u.bg });
         colorUses.set(u.name, arr);
-      } else reqs.push({ base: u.name, value: valueKey(t.value), count: u.count, token: t });
+      } else reqs.push({ base: u.name, value: valueKey(t.value), count: n, token: t });
     }
   }
   for (const [use, list] of colorUses) {
-    // 입력 = (hex · 배경 종류 · 곳 수) — inverse 여부는 함수 안에서 기준색을 정한 뒤 판정한다(12.4).
-    const defKey = existing.get(`${use}/default`)?.[0];
-    const bases = colorRoleBases(
-      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-      defKey || undefined, // 색 값 키여도 colorRoleBases가 hex만 본다
-      use.slice('color/'.length),
-    );
-    const refHex = colorRoleRef(
-      list.map((x) => ({ hex: String(x.token.value), count: x.count, bg: x.bg, alpha: x.token.alpha })),
-      defKey || undefined,
-      use.slice('color/'.length), // 쓰임별 기준값(12.12 N-D4)
-    );
+    const refHex = refs.get(use);
     for (const x of list) {
-      const hex = String(x.token.value).toLowerCase();
       // 값 = 색 값 키 — 같은 hex · 다른 투명도는 다른 값이라 투명도 단계로 갈린다(default · default-subtle, 12.5)
-      reqs.push({ base: `${use}/${bases.get(colorSlotKey(hex, x.bg, x.token.alpha)) ?? 'default'}`, value: colorKey(hex, x.token.alpha), count: x.count, token: x.token, ...(refHex ? { refHex } : {}) });
+      reqs.push({ base: bases.get(colorBaseKey(use, String(x.token.value), x.bg, x.token.alpha)) ?? `${use}/default`, value: colorKey(String(x.token.value).toLowerCase(), x.token.alpha), count: x.count, token: x.token, ...(refHex ? { refHex } : {}) });
     }
   }
   const names = assignNames(reqs, existing, { canReuse });
+  // Semantic 수 r(ia-v4 §2.9 S2-P8) — 지은 역할 이름마다, 값 키가 같고 그 역할의 용도를 모두 덮는 별칭 후보가 이미 있으면
+  // (사용자 별칭은 이름과 상관없이, 플러그인이 만든 역할은 가족일 때) 세지도 만들지도 않는다 — 안 쓰는 Semantic을 남기지 않는다.
+  const infos = (await readVarInfos()).infos;
   const toMake = new Map<string, DraftToken>();
   for (const r of reqs) {
     const name = names.get(`${r.base}\u0000${r.value}`) ?? r.base;
     if (existing.has(name) || toMake.has(name)) continue; // 재사용(같은 값 · 맞는 용도) — 차지된 이름은 assignNames가 피했다
+    const type = resolvedTypeForToken(r.token);
+    const need = (scopeForSemanticRole(name) ?? (globalFor(r.token)?.scopes as string[] | undefined) ?? scopesForType(scopesForSources(r.token.sources), type)) as string[];
+    const key = type === 'COLOR' ? colorKey(String(r.token.value), r.token.alpha) : type === 'FLOAT' ? valueKeyOf('num', Number(r.token.value)) : String(r.token.value);
+    if (aliasCovers(infos, { type, key, need, base: r.base })) continue;
     toMake.set(name, r.token);
   }
   if (preview) {
@@ -635,6 +744,8 @@ function walkText(node: SceneNode, out: TextNode[], instanceOut?: TextNode[]): v
 export interface TextScanResult {
   samples: TextSample[];
   warnings: string[];
+  /** 표본 글자 id → 노드(만들기 탭 RT-D5 판정 — 다시 읽지 않는다). */
+  nodeById?: Map<string, TextNode>;
 }
 
 /** 노드/세그먼트 행간 → px 시그니처 + 원본 %. */
@@ -870,7 +981,7 @@ export async function scanTextStyles(nodes: readonly SceneNode[]): Promise<TextS
       uiRole: inUiRole(node, ownerCache),
     });
   }
-  return { samples, warnings: [...warnings] };
+  return { samples, warnings: [...warnings], nodeById: new Map(texts.map((t) => [t.id, t])) };
 }
 
 /** 스타일/노드의 행간을 있는 그대로 px 환산(AUTO/혼합=0) — 값을 기록하는 경로용. */
@@ -898,7 +1009,7 @@ export async function scanExistingTextStyles(): Promise<ExistingTextStyle[]> {
   return (await figma.getLocalTextStylesAsync()).map(existingOf);
 }
 
-/** 로컬 텍스트 스타일 하나 → 시그니처 매칭 모양(scanExistingTextStyles · 이름 다시 짓기의 `tsSig`가 같은 값을 쓴다). */
+/** 로컬 텍스트 스타일 하나 → 시그니처 매칭 모양(scanExistingTextStyles가 쓴다 — `tsSig`와 같은 값). */
 function existingOf(s: TextStyle): ExistingTextStyle {
   const fontSize = roundN(s.fontSize);
   const lineHeightPercent = lhPctOf(s.lineHeight);
@@ -1003,7 +1114,7 @@ async function readSemanticIndex(): Promise<{ cols: VariableCollection[]; existi
     else if (k && !arr.includes(k)) arr.push(k);
     byName.set(v.name, [...(byName.get(v.name) ?? []), { key: k, v }]);
   }
-  const globalNames = new Set(vars.filter((x) => tiers.get(x.variableCollectionId) === 1).map((x) => x.name));
+  const globalNames = pluginGlobalNames(cols, vars); // 거울 판정은 한 정의로(ia-v4 §2.9 S2-P4)
   return { cols, existing, byName, globalNames };
 }
 
@@ -1102,7 +1213,7 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
   // 대상 이름을 다른 스타일이 이미 쓰면 rename 충돌 — 이름·시맨틱·바인딩을 건드리지 않고 보고만.
   const renameBlocked = new Set<string>(); // boundStyleId (또는 name) 키
   const roleRenames: Array<{ from: string; to: string }> = [];
-  const roleSpecs: TextStyleSpec[] = []; // roleRenames와 같은 순서 — 3단계 뒤 되돌림(§5.3)
+  const roleSpecs: TextStyleSpec[] = []; // roleRenames와 같은 순서 — 3단계 뒤 되돌림(docs/text-style-krds.md §6 "등록 순서")
   for (const spec of specs) {
     const st = anchoredStyle(spec);
     if (!st || st.name === spec.name) continue;
@@ -1113,14 +1224,14 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
       continue;
     }
     // 역할 변수 이름을 함께 바꾸는 것은 옛 규칙 변수(표시 없음 · 이름 = `font-size/{지금 이름}`)에 연결된 스타일만(12.12 N-D2).
-    // 새 규칙 변수(표시 있음)는 여러 스타일이 쓰므로 이름을 바꾸지 않고, 연결도 그대로 둔다(옮겨 연결은 이름 다시 짓기에서만).
+    // 새 규칙 변수(표시 있음)는 여러 스타일이 쓰므로 이름을 바꾸지 않고, 연결도 그대로 둔다(새 단계 변수로 옮겨 연결하지 않는다).
     const fsBound = await styleBoundVar(st, 'fontSize');
     if (!fsBound || textStepOf(fsBound) || fsBound.name !== `font-size/${st.name}`) continue;
     roleRenames.push({ from: st.name, to: spec.name });
     roleSpecs.push(spec);
   }
-  // 역할 변수 이름을 **먼저** 바꾼다 — 3단계가 `font-size/{새 이름}`으로 변수를 찾아 붙이므로(docs/text-style-krds.md §5.3
-  // "두 경로의 순서가 다르다"). 이름 다시 짓기와 같은 공용 함수(직접 만든 변수 · 사용자 컬렉션은 건드리지 않음,
+  // 역할 변수 이름을 **먼저** 바꾼다 — 3단계가 `font-size/{새 이름}`으로 변수를 찾아 붙이므로(docs/text-style-krds.md §6
+  // "등록 순서"). 공용 함수 `renameTextRoleVars`(직접 만든 변수 · 사용자 컬렉션은 건드리지 않음,
   // 최종 집합 밖의 다른 변수와 이름이 겹치면 건너뜀 — 기존 역할 토큰을 스캔 값으로 덮지 않기 위함).
   const roleMoved = roleRenames.length ? (await renameTextRoleVars(roleRenames)).moved : [];
 
@@ -1413,7 +1524,7 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
   }
 
   // 0단계에서 변수 이름을 바꿨는데 3단계에서 그 스타일 이름 바꾸기가 끝나지 않았으면(보류 · 이름을 쓰기 전 오류)
-  // 그 스타일의 변수를 되돌린다 — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게(docs/text-style-krds.md §5.3).
+  // 그 스타일의 변수를 되돌린다 — 변수 이름만 바뀌고 스타일 이름은 그대로 남지 않게(docs/text-style-krds.md §6 "등록 순서").
   // missFontKeep은 이름을 바꾸므로 여기 걸리지 않는다.
   for (let i = 0; i < roleSpecs.length; i++) {
     const spec = roleSpecs[i];
@@ -1436,8 +1547,8 @@ export async function createSemanticTextStyles(allSpecs: TextStyleSpec[]): Promi
 }
 
 /* ============================================================
-   이름 바꾸기 공용 — 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림(docs/text-style-krds.md §5.3)
-   텍스트 스타일([이름 다시 짓기])과 역할 변수(renameTextRoleVars)가 같은 방식으로 바꾼다.
+   이름 바꾸기 공용 — 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 되돌림(docs/text-style-krds.md §6 "등록 순서")
+   역할 변수(renameTextRoleVars — 텍스트 스타일 등록이 쓴다)가 이 방식으로 바꾼다.
    ============================================================ */
 
 /** 텍스트 스타일 등록이 스타일 이름으로 만드는 역할 변수 3종(`{종류}/{스타일 이름}`). */
@@ -1533,14 +1644,14 @@ export interface RoleVarRenameResult {
   error: number;
   /** 되돌리지 못한 변수의 지금 이름. */
   stuck: string[];
-  /** 바꾼 변수 id와 그 짝의 순번(pairs 안) — 등록 경로의 되돌림(§5.3)이 쓴다. */
+  /** 바꾼 변수 id와 그 짝의 순번(pairs 안) — 등록 경로의 되돌림(docs/text-style-krds.md §6 "등록 순서")이 쓴다. */
   moved: { id: string; pair: number }[];
 }
 
 /**
  * 역할 변수 `font-size/{from}` · `line-height/{from}` · `letter-spacing/{from}`을 `{to}`로 바꾼다
- * (docs/text-style-krds.md §5.3). 플러그인 Semantic 컬렉션 안에서만 — 사용자 컬렉션 · 직접 만든 변수(`isManualVar`)는
- * 건드리지 않는다. 스타일과 같은 방식(최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 시 되돌림).
+ * (docs/text-style-krds.md §6 "등록 순서"). 플러그인 Semantic 컬렉션 안에서만 — 사용자 컬렉션 · 직접 만든 변수(`isManualVar`)는
+ * 건드리지 않는다. 바꾸는 방식은 최종 이름 집합 고정점 · 임시 이름 2단계 · 실패 시 되돌림.
  * `onlyIds`를 주면 그 변수만(등록 경로의 되돌림이 0단계에서 옮긴 변수만 되돌린다).
  */
 export async function renameTextRoleVars(
@@ -1591,187 +1702,6 @@ export async function renameTextRoleVars(
     } else {
       res.error++;
       if (st === 'error-stuck') res.stuck.push(c.v.name);
-    }
-  }
-  return res;
-}
-
-/** 이름 다시 짓기의 스타일 하나 → KRDS 입력(쓰인 횟수를 세지 않는다 — count · uiCount 0, §3.1). */
-function krdsInputOf(s: TextStyle): KrdsInput {
-  const e = existingOf(s);
-  return {
-    id: e.id,
-    name: e.name,
-    fontSize: e.fontSize,
-    lineHeight: e.lineHeight,
-    ...(e.lineHeightPercent ? { lineHeightPercent: e.lineHeightPercent } : {}),
-    letterSpacing: e.letterSpacing,
-    family: e.family,
-    style: e.style,
-    count: 0,
-    uiCount: 0,
-  };
-}
-
-/**
- * [이름 다시 짓기] 미리보기(docs/text-style-krds.md §5.2) — 이 파일의 로컬 텍스트 스타일 전부에 §3을 한 번에 적용한다
- * (앵커 없음, count 0). 대상이 파일의 모든 스타일이고 각자 자기 지금 이름은 예약하지 않으므로(§3.4) 예약 이름은 비어 있다 —
- * 지금 이름끼리의 겹침은 바꾸기의 최종 이름 집합(§5.3)이 맡는다(맞바꿈 A↔B도 된다). 이름이 바뀌는 줄만 돌려준다.
- * 읽기만 한다 — 글꼴을 불러오지 않는다.
- */
-export async function planTsRename(): Promise<TsRenameRow[]> {
-  const styles = await figma.getLocalTextStylesAsync();
-  const steps: string[] = []; // 새 이름의 크기 단계(`sizeKey`) — 바꾸기의 옮겨 연결이 쓴다(12.12 N-D2a)
-  const names = nameKrdsStyles(styles.map(krdsInputOf), { reserved: new Set<string>(), path: 'rename', steps });
-  const rows: TsRenameRow[] = [];
-  styles.forEach((s, i) => {
-    const to = names[i];
-    if (!to || to === s.name) return;
-    rows.push({ id: s.id, from: s.name, to, sig: tsSig(existingOf(s)), ...(steps[i] ? { step: steps[i] } : {}) });
-  });
-  return rows;
-}
-
-/** TS_RENAMED의 내용(type · reqId 제외). */
-export interface TsRenameResult {
-  results: { id: string; status: string; name: string }[];
-  renamed: number;
-  skipped: number;
-  skipReasons: Record<string, number>;
-  roleVarsRenamed: number;
-  roleVarsTaken: number;
-  roleVarsError: number;
-  roleVarsStuck: string[];
-  /** 새 단계의 변수로 옮겨 연결하지 못한 스타일 수(12.12 N-D2a) · 그 스타일 이름. */
-  roleMoveError: number;
-  roleMoveNames: string[];
-}
-
-/**
- * 새 규칙 변수에 연결된 스타일을 새 크기 단계의 역할 변수로 옮겨 연결한다(12.12 N-D2a). 글꼴을 불러오고(§5.1의 예외),
- * 최종 이름은 placeTextRoleVars(없으면 만듦 · 같은 값이면 재사용 · 다른 값이면 꼬리), 별칭은 같은 값 Global(없으면 createTokens로).
- * 실패하면 throw — 부르는 쪽이 "옮기지 못함"으로 센다(스타일 이름은 되돌리지 않는다).
- */
-async function moveStyleToStep(st: TextStyle, step: string): Promise<void> {
-  await figma.loadFontAsync(st.fontName);
-  const fontSize = roundN(st.fontSize);
-  const lh = lhPxOf(fontSize, st.lineHeight);
-  const ls = lsPxOf(fontSize, st.letterSpacing);
-  const toks: DraftToken[] = [{ name: numberTokenName('font-size', fontSize), category: 'fontSize', value: fontSize, sources: ['fontSize'] }];
-  const reqs: { field: 'fontSize' | 'lineHeight' | 'letterSpacing'; req: TextRoleReq }[] = [{ field: 'fontSize', req: { base: `font-size/${step}`, value: fontSize, step, token: toks[0].name } }];
-  // 줄 높이 · 자간은 등록과 같이 px 정수일 때만(%는 스타일이 보관)
-  if (lh > 0 && lhPctOf(st.lineHeight) === 0 && Number.isInteger(lh)) {
-    const name = numberTokenName('line-height', lh);
-    toks.push({ name, category: 'lineHeight', value: lh, unit: 'px', sources: ['lineHeight'] });
-    reqs.push({ field: 'lineHeight', req: { base: `line-height/${step}`, value: lh, step, token: name } });
-  }
-  if (ls !== 0 && lsPctOf(st.letterSpacing) === 0 && Number.isInteger(ls)) {
-    const name = numberTokenName('letter-spacing', ls);
-    toks.push({ name, category: 'letterSpacing', value: ls, unit: 'px', sources: ['letterSpacing'] });
-    reqs.push({ field: 'letterSpacing', req: { base: `letter-spacing/${step}`, value: ls, step, token: name } });
-  }
-  const made = await createTokens(toks, 16);
-  const allVars = new Map((await figma.variables.getLocalVariablesAsync()).map((v) => [v.id, v]));
-  const placed = await placeTextRoleVars(
-    reqs.map((r) => r.req),
-    (token) => {
-      const id = made.globalOf.get(token);
-      return id ? allVars.get(id) : undefined;
-    },
-  );
-  if (placed.some((p) => !p.v)) throw new Error('no global');
-  reqs.forEach((r, i) => st.setBoundVariable(r.field, placed[i].v as Variable));
-}
-
-/**
- * [이름 다시 짓기] 바꾸기(docs/text-style-krds.md §5.3). 이름만 쓴다 — 글꼴을 불러오지 않고 값을 쓰지 않는다(§5.1 "글꼴").
- * 1) 다시 확인: 지금 이름 ≠ from → 'renamed-meanwhile'(스타일이 없어져도), 시그니처 ≠ sig → 'value-changed'.
- * 2) 최종 이름 집합 고정점 → 'name-taken'. 3) 임시 이름 2단계 · 실패 되돌림(닫힘) → 'error' · 'error-chain' · 'error-stuck'.
- * 4) 'renamed'인 항목의 역할 변수만 `renameTextRoleVars`로(변수 쪽 실패는 스타일 이름을 되돌리지 않는다).
- */
-export async function applyTsRename(items: readonly TsRenameItem[]): Promise<TsRenameResult> {
-  const styles = await figma.getLocalTextStylesAsync();
-  const byId = new Map(styles.map((s) => [s.id, s]));
-  const status = new Map<string, string>();
-  const order: string[] = [];
-  const cands: { key: string; from: string; to: string; st: TextStyle }[] = [];
-  for (const it of items) {
-    if (status.has(it.id)) continue; // 같은 id가 두 번 오면 처음 것만
-    order.push(it.id);
-    const st = byId.get(it.id);
-    if (!st || st.name !== it.from) status.set(it.id, 'renamed-meanwhile');
-    else if (tsSig(existingOf(st)) !== it.sig) status.set(it.id, 'value-changed');
-    else {
-      status.set(it.id, 'pending');
-      cands.push({ key: it.id, from: it.from, to: it.to, st });
-    }
-  }
-  const candIds = new Set(cands.map((c) => c.key));
-  const taken = finalNameTaken(cands, styles.filter((s) => !candIds.has(s.id)).map((s) => s.name));
-  for (const k of taken) status.set(k, 'name-taken');
-  const live = cands.filter((c) => !taken.has(c.key));
-  const done = twoPhaseRename(
-    live.map((c) => ({
-      key: c.key,
-      from: c.from,
-      to: c.to,
-      tmp: `__dsl_tmp_${c.key}`,
-      get: () => c.st.name,
-      set: (n: string) => {
-        c.st.name = n; // 이름 쓰기는 글꼴 없이 된다(ia-v4 §4.3 "글꼴")
-      },
-    })),
-  );
-  for (const [k, v] of done) status.set(k, v);
-
-  const res: TsRenameResult = { results: [], renamed: 0, skipped: 0, skipReasons: {}, roleVarsRenamed: 0, roleVarsTaken: 0, roleVarsError: 0, roleVarsStuck: [], roleMoveError: 0, roleMoveNames: [] };
-  for (const id of order) {
-    const st = status.get(id) as string;
-    res.results.push({ id, status: st, name: byId.get(id)?.name ?? '' });
-    if (st === 'renamed') res.renamed++;
-    else {
-      res.skipped++;
-      res.skipReasons[st] = (res.skipReasons[st] ?? 0) + 1;
-    }
-  }
-  // 역할 변수(12.12 N-D2): 스타일마다 지금 연결된 글자 크기 변수를 보고 정한다.
-  // 옛 규칙 변수(표시 없음 · 이름 = `font-size/{옛 이름}`) → 변수 이름도 함께 바꿈. 새 규칙 변수(표시 있음) → 크기 단계가 바뀌었으면 옮겨 연결(N-D2a).
-  const stepOf = new Map(items.map((it) => [it.id, it.step]));
-  const pairs: { from: string; to: string }[] = [];
-  const moves: { st: TextStyle; step: string }[] = [];
-  for (const c of live) {
-    if (status.get(c.key) !== 'renamed') continue;
-    let fs: Variable | null = null;
-    try {
-      fs = await styleBoundVar(c.st, 'fontSize');
-    } catch {
-      fs = null;
-    }
-    if (!fs) continue; // 연결 없음 — 아무것도 하지 않는다
-    const mark = textStepOf(fs);
-    const step = stepOf.get(c.key);
-    if (!mark) {
-      if (fs.name === `font-size/${c.from}`) pairs.push({ from: c.from, to: c.to });
-    } else if (step && step !== mark) moves.push({ st: c.st, step });
-  }
-  for (const m of moves) {
-    try {
-      await moveStyleToStep(m.st, m.step);
-    } catch {
-      res.roleMoveError++;
-      res.roleMoveNames.push(m.st.name);
-    }
-  }
-  if (pairs.length) {
-    try {
-      const rv = await renameTextRoleVars(pairs);
-      res.roleVarsRenamed = rv.renamed;
-      res.roleVarsTaken = rv.taken;
-      res.roleVarsError = rv.error;
-      res.roleVarsStuck = rv.stuck;
-    } catch {
-      // 변수 목록을 읽지 못함 — 스타일 이름은 그대로 두고(§5.3) 짝마다 하나씩 오류로 센다.
-      res.roleVarsError = pairs.length;
     }
   }
   return res;
@@ -1906,12 +1836,66 @@ export interface TextStylePlanRow {
   name: string;
   nodeIds: string[];
 }
-/** 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null). */
-async function textStyleIndex(): Promise<Map<string, TextStyle | null>> {
+/** 노드가 있는 페이지(없으면 null). */
+function pageOfNode(n: BaseNode): PageNode | null {
+  let p: BaseNode | null = n;
+  while (p && p.type !== 'PAGE') p = p.parent;
+  return (p as PageNode | null) ?? null;
+}
+
+/**
+ * 원격 목록(IA v4 §4.2 B.40 RT-D1) — 현재 페이지와 루트가 있는 페이지들의 글자에 글자 전체로 붙은 원격 텍스트 스타일
+ * (+ extraIds — 다시 확인의 줄 스타일). 현재 페이지가 아니면 훑기 전에 loadAsync(dynamic-page).
+ * 비용(받아들임): 그 페이지들의 모든 글자를 훑는다.
+ */
+export async function remoteTextStyles(roots: readonly BaseNode[], extraIds: readonly string[] = []): Promise<TextStyle[]> {
+  const cur = (figma as { currentPage?: PageNode }).currentPage;
+  const pages = new Set<PageNode>();
+  if (cur) pages.add(cur);
+  for (const r of roots) {
+    const pg = pageOfNode(r);
+    if (pg) pages.add(pg);
+  }
+  const ids = new Set<string>(extraIds.filter((x) => typeof x === 'string' && x !== ''));
+  for (const pg of pages) {
+    if (typeof (pg as { findAllWithCriteria?: unknown }).findAllWithCriteria !== 'function') continue; // 테스트 목
+    if (pg !== cur) {
+      try { await pg.loadAsync(); } catch { /* 이미 불렸거나 동적 페이지가 아님 */ }
+    }
+    for (const t of pg.findAllWithCriteria({ types: ['TEXT'] })) {
+      const id = (t as { textStyleId?: unknown }).textStyleId;
+      if (typeof id === 'string' && id !== '') ids.add(id); // 구간마다 다른 스타일(figma.mixed)은 모으지 않는다
+    }
+  }
+  const out: TextStyle[] = [];
+  for (const id of ids) {
+    try {
+      const st = await figma.getStyleByIdAsync(id);
+      if (st && st.type === 'TEXT' && (st as { remote?: boolean }).remote) out.push(st as TextStyle);
+    } catch {
+      /* 없는 스타일 */
+    }
+  }
+  return out;
+}
+
+/**
+ * 스타일 키 인덱스(같은 키 2개 이상 = 같은 모양 스타일이 여럿 → 모호, null).
+ * 로컬을 먼저 넣고, 원격(B.40)은 그 키에 로컬이 없을 때만 — 원격끼리 다른 스타일이 둘 이상이면 모호.
+ */
+async function textStyleIndex(remote: readonly TextStyle[] = []): Promise<Map<string, TextStyle | null>> {
   const styleByKey = new Map<string, TextStyle | null>();
   for (const s of await figma.getLocalTextStylesAsync()) {
     const k = typoKey(s as unknown as TypoFields);
     styleByKey.set(k, styleByKey.has(k) ? null : s);
+  }
+  const localKeys = new Set(styleByKey.keys());
+  for (const s of remote) {
+    const k = typoKey(s as unknown as TypoFields);
+    if (localKeys.has(k)) continue; // 로컬 우선(RT-D3)
+    const ex = styleByKey.get(k);
+    if (ex === undefined) styleByKey.set(k, s);
+    else if (ex && ex.id !== s.id) styleByKey.set(k, null);
   }
   return styleByKey;
 }
@@ -1941,7 +1925,7 @@ function textStyleFor(t: TextNode, styleByKey: Map<string, TextStyle | null>): T
  */
 export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promise<{ rows: TextStylePlanRow[]; skipReasons: Record<TextStyleSkipReason, number> }> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
-  const styleByKey = await textStyleIndex();
+  const styleByKey = await textStyleIndex(await remoteTextStyles(nodes));
   const { texts, inInstance } = planTexts(nodes);
   skipReasons.instance += inInstance.length;
   const rows = new Map<string, TextStylePlanRow>();
@@ -1958,14 +1942,17 @@ export async function planExistingTextStyles(nodes: readonly SceneNode[]): Promi
  * 켠 스타일 줄만 붙인다(IA v4 §4.2 — 연결 직전 다시 확인). 그 사이 스타일이 붙었거나 값이 달라진 글자는 건너뛴다.
  * 반환: 붙인 레이어 수 · 건너뛴 사유.
  */
-export async function applyTextStyleRows(rows: readonly { styleId: string; nodeIds: readonly string[] }[]): Promise<ApplyTextStylesResult> {
+export async function applyTextStyleRows(rows: readonly { styleId: string; nodeIds: readonly string[] }[], index?: Map<string, TextStyle | null>): Promise<ApplyTextStylesResult> {
   const skipReasons: Record<TextStyleSkipReason, number> = { hasStyle: 0, noStyle: 0, ambiguous: 0, mixed: 0, instance: 0 };
   const res: ApplyTextStylesResult = { applied: 0, skipped: 0, skipReasons };
-  const styleByKey = await textStyleIndex();
+  // 글자를 먼저 읽는다 — 다시 확인의 원격 목록 루트 = 줄의 글자 + 줄의 스타일 id(B.40 — APPLY_SELECTED에는 기준이 없다)
+  const nodeById = new Map<string, BaseNode | null>();
+  for (const row of rows) for (const id of row.nodeIds) if (!nodeById.has(id)) nodeById.set(id, await figma.getNodeByIdAsync(id).catch(() => null));
+  const styleByKey = index ?? (await textStyleIndex(await remoteTextStyles([...nodeById.values()].filter((n): n is BaseNode => !!n), rows.map((r) => r.styleId))));
   const loaded = new Set<string>();
   for (const row of rows) {
     for (const id of row.nodeIds) {
-      const t = await figma.getNodeByIdAsync(id).catch(() => null);
+      const t = nodeById.get(id) ?? null;
       if (!t || t.type !== 'TEXT') { skipReasons.noStyle++; res.skipped++; continue; }
       const r = textStyleFor(t as TextNode, styleByKey);
       if (typeof r === 'string' || r.id !== row.styleId) { skipReasons[typeof r === 'string' ? r : 'noStyle']++; res.skipped++; continue; }
@@ -1982,11 +1969,55 @@ export async function applyTextStyleRows(rows: readonly { styleId: string; nodeI
 }
 
 /**
+ * 만들기 Text Style 탭(IA v4 §4.2 B.40 RT-D5) — 로컬 앵커 없는 묶음 가운데 표본 글자가 모두 같은 원격 스타일 하나로
+ * 정해지는 묶음을 뺀다. 정해짐 = 인스턴스 안쪽이 아니고, 그 원격 스타일이 붙어 있으며 typoKey도 같거나,
+ * 스타일이 없고 연결의 인덱스(로컬 우선 · 같은 키 원격 둘 이상이면 모호)가 그 원격 스타일을 고름.
+ */
+export async function dropRemoteClusters<C extends { nodeIds?: string[] }>(
+  clusters: C[],
+  nodeById: ReadonlyMap<string, TextNode>,
+  roots: readonly SceneNode[],
+  anchored: (c: C) => boolean,
+): Promise<C[]> {
+  const remote = await remoteTextStyles(roots);
+  if (!remote.length) return clusters;
+  const index = await textStyleIndex(remote);
+  const keyOfRemote = new Map(remote.map((r) => [r.id, typoKey(r as unknown as TypoFields)]));
+  const resolved = (t: TextNode): string | null => {
+    if (insideInstance(t)) return null;
+    const sid = (t as { textStyleId?: unknown }).textStyleId;
+    if (typeof sid === 'string' && sid !== '') {
+      if (!keyOfRemote.has(sid) || isMixedTypography(t)) return null;
+      return typoKey(t as unknown as TypoFields) === keyOfRemote.get(sid) ? sid : null;
+    }
+    const r = textStyleFor(t, index);
+    return typeof r !== 'string' && keyOfRemote.has(r.id) ? r.id : null;
+  };
+  return clusters.filter((c) => {
+    if (anchored(c)) return true;
+    const ids = c.nodeIds ?? [];
+    if (!ids.length) return true;
+    let one: string | null = null;
+    for (const id of ids) {
+      const t = nodeById.get(id);
+      const got = t ? resolved(t) : null;
+      if (!got || (one && one !== got)) return true;
+      one = got;
+    }
+    return false;
+  });
+}
+
+/**
  * 텍스트 스타일 후보 판정(연결의 "텍스트 스타일이 먼저" — IA v4 §4.2 · §4.3 `APPLY.skipTextStyleNodes`).
  * `planExistingTextStyles`가 줄에 넣을 글자(인스턴스 밖 · 붙일 로컬 스타일이 하나로 정해짐)면 true.
  */
-export async function textStyleCandidateTest(): Promise<(t: TextNode) => boolean> {
-  const styleByKey = await textStyleIndex();
+export async function textStyleCandidateTest(roots: readonly SceneNode[] = []): Promise<(t: TextNode) => boolean> {
+  // 선택에 글자가 없으면 판정할 글자도 없다 — 페이지 전체 글자를 훑는 원격 스타일 목록(`remoteTextStyles`)을 읽지 않는다(선택이 바뀔 때마다 도는 EXTRACT 비용).
+  // 찾아보는 함수가 없는 노드(테스트 목)는 글자가 있다고 본다.
+  const hasText = roots.some((r) => r.type === 'TEXT' || (typeof (r as { findAllWithCriteria?: unknown }).findAllWithCriteria === 'function' ? (r as ChildrenMixin).findAllWithCriteria({ types: ['TEXT'] }).length > 0 : 'children' in r));
+  if (roots.length && !hasText) return () => false;
+  const styleByKey = await textStyleIndex(await remoteTextStyles(roots));
   return (t) => !insideInstance(t) && typeof textStyleFor(t, styleByKey) !== 'string';
 }
 
@@ -2022,7 +2053,7 @@ export async function applyRegisteredTextStyles(roots: readonly SceneNode[], sty
   };
   for (const t of plan.inInstance) if (idByKey.has(keyOf(t) ?? '\u0000')) skipped('instance');
   const rows = new Map<string, string[]>();
-  const styleByKey = await textStyleIndex();
+  const styleByKey = await textStyleIndex(await remoteTextStyles(roots)); // 한 요청 안 한 번 — 아래 applyTextStyleRows에 넘긴다(B.40)
   for (const t of plan.texts) {
     const k = keyOf(t);
     if (k === undefined || !idByKey.has(k)) continue; // 범위 밖(값이 방금 스타일과 다름 · 섞인 서식)
@@ -2038,7 +2069,7 @@ export async function applyRegisteredTextStyles(roots: readonly SceneNode[], sty
     rows.set(r.id, arr);
   }
   if (rows.size) {
-    const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })));
+    const r = await applyTextStyleRows([...rows].map(([styleId, nodeIds]) => ({ styleId, nodeIds })), styleByKey);
     out.applied = r.applied;
     if (r.appliedIds?.length) out.appliedIds = r.appliedIds;
   }
@@ -2052,7 +2083,7 @@ export async function applyExistingTextStyles(nodes: readonly SceneNode[]): Prom
     skipReasons[k]++;
     res.skipped++;
   };
-  const styleByKey = await textStyleIndex();
+  const styleByKey = await textStyleIndex(await remoteTextStyles(nodes));
 
   const texts: TextNode[] = [];
   const inInstance: TextNode[] = [];
