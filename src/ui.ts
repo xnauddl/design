@@ -1510,15 +1510,16 @@ window.addEventListener('message', (event: MessageEvent) => {
   if (!m) return;
   // 바인딩 진행률(UX6)은 마법사 자체 진행바로 표시(‘적용’ 탭 진행바는 안 보임).
   if (!wizardWaiter) return;
-  // 오류/유료요구는 대기 중이면 해당 단계 실패로 처리(무한 대기 방지).
+  // 오류/유료요구는 그 단계의 reqId일 때만 단계 실패(ia-v4 §4.11a ① — 다른 요청의 오류는 메인 처리기로).
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
+    if (m.reqId !== wizardWaiter.reqId) return;
     const w = wizardWaiter;
     wizardWaiter = null;
     if (m.type === 'ERROR') wizardErrorMsg = m; // 메인 처리기가 같은 ERROR를 카드에 그리지 않게
     w.reject(m.type === 'PREMIUM_REQUIRED' ? new PaidRequiredError() : new Error(m.message));
     return;
   }
-  if (wizardWaiter.types.includes(m.type) && (wizardWaiter.reqId === undefined || (m as { reqId?: number }).reqId === wizardWaiter.reqId)) {
+  if (wizardWaiter.types.includes(m.type) && m.reqId === wizardWaiter.reqId) {
     const w = wizardWaiter;
     wizardWaiter = null;
     // 메인 핸들러(window.onmessage)가 같은 메시지를 **다 처리한 뒤** 깨운다. 이 리스너가 먼저
@@ -1531,10 +1532,13 @@ window.addEventListener('message', (event: MessageEvent) => {
 
 /** 메시지를 보내고 기대 응답(또는 오류)까지 기다린다. 결과 타입은 expect로 좁혀진다. */
 function wizardRequest<T extends CodeToUi['type']>(msg: UiToCode, expect: T[], reqId?: number): Promise<Extract<CodeToUi, { type: T }>> {
+  // 모든 단계 요청이 reqId를 싣고 그 reqId로만 응답을 받는다(ia-v4 §4.11a ①).
+  const id = reqId ?? msg.reqId ?? ++bindReqSeq;
+  msg.reqId = id;
   return new Promise<Extract<CodeToUi, { type: T }>>((resolve, reject) => {
     wizardWaiter = {
       types: [...expect],
-      reqId,
+      reqId: id,
       resolve: (m) => resolve(m as Extract<CodeToUi, { type: T }>),
       reject,
     };
@@ -1885,7 +1889,9 @@ if (!licenseVerifyConfigured()) $('licenseSetupHint').style.display = '';
 window.onmessage = (event: MessageEvent) => {
   const msg = event.data.pluginMessage as CodeToUi | undefined;
   if (!msg) return;
-  opReceived(msg); // 진행 테두리·✓/⚠·작업 직후 다시 읽기
+  // 조용한 reqId의 응답은 작업 추적(opReceived)을 건너뛰고 먼저 화면이 받는다(ia-v4 §4.11a ④) — 받지 않으면 아래로 진행.
+  const silent = msg.reqId != null && silentReqs.delete(msg.reqId);
+  if (!silent) opReceived(msg); // 진행 테두리·✓/⚠·작업 직후 다시 읽기
   if (makeTakes(msg)) return; // 만들기 화면의 reqId 응답(§4.3) — 값을 직접 고르기 처리기를 건드리지 않는다
   if (mcTakes(msg)) return; // 선택 탭 만들기 카드의 reqId 응답(§4.1) — 메인 처리기를 타지 않는다
   switch (msg.type) {
@@ -2292,6 +2298,7 @@ window.onmessage = (event: MessageEvent) => {
       break;
     case 'ERROR': {
       // 고치기 저장 중 응답·표가 오지 않음(§4.4 고치기) — "저장됐을 수 있어요". 고치기 오류는 팝업 안에서만 알린다.
+      if (msg.op === 'UPDATE_VARIABLE' && msg.reqId != null) clearUpdSaving(msg.reqId); // 저장 중 쓰기 잠금 풂(§4.11a ⑤)
       if (msg.op === 'UPDATE_VARIABLE' || msg.op === 'GET_VAR_TABLE') edMaybeSaved();
       if (msg.op === 'UPDATE_VARIABLE') break;
       // 사용 수 읽기 실패 — 진행 중 표시를 풀어 다음 읽기 · 창 다시 들어옴 다시 읽기가 막히지 않게(#110 검토 ②). 알림은 아래 Toast 그대로.
@@ -2461,8 +2468,11 @@ function showError(id: string, f: FriendlyError, op?: string): void {
   const onRetry = f.retryable && (linkRetry || retry) ? (): void => {
     if (linkRetry) { startLink(linkRetry); return; }
     if (!retry) return;
-    // 연결 중에는 쓰기 작업을 다시 보내지 않는다.
-    if (bindLinking && OPS[retry.type]?.write) { setStatus(id, t('bind.waitLink'), 'warn'); return; }
+    // 쓰기 작업은 다른 쓰기가 진행 중이면 다시 보내지 않는다(ia-v4 §4.11a ⑤ — 미리보기는 쓰기가 아님).
+    if (OPS[retry.type]?.write && !(retry.type === 'CREATE_TOKENS' && retry.preview)) {
+      const wl = writeLockReason();
+      if (wl) { setStatus(id, wl, 'warn'); return; }
+    }
     send(retry);
   } : null;
   const { box, retry: retryBtn } = errorBox(f, onRetry);
@@ -2776,10 +2786,29 @@ function mkSendPreview(): void {
 function makeTakes(msg: CodeToUi): boolean {
   const rid = (msg as { reqId?: number }).reqId;
   if (rid == null || !mkOwned.has(rid)) return false;
+  if (msg.type === 'PREMIUM_REQUIRED' || msg.type === 'ERROR') { onMakeReadFail(msg, rid); return true; }
   if (msg.type === 'EXTRACT_RESULT' && rid === mkExtractReq) onMakeExtract(msg);
   else if (msg.type === 'CREATE_RESULT' && rid === mkPreviewReq && msg.preview) onMakePreview(msg);
   else if (msg.type === 'TEXT_STYLE_CANDIDATES' && rid === mkScanReq) onMakeScan(msg);
   return true; // 실행 단계 응답은 wizardRequest가 받는다
+}
+
+/** 만들기 화면 조용한 읽기의 거절 · 오류(ia-v4 §4.11a ② · T-P28). 실행 단계 응답은 마법사가 받으므로 여기서는 읽기 셋만. */
+function onMakeReadFail(msg: Extract<CodeToUi, { type: 'ERROR' | 'PREMIUM_REQUIRED' }>, rid: number): void {
+  const err = msg.type === 'ERROR' ? msg : null;
+  const say = (): void => { if (err) notify(explainError(err.message).message, 'error', { tip: err.message }); };
+  if (rid === mkScanReq) {
+    // 텍스트 스타일 후보 읽기 — 거절(플러그인은 무료로 봄)이면 후보 0개(Toast 없음), 오류면 후보 0개 + error Toast.
+    onMakeScan({ type: 'TEXT_STYLE_CANDIDATES', styles: [], decimalRows: [], warnings: [], existing: [] });
+    say();
+  } else if (rid === mkExtractReq) {
+    mkReading = false; // 다음 때에 다시 읽을 수 있게(화면 글은 받아들임 — S-6c)
+    say();
+    renderMakeScreen();
+  } else if (rid === mkPreviewReq) {
+    say();
+    renderMakeScreen();
+  }
 }
 
 function onMakeExtract(msg: Extract<CodeToUi, { type: 'EXTRACT_RESULT' }>): void {
@@ -3192,6 +3221,7 @@ function renderMakeResults(): void {
 
 function renderMakeFoot(showResults: boolean): void {
   const run = $('btnMakeRun');
+  if (mkFootClose !== showResults) { mkFootClose = showResults; renderWaitLocks(); } // [닫기] ↔ 실행 버튼 — 쓰기 잠금을 다시 맞춘다
   const opts = $('makeOpts');
   opts.hidden = showResults;
   const dark = $('makeOptDark') as HTMLInputElement;
@@ -4447,7 +4477,7 @@ $('btnExpand').addEventListener('click', () => setMini(false));
 /* ---------- 작업 추적 — 진행 테두리·✓/⚠(§4.9)와 작업 직후 다시 읽기(§4.1) ----------
    사용자가 일으킨 작업 요청을 보내고 결과가 올 때까지. 조용한 다시 읽기는 대상이 아니다. */
 type OpGo = () => void;
-interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean }
+interface OpDef { results: CodeToUi['type'][]; label: string; go: OpGo; write: boolean; /** 보낸 요청의 reqId — 응답을 이것으로 맞춘다(ia-v4 §4.11a ③) */ reqId?: number }
 const goLayer = (step: ApplyStep): OpGo => () => { showTab('select'); showApplyStep(step); };
 const OPS: Partial<Record<UiToCode['type'], OpDef>> = {
   EXTRACT: { results: ['EXTRACT_RESULT'], label: 'op.extract', go: () => showPick('color'), write: false },
@@ -4488,19 +4518,36 @@ const WAIT_LINK_IDS = [
 ];
 /** 연결 화면의 [n곳 연결] — 사유는 화면 상태 줄(#applyStatus). */
 const WAIT_CARD_IDS = ['btnApplyConfirm'];
-/** 지금 진행 중인 다른 쓰기 작업의 이름(op.* 라벨) — 없으면 null. 연결 자신은 빼고 본다. */
-function otherWriteOp(): string | null {
+/** 지금 진행 중인 다른 쓰기 작업의 이름(op.* 라벨) — 없으면 null. 연결 자신은 빼고 본다.
+ *  상세 [저장](UPDATE_VARIABLE)도 쓰기다(ia-v4 §4.11a ⑤) — skipReq가 그 저장의 reqId면(열린 팝업 자기 저장) 뺀다. */
+function otherWriteOp(skipReq?: number): string | null {
   if (opWizard || wizardRunning) return t('op.wizard');
   for (const [type, def] of opPending) if (type !== 'APPLY_SELECTED' && def.write) return t(def.label);
+  if (updSaving && updSaving.reqId !== skipReq) return t('op.updateVar');
   return null;
 }
-/** 변수 탭 쓰기 작업(§4.6 쓰기 잠금) — 진행 중이면 다른 쓰기 버튼을 잠근다. */
-const VAR_WRITE_OPS: readonly UiToCode['type'][] = ['APPLY_VARIABLE', 'CREATE_VARIABLE', 'DUPLICATE_VARIABLE', 'DELETE_VARIABLE', 'DELETE_VARIABLES'];
+/** 상세 [저장]이 응답을 기다리는 중 — 팝업과 따로 둔다(최소화로 팝업이 닫혀도 남음, §4.11a ⑤). */
+let updSaving: { reqId: number; timer: ReturnType<typeof setTimeout> } | null = null;
+function setUpdSaving(reqId: number): void {
+  if (updSaving) clearTimeout(updSaving.timer);
+  updSaving = { reqId, timer: setTimeout(() => clearUpdSaving(reqId), EDIT_TIMEOUT) };
+  renderWaitLocks();
+}
+function clearUpdSaving(reqId: number): void {
+  if (!updSaving || updSaving.reqId !== reqId) return;
+  clearTimeout(updSaving.timer);
+  updSaving = null;
+  renderWaitLocks();
+}
+/** 만들기 화면 아래 고정 줄이 결과 화면의 [닫기]인가(renderMakeFoot이 정함) — [닫기]는 쓰기가 아니라 잠그지 않는다. */
+let mkFootClose = false;
 function renderWaitLocks(): void {
   const link = bindLinking ? t('bind.waitLink') : null;
-  const varOp = VAR_WRITE_OPS.find((x) => opPending.has(x));
-  const varLock = varOp ? t('bind.waitOp', { op: t(opPending.get(varOp)!.label) }) : null;
-  for (const id of WAIT_LINK_IDS) setWait($(id), link ?? varLock);
+  // 어느 쓰기 작업이든 진행 중이면 다른 쓰기 버튼을 잠근다(ia-v4 §4.11a ⑤ · T-D8) — 예외: 결과 화면의 [닫기].
+  const anyWrite = otherWriteOp();
+  const writeLock = link ?? (anyWrite ? t('bind.waitOp', { op: anyWrite }) : null);
+  for (const id of WAIT_LINK_IDS) setWait($(id), id === 'btnMakeRun' && mkFootClose ? null : writeLock);
+  if (ed) edChrome(); // 상세 [저장] 잠금도 맞춘다(다른 쓰기가 오류로 끝나도 잠긴 채 남지 않게)
   const other = link ? null : otherWriteOp();
   const wiz = opWizard || wizardRunning ? t('bind.waitOp', { op: t('op.wizard') }) : null;
   for (const id of WAIT_CARD_IDS) {
@@ -4521,11 +4568,20 @@ const opProgress = (): number | null => opProg;
 
 /** 조용한 다시 계산(복귀 때 미리보기) — 진행 테두리 대상이 아니다(§4.9). */
 let opSilent = false;
+/** 조용한 reqId(ia-v4 §4.11a ④) — opSilent로 보낸 요청 · 마법사 단계 요청. 응답은 opReceived보다 먼저 받는다. */
+const silentReqs = new Set<number>();
 function opSent(msg: UiToCode): void {
-  if (wizardRunning || opSilent) return; // 마법사 단계 요청은 마법사 한 작업으로 센다
-  const def = OPS[msg.type];
+  // 모든 요청이 reqId를 싣는다(§4.11a ①) — 화면이 정한 것이 없으면 여기서 붙인다(마법사 · 조용한 읽기 · OPS 밖 포함).
+  if (msg.reqId == null) msg.reqId = ++bindReqSeq;
+  if (wizardRunning || opSilent) { silentReqs.add(msg.reqId); return; } // 마법사 단계 요청은 마법사 한 작업으로 센다
+  let def = OPS[msg.type];
   if (!def) return;
-  opPending.set(msg.type, def);
+  if (msg.type === 'CREATE_TOKENS' && msg.preview) {
+    // 미리보기는 쓰기가 아니다(§4.11a ⑤) — 진행 중인 쓰기 항목이 있으면 덮어쓰지 않고 OPS에 적지 않는다.
+    if (opPending.get('CREATE_TOKENS')?.write) return;
+    def = { ...def, write: false };
+  }
+  opPending.set(msg.type, { ...def, reqId: msg.reqId });
   if (msg.type === 'APPLY_SELECTED' || msg.type === 'APPLY') opProg = null;
   if (isMini) renderMiniMark();
   if (def.write) renderWaitLocks(); // 다른 쓰기 작업 중 [🔗 연결] 잠금(§4.6 "반대 방향")
@@ -4539,27 +4595,22 @@ function opReceived(m: CodeToUi): void {
     if (isMini) renderMiniMark();
     return;
   }
-  if (wizardRunning) return;
+  const rid = m.reqId;
   if (m.type === 'ERROR' || m.type === 'PREMIUM_REQUIRED') {
-    // 오류의 op가 있으면 그 작업만 끝낸다 — 다른 작업(예: 연결)이 기다리는 결과는 그대로 기다린다.
+    // 거절 · 오류는 그 reqId를 적은 작업만 끝낸다(§4.11a ③) — ERROR는 op도 맞아야 한다. 맞는 작업이 없으면(OPS 밖 요청) 아무것도 끝내지 않는다.
+    if (rid == null) { console.warn('[op] rejection or error without reqId — ending no op', m); return; }
     const op = m.type === 'ERROR' ? (m.op as UiToCode['type'] | undefined) : undefined;
-    let def: OpDef | undefined;
-    if (op) {
-      def = opPending.get(op);
-      if (!def) return;
-      opPending.delete(op);
-    } else {
-      def = [...opPending.values()][0];
-      if (!def) return;
-      opPending.clear();
-    }
+    const hit = [...opPending].find(([type, d]) => d.reqId === rid && (!op || op === type));
+    if (!hit) return;
+    opPending.delete(hit[0]);
     opProg = null;
     renderWaitLocks();
-    opFinished(false, def);
+    opFinished(false, hit[1]);
     return;
   }
   for (const [type, def] of opPending) {
     if (!def.results.includes(m.type)) continue;
+    if (rid != null && def.reqId !== rid) continue; // 같은 종류의 다른 요청 응답(예 조용한 미리보기)은 이 작업을 끝내지 않는다
     opPending.delete(type);
     opProg = null;
     if (def.write) renderWaitLocks();
@@ -4849,11 +4900,19 @@ $('btnSettings').addEventListener('click', () => { showTab('settings'); $('btnSe
 $('btnSettingsBack').addEventListener('click', () => { showTab(settingsReturn); $('btnSettings').focus(); });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || menuEl || modalEl || e.defaultPrevented) return;
-  const tg = e.target as HTMLElement;
-  if (tg.closest('input, textarea, select, [contenteditable]')) return;
+  // 글자를 넣는 칸에서만 Esc가 그 칸 몫(ia-v4 §4.11a ⑥ · T-D7) — 체크박스 · 라디오 · 색 피커 · 닫힌 고르개에서는 돌아간다.
+  if (isTextEntry(e.target as HTMLElement)) return;
   if (activeTab === 'settings') { e.preventDefault(); showTab(settingsReturn); $('btnSettings').focus(); }
   else if (activeTab === 'select' && selSub !== 'home') { e.preventDefault(); subBack(); }
 });
+
+/** 글자를 넣는 칸인가 — input(type 없음 · text · number · search · email · url · password · tel) · textarea · contenteditable. */
+function isTextEntry(el: HTMLElement | null): boolean {
+  if (!el) return false;
+  if (el.closest('textarea, [contenteditable=""], [contenteditable="true"]')) return true;
+  if (el instanceof HTMLInputElement) return ['text', 'number', 'search', 'email', 'url', 'password', 'tel'].includes(el.type);
+  return false;
+}
 
 /** 값을 직접 고르기(v3 만들기 4단계)로 — from: 돌아갈 곳(만들기 화면 · 변수 탭). */
 let pickFrom: 'make' | 'vars' = 'make';
@@ -5955,9 +6014,9 @@ function gridKey(ev: KeyboardEvent, el: HTMLElement): void {
 /* ---------- 클릭 연결(§4.7) ---------- */
 let applyVarReq = 0;
 /** 쓰기 작업 잠금 사유(§4.6 쓰기 잠금) — 없으면 null. */
-function writeLockReason(): string | null {
+function writeLockReason(skipReq?: number): string | null {
   if (bindLinking) return t('bind.waitLink');
-  const other = otherWriteOp();
+  const other = otherWriteOp(skipReq);
   return other ? t('bind.waitOp', { op: other }) : null;
 }
 function applyVar(v: VarRow, target?: ApplyTarget): void {
@@ -6316,10 +6375,12 @@ function edChrome(): void {
     return;
   }
   // 연결 중에도 잠근다(§4.6 "연결 중의 다른 일") — 툴팁 꼬리 · 누르면 팝업 안 알림 줄에 bind.waitLink.
-  const locked = e.create ? !!e.create.reqId || bindLinking !== 0 : saving || !!e.sticky || !st.changed || st.hasErr || bindLinking !== 0;
+  // [저장]은 어느 쓰기 작업이든 진행 중이면 잠근다(ia-v4 §4.11a ⑤ — 자기 저장 reqId만 뺌). 새 변수 [만들기]는 지금처럼 연결 중만.
+  const wl = e.create ? (bindLinking ? t('bind.waitLink') : null) : writeLockReason(e.saving?.reqId);
+  const locked = e.create ? !!e.create.reqId || !!wl : saving || !!e.sticky || !st.changed || st.hasErr || !!wl;
   if (locked) { e.btnSave.setAttribute('aria-disabled', 'true'); e.btnSave.dataset.lock = 'edit'; }
   else { e.btnSave.removeAttribute('aria-disabled'); delete e.btnSave.dataset.lock; }
-  e.btnSave.title = bindLinking ? t('bind.waitLink') : '';
+  e.btnSave.title = wl ?? '';
 }
 /** 잠긴 [만들기 🔒]를 눌렀다 — 늘 보이는 사유 줄을 그대로 둔 채 화면 읽기 프로그램에 다시 알린다(줄을 더 띄우지 않음 — F-D11). */
 function edPaidPing(e: Editor): void {
@@ -6342,7 +6403,8 @@ function edLockedSave(): void {
   if (e?.create?.paidLocked) { edPaidPing(e); return; } // 유료 잠금 — Toast이 아니라 팝업 안 사유 줄(§4.9 F2)
   if (!e || e.saving || e.sticky) return; // 저장 중 · 남는 상태 문구는 그대로
   const st = edState(e);
-  if (bindLinking) e.event = { text: t('bind.waitLink'), err: false }; // 연결 중(§4.6 "연결 중의 다른 일")
+  const wl = writeLockReason();
+  if (wl) e.event = { text: wl, err: false }; // 연결 중 · 다른 쓰기 중(§4.6 · §4.11a ⑤)
   else if (!st.changed) e.event = { text: t('edit.noChange'), err: false };
   else if (st.hasErr) { e.event = { text: t('edit.checkInput'), err: true }; st.firstErr?.focus(); }
   edChrome();
@@ -6911,7 +6973,7 @@ function edSave(): void {
   if (e.create?.paidLocked) { edPaidPing(e); return; }
   if (e.create) { edCreate(e); return; }
   const st = edState(e);
-  if (bindLinking || !st.changed || st.hasErr) { edLockedSave(); return; }
+  if (writeLockReason() || !st.changed || st.hasErr) { edLockedSave(); return; }
   const n = edNameState(e);
   const values: Record<string, EditValue> = {};
   const baseValues: Record<string, VarCell | null> = {};
@@ -6927,6 +6989,7 @@ function edSave(): void {
   e.confirm = false;
   if (e.picker) edClosePicker(false);
   e.timer = setTimeout(() => edMaybeSaved(reqId), EDIT_TIMEOUT);
+  setUpdSaving(reqId); // 저장 중은 쓰기 작업 — 팝업이 닫혀도 응답 · 시간 초과까지 남는다(§4.11a ⑤)
   const msg: UiToCode = { type: 'UPDATE_VARIABLE', reqId, id: e.v.id, base: { name: e.v.name, values: baseValues } };
   if (n.changed) msg.name = n.name;
   if (Object.keys(values).length) msg.values = values;
@@ -6945,6 +7008,7 @@ function edSetSticky(e: Editor, s: EdSticky): void {
 }
 /** 응답이나 표가 오지 않음(ERROR · 10초) — 결과를 알 수 없다: 저장 중 끝, [저장]은 닫을 때까지 잠금. */
 function edMaybeSaved(reqId?: number): void {
+  if (reqId !== undefined) clearUpdSaving(reqId); // 번호가 맞을 때 · 시간 초과만 내린다(번호 없는 부름은 GET_VAR_TABLE 오류에서도 온다)
   const e = ed;
   if (!e?.saving || (reqId !== undefined && e.saving.reqId !== reqId)) return;
   e.dead.add(e.saving.reqId);
@@ -6961,6 +7025,7 @@ function edReasonText(err: VarUpdateError | undefined): { text: string; tip?: st
 }
 /** 저장 응답(VARIABLE_UPDATED). */
 function onVariableUpdated(msg: Extract<CodeToUi, { type: 'VARIABLE_UPDATED' }>): void {
+  clearUpdSaving(msg.reqId); // 맨 앞에서 — 늦은 응답 · 팝업 없음 갈래보다 먼저(§4.11a ⑤)
   const e = ed;
   if (edDeadReqs.has(msg.reqId)) {
     // 시간 초과 뒤 늦은 응답 — 팝업은 다시 그리지 않는다. 바뀌었으면 목록을 실제와 맞추고 닫을 때 판정에 넣는다.

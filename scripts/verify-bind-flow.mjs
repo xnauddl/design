@@ -645,7 +645,8 @@ const reenter = (p) => p.evaluate(() => {
   await reenter(p);
   await p.waitForTimeout(500);
   check('10 최소화 중 창 다시 들어옴은 0회', (await count(p, 'GET_PREREQ')) === before);
-  await recv(p, { type: 'ERROR', message: '테스트 실패', op: 'APPLY' });
+  // 그 찾기 요청의 reqId로 — reqId 없는 오류는 아무 작업도 끝내지 않는다(ia-v4 §4.11a ③)
+  await recv(p, { type: 'ERROR', message: '테스트 실패', op: 'APPLY', reqId: (await sent(p, 'APPLY')).at(-1).reqId });
   check('10 실패 → ⚠ 표시', await visible(p, '#miniBadge') && (await p.$eval('#miniBadge', (e) => e.classList.contains('fail'))));
   await p.waitForTimeout(3300);
   check('10 ⚠는 펼칠 때까지 유지', await visible(p, '#miniBadge'));
@@ -4501,6 +4502,65 @@ const s2Shot = async (p, name) => { if (process.env.SHOT_DIR) await p.screenshot
   await p.waitForTimeout(60);
   const after = await p.evaluate(() => { const t = document.querySelector('#toastHost .ds-toast').getBoundingClientRect(); return { top: Math.round(document.getElementById('bindFoot').getBoundingClientRect().top), toastBottomGap: Math.round(innerHeight - t.bottom), toastTop: Math.round(t.top), barBottom: Math.round(document.getElementById('bindFoot').getBoundingClientRect().bottom) }; });
   check('DS-3b 짧은 하위 화면 — 아래 고정 줄도 창 바닥(510) · Toast가 떠도 움직이지 않음 · Toast는 줄 위', !before.scrolls && before.top === after.top && after.barBottom === 510 && after.toastBottomGap > 12, JSON.stringify({ before, after }));
+  await p.close();
+}
+
+/* ---------- S-6a 도구 탭 기반(ia-v4 §4.11a · B.45) ---------- */
+{
+  // ③ 거절 · 오류 · 결과는 그 reqId의 작업만 끝낸다 — 사용자 찾기(OPS APPLY)가 도는 중
+  const p = await open(560, 'select');
+  await recv(p, PREREQ);
+  await recv(p, { ...sel(1, 0), scanned: 400 });
+  await p.waitForTimeout(450);
+  await p.click('#selCards button'); // [읽기] — OPS 작업
+  const ap = (await sent(p, 'APPLY')).at(-1);
+  check('S-6a ① 보낸 요청에 reqId가 붙음(OPS 작업)', typeof ap?.reqId === 'number');
+  await p.click('#btnMinimize');
+  await recv(p, { type: 'PREMIUM_REQUIRED', feature: 'tokens', reqId: ap.reqId + 999 });
+  await recv(p, { type: 'ERROR', message: 'other', op: 'APPLY', reqId: ap.reqId + 998 });
+  await recv(p, { type: 'APPLY_RESULT', preview: true, bound: 0, skipped: 0, reasons: {}, reqId: ap.reqId + 997 });
+  await recv(p, { type: 'ERROR', message: 'no reqId', op: 'APPLY' });
+  check('S-6a ③ 다른 reqId의 거절 · 오류 · 같은 종류 결과, reqId 없는 오류는 진행 중인 작업을 끝내지 않음(진행 테두리 그대로 · ⚠ 없음)', (await p.$eval('#btnExpand', (e) => e.classList.contains('busy'))) && !(await p.$eval('#miniBadge', (e) => e.classList.contains('fail') && !e.hidden)));
+  await recv(p, { type: 'APPLY_RESULT', preview: true, bound: 0, skipped: 0, reasons: {}, reqId: ap.reqId, candidates: [], nodes: [], skips: [] });
+  await p.waitForTimeout(30);
+  check('S-6a ③ 자기 reqId 결과로 작업이 끝남', !(await p.$eval('#btnExpand', (e) => e.classList.contains('busy'))));
+  await p.close();
+}
+{
+  // ⑤ 상세 [저장]도 쓰기 — 저장 중 다른 쓰기 버튼 잠김 · 최소화로 팝업이 닫혀도 유지 · 응답에서 풀림
+  const p = await openEditList();
+  await menuEdit(p, 'tx');
+  await p.fill(NAME, 'color/text/main2');
+  const u = await saveAndGet(p);
+  const waitOf = () => p.$eval('#btnRename', (b) => b.dataset.wait ?? '');
+  check('S-6a ⑤ 저장 중 — 다른 쓰기 버튼(이름 바꾸기)이 "고치기 작업이 끝나면" 잠김', (await waitOf()).includes('고치기'), await waitOf());
+  await p.evaluate(() => document.getElementById('btnMinimize').click()); // 팝업 뒤라 포인터로는 못 누름 — 최소화 경로만 본다
+  await p.waitForTimeout(30);
+  await p.click('#btnExpand');
+  await p.waitForTimeout(60);
+  check('S-6a ⑤ 저장 중 최소화로 팝업이 닫혀도 잠금 유지', (await p.$('.modal')) === null && (await waitOf()).includes('고치기'), await waitOf());
+  await recv(p, { type: 'VARIABLE_UPDATED', reqId: u.reqId, ok: true, applied: ['name'] });
+  await p.waitForTimeout(30);
+  check('S-6a ⑤ 저장 응답(팝업 없음)에서 잠금 풀림', (await waitOf()) === '', await waitOf());
+  await p.close();
+}
+{
+  // ⑥ Esc — 체크박스에 포커스가 있어도 하위 화면에서 돌아감 · 글자 칸에서는 칸 몫
+  const p = await open(560, 'select');
+  await openSel(p);
+  await found(p);
+  await p.click('[data-k="todo-link"]');
+  await p.waitForTimeout(80);
+  await p.evaluate(() => { const i = document.createElement('input'); i.id = 'escText'; document.getElementById('bindFoot').appendChild(i); });
+  await p.focus('#escText');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(40);
+  check('S-6a ⑥ 글자 칸(type 없음)에서 Esc → 화면에 남음', await p.$eval('#subHead', (e) => !e.hidden));
+  await p.evaluate(() => { const c = document.createElement('input'); c.type = 'checkbox'; c.id = 'escBox'; document.getElementById('bindFoot').appendChild(c); });
+  await p.focus('#escBox');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(60);
+  check('S-6a ⑥ 체크박스에서 Esc → 하위 화면에서 돌아감', await p.$eval('#subHead', (e) => e.hidden));
   await p.close();
 }
 
